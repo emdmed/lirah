@@ -420,16 +420,16 @@ function App() {
       <Layout
         sidebar={
           sidebarOpen && (
-            <Sidebar collapsible="none">
+            <Sidebar collapsible="none" className="border-e m-2 p-2">
               <SidebarContent>
                 {/* Mode Badge and Action Buttons */}
                 <div style={{
-                  padding: '8px 16px',
+                  padding: '4px 8px',
                   borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '8px'
+                  gap: '6px'
                 }}>
                   <Badge variant={viewMode === 'tree' ? 'info' : 'success'}>
                     {viewMode === 'tree' ? 'CLAUDE MODE' : 'NAVIGATION MODE'}
@@ -437,9 +437,9 @@ function App() {
 
                   {/* Show action buttons only in tree mode when files are selected */}
                   {viewMode === 'tree' && selectedFilePaths.length > 0 && (
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       <span style={{
-                        fontSize: '0.7rem',
+                        fontSize: '0.65rem',
                         opacity: 0.7,
                         fontWeight: '500'
                       }}>
@@ -451,12 +451,12 @@ function App() {
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
-                          padding: '4px',
+                          padding: '2px',
                           display: 'flex',
                           alignItems: 'center',
                           opacity: 0.7,
                           transition: 'opacity 0.2s',
-                          borderRadius: '4px'
+                          borderRadius: '3px'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.opacity = '1';
@@ -476,12 +476,12 @@ function App() {
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
-                          padding: '4px',
+                          padding: '2px',
                           display: 'flex',
                           alignItems: 'center',
                           opacity: 0.7,
                           transition: 'opacity 0.2s',
-                          borderRadius: '4px'
+                          borderRadius: '3px'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.opacity = '1';
@@ -501,7 +501,7 @@ function App() {
                 <SidebarGroup>
                   <SidebarGroupLabel>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 'normal', opacity: 0.7, flex: 1 }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 'normal', opacity: 0.7, flex: 1 }}>
                         {currentPath || 'No path'}
                       </div>
                       {currentPath && currentPath !== '/' && (
@@ -511,23 +511,23 @@ function App() {
                             background: 'none',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '4px',
+                            padding: '2px',
                             display: 'flex',
                             alignItems: 'center',
                             opacity: 0.7,
                           }}
                           title="Go to parent directory"
                         >
-                          <ChevronUp className="w-4 h-4" />
+                          <ChevronUp className="w-3 h-3" />
                         </button>
                       )}
                     </div>
                   </SidebarGroupLabel>
-                  <SidebarGroupContent className="p-2">
+                  <SidebarGroupContent className="p-1">
                     {viewMode === 'flat' ? (
                       <SidebarMenu>
                         {folders.length === 0 ? (
-                          <div style={{ padding: '0.5rem', opacity: 0.5, fontSize: '0.875rem' }}>
+                          <div style={{ padding: '0.25rem', opacity: 0.5, fontSize: '0.7rem' }}>
                             No files or folders found
                           </div>
                         ) : (
@@ -535,12 +535,19 @@ function App() {
                             <SidebarMenuItem key={item.path}>
                               <SidebarMenuButton
                                 onClick={item.is_dir ? () => loadFolders(item.path) : undefined}
-                                style={{ cursor: item.is_dir ? 'pointer' : 'default' }}
+                                style={{
+                                  cursor: item.is_dir ? 'pointer' : 'default',
+                                  paddingLeft: '4px',
+                                  paddingRight: '4px',
+                                  paddingTop: '1px',
+                                  paddingBottom: '1px',
+                                  fontSize: '0.75rem',
+                                }}
                               >
                                 {item.is_dir ? (
-                                  <Folder className="w-4 h-4 mr-2" />
+                                  <Folder className="w-3 h-3 mr-1.5" />
                                 ) : (
-                                  <File className="w-4 h-4 mr-2" />
+                                  <File className="w-3 h-3 mr-1.5" />
                                 )}
                                 {item.name}
                               </SidebarMenuButton>

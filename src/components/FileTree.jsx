@@ -3,13 +3,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { Button } from "./ui/button";
 import { Folder, File, ChevronRight, ChevronDown, Copy, Check } from "lucide-react";
 
 export function FileTree({ nodes, expandedFolders, currentPath, onToggle, selectedFiles, onToggleSelection }) {
 
   if (!nodes || nodes.length === 0) {
     return (
-      <div style={{ padding: '0.5rem', opacity: 0.5, fontSize: '0.875rem' }}>
+      <div className="p-1 opacity-50 text-[0.7rem]">
         No files or folders found
       </div>
     );
@@ -45,69 +46,49 @@ function TreeNode({ node, expandedFolders, currentPath, onToggle, selectedFiles,
         {node.is_dir ? (
           // Folder: clickable button to expand/collapse
           <SidebarMenuButton
+            size="sm"
             onClick={() => onToggle(node.path)}
-            style={{
-              cursor: 'pointer',
-              paddingLeft: `${depth * 16 + 8}px`,
-            }}
-            className={isCurrentPath ? 'bg-accent' : ''}
+            style={{ paddingLeft: `${depth * 8 + 2}px` }}
+            className={`cursor-pointer ${isCurrentPath ? 'bg-accent' : ''}`}
           >
-            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-              <div style={{ width: '16px', display: 'flex', alignItems: 'center' }}>
+            <div className="flex items-center w-full">
+              <div className="w-3 flex items-center">
                 {isExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3" />
                 ) : (
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3xs h-3" />
                 )}
               </div>
-              <Folder className="w-4 h-4 ml-1 mr-2" />
+              <Folder className="w-3 h-3 ml-1 mr-1.5" />
               <span>{node.name}</span>
             </div>
           </SidebarMenuButton>
         ) : (
           // File: display with copy button
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              width: '100%',
-              paddingLeft: `${depth * 16 + 8}px`,
-              paddingRight: '8px',
-              paddingTop: '4px',
-              paddingBottom: '4px',
-            }}
-            className={isCurrentPath ? 'bg-accent' : ''}
+            style={{ paddingLeft: `${depth * 8 + 2}px` }}
+            className={`flex items-center w-full py-px pr-px ${isCurrentPath ? 'bg-accent' : ''}`}
           >
             {/* Main file display (non-clickable) */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-              <File className="w-4 h-4 ml-1 mr-2" />
-              <span style={{ fontSize: '0.875rem' }}>{node.name}</span>
+            <div className="flex items-center justify-start w-full" >
+              <File className="w-3 h-3 ml-1 mr-1.5" />
+              <span className="truncate text-xs">{node.name}</span>
             </div>
 
             {/* Selection toggle button */}
             <button
+              variant="icon-sm"
+              className={`p-1 transition-opacity duration-200 hover:opacity-100 ${isSelected ? 'opacity-100' : 'opacity-60'}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSelection(node.path);
               }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: isSelected ? 1 : 0.6,
-                transition: 'opacity 0.2s',
-              }}
-              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.opacity = '1'; }}
-              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.opacity = '0.6'; }}
               title={isSelected ? "Deselect file" : "Select file"}
             >
               {isSelected ? (
-                <Check className="w-4 h-4 text-blue-500" />
+                <Check className="w-3 h-3 text-blue-500" />
               ) : (
-                <Copy className="w-4 h-4" />
+                <Copy className="w-3 h-3" />
               )}
             </button>
           </div>

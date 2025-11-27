@@ -3,32 +3,33 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-border: hsl(158 64% 20%);
-  --color-input: hsl(158 64% 20%);
-  --color-ring: hsl(158 64% 52%);
-  --color-background: hsl(0 0% 0%);
-  --color-foreground: hsl(158 64% 52%);
+  /* Kanagawa Theme Colors */
+  --color-border: hsl(240 13% 20%);
+  --color-input: hsl(240 13% 20%);
+  --color-ring: hsl(225 46% 67%);
+  --color-background: hsl(240 13% 14%);
+  --color-foreground: hsl(45 26% 80%);
 
-  --color-primary: hsl(158 64% 52%);
-  --color-primary-foreground: hsl(0 0% 0%);
+  --color-primary: hsl(225 46% 67%);
+  --color-primary-foreground: hsl(240 13% 14%);
 
-  --color-secondary: hsl(0 0% 10%);
-  --color-secondary-foreground: hsl(158 64% 52%);
+  --color-secondary: hsl(240 13% 18%);
+  --color-secondary-foreground: hsl(45 26% 80%);
 
-  --color-muted: hsl(0 0% 10%);
-  --color-muted-foreground: hsl(158 64% 40%);
+  --color-muted: hsl(240 13% 18%);
+  --color-muted-foreground: hsl(45 26% 60%);
 
-  --color-accent: hsl(158 64% 52%);
-  --color-accent-foreground: hsl(0 0% 0%);
+  --color-accent: hsl(225 46% 67%);
+  --color-accent-foreground: hsl(240 13% 14%);
 
-  --color-destructive: hsl(0 84% 60%);
-  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(359 50% 51%);
+  --color-destructive-foreground: hsl(45 26% 80%);
 
-  --color-card: hsl(0 0% 0%);
-  --color-card-foreground: hsl(158 64% 52%);
+  --color-card: hsl(240 13% 16%);
+  --color-card-foreground: hsl(45 26% 80%);
 
-  --color-popover: hsl(0 0% 0%);
-  --color-popover-foreground: hsl(158 64% 52%);
+  --color-popover: hsl(240 13% 16%);
+  --color-popover-foreground: hsl(45 26% 80%);
 
   --radius-lg: 0.5rem;
   --radius-md: calc(0.5rem - 2px);
@@ -42,20 +43,20 @@ html, body, #root {
 }
 
 body {
-  background-color: #000000;
-  color: #34d399;
+  background-color: #1F1F28;
+  color: #DCD7BA;
   font-family: "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
 }
 
 :root {
-  --sidebar: hsl(0 0% 0%);
-  --sidebar-foreground: hsl(158 64% 52%);
-  --sidebar-primary: hsl(158 64% 52%);
-  --sidebar-primary-foreground: hsl(0 0% 0%);
-  --sidebar-accent: hsl(0 0% 10%);
-  --sidebar-accent-foreground: hsl(158 64% 52%);
-  --sidebar-border: hsl(158 64% 20%);
-  --sidebar-ring: hsl(158 64% 52%);
+  --sidebar: hsl(240 13% 14%);
+  --sidebar-foreground: hsl(45 26% 80%);
+  --sidebar-primary: hsl(225 46% 67%);
+  --sidebar-primary-foreground: hsl(240 13% 14%);
+  --sidebar-accent: hsl(240 13% 22%);
+  --sidebar-accent-foreground: hsl(45 26% 80%);
+  --sidebar-border: hsl(240 13% 20%);
+  --sidebar-ring: hsl(225 46% 67%);
 }
 
 @theme inline {
