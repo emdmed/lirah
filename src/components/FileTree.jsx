@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -6,64 +5,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Folder, File, ChevronRight, ChevronDown, Copy, Check } from "lucide-react";
 
-// Helper function to calculate relative path
-function getRelativePath(absolutePath, cwdPath) {
-  // Ensure both paths end without trailing slash
-  const normalizedCwd = cwdPath.endsWith('/') ? cwdPath.slice(0, -1) : cwdPath;
-  const normalizedFile = absolutePath.endsWith('/') ? absolutePath.slice(0, -1) : absolutePath;
-
-  // If file is within CWD, remove CWD prefix
-  if (normalizedFile.startsWith(normalizedCwd + '/')) {
-    return normalizedFile.slice(normalizedCwd.length + 1);
-  }
-
-  // If file is CWD itself
-  if (normalizedFile === normalizedCwd) {
-    return '.';
-  }
-
-  // Otherwise return absolute path (fallback)
-  return absolutePath;
-}
-
-// Helper function to copy text to clipboard
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (error) {
-    console.error('Failed to copy to clipboard:', error);
-    // Fallback: create temporary textarea
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const success = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return success;
-  }
-}
-
-export function FileTree({ nodes, expandedFolders, currentPath, onToggle }) {
-  const [recentlyCopiedPath, setRecentlyCopiedPath] = useState(null);
-
-  const handleCopyPath = async (node) => {
-    const relativePath = getRelativePath(node.path, currentPath);
-    const success = await copyToClipboard(relativePath);
-
-    if (success) {
-      console.log('Copied relative path:', relativePath);
-      // Show checkmark icon
-      setRecentlyCopiedPath(node.path);
-
-      // Reset after 1.5 seconds
-      setTimeout(() => {
-        setRecentlyCopiedPath(null);
-      }, 1500);
-    }
-  };
+export function FileTree({ nodes, expandedFolders, currentPath, onToggle, selectedFiles, onToggleSelection }) {
 
   if (!nodes || nodes.length === 0) {
     return (
@@ -82,20 +24,20 @@ export function FileTree({ nodes, expandedFolders, currentPath, onToggle }) {
           expandedFolders={expandedFolders}
           currentPath={currentPath}
           onToggle={onToggle}
-          onCopyPath={handleCopyPath}
-          recentlyCopiedPath={recentlyCopiedPath}
+          selectedFiles={selectedFiles}
+          onToggleSelection={onToggleSelection}
         />
       ))}
     </SidebarMenu>
   );
 }
 
-function TreeNode({ node, expandedFolders, currentPath, onToggle, onCopyPath, recentlyCopiedPath }) {
+function TreeNode({ node, expandedFolders, currentPath, onToggle, selectedFiles, onToggleSelection }) {
   const isExpanded = expandedFolders.has(node.path);
   const isCurrentPath = currentPath === node.path;
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
   const depth = node.depth || 0;
-  const wasRecentlyCopied = recentlyCopiedPath === node.path;
+  const isSelected = selectedFiles && selectedFiles.includes(node.path);
 
   return (
     <>
@@ -142,11 +84,11 @@ function TreeNode({ node, expandedFolders, currentPath, onToggle, onCopyPath, re
               <span style={{ fontSize: '0.875rem' }}>{node.name}</span>
             </div>
 
-            {/* Copy button */}
+            {/* Selection toggle button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onCopyPath(node);
+                onToggleSelection(node.path);
               }}
               style={{
                 background: 'none',
@@ -155,15 +97,15 @@ function TreeNode({ node, expandedFolders, currentPath, onToggle, onCopyPath, re
                 padding: '4px',
                 display: 'flex',
                 alignItems: 'center',
-                opacity: wasRecentlyCopied ? 1 : 0.6,
+                opacity: isSelected ? 1 : 0.6,
                 transition: 'opacity 0.2s',
               }}
-              onMouseEnter={(e) => { if (!wasRecentlyCopied) e.currentTarget.style.opacity = '1'; }}
-              onMouseLeave={(e) => { if (!wasRecentlyCopied) e.currentTarget.style.opacity = '0.6'; }}
-              title="Copy relative path"
+              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.opacity = '1'; }}
+              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.opacity = '0.6'; }}
+              title={isSelected ? "Deselect file" : "Select file"}
             >
-              {wasRecentlyCopied ? (
-                <Check className="w-4 h-4 text-green-500" />
+              {isSelected ? (
+                <Check className="w-4 h-4 text-blue-500" />
               ) : (
                 <Copy className="w-4 h-4" />
               )}
@@ -181,8 +123,8 @@ function TreeNode({ node, expandedFolders, currentPath, onToggle, onCopyPath, re
             expandedFolders={expandedFolders}
             currentPath={currentPath}
             onToggle={onToggle}
-            onCopyPath={onCopyPath}
-            recentlyCopiedPath={recentlyCopiedPath}
+            selectedFiles={selectedFiles}
+            onToggleSelection={onToggleSelection}
           />
         ))
       )}
