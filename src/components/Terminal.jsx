@@ -1,9 +1,16 @@
 import { useRef, useEffect } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export function Terminal({ theme, onResize }) {
+export function Terminal({ theme, onResize, onSessionReady }) {
   const terminalRef = useRef(null);
-  const { handleResize } = useTerminal(terminalRef, theme);
+  const { handleResize, sessionId } = useTerminal(terminalRef, theme);
+
+  // Notify parent when session is ready
+  useEffect(() => {
+    if (sessionId && onSessionReady) {
+      onSessionReady(sessionId);
+    }
+  }, [sessionId, onSessionReady]);
 
   // Setup resize observer
   useEffect(() => {
