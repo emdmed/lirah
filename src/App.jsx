@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Terminal } from "./components/Terminal";
 import { Layout } from "./components/Layout";
+import { FileTree } from "./components/FileTree";
 import { themes, loadTheme } from "./themes/themes";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
-import { useClaudeDetection } from "./hooks/useClaude";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,8 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import { Folder, File, ChevronUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react";
 
 function App() {
   const currentTheme = loadTheme();
@@ -25,32 +26,62 @@ function App() {
   const [currentPath, setCurrentPath] = useState("");
   const [terminalSessionId, setTerminalSessionId] = useState(null);
 
+  // Tree view state
+  const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
+  const [treeData, setTreeData] = useState([]);
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
+
   // Monitor terminal CWD changes
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen);
-
-  // Detect if running in Claude Code
-  const isRunningInClaude = useClaudeDetection(terminalSessionId, sidebarOpen);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
         e.stopPropagation();
-        setSidebarOpen((prev) => !prev);
+
+        if (sidebarOpen && viewMode === 'flat') {
+          // Flat view is open, close it
+          setSidebarOpen(false);
+        } else {
+          // Open flat view (closes tree if open)
+          setViewMode('flat');
+          setSidebarOpen(true);
+          loadFolders();
+        }
+      }
+
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (sidebarOpen && viewMode === 'tree') {
+          // Tree view is open, close it
+          setSidebarOpen(false);
+        } else {
+          // Open tree view (closes flat if open)
+          setViewMode('tree');
+          setSidebarOpen(true);
+          loadTreeData();
+        }
       }
     };
 
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, []);
+  }, [sidebarOpen, viewMode]);
 
-  // Fetch folders when sidebar opens
+  // Fetch data when sidebar opens (mode-specific)
   useEffect(() => {
     if (sidebarOpen) {
-      loadFolders();
+      if (viewMode === 'flat') {
+        loadFolders();
+      } else if (viewMode === 'tree') {
+        loadTreeData();
+      }
     }
-  }, [sidebarOpen]);
+  }, [sidebarOpen, viewMode]);
 
   // Auto-refresh sidebar when terminal session becomes available
   useEffect(() => {
@@ -59,13 +90,20 @@ function App() {
     }
   }, [terminalSessionId]);
 
-  // Reload sidebar when terminal CWD changes
+  // Reload sidebar when terminal CWD changes (mode-specific)
   useEffect(() => {
     if (detectedCwd && sidebarOpen) {
-      console.log('CWD changed, reloading sidebar');
-      loadFolders();
+      console.log('CWD changed, updating view');
+      if (viewMode === 'flat') {
+        loadFolders();
+      } else if (viewMode === 'tree') {
+        // For tree view, expand to the new CWD path
+        expandToPath(detectedCwd);
+        // Also update currentPath
+        setCurrentPath(detectedCwd);
+      }
     }
-  }, [detectedCwd]);
+  }, [detectedCwd, viewMode]);
 
   const loadFolders = async (path) => {
     try {
@@ -146,6 +184,145 @@ function App() {
     }
   };
 
+  // Tree view helper functions
+  const findNodeInTree = (tree, targetPath) => {
+    for (const node of tree) {
+      if (node.path === targetPath) {
+        return node;
+      }
+      if (node.children && Array.isArray(node.children)) {
+        const found = findNodeInTree(node.children, targetPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const updateTreeNode = (tree, parentPath, newChildren) => {
+    return tree.map(node => {
+      if (node.path === parentPath) {
+        // Found the parent node - update its children
+        return {
+          ...node,
+          children: newChildren.map(child => ({
+            ...child,
+            children: child.is_dir ? null : undefined, // null = not loaded, undefined = not a directory
+            depth: (node.depth || 0) + 1
+          }))
+        };
+      }
+      if (node.children && Array.isArray(node.children)) {
+        // Recursively search in children
+        return {
+          ...node,
+          children: updateTreeNode(node.children, parentPath, newChildren)
+        };
+      }
+      return node;
+    });
+  };
+
+  const loadTreeData = async () => {
+    try {
+      if (!terminalSessionId) {
+        console.log('Terminal session not ready');
+        setTreeData([]);
+        setCurrentPath('Waiting for terminal...');
+        return;
+      }
+
+      // Get terminal's current CWD
+      const cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+      console.log('Loading tree from CWD:', cwd);
+
+      // Load top-level items
+      const entries = await invoke('read_directory', { path: cwd });
+      console.log('Loaded', entries.length, 'items for tree');
+
+      // Convert to tree nodes
+      const treeNodes = entries.map(item => ({
+        ...item,
+        children: item.is_dir ? null : undefined, // null = not loaded, undefined = not a directory
+        depth: 0
+      }));
+
+      setTreeData(treeNodes);
+      setCurrentPath(cwd);
+    } catch (error) {
+      console.error('Failed to load tree data:', error);
+      setTreeData([]);
+      setCurrentPath('Error loading directory');
+    }
+  };
+
+  const loadTreeChildren = async (parentPath) => {
+    try {
+      const entries = await invoke('read_directory', { path: parentPath });
+      console.log('Loaded', entries.length, 'children for:', parentPath);
+
+      // Update tree data with new children
+      setTreeData(prevTree => updateTreeNode(prevTree, parentPath, entries));
+    } catch (error) {
+      console.error('Failed to load tree children for', parentPath, error);
+    }
+  };
+
+  const toggleFolder = (folderPath) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folderPath)) {
+        // Collapse
+        next.delete(folderPath);
+      } else {
+        // Expand
+        next.add(folderPath);
+
+        // Lazy load children if not already loaded
+        const node = findNodeInTree(treeData, folderPath);
+        if (node && node.children === null) {
+          loadTreeChildren(folderPath);
+        }
+      }
+      return next;
+    });
+  };
+
+  const expandToPath = async (targetPath) => {
+    if (!targetPath || targetPath === '/') return;
+
+    try {
+      // Split path into segments
+      const segments = targetPath.split('/').filter(Boolean);
+
+      // Build paths to expand: /home, /home/user, /home/user/project, etc.
+      let currentSegmentPath = '';
+      const pathsToExpand = [];
+
+      for (const segment of segments) {
+        currentSegmentPath += '/' + segment;
+        pathsToExpand.push(currentSegmentPath);
+      }
+
+      // Expand each path in sequence
+      for (const pathToExpand of pathsToExpand) {
+        // Add to expanded set
+        setExpandedFolders(prev => new Set(prev).add(pathToExpand));
+
+        // Load children if not already loaded
+        const node = findNodeInTree(treeData, pathToExpand);
+        if (node && node.children === null) {
+          await loadTreeChildren(pathToExpand);
+          // Wait a bit for state to update before continuing
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+
+      console.log('Expanded tree to:', targetPath);
+    } catch (error) {
+      console.error('Failed to expand to path:', targetPath, error);
+    }
+  };
+
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <Layout
@@ -153,21 +330,15 @@ function App() {
           sidebarOpen && (
             <Sidebar collapsible="none">
               <SidebarContent>
-                {isRunningInClaude && (
-                  <div style={{
-                    padding: '8px 16px',
-                    borderBottom: '1px solid rgba(139, 92, 246, 0.2)'
-                  }}>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      fontWeight: '600',
-                      color: 'rgb(167, 139, 250)',
-                      letterSpacing: '0.05em'
-                    }}>
-                      CLAUDE
-                    </span>
-                  </div>
-                )}
+                {/* Mode Badge */}
+                <div style={{
+                  padding: '8px 16px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <Badge variant={viewMode === 'tree' ? 'info' : 'success'}>
+                    {viewMode === 'tree' ? 'CLAUDE MODE' : 'NAVIGATION MODE'}
+                  </Badge>
+                </div>
                 <SidebarGroup>
                   <SidebarGroupLabel>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -194,29 +365,38 @@ function App() {
                     </div>
                   </SidebarGroupLabel>
                   <SidebarGroupContent className="p-2">
-                    <SidebarMenu>
-                      {folders.length === 0 ? (
-                        <div style={{ padding: '0.5rem', opacity: 0.5, fontSize: '0.875rem' }}>
-                          No files or folders found
-                        </div>
-                      ) : (
-                        folders.map((item) => (
-                          <SidebarMenuItem key={item.path}>
-                            <SidebarMenuButton
-                              onClick={item.is_dir ? () => loadFolders(item.path) : undefined}
-                              style={{ cursor: item.is_dir ? 'pointer' : 'default' }}
-                            >
-                              {item.is_dir ? (
-                                <Folder className="w-4 h-4 mr-2" />
-                              ) : (
-                                <File className="w-4 h-4 mr-2" />
-                              )}
-                              {item.name}
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        ))
-                      )}
-                    </SidebarMenu>
+                    {viewMode === 'flat' ? (
+                      <SidebarMenu>
+                        {folders.length === 0 ? (
+                          <div style={{ padding: '0.5rem', opacity: 0.5, fontSize: '0.875rem' }}>
+                            No files or folders found
+                          </div>
+                        ) : (
+                          folders.map((item) => (
+                            <SidebarMenuItem key={item.path}>
+                              <SidebarMenuButton
+                                onClick={item.is_dir ? () => loadFolders(item.path) : undefined}
+                                style={{ cursor: item.is_dir ? 'pointer' : 'default' }}
+                              >
+                                {item.is_dir ? (
+                                  <Folder className="w-4 h-4 mr-2" />
+                                ) : (
+                                  <File className="w-4 h-4 mr-2" />
+                                )}
+                                {item.name}
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          ))
+                        )}
+                      </SidebarMenu>
+                    ) : (
+                      <FileTree
+                        nodes={treeData}
+                        expandedFolders={expandedFolders}
+                        currentPath={currentPath}
+                        onToggle={toggleFolder}
+                      />
+                    )}
                   </SidebarGroupContent>
                 </SidebarGroup>
               </SidebarContent>
