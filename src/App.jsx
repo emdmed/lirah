@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout";
 import { themes, loadTheme } from "./themes/themes";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
+import { useClaudeDetection } from "./hooks/useClaude";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +27,9 @@ function App() {
 
   // Monitor terminal CWD changes
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen);
+
+  // Detect if running in Claude Code
+  const isRunningInClaude = useClaudeDetection(terminalSessionId, sidebarOpen);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -149,6 +153,21 @@ function App() {
           sidebarOpen && (
             <Sidebar collapsible="none">
               <SidebarContent>
+                {isRunningInClaude && (
+                  <div style={{
+                    padding: '8px 16px',
+                    borderBottom: '1px solid rgba(139, 92, 246, 0.2)'
+                  }}>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: '600',
+                      color: 'rgb(167, 139, 250)',
+                      letterSpacing: '0.05em'
+                    }}>
+                      CLAUDE
+                    </span>
+                  </div>
+                )}
                 <SidebarGroup>
                   <SidebarGroupLabel>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
