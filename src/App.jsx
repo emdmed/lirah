@@ -67,8 +67,26 @@ function App() {
     try {
       let targetPath = path;
 
-      // If no explicit path, get terminal's CWD first
-      if (!path) {
+      // If explicit path provided, navigate terminal FIRST
+      if (path) {
+        if (!terminalSessionId) {
+          console.log('Terminal session not ready');
+          setFolders([]);
+          setCurrentPath('Waiting for terminal...');
+          return;
+        }
+
+        // Send cd command to terminal and wait for it
+        await navigateTerminalToPath(path);
+
+        // Wait briefly for shell to process the cd command
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Get the terminal's actual CWD after navigation
+        targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+        console.log('Terminal navigated to:', targetPath);
+      } else {
+        // No explicit path - sync to terminal's current CWD
         if (!terminalSessionId) {
           console.log('No terminal session yet');
           setFolders([]);
@@ -76,12 +94,12 @@ function App() {
           return;
         }
 
-        // Get terminal's actual CWD FIRST
+        // Get terminal's actual CWD
         targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
         console.log('Terminal CWD:', targetPath);
       }
 
-      // Now load files from the correct directory
+      // Now load files from the confirmed directory
       const directories = await invoke('read_directory', { path: targetPath });
       console.log('Loaded', directories.length, 'items from:', targetPath);
 
@@ -101,6 +119,27 @@ function App() {
 
     const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
     await loadFolders(parentPath);
+  };
+
+  const navigateTerminalToPath = async (path) => {
+    if (!terminalSessionId) {
+      console.warn('Terminal session not ready, skipping terminal navigation');
+      return;
+    }
+
+    try {
+      // Escape path for shell safety (handle spaces and special characters)
+      const safePath = `'${path.replace(/'/g, "'\\''")}'`;
+      const command = `cd ${safePath}\n`;
+
+      await invoke('write_to_terminal', {
+        sessionId: terminalSessionId,
+        data: command
+      });
+    } catch (error) {
+      console.error('Failed to navigate terminal to path:', path, error);
+      // Don't throw - sidebar update should succeed even if terminal navigation fails
+    }
   };
 
   return (
