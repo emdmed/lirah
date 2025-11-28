@@ -420,8 +420,8 @@ function App() {
       <Layout
         sidebar={
           sidebarOpen && (
-            <Sidebar collapsible="none" className="border-e m-2 p-2">
-              <SidebarContent>
+            <Sidebar collapsible="none" className="border-e m-2 p-2" style={{ height: '100%', maxHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+              <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, maxHeight: '100%' }}>
                 {/* Mode Badge and Action Buttons */}
                 <div style={{
                   padding: '4px 8px',
@@ -429,7 +429,8 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '6px'
+                  gap: '6px',
+                  flexShrink: 0
                 }}>
                   <Badge variant={viewMode === 'tree' ? 'info' : 'success'}>
                     {viewMode === 'tree' ? 'CLAUDE MODE' : 'NAVIGATION MODE'}
@@ -498,8 +499,8 @@ function App() {
                     </div>
                   )}
                 </div>
-                <SidebarGroup>
-                  <SidebarGroupLabel>
+                <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                  <SidebarGroupLabel style={{ flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <div style={{ fontSize: '0.65rem', fontWeight: 'normal', opacity: 0.7, flex: 1 }}>
                         {currentPath || 'No path'}
@@ -523,7 +524,7 @@ function App() {
                       )}
                     </div>
                   </SidebarGroupLabel>
-                  <SidebarGroupContent className="p-1">
+                  <SidebarGroupContent className="p-1" style={{ overflowY: 'scroll', flex: 1, minHeight: 0 }}>
                     {viewMode === 'flat' ? (
                       <SidebarMenu>
                         {folders.length === 0 ? (
