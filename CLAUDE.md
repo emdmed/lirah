@@ -40,12 +40,13 @@ src/                          # React frontend
 ├── components/
 │   ├── Terminal.jsx          # Terminal component wrapper
 │   ├── Layout.jsx            # Layout with sidebar support
+│   ├── FileTree.jsx          # Recursive tree view component for CLAUDE MODE
 │   └── ui/                   # shadcn/ui components (sidebar, button, etc.)
 ├── hooks/
 │   ├── useTerminal.js        # Terminal initialization, PTY spawning, I/O handling
 │   └── useCwdMonitor.js      # Polls terminal CWD every 500ms for sidebar sync
 └── themes/
-    └── themes.js             # xterm.js color schemes (default: emerald green)
+    └── themes.js             # xterm.js color schemes (kanagawa, default)
 
 src-tauri/src/                # Rust backend
 ├── lib.rs                    # Tauri app entry point, command handler registration
@@ -108,11 +109,30 @@ app.emit("terminal-output", TerminalOutputPayload { session_id, data });
 - Shell spawned as login shell (`-l` flag) with `$HOME` as CWD
 - PTY reading happens in background thread, emits events to frontend
 
+#### Dual-Mode Sidebar System
+
+The sidebar has **two distinct modes** controlled by keyboard shortcuts:
+
+1. **NAVIGATION MODE** (Ctrl+S) - Flat view:
+   - Shows only current directory contents
+   - Clicking folders navigates terminal to that directory
+   - Designed for quick directory navigation
+   - Files are displayed but not interactive
+
+2. **CLAUDE MODE** (Ctrl+K) - Tree view:
+   - Hierarchical expandable/collapsible folder tree
+   - Lazy-loads folder contents on expansion
+   - Files have "send to terminal" buttons (CornerDownRight icon)
+   - Designed for AI assistants to send file paths to terminal
+   - Clicking files sends their relative path to terminal input
+
+Mode state tracked in `App.jsx`: `viewMode` ('flat' | 'tree')
+
 #### Sidebar ↔ Terminal Synchronization
 
 **Bidirectional sync architecture**:
 
-1. **Sidebar → Terminal** (user clicks folder):
+1. **Sidebar → Terminal** (user clicks folder in flat mode):
    - `loadFolders(path)` called in App.jsx
    - Sends `cd 'path'\n` command via `write_to_terminal`
    - Waits 100ms for shell to process
@@ -122,13 +142,23 @@ app.emit("terminal-output", TerminalOutputPayload { session_id, data });
 2. **Terminal → Sidebar** (user types `cd` in terminal):
    - `useCwdMonitor` hook polls `get_terminal_cwd` every 500ms
    - Detects CWD change
-   - Triggers `loadFolders()` to refresh sidebar
+   - In flat mode: triggers `loadFolders()` to refresh sidebar
+   - In tree mode: triggers `expandToPath()` to expand tree to new location
 
 **Path escaping**: Sidebar wraps paths in single quotes with `'\''` escape for embedded quotes
 ```javascript
 const safePath = `'${path.replace(/'/g, "'\\''")}'`;
 const command = `cd ${safePath}\n`;
 ```
+
+#### Tree View Implementation
+
+- `FileTree.jsx` renders recursive tree structure
+- Nodes have `children` property: `null` (not loaded), `undefined` (not a directory), or `array` (loaded)
+- `expandedFolders` is a Set tracking which folder paths are expanded
+- Lazy loading: children fetched via `read_directory` only when folder first expanded
+- `expandToPath()` recursively expands all parent folders to reveal a deep path
+- Relative path calculation in `getRelativePath()` for sending files to terminal
 
 #### Terminal Lifecycle
 
@@ -150,15 +180,17 @@ const command = `cd ${safePath}\n`;
 
 ### Modifying Sidebar Behavior
 
-- Sidebar state lives in `App.jsx`: `folders`, `currentPath`, `sidebarOpen`
-- Toggle sidebar: Ctrl+S (captured in `App.jsx` keydown listener)
-- Folder navigation logic in `loadFolders()` function
+- Sidebar state lives in `App.jsx`: `folders`, `currentPath`, `sidebarOpen`, `viewMode`
+- Toggle navigation mode: Ctrl+S (captured in `App.jsx` keydown listener)
+- Toggle CLAUDE MODE: Ctrl+K (captured in `App.jsx` keydown listener)
+- Flat mode folder navigation logic in `loadFolders()` function
+- Tree mode expansion logic in `toggleFolder()` and `expandToPath()`
 - Parent directory navigation in `navigateToParent()`
 
 ### Theme Customization
 
 - Themes defined in `src/themes/themes.js`
-- Currently only 'default' theme (emerald green monochrome)
+- Currently supports 'kanagawa' (default) and 'default' (emerald green monochrome)
 - Theme saved to localStorage
 - Applied to xterm.js via `terminal.options.theme = theme`
 
@@ -192,9 +224,19 @@ Uses shadcn/ui components (Radix UI primitives):
 - `SidebarProvider` - manages open/close state
 - `Sidebar`, `SidebarContent`, `SidebarGroup` - layout structure
 - `SidebarMenuButton` - clickable folder/file items
-- Folder icon: `lucide-react` Folder component
+- `Badge` - shows current mode (NAVIGATION MODE / CLAUDE MODE)
+- Folder icon: `lucide-react` Folder component (golden color #E6C384)
 - File icon: `lucide-react` File component
 - Parent nav: ChevronUp icon button
+
+### File Path Handling for AI Assistants
+
+When in CLAUDE MODE (tree view):
+- Files display a CornerDownRight icon button on hover
+- Clicking sends **relative path** to terminal (not absolute)
+- Path is shell-escaped and appends space (ready for command completion)
+- Terminal auto-focuses after path insertion
+- Relative path calculation handles special cases (same dir = '.', parent dirs, etc.)
 
 ## Debugging
 
