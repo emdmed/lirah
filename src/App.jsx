@@ -17,6 +17,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "./components/ui/button";
 import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react";
 
 function App() {
@@ -33,6 +34,13 @@ function App() {
   const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
   const [treeData, setTreeData] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
+
+  // Clear folder expansion state when sidebar closes
+  useEffect(() => {
+    if (!sidebarOpen) {
+      setExpandedFolders(new Set());
+    }
+  }, [sidebarOpen]);
 
   // Monitor terminal CWD changes
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen);
@@ -380,7 +388,7 @@ function App() {
       <Layout
         sidebar={
           sidebarOpen && (
-            <Sidebar collapsible="none" className="border-e m-2 p-2" style={{ height: '100%', maxHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <Sidebar collapsible="none" className="border-e m-0 p-1 max-w-[300px]" style={{ height: '100%', maxHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
               <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, maxHeight: '100%' }}>
                 {/* Mode Badge and Action Buttons */}
                 <div style={{
@@ -399,25 +407,18 @@ function App() {
                 <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <SidebarGroupLabel style={{ flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <div style={{ fontSize: '0.65rem', fontWeight: 'normal', opacity: 0.7, flex: 1 }}>
+                      <div className="truncate text-xs">
                         {currentPath || 'No path'}
                       </div>
                       {currentPath && currentPath !== '/' && (
-                        <button
+                        <Button
                           onClick={navigateToParent}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '2px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            opacity: 0.7,
-                          }}
+                          size="icon-xs"
+                          variant="ghost"
                           title="Go to parent directory"
                         >
                           <ChevronUp className="w-3 h-3" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </SidebarGroupLabel>
