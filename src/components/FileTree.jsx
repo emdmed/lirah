@@ -4,9 +4,9 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { Button } from "./ui/button";
-import { Folder, File, ChevronRight, ChevronDown, Copy, Check } from "lucide-react";
+import { Folder, File, ChevronRight, ChevronDown, CornerDownRight } from "lucide-react";
 
-export function FileTree({ nodes, expandedFolders, currentPath, onToggle, selectedFiles, onToggleSelection }) {
+export function FileTree({ nodes, expandedFolders, currentPath, onToggle, onSendToTerminal }) {
 
   if (!nodes || nodes.length === 0) {
     return (
@@ -25,20 +25,18 @@ export function FileTree({ nodes, expandedFolders, currentPath, onToggle, select
           expandedFolders={expandedFolders}
           currentPath={currentPath}
           onToggle={onToggle}
-          selectedFiles={selectedFiles}
-          onToggleSelection={onToggleSelection}
+          onSendToTerminal={onSendToTerminal}
         />
       ))}
     </SidebarMenu>
   );
 }
 
-function TreeNode({ node, expandedFolders, currentPath, onToggle, selectedFiles, onToggleSelection }) {
+function TreeNode({ node, expandedFolders, currentPath, onToggle, onSendToTerminal }) {
   const isExpanded = expandedFolders.has(node.path);
   const isCurrentPath = currentPath === node.path;
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
   const depth = node.depth || 0;
-  const isSelected = selectedFiles && selectedFiles.includes(node.path);
 
   return (
     <>
@@ -64,32 +62,27 @@ function TreeNode({ node, expandedFolders, currentPath, onToggle, selectedFiles,
             </div>
           </SidebarMenuButton>
         ) : (
-          // File: display with copy button
+          // File: display with send-to-terminal button
           <div
             style={{ paddingLeft: `${depth * 8 + 2}px` }}
             className={`flex items-center w-full py-px pr-px ${isCurrentPath ? 'bg-accent' : ''}`}
           >
             {/* Main file display (non-clickable) */}
-            <div className="flex items-center justify-start w-full" >
+            <div className="flex items-center justify-start w-full">
               <File className="w-3 h-3 ml-1 mr-1.5" />
               <span className="truncate text-xs">{node.name}</span>
             </div>
 
-            {/* Selection toggle button */}
+            {/* Send to terminal button */}
             <button
-              variant="icon-sm"
-              className={`p-1 transition-opacity duration-200 hover:opacity-100 ${isSelected ? 'opacity-100' : 'opacity-60'}`}
+              className="p-1 transition-opacity duration-200 opacity-60 hover:opacity-100 hover:bg-white/10 rounded"
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleSelection(node.path);
+                onSendToTerminal(node.path);
               }}
-              title={isSelected ? "Deselect file" : "Select file"}
+              title="Send path to terminal"
             >
-              {isSelected ? (
-                <Check className="w-3 h-3 text-blue-500" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
+              <CornerDownRight className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -104,8 +97,7 @@ function TreeNode({ node, expandedFolders, currentPath, onToggle, selectedFiles,
             expandedFolders={expandedFolders}
             currentPath={currentPath}
             onToggle={onToggle}
-            selectedFiles={selectedFiles}
-            onToggleSelection={onToggleSelection}
+            onSendToTerminal={onSendToTerminal}
           />
         ))
       )}

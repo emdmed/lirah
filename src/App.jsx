@@ -17,7 +17,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { Folder, File, ChevronUp, ChevronRight, ChevronDown, Copy, X } from "lucide-react";
+import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react";
 
 function App() {
   const currentTheme = loadTheme();
@@ -30,7 +30,6 @@ function App() {
   const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
   const [treeData, setTreeData] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
-  const [selectedFilePaths, setSelectedFilePaths] = useState([]);
 
   // Monitor terminal CWD changes
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen);
@@ -66,22 +65,12 @@ function App() {
           loadTreeData();
         }
       }
-
-      // Alt+Enter to copy all selected files and paste to terminal
-      if (e.altKey && e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (viewMode === 'tree' && selectedFilePaths.length > 0) {
-          copyAllSelected(true); // true = auto-paste to terminal
-        }
-      }
     };
 
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [sidebarOpen, viewMode, selectedFilePaths]);
+  }, [sidebarOpen, viewMode]);
 
   // Fetch data when sidebar opens (mode-specific)
   useEffect(() => {
@@ -211,68 +200,31 @@ function App() {
     return absolutePath;
   };
 
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-      // Fallback: create temporary textarea
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      const success = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      return success;
+  const escapeShellPath = (path) => {
+    // Single quotes preserve all special characters except single quote itself
+    // To include a single quote: 'path'\''s name'
+    return `'${path.replace(/'/g, "'\\''")}'`;
+  };
+
+  const sendFileToTerminal = async (absolutePath) => {
+    if (!terminalSessionId) {
+      console.warn('Terminal session not ready');
+      return;
     }
-  };
 
-  const toggleFileSelection = (filePath) => {
-    setSelectedFilePaths(prev => {
-      if (prev.includes(filePath)) {
-        return prev.filter(path => path !== filePath);
-      } else {
-        return [...prev, filePath];
-      }
-    });
-  };
+    try {
+      const relativePath = getRelativePath(absolutePath, currentPath);
+      const escapedPath = escapeShellPath(relativePath);
+      const textToSend = `${escapedPath} `;
 
-  const clearSelections = () => {
-    setSelectedFilePaths([]);
-  };
+      await invoke('write_to_terminal', {
+        sessionId: terminalSessionId,
+        data: textToSend
+      });
 
-  const copyAllSelected = async (autoPaste = false) => {
-    if (selectedFilePaths.length === 0) return;
-
-    // Convert absolute paths to relative paths
-    const relativePaths = selectedFilePaths.map(absPath =>
-      getRelativePath(absPath, currentPath)
-    );
-
-    // Join with spaces
-    const pathsString = relativePaths.join(' ');
-
-    // Copy to clipboard
-    const success = await copyToClipboard(pathsString);
-
-    if (success) {
-      console.log('Copied paths:', pathsString);
-
-      // Auto-paste to terminal if requested
-      if (autoPaste && terminalSessionId) {
-        try {
-          await invoke('write_to_terminal', {
-            sessionId: terminalSessionId,
-            data: pathsString
-          });
-          console.log('Auto-pasted to terminal');
-        } catch (error) {
-          console.error('Failed to paste to terminal:', error);
-        }
-      }
+      console.log('Sent to terminal:', textToSend);
+    } catch (error) {
+      console.error('Failed to send file to terminal:', absolutePath, error);
     }
   };
 
@@ -435,69 +387,6 @@ function App() {
                   <Badge variant={viewMode === 'tree' ? 'info' : 'success'}>
                     {viewMode === 'tree' ? 'CLAUDE MODE' : 'NAVIGATION MODE'}
                   </Badge>
-
-                  {/* Show action buttons only in tree mode when files are selected */}
-                  {viewMode === 'tree' && selectedFilePaths.length > 0 && (
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      <span style={{
-                        fontSize: '0.65rem',
-                        opacity: 0.7,
-                        fontWeight: '500'
-                      }}>
-                        {selectedFilePaths.length} selected
-                      </span>
-                      <button
-                        onClick={copyAllSelected}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          opacity: 0.7,
-                          transition: 'opacity 0.2s',
-                          borderRadius: '3px'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '0.7';
-                          e.currentTarget.style.background = 'none';
-                        }}
-                        title="Copy all selected paths"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={clearSelections}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          opacity: 0.7,
-                          transition: 'opacity 0.2s',
-                          borderRadius: '3px'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '0.7';
-                          e.currentTarget.style.background = 'none';
-                        }}
-                        title="Clear selections"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
                 </div>
                 <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <SidebarGroupLabel style={{ flexShrink: 0 }}>
@@ -562,8 +451,7 @@ function App() {
                         expandedFolders={expandedFolders}
                         currentPath={currentPath}
                         onToggle={toggleFolder}
-                        selectedFiles={selectedFilePaths}
-                        onToggleSelection={toggleFileSelection}
+                        onSendToTerminal={sendFileToTerminal}
                       />
                     )}
                   </SidebarGroupContent>
