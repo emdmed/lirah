@@ -8,6 +8,8 @@ import { FlatViewMenu } from "./components/FlatViewMenu";
 import { themes, loadTheme } from "./themes/themes";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
+import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
+import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
 import { analyzeJSFile } from "./utils/fileAnalyzer";
 import {
   Sidebar,
@@ -27,12 +29,13 @@ import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react
 function App() {
   const currentTheme = loadTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [folders, setFolders] = useState([]);
-  const [currentPath, setCurrentPath] = useState("");
   const [terminalSessionId, setTerminalSessionId] = useState(null);
 
   // Ref to access terminal's imperative methods
   const terminalRef = useRef(null);
+
+  // Flat view navigation hook
+  const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
 
   // Tree view state
   const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
@@ -42,6 +45,50 @@ function App() {
   // File analysis state
   const [analyzedFiles, setAnalyzedFiles] = useState(new Map());
   const [expandedAnalysis, setExpandedAnalysis] = useState(new Set());
+
+  // Tree view helper functions (defined early for use in hooks)
+  const loadTreeData = async () => {
+    try {
+      if (!terminalSessionId) {
+        console.log('Terminal session not ready');
+        setTreeData([]);
+        setCurrentPath('Waiting for terminal...');
+        return;
+      }
+
+      // Get terminal's current CWD
+      const cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+      console.log('Loading tree from CWD:', cwd);
+
+      // Load top-level items
+      const entries = await invoke('read_directory', { path: cwd });
+      console.log('Loaded', entries.length, 'items for tree');
+
+      // Convert to tree nodes
+      const treeNodes = entries.map(item => ({
+        ...item,
+        children: item.is_dir ? null : undefined, // null = not loaded, undefined = not a directory
+        depth: 0
+      }));
+
+      setTreeData(treeNodes);
+      setCurrentPath(cwd);
+    } catch (error) {
+      console.error('Failed to load tree data:', error);
+      setTreeData([]);
+      setCurrentPath('Error loading directory');
+    }
+  };
+
+  // Keyboard shortcuts hook
+  useViewModeShortcuts({
+    sidebarOpen,
+    setSidebarOpen,
+    viewMode,
+    setViewMode,
+    onLoadFlatView: loadFolders,
+    onLoadTreeView: loadTreeData
+  });
 
   // Clear folder expansion state when sidebar closes
   useEffect(() => {
@@ -53,44 +100,6 @@ function App() {
 
   // Monitor terminal CWD changes
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (sidebarOpen && viewMode === 'flat') {
-          // Flat view is open, close it
-          setSidebarOpen(false);
-        } else {
-          // Open flat view (closes tree if open)
-          setViewMode('flat');
-          setSidebarOpen(true);
-          loadFolders();
-        }
-      }
-
-      if (e.ctrlKey && e.key === 'k') {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (sidebarOpen && viewMode === 'tree') {
-          // Tree view is open, close it
-          setSidebarOpen(false);
-        } else {
-          // Open tree view (closes flat if open)
-          setViewMode('tree');
-          setSidebarOpen(true);
-          loadTreeData();
-        }
-      }
-    };
-
-    // Use capture phase to intercept before terminal
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [sidebarOpen, viewMode]);
 
   // Fetch data when sidebar opens (mode-specific)
   useEffect(() => {
@@ -124,85 +133,6 @@ function App() {
       }
     }
   }, [detectedCwd, viewMode]);
-
-  const loadFolders = async (path) => {
-    try {
-      let targetPath = path;
-
-      // If explicit path provided, navigate terminal FIRST
-      if (path) {
-        if (!terminalSessionId) {
-          console.log('Terminal session not ready');
-          setFolders([]);
-          setCurrentPath('Waiting for terminal...');
-          return;
-        }
-
-        // Send cd command to terminal and wait for it
-        await navigateTerminalToPath(path);
-
-        // Wait briefly for shell to process the cd command
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Get the terminal's actual CWD after navigation
-        targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-        console.log('Terminal navigated to:', targetPath);
-      } else {
-        // No explicit path - sync to terminal's current CWD
-        if (!terminalSessionId) {
-          console.log('No terminal session yet');
-          setFolders([]);
-          setCurrentPath('Waiting for terminal...');
-          return;
-        }
-
-        // Get terminal's actual CWD
-        targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-        console.log('Terminal CWD:', targetPath);
-      }
-
-      // Now load files from the confirmed directory
-      const directories = await invoke('read_directory', { path: targetPath });
-      console.log('Loaded', directories.length, 'items from:', targetPath);
-
-      setFolders(directories);
-      setCurrentPath(targetPath);
-    } catch (error) {
-      console.error('Failed to load folders:', error);
-      setFolders([]);
-      setCurrentPath('Error loading directory');
-    }
-  };
-
-  const navigateToParent = async () => {
-    if (!currentPath || currentPath === '/') {
-      return; // Already at root
-    }
-
-    const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-    await loadFolders(parentPath);
-  };
-
-  const navigateTerminalToPath = async (path) => {
-    if (!terminalSessionId) {
-      console.warn('Terminal session not ready, skipping terminal navigation');
-      return;
-    }
-
-    try {
-      // Escape path for shell safety (handle spaces and special characters)
-      const safePath = `'${path.replace(/'/g, "'\\''")}'`;
-      const command = `cd ${safePath}\n`;
-
-      await invoke('write_to_terminal', {
-        sessionId: terminalSessionId,
-        data: command
-      });
-    } catch (error) {
-      console.error('Failed to navigate terminal to path:', path, error);
-      // Don't throw - sidebar update should succeed even if terminal navigation fails
-    }
-  };
 
   // Helper functions for multi-file copy
   const getRelativePath = (absolutePath, cwdPath) => {
@@ -289,39 +219,6 @@ function App() {
       }
       return node;
     });
-  };
-
-  const loadTreeData = async () => {
-    try {
-      if (!terminalSessionId) {
-        console.log('Terminal session not ready');
-        setTreeData([]);
-        setCurrentPath('Waiting for terminal...');
-        return;
-      }
-
-      // Get terminal's current CWD
-      const cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-      console.log('Loading tree from CWD:', cwd);
-
-      // Load top-level items
-      const entries = await invoke('read_directory', { path: cwd });
-      console.log('Loaded', entries.length, 'items for tree');
-
-      // Convert to tree nodes
-      const treeNodes = entries.map(item => ({
-        ...item,
-        children: item.is_dir ? null : undefined, // null = not loaded, undefined = not a directory
-        depth: 0
-      }));
-
-      setTreeData(treeNodes);
-      setCurrentPath(cwd);
-    } catch (error) {
-      console.error('Failed to load tree data:', error);
-      setTreeData([]);
-      setCurrentPath('Error loading directory');
-    }
   };
 
   const loadTreeChildren = async (parentPath) => {
