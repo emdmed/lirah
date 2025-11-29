@@ -14,6 +14,11 @@ export default defineConfig(async () => ({
     },
   },
 
+  // Define global variables for browser compatibility
+  define: {
+    'process.env': {}
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

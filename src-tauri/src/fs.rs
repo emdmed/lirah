@@ -80,3 +80,9 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
         Err("Getting terminal cwd is only supported on Linux".to_string())
     }
 }
+
+#[tauri::command]
+pub fn read_file_content(path: String) -> Result<String, String> {
+    fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read file: {}", e))
+}
