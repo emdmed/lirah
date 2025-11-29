@@ -134,12 +134,21 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   // Handle resize
   const handleResize = useCallback(() => {
     if (fitAddon && terminal && sessionId) {
-      fitAddon.fit();
-      const rows = terminal.rows;
-      const cols = terminal.cols;
-      invoke('resize_terminal', { sessionId, rows, cols }).catch((error) => {
-        console.error('Failed to resize terminal:', error);
-      });
+      try {
+        // Check if terminal is ready for resize
+        if (!terminal._core || !terminal._core._renderService) {
+          return; // Terminal not fully initialized yet
+        }
+        fitAddon.fit();
+        const rows = terminal.rows;
+        const cols = terminal.cols;
+        invoke('resize_terminal', { sessionId, rows, cols }).catch((error) => {
+          console.error('Failed to resize terminal:', error);
+        });
+      } catch (error) {
+        // Silently ignore resize errors during initialization
+        console.debug('Resize skipped (terminal not ready):', error.message);
+      }
     }
   }, [fitAddon, terminal, sessionId]);
 

@@ -10,7 +10,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
+import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
 import { useFileSearch } from "./hooks/useFileSearch";
+import { TextareaPanel } from "./components/TextareaPanel";
 import { analyzeJSFile } from "./utils/fileAnalyzer";
 import {
   Sidebar,
@@ -61,6 +63,13 @@ function App() {
 
   // Loading state
   const [treeLoading, setTreeLoading] = useState(false);
+
+  // Textarea state
+  const [textareaVisible, setTextareaVisible] = useState(false);
+  const [textareaContent, setTextareaContent] = useState('');
+  const textareaRef = useRef(null);
+  const [selectedFiles, setSelectedFiles] = useState(new Set());
+  const [fileStates, setFileStates] = useState(new Map()); // Map<filePath, 'modify'|'do-not-modify'|'use-as-example'>
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
@@ -165,6 +174,155 @@ function App() {
     }
   };
 
+  // File selection handlers
+  const toggleFileSelection = (filePath) => {
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(filePath)) {
+        // Removing file
+        next.delete(filePath);
+        // Also remove from fileStates
+        setFileStates(prevStates => {
+          const nextStates = new Map(prevStates);
+          nextStates.delete(filePath);
+          return nextStates;
+        });
+      } else {
+        // Adding file
+        next.add(filePath);
+        // Set default state to 'modify'
+        setFileStates(prevStates => {
+          const nextStates = new Map(prevStates);
+          nextStates.set(filePath, 'modify');
+          return nextStates;
+        });
+      }
+      return next;
+    });
+  };
+
+  const removeFileFromSelection = (filePath) => {
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      next.delete(filePath);
+      return next;
+    });
+    setFileStates(prev => {
+      const next = new Map(prev);
+      next.delete(filePath);
+      return next;
+    });
+  };
+
+  const clearFileSelection = () => {
+    setSelectedFiles(new Set());
+    setFileStates(new Map());
+  };
+
+  const setFileState = (filePath, state) => {
+    setFileStates(prev => {
+      const next = new Map(prev);
+      next.set(filePath, state);
+      return next;
+    });
+  };
+
+  // Send textarea content to terminal
+  const sendTextareaToTerminal = useCallback(async () => {
+    if (!terminalSessionId) {
+      return;
+    }
+
+    const hasTextContent = textareaContent?.trim();
+    const hasFiles = selectedFiles.size > 0;
+
+    if (!hasTextContent && !hasFiles) {
+      return;
+    }
+
+    try {
+      let fullCommand = '';
+
+      if (hasTextContent) {
+        fullCommand = textareaContent;
+      }
+
+      if (hasFiles) {
+        const fileArray = Array.from(selectedFiles);
+
+        // Group files by state
+        const modifyFiles = [];
+        const doNotModifyFiles = [];
+        const exampleFiles = [];
+
+        fileArray.forEach(absolutePath => {
+          const relativePath = getRelativePath(absolutePath, currentPath);
+          const escapedPath = escapeShellPath(relativePath);
+          const state = fileStates.get(absolutePath) || 'modify';
+
+          if (state === 'modify') {
+            modifyFiles.push(escapedPath);
+          } else if (state === 'do-not-modify') {
+            doNotModifyFiles.push(escapedPath);
+          } else if (state === 'use-as-example') {
+            exampleFiles.push(escapedPath);
+          }
+        });
+
+        // Build structured format
+        const sections = [];
+
+        if (modifyFiles.length > 0) {
+          sections.push(`MODIFY: ${modifyFiles.join(' ')}`);
+        }
+        if (doNotModifyFiles.length > 0) {
+          sections.push(`DO_NOT_MODIFY: ${doNotModifyFiles.join(' ')}`);
+        }
+        if (exampleFiles.length > 0) {
+          sections.push(`USE_AS_EXAMPLE: ${exampleFiles.join(' ')}`);
+        }
+
+        const filesString = sections.join(' ');
+
+        if (hasTextContent) {
+          fullCommand = `${textareaContent} ${filesString}`;
+        } else {
+          fullCommand = filesString;
+        }
+      }
+
+      await invoke('write_to_terminal', {
+        sessionId: terminalSessionId,
+        data: fullCommand
+      });
+
+      console.log('Sent to terminal:', fullCommand);
+
+      // Focus terminal first
+      if (terminalRef.current?.focus) {
+        terminalRef.current.focus();
+      }
+
+      // Small delay to ensure content is processed, then send Enter
+      setTimeout(async () => {
+        try {
+          await invoke('write_to_terminal', {
+            sessionId: terminalSessionId,
+            data: '\n'
+          });
+        } catch (error) {
+          console.error('Failed to send Enter key:', error);
+        }
+      }, 50);
+
+      // Clear both textarea and file selection
+      setTextareaContent('');
+      clearFileSelection();
+    } catch (error) {
+      console.error('Failed to send to terminal:', error);
+    }
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates]);
+
   // Keyboard shortcuts hook
   useViewModeShortcuts({
     sidebarOpen,
@@ -173,6 +331,14 @@ function App() {
     setViewMode,
     onLoadFlatView: loadFolders,
     onLoadTreeView: loadTreeData
+  });
+
+  // Textarea keyboard shortcuts
+  useTextareaShortcuts({
+    textareaVisible,
+    setTextareaVisible,
+    textareaRef,
+    onSendContent: sendTextareaToTerminal,
   });
 
   // Clear folder expansion state when sidebar closes
@@ -588,6 +754,8 @@ function App() {
                           onAnalyzeFile={analyzeFile}
                           onToggleAnalysis={toggleAnalysisExpansion}
                           onSendAnalysisItem={sendAnalysisItemToTerminal}
+                          selectedFiles={selectedFiles}
+                          onToggleFileSelection={toggleFileSelection}
                         />
                       )
                     )}
@@ -595,6 +763,25 @@ function App() {
                 </SidebarGroup>
               </SidebarContent>
             </Sidebar>
+          )
+        }
+        textarea={
+          textareaVisible && (
+            <TextareaPanel
+              value={textareaContent}
+              onChange={setTextareaContent}
+              onSend={sendTextareaToTerminal}
+              onClose={() => setTextareaVisible(false)}
+              textareaRef={textareaRef}
+              disabled={!terminalSessionId}
+              selectedFiles={selectedFiles}
+              currentPath={currentPath}
+              onRemoveFile={removeFileFromSelection}
+              onClearAllFiles={clearFileSelection}
+              getRelativePath={getRelativePath}
+              fileStates={fileStates}
+              onSetFileState={setFileState}
+            />
           )
         }
         statusBar={

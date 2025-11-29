@@ -4,7 +4,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { Button } from "./ui/button";
-import { Folder, File, ChevronRight, ChevronDown, CornerDownRight, ArrowDownFromLine } from "lucide-react";
+import { Folder, File, ChevronRight, ChevronDown, CornerDownRight, ArrowDownFromLine, Plus } from "lucide-react";
 
 export function FileTree({
   nodes,
@@ -18,7 +18,9 @@ export function FileTree({
   expandedAnalysis,
   onAnalyzeFile,
   onToggleAnalysis,
-  onSendAnalysisItem
+  onSendAnalysisItem,
+  selectedFiles,
+  onToggleFileSelection
 }) {
 
   if (!nodes || nodes.length === 0) {
@@ -54,6 +56,8 @@ export function FileTree({
           onAnalyzeFile={onAnalyzeFile}
           onToggleAnalysis={onToggleAnalysis}
           onSendAnalysisItem={onSendAnalysisItem}
+          selectedFiles={selectedFiles}
+          onToggleFileSelection={onToggleFileSelection}
         />
       ))}
     </SidebarMenu>
@@ -71,11 +75,14 @@ function TreeNode({
   expandedAnalysis,
   onAnalyzeFile,
   onToggleAnalysis,
-  onSendAnalysisItem
+  onSendAnalysisItem,
+  selectedFiles,
+  onToggleFileSelection
 }) {
   const isExpanded = expandedFolders.has(node.path);
   const isCurrentPath = currentPath === node.path;
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
+  const isSelected = selectedFiles && selectedFiles.has(node.path);
   const depth = node.depth || 0;
 
   // Analysis state
@@ -148,6 +155,24 @@ function TreeNode({
                 </button>
               )}
 
+              {/* Add to textarea button - only for files */}
+              {!node.is_dir && (
+                <button
+                  className={`p-1 transition-opacity duration-200 rounded ${
+                    isSelected
+                      ? 'opacity-100 bg-blue-500/30 hover:bg-blue-500/40'
+                      : 'opacity-60 hover:opacity-100 hover:bg-white/10'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFileSelection(node.path);
+                  }}
+                  title={isSelected ? "Remove from textarea" : "Add to textarea"}
+                >
+                  <Plus className={`w-3 h-3 ${isSelected ? 'text-blue-400' : ''}`} />
+                </button>
+              )}
+
               {/* Send to terminal button */}
               <button
                 className="p-1 transition-opacity duration-200 opacity-60 hover:opacity-100 hover:bg-white/10 rounded"
@@ -189,6 +214,8 @@ function TreeNode({
             onAnalyzeFile={onAnalyzeFile}
             onToggleAnalysis={onToggleAnalysis}
             onSendAnalysisItem={onSendAnalysisItem}
+            selectedFiles={selectedFiles}
+            onToggleFileSelection={onToggleFileSelection}
           />
         ))
       )}
