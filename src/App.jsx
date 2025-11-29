@@ -456,12 +456,12 @@ function App() {
   };
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} style={{ height: '100%' }}>
       <Layout
         sidebar={
           sidebarOpen && (
-            <Sidebar collapsible="none" className="border-e m-0 p-1 max-w-[300px]" style={{ height: '100%', maxHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-              <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, maxHeight: '100%' }}>
+            <Sidebar collapsible="none" className="border-e m-0 p-1 max-w-[300px]" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 {/* Mode Badge and Action Buttons */}
                 <div style={{
                   padding: '4px 8px',

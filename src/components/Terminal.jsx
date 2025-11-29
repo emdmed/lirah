@@ -36,8 +36,8 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady }, ref) =>
       ref={terminalRef}
       style={{
         width: '100%',
-        height: '100%',
-        maxHeight: '100vh',
+        flex: 1,
+        minHeight: 0,
         overflow: 'auto',
       }}
     />
