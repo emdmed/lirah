@@ -3,6 +3,8 @@ import { Terminal } from "./components/Terminal";
 import { Layout } from "./components/Layout";
 import { StatusBar } from "./components/StatusBar";
 import { FileTree } from "./components/FileTree";
+import { SidebarHeader } from "./components/SidebarHeader";
+import { FlatViewMenu } from "./components/FlatViewMenu";
 import { themes, loadTheme } from "./themes/themes";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
@@ -462,63 +464,18 @@ function App() {
           sidebarOpen && (
             <Sidebar collapsible="none" className="border-e m-0 p-1 max-w-[300px]" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                {/* Mode Badge and Action Buttons */}
-                <div style={{
-                  padding: '4px 8px',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '6px',
-                  flexShrink: 0
-                }}>
-                  <Badge variant={viewMode === 'tree' ? 'info' : 'success'}>
-                    {viewMode === 'tree' ? 'CLAUDE MODE' : 'NAVIGATION MODE'}
-                  </Badge>
-                  {currentPath && currentPath !== '/' && (
-                    <Button
-                      onClick={navigateToParent}
-                      size="icon-xs"
-                      variant="ghost"
-                      title="Go to parent directory"
-                    >
-                      <ChevronUp className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
+                <SidebarHeader
+                  viewMode={viewMode}
+                  currentPath={currentPath}
+                  onNavigateParent={navigateToParent}
+                />
                 <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                     {viewMode === 'flat' ? (
-                      <SidebarMenu>
-                        {folders.length === 0 ? (
-                          <div style={{ padding: '0.25rem', opacity: 0.5, fontSize: '0.7rem' }}>
-                            No files or folders found
-                          </div>
-                        ) : (
-                          folders.map((item) => (
-                            <SidebarMenuItem key={item.path}>
-                              <SidebarMenuButton
-                                onClick={item.is_dir ? () => loadFolders(item.path) : undefined}
-                                style={{
-                                  cursor: item.is_dir ? 'pointer' : 'default',
-                                  paddingLeft: '4px',
-                                  paddingRight: '4px',
-                                  paddingTop: '1px',
-                                  paddingBottom: '1px',
-                                  fontSize: '0.75rem',
-                                }}
-                              >
-                                {item.is_dir ? (
-                                  <Folder className="w-3 h-3 mr-1.5" style={{ color: '#E6C384' }} />
-                                ) : (
-                                  <File className="w-3 h-3 mr-1.5" />
-                                )}
-                                {item.name}
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                          ))
-                        )}
-                      </SidebarMenu>
+                      <FlatViewMenu
+                        folders={folders}
+                        onFolderClick={loadFolders}
+                      />
                     ) : (
                       <FileTree
                         nodes={treeData}
