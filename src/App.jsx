@@ -12,6 +12,7 @@ import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
 import { useFileSearch } from "./hooks/useFileSearch";
+import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { TextareaPanel } from "./components/TextareaPanel";
 import { analyzeJSFile } from "./utils/fileAnalyzer";
 import {
@@ -69,6 +70,9 @@ function App() {
   const textareaRef = useRef(null);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [fileStates, setFileStates] = useState(new Map()); // Map<filePath, 'modify'|'do-not-modify'|'use-as-example'>
+
+  // Help state
+  const [showHelp, setShowHelp] = useState(false);
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
@@ -327,6 +331,12 @@ function App() {
     setTextareaVisible,
     textareaRef,
     onSendContent: sendTextareaToTerminal,
+  });
+
+  // Help keyboard shortcut
+  useHelpShortcut({
+    showHelp,
+    setShowHelp,
   });
 
   // Clear folder expansion state when sidebar closes
@@ -722,6 +732,8 @@ function App() {
             currentPath={currentPath}
             sessionId={terminalSessionId}
             theme={theme.terminal}
+            showHelp={showHelp}
+            onToggleHelp={() => setShowHelp(prev => !prev)}
           />
         }
       >

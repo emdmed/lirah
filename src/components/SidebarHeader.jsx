@@ -1,4 +1,3 @@
-import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ChevronUp, Search, X, GitBranch } from 'lucide-react';
@@ -16,33 +15,28 @@ export function SidebarHeader({
   onToggleGitFilter
 }) {
   return (
-    <div style={{
-      padding: '4px 8px',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '6px',
-      flexShrink: 0
-    }}>
-      {/* Mode badge + parent navigation */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '6px',
-      }}>
-        <Badge variant={viewMode === 'tree' ? 'info' : 'success'}>
-          {viewMode === 'tree' ? 'CLAUDE MODE' : 'NAVIGATION MODE'}
-        </Badge>
-        <div style={{ display: 'flex', gap: '4px' }}>
+    <div className="px-2 py-1.5 border-b border-white/10 flex flex-col gap-1.5 flex-shrink-0">
+      {/* Mode indicator + controls */}
+      <div className="flex items-center justify-between gap-1.5">
+        {/* Minimal mode indicator */}
+        <div className="flex items-center gap-1.5">
+          <div className={`w-1.5 h-1.5 rounded-full ${viewMode === 'tree' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+          <span className="text-[0.65rem] font-medium opacity-60 tracking-wide uppercase">
+            {viewMode === 'tree' ? 'Claude Mode' : 'Navigation Mode'}
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-1">
           {showSearch && (
             <Button
               onClick={onToggleGitFilter}
               size="icon-xs"
               variant={showGitChangesOnly ? 'default' : 'ghost'}
-              title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only files with git changes (Ctrl+G)"}
+              className="h-5 w-5"
+              title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only git changes (Ctrl+G)"}
             >
-              <GitBranch className="w-3 h-3" />
+              <GitBranch className="w-2.5 h-2.5" />
             </Button>
           )}
           {currentPath && currentPath !== '/' && (
@@ -50,51 +44,34 @@ export function SidebarHeader({
               onClick={onNavigateParent}
               size="icon-xs"
               variant="ghost"
-              title="Go to parent directory"
+              className="h-5 w-5"
+              title="Parent directory"
             >
-              <ChevronUp className="w-3 h-3" />
+              <ChevronUp className="w-2.5 h-2.5" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Search input - only in tree mode */}
+      {/* Search input - tree mode only */}
       {showSearch && (
-        <div style={{ position: 'relative' }}>
-          <Search className="w-3 h-3" style={{
-            position: 'absolute',
-            left: '8px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            opacity: 0.5
-          }} />
+        <div className="relative">
+          <Search className="w-2.5 h-2.5 absolute left-2 top-1/2 -translate-y-1/2 opacity-40" />
           <Input
             ref={searchInputRef}
             type="text"
-            placeholder="Search files... (Ctrl+F)"
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            style={{
-              paddingLeft: '28px',
-              paddingRight: searchQuery ? '28px' : '8px',
-              fontSize: '0.75rem',
-              height: '28px'
-            }}
+            className="h-6 pl-6 pr-6 text-xs"
           />
           {searchQuery && (
             <button
               onClick={onSearchClear}
-              style={{
-                position: 'absolute',
-                right: '6px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                opacity: 0.5,
-                padding: '2px'
-              }}
-              className="hover:opacity-100 transition-opacity"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded"
+              title="Clear search"
             >
-              <X className="w-3 h-3" />
+              <X className="w-2.5 h-2.5" />
             </button>
           )}
         </div>
