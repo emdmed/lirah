@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Terminal } from "./components/Terminal";
 import { Layout } from "./components/Layout";
 import { StatusBar } from "./components/StatusBar";
-import { FileTree } from "./components/FileTree";
+import { FileTree } from "./components/file-tree";
 import { SidebarHeader } from "./components/SidebarHeader";
 import { FlatViewMenu } from "./components/FlatViewMenu";
 import { useTheme } from "./contexts/ThemeContext";

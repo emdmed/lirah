@@ -1,6 +1,6 @@
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
-import { Send, X, File } from "lucide-react";
+import { Send, X, File, Pencil, Ban, Eye } from "lucide-react";
 
 export function TextareaPanel({
   value,
@@ -79,29 +79,41 @@ export function TextareaPanel({
                         <Button
                           onClick={() => onSetFileState(file.absolute, 'modify')}
                           size="icon-xs"
-                          className="w-4 h-4"
-                          variant={currentState === "modify" ? "" : "outline"}
+                          variant={currentState === 'modify' ? 'default' : 'outline'}
+                          className={`w-6 h-6 ${
+                            currentState === 'modify'
+                              ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                              : ''
+                          }`}
                           title="Modify this file"
                         >
-                          M
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           onClick={() => onSetFileState(file.absolute, 'do-not-modify')}
                           size="icon-xs"
-                          variant={currentState === "do-not-modify" ? "destructive" : "outline"}
-                          className="w-4 h-4"
+                          variant={currentState === 'do-not-modify' ? 'default' : 'outline'}
+                          className={`w-6 h-6 ${
+                            currentState === 'do-not-modify'
+                              ? 'bg-red-500 text-white hover:bg-red-600'
+                              : ''
+                          }`}
                           title="Do not modify this file"
                         >
-                          D
+                          <Ban className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           onClick={() => onSetFileState(file.absolute, 'use-as-example')}
                           size="icon-xs"
-                          variant={currentState === "use-as-example" ? "" : "outline"}
-                          className="w-4 h-4"
+                          variant={currentState === 'use-as-example' ? 'default' : 'outline'}
+                          className={`w-6 h-6 ${
+                            currentState === 'use-as-example'
+                              ? 'bg-sky-500 text-white hover:bg-sky-600'
+                              : ''
+                          }`}
                           title="Use as example"
                         >
-                          E
+                          <Eye className="w-3.5 h-3.5" />
                         </Button>
                         <span className="text-xs truncate" title={file.absolute}>
                           {file.name}
