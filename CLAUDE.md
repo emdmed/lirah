@@ -41,17 +41,32 @@ src/                          # React frontend
 │   ├── Terminal.jsx          # Terminal component wrapper
 │   ├── Layout.jsx            # Layout with sidebar support
 │   ├── FileTree.jsx          # Recursive tree view component for CLAUDE MODE
+│   ├── TextareaPanel.jsx     # Multi-line input panel component
+│   ├── StatusBar.jsx         # Bottom status bar with keyboard shortcuts
+│   ├── SidebarHeader.jsx     # Sidebar header with git filter toggle
+│   ├── FlatViewMenu.jsx      # Flat view directory listing
+│   ├── ThemeSwitcher.jsx     # Theme selection dropdown
 │   └── ui/                   # shadcn/ui components (sidebar, button, etc.)
 ├── hooks/
 │   ├── useTerminal.js        # Terminal initialization, PTY spawning, I/O handling
-│   └── useCwdMonitor.js      # Polls terminal CWD every 500ms for sidebar sync
-└── themes/
-    └── themes.js             # xterm.js color schemes (kanagawa, default)
+│   ├── useCwdMonitor.js      # Polls terminal CWD every 500ms for sidebar sync
+│   ├── useFileSearch.js      # Fuzzy file search using js-search
+│   ├── useFlatViewNavigation.js  # Flat view directory navigation logic
+│   ├── useViewModeShortcuts.js   # Ctrl+S and Ctrl+K shortcuts
+│   ├── useTextareaShortcuts.js   # Ctrl+T and Ctrl+Enter shortcuts
+│   └── useHelpShortcut.js    # Ctrl+H shortcut
+├── contexts/
+│   └── ThemeContext.jsx      # Theme management context
+├── themes/
+│   ├── theme-config.js       # Theme definitions (terminal + UI colors)
+│   └── themes.js             # Backwards compatibility wrapper (deprecated)
+└── utils/
+    └── fileAnalyzer.js       # JavaScript/TypeScript AST analysis using Babel
 
 src-tauri/src/                # Rust backend
 ├── lib.rs                    # Tauri app entry point, command handler registration
 ├── state.rs                  # AppState = Arc<Mutex<HashMap<sessionId, PtySession>>>
-├── fs.rs                     # read_directory, get_terminal_cwd commands
+├── fs.rs                     # Directory/file reading, git stats, CWD detection
 └── pty/
     ├── mod.rs                # PTY module definition
     ├── manager.rs            # spawn_pty, write_to_pty, resize_pty functions
@@ -77,6 +92,19 @@ const cwd = await invoke('get_terminal_cwd', { sessionId });
 
 // Read directory contents (returns array of {name, path, is_dir})
 const entries = await invoke('read_directory', { path: '/home/user' });
+
+// Read directory recursively for tree view (returns array with depth and parent_path)
+const tree = await invoke('read_directory_recursive', {
+  path: '/home/user',
+  maxDepth: 10,      // optional, default 10
+  maxFiles: 10000    // optional, default 10000
+});
+
+// Read file content
+const content = await invoke('read_file_content', { path: '/path/to/file' });
+
+// Get git stats for directory (returns HashMap<path, {added, deleted}>)
+const gitStats = await invoke('get_git_stats', { path: '/home/user' });
 
 // Resize terminal
 await invoke('resize_terminal', { sessionId, rows: 30, cols: 100 });
@@ -160,6 +188,14 @@ const command = `cd ${safePath}\n`;
 - `expandToPath()` recursively expands all parent folders to reveal a deep path
 - Relative path calculation in `getRelativePath()` for sending files to terminal
 
+**Tree Loading**:
+- Initial tree load uses `read_directory_recursive` to fetch entire directory tree at once
+- Ignores common build/cache directories: `.git`, `node_modules`, `target`, `dist`, `build`, `.cache`, `.next`, `.nuxt`, `__pycache__`, `.venv`, `venv`
+- Returns flat array with `depth` and `parent_path` for each entry
+- Frontend builds hierarchical tree using `buildTreeFromFlatList()` in App.jsx
+- Skips symlinks to prevent infinite loops
+- Max depth (10) and max files (10000) limits prevent performance issues
+
 #### Terminal Lifecycle
 
 1. `useTerminal` hook initializes xterm.js Terminal instance
@@ -189,10 +225,134 @@ const command = `cd ${safePath}\n`;
 
 ### Theme Customization
 
-- Themes defined in `src/themes/themes.js`
-- Currently supports 'kanagawa' (default) and 'default' (emerald green monochrome)
-- Theme saved to localStorage
-- Applied to xterm.js via `terminal.options.theme = theme`
+- Themes defined in `src/themes/theme-config.js`
+- Currently supports 'kanagawa' (default dark), 'light', and 'default' themes
+- Each theme contains both terminal colors (xterm.js) and UI colors (Tailwind CSS variables)
+- Theme managed via `ThemeContext` (React Context API)
+- Theme saved to localStorage via `saveTheme()` in theme-config.js
+- Applied to xterm.js via `terminal.options.theme = theme.terminal`
+- Applied to UI via CSS variables injected into `:root`
+- Theme switching: use `ThemeContext.changeTheme(themeName)`
+
+### Keyboard Shortcuts
+
+All keyboard shortcuts use Ctrl key and capture phase to intercept before terminal:
+
+| Shortcut | Function | Details |
+|----------|----------|---------|
+| **Ctrl+S** | Toggle Navigation Mode | Opens flat directory view for quick navigation |
+| **Ctrl+K** | Toggle Claude Mode | Opens tree view for file exploration and AI interaction |
+| **Ctrl+T** | Toggle Textarea Panel | Opens multi-line input panel for complex commands |
+| **Ctrl+Enter** | Send Textarea Content | Sends textarea content to terminal (only when textarea focused) |
+| **Ctrl+F** | Focus File Search | Focuses search input in tree mode (Cmd+F on Mac) |
+| **Ctrl+G** | Toggle Git Filter | Shows only files with uncommitted git changes (Cmd+G on Mac) |
+| **Ctrl+H** | Toggle Help Modal | Shows keyboard shortcuts reference |
+
+Implemented in separate hooks:
+- `useViewModeShortcuts.js` - Ctrl+S, Ctrl+K
+- `useTextareaShortcuts.js` - Ctrl+T, Ctrl+Enter
+- `useHelpShortcut.js` - Ctrl+H
+- `useTerminal.js` - Ctrl+F, Ctrl+G (intercepts and calls callbacks)
+
+### Textarea Panel Feature
+
+Multi-line input panel for composing complex commands or prompts before sending to terminal.
+
+**Architecture**:
+- `TextareaPanel.jsx` - Panel component rendered at bottom of terminal
+- `useTextareaShortcuts.js` - Handles Ctrl+T and Ctrl+Enter keyboard shortcuts
+- State managed in `App.jsx`: `textareaVisible`, `textareaContent`, `selectedFiles`, `fileStates`
+
+**File Selection System**:
+- Files can be selected from tree view (Plus icon button on hover)
+- Selected files appear as badges in textarea panel
+- Each file has a state: 'modify', 'do-not-modify', or 'use-as-example'
+- Clicking badge cycles through states (visual color changes)
+- Files are sent with their relative paths when Ctrl+Enter is pressed
+
+**Usage Flow**:
+1. Press Ctrl+T to open textarea panel
+2. Type multi-line command or prompt
+3. Optionally select files from tree view (Plus icon)
+4. Press Ctrl+Enter to send content to terminal
+5. All selected files cleared after sending
+
+### File Search Feature
+
+Fuzzy search for finding files in tree view using js-search library.
+
+**Implementation**:
+- `useFileSearch.js` - Hook providing search index initialization and search
+- Uses `AllSubstringsIndexStrategy` for fuzzy matching
+- Uses `TfIdfSearchIndex` for relevance ranking
+- Searches both file name and full path
+- Case-insensitive search via `LowerCaseSanitizer`
+
+**Usage**:
+- Ctrl+F focuses search input when tree view is open
+- Search results filter the tree in real-time
+- Search index built from flat file list when tree is loaded
+- Clearing search restores full tree view
+
+**Functions**:
+```javascript
+const { initializeSearch, search, clearSearch } = useFileSearch();
+
+// Build index when tree loads
+initializeSearch(flatFileList);
+
+// Search for files
+const results = search(query); // Returns matching file entries
+
+// Clear index
+clearSearch();
+```
+
+### Git Integration
+
+Displays uncommitted changes and provides git-based filtering.
+
+**Git Stats Feature**:
+- `get_git_stats` Tauri command in `fs.rs`
+- Runs `git diff HEAD --numstat` to get line changes
+- Returns HashMap of file paths to `GitStats { added, deleted }`
+- FileTree component fetches git stats every 5 seconds
+- Files with changes show colored badges with +/- line counts
+
+**Git Filter (Ctrl+G)**:
+- Filters tree view to show only files with uncommitted changes
+- Recursively filters directories (shows dir if any child has changes)
+- Implemented in `FileTree.jsx` via `filterTreeByGitChanges()`
+- Toggle button in sidebar header (Filter icon)
+- State tracked in `App.jsx`: `showGitChangesOnly`
+
+### File Analysis Feature
+
+Analyzes JavaScript/TypeScript files to extract hooks, components, and functions.
+
+**Implementation**:
+- `utils/fileAnalyzer.js` - Uses Babel parser and traverse
+- Parses JS/JSX/TS/TSX files into AST
+- Extracts:
+  - React hooks (any function call starting with "use")
+  - React components (function components with JSX, class components extending Component)
+  - Used components (JSX elements in the file)
+  - Regular functions (non-component, non-hook functions)
+
+**Usage in UI**:
+- Available in tree view (beaker icon on JS/JSX files)
+- Click to analyze file (async operation)
+- Results cached in `analyzedFiles` Map
+- Expandable sections show extracted items
+- Each item has "send to terminal" button (sends item name to terminal)
+
+**Functions**:
+```javascript
+import { analyzeJSFile } from './utils/fileAnalyzer';
+
+const result = analyzeJSFile(code, filePath);
+// Returns: { hooks: Set, definedComponents: Set, usedComponents: Set, functions: Set }
+```
 
 ## Important Implementation Notes
 
