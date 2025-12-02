@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
 import { X } from "lucide-react";
 import { SelectedFilesList } from "./SelectedFilesList";
 import { ActionButtons } from "./ActionButtons";
@@ -23,8 +24,19 @@ export function TextareaPanel({
   getRelativePath,
   fileStates,
   onSetFileState,
+  keepFilesAfterSend = false,
+  onToggleKeepFiles,
 }) {
+  const fileListRef = useRef(null);
+
   const handleKeyDown = (e) => {
+    // Shift+Tab: move focus to file list (if files exist)
+    if (e.shiftKey && e.key === 'Tab' && fileArray.length > 0) {
+      e.preventDefault();
+      fileListRef.current?.focus();
+      return;
+    }
+
     // Enter creates new lines (default behavior)
     // Ctrl+Enter is handled by the useTextareaShortcuts hook
     if (e.key === 'Enter' && !e.ctrlKey) {
@@ -34,7 +46,7 @@ export function TextareaPanel({
 
   const handleSend = () => {
     onSend();
-    onClearAllFiles();
+    // Note: File clearing is now handled by App.jsx based on keepFilesAfterSend state
   };
 
   const fileArray = Array.from(selectedFiles || new Set());
@@ -49,17 +61,36 @@ export function TextareaPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
-          Multi-line Input (Ctrl+Enter to send, Ctrl+T to close)
+          Multi-line Input (Ctrl+Enter: send, Ctrl+T: close, Tab: navigate files)
         </span>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={onClose}
+          aria-label="Close panel"
           className="h-6 w-6"
         >
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Persistence toggle */}
+      {onToggleKeepFiles && (
+        <div className="flex items-center gap-2 py-1">
+          <Checkbox
+            id="keep-files"
+            checked={keepFilesAfterSend}
+            onCheckedChange={onToggleKeepFiles}
+            disabled={disabled}
+          />
+          <label
+            htmlFor="keep-files"
+            className="text-xs text-muted-foreground cursor-pointer select-none"
+          >
+            Keep files selected after sending
+          </label>
+        </div>
+      )}
 
       {/* Main content area */}
       <div className="flex gap-2 min-h-[120px] max-h-[300px]">
@@ -69,6 +100,7 @@ export function TextareaPanel({
           onSetFileState={onSetFileState}
           onRemoveFile={onRemoveFile}
           onClearAllFiles={onClearAllFiles}
+          textareaRef={textareaRef}
         />
 
         <Textarea

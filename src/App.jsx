@@ -70,9 +70,31 @@ function App() {
   const textareaRef = useRef(null);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [fileStates, setFileStates] = useState(new Map()); // Map<filePath, 'modify'|'do-not-modify'|'use-as-example'>
+  const [keepFilesAfterSend, setKeepFilesAfterSend] = useState(false);
 
   // Help state
   const [showHelp, setShowHelp] = useState(false);
+
+  // Load keepFilesAfterSend from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nevo-terminal:keep-files-after-send');
+      if (saved !== null) {
+        setKeepFilesAfterSend(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.warn('Failed to load keep-files preference from localStorage:', error);
+    }
+  }, []);
+
+  // Save keepFilesAfterSend to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('nevo-terminal:keep-files-after-send', JSON.stringify(keepFilesAfterSend));
+    } catch (error) {
+      console.warn('Failed to save keep-files preference to localStorage:', error);
+    }
+  }, [keepFilesAfterSend]);
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
@@ -307,13 +329,17 @@ function App() {
         }
       }, 50);
 
-      // Clear both textarea and file selection
+      // Clear textarea content (always)
       setTextareaContent('');
-      clearFileSelection();
+
+      // Clear file selection only if persistence is disabled
+      if (!keepFilesAfterSend) {
+        clearFileSelection();
+      }
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -723,6 +749,8 @@ function App() {
               getRelativePath={getRelativePath}
               fileStates={fileStates}
               onSetFileState={setFileState}
+              keepFilesAfterSend={keepFilesAfterSend}
+              onToggleKeepFiles={setKeepFilesAfterSend}
             />
           )
         }

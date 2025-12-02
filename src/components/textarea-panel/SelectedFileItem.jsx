@@ -1,34 +1,43 @@
 import React from "react";
 import { X } from "lucide-react";
-import { FileStateButton } from "./FileStateButton";
+import { FileStateSelector } from "./FileStateSelector";
+import { cn } from "@/lib/utils";
 
 /**
  * Individual file item in the selected files list
- * Shows file state buttons and remove button
+ * Shows file state segmented control and remove button
  * @param {Object} file - File object with absolute path, relative path, and name
  * @param {string} currentState - Current file state
  * @param {Function} onSetFileState - Callback to set file state
  * @param {Function} onRemoveFile - Callback to remove file
+ * @param {boolean} isSelected - Whether this item is currently selected (for keyboard nav)
+ * @param {Function} itemRef - Ref callback for keyboard navigation
  */
-export function SelectedFileItem({ file, currentState, onSetFileState, onRemoveFile }) {
+export function SelectedFileItem({
+  file,
+  currentState,
+  onSetFileState,
+  onRemoveFile,
+  isSelected = false,
+  itemRef
+}) {
   return (
-    <div className="flex flex-col gap-1 p-0 py-1.5 me-4">
+    <div
+      ref={itemRef}
+      role="listitem"
+      aria-selected={isSelected}
+      aria-label={`${file.name}, state: ${currentState.replace(/-/g, ' ')}`}
+      tabIndex={-1}
+      className={cn(
+        "flex flex-col gap-1 p-2 rounded-md transition-colors",
+        isSelected && "bg-accent/20 border-l-2 border-accent"
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 min-w-0 flex-1">
-          <FileStateButton
-            type="modify"
-            isActive={currentState === 'modify'}
-            onClick={() => onSetFileState(file.absolute, 'modify')}
-          />
-          <FileStateButton
-            type="do-not-modify"
-            isActive={currentState === 'do-not-modify'}
-            onClick={() => onSetFileState(file.absolute, 'do-not-modify')}
-          />
-          <FileStateButton
-            type="use-as-example"
-            isActive={currentState === 'use-as-example'}
-            onClick={() => onSetFileState(file.absolute, 'use-as-example')}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <FileStateSelector
+            value={currentState}
+            onValueChange={(newState) => onSetFileState(file.absolute, newState)}
           />
           <span className="text-xs truncate" title={file.absolute}>
             {file.name}
@@ -36,6 +45,7 @@ export function SelectedFileItem({ file, currentState, onSetFileState, onRemoveF
         </div>
         <button
           onClick={() => onRemoveFile(file.absolute)}
+          aria-label={`Remove ${file.name}`}
           className="p-0.5 opacity-60 hover:opacity-100 hover:bg-white/10 rounded flex-shrink-0"
           title="Remove file"
         >
