@@ -22,7 +22,11 @@ export function TreeNode({
   onSendAnalysisItem,
   selectedFiles,
   onToggleFileSelection,
-  isTextareaPanelOpen
+  isTextareaPanelOpen,
+  typeCheckResults,
+  checkingFiles,
+  successfulChecks,
+  onCheckFileTypes
 }) {
   const isExpanded = expandedFolders.has(node.path);
   const isCurrentPath = currentPath === node.path;
@@ -37,6 +41,11 @@ export function TreeNode({
 
   // Git stats
   const stats = gitStats?.get(node.path);
+
+  // Type check state
+  const typeCheckResult = typeCheckResults && typeCheckResults.get(node.path);
+  const isCheckingTypes = checkingFiles && checkingFiles.has(node.path);
+  const isTypeCheckSuccess = successfulChecks && successfulChecks.has(node.path);
 
   return (
     <>
@@ -68,6 +77,10 @@ export function TreeNode({
             onSendToTerminal={onSendToTerminal}
             onAnalyzeFile={onAnalyzeFile}
             onToggleFileSelection={onToggleFileSelection}
+            typeCheckResult={typeCheckResult}
+            isCheckingTypes={isCheckingTypes}
+            isTypeCheckSuccess={isTypeCheckSuccess}
+            onCheckFileTypes={onCheckFileTypes}
           />
         )}
       </SidebarMenuItem>
@@ -100,6 +113,10 @@ export function TreeNode({
             selectedFiles={selectedFiles}
             onToggleFileSelection={onToggleFileSelection}
             isTextareaPanelOpen={isTextareaPanelOpen}
+            typeCheckResults={typeCheckResults}
+            checkingFiles={checkingFiles}
+            successfulChecks={successfulChecks}
+            onCheckFileTypes={onCheckFileTypes}
           />
         ))
       )}

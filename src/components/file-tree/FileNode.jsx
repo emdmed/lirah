@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { File, ArrowDownFromLine, CornerDownRight, Plus } from "lucide-react";
+import { File, ArrowDownFromLine, CornerDownRight, Plus, CheckCircle, Loader2 } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
+import { TypeCheckBadge } from "./TypeCheckBadge";
 
 /**
  * Renders a file node in the tree with analysis and action buttons
@@ -23,7 +24,11 @@ export function FileNode({
   isTextareaPanelOpen,
   onSendToTerminal,
   onAnalyzeFile,
-  onToggleFileSelection
+  onToggleFileSelection,
+  typeCheckResult,
+  isCheckingTypes,
+  isTypeCheckSuccess,
+  onCheckFileTypes
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const isSupportedForAnalysis = /\.(jsx?|tsx?)$/i.test(node.name);
@@ -44,6 +49,9 @@ export function FileNode({
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}
 
+        {/* Type check badge */}
+        {typeCheckResult && <TypeCheckBadge result={typeCheckResult} />}
+
         {/* Analyze button - inline with filename, visible on hover */}
         {isSupportedForAnalysis && (
           <button
@@ -56,6 +64,31 @@ export function FileNode({
             title="Analyze file"
           >
             <ArrowDownFromLine className="w-3 h-3" />
+          </button>
+        )}
+
+        {/* Check types button - inline with filename, visible on hover */}
+        {isSupportedForAnalysis && (
+          <button
+            className={`p-1 flex-shrink-0 transition-all duration-200 rounded ${
+              isTypeCheckSuccess
+                ? 'opacity-100 bg-green-500/30 hover:bg-green-500/40'
+                : isHovered
+                ? 'opacity-60 hover:opacity-100 hover:bg-white/10'
+                : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCheckFileTypes(node.path);
+            }}
+            disabled={isCheckingTypes}
+            title="Check types"
+          >
+            {isCheckingTypes ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <CheckCircle className={`w-3 h-3 ${isTypeCheckSuccess ? 'text-green-400' : ''}`} />
+            )}
           </button>
         )}
       </div>

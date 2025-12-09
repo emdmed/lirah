@@ -24,7 +24,11 @@ export function FileTree({
   onSendAnalysisItem,
   selectedFiles,
   onToggleFileSelection,
-  isTextareaPanelOpen
+  isTextareaPanelOpen,
+  typeCheckResults,
+  checkingFiles,
+  successfulChecks,
+  onCheckFileTypes
 }) {
   // Fetch git stats periodically
   const gitStats = useGitStats(currentPath);
@@ -64,6 +68,10 @@ export function FileTree({
           selectedFiles={selectedFiles}
           onToggleFileSelection={onToggleFileSelection}
           isTextareaPanelOpen={isTextareaPanelOpen}
+          typeCheckResults={typeCheckResults}
+          checkingFiles={checkingFiles}
+          successfulChecks={successfulChecks}
+          onCheckFileTypes={onCheckFileTypes}
         />
       ))}
     </SidebarMenu>
