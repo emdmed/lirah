@@ -4,13 +4,17 @@ import { invoke } from "@tauri-apps/api/core";
 /**
  * Custom hook to fetch and manage git statistics for files
  * @param {string} currentPath - The current directory path to fetch stats for
+ * @param {boolean} enabled - Whether to enable git stats polling (default: true)
  * @returns {Map} Map of file paths to git stats {added, deleted}
  */
-export function useGitStats(currentPath) {
+export function useGitStats(currentPath, enabled = true) {
   const [gitStats, setGitStats] = useState(new Map());
 
   useEffect(() => {
-    if (!currentPath) return;
+    if (!currentPath || !enabled) {
+      setGitStats(new Map());
+      return;
+    }
 
     const fetchGitStats = async () => {
       try {
@@ -30,7 +34,7 @@ export function useGitStats(currentPath) {
 
     // Cleanup on unmount or path change
     return () => clearInterval(interval);
-  }, [currentPath]);
+  }, [currentPath, enabled]);
 
   return gitStats;
 }

@@ -28,10 +28,11 @@ export function FileTree({
   typeCheckResults,
   checkingFiles,
   successfulChecks,
-  onCheckFileTypes
+  onCheckFileTypes,
+  fileWatchingEnabled
 }) {
   // Fetch git stats periodically
-  const gitStats = useGitStats(currentPath);
+  const gitStats = useGitStats(currentPath, fileWatchingEnabled);
 
   // Apply filters to get displayed nodes
   const displayedNodes = useMemo(() => {

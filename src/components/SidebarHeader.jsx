@@ -12,7 +12,8 @@ export function SidebarHeader({
   showSearch,
   searchInputRef,
   showGitChangesOnly,
-  onToggleGitFilter
+  onToggleGitFilter,
+  fileWatchingEnabled
 }) {
   return (
     <div className="px-2 py-1.5 border-b border-white/10 flex flex-col gap-1.5 flex-shrink-0">
@@ -24,6 +25,11 @@ export function SidebarHeader({
           <span className="text-[0.65rem] font-medium opacity-60 tracking-wide uppercase">
             {viewMode === 'tree' ? 'Claude Mode' : 'Navigation Mode'}
           </span>
+          {!fileWatchingEnabled && (
+            <span className="text-[0.55rem] font-medium px-1 py-0.5 rounded bg-red-500/20 text-red-400 tracking-wide">
+              WATCHERS OFF
+            </span>
+          )}
         </div>
 
         {/* Action buttons */}
@@ -33,7 +39,7 @@ export function SidebarHeader({
               onClick={onToggleGitFilter}
               size="icon-xs"
               variant={showGitChangesOnly ? 'default' : 'ghost'}
-              className="h-5 w-5"
+              className={`h-5 w-5 ${!fileWatchingEnabled ? 'opacity-40' : ''}`}
               title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only git changes (Ctrl+G)"}
             >
               <GitBranch className="w-2.5 h-2.5" />

@@ -1,7 +1,13 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Eye, EyeOff } from 'lucide-react';
+import { useWatcher } from '../contexts/WatcherContext';
+import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 
 export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, onToggleHelp }) => {
+  const { fileWatchingEnabled, toggleWatchers } = useWatcher();
+
+  useWatcherShortcut({ onToggle: toggleWatchers });
+
   return (
     <>
       {/* Help content section - compact single line */}
@@ -23,6 +29,8 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
             <span className="opacity-30">|</span>
             <span className="opacity-70">Ctrl+F: Search</span>
             <span className="opacity-70">Ctrl+G: Git Filter</span>
+            <span className="opacity-70">Ctrl+W: Watchers</span>
+            <span className="opacity-30">|</span>
             <span className="opacity-70">Ctrl+H: Help</span>
           </div>
         </div>
@@ -45,7 +53,7 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
           </span>
         </div>
 
-        {/* Right section: Help, Theme switcher and session status */}
+        {/* Right section: Help, Watchers, Theme switcher and session status */}
         <div className="flex items-center gap-4">
           <button
             onClick={onToggleHelp}
@@ -53,6 +61,19 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
             title="Keyboard shortcuts (Ctrl+H)"
           >
             <HelpCircle className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={toggleWatchers}
+            className="transition-opacity cursor-pointer"
+            style={{
+              opacity: fileWatchingEnabled ? 0.5 : 0.3,
+              color: fileWatchingEnabled ? 'inherit' : '#E82424',
+            }}
+            title={`File watching: ${fileWatchingEnabled ? 'ON' : 'OFF'} (Ctrl+W)`}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = fileWatchingEnabled ? 0.5 : 0.3; }}
+          >
+            {fileWatchingEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
           </button>
           <ThemeSwitcher />
           <span style={{ color: theme.cursor || '#C8C093' }}>

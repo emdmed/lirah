@@ -6,6 +6,7 @@ import { FileTree } from "./components/file-tree/file-tree";
 import { SidebarHeader } from "./components/SidebarHeader";
 import { FlatViewMenu } from "./components/FlatViewMenu";
 import { useTheme } from "./contexts/ThemeContext";
+import { useWatcher } from "./contexts/WatcherContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
@@ -32,6 +33,7 @@ import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react
 
 function App() {
   const { theme } = useTheme();
+  const { fileWatchingEnabled } = useWatcher();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [terminalSessionId, setTerminalSessionId] = useState(null);
 
@@ -382,7 +384,7 @@ function App() {
   }, [sidebarOpen]);
 
   // Monitor terminal CWD changes
-  const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen);
+  const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen && fileWatchingEnabled);
 
   // Fetch data when sidebar opens (mode-specific)
   useEffect(() => {
@@ -793,6 +795,7 @@ function App() {
                   searchInputRef={searchInputRef}
                   showGitChangesOnly={showGitChangesOnly}
                   onToggleGitFilter={handleToggleGitFilter}
+                  fileWatchingEnabled={fileWatchingEnabled}
                 />
                 <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
@@ -827,6 +830,7 @@ function App() {
                           checkingFiles={checkingFiles}
                           successfulChecks={successfulChecks}
                           onCheckFileTypes={checkFileTypes}
+                          fileWatchingEnabled={fileWatchingEnabled}
                         />
                       )
                     )}
