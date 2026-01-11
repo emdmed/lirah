@@ -8,20 +8,13 @@ export function useTextareaShortcuts({
 }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl+T: Toggle textarea
+      // Ctrl+T: Focus textarea
       if (e.ctrlKey && e.key === 't') {
         e.preventDefault();
         e.stopPropagation();
 
-        const newVisible = !textareaVisible;
-        setTextareaVisible(newVisible);
-
-        // Auto-focus textarea when opening
-        if (newVisible) {
-          setTimeout(() => {
-            textareaRef.current?.focus();
-          }, 50); // Small delay to ensure DOM update
-        }
+        // Focus textarea
+        textareaRef.current?.focus();
         return;
       }
 

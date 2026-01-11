@@ -34,7 +34,7 @@ import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react
 function App() {
   const { theme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [terminalSessionId, setTerminalSessionId] = useState(null);
 
   // Ref to access terminal's imperative methods
@@ -67,7 +67,7 @@ function App() {
   const [treeLoading, setTreeLoading] = useState(false);
 
   // Textarea state
-  const [textareaVisible, setTextareaVisible] = useState(false);
+  const [textareaVisible, setTextareaVisible] = useState(true);
   const [textareaContent, setTextareaContent] = useState('');
   const textareaRef = useRef(null);
   const [selectedFiles, setSelectedFiles] = useState(new Set());

@@ -139,13 +139,14 @@ app.emit("terminal-output", TerminalOutputPayload { session_id, data });
 
 #### Dual-Mode Sidebar System
 
-The sidebar has **two distinct modes** controlled by keyboard shortcuts:
+The sidebar has **two distinct modes** controlled by keyboard shortcuts. The sidebar is **open by default** in Navigation Mode:
 
-1. **NAVIGATION MODE** (Ctrl+S) - Flat view:
+1. **NAVIGATION MODE** (Ctrl+S) - Flat view [DEFAULT]:
    - Shows only current directory contents
    - Clicking folders navigates terminal to that directory
    - Designed for quick directory navigation
    - Files are displayed but not interactive
+   - This is the default mode when the app starts
 
 2. **CLAUDE MODE** (Ctrl+K) - Tree view:
    - Hierarchical expandable/collapsible folder tree
@@ -155,6 +156,7 @@ The sidebar has **two distinct modes** controlled by keyboard shortcuts:
    - Clicking files sends their relative path to terminal input
 
 Mode state tracked in `App.jsx`: `viewMode` ('flat' | 'tree')
+Initial states: `sidebarOpen: true`, `viewMode: 'flat'`
 
 #### Sidebar ↔ Terminal Synchronization
 
@@ -242,7 +244,7 @@ All keyboard shortcuts use Ctrl key and capture phase to intercept before termin
 |----------|----------|---------|
 | **Ctrl+S** | Toggle Navigation Mode | Opens flat directory view for quick navigation |
 | **Ctrl+K** | Toggle Claude Mode | Opens tree view for file exploration and AI interaction |
-| **Ctrl+T** | Toggle Textarea Panel | Opens multi-line input panel for complex commands |
+| **Ctrl+T** | Focus Textarea Panel | Focuses the multi-line input panel (visible by default) |
 | **Ctrl+Enter** | Send Textarea Content | Sends textarea content to terminal (only when textarea focused) |
 | **Ctrl+F** | Focus File Search | Focuses search input in tree mode (Cmd+F on Mac) |
 | **Ctrl+G** | Toggle Git Filter | Shows only files with uncommitted git changes (Cmd+G on Mac) |
@@ -256,12 +258,12 @@ Implemented in separate hooks:
 
 ### Textarea Panel Feature
 
-Multi-line input panel for composing complex commands or prompts before sending to terminal.
+Multi-line input panel for composing complex commands or prompts before sending to terminal. The panel is **visible by default** at the bottom of the terminal.
 
 **Architecture**:
 - `TextareaPanel.jsx` - Panel component rendered at bottom of terminal
-- `useTextareaShortcuts.js` - Handles Ctrl+T and Ctrl+Enter keyboard shortcuts
-- State managed in `App.jsx`: `textareaVisible`, `textareaContent`, `selectedFiles`, `fileStates`
+- `useTextareaShortcuts.js` - Handles Ctrl+T (focus) and Ctrl+Enter (send) keyboard shortcuts
+- State managed in `App.jsx`: `textareaVisible` (default: `true`), `textareaContent`, `selectedFiles`, `fileStates`
 
 **File Selection System**:
 - Files can be selected from tree view (Plus icon button on hover)
@@ -271,11 +273,12 @@ Multi-line input panel for composing complex commands or prompts before sending 
 - Files are sent with their relative paths when Ctrl+Enter is pressed
 
 **Usage Flow**:
-1. Press Ctrl+T to open textarea panel
-2. Type multi-line command or prompt
-3. Optionally select files from tree view (Plus icon)
-4. Press Ctrl+Enter to send content to terminal
-5. All selected files cleared after sending
+1. Textarea panel is visible by default at the bottom
+2. Press Ctrl+T to focus the textarea (if not already focused)
+3. Type multi-line command or prompt
+4. Optionally select files from tree view (Plus icon)
+5. Press Ctrl+Enter to send content to terminal
+6. Text content and selected files cleared after sending (files optional based on setting)
 
 ### File Search Feature
 
