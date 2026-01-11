@@ -24,6 +24,7 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
             <span className="opacity-70">Ctrl+S: Nav</span>
             <span className="opacity-70">Ctrl+K: Claude</span>
             <span className="opacity-30">|</span>
+            <span className="opacity-70">Ctrl+P: Projects</span>
             <span className="opacity-70">Ctrl+T: Focus Input</span>
             <span className="opacity-70">Ctrl+Enter: Send</span>
             <span className="opacity-30">|</span>

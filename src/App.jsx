@@ -5,8 +5,11 @@ import { StatusBar } from "./components/StatusBar";
 import { FileTree } from "./components/file-tree/file-tree";
 import { SidebarHeader } from "./components/SidebarHeader";
 import { FlatViewMenu } from "./components/FlatViewMenu";
+import { AddBookmarkDialog } from "./components/AddBookmarkDialog";
+import { BookmarksPalette } from "./components/BookmarksPalette";
 import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./contexts/WatcherContext";
+import { useBookmarks } from "./contexts/BookmarksContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
@@ -14,6 +17,7 @@ import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
 import { useFileSearch } from "./hooks/useFileSearch";
 import { useHelpShortcut } from "./hooks/useHelpShortcut";
+import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { analyzeJSFile } from "./utils/fileAnalyzer";
 import {
@@ -76,6 +80,11 @@ function App() {
 
   // Help state
   const [showHelp, setShowHelp] = useState(false);
+
+  // Bookmarks state
+  const [addBookmarkDialogOpen, setAddBookmarkDialogOpen] = useState(false);
+  const [bookmarksPaletteOpen, setBookmarksPaletteOpen] = useState(false);
+  const { updateBookmark } = useBookmarks();
 
   // Type check state
   const [typeCheckResults, setTypeCheckResults] = useState(new Map());
@@ -248,6 +257,56 @@ function App() {
     });
   };
 
+  // Navigate to bookmark
+  const navigateToBookmark = useCallback(async (bookmark) => {
+    if (!terminalSessionId) {
+      console.warn('Terminal session not ready');
+      return;
+    }
+
+    try {
+      // Shell escape the path
+      const safePath = `'${bookmark.path.replace(/'/g, "'\\''")}'`;
+      const command = `cd ${safePath}\n`;
+
+      await invoke('write_to_terminal', {
+        sessionId: terminalSessionId,
+        data: command
+      });
+
+      // Wait for shell to process
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Verify navigation succeeded
+      const actualCwd = await invoke('get_terminal_cwd', {
+        sessionId: terminalSessionId
+      });
+
+      // Update lastAccessedAt
+      updateBookmark(bookmark.id, { lastAccessedAt: Date.now() });
+
+      // Reload sidebar view
+      if (viewMode === 'flat') {
+        loadFolders();
+      } else if (viewMode === 'tree') {
+        loadTreeData();
+      }
+
+      // Focus terminal
+      if (terminalRef.current?.focus) {
+        terminalRef.current.focus();
+      }
+
+      // Check if navigation failed
+      if (actualCwd !== bookmark.path) {
+        console.error(`Failed to navigate to bookmark path: ${bookmark.path}`);
+        console.error(`Current directory: ${actualCwd}`);
+      }
+    } catch (error) {
+      console.error('Failed to navigate to bookmark:', error);
+    }
+  }, [terminalSessionId, viewMode, loadFolders, loadTreeData, updateBookmark, terminalRef]);
+
   // Send textarea content to terminal
   const sendTextareaToTerminal = useCallback(async () => {
     if (!terminalSessionId) {
@@ -370,6 +429,12 @@ function App() {
   useHelpShortcut({
     showHelp,
     setShowHelp,
+  });
+
+  // Bookmarks keyboard shortcut
+  useBookmarksShortcut({
+    bookmarksPaletteOpen,
+    setBookmarksPaletteOpen,
   });
 
   // Clear folder expansion state when sidebar closes
@@ -796,6 +861,9 @@ function App() {
                   showGitChangesOnly={showGitChangesOnly}
                   onToggleGitFilter={handleToggleGitFilter}
                   fileWatchingEnabled={fileWatchingEnabled}
+                  onAddBookmark={() => setAddBookmarkDialogOpen(true)}
+                  onNavigateBookmark={navigateToBookmark}
+                  hasTerminalSession={!!terminalSessionId}
                 />
                 <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
@@ -880,6 +948,16 @@ function App() {
           onToggleGitFilter={handleToggleGitFilter}
         />
       </Layout>
+      <AddBookmarkDialog
+        open={addBookmarkDialogOpen}
+        onOpenChange={setAddBookmarkDialogOpen}
+        currentPath={currentPath}
+      />
+      <BookmarksPalette
+        open={bookmarksPaletteOpen}
+        onOpenChange={setBookmarksPaletteOpen}
+        onNavigate={navigateToBookmark}
+      />
     </SidebarProvider>
   );
 }
