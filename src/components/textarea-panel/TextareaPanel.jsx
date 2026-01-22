@@ -5,6 +5,7 @@ import { Checkbox } from "../ui/checkbox";
 import { X } from "lucide-react";
 import { SelectedFilesList } from "./SelectedFilesList";
 import { ActionButtons } from "./ActionButtons";
+import { TemplateSelector } from "./TemplateSelector";
 
 /**
  * Main textarea panel component for multi-line input with file selection
@@ -26,6 +27,9 @@ export function TextareaPanel({
   onSetFileState,
   keepFilesAfterSend = false,
   onToggleKeepFiles,
+  selectedTemplateId,
+  onSelectTemplate,
+  onManageTemplates,
 }) {
   const fileListRef = useRef(null);
 
@@ -63,15 +67,22 @@ export function TextareaPanel({
         <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
           Multi-line Input (Ctrl+Enter: send, Ctrl+T: close, Tab: navigate files)
         </span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onClose}
-          aria-label="Close panel"
-          className="h-6 w-6"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <TemplateSelector
+            selectedTemplateId={selectedTemplateId}
+            onSelectTemplate={onSelectTemplate}
+            onManageTemplates={onManageTemplates}
+          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            aria-label="Close panel"
+            className="h-6 w-6"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Persistence toggle */}

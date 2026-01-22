@@ -7,6 +7,8 @@ import { SidebarHeader } from "./components/SidebarHeader";
 import { FlatViewMenu } from "./components/FlatViewMenu";
 import { AddBookmarkDialog } from "./components/AddBookmarkDialog";
 import { BookmarksPalette } from "./components/BookmarksPalette";
+import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
+import { usePromptTemplates } from "./contexts/PromptTemplatesContext";
 import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./contexts/WatcherContext";
 import { useBookmarks } from "./contexts/BookmarksContext";
@@ -38,6 +40,7 @@ import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react
 function App() {
   const { theme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
+  const { getTemplateById } = usePromptTemplates();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [terminalSessionId, setTerminalSessionId] = useState(null);
 
@@ -85,6 +88,10 @@ function App() {
   const [addBookmarkDialogOpen, setAddBookmarkDialogOpen] = useState(false);
   const [bookmarksPaletteOpen, setBookmarksPaletteOpen] = useState(false);
   const { updateBookmark } = useBookmarks();
+
+  // Prompt templates state
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [manageTemplatesDialogOpen, setManageTemplatesDialogOpen] = useState(false);
 
   // Type check state
   const [typeCheckResults, setTypeCheckResults] = useState(new Map());
@@ -371,6 +378,15 @@ function App() {
         }
       }
 
+      // Append selected template content if any
+      if (selectedTemplateId) {
+        const template = getTemplateById(selectedTemplateId);
+        if (template) {
+          const separator = fullCommand.trim() ? '\n\n' : '';
+          fullCommand = fullCommand + separator + template.content;
+        }
+      }
+
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
         data: fullCommand
@@ -405,7 +421,7 @@ function App() {
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -926,6 +942,9 @@ function App() {
               onSetFileState={setFileState}
               keepFilesAfterSend={keepFilesAfterSend}
               onToggleKeepFiles={setKeepFilesAfterSend}
+              selectedTemplateId={selectedTemplateId}
+              onSelectTemplate={setSelectedTemplateId}
+              onManageTemplates={() => setManageTemplatesDialogOpen(true)}
             />
           )
         }
@@ -957,6 +976,10 @@ function App() {
         open={bookmarksPaletteOpen}
         onOpenChange={setBookmarksPaletteOpen}
         onNavigate={navigateToBookmark}
+      />
+      <ManageTemplatesDialog
+        open={manageTemplatesDialogOpen}
+        onOpenChange={setManageTemplatesDialogOpen}
       />
     </SidebarProvider>
   );
