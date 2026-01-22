@@ -313,6 +313,70 @@ export const themes = {
       sidebarRing: 'hsl(156 72% 67%)',
     },
   },
+
+  gruvbox: {
+    name: 'Gruvbox',
+    type: 'dark',
+    // Terminal colors - Gruvbox dark
+    terminal: {
+      foreground: '#ebdbb2',      // fg0
+      background: '#282828',      // bg0
+      cursor: '#fabd2f',          // bright yellow
+      cursorAccent: '#282828',    // bg0
+      selectionBackground: '#504945', // bg2
+      selectionForeground: '#ebdbb2', // fg0
+
+      // Normal colors
+      black: '#282828',           // bg0
+      red: '#cc241d',             // red
+      green: '#98971a',           // green
+      yellow: '#d79921',          // yellow
+      blue: '#458588',            // blue
+      magenta: '#b16286',         // purple
+      cyan: '#689d6a',            // aqua
+      white: '#a89984',           // fg4
+
+      // Bright colors
+      brightBlack: '#928374',     // gray
+      brightRed: '#fb4934',       // bright red
+      brightGreen: '#b8bb26',     // bright green
+      brightYellow: '#fabd2f',    // bright yellow
+      brightBlue: '#83a598',      // bright blue
+      brightMagenta: '#d3869b',   // bright purple
+      brightCyan: '#8ec07c',      // bright aqua
+      brightWhite: '#ebdbb2',     // fg0
+    },
+    // UI colors
+    ui: {
+      background: 'hsl(0 0% 16%)',          // bg0_h #1d2021 (hard contrast)
+      foreground: 'hsl(39 27% 83%)',        // fg1 #ebdbb2
+      card: 'hsl(0 0% 20%)',                // bg1 #3c3836
+      cardForeground: 'hsl(39 27% 83%)',    // fg1 #ebdbb2
+      popover: 'hsl(0 0% 20%)',             // bg1 #3c3836
+      popoverForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
+      primary: 'hsl(24 75% 59%)',           // orange #fe8019
+      primaryForeground: 'hsl(0 0% 16%)',   // bg0_h #1d2021
+      secondary: 'hsl(0 0% 25%)',           // bg2 #504945
+      secondaryForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
+      muted: 'hsl(0 0% 25%)',               // bg2 #504945
+      mutedForeground: 'hsl(30 13% 65%)',   // fg3 #bdae93
+      accent: 'hsl(24 75% 59%)',            // orange #fe8019
+      accentForeground: 'hsl(0 0% 16%)',    // bg0_h #1d2021
+      destructive: 'hsl(0 100% 60%)',       // bright red #fb4934
+      destructiveForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
+      border: 'hsl(0 0% 30%)',              // bg3 #665c54
+      input: 'hsl(0 0% 25%)',               // bg2 #504945
+      ring: 'hsl(24 75% 59%)',              // orange #fe8019
+      sidebar: 'hsl(0 0% 16%)',             // bg0_h #1d2021
+      sidebarForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
+      sidebarPrimary: 'hsl(24 75% 59%)',    // orange #fe8019
+      sidebarPrimaryForeground: 'hsl(0 0% 16%)', // bg0_h #1d2021
+      sidebarAccent: 'hsl(0 0% 25%)',       // bg2 #504945
+      sidebarAccentForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
+      sidebarBorder: 'hsl(0 0% 30%)',       // bg3 #665c54
+      sidebarRing: 'hsl(24 75% 59%)',       // orange #fe8019
+    },
+  },
 };
 
 export const defaultTheme = 'kanagawa';

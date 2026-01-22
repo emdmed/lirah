@@ -4,20 +4,12 @@ import { Send } from "lucide-react";
 
 /**
  * Action buttons at the bottom of the textarea panel
- * @param {Function} onClose - Callback to close panel
  * @param {Function} onSend - Callback to send content
  * @param {boolean} disabled - Whether send button is disabled
  */
-export function ActionButtons({ onClose, onSend, disabled }) {
+export function ActionButtons({ onSend, disabled }) {
   return (
     <div className="flex justify-end gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onClose}
-      >
-        Cancel
-      </Button>
       <Button
         size="sm"
         onClick={onSend}

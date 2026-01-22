@@ -1,8 +1,6 @@
 import React, { useRef } from "react";
 import { Textarea } from "../ui/textarea";
-import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
-import { X } from "lucide-react";
 import { SelectedFilesList } from "./SelectedFilesList";
 import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
@@ -64,44 +62,33 @@ export function TextareaPanel({
     <div className="flex flex-col border-t border-input bg-background p-2 gap-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
-          Multi-line Input (Ctrl+Enter: send, Ctrl+T: close, Tab: navigate files)
-        </span>
-        <div className="flex items-center gap-1">
-          <TemplateSelector
-            selectedTemplateId={selectedTemplateId}
-            onSelectTemplate={onSelectTemplate}
-            onManageTemplates={onManageTemplates}
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClose}
-            aria-label="Close panel"
-            className="h-6 w-6"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-4">
+          <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
+            Multi-line Input (Ctrl+Enter: send, Tab: navigate files)
+          </span>
+          {onToggleKeepFiles && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="keep-files"
+                checked={keepFilesAfterSend}
+                onCheckedChange={onToggleKeepFiles}
+                disabled={disabled}
+              />
+              <label
+                htmlFor="keep-files"
+                className="text-xs text-muted-foreground cursor-pointer select-none"
+              >
+                keep files
+              </label>
+            </div>
+          )}
         </div>
+        <TemplateSelector
+          selectedTemplateId={selectedTemplateId}
+          onSelectTemplate={onSelectTemplate}
+          onManageTemplates={onManageTemplates}
+        />
       </div>
-
-      {/* Persistence toggle */}
-      {onToggleKeepFiles && (
-        <div className="flex items-center gap-2 py-1">
-          <Checkbox
-            id="keep-files"
-            checked={keepFilesAfterSend}
-            onCheckedChange={onToggleKeepFiles}
-            disabled={disabled}
-          />
-          <label
-            htmlFor="keep-files"
-            className="text-xs text-muted-foreground cursor-pointer select-none"
-          >
-            Keep files selected after sending
-          </label>
-        </div>
-      )}
 
       {/* Main content area */}
       <div className="flex gap-2 min-h-[120px] max-h-[300px]">
@@ -129,7 +116,6 @@ export function TextareaPanel({
 
       {/* Action buttons */}
       <ActionButtons
-        onClose={onClose}
         onSend={handleSend}
         disabled={disabled || (!value?.trim() && fileArray.length === 0)}
       />
