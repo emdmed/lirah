@@ -6,7 +6,8 @@ export function useViewModeShortcuts({
   viewMode,
   setViewMode,
   onLoadFlatView,
-  onLoadTreeView
+  onLoadTreeView,
+  onLaunchClaude
 }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -38,11 +39,16 @@ export function useViewModeShortcuts({
           setSidebarOpen(true);
           onLoadTreeView();
         }
+
+        // Launch Claude Code
+        if (onLaunchClaude) {
+          onLaunchClaude();
+        }
       }
     };
 
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView]);
+  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude]);
 }

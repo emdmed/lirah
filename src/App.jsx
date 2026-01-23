@@ -20,6 +20,7 @@ import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
 import { useFileSearch } from "./hooks/useFileSearch";
 import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
+import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { analyzeJSFile } from "./utils/fileAnalyzer";
 import {
@@ -121,6 +122,9 @@ function App() {
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
+
+  // Claude launcher hook
+  const { launchClaude } = useClaudeLauncher(terminalSessionId, terminalRef);
 
   // Helper function to build tree from flat list
   const buildTreeFromFlatList = (flatList, rootPath) => {
@@ -430,7 +434,8 @@ function App() {
     viewMode,
     setViewMode,
     onLoadFlatView: loadFolders,
-    onLoadTreeView: loadTreeData
+    onLoadTreeView: loadTreeData,
+    onLaunchClaude: launchClaude
   });
 
   // Textarea keyboard shortcuts
