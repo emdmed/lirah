@@ -91,7 +91,7 @@ function App() {
   const { updateBookmark } = useBookmarks();
 
   // Prompt templates state
-  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('default-orchestration');
   const [manageTemplatesDialogOpen, setManageTemplatesDialogOpen] = useState(false);
 
   // Type check state

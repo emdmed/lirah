@@ -5,6 +5,15 @@ const PromptTemplatesContext = createContext(undefined);
 const STORAGE_KEY = 'nevo-terminal:prompt-templates';
 const MAX_TEMPLATES = 50;
 
+const DEFAULT_TEMPLATES = [
+  {
+    id: 'default-orchestration',
+    title: 'Orchestration',
+    content: 'Read and follow .claude/orchestration.md',
+    isDefault: true,
+  },
+];
+
 function validateTemplates(templates) {
   if (!Array.isArray(templates)) return [];
 
@@ -39,14 +48,17 @@ function saveTemplates(templates) {
 }
 
 export function PromptTemplatesProvider({ children }) {
-  const [templates, setTemplates] = useState(() => loadTemplates());
+  const [userTemplates, setUserTemplates] = useState(() => loadTemplates());
+
+  // Combine default templates with user templates
+  const templates = [...DEFAULT_TEMPLATES, ...userTemplates];
 
   useEffect(() => {
-    saveTemplates(templates);
-  }, [templates]);
+    saveTemplates(userTemplates);
+  }, [userTemplates]);
 
   const addTemplate = (title, content) => {
-    if (templates.length >= MAX_TEMPLATES) {
+    if (userTemplates.length >= MAX_TEMPLATES) {
       throw new Error(`Maximum ${MAX_TEMPLATES} templates reached`);
     }
 
@@ -66,15 +78,19 @@ export function PromptTemplatesProvider({ children }) {
       updatedAt: Date.now(),
     };
 
-    setTemplates(prev => [...prev, newTemplate]);
+    setUserTemplates(prev => [...prev, newTemplate]);
     return newTemplate;
   };
 
   const removeTemplate = (id) => {
-    setTemplates(prev => prev.filter(t => t.id !== id));
+    // Don't allow removing default templates
+    if (DEFAULT_TEMPLATES.some(t => t.id === id)) return;
+    setUserTemplates(prev => prev.filter(t => t.id !== id));
   };
 
   const updateTemplate = (id, updates) => {
+    // Don't allow updating default templates
+    if (DEFAULT_TEMPLATES.some(t => t.id === id)) return;
     if (updates.title !== undefined && (!updates.title || updates.title.trim() === '')) {
       throw new Error('Template title cannot be empty');
     }
@@ -83,7 +99,7 @@ export function PromptTemplatesProvider({ children }) {
       throw new Error('Template content cannot be empty');
     }
 
-    setTemplates(prev =>
+    setUserTemplates(prev =>
       prev.map(t => (t.id === id ? { ...t, ...updates, updatedAt: Date.now() } : t))
     );
   };

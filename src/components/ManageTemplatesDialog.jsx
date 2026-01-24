@@ -117,25 +117,27 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                         {template.content.length > 50 ? '...' : ''}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleStartEdit(template)}
-                        aria-label="Edit template"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleDelete(template.id)}
-                        aria-label="Delete template"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {!template.isDefault && (
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleStartEdit(template)}
+                          aria-label="Edit template"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleDelete(template.id)}
+                          aria-label="Delete template"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
