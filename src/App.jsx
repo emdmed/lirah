@@ -126,6 +126,27 @@ function App() {
   // Claude launcher hook
   const { launchClaude } = useClaudeLauncher(terminalSessionId, terminalRef);
 
+  // Launch orchestration handler
+  const launchOrchestration = useCallback(async () => {
+    if (!terminalSessionId) {
+      console.warn('Terminal session not ready');
+      return;
+    }
+
+    try {
+      await invoke('write_to_terminal', {
+        sessionId: terminalSessionId,
+        data: 'npx claude-orchestration\n'
+      });
+
+      if (terminalRef.current?.focus) {
+        terminalRef.current.focus();
+      }
+    } catch (error) {
+      console.error('Failed to launch orchestration:', error);
+    }
+  }, [terminalSessionId]);
+
   // Helper function to build tree from flat list
   const buildTreeFromFlatList = (flatList, rootPath) => {
     const nodeMap = new Map();
@@ -961,6 +982,7 @@ function App() {
             theme={theme.terminal}
             showHelp={showHelp}
             onToggleHelp={() => setShowHelp(prev => !prev)}
+            onLaunchOrchestration={launchOrchestration}
           />
         }
       >
