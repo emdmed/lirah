@@ -347,8 +347,9 @@ function App() {
 
     const hasTextContent = textareaContent?.trim();
     const hasFiles = selectedFiles.size > 0;
+    const hasTemplate = !!selectedTemplateId;
 
-    if (!hasTextContent && !hasFiles) {
+    if (!hasTextContent && !hasFiles && !hasTemplate) {
       return;
     }
 
@@ -412,29 +413,30 @@ function App() {
         }
       }
 
+      // Send text content first
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
         data: fullCommand
       });
 
-      console.log('Sent to terminal:', fullCommand);
-
-      // Focus terminal first
-      if (terminalRef.current?.focus) {
-        terminalRef.current.focus();
-      }
-
-      // Small delay to ensure content is processed, then send Enter
+      // Small delay then send Enter (carriage return) to submit
       setTimeout(async () => {
         try {
           await invoke('write_to_terminal', {
             sessionId: terminalSessionId,
-            data: '\n'
+            data: '\r'
           });
         } catch (error) {
-          console.error('Failed to send Enter key:', error);
+          console.error('Failed to send Enter:', error);
         }
-      }, 50);
+      }, 100);
+
+      console.log('Sent to terminal:', fullCommand);
+
+      // Focus terminal
+      if (terminalRef.current?.focus) {
+        terminalRef.current.focus();
+      }
 
       // Clear textarea content (always)
       setTextareaContent('');
