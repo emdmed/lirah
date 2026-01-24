@@ -1,7 +1,8 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { HelpCircle, Eye, EyeOff, Play } from 'lucide-react';
+import { HelpCircle, Eye, EyeOff, Download } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
+import { Button } from './ui/button';
 
 export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, onToggleHelp, onLaunchOrchestration }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
@@ -56,15 +57,16 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
 
         {/* Right section: Help, Watchers, Theme switcher and session status */}
         <div className="flex items-center gap-4">
-          <button
+          <Button
+            variant="outline"
+            size="xs"
             onClick={onLaunchOrchestration}
-            className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
-            title="Run claude-orchestration"
+            title="Initialize claude-orchestration in current project"
             disabled={!sessionId}
-            style={{ opacity: sessionId ? undefined : 0.3 }}
           >
-            <Play className="w-3.5 h-3.5" />
-          </button>
+            <Download className="w-3 h-3" />
+            Initialize Claude Orchestration
+          </Button>
           <button
             onClick={onToggleHelp}
             className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer"

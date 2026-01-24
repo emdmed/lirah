@@ -408,3 +408,8 @@ When in CLAUDE MODE (tree view):
 - Terminal output events: Check `console.log` in `terminal-output` listener
 - PTY issues: Check portable-pty errors in Rust logs
 - CWD sync: Watch `useCwdMonitor` console logs for detected changes
+
+
+## Orchestration
+
+For complex tasks, refer to .claude/orchestration.md for available workflows.

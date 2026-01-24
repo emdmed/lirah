@@ -64,7 +64,11 @@ export function TextareaPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
-            Multi-line Input (Ctrl+Enter: send, Tab: navigate files)
+            {selectedTemplateId && !value?.trim() ? (
+              <span className="text-primary">Ctrl+Enter to send template</span>
+            ) : (
+              "Multi-line Input (Ctrl+Enter: send, Tab: navigate files)"
+            )}
           </span>
           {onToggleKeepFiles && (
             <div className="flex items-center gap-2">
@@ -117,7 +121,7 @@ export function TextareaPanel({
       {/* Action buttons */}
       <ActionButtons
         onSend={handleSend}
-        disabled={disabled || (!value?.trim() && fileArray.length === 0)}
+        disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId)}
       />
     </div>
   );
