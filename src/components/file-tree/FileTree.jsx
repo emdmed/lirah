@@ -7,7 +7,7 @@ import { filterTreeByGitChanges } from "./utils/filterUtils";
 
 /**
  * Main FileTree component - renders a tree view of files and folders
- * Supports git stats display, filtering, and file analysis
+ * Supports git stats display and filtering
  */
 export function FileTree({
   nodes,
@@ -17,11 +17,6 @@ export function FileTree({
   showGitChangesOnly,
   onToggle,
   onSendToTerminal,
-  analyzedFiles,
-  expandedAnalysis,
-  onAnalyzeFile,
-  onToggleAnalysis,
-  onSendAnalysisItem,
   selectedFiles,
   onToggleFileSelection,
   isTextareaPanelOpen,
@@ -61,11 +56,6 @@ export function FileTree({
           gitStats={gitStats}
           onToggle={onToggle}
           onSendToTerminal={onSendToTerminal}
-          analyzedFiles={analyzedFiles}
-          expandedAnalysis={expandedAnalysis}
-          onAnalyzeFile={onAnalyzeFile}
-          onToggleAnalysis={onToggleAnalysis}
-          onSendAnalysisItem={onSendAnalysisItem}
           selectedFiles={selectedFiles}
           onToggleFileSelection={onToggleFileSelection}
           isTextareaPanelOpen={isTextareaPanelOpen}

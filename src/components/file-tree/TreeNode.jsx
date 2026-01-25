@@ -2,7 +2,6 @@ import React from "react";
 import { SidebarMenuItem } from "@/components/ui/sidebar";
 import { FolderNode } from "./FolderNode";
 import { FileNode } from "./FileNode";
-import { AnalysisPanel } from "./AnalysisPanel";
 
 /**
  * Renders a tree node (file or folder) with all interactions
@@ -15,11 +14,6 @@ export function TreeNode({
   gitStats,
   onToggle,
   onSendToTerminal,
-  analyzedFiles,
-  expandedAnalysis,
-  onAnalyzeFile,
-  onToggleAnalysis,
-  onSendAnalysisItem,
   selectedFiles,
   onToggleFileSelection,
   isTextareaPanelOpen,
@@ -33,11 +27,6 @@ export function TreeNode({
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
   const isSelected = selectedFiles && selectedFiles.has(node.path);
   const depth = node.depth || 0;
-
-  // Analysis state
-  const isAnalyzed = analyzedFiles && analyzedFiles.has(node.path);
-  const isAnalysisExpanded = expandedAnalysis && expandedAnalysis.has(node.path);
-  const analysisData = analyzedFiles && analyzedFiles.get(node.path);
 
   // Git stats
   const stats = gitStats?.get(node.path);
@@ -75,7 +64,6 @@ export function TreeNode({
             isSelected={isSelected}
             isTextareaPanelOpen={isTextareaPanelOpen}
             onSendToTerminal={onSendToTerminal}
-            onAnalyzeFile={onAnalyzeFile}
             onToggleFileSelection={onToggleFileSelection}
             typeCheckResult={typeCheckResult}
             isCheckingTypes={isCheckingTypes}
@@ -84,15 +72,6 @@ export function TreeNode({
           />
         )}
       </SidebarMenuItem>
-
-      {/* Analysis expansion panel */}
-      {!node.is_dir && isAnalyzed && isAnalysisExpanded && (
-        <AnalysisPanel
-          data={analysisData}
-          depth={depth}
-          onSendItem={onSendAnalysisItem}
-        />
-      )}
 
       {/* Recursively render children if expanded */}
       {node.is_dir && isExpanded && hasChildren && (
@@ -105,11 +84,6 @@ export function TreeNode({
             gitStats={gitStats}
             onToggle={onToggle}
             onSendToTerminal={onSendToTerminal}
-            analyzedFiles={analyzedFiles}
-            expandedAnalysis={expandedAnalysis}
-            onAnalyzeFile={onAnalyzeFile}
-            onToggleAnalysis={onToggleAnalysis}
-            onSendAnalysisItem={onSendAnalysisItem}
             selectedFiles={selectedFiles}
             onToggleFileSelection={onToggleFileSelection}
             isTextareaPanelOpen={isTextareaPanelOpen}

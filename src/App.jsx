@@ -22,7 +22,6 @@ import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
-import { analyzeJSFile } from "./utils/fileAnalyzer";
 import {
   Sidebar,
   SidebarContent,
@@ -58,10 +57,6 @@ function App() {
   const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
   const [treeData, setTreeData] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
-
-  // File analysis state
-  const [analyzedFiles, setAnalyzedFiles] = useState(new Map());
-  const [expandedAnalysis, setExpandedAnalysis] = useState(new Set());
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -724,45 +719,6 @@ function App() {
   };
 
 
-  // File analysis functions
-  const analyzeFile = async (filePath) => {
-    // Check cache - if already analyzed, just toggle expansion
-    if (analyzedFiles.has(filePath)) {
-      toggleAnalysisExpansion(filePath);
-      return;
-    }
-
-    try {
-      // Fetch file content from backend
-      const content = await invoke('read_file_content', { path: filePath });
-
-      // Parse and analyze
-      const analysis = analyzeJSFile(content, filePath);
-
-      // Cache results
-      setAnalyzedFiles(new Map(analyzedFiles).set(filePath, analysis));
-
-      // Expand panel
-      setExpandedAnalysis(new Set(expandedAnalysis).add(filePath));
-    } catch (error) {
-      console.error('Failed to analyze file:', filePath, error);
-      // Store error state
-      setAnalyzedFiles(new Map(analyzedFiles).set(filePath, { error: error.message }));
-    }
-  };
-
-  const toggleAnalysisExpansion = (filePath) => {
-    setExpandedAnalysis(prev => {
-      const next = new Set(prev);
-      if (next.has(filePath)) {
-        next.delete(filePath);
-      } else {
-        next.add(filePath);
-      }
-      return next;
-    });
-  };
-
   // Type check functions
   const checkFileTypes = async (filePath) => {
     if (checkingFiles.has(filePath)) {
@@ -854,32 +810,6 @@ function App() {
     return lines.join('\n');
   };
 
-  const sendAnalysisItemToTerminal = async (itemName, category) => {
-    if (!terminalSessionId) {
-      console.warn('Terminal session not ready');
-      return;
-    }
-
-    try {
-      // Format with category context
-      const textToSend = category
-        ? `${itemName} ${category} `
-        : `${itemName} `;
-
-      await invoke('write_to_terminal', {
-        sessionId: terminalSessionId,
-        data: textToSend
-      });
-
-      // Focus terminal after sending
-      if (terminalRef.current?.focus) {
-        terminalRef.current.focus();
-      }
-    } catch (error) {
-      console.error('Failed to send to terminal:', itemName, error);
-    }
-  };
-
   // Create filtered tree data for display (search filter only)
   const displayedTreeData = useMemo(() => {
     let filtered = treeData;
@@ -937,11 +867,6 @@ function App() {
                           showGitChangesOnly={showGitChangesOnly}
                           onToggle={toggleFolder}
                           onSendToTerminal={sendFileToTerminal}
-                          analyzedFiles={analyzedFiles}
-                          expandedAnalysis={expandedAnalysis}
-                          onAnalyzeFile={analyzeFile}
-                          onToggleAnalysis={toggleAnalysisExpansion}
-                          onSendAnalysisItem={sendAnalysisItemToTerminal}
                           selectedFiles={selectedFiles}
                           onToggleFileSelection={toggleFileSelection}
                           isTextareaPanelOpen={textareaVisible}

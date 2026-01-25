@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { File, ArrowDownFromLine, CornerDownRight, Plus, CheckCircle, Loader2 } from "lucide-react";
+import { File, CornerDownRight, Plus, CheckCircle, Loader2 } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
 
 /**
- * Renders a file node in the tree with analysis and action buttons
+ * Renders a file node in the tree with action buttons
  * @param {Object} node - Node data (path, name, is_dir)
  * @param {number} depth - Tree depth for indentation
  * @param {boolean} isCurrentPath - Whether this is the current working directory
@@ -11,7 +11,6 @@ import { GitStatsBadge } from "./GitStatsBadge";
  * @param {boolean} isSelected - Whether file is selected for textarea panel
  * @param {boolean} isTextareaPanelOpen - Whether textarea panel is open
  * @param {Function} onSendToTerminal - Callback to send file path to terminal
- * @param {Function} onAnalyzeFile - Callback to analyze file
  * @param {Function} onToggleFileSelection - Callback to toggle file selection
  */
 export function FileNode({
@@ -22,7 +21,6 @@ export function FileNode({
   isSelected,
   isTextareaPanelOpen,
   onSendToTerminal,
-  onAnalyzeFile,
   onToggleFileSelection,
   typeCheckResult,
   isCheckingTypes,
@@ -30,7 +28,7 @@ export function FileNode({
   onCheckFileTypes
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const isSupportedForAnalysis = /\.(jsx?|tsx?)$/i.test(node.name);
+  const isSupportedForTypeCheck = /\.(jsx?|tsx?)$/i.test(node.name);
   const hasGitChanges = stats && (stats.added > 0 || stats.deleted > 0);
   const hasTypeErrors = typeCheckResult && typeCheckResult.error_count > 0;
 
@@ -55,23 +53,8 @@ export function FileNode({
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}
 
-        {/* Analyze button - inline with filename, visible on hover */}
-        {isSupportedForAnalysis && (
-          <button
-            className={`p-1 flex-shrink-0 transition-opacity duration-200 rounded hover:bg-white/10 ${isHovered ? 'opacity-60 hover:opacity-100' : 'opacity-0 pointer-events-none'
-              }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onAnalyzeFile(node.path);
-            }}
-            title="Analyze file"
-          >
-            <ArrowDownFromLine className="w-3 h-3" />
-          </button>
-        )}
-
         {/* Check types button - inline with filename, visible on hover */}
-        {isSupportedForAnalysis && (
+        {isSupportedForTypeCheck && (
           <button
             className={`p-1 flex-shrink-0 transition-all duration-200 rounded ${
               isTypeCheckSuccess

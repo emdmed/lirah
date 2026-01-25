@@ -33,14 +33,22 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchF
 
   return (
     <div
-      ref={terminalRef}
       style={{
         width: '100%',
         flex: 1,
         minHeight: 0,
-        overflow: 'auto',
+        position: 'relative',
       }}
-    />
+    >
+      <div
+        ref={terminalRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'auto',
+        }}
+      />
+    </div>
   );
 });
 
