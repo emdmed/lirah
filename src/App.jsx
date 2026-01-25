@@ -8,6 +8,7 @@ import { FlatViewMenu } from "./components/FlatViewMenu";
 import { AddBookmarkDialog } from "./components/AddBookmarkDialog";
 import { BookmarksPalette } from "./components/BookmarksPalette";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
+import { GitDiffDialog } from "./components/GitDiffDialog";
 import { usePromptTemplates } from "./contexts/PromptTemplatesContext";
 import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./contexts/WatcherContext";
@@ -94,6 +95,10 @@ function App() {
   const [typeCheckResults, setTypeCheckResults] = useState(new Map());
   const [checkingFiles, setCheckingFiles] = useState(new Set());
   const [successfulChecks, setSuccessfulChecks] = useState(new Set()); // Files that passed (no errors)
+
+  // Git diff dialog state
+  const [diffDialogOpen, setDiffDialogOpen] = useState(false);
+  const [diffFilePath, setDiffFilePath] = useState(null);
 
   // Load keepFilesAfterSend from localStorage on mount
   useEffect(() => {
@@ -276,6 +281,12 @@ function App() {
     setSelectedFiles(new Set());
     setFileStates(new Map());
   };
+
+  // View git diff for a file
+  const viewFileDiff = useCallback((filePath) => {
+    setDiffFilePath(filePath);
+    setDiffDialogOpen(true);
+  }, []);
 
   const setFileState = (filePath, state) => {
     setFileStates(prev => {
@@ -867,6 +878,7 @@ function App() {
                           showGitChangesOnly={showGitChangesOnly}
                           onToggle={toggleFolder}
                           onSendToTerminal={sendFileToTerminal}
+                          onViewDiff={viewFileDiff}
                           selectedFiles={selectedFiles}
                           onToggleFileSelection={toggleFileSelection}
                           isTextareaPanelOpen={textareaVisible}
@@ -943,6 +955,12 @@ function App() {
       <ManageTemplatesDialog
         open={manageTemplatesDialogOpen}
         onOpenChange={setManageTemplatesDialogOpen}
+      />
+      <GitDiffDialog
+        open={diffDialogOpen}
+        onOpenChange={setDiffDialogOpen}
+        filePath={diffFilePath}
+        repoPath={currentPath}
       />
     </SidebarProvider>
   );

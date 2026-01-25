@@ -349,3 +349,98 @@ pub fn check_command_exists(command: String) -> Result<bool, String> {
 
     Ok(output.status.success())
 }
+
+#[derive(Serialize)]
+pub struct GitDiffResult {
+    pub file_path: String,
+    pub old_content: String,
+    pub new_content: String,
+    pub added_lines: usize,
+    pub deleted_lines: usize,
+    pub is_new_file: bool,
+    pub is_deleted_file: bool,
+}
+
+#[tauri::command]
+pub fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
+    let repo = PathBuf::from(&repo_path);
+    let file = PathBuf::from(&file_path);
+
+    // Check if .git directory exists
+    let git_dir = repo.join(".git");
+    if !git_dir.exists() {
+        return Err("Not a git repository".to_string());
+    }
+
+    // Calculate relative path from repo root
+    let relative_path = if file.starts_with(&repo) {
+        file.strip_prefix(&repo)
+            .map_err(|e| format!("Failed to get relative path: {}", e))?
+            .to_string_lossy()
+            .to_string()
+    } else {
+        file_path.clone()
+    };
+
+    // Get old content from git (HEAD version)
+    let old_output = Command::new("git")
+        .arg("show")
+        .arg(format!("HEAD:{}", relative_path))
+        .current_dir(&repo)
+        .output()
+        .map_err(|e| format!("Failed to execute git show: {}", e))?;
+
+    let is_new_file = !old_output.status.success();
+    let old_content = if is_new_file {
+        String::new()
+    } else {
+        String::from_utf8_lossy(&old_output.stdout).to_string()
+    };
+
+    // Get new content from disk (current working tree)
+    let new_content = if file.exists() {
+        fs::read_to_string(&file)
+            .map_err(|e| format!("Failed to read file: {}", e))?
+    } else {
+        String::new()
+    };
+
+    let is_deleted_file = !file.exists() && !is_new_file;
+
+    // Count changes using git diff --numstat
+    let numstat_output = Command::new("git")
+        .arg("diff")
+        .arg("HEAD")
+        .arg("--numstat")
+        .arg("--")
+        .arg(&relative_path)
+        .current_dir(&repo)
+        .output()
+        .map_err(|e| format!("Failed to execute git diff: {}", e))?;
+
+    let numstat = String::from_utf8_lossy(&numstat_output.stdout);
+    let (added_lines, deleted_lines) = numstat
+        .lines()
+        .next()
+        .map(|line| {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 2 {
+                let added = parts[0].parse::<usize>().unwrap_or(0);
+                let deleted = parts[1].parse::<usize>().unwrap_or(0);
+                (added, deleted)
+            } else {
+                (0, 0)
+            }
+        })
+        .unwrap_or((0, 0));
+
+    Ok(GitDiffResult {
+        file_path,
+        old_content,
+        new_content,
+        added_lines,
+        deleted_lines,
+        is_new_file,
+        is_deleted_file,
+    })
+}

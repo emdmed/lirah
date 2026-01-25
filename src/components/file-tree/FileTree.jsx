@@ -17,6 +17,7 @@ export function FileTree({
   showGitChangesOnly,
   onToggle,
   onSendToTerminal,
+  onViewDiff,
   selectedFiles,
   onToggleFileSelection,
   isTextareaPanelOpen,
@@ -56,6 +57,7 @@ export function FileTree({
           gitStats={gitStats}
           onToggle={onToggle}
           onSendToTerminal={onSendToTerminal}
+          onViewDiff={onViewDiff}
           selectedFiles={selectedFiles}
           onToggleFileSelection={onToggleFileSelection}
           isTextareaPanelOpen={isTextareaPanelOpen}

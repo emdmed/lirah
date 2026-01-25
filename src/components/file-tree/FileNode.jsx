@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { File, CornerDownRight, Plus, CheckCircle, Loader2 } from "lucide-react";
+import { File, CornerDownRight, Plus, CheckCircle, Loader2, GitBranch } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
 
 /**
@@ -22,6 +22,7 @@ export function FileNode({
   isTextareaPanelOpen,
   onSendToTerminal,
   onToggleFileSelection,
+  onViewDiff,
   typeCheckResult,
   isCheckingTypes,
   isTypeCheckSuccess,
@@ -81,6 +82,24 @@ export function FileNode({
 
       {/* Action buttons */}
       <div className="flex gap-1 flex-shrink-0">
+        {/* View Diff button - only visible for files with git changes */}
+        {hasGitChanges && (
+          <button
+            className={`p-1 transition-opacity duration-200 rounded ${
+              isHovered
+                ? 'opacity-60 hover:opacity-100 hover:bg-white/10'
+                : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDiff?.(node.path);
+            }}
+            title="View git diff"
+          >
+            <GitBranch className="w-3 h-3" />
+          </button>
+        )}
+
         {/* Unified button - behavior depends on textarea panel state */}
         <button
           className={`p-1 transition-opacity duration-200 rounded ${isTextareaPanelOpen && isSelected

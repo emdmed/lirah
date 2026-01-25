@@ -14,6 +14,7 @@ export function TreeNode({
   gitStats,
   onToggle,
   onSendToTerminal,
+  onViewDiff,
   selectedFiles,
   onToggleFileSelection,
   isTextareaPanelOpen,
@@ -65,6 +66,7 @@ export function TreeNode({
             isTextareaPanelOpen={isTextareaPanelOpen}
             onSendToTerminal={onSendToTerminal}
             onToggleFileSelection={onToggleFileSelection}
+            onViewDiff={onViewDiff}
             typeCheckResult={typeCheckResult}
             isCheckingTypes={isCheckingTypes}
             isTypeCheckSuccess={isTypeCheckSuccess}
@@ -84,6 +86,7 @@ export function TreeNode({
             gitStats={gitStats}
             onToggle={onToggle}
             onSendToTerminal={onSendToTerminal}
+            onViewDiff={onViewDiff}
             selectedFiles={selectedFiles}
             onToggleFileSelection={onToggleFileSelection}
             isTextareaPanelOpen={isTextareaPanelOpen}
