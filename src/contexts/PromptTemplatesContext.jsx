@@ -5,14 +5,7 @@ const PromptTemplatesContext = createContext(undefined);
 const STORAGE_KEY = 'nevo-terminal:prompt-templates';
 const MAX_TEMPLATES = 50;
 
-const DEFAULT_TEMPLATES = [
-  {
-    id: 'default-orchestration',
-    title: 'Orchestration',
-    content: 'Read and follow .claude/orchestration.md',
-    isDefault: true,
-  },
-];
+const DEFAULT_TEMPLATES = [];
 
 function validateTemplates(templates) {
   if (!Array.isArray(templates)) return [];

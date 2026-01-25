@@ -28,6 +28,8 @@ export function TextareaPanel({
   selectedTemplateId,
   onSelectTemplate,
   onManageTemplates,
+  appendOrchestration = true,
+  onToggleOrchestration,
 }) {
   const fileListRef = useRef(null);
 
@@ -63,13 +65,22 @@ export function TextareaPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
-            {selectedTemplateId && !value?.trim() ? (
-              <span className="text-primary">Ctrl+Enter to send template</span>
-            ) : (
-              "Multi-line Input (Ctrl+Enter: send, Tab: navigate files)"
-            )}
-          </span>
+          {onToggleOrchestration && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="orchestration"
+                checked={appendOrchestration}
+                onCheckedChange={onToggleOrchestration}
+                disabled={disabled}
+              />
+              <label
+                htmlFor="orchestration"
+                className="text-xs text-muted-foreground cursor-pointer select-none"
+              >
+                orchestration
+              </label>
+            </div>
+          )}
           {onToggleKeepFiles && (
             <div className="flex items-center gap-2">
               <Checkbox
@@ -118,11 +129,20 @@ export function TextareaPanel({
         />
       </div>
 
-      {/* Action buttons */}
-      <ActionButtons
-        onSend={handleSend}
-        disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId)}
-      />
+      {/* Footer row: instructions + action buttons */}
+      <div className="flex items-center justify-between">
+        <span id="textarea-instructions" className="text-xs text-muted-foreground font-mono">
+          {selectedTemplateId && !value?.trim() ? (
+            <span className="text-primary">Ctrl+Enter to send template</span>
+          ) : (
+            "Ctrl+Enter: send, Tab: navigate files"
+          )}
+        </span>
+        <ActionButtons
+          onSend={handleSend}
+          disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId)}
+        />
+      </div>
     </div>
   );
 }

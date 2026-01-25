@@ -91,8 +91,9 @@ function App() {
   const { updateBookmark } = useBookmarks();
 
   // Prompt templates state
-  const [selectedTemplateId, setSelectedTemplateId] = useState('default-orchestration');
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [manageTemplatesDialogOpen, setManageTemplatesDialogOpen] = useState(false);
+  const [appendOrchestration, setAppendOrchestration] = useState(true);
 
   // Type check state
   const [typeCheckResults, setTypeCheckResults] = useState(new Map());
@@ -413,6 +414,12 @@ function App() {
         }
       }
 
+      // Append orchestration prompt if checkbox is checked
+      if (appendOrchestration) {
+        const separator = fullCommand.trim() ? '\n\n' : '';
+        fullCommand = fullCommand + separator + 'Read and follow .claude/orchestration.md';
+      }
+
       // Send text content first
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
@@ -448,7 +455,7 @@ function App() {
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -973,6 +980,8 @@ function App() {
               selectedTemplateId={selectedTemplateId}
               onSelectTemplate={setSelectedTemplateId}
               onManageTemplates={() => setManageTemplatesDialogOpen(true)}
+              appendOrchestration={appendOrchestration}
+              onToggleOrchestration={setAppendOrchestration}
             />
           )
         }
