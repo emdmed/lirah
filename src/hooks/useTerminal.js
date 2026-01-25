@@ -20,7 +20,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: '"Source Code Pro", Menlo, Monaco, "Courier New", monospace',
+      fontFamily: '"Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace',
       theme: theme,
       allowProposedApi: true,
     });

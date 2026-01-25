@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Typestar OCR';
+  src: url('./assets/fonts/Typestar-OCR.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -44,7 +52,7 @@ html, body, #root {
 
 body {
   /* Background color will be set dynamically by ThemeProvider */
-  font-family: "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  font-family: "Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
 }
 
 :root {
