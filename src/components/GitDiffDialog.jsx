@@ -55,6 +55,7 @@ export function GitDiffDialog({ open, onOpenChange, filePath, repoPath }) {
   const [diffResult, setDiffResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [nearestDiffInfo, setNearestDiffInfo] = useState(null);
 
   useEffect(() => {
     if (open && filePath && repoPath) {
@@ -142,9 +143,21 @@ export function GitDiffDialog({ open, onOpenChange, filePath, repoPath }) {
               isDeletedFile={diffResult.is_deleted_file}
               language={language}
               scrollContainerRef={scrollContainerRef}
+              onNearestDiffChange={setNearestDiffInfo}
             />
           ) : null}
         </div>
+
+        {/* Distance to nearest diff indicator */}
+        {nearestDiffInfo && nearestDiffInfo.distance > 0 && (
+          <div className="absolute bottom-8 right-8 bg-muted/90 backdrop-blur-sm border border-border rounded-md px-3 py-2 text-xs font-mono shadow-lg z-10">
+            <span className="text-muted-foreground">
+              {nearestDiffInfo.direction === 'up' ? '↑' : '↓'}{' '}
+              <span className="text-foreground font-medium">{nearestDiffInfo.distance}</span>{' '}
+              {nearestDiffInfo.distance === 1 ? 'line' : 'lines'} to next change
+            </span>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

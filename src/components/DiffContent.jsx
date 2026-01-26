@@ -79,8 +79,9 @@ const kanagawaTheme = {
  * @param {boolean} isDeletedFile - Whether this file has been deleted
  * @param {string} language - Programming language for syntax highlighting
  * @param {React.RefObject} scrollContainerRef - Ref to the scroll container for tracking position
+ * @param {function} onNearestDiffChange - Callback when nearest diff info changes
  */
-export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, language, scrollContainerRef }) {
+export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, language, scrollContainerRef, onNearestDiffChange }) {
   // Compute the diff
   const diffResult = useMemo(() => {
     if (isNewFile) {
@@ -292,6 +293,11 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
     return null;
   }, [diffChunks, visibleRange]);
 
+  // Notify parent of nearest diff changes
+  useEffect(() => {
+    onNearestDiffChange?.(nearestDiffInfo);
+  }, [nearestDiffInfo, onNearestDiffChange]);
+
   return (
     <div className="flex font-mono text-sm relative">
       {/* Old file (left side) */}
@@ -336,16 +342,6 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
         </div>
       </div>
 
-      {/* Distance to nearest diff indicator */}
-      {nearestDiffInfo && nearestDiffInfo.distance > 0 && (
-        <div className="fixed bottom-4 right-8 bg-muted/90 backdrop-blur-sm border border-border rounded-md px-3 py-2 text-xs font-mono shadow-lg z-10">
-          <span className="text-muted-foreground">
-            {nearestDiffInfo.direction === 'up' ? '↑' : '↓'}{' '}
-            <span className="text-foreground font-medium">{nearestDiffInfo.distance}</span>{' '}
-            {nearestDiffInfo.distance === 1 ? 'line' : 'lines'} to next change
-          </span>
-        </div>
-      )}
     </div>
   );
 }
