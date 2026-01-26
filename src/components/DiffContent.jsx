@@ -159,56 +159,87 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
   const { oldLines, newLines } = diffResult;
   const maxLines = Math.max(oldLines.length, newLines.length);
 
-  // Collect indices of diff lines (added or removed)
-  const diffIndices = useMemo(() => {
-    const indices = [];
+  // Collect diff chunks (groups of consecutive changed lines)
+  const diffChunks = useMemo(() => {
+    const chunks = [];
+    let currentChunk = null;
+
     for (let i = 0; i < maxLines; i++) {
       const oldLine = oldLines[i];
       const newLine = newLines[i];
-      if (oldLine?.type === 'removed' || newLine?.type === 'added') {
-        indices.push(i);
+      const isDiff = oldLine?.type === 'removed' || newLine?.type === 'added';
+
+      if (isDiff) {
+        if (currentChunk === null) {
+          currentChunk = { start: i, end: i };
+        } else {
+          currentChunk.end = i;
+        }
+      } else if (currentChunk !== null) {
+        chunks.push(currentChunk);
+        currentChunk = null;
       }
     }
-    return indices;
+
+    if (currentChunk !== null) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
   }, [oldLines, newLines, maxLines]);
 
   // Track scroll position to calculate distance to nearest diff
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 });
   const scrollThrottleRef = useRef(null);
-  const [containerReady, setContainerReady] = useState(false);
+  const [container, setContainer] = useState(null);
 
   const LINE_HEIGHT = 24; // h-6 = 24px
 
-  // Check when container ref becomes available
+  // Track when container ref becomes available
   useEffect(() => {
-    if (scrollContainerRef?.current && !containerReady) {
-      setContainerReady(true);
-    }
-  });
+    const checkContainer = () => {
+      if (scrollContainerRef?.current && scrollContainerRef.current !== container) {
+        setContainer(scrollContainerRef.current);
+      }
+    };
+
+    checkContainer();
+    // Check again after a short delay in case ref isn't ready yet
+    const timeout = setTimeout(checkContainer, 50);
+    return () => clearTimeout(timeout);
+  }, [scrollContainerRef, container]);
 
   useEffect(() => {
-    const container = scrollContainerRef?.current;
     if (!container) return;
+
+    const calculateVisibleRange = () => {
+      const scrollTop = container.scrollTop;
+      const viewportHeight = container.clientHeight;
+
+      const startLine = Math.floor(scrollTop / LINE_HEIGHT);
+      const visibleLines = Math.ceil(viewportHeight / LINE_HEIGHT);
+      const endLine = startLine + visibleLines;
+
+      setVisibleRange(prev => {
+        if (prev.start === startLine && prev.end === endLine) {
+          return prev;
+        }
+        return { start: startLine, end: endLine };
+      });
+    };
 
     const handleScroll = () => {
       // Throttle with requestAnimationFrame
       if (scrollThrottleRef.current) return;
 
       scrollThrottleRef.current = requestAnimationFrame(() => {
-        const scrollTop = container.scrollTop;
-        const viewportHeight = container.clientHeight;
-
-        const startLine = Math.floor(scrollTop / LINE_HEIGHT);
-        const visibleLines = Math.ceil(viewportHeight / LINE_HEIGHT);
-        const endLine = startLine + visibleLines;
-
-        setVisibleRange({ start: startLine, end: endLine });
+        calculateVisibleRange();
         scrollThrottleRef.current = null;
       });
     };
 
     // Initial calculation
-    handleScroll();
+    calculateVisibleRange();
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
@@ -217,37 +248,49 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
         cancelAnimationFrame(scrollThrottleRef.current);
       }
     };
-  }, [containerReady]);
+  }, [container]);
 
-  // Calculate distance to nearest diff outside the current viewport
+  // Calculate distance to nearest diff chunk that is completely outside the viewport
   const nearestDiffInfo = useMemo(() => {
-    if (diffIndices.length === 0) return null;
+    if (diffChunks.length === 0) return null;
 
     const { start, end } = visibleRange;
 
-    // Find nearest diff above and below the viewport
+    // A chunk is visible if any part of it overlaps with the visible range
+    const isChunkVisible = (chunk) => {
+      return chunk.start <= end && chunk.end >= start;
+    };
+
+    // Find nearest chunk completely above and below the viewport
     let nearestAbove = null;
     let nearestBelow = null;
 
-    for (const idx of diffIndices) {
-      if (idx < start) {
-        nearestAbove = idx;
-      } else if (idx > end && nearestBelow === null) {
-        nearestBelow = idx;
+    for (const chunk of diffChunks) {
+      if (isChunkVisible(chunk)) {
+        // Skip chunks that are even partially visible
+        continue;
+      }
+
+      if (chunk.end < start) {
+        // Chunk is completely above the viewport
+        nearestAbove = chunk;
+      } else if (chunk.start > end && nearestBelow === null) {
+        // Chunk is completely below the viewport
+        nearestBelow = chunk;
         break;
       }
     }
 
     // Prioritize showing next diff below, then above
     if (nearestBelow !== null) {
-      return { distance: nearestBelow - end, direction: 'down' };
+      return { distance: nearestBelow.start - end, direction: 'down' };
     } else if (nearestAbove !== null) {
-      return { distance: start - nearestAbove, direction: 'up' };
+      return { distance: start - nearestAbove.end, direction: 'up' };
     }
 
     // All diffs are currently visible
     return null;
-  }, [diffIndices, visibleRange]);
+  }, [diffChunks, visibleRange]);
 
   return (
     <div className="flex font-mono text-sm relative">
