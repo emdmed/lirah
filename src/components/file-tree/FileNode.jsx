@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { File, CornerDownRight, Plus, CheckCircle, Loader2, GitBranch } from "lucide-react";
+import { File, CornerDownRight, CheckCircle, Loader2, GitBranch } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
 
 /**
@@ -33,15 +33,28 @@ export function FileNode({
   const hasGitChanges = stats && (stats.added > 0 || stats.deleted > 0);
   const hasTypeErrors = typeCheckResult && typeCheckResult.error_count > 0;
 
+  const handleFileClick = () => {
+    if (isTextareaPanelOpen) {
+      onToggleFileSelection(node.path);
+    }
+  };
+
   return (
     <div
       style={{ paddingLeft: `${depth * 12}px` }}
-      className={`flex h-5 items-center w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''}`}
+      className={`flex h-5 items-center w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${
+        isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
+      }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Main file display */}
-      <div className="flex items-center justify-start flex-1 min-w-0 gap-1">
+      {/* Main file display - clickable when textarea panel is open */}
+      <div
+        className={`flex items-center justify-start flex-1 min-w-0 gap-1 ${
+          isTextareaPanelOpen ? 'cursor-pointer hover:bg-white/5' : ''
+        }`}
+        onClick={handleFileClick}
+      >
         <File className="w-3 h-3 ml-1 mr-1 flex-shrink-0" />
         <span
           className="truncate text-xs"
@@ -100,32 +113,19 @@ export function FileNode({
           </button>
         )}
 
-        {/* Unified button - behavior depends on textarea panel state */}
-        <button
-          className={`p-1 transition-opacity duration-200 rounded ${isTextareaPanelOpen && isSelected
-              ? 'opacity-100 bg-blue-500/30 hover:bg-blue-500/40'
-              : 'opacity-60 hover:opacity-100 hover:bg-white/10'
-            }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (isTextareaPanelOpen) {
-              onToggleFileSelection(node.path);
-            } else {
+        {/* Send to terminal button - only visible when textarea panel is closed */}
+        {!isTextareaPanelOpen && (
+          <button
+            className="p-1 transition-opacity duration-200 rounded opacity-60 hover:opacity-100 hover:bg-white/10"
+            onClick={(e) => {
+              e.stopPropagation();
               onSendToTerminal(node.path);
-            }
-          }}
-          title={
-            isTextareaPanelOpen
-              ? (isSelected ? "Remove from file list" : "Add to file list")
-              : "Send path to terminal"
-          }
-        >
-          {isTextareaPanelOpen ? (
-            <Plus className={`w-3 h-3 ${isSelected ? 'text-blue-400' : ''}`} />
-          ) : (
+            }}
+            title="Send path to terminal"
+          >
             <CornerDownRight className="w-3 h-3" />
-          )}
-        </button>
+          </button>
+        )}
       </div>
     </div>
   );
