@@ -99,7 +99,7 @@ export function GitDiffDialog({ open, onOpenChange, filePath, repoPath }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
+      <DialogContent className="w-[calc(100vw-2rem)] h-[calc(100vh-2rem)] max-w-none flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-mono text-sm">
             {fileName}
