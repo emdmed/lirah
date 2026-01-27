@@ -7,6 +7,7 @@ import { SidebarHeader } from "./components/SidebarHeader";
 import { FlatViewMenu } from "./components/FlatViewMenu";
 import { AddBookmarkDialog } from "./components/AddBookmarkDialog";
 import { BookmarksPalette } from "./components/BookmarksPalette";
+import { InitialProjectDialog } from "./components/InitialProjectDialog";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
 import { GitDiffDialog } from "./components/GitDiffDialog";
 import { usePromptTemplates } from "./contexts/PromptTemplatesContext";
@@ -84,7 +85,8 @@ function App() {
   // Bookmarks state
   const [addBookmarkDialogOpen, setAddBookmarkDialogOpen] = useState(false);
   const [bookmarksPaletteOpen, setBookmarksPaletteOpen] = useState(false);
-  const { updateBookmark } = useBookmarks();
+  const [initialProjectDialogOpen, setInitialProjectDialogOpen] = useState(false);
+  const { bookmarks, updateBookmark } = useBookmarks();
 
   // Prompt templates state
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
@@ -526,6 +528,13 @@ function App() {
     }
   }, [terminalSessionId]);
 
+  // Show initial project dialog when terminal is ready and bookmarks exist
+  useEffect(() => {
+    if (terminalSessionId && bookmarks.length > 0) {
+      setInitialProjectDialogOpen(true);
+    }
+  }, [terminalSessionId]); // Only run once when session becomes available
+
   // Reload sidebar when terminal CWD changes (mode-specific)
   useEffect(() => {
     if (detectedCwd && sidebarOpen) {
@@ -961,6 +970,12 @@ function App() {
         onOpenChange={setDiffDialogOpen}
         filePath={diffFilePath}
         repoPath={currentPath}
+      />
+      <InitialProjectDialog
+        open={initialProjectDialogOpen}
+        onOpenChange={setInitialProjectDialogOpen}
+        onNavigate={navigateToBookmark}
+        onLaunchClaude={launchClaude}
       />
     </SidebarProvider>
   );
