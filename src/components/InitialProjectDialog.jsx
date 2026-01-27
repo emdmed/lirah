@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { useBookmarks } from '../contexts/BookmarksContext';
 import { FolderOpen } from 'lucide-react';
 
-export function InitialProjectDialog({ open, onOpenChange, onNavigate, onLaunchClaude }) {
+export function InitialProjectDialog({ open, onOpenChange, onNavigate, onLaunchClaude, onSwitchToClaudeMode }) {
   const { bookmarks } = useBookmarks();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selectedItemRef = useRef(null);
@@ -68,13 +68,15 @@ export function InitialProjectDialog({ open, onOpenChange, onNavigate, onLaunchC
     if (onNavigate) {
       await onNavigate(bookmark);
     }
-    // Launch Claude after navigation completes
-    if (onLaunchClaude) {
-      // Small delay to ensure terminal is ready after navigation
-      setTimeout(() => {
+    // Switch to Claude mode (tree view) and launch Claude after navigation completes
+    setTimeout(() => {
+      if (onSwitchToClaudeMode) {
+        onSwitchToClaudeMode();
+      }
+      if (onLaunchClaude) {
         onLaunchClaude();
-      }, 200);
-    }
+      }
+    }, 200);
   };
 
   const handleSkip = () => {

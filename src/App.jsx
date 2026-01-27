@@ -129,6 +129,12 @@ function App() {
   // Claude launcher hook
   const { launchClaude } = useClaudeLauncher(terminalSessionId, terminalRef);
 
+  // Switch to Claude mode (tree view)
+  const switchToClaudeMode = useCallback(() => {
+    setViewMode('tree');
+    setSidebarOpen(true);
+  }, []);
+
   // Launch orchestration handler
   const launchOrchestration = useCallback(async () => {
     if (!terminalSessionId) {
@@ -976,6 +982,7 @@ function App() {
         onOpenChange={setInitialProjectDialogOpen}
         onNavigate={navigateToBookmark}
         onLaunchClaude={launchClaude}
+        onSwitchToClaudeMode={switchToClaudeMode}
       />
     </SidebarProvider>
   );
