@@ -1,5 +1,6 @@
 use tauri::{AppHandle, Emitter};
 use std::io::Read;
+use std::sync::atomic::Ordering;
 use std::thread;
 use uuid::Uuid;
 use crate::state::AppState;
@@ -24,14 +25,27 @@ pub fn spawn_terminal(
         .try_clone_reader()
         .map_err(|e| format!("Failed to clone reader: {}", e))?;
 
+    // Clone shutdown flag for the reader thread
+    let shutdown_flag = session.shutdown.clone();
+
     // Spawn a thread to read from PTY and emit events
     let session_id_clone = session_id.clone();
     let app_clone = app.clone();
     thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
+            // Check shutdown flag before reading
+            if shutdown_flag.load(Ordering::SeqCst) {
+                break;
+            }
+
             match reader.read(&mut buf) {
                 Ok(n) if n > 0 => {
+                    // Check shutdown flag after read
+                    if shutdown_flag.load(Ordering::SeqCst) {
+                        break;
+                    }
+
                     // Convert bytes to string (handling UTF-8)
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
 
@@ -43,14 +57,18 @@ pub fn spawn_terminal(
                 }
                 Ok(_) => {
                     // EOF reached, process exited
-                    let _ = app_clone.emit("terminal-output", serde_json::json!({
-                        "session_id": session_id_clone,
-                        "data": "\r\n[Process exited]\r\n",
-                    }));
+                    if !shutdown_flag.load(Ordering::SeqCst) {
+                        let _ = app_clone.emit("terminal-output", serde_json::json!({
+                            "session_id": session_id_clone,
+                            "data": "\r\n[Process exited]\r\n",
+                        }));
+                    }
                     break;
                 }
                 Err(e) => {
-                    eprintln!("Error reading from PTY: {}", e);
+                    if !shutdown_flag.load(Ordering::SeqCst) {
+                        eprintln!("Error reading from PTY: {}", e);
+                    }
                     break;
                 }
             }
@@ -105,15 +123,28 @@ pub fn resize_terminal(
 }
 
 #[tauri::command]
-pub fn close_terminal(session_id: String, state: tauri::State<AppState>) -> Result<(), String> {
+pub fn close_terminal(
+    session_id: String,
+    app: AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
     let mut state_lock = state
         .lock()
         .map_err(|e| format!("Failed to lock state: {}", e))?;
 
-    state_lock
-        .pty_sessions
-        .remove(&session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+    if let Some(mut session) = state_lock.pty_sessions.remove(&session_id) {
+        // Signal reader thread to stop
+        session.shutdown.store(true, Ordering::SeqCst);
+
+        // Kill child process
+        let _ = session.child.kill();
+
+        // Emit closed event
+        let _ = app.emit(
+            "terminal-closed",
+            serde_json::json!({"session_id": session_id}),
+        );
+    }
 
     Ok(())
 }

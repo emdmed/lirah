@@ -1,4 +1,6 @@
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use crate::state::PtySession;
 
 pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
@@ -38,6 +40,7 @@ pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
         master,
         child,
         writer,
+        shutdown: Arc::new(AtomicBool::new(false)),
     })
 }
 
@@ -46,7 +49,11 @@ pub fn write_to_pty(session: &mut PtySession, data: &str) -> Result<(), String> 
     session
         .writer
         .write_all(data.as_bytes())
-        .map_err(|e| format!("Failed to write to PTY: {}", e))
+        .map_err(|e| format!("Failed to write to PTY: {}", e))?;
+    session
+        .writer
+        .flush()
+        .map_err(|e| format!("Failed to flush PTY: {}", e))
 }
 
 pub fn resize_pty(session: &mut PtySession, rows: u16, cols: u16) -> Result<(), String> {

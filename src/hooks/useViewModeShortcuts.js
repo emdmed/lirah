@@ -30,15 +30,15 @@ export function useViewModeShortcuts({
         e.preventDefault();
         e.stopPropagation();
 
+        // Do nothing if already in tree mode
         if (sidebarOpen && viewMode === 'tree') {
-          // Tree view is open, close it
-          setSidebarOpen(false);
-        } else {
-          // Open tree view (closes flat if open)
-          setViewMode('tree');
-          setSidebarOpen(true);
-          onLoadTreeView();
+          return;
         }
+
+        // Open tree view (closes flat if open)
+        setViewMode('tree');
+        setSidebarOpen(true);
+        onLoadTreeView();
 
         // Launch Claude Code
         if (onLaunchClaude) {

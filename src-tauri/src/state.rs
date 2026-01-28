@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use portable_pty::{Child, MasterPty};
 use std::io::Write;
@@ -7,6 +8,7 @@ pub struct PtySession {
     pub master: Box<dyn MasterPty + Send>,
     pub child: Box<dyn Child + Send>,
     pub writer: Box<dyn Write + Send>,
+    pub shutdown: Arc<AtomicBool>,
 }
 
 pub struct AppStateData {
