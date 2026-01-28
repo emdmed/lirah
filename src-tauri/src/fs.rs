@@ -283,7 +283,8 @@ pub fn get_git_stats(path: Option<String>, state: tauri::State<AppState>) -> Res
             .map_err(|e| format!("Failed to lock state: {}", e))?;
 
         if let Some(cached_stats) = state_lock.git_cache.get(&canonical_path) {
-            return Ok(cached_stats);
+            // Clone from Arc - cheap if caller just reads, necessary for Tauri serialization
+            return Ok((*cached_stats).clone());
         }
     }
 
