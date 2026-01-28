@@ -1,52 +1,43 @@
 # React Refactor Workflow
 
-## Architecture Rules
+> Architecture rules: See orchestration.md. Violations block merge.
 
-- **Feature architecture**: Organize by feature, not by type
-- **No barrel exports**: Never use `index.ts` to re-export
-- **Entry point naming**: File must match folder name (`Button/Button.tsx`)
-- **Colocation**: Keep related files together
+## Before Coding
 
-## Before Starting
-
-- [ ] What specific improvement am I making?
-- [ ] Is there adequate test coverage?
-- [ ] How will I verify behavior is unchanged?
+MUST answer:
+- What specific improvement am I making?
+- Is there adequate test coverage?
+- How will I verify behavior is unchanged?
 
 ## Process
 
 ### 1. Ensure Safety Net
-- Run tests to confirm they pass before changes
+- Run tests to confirm they pass
 - Add tests if coverage is insufficient
 
-### 2. Plan the Refactor
+### 2. Plan
 - Map all imports and dependencies
-- Identify all callers of components and hooks
+- Identify all callers of affected code
 - Break into small, safe steps
 
 ### 3. Execute Incrementally
 
-**Update imports to direct paths:**
-```tsx
-// Before (barrel)
-import { Button } from '@/components'
+Make one type of change at a time. Examples:
 
-// After (direct)
-import { Button } from '@/shared/components/Button/Button'
-```
+- Rename files to match folder names
+- Convert barrel imports to direct imports
+- Extract logic into hooks
+- Split large components
 
-**Rename entry points:**
-```
-Button/index.tsx  →  Button/Button.tsx
-```
+Run tests after each step.
 
 ### 4. Validate
 - All tests pass
 - No `index.ts` or `index.tsx` files remain
 - All entry points match folder names
 
-## Reminders
+## Constraints
 
-- Refactoring changes structure, not behavior
-- If you find bugs, fix them separately
-- Keep scope contained—one feature at a time
+- Refactoring changes structure, NOT behavior
+- NEVER fix bugs during refactor—note them separately
+- MUST keep scope contained: one change type at a time
