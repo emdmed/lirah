@@ -44,6 +44,8 @@ function App() {
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isResizing, setIsResizing] = useState(false);
   const [terminalSessionId, setTerminalSessionId] = useState(null);
 
   // Ref to access terminal's imperative methods
@@ -51,6 +53,34 @@ function App() {
 
   // Ref for search input
   const searchInputRef = useRef(null);
+
+  // Sidebar resize handlers
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleResizeMove = (e) => {
+      if (!isResizing) return;
+      const newWidth = Math.min(Math.max(200, e.clientX), 600);
+      setSidebarWidth(newWidth);
+    };
+
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isResizing]);
 
   // Flat view navigation hook
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
@@ -869,65 +899,72 @@ function App() {
   }, [treeData, searchResults]);
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} style={{ height: '100%' }}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} className={isResizing ? 'select-none' : ''} style={{ height: '100%' }}>
       <Layout
         sidebar={
           sidebarOpen && (
-            <Sidebar collapsible="none" className="border-e m-0 p-1 w-[280px] shrink-0" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                <SidebarHeader
-                  viewMode={viewMode}
-                  currentPath={currentPath}
-                  onNavigateParent={navigateToParent}
-                  searchQuery={searchQuery}
-                  onSearchChange={handleSearchChange}
-                  onSearchClear={handleSearchClear}
-                  showSearch={viewMode === 'tree'}
-                  searchInputRef={searchInputRef}
-                  showGitChangesOnly={showGitChangesOnly}
-                  onToggleGitFilter={handleToggleGitFilter}
-                  fileWatchingEnabled={fileWatchingEnabled}
-                  onAddBookmark={() => setAddBookmarkDialogOpen(true)}
-                  onNavigateBookmark={navigateToBookmark}
-                  hasTerminalSession={!!terminalSessionId}
-                />
-                <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                  <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                    {viewMode === 'flat' ? (
-                      <FlatViewMenu
-                        folders={folders}
-                        onFolderClick={loadFolders}
-                      />
-                    ) : (
-                      treeLoading ? (
-                        <div className="p-4 text-center">
-                          <div className="text-sm opacity-60">Loading directory tree...</div>
-                        </div>
-                      ) : (
-                        <FileTree
-                          nodes={displayedTreeData}
-                          searchQuery={searchQuery}
-                          expandedFolders={expandedFolders}
-                          currentPath={currentPath}
-                          showGitChangesOnly={showGitChangesOnly}
-                          onToggle={toggleFolder}
-                          onSendToTerminal={sendFileToTerminal}
-                          onViewDiff={viewFileDiff}
-                          selectedFiles={selectedFiles}
-                          onToggleFileSelection={toggleFileSelection}
-                          isTextareaPanelOpen={textareaVisible}
-                          typeCheckResults={typeCheckResults}
-                          checkingFiles={checkingFiles}
-                          successfulChecks={successfulChecks}
-                          onCheckFileTypes={checkFileTypes}
-                          fileWatchingEnabled={fileWatchingEnabled}
+            <>
+              <Sidebar collapsible="none" className="border-e m-0 p-1 shrink-0 overflow-hidden" style={{ height: '100%', display: 'flex', flexDirection: 'column', width: sidebarWidth }}>
+                <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                  <SidebarHeader
+                    viewMode={viewMode}
+                    currentPath={currentPath}
+                    onNavigateParent={navigateToParent}
+                    searchQuery={searchQuery}
+                    onSearchChange={handleSearchChange}
+                    onSearchClear={handleSearchClear}
+                    showSearch={viewMode === 'tree'}
+                    searchInputRef={searchInputRef}
+                    showGitChangesOnly={showGitChangesOnly}
+                    onToggleGitFilter={handleToggleGitFilter}
+                    fileWatchingEnabled={fileWatchingEnabled}
+                    onAddBookmark={() => setAddBookmarkDialogOpen(true)}
+                    onNavigateBookmark={navigateToBookmark}
+                    hasTerminalSession={!!terminalSessionId}
+                  />
+                  <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                    <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                      {viewMode === 'flat' ? (
+                        <FlatViewMenu
+                          folders={folders}
+                          onFolderClick={loadFolders}
                         />
-                      )
-                    )}
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              </SidebarContent>
-            </Sidebar>
+                      ) : (
+                        treeLoading ? (
+                          <div className="p-4 text-center">
+                            <div className="text-sm opacity-60">Loading directory tree...</div>
+                          </div>
+                        ) : (
+                          <FileTree
+                            nodes={displayedTreeData}
+                            searchQuery={searchQuery}
+                            expandedFolders={expandedFolders}
+                            currentPath={currentPath}
+                            showGitChangesOnly={showGitChangesOnly}
+                            onToggle={toggleFolder}
+                            onSendToTerminal={sendFileToTerminal}
+                            onViewDiff={viewFileDiff}
+                            selectedFiles={selectedFiles}
+                            onToggleFileSelection={toggleFileSelection}
+                            isTextareaPanelOpen={textareaVisible}
+                            typeCheckResults={typeCheckResults}
+                            checkingFiles={checkingFiles}
+                            successfulChecks={successfulChecks}
+                            onCheckFileTypes={checkFileTypes}
+                            fileWatchingEnabled={fileWatchingEnabled}
+                          />
+                        )
+                      )}
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                </SidebarContent>
+              </Sidebar>
+              {/* Resize handle */}
+              <div
+                className={`w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50 shrink-0 ${isResizing ? 'bg-primary/50' : ''}`}
+                onMouseDown={handleResizeStart}
+              />
+            </>
           )
         }
         textarea={
