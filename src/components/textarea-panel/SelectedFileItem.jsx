@@ -19,7 +19,8 @@ export function SelectedFileItem({
   onSetFileState,
   onRemoveFile,
   isSelected = false,
-  itemRef
+  itemRef,
+  showKeyboardHints = false
 }) {
   return (
     <div
@@ -38,6 +39,7 @@ export function SelectedFileItem({
           <FileStateSelector
             value={currentState}
             onValueChange={(newState) => onSetFileState(file.absolute, newState)}
+            showKeyboardHints={showKeyboardHints && isSelected}
           />
           <span className="text-xs truncate" title={file.absolute}>
             {file.name}

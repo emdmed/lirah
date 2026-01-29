@@ -11,8 +11,8 @@ export function GitStatsBadge({ stats }) {
 
   return (
     <span className="inline-flex items-center gap-1 text-[0.65rem] font-mono flex-shrink-0">
-      <span style={{ color: '#98BB6C' }}>+{stats.added}</span>
-      <span style={{ color: '#C34043' }}>-{stats.deleted}</span>
+      <span className="text-git-added">+{stats.added}</span>
+      <span className="text-git-deleted">-{stats.deleted}</span>
     </span>
   );
 }

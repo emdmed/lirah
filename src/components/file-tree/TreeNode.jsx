@@ -2,6 +2,7 @@ import React from "react";
 import { SidebarMenuItem } from "@/components/ui/sidebar";
 import { FolderNode } from "./FolderNode";
 import { FileNode } from "./FileNode";
+import { INDENT_PX, GUIDE_OFFSET_PX } from "./constants";
 
 /**
  * Renders a tree node (file or folder) with all interactions
@@ -43,8 +44,8 @@ export function TreeNode({
         {/* Indentation guide line */}
         {depth > 0 && (
           <div
-            className="absolute top-0 bottom-0 border-l border-white/10"
-            style={{ left: `${(depth - 1) * 12 + 6}px` }}
+            className="absolute top-0 bottom-0 border-l border-tree-guide"
+            style={{ left: `${(depth - 1) * INDENT_PX + GUIDE_OFFSET_PX}px` }}
           />
         )}
 

@@ -41,6 +41,7 @@ export function SidebarHeader({
               variant="ghost"
               className="h-5 w-5"
               title="Bookmark current directory"
+              aria-label="Bookmark current directory"
             >
               <Star className="w-2.5 h-2.5" />
             </Button>
@@ -52,6 +53,8 @@ export function SidebarHeader({
               variant={showGitChangesOnly ? 'default' : 'ghost'}
               className={`h-5 w-5 ${!fileWatchingEnabled ? 'opacity-40' : ''}`}
               title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only git changes (Ctrl+G)"}
+              aria-label={showGitChangesOnly ? "Show all files" : "Show only git changes"}
+              aria-pressed={showGitChangesOnly}
             >
               <GitBranch className="w-2.5 h-2.5" />
             </Button>
@@ -63,6 +66,7 @@ export function SidebarHeader({
               variant="ghost"
               className="h-5 w-5"
               title="Parent directory"
+              aria-label="Navigate to parent directory"
             >
               <ChevronUp className="w-2.5 h-2.5" />
             </Button>
@@ -85,8 +89,9 @@ export function SidebarHeader({
           {searchQuery && (
             <button
               onClick={onSearchClear}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 transition-opacity p-0.5 rounded focus-ring"
               title="Clear search"
+              aria-label="Clear search"
             >
               <X className="w-2.5 h-2.5" />
             </button>

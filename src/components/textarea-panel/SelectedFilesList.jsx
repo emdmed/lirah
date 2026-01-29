@@ -77,6 +77,7 @@ export function SelectedFilesList({
               onRemoveFile={onRemoveFile}
               isSelected={selectedIndex === index}
               itemRef={(el) => (fileRefs.current[index] = el)}
+              showKeyboardHints={true}
             />
           );
         })}

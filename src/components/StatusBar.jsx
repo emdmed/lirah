@@ -69,19 +69,21 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
           </Button>
           <button
             onClick={onToggleHelp}
-            className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
+            className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer focus-ring rounded"
             title="Keyboard shortcuts (Ctrl+H)"
+            aria-label="Toggle keyboard shortcuts help"
           >
             <HelpCircle className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={toggleWatchers}
-            className="transition-opacity cursor-pointer"
+            className="transition-opacity cursor-pointer focus-ring rounded"
             style={{
               opacity: fileWatchingEnabled ? 0.5 : 0.3,
               color: fileWatchingEnabled ? 'inherit' : '#E82424',
             }}
             title={`File watching: ${fileWatchingEnabled ? 'ON' : 'OFF'} (Ctrl+W)`}
+            aria-label={`Toggle file watching, currently ${fileWatchingEnabled ? 'enabled' : 'disabled'}`}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = fileWatchingEnabled ? 0.5 : 0.3; }}
           >

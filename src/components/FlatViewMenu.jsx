@@ -5,7 +5,7 @@ export function FlatViewMenu({ folders, onFolderClick }) {
   return (
     <SidebarMenu>
       {folders.length === 0 ? (
-        <div style={{ padding: '0.25rem', opacity: 0.5, fontSize: '0.7rem' }}>
+        <div className="p-1 opacity-50 text-[0.7rem]">
           No files or folders found
         </div>
       ) : (
@@ -13,17 +13,10 @@ export function FlatViewMenu({ folders, onFolderClick }) {
           <SidebarMenuItem key={item.path}>
             <SidebarMenuButton
               onClick={item.is_dir ? () => onFolderClick(item.path) : undefined}
-              style={{
-                cursor: item.is_dir ? 'pointer' : 'default',
-                paddingLeft: '4px',
-                paddingRight: '4px',
-                paddingTop: '1px',
-                paddingBottom: '1px',
-                fontSize: '0.75rem',
-              }}
+              className={`px-1 py-px text-xs ${item.is_dir ? 'cursor-pointer' : 'cursor-default'}`}
             >
               {item.is_dir ? (
-                <Folder className="w-3 h-3 mr-1.5" style={{ color: '#E6C384' }} />
+                <Folder className="w-3 h-3 mr-1.5 text-folder" />
               ) : (
                 <File className="w-3 h-3 mr-1.5" />
               )}

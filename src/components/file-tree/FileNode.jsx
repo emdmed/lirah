@@ -1,6 +1,7 @@
 import React from "react";
 import { File, GitBranch } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
+import { INDENT_PX } from "./constants";
 
 /**
  * Renders a file node in the tree with action buttons
@@ -28,7 +29,7 @@ export function FileNode({
 
   return (
     <div
-      style={{ paddingLeft: `${depth * 12}px` }}
+      style={{ paddingLeft: `${depth * INDENT_PX}px` }}
       className={`flex h-5 items-center justify-between w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${
         isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
       }`}

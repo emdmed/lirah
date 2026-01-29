@@ -86,3 +86,30 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Semantic color utilities */
+.text-folder {
+  color: hsl(var(--color-folder));
+}
+
+.text-git-added {
+  color: hsl(var(--color-git-added));
+}
+
+.text-git-deleted {
+  color: hsl(var(--color-git-deleted));
+}
+
+.border-tree-guide {
+  border-color: hsl(var(--color-tree-guide));
+}
+
+/* Focus visible styles for keyboard navigation */
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background;
+}
+
+/* Theme transition for smooth color changes */
+.theme-transition {
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}

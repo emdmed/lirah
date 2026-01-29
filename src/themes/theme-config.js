@@ -65,6 +65,11 @@ export const themes = {
       sidebarAccentForeground: 'hsl(45 26% 80%)',
       sidebarBorder: 'hsl(240 13% 20%)',
       sidebarRing: 'hsl(225 46% 67%)',
+      // Semantic colors
+      folder: '45 93% 47%',           // Carpenter Yellow for folder icons
+      gitAdded: '95 40% 56%',         // Spring Green for +lines
+      gitDeleted: '359 50% 51%',      // Samurai Red for -lines
+      treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
     },
   },
 
@@ -127,6 +132,11 @@ export const themes = {
       sidebarAccentForeground: 'hsl(222 16% 28%)',
       sidebarBorder: 'hsl(220 13% 91%)',
       sidebarRing: 'hsl(213 32% 52%)',
+      // Semantic colors
+      folder: '35 80% 50%',           // Warm orange for folder icons
+      gitAdded: '96 44% 68%',         // Light green for +lines
+      gitDeleted: '354 70% 54%',      // Red for -lines
+      treeGuide: '0 0% 0% / 0.1',     // Black with opacity for tree guide lines
     },
   },
 
@@ -189,6 +199,11 @@ export const themes = {
       sidebarAccentForeground: 'hsl(60 30% 96%)',
       sidebarBorder: 'hsl(232 14% 31%)',
       sidebarRing: 'hsl(265 89% 78%)',
+      // Semantic colors
+      folder: '65 92% 76%',           // Dracula yellow for folder icons
+      gitAdded: '135 94% 65%',        // Dracula green for +lines
+      gitDeleted: '0 100% 67%',       // Dracula red for -lines
+      treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
     },
   },
 
@@ -251,6 +266,11 @@ export const themes = {
       sidebarAccentForeground: 'hsl(60 30% 96%)',
       sidebarBorder: 'hsl(55 11% 22%)',
       sidebarRing: 'hsl(81 88% 67%)',
+      // Semantic colors
+      folder: '35 82% 57%',           // Monokai orange for folder icons
+      gitAdded: '80 76% 53%',         // Monokai green for +lines
+      gitDeleted: '338 95% 56%',      // Monokai pink/red for -lines
+      treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
     },
   },
 
@@ -311,6 +331,11 @@ export const themes = {
       sidebarAccentForeground: 'hsl(156 72% 67%)',
       sidebarBorder: 'hsl(0 0% 15%)',
       sidebarRing: 'hsl(156 72% 67%)',
+      // Semantic colors (monochrome emerald theme)
+      folder: '156 72% 67%',          // Emerald for folder icons
+      gitAdded: '156 72% 67%',        // Emerald for +lines
+      gitDeleted: '156 72% 47%',      // Darker emerald for -lines
+      treeGuide: '156 72% 67% / 0.15', // Emerald with opacity for tree guide lines
     },
   },
 
@@ -375,6 +400,11 @@ export const themes = {
       sidebarAccentForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
       sidebarBorder: 'hsl(0 0% 30%)',       // bg3 #665c54
       sidebarRing: 'hsl(24 75% 59%)',       // orange #fe8019
+      // Semantic colors
+      folder: '45 100% 55%',          // Gruvbox bright yellow for folder icons
+      gitAdded: '61 66% 44%',         // Gruvbox bright green for +lines
+      gitDeleted: '0 100% 60%',       // Gruvbox bright red for -lines
+      treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
     },
   },
 };
