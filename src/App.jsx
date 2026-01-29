@@ -567,8 +567,27 @@ function App() {
   };
 
   const handleToggleGitFilter = useCallback(() => {
-    setShowGitChangesOnly(prev => !prev);
-  }, []);
+    setShowGitChangesOnly(prev => {
+      const newValue = !prev;
+      // When enabling git filter, expand all folders to show all changed files
+      if (newValue && treeData.length > 0) {
+        const allFolderPaths = new Set();
+        const collectFolders = (nodes) => {
+          nodes.forEach(node => {
+            if (node.is_dir) {
+              allFolderPaths.add(node.path);
+              if (node.children) {
+                collectFolders(node.children);
+              }
+            }
+          });
+        };
+        collectFolders(treeData);
+        setExpandedFolders(allFolderPaths);
+      }
+      return newValue;
+    });
+  }, [treeData]);
 
   // Debounced search effect
   useEffect(() => {

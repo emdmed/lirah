@@ -1,161 +1,164 @@
-import React, { useMemo, useState, useEffect, useRef, memo } from 'react';
-import { diffLines } from 'diff';
-import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import React, { useMemo, useState, useEffect, useRef, memo, useCallback } from 'react';
+import { diffLines, diffWords } from 'diff';
+import { ChevronDown, Copy, Check } from 'lucide-react';
+import { Button } from './ui/button';
 
-// Import language support
-import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
-import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
-import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
-import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
-import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
-import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
-import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust';
-import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
-import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
-import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
-import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
-import toml from 'react-syntax-highlighter/dist/esm/languages/prism/toml';
+const LINE_HEIGHT = 24;
+const CONTEXT_LINES = 3; // Lines of context to show around changes
+const VIRTUALIZATION_BUFFER = 10; // Extra lines to render above/below viewport
 
-// Register languages
-SyntaxHighlighter.registerLanguage('javascript', javascript);
-SyntaxHighlighter.registerLanguage('typescript', typescript);
-SyntaxHighlighter.registerLanguage('jsx', jsx);
-SyntaxHighlighter.registerLanguage('tsx', tsx);
-SyntaxHighlighter.registerLanguage('css', css);
-SyntaxHighlighter.registerLanguage('json', json);
-SyntaxHighlighter.registerLanguage('rust', rust);
-SyntaxHighlighter.registerLanguage('python', python);
-SyntaxHighlighter.registerLanguage('bash', bash);
-SyntaxHighlighter.registerLanguage('markdown', markdown);
-SyntaxHighlighter.registerLanguage('yaml', yaml);
-SyntaxHighlighter.registerLanguage('toml', toml);
+/**
+ * Compute word-level diff between two strings
+ */
+function computeWordDiff(oldStr, newStr) {
+  const changes = diffWords(oldStr, newStr);
+  const oldParts = [];
+  const newParts = [];
 
-// Kanagawa-inspired syntax theme
-const kanagawaTheme = {
-  'code[class*="language-"]': {
-    color: '#DCD7BA',
-    background: 'transparent',
-  },
-  'pre[class*="language-"]': {
-    color: '#DCD7BA',
-    background: 'transparent',
-  },
-  comment: { color: '#727169' },
-  prolog: { color: '#727169' },
-  doctype: { color: '#727169' },
-  cdata: { color: '#727169' },
-  punctuation: { color: '#9CABCA' },
-  property: { color: '#7E9CD8' },
-  tag: { color: '#7E9CD8' },
-  boolean: { color: '#FF9E3B' },
-  number: { color: '#D27E99' },
-  constant: { color: '#FFA066' },
-  symbol: { color: '#D27E99' },
-  selector: { color: '#98BB6C' },
-  'attr-name': { color: '#7FB4CA' },
-  string: { color: '#98BB6C' },
-  char: { color: '#98BB6C' },
-  builtin: { color: '#7FB4CA' },
-  inserted: { color: '#98BB6C' },
-  operator: { color: '#C0A36E' },
-  entity: { color: '#7E9CD8' },
-  url: { color: '#7FB4CA' },
-  variable: { color: '#DCD7BA' },
-  atrule: { color: '#7E9CD8' },
-  'attr-value': { color: '#98BB6C' },
-  keyword: { color: '#957FB8' },
-  function: { color: '#7E9CD8' },
-  'class-name': { color: '#7FB4CA' },
-  regex: { color: '#E6C384' },
-  important: { color: '#FF9E3B' },
-  deleted: { color: '#C34043' },
-};
+  changes.forEach((change) => {
+    if (change.added) {
+      newParts.push({ text: change.value, highlight: true });
+    } else if (change.removed) {
+      oldParts.push({ text: change.value, highlight: true });
+    } else {
+      oldParts.push({ text: change.value, highlight: false });
+      newParts.push({ text: change.value, highlight: false });
+    }
+  });
+
+  return { oldParts, newParts };
+}
 
 /**
  * Renders a side-by-side diff view showing old and new file versions
- * @param {string} oldContent - Original file content (from git HEAD)
- * @param {string} newContent - Current file content (working tree)
- * @param {boolean} isNewFile - Whether this is a newly created file
- * @param {boolean} isDeletedFile - Whether this file has been deleted
- * @param {string} language - Programming language for syntax highlighting
- * @param {React.RefObject} scrollContainerRef - Ref to the scroll container for tracking position
- * @param {function} onNearestDiffChange - Callback when nearest diff info changes
  */
-export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, language, scrollContainerRef, onNearestDiffChange }) {
-  // Compute the diff
+export function DiffContent({
+  oldContent,
+  newContent,
+  isNewFile,
+  isDeletedFile,
+  scrollContainerRef,
+}) {
+  const [collapsedRegions, setCollapsedRegions] = useState(new Set());
+  const [selectedLines, setSelectedLines] = useState(new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState(null);
+  const [copiedChunk, setCopiedChunk] = useState(null);
+  const contentRef = useRef(null);
+
+  // Compute the diff with word-level highlighting for modified lines
   const diffResult = useMemo(() => {
     if (isNewFile) {
-      // New file: all lines are additions
       const lines = newContent.split('\n');
       return {
-        oldLines: lines.map(() => ({ content: '', type: 'empty' })),
+        oldLines: lines.map(() => ({ content: '', type: 'empty', wordDiff: null })),
         newLines: lines.map((content, i) => ({
           content,
           type: 'added',
-          lineNum: i + 1
+          lineNum: i + 1,
+          wordDiff: null
         })),
       };
     }
 
     if (isDeletedFile) {
-      // Deleted file: all lines are deletions
       const lines = oldContent.split('\n');
       return {
         oldLines: lines.map((content, i) => ({
           content,
           type: 'removed',
-          lineNum: i + 1
+          lineNum: i + 1,
+          wordDiff: null
         })),
-        newLines: lines.map(() => ({ content: '', type: 'empty' })),
+        newLines: lines.map(() => ({ content: '', type: 'empty', wordDiff: null })),
       };
     }
 
-    // Use diff library to compute changes
     const changes = diffLines(oldContent, newContent);
-
     const oldLines = [];
     const newLines = [];
     let oldLineNum = 1;
     let newLineNum = 1;
 
-    changes.forEach((change) => {
-      const lines = change.value.split('\n');
-      // Remove last empty element if the value ends with \n
-      if (lines[lines.length - 1] === '') {
-        lines.pop();
-      }
+    // Process changes and detect modifications (removed followed by added)
+    let i = 0;
+    while (i < changes.length) {
+      const change = changes[i];
+      const nextChange = changes[i + 1];
 
-      if (change.added) {
-        // Added lines: show empty on left, content on right
+      // Check if this is a modification (removed followed by added)
+      if (change.removed && nextChange?.added) {
+        const removedLines = change.value.split('\n');
+        const addedLines = nextChange.value.split('\n');
+
+        if (removedLines[removedLines.length - 1] === '') removedLines.pop();
+        if (addedLines[addedLines.length - 1] === '') addedLines.pop();
+
+        // Pair up lines for word-level diff
+        const maxLen = Math.max(removedLines.length, addedLines.length);
+
+        for (let j = 0; j < maxLen; j++) {
+          const oldLine = removedLines[j];
+          const newLine = addedLines[j];
+
+          if (oldLine !== undefined && newLine !== undefined) {
+            // Modified line - compute word diff
+            const wordDiff = computeWordDiff(oldLine, newLine);
+            oldLines.push({
+              content: oldLine,
+              type: 'modified-old',
+              lineNum: oldLineNum++,
+              wordDiff: wordDiff.oldParts
+            });
+            newLines.push({
+              content: newLine,
+              type: 'modified-new',
+              lineNum: newLineNum++,
+              wordDiff: wordDiff.newParts
+            });
+          } else if (oldLine !== undefined) {
+            // Only removed
+            oldLines.push({ content: oldLine, type: 'removed', lineNum: oldLineNum++, wordDiff: null });
+            newLines.push({ content: '', type: 'empty', wordDiff: null });
+          } else {
+            // Only added
+            oldLines.push({ content: '', type: 'empty', wordDiff: null });
+            newLines.push({ content: newLine, type: 'added', lineNum: newLineNum++, wordDiff: null });
+          }
+        }
+
+        i += 2; // Skip both changes
+      } else if (change.added) {
+        const lines = change.value.split('\n');
+        if (lines[lines.length - 1] === '') lines.pop();
+
         lines.forEach((content) => {
-          oldLines.push({ content: '', type: 'empty' });
-          newLines.push({ content, type: 'added', lineNum: newLineNum++ });
+          oldLines.push({ content: '', type: 'empty', wordDiff: null });
+          newLines.push({ content, type: 'added', lineNum: newLineNum++, wordDiff: null });
         });
+        i++;
       } else if (change.removed) {
-        // Removed lines: show content on left, empty on right
+        const lines = change.value.split('\n');
+        if (lines[lines.length - 1] === '') lines.pop();
+
         lines.forEach((content) => {
-          oldLines.push({ content, type: 'removed', lineNum: oldLineNum++ });
-          newLines.push({ content: '', type: 'empty' });
+          oldLines.push({ content, type: 'removed', lineNum: oldLineNum++, wordDiff: null });
+          newLines.push({ content: '', type: 'empty', wordDiff: null });
         });
+        i++;
       } else {
-        // Unchanged lines: show on both sides
+        const lines = change.value.split('\n');
+        if (lines[lines.length - 1] === '') lines.pop();
+
         lines.forEach((content) => {
-          oldLines.push({ content, type: 'unchanged', lineNum: oldLineNum++ });
-          newLines.push({ content, type: 'unchanged', lineNum: newLineNum++ });
+          oldLines.push({ content, type: 'unchanged', lineNum: oldLineNum++, wordDiff: null });
+          newLines.push({ content, type: 'unchanged', lineNum: newLineNum++, wordDiff: null });
         });
+        i++;
       }
-    });
+    }
 
     return { oldLines, newLines };
   }, [oldContent, newContent, isNewFile, isDeletedFile]);
-
-  if (!oldContent && !newContent) {
-    return (
-      <div className="p-4 text-center text-muted-foreground">
-        No content to display.
-      </div>
-    );
-  }
 
   const { oldLines, newLines } = diffResult;
   const maxLines = Math.max(oldLines.length, newLines.length);
@@ -168,7 +171,8 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
     for (let i = 0; i < maxLines; i++) {
       const oldLine = oldLines[i];
       const newLine = newLines[i];
-      const isDiff = oldLine?.type === 'removed' || newLine?.type === 'added';
+      const isDiff = oldLine?.type !== 'unchanged' && oldLine?.type !== 'empty' ||
+                     newLine?.type !== 'unchanged' && newLine?.type !== 'empty';
 
       if (isDiff) {
         if (currentChunk === null) {
@@ -189,14 +193,113 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
     return chunks;
   }, [oldLines, newLines, maxLines]);
 
-  // Track scroll position to calculate distance to nearest diff
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 });
+  // Pre-compute line-to-chunk lookup array for O(1) access
+  const lineToChunk = useMemo(() => {
+    const map = new Array(maxLines).fill(-1);
+    diffChunks.forEach((chunk, i) => {
+      for (let j = chunk.start; j <= chunk.end; j++) {
+        map[j] = i;
+      }
+    });
+    return map;
+  }, [diffChunks, maxLines]);
+
+  // Compute collapsible regions (unchanged lines between diff chunks)
+  const collapsibleRegions = useMemo(() => {
+    const regions = [];
+
+    if (diffChunks.length === 0) return regions;
+
+    // Region before first chunk
+    const firstChunkStart = diffChunks[0].start;
+    if (firstChunkStart > CONTEXT_LINES * 2) {
+      regions.push({
+        id: 'start',
+        start: 0,
+        end: firstChunkStart - CONTEXT_LINES - 1,
+        displayStart: CONTEXT_LINES,
+        displayEnd: firstChunkStart - CONTEXT_LINES - 1,
+      });
+    }
+
+    // Regions between chunks
+    for (let i = 0; i < diffChunks.length - 1; i++) {
+      const currentChunkEnd = diffChunks[i].end;
+      const nextChunkStart = diffChunks[i + 1].start;
+      const gapSize = nextChunkStart - currentChunkEnd - 1;
+
+      if (gapSize > CONTEXT_LINES * 2) {
+        regions.push({
+          id: `gap-${i}`,
+          start: currentChunkEnd + CONTEXT_LINES + 1,
+          end: nextChunkStart - CONTEXT_LINES - 1,
+          displayStart: currentChunkEnd + CONTEXT_LINES + 1,
+          displayEnd: nextChunkStart - CONTEXT_LINES - 1,
+        });
+      }
+    }
+
+    // Region after last chunk
+    const lastChunkEnd = diffChunks[diffChunks.length - 1].end;
+    if (maxLines - lastChunkEnd - 1 > CONTEXT_LINES * 2) {
+      regions.push({
+        id: 'end',
+        start: lastChunkEnd + CONTEXT_LINES + 1,
+        end: maxLines - 1,
+        displayStart: lastChunkEnd + CONTEXT_LINES + 1,
+        displayEnd: maxLines - CONTEXT_LINES - 1,
+      });
+    }
+
+    return regions;
+  }, [diffChunks, maxLines]);
+
+  // Initialize collapsed regions
+  useEffect(() => {
+    if (collapsibleRegions.length > 0 && collapsedRegions.size === 0) {
+      setCollapsedRegions(new Set(collapsibleRegions.map(r => r.id)));
+    }
+  }, [collapsibleRegions]);
+
+  // Compute which lines to render (accounting for collapsed regions)
+  const visibleLines = useMemo(() => {
+    const lines = [];
+    let i = 0;
+
+    while (i < maxLines) {
+      // Check if this line starts a collapsed region
+      const collapsedRegion = collapsibleRegions.find(
+        r => collapsedRegions.has(r.id) && i === r.start
+      );
+
+      if (collapsedRegion) {
+        // Add a collapse placeholder
+        lines.push({
+          type: 'collapsed',
+          regionId: collapsedRegion.id,
+          hiddenCount: collapsedRegion.end - collapsedRegion.start + 1,
+          lineIndex: i,
+        });
+        i = collapsedRegion.end + 1;
+      } else {
+        lines.push({
+          type: 'line',
+          lineIndex: i,
+          oldLine: oldLines[i],
+          newLine: newLines[i],
+        });
+        i++;
+      }
+    }
+
+    return lines;
+  }, [maxLines, oldLines, newLines, collapsibleRegions, collapsedRegions]);
+
+  // Track scroll position for virtualization
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
   const scrollThrottleRef = useRef(null);
   const [container, setContainer] = useState(null);
 
-  const LINE_HEIGHT = 24; // h-6 = 24px
-
-  // Track when container ref becomes available
   useEffect(() => {
     const checkContainer = () => {
       if (scrollContainerRef?.current && scrollContainerRef.current !== container) {
@@ -205,7 +308,6 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
     };
 
     checkContainer();
-    // Check again after a short delay in case ref isn't ready yet
     const timeout = setTimeout(checkContainer, 50);
     return () => clearTimeout(timeout);
   }, [scrollContainerRef, container]);
@@ -218,8 +320,8 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
       const viewportHeight = container.clientHeight;
 
       const startLine = Math.floor(scrollTop / LINE_HEIGHT);
-      const visibleLines = Math.ceil(viewportHeight / LINE_HEIGHT);
-      const endLine = startLine + visibleLines;
+      const visibleLinesCount = Math.ceil(viewportHeight / LINE_HEIGHT);
+      const endLine = startLine + visibleLinesCount;
 
       setVisibleRange(prev => {
         if (prev.start === startLine && prev.end === endLine) {
@@ -230,7 +332,6 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
     };
 
     const handleScroll = () => {
-      // Throttle with requestAnimationFrame
       if (scrollThrottleRef.current) return;
 
       scrollThrottleRef.current = requestAnimationFrame(() => {
@@ -239,7 +340,6 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
       });
     };
 
-    // Initial calculation
     calculateVisibleRange();
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -251,166 +351,372 @@ export function DiffContent({ oldContent, newContent, isNewFile, isDeletedFile, 
     };
   }, [container]);
 
-  // Calculate distance to nearest diff chunk that is completely outside the viewport
-  const nearestDiffInfo = useMemo(() => {
-    if (diffChunks.length === 0) return null;
-
-    const { start, end } = visibleRange;
-
-    // A chunk is visible if any part of it overlaps with the visible range
-    const isChunkVisible = (chunk) => {
-      return chunk.start <= end && chunk.end >= start;
-    };
-
-    // Find nearest chunk completely above and below the viewport
-    let nearestAbove = null;
-    let nearestBelow = null;
-
-    for (const chunk of diffChunks) {
-      if (isChunkVisible(chunk)) {
-        // Skip chunks that are even partially visible
-        continue;
+  // Handle line selection via event delegation
+  const handleLineClick = useCallback((lineIndex, e) => {
+    if (e.shiftKey && selectionAnchor !== null) {
+      // Range selection
+      const start = Math.min(selectionAnchor, lineIndex);
+      const end = Math.max(selectionAnchor, lineIndex);
+      const newSelection = new Set();
+      for (let i = start; i <= end; i++) {
+        newSelection.add(i);
       }
+      setSelectedLines(newSelection);
+    } else {
+      // Single selection or toggle
+      setSelectionAnchor(lineIndex);
+      setSelectedLines(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(lineIndex)) {
+          newSet.delete(lineIndex);
+        } else {
+          newSet.clear();
+          newSet.add(lineIndex);
+        }
+        return newSet;
+      });
+    }
+  }, [selectionAnchor]);
 
-      if (chunk.end < start) {
-        // Chunk is completely above the viewport
-        nearestAbove = chunk;
-      } else if (chunk.start > end && nearestBelow === null) {
-        // Chunk is completely below the viewport
-        nearestBelow = chunk;
-        break;
+  // Event delegation handler for container clicks
+  const handleContainerClick = useCallback((e) => {
+    const lineEl = e.target.closest('[data-line-index]');
+    if (!lineEl) return;
+    const lineIndex = parseInt(lineEl.dataset.lineIndex, 10);
+    if (!isNaN(lineIndex)) {
+      handleLineClick(lineIndex, e);
+    }
+  }, [handleLineClick]);
+
+  // Toggle collapsed region
+  const toggleRegion = useCallback((regionId) => {
+    setCollapsedRegions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(regionId)) {
+        newSet.delete(regionId);
+      } else {
+        newSet.add(regionId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Copy chunk content
+  const copyChunk = useCallback(async (chunkIndex, side) => {
+    const chunk = diffChunks[chunkIndex];
+    if (!chunk) return;
+
+    const lines = [];
+    for (let i = chunk.start; i <= chunk.end; i++) {
+      const line = side === 'old' ? oldLines[i] : newLines[i];
+      if (line && line.type !== 'empty') {
+        lines.push(line.content);
       }
     }
 
-    // Prioritize showing next diff below, then above
-    if (nearestBelow !== null) {
-      return { distance: nearestBelow.start - end, direction: 'down' };
-    } else if (nearestAbove !== null) {
-      return { distance: start - nearestAbove.end, direction: 'up' };
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setCopiedChunk(`${chunkIndex}-${side}`);
+      setTimeout(() => setCopiedChunk(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
+  }, [diffChunks, oldLines, newLines]);
 
-    // All diffs are currently visible
-    return null;
-  }, [diffChunks, visibleRange]);
+  if (!oldContent && !newContent) {
+    return (
+      <div className="p-4 text-center text-muted-foreground">
+        No content to display.
+      </div>
+    );
+  }
 
-  // Notify parent of nearest diff changes
-  useEffect(() => {
-    onNearestDiffChange?.(nearestDiffInfo);
-  }, [nearestDiffInfo, onNearestDiffChange]);
+  // Calculate virtualization bounds
+  const startIdx = Math.max(0, visibleRange.start - VIRTUALIZATION_BUFFER);
+  const endIdx = Math.min(visibleLines.length, visibleRange.end + VIRTUALIZATION_BUFFER);
+  const virtualizedLines = visibleLines.slice(startIdx, endIdx);
+  const totalHeight = visibleLines.length * LINE_HEIGHT;
+  const offsetY = startIdx * LINE_HEIGHT;
 
   return (
     <div className="flex font-mono text-sm relative">
+      {/* Minimap */}
+      <DiffMinimap
+        diffChunks={diffChunks}
+        totalLines={maxLines}
+        visibleRange={visibleRange}
+        onClickPosition={(lineIndex) => {
+          container?.scrollTo({
+            top: lineIndex * LINE_HEIGHT,
+            behavior: 'smooth'
+          });
+        }}
+      />
+
       {/* Old file (left side) */}
       <div className="flex-1 border-r border-border overflow-x-auto">
-        <div className="sticky top-0 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-border">
+        <div className="sticky top-0 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-border z-10">
           {isNewFile ? '(new file)' : 'HEAD'}
         </div>
-        <div className="min-w-max">
-          {Array.from({ length: maxLines }).map((_, i) => {
-            const line = oldLines[i] || { content: '', type: 'empty' };
-            return (
-              <DiffLine
-                key={`old-${i}`}
-                lineNum={line.lineNum}
-                content={line.content}
-                type={line.type}
-                language={language}
-              />
-            );
-          })}
+        <div
+          className="min-w-max relative"
+          ref={contentRef}
+          style={{ height: totalHeight }}
+          onClick={handleContainerClick}
+        >
+          <div style={{ transform: `translateY(${offsetY}px)` }}>
+            {virtualizedLines.map((item) => {
+              if (item.type === 'collapsed') {
+                return (
+                  <CollapsedRegionPlaceholder
+                    key={`collapsed-old-${item.regionId}`}
+                    hiddenCount={item.hiddenCount}
+                    onExpand={() => toggleRegion(item.regionId)}
+                  />
+                );
+              }
+
+              const line = item.oldLine || { content: '', type: 'empty' };
+              const chunkIndex = lineToChunk[item.lineIndex];
+              const isChunkStart = chunkIndex >= 0 && diffChunks[chunkIndex].start === item.lineIndex;
+
+              return (
+                <DiffLine
+                  key={`old-${item.lineIndex}`}
+                  lineNum={line.lineNum}
+                  content={line.content}
+                  type={line.type}
+                  wordDiff={line.wordDiff}
+                  isSelected={selectedLines.has(item.lineIndex)}
+                  lineIndex={item.lineIndex}
+                  showCopyButton={isChunkStart}
+                  onCopy={() => copyChunk(chunkIndex, 'old')}
+                  isCopied={copiedChunk === `${chunkIndex}-old`}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* New file (right side) */}
       <div className="flex-1 overflow-x-auto">
-        <div className="sticky top-0 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-border">
+        <div className="sticky top-0 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-border z-10">
           {isDeletedFile ? '(deleted)' : 'Working Tree'}
         </div>
-        <div className="min-w-max">
-          {Array.from({ length: maxLines }).map((_, i) => {
-            const line = newLines[i] || { content: '', type: 'empty' };
-            return (
-              <DiffLine
-                key={`new-${i}`}
-                lineNum={line.lineNum}
-                content={line.content}
-                type={line.type}
-                language={language}
-              />
-            );
-          })}
+        <div
+          className="min-w-max relative"
+          style={{ height: totalHeight }}
+          onClick={handleContainerClick}
+        >
+          <div style={{ transform: `translateY(${offsetY}px)` }}>
+            {virtualizedLines.map((item) => {
+              if (item.type === 'collapsed') {
+                return (
+                  <CollapsedRegionPlaceholder
+                    key={`collapsed-new-${item.regionId}`}
+                    hiddenCount={item.hiddenCount}
+                    onExpand={() => toggleRegion(item.regionId)}
+                  />
+                );
+              }
+
+              const line = item.newLine || { content: '', type: 'empty' };
+              const chunkIndex = lineToChunk[item.lineIndex];
+              const isChunkStart = chunkIndex >= 0 && diffChunks[chunkIndex].start === item.lineIndex;
+
+              return (
+                <DiffLine
+                  key={`new-${item.lineIndex}`}
+                  lineNum={line.lineNum}
+                  content={line.content}
+                  type={line.type}
+                  wordDiff={line.wordDiff}
+                  isSelected={selectedLines.has(item.lineIndex)}
+                  lineIndex={item.lineIndex}
+                  showCopyButton={isChunkStart}
+                  onCopy={() => copyChunk(chunkIndex, 'new')}
+                  isCopied={copiedChunk === `${chunkIndex}-new`}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
-
     </div>
   );
 }
 
 /**
- * Single line in the diff view - memoized to prevent re-renders on scroll
+ * Minimap showing diff chunk positions
  */
-const DiffLine = memo(function DiffLine({ lineNum, content, type, language }) {
+const DiffMinimap = memo(function DiffMinimap({ diffChunks, totalLines, visibleRange, onClickPosition }) {
+  const minimapHeight = 200;
+  const lineToY = (line) => (line / totalLines) * minimapHeight;
+
+  return (
+    <div
+      className="w-3 flex-shrink-0 bg-muted/30 border-r border-border relative cursor-pointer"
+      style={{ height: `${minimapHeight}px`, position: 'sticky', top: '28px' }}
+      onClick={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const lineIndex = Math.floor((y / minimapHeight) * totalLines);
+        onClickPosition(lineIndex);
+      }}
+    >
+      {/* Viewport indicator */}
+      <div
+        className="absolute left-0 right-0 bg-foreground/10 border-y border-foreground/20"
+        style={{
+          top: `${lineToY(visibleRange.start)}px`,
+          height: `${Math.max(4, lineToY(visibleRange.end) - lineToY(visibleRange.start))}px`,
+        }}
+      />
+
+      {/* Diff chunk markers */}
+      {diffChunks.map((chunk, i) => (
+        <div
+          key={i}
+          className="absolute left-0.5 right-0.5 rounded-sm"
+          style={{
+            top: `${lineToY(chunk.start)}px`,
+            height: `${Math.max(2, lineToY(chunk.end + 1) - lineToY(chunk.start))}px`,
+            backgroundColor: 'rgba(152, 187, 108, 0.6)',
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+
+/**
+ * Collapsed region placeholder
+ */
+const CollapsedRegionPlaceholder = memo(function CollapsedRegionPlaceholder({ hiddenCount, onExpand }) {
+  return (
+    <div
+      className="flex items-center justify-center h-6 bg-muted/50 border-y border-border/50 cursor-pointer hover:bg-muted transition-colors"
+      onClick={onExpand}
+    >
+      <ChevronDown className="w-3 h-3 mr-1 text-muted-foreground" />
+      <span className="text-xs text-muted-foreground">
+        {hiddenCount} unchanged {hiddenCount === 1 ? 'line' : 'lines'}
+      </span>
+    </div>
+  );
+});
+
+/**
+ * Single line in the diff view - memoized to prevent re-renders on scroll
+ * Uses data attributes for event delegation instead of individual handlers
+ */
+const DiffLine = memo(function DiffLine({
+  lineNum,
+  content,
+  type,
+  wordDiff,
+  isSelected,
+  lineIndex,
+  showCopyButton,
+  onCopy,
+  isCopied,
+}) {
   let bgColor = '';
+  let gutterSymbol = '';
+  let gutterColor = '';
 
   if (type === 'added') {
     bgColor = 'rgba(152, 187, 108, 0.15)';
+    gutterSymbol = '+';
+    gutterColor = 'text-green-500';
   } else if (type === 'removed') {
     bgColor = 'rgba(195, 64, 67, 0.15)';
+    gutterSymbol = '-';
+    gutterColor = 'text-red-500';
+  } else if (type === 'modified-old') {
+    bgColor = 'rgba(195, 64, 67, 0.15)';
+    gutterSymbol = '~';
+    gutterColor = 'text-yellow-500';
+  } else if (type === 'modified-new') {
+    bgColor = 'rgba(152, 187, 108, 0.15)';
+    gutterSymbol = '~';
+    gutterColor = 'text-yellow-500';
   } else if (type === 'empty') {
     bgColor = 'rgba(128, 128, 128, 0.05)';
   }
 
-  // Render syntax-highlighted content
+  if (isSelected) {
+    bgColor = 'rgba(126, 156, 216, 0.25)';
+  }
+
+  // Render content - plain text with word-level diff highlighting only
   const renderContent = () => {
     if (!content || type === 'empty') {
       return <span>{' '}</span>;
     }
 
-    if (!language) {
-      return <span>{content}</span>;
+    // If we have word-level diff, render with highlights
+    if (wordDiff && wordDiff.length > 0) {
+      return (
+        <span>
+          {wordDiff.map((part, i) => (
+            <span
+              key={i}
+              className={part.highlight ? (
+                type === 'modified-old'
+                  ? 'bg-red-500/30 rounded-sm'
+                  : 'bg-green-500/30 rounded-sm'
+              ) : ''}
+            >
+              {part.text}
+            </span>
+          ))}
+        </span>
+      );
     }
 
-    return (
-      <SyntaxHighlighter
-        language={language}
-        style={kanagawaTheme}
-        customStyle={{
-          margin: 0,
-          padding: 0,
-          background: 'transparent',
-          display: 'inline',
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
-          textRendering: 'optimizeLegibility',
-        }}
-        codeTagProps={{
-          style: {
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-          },
-        }}
-        PreTag="span"
-        CodeTag="span"
-      >
-        {content}
-      </SyntaxHighlighter>
-    );
+    // Plain text - no syntax highlighting
+    return <span>{content}</span>;
   };
 
   return (
     <div
-      className="flex h-6 leading-6"
+      className="flex h-6 leading-6 group relative"
       style={{ backgroundColor: bgColor }}
+      data-line-index={lineIndex}
     >
+      {/* Gutter symbol */}
+      <div className={`w-4 flex-shrink-0 text-center select-none ${gutterColor}`}>
+        {gutterSymbol}
+      </div>
       {/* Line number */}
-      <div className="w-12 flex-shrink-0 text-right pr-2 text-muted-foreground/50 select-none border-r border-border/50">
+      <div className="w-10 flex-shrink-0 text-right pr-2 text-muted-foreground/70 select-none border-r border-border/50">
         {lineNum || ''}
       </div>
       {/* Content */}
-      <div className="px-2 whitespace-pre overflow-hidden">
+      <div className="px-2 whitespace-pre overflow-hidden flex-1">
         {renderContent()}
       </div>
+      {/* Copy button - CSS hover controlled */}
+      {showCopyButton && (
+        <Button
+          variant="ghost"
+          size="xs"
+          className="absolute right-1 top-0.5 h-5 opacity-0 group-hover:opacity-100 transition-opacity"
+          title={isCopied ? 'Copied!' : 'Copy chunk'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopy();
+          }}
+        >
+          {isCopied ? (
+            <Check className="w-3 h-3 text-green-500" />
+          ) : (
+            <Copy className="w-3 h-3" />
+          )}
+        </Button>
+      )}
     </div>
   );
 });
-

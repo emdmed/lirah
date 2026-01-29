@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Dialog,
@@ -8,41 +8,9 @@ import {
   DialogDescription,
 } from './ui/dialog';
 import { DiffContent } from './DiffContent';
-import { Loader2 } from 'lucide-react';
-
-// Map file extensions to Prism language names
-const extensionToLanguage = {
-  '.js': 'javascript',
-  '.mjs': 'javascript',
-  '.cjs': 'javascript',
-  '.jsx': 'jsx',
-  '.ts': 'typescript',
-  '.tsx': 'tsx',
-  '.css': 'css',
-  '.scss': 'css',
-  '.json': 'json',
-  '.rs': 'rust',
-  '.py': 'python',
-  '.sh': 'bash',
-  '.bash': 'bash',
-  '.zsh': 'bash',
-  '.md': 'markdown',
-  '.mdx': 'markdown',
-  '.yaml': 'yaml',
-  '.yml': 'yaml',
-  '.toml': 'toml',
-};
-
-/**
- * Get language from file path extension
- */
-function getLanguageFromPath(filePath) {
-  if (!filePath) return null;
-  const lastDot = filePath.lastIndexOf('.');
-  if (lastDot === -1) return null;
-  const ext = filePath.slice(lastDot).toLowerCase();
-  return extensionToLanguage[ext] || null;
-}
+import { Button } from './ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * Dialog that shows side-by-side git diff for a specific file
@@ -50,12 +18,32 @@ function getLanguageFromPath(filePath) {
  * @param {function} onOpenChange - Callback when open state changes
  * @param {string} filePath - Absolute path to the file
  * @param {string} repoPath - Path to the git repository root
+ * @param {Array} changedFiles - Optional list of all changed files for navigation
+ * @param {function} onFileChange - Optional callback when navigating to a different file
  */
-export function GitDiffDialog({ open, onOpenChange, filePath, repoPath }) {
+export function GitDiffDialog({
+  open,
+  onOpenChange,
+  filePath,
+  repoPath,
+  changedFiles = [],
+  onFileChange
+}) {
   const [diffResult, setDiffResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [nearestDiffInfo, setNearestDiffInfo] = useState(null);
+
+  const scrollContainerRef = useRef(null);
+
+  // Find current file index in changed files list
+  const currentFileIndex = useMemo(() => {
+    if (!changedFiles.length || !filePath) return -1;
+    return changedFiles.findIndex(f => f.path === filePath || f === filePath);
+  }, [changedFiles, filePath]);
+
+  const hasMultipleFiles = changedFiles.length > 1;
+  const canGoPrevFile = currentFileIndex > 0;
+  const canGoNextFile = currentFileIndex < changedFiles.length - 1;
 
   useEffect(() => {
     if (open && filePath && repoPath) {
@@ -85,41 +73,116 @@ export function GitDiffDialog({ open, onOpenChange, filePath, repoPath }) {
     }
   };
 
+  const goToPrevFile = useCallback(() => {
+    if (!canGoPrevFile || !onFileChange) return;
+    const prevFile = changedFiles[currentFileIndex - 1];
+    onFileChange(typeof prevFile === 'string' ? prevFile : prevFile.path);
+  }, [canGoPrevFile, onFileChange, changedFiles, currentFileIndex]);
+
+  const goToNextFile = useCallback(() => {
+    if (!canGoNextFile || !onFileChange) return;
+    const nextFile = changedFiles[currentFileIndex + 1];
+    onFileChange(typeof nextFile === 'string' ? nextFile : nextFile.path);
+  }, [canGoNextFile, onFileChange, changedFiles, currentFileIndex]);
+
+  // Keyboard shortcuts for file navigation
+  useEffect(() => {
+    if (!open || !hasMultipleFiles) return;
+
+    const handleKeyDown = (e) => {
+      // Don't capture if user is typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      switch (e.key) {
+        case '[':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            goToPrevFile();
+          }
+          break;
+        case ']':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            goToNextFile();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, hasMultipleFiles, goToPrevFile, goToNextFile]);
+
   // Extract filename from path for display
   const fileName = filePath ? filePath.split('/').pop() : '';
   const relativePath = filePath && repoPath
     ? filePath.replace(repoPath + '/', '')
     : filePath;
 
-  // Detect language for syntax highlighting
-  const language = useMemo(() => getLanguageFromPath(filePath), [filePath]);
-
-  // Ref for scroll container to track scroll position
-  const scrollContainerRef = useRef(null);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] h-[calc(100vh-2rem)] max-w-none flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="font-mono text-sm">
-            {fileName}
-            {diffResult?.is_new_file && (
-              <span className="ml-2 text-xs text-green-500 font-normal">(new file)</span>
+        <DialogHeader className="flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="font-mono text-sm flex items-center gap-2">
+                <span className="truncate">{fileName}</span>
+                {diffResult?.is_new_file && (
+                  <span className="text-xs text-green-500 font-normal">(new file)</span>
+                )}
+                {diffResult?.is_deleted_file && (
+                  <span className="text-xs text-red-500 font-normal">(deleted)</span>
+                )}
+              </DialogTitle>
+              <DialogDescription className="font-mono text-xs truncate">
+                {relativePath}
+                {diffResult && (
+                  <span className="ml-2">
+                    <span className="text-green-500">+{diffResult.added_lines}</span>
+                    {' '}
+                    <span className="text-red-500">-{diffResult.deleted_lines}</span>
+                  </span>
+                )}
+              </DialogDescription>
+            </div>
+
+            {/* File navigation controls */}
+            {hasMultipleFiles && (
+              <div className="flex items-center gap-1 ml-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={!canGoPrevFile}
+                      onClick={goToPrevFile}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Previous file (Ctrl+[)</TooltipContent>
+                </Tooltip>
+
+                <span className="text-xs text-muted-foreground px-1">
+                  {currentFileIndex + 1}/{changedFiles.length}
+                </span>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={!canGoNextFile}
+                      onClick={goToNextFile}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Next file (Ctrl+])</TooltipContent>
+                </Tooltip>
+              </div>
             )}
-            {diffResult?.is_deleted_file && (
-              <span className="ml-2 text-xs text-red-500 font-normal">(deleted)</span>
-            )}
-          </DialogTitle>
-          <DialogDescription className="font-mono text-xs truncate">
-            {relativePath}
-            {diffResult && (
-              <span className="ml-2">
-                <span className="text-green-500">+{diffResult.added_lines}</span>
-                {' '}
-                <span className="text-red-500">-{diffResult.deleted_lines}</span>
-              </span>
-            )}
-          </DialogDescription>
+          </div>
         </DialogHeader>
 
         <div
@@ -141,23 +204,10 @@ export function GitDiffDialog({ open, onOpenChange, filePath, repoPath }) {
               newContent={diffResult.new_content}
               isNewFile={diffResult.is_new_file}
               isDeletedFile={diffResult.is_deleted_file}
-              language={language}
               scrollContainerRef={scrollContainerRef}
-              onNearestDiffChange={setNearestDiffInfo}
             />
           ) : null}
         </div>
-
-        {/* Distance to nearest diff indicator */}
-        {nearestDiffInfo && nearestDiffInfo.distance > 0 && (
-          <div className="absolute bottom-8 right-8 bg-muted/90 backdrop-blur-sm border border-border rounded-md px-3 py-2 text-xs font-mono shadow-lg z-10">
-            <span className="text-muted-foreground">
-              {nearestDiffInfo.direction === 'up' ? '↑' : '↓'}{' '}
-              <span className="text-foreground font-medium">{nearestDiffInfo.distance}</span>{' '}
-              {nearestDiffInfo.distance === 1 ? 'line' : 'lines'} to next change
-            </span>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
