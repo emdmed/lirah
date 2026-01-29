@@ -39,7 +39,7 @@ export function TreeNode({
 
   return (
     <>
-      <SidebarMenuItem className="me-4 relative my-0 p-0">
+      <SidebarMenuItem className="relative my-0 p-0 w-full">
         {/* Indentation guide line */}
         {depth > 0 && (
           <div

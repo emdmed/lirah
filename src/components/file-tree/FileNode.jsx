@@ -1,6 +1,12 @@
 import React, { useState } from "react";
-import { File, CornerDownRight, CheckCircle, Loader2, GitBranch } from "lucide-react";
+import { File, CheckCircle, Loader2, GitBranch } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * Renders a file node in the tree with action buttons
@@ -36,13 +42,15 @@ export function FileNode({
   const handleFileClick = () => {
     if (isTextareaPanelOpen) {
       onToggleFileSelection(node.path);
+    } else {
+      onSendToTerminal(node.path);
     }
   };
 
   return (
     <div
       style={{ paddingLeft: `${depth * 12}px` }}
-      className={`flex h-5 items-center w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${
+      className={`flex h-5 items-center justify-between w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${
         isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
       }`}
       onMouseEnter={() => setIsHovered(true)}
@@ -50,82 +58,78 @@ export function FileNode({
     >
       {/* Main file display - clickable when textarea panel is open */}
       <div
-        className={`flex items-center justify-start flex-1 min-w-0 gap-1 ${
-          isTextareaPanelOpen ? 'cursor-pointer hover:bg-white/5' : ''
-        }`}
+        className="flex items-center justify-start min-w-0 gap-1 cursor-pointer hover:bg-white/5"
         onClick={handleFileClick}
       >
         <File className="w-3 h-3 ml-1 mr-1 flex-shrink-0" />
-        <span
-          className="truncate text-xs"
-          style={{ color: hasTypeErrors ? '#C34043' : 'inherit' }}
-          title={node.name}
-        >
-          {node.name}
-        </span>
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="truncate text-xs"
+                style={{ color: hasTypeErrors ? '#C34043' : 'inherit' }}
+              >
+                {node.name}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {node.name}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}
-
-        {/* Check types button - inline with filename, visible on hover */}
-        {isSupportedForTypeCheck && (
-          <button
-            className={`p-1 flex-shrink-0 transition-all duration-200 rounded ${
-              isTypeCheckSuccess
-                ? 'opacity-100 bg-green-500/30 hover:bg-green-500/40'
-                : isHovered
-                ? 'opacity-60 hover:opacity-100 hover:bg-white/10'
-                : 'opacity-0 pointer-events-none'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCheckFileTypes(node.path);
-            }}
-            disabled={isCheckingTypes}
-            title="Check types"
-          >
-            {isCheckingTypes ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <CheckCircle className={`w-3 h-3 ${isTypeCheckSuccess ? 'text-green-400' : ''}`} />
-            )}
-          </button>
-        )}
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-1 flex-shrink-0">
-        {/* View Diff button - only visible for files with git changes */}
-        {hasGitChanges && (
-          <button
-            className={`p-1 transition-opacity duration-200 rounded ${
-              isHovered
-                ? 'opacity-60 hover:opacity-100 hover:bg-white/10'
-                : 'opacity-0 pointer-events-none'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDiff?.(node.path);
-            }}
-            title="View git diff"
-          >
-            <GitBranch className="w-3 h-3" />
-          </button>
-        )}
+      {/* Action buttons - fixed width columns for alignment */}
+      <div className="flex flex-shrink-0">
+        {/* Check types button column */}
+        <div className="w-5 flex items-center justify-center">
+          {isSupportedForTypeCheck && (
+            <button
+              className={`p-1 transition-all duration-200 rounded ${
+                isTypeCheckSuccess
+                  ? 'opacity-100 bg-green-500/30 hover:bg-green-500/40'
+                  : isHovered
+                  ? 'opacity-60 hover:opacity-100 hover:bg-white/10'
+                  : 'opacity-0 pointer-events-none'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCheckFileTypes(node.path);
+              }}
+              disabled={isCheckingTypes}
+              title="Check types"
+            >
+              {isCheckingTypes ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <CheckCircle className={`w-3 h-3 ${isTypeCheckSuccess ? 'text-green-400' : ''}`} />
+              )}
+            </button>
+          )}
+        </div>
 
-        {/* Send to terminal button - only visible when textarea panel is closed */}
-        {!isTextareaPanelOpen && (
-          <button
-            className="p-1 transition-opacity duration-200 rounded opacity-60 hover:opacity-100 hover:bg-white/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSendToTerminal(node.path);
-            }}
-            title="Send path to terminal"
-          >
-            <CornerDownRight className="w-3 h-3" />
-          </button>
-        )}
+        {/* View Diff button column */}
+        <div className="w-5 flex items-center justify-center">
+          {hasGitChanges && (
+            <button
+              className={`p-1 transition-opacity duration-200 rounded ${
+                isHovered
+                  ? 'opacity-60 hover:opacity-100 hover:bg-white/10'
+                  : 'opacity-0 pointer-events-none'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDiff?.(node.path);
+              }}
+              title="View git diff"
+            >
+              <GitBranch className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

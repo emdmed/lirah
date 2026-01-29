@@ -873,7 +873,7 @@ function App() {
       <Layout
         sidebar={
           sidebarOpen && (
-            <Sidebar collapsible="none" className="border-e m-0 p-1 max-w-[400px]" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Sidebar collapsible="none" className="border-e m-0 p-1 w-[280px] shrink-0" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <SidebarHeader
                   viewMode={viewMode}
