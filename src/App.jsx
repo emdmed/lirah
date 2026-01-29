@@ -927,6 +927,7 @@ function App() {
                       {viewMode === 'flat' ? (
                         <FlatViewMenu
                           folders={folders}
+                          currentPath={currentPath}
                           onFolderClick={loadFolders}
                         />
                       ) : (
