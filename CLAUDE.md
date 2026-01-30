@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-nevo-terminal is a GUI for running Claude Code, built with Tauri 2, React 19, and xterm.js. It wraps the terminal with a file browser sidebar that stays synchronized with the working directory.
+Lirah is a GUI for running Claude Code, built with Tauri 2, React 19, and xterm.js. It wraps the terminal with a file browser sidebar that stays synchronized with the working directory.
 
 **Key Features**:
 - **Prompt Textarea**: Write multi-line prompts and send them directly to Claude Code running in the embedded terminal
