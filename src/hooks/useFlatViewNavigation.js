@@ -1,9 +1,38 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 export function useFlatViewNavigation(terminalSessionId) {
   const [folders, setFolders] = useState([]);
   const [currentPath, setCurrentPath] = useState('');
+
+  // Merge deleted files from git stats into directory listing
+  const mergeDeletedFiles = useCallback(async (directories, dirPath) => {
+    try {
+      const gitStats = await invoke('get_git_stats', { path: dirPath });
+      const deletedFiles = [];
+
+      for (const [filePath, stats] of Object.entries(gitStats)) {
+        if (stats.status === 'deleted') {
+          // Only include deleted files from the current directory
+          const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+          if (parentDir === dirPath) {
+            const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+            deletedFiles.push({
+              name: fileName,
+              path: filePath,
+              is_dir: false,
+              is_deleted: true
+            });
+          }
+        }
+      }
+
+      return [...directories, ...deletedFiles];
+    } catch (error) {
+      console.warn('Failed to merge deleted files:', error);
+      return directories;
+    }
+  }, []);
 
   const navigateTerminalToPath = async (path) => {
     if (!terminalSessionId) {
@@ -66,7 +95,10 @@ export function useFlatViewNavigation(terminalSessionId) {
       const directories = await invoke('read_directory', { path: targetPath });
       console.log('Loaded', directories.length, 'items from:', targetPath);
 
-      setFolders(directories);
+      // Merge in deleted files from git stats
+      const mergedFolders = await mergeDeletedFiles(directories, targetPath);
+
+      setFolders(mergedFolders);
       setCurrentPath(targetPath);
     } catch (error) {
       console.error('Failed to load folders:', error);

@@ -1,5 +1,5 @@
 import React from "react";
-import { File, GitBranch } from "lucide-react";
+import { File, FileX, GitBranch } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
 import { INDENT_PX } from "./constants";
 
@@ -17,9 +17,14 @@ export function FileNode({
   onToggleFileSelection,
   onViewDiff
 }) {
-  const hasGitChanges = stats && (stats.added > 0 || stats.deleted > 0);
+  const hasGitChanges = stats && (stats.added > 0 || stats.deleted > 0 || stats.status);
+  const isDeleted = node.is_deleted || (stats && stats.status === 'deleted');
+  const isUntracked = stats && stats.status === 'untracked';
 
   const handleFileClick = () => {
+    // Don't allow interaction with deleted files
+    if (isDeleted) return;
+
     if (isTextareaPanelOpen) {
       onToggleFileSelection(node.path);
     } else {
@@ -32,11 +37,11 @@ export function FileNode({
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
       className={`flex h-5 items-center justify-between w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${
         isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
-      }`}
+      } ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Left side - diff button column (fixed width for alignment) */}
       <div className="w-5 flex items-center justify-center flex-shrink-0">
-        {hasGitChanges && (
+        {hasGitChanges && !isDeleted && (
           <button
             className="p-1 transition-opacity duration-200 rounded opacity-60 hover:opacity-100 hover:bg-white/10"
             onClick={(e) => {
@@ -48,15 +53,22 @@ export function FileNode({
             <GitBranch className="w-3 h-3" />
           </button>
         )}
+        {isDeleted && (
+          <span className="text-git-deleted text-[0.65rem] font-mono">D</span>
+        )}
       </div>
 
       {/* Main file display */}
       <div
-        className="flex items-center justify-start min-w-0 gap-1 cursor-pointer hover:bg-white/5 flex-1"
+        className={`flex items-center justify-start min-w-0 gap-1 flex-1 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
         onClick={handleFileClick}
       >
-        <File className="w-3 h-3 flex-shrink-0" />
-        <span className="truncate text-xs">{node.name}</span>
+        {isDeleted ? (
+          <FileX className="w-3 h-3 flex-shrink-0 text-git-deleted" />
+        ) : (
+          <File className={`w-3 h-3 flex-shrink-0 ${isUntracked ? 'text-git-added' : ''}`} />
+        )}
+        <span className={`truncate text-xs ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`}>{node.name}</span>
 
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}

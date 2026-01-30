@@ -26,6 +26,8 @@ pub struct RecursiveDirectoryEntry {
 pub struct GitStats {
     pub added: usize,
     pub deleted: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>, // "untracked", "deleted", or None for modified
 }
 
 #[tauri::command]
@@ -220,45 +222,107 @@ pub fn read_directory_recursive(
     Ok(entries)
 }
 
+/// Find the git repository root by walking up the directory tree
+fn find_git_root(start_path: &PathBuf) -> Option<PathBuf> {
+    let mut current = start_path.clone();
+    loop {
+        let git_dir = current.join(".git");
+        if git_dir.exists() {
+            return Some(current);
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
+}
+
 fn get_git_diff_stats(repo_path: &PathBuf) -> Result<HashMap<String, GitStats>, String> {
-    // Check if .git directory exists
-    let git_dir = repo_path.join(".git");
-    if !git_dir.exists() {
+    // Find the git repository root by looking for .git in parent directories
+    let git_root = find_git_root(repo_path);
+    if git_root.is_none() {
         return Ok(HashMap::new());
     }
+    let git_root = git_root.unwrap();
 
-    // Run: git diff HEAD --numstat
+    let mut stats_map = HashMap::new();
+
+    // Run: git diff HEAD --numstat for modified files
     let output = Command::new("git")
         .arg("diff")
         .arg("HEAD")
         .arg("--numstat")
-        .current_dir(repo_path)
+        .current_dir(&git_root)
         .output()
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
 
-    if !output.status.success() {
-        eprintln!("Git diff command failed: {}", String::from_utf8_lossy(&output.stderr));
-        return Ok(HashMap::new());
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        for line in stdout.lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() != 3 {
+                continue;
+            }
+
+            let added = parts[0].parse::<usize>().unwrap_or(0);
+            let deleted = parts[1].parse::<usize>().unwrap_or(0);
+            let relative_path = parts[2];
+
+            // Convert relative path to absolute (relative to git root)
+            let absolute_path = git_root.join(relative_path);
+            let absolute_path_str = absolute_path.to_string_lossy().to_string();
+
+            // Check if this is a deleted file (file no longer exists)
+            let status = if !absolute_path.exists() {
+                Some("deleted".to_string())
+            } else {
+                None
+            };
+
+            stats_map.insert(absolute_path_str, GitStats { added, deleted, status });
+        }
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut stats_map = HashMap::new();
+    // Get untracked files using git ls-files --others --exclude-standard
+    let untracked_output = Command::new("git")
+        .arg("ls-files")
+        .arg("--others")
+        .arg("--exclude-standard")
+        .current_dir(&git_root)
+        .output()
+        .map_err(|e| format!("Failed to execute git ls-files command: {}", e))?;
 
-    for line in stdout.lines() {
-        let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() != 3 {
-            continue;
+    if untracked_output.status.success() {
+        let stdout = String::from_utf8_lossy(&untracked_output.stdout);
+
+        for relative_path in stdout.lines() {
+            if relative_path.is_empty() {
+                continue;
+            }
+
+            let absolute_path = git_root.join(relative_path);
+            let absolute_path_str = absolute_path.to_string_lossy().to_string();
+
+            // Skip if already in stats (shouldn't happen, but be safe)
+            if stats_map.contains_key(&absolute_path_str) {
+                continue;
+            }
+
+            // Count lines in the untracked file
+            let line_count = if absolute_path.is_file() {
+                fs::read_to_string(&absolute_path)
+                    .map(|content| content.lines().count())
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+
+            stats_map.insert(absolute_path_str, GitStats {
+                added: line_count,
+                deleted: 0,
+                status: Some("untracked".to_string()),
+            });
         }
-
-        let added = parts[0].parse::<usize>().unwrap_or(0);
-        let deleted = parts[1].parse::<usize>().unwrap_or(0);
-        let relative_path = parts[2];
-
-        // Convert relative path to absolute
-        let absolute_path = repo_path.join(relative_path);
-        let absolute_path_str = absolute_path.to_string_lossy().to_string();
-
-        stats_map.insert(absolute_path_str, GitStats { added, deleted });
     }
 
     Ok(stats_map)
