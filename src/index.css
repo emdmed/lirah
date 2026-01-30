@@ -11,9 +11,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* Font family */
+  --font-mono: "Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+
   /* Default theme colors - will be overridden by ThemeProvider */
   --color-border: hsl(240 13% 20%);
   --color-input: hsl(240 13% 20%);
+  --color-input-background: hsl(240 13% 10%);
   --color-ring: hsl(225 46% 67%);
   --color-background: hsl(240 13% 14%);
   --color-foreground: hsl(45 26% 80%);
@@ -81,6 +85,8 @@ body {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.12);
   }
   body {
     @apply bg-background text-foreground;
@@ -112,6 +118,43 @@ body {
 /* Theme transition for smooth color changes */
 .theme-transition {
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+/* Custom scrollbar - consistent thin width, no resize on hover */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Disable overlay scrollbar behavior */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* Force scrollbar to always show at same size */
+.overflow-y-auto,
+.overflow-auto {
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Engineering sketch dashed borders */

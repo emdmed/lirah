@@ -45,18 +45,18 @@ export function SelectedFilesList({
   }
 
   return (
-    <div className="flex flex-col w-1/3 p-1 gap-1 overflow-y-auto flex-shrink-0">
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="text-xs font-semibold opacity-60">
-          Selected Files ({filesWithRelativePaths.length})
+    <div className="flex flex-col w-1/3 p-1 overflow-y-auto flex-shrink-0">
+      <div className="flex items-center justify-between gap-1 mb-0.5">
+        <div className="text-[0.65rem] font-semibold opacity-60">
+          Files ({filesWithRelativePaths.length})
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={onClearAllFiles}
-          className="text-xs h-5 px-2"
+          className="text-[0.65rem] h-4 px-1"
         >
-          Clear all
+          Clear
         </Button>
       </div>
       <div
@@ -64,7 +64,7 @@ export function SelectedFilesList({
         aria-label="Selected files for terminal command"
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        className="flex-1 overflow-y-auto space-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
+        className="flex-1 overflow-y-auto space-y-0 pr-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
       >
         {filesWithRelativePaths.map((file, index) => {
           const currentState = fileStates?.get(file.absolute) || 'modify';

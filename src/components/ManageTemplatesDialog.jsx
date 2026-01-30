@@ -96,7 +96,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Template list */}
-          <div className="flex-1 min-h-0 overflow-y-auto border rounded-md">
+          <div className="flex-1 min-h-0 overflow-y-auto border border-sketch rounded-none">
             {templates.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
                 No templates yet. Click "Add Template" to create one.
@@ -146,7 +146,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
 
           {/* Add/Edit form */}
           {(isAdding || editingId) && (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-3 border rounded-md bg-muted/30">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-3 border border-sketch rounded-none bg-muted/20">
               <div className="flex flex-col gap-2">
                 <label htmlFor="template-title" className="text-sm font-medium">
                   Title

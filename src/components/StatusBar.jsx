@@ -88,9 +88,6 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
             {fileWatchingEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
           </button>
           <ThemeSwitcher />
-          <span style={{ color: theme.cursor || '#C8C093' }}>
-            {sessionId ? `Session: ${sessionId.slice(0, 8)}` : 'No session'}
-          </span>
         </div>
       </div>
     </>

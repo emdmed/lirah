@@ -187,7 +187,7 @@ export function GitDiffDialog({
 
         <div
           ref={scrollContainerRef}
-          className="flex-1 min-h-0 overflow-auto border rounded-md bg-background"
+          className="flex-1 min-h-0 overflow-auto border border-sketch rounded-none bg-background"
         >
           {loading ? (
             <div className="flex items-center justify-center p-8">

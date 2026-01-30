@@ -454,8 +454,8 @@ export function DiffContent({
       />
 
       {/* Old file (left side) */}
-      <div className="flex-1 border-r border-border overflow-x-auto">
-        <div className="sticky top-0 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-border z-10">
+      <div className="flex-1 border-r border-sketch overflow-x-auto">
+        <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-sketch z-10">
           {isNewFile ? '(new file)' : 'HEAD'}
         </div>
         <div
@@ -501,7 +501,7 @@ export function DiffContent({
 
       {/* New file (right side) */}
       <div className="flex-1 overflow-x-auto">
-        <div className="sticky top-0 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-border z-10">
+        <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-sketch z-10">
           {isDeletedFile ? '(deleted)' : 'Working Tree'}
         </div>
         <div
@@ -556,7 +556,7 @@ const DiffMinimap = memo(function DiffMinimap({ diffChunks, totalLines, visibleR
 
   return (
     <div
-      className="w-3 flex-shrink-0 bg-muted/30 border-r border-border relative cursor-pointer"
+      className="w-3 flex-shrink-0 bg-muted/20 border-r border-sketch relative cursor-pointer"
       style={{ height: `${minimapHeight}px`, position: 'sticky', top: '28px' }}
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -596,7 +596,7 @@ const DiffMinimap = memo(function DiffMinimap({ diffChunks, totalLines, visibleR
 const CollapsedRegionPlaceholder = memo(function CollapsedRegionPlaceholder({ hiddenCount, onExpand }) {
   return (
     <div
-      className="flex items-center justify-center h-6 bg-muted/50 border-y border-border/50 cursor-pointer hover:bg-muted transition-colors"
+      className="flex items-center justify-center h-6 bg-muted/30 border-y border-sketch cursor-pointer hover:bg-muted/50 transition-colors"
       onClick={onExpand}
     >
       <ChevronDown className="w-3 h-3 mr-1 text-muted-foreground" />
@@ -691,7 +691,7 @@ const DiffLine = memo(function DiffLine({
         {gutterSymbol}
       </div>
       {/* Line number */}
-      <div className="w-10 flex-shrink-0 text-right pr-2 text-muted-foreground/70 select-none border-r border-border/50">
+      <div className="w-10 flex-shrink-0 text-right pr-2 text-muted-foreground/70 select-none border-r border-sketch">
         {lineNum || ''}
       </div>
       {/* Content */}

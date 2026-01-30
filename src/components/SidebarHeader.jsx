@@ -33,7 +33,7 @@ export function SidebarHeader({
           </span>
           <Badge
             variant="outline"
-            className={`px-1.5 py-0 text-[0.6rem] h-4 ${viewMode === 'tree' ? 'border-blue-400/50 text-blue-400' : 'border-emerald-400/50 text-emerald-400'}`}
+            className={`px-1.5 py-0 text-[0.6rem] h-4 ${viewMode === 'tree' ? 'border-primary/50 text-primary' : 'border-muted-foreground/50 text-muted-foreground'}`}
           >
             {viewMode === 'tree' ? 'claude' : 'nav'}
           </Badge>
@@ -92,7 +92,7 @@ export function SidebarHeader({
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-6 pl-6 pr-6 text-xs"
+            className="h-6 pl-6 pr-6 py-0 text-xs leading-6"
           />
           {searchQuery && (
             <button

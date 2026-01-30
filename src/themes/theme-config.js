@@ -56,6 +56,7 @@ export const themes = {
       destructiveForeground: 'hsl(45 26% 80%)',
       border: 'hsl(240 13% 20%)',
       input: 'hsl(240 13% 20%)',
+      inputBackground: 'hsl(240 13% 10%)',
       ring: 'hsl(225 46% 67%)',
       sidebar: 'hsl(240 13% 14%)',
       sidebarForeground: 'hsl(45 26% 80%)',
@@ -123,6 +124,7 @@ export const themes = {
       destructiveForeground: 'hsl(0 0% 100%)',
       border: 'hsl(220 13% 91%)',
       input: 'hsl(220 13% 91%)',
+      inputBackground: 'hsl(220 13% 96%)',
       ring: 'hsl(213 32% 52%)',
       sidebar: 'hsl(220 16% 96%)',
       sidebarForeground: 'hsl(222 16% 28%)',
@@ -190,6 +192,7 @@ export const themes = {
       destructiveForeground: 'hsl(60 30% 96%)',
       border: 'hsl(232 14% 31%)',
       input: 'hsl(232 14% 31%)',
+      inputBackground: 'hsl(231 15% 14%)',
       ring: 'hsl(265 89% 78%)',
       sidebar: 'hsl(231 15% 18%)',
       sidebarForeground: 'hsl(60 30% 96%)',
@@ -257,6 +260,7 @@ export const themes = {
       destructiveForeground: 'hsl(60 30% 96%)',
       border: 'hsl(55 11% 22%)',
       input: 'hsl(55 11% 22%)',
+      inputBackground: 'hsl(70 8% 10%)',
       ring: 'hsl(81 88% 67%)',
       sidebar: 'hsl(70 8% 15%)',
       sidebarForeground: 'hsl(60 30% 96%)',
@@ -322,6 +326,7 @@ export const themes = {
       destructiveForeground: 'hsl(156 72% 67%)',
       border: 'hsl(0 0% 15%)',
       input: 'hsl(0 0% 15%)',
+      inputBackground: 'hsl(0 0% 3%)',
       ring: 'hsl(156 72% 67%)',
       sidebar: 'hsl(0 0% 0%)',
       sidebarForeground: 'hsl(156 72% 67%)',
@@ -391,6 +396,7 @@ export const themes = {
       destructiveForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
       border: 'hsl(0 0% 30%)',              // bg3 #665c54
       input: 'hsl(0 0% 25%)',               // bg2 #504945
+      inputBackground: 'hsl(0 0% 11%)',     // darker than bg0_h
       ring: 'hsl(24 75% 59%)',              // orange #fe8019
       sidebar: 'hsl(0 0% 16%)',             // bg0_h #1d2021
       sidebarForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
