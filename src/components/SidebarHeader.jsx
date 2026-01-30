@@ -1,5 +1,6 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Badge } from './ui/badge';
 import { BookmarksDropdown } from './BookmarksDropdown';
 import { ChevronUp, Search, X, GitBranch, Star } from 'lucide-react';
 
@@ -21,14 +22,21 @@ export function SidebarHeader({
 }) {
   return (
     <div className="px-2 py-1.5 border-b border-white/10 flex flex-col gap-1.5 flex-shrink-0">
-      {/* Mode indicator + controls */}
+      {/* Branding + Mode indicator + controls */}
       <div className="flex items-center justify-between gap-1.5">
-        {/* Minimal mode indicator */}
-        <div className="flex items-center gap-1.5">
-          <div className={`w-1.5 h-1.5 rounded-full ${viewMode === 'tree' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
-          <span className="text-[0.65rem] font-medium opacity-60 tracking-wide uppercase">
-            {viewMode === 'tree' ? 'Claude Mode' : 'Navigation Mode'}
+        <div className="flex items-baseline gap-2">
+          <span
+            className="text-xl"
+            style={{ fontFamily: "'Grenze Gotisch', serif", fontWeight: 600, lineHeight: 1 }}
+          >
+            Lirah
           </span>
+          <Badge
+            variant="outline"
+            className={`px-1.5 py-0 text-[0.6rem] h-4 ${viewMode === 'tree' ? 'border-blue-400/50 text-blue-400' : 'border-emerald-400/50 text-emerald-400'}`}
+          >
+            {viewMode === 'tree' ? 'claude' : 'nav'}
+          </Badge>
         </div>
 
         {/* Action buttons */}
