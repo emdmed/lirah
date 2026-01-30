@@ -904,7 +904,7 @@ function App() {
         sidebar={
           sidebarOpen && (
             <>
-              <Sidebar collapsible="none" className="border-e m-0 p-1 shrink-0 overflow-hidden" style={{ height: '100%', display: 'flex', flexDirection: 'column', width: sidebarWidth }}>
+              <Sidebar collapsible="none" className="border-e border-e-sketch m-0 p-1 shrink-0 overflow-hidden" style={{ height: '100%', display: 'flex', flexDirection: 'column', width: sidebarWidth }}>
                 <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <SidebarHeader
                     viewMode={viewMode}

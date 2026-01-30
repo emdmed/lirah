@@ -61,7 +61,7 @@ export function TextareaPanel({
   }));
 
   return (
-    <div className="flex flex-col border-t border-input bg-background p-2 gap-2">
+    <div className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

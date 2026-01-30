@@ -21,7 +21,7 @@ export function SidebarHeader({
   hasTerminalSession
 }) {
   return (
-    <div className="px-2 py-1.5 border-b border-white/10 flex flex-col gap-1.5 flex-shrink-0">
+    <div className="px-2 py-1.5 border-b border-b-sketch flex flex-col gap-1.5 flex-shrink-0">
       {/* Branding + Mode indicator + controls */}
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-baseline gap-2">

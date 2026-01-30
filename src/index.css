@@ -113,3 +113,24 @@ body {
 .theme-transition {
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
+
+/* Engineering sketch dashed borders */
+.border-sketch {
+  border-style: dashed !important;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.border-t-sketch {
+  border-top-style: dashed !important;
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.border-b-sketch {
+  border-bottom-style: dashed !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.border-e-sketch {
+  border-inline-end-style: dashed !important;
+  border-inline-end-color: rgba(255, 255, 255, 0.12);
+}

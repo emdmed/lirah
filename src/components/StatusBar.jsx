@@ -14,11 +14,10 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
       {/* Help content section - compact single line */}
       {showHelp && (
         <div
-          className="px-4 py-1.5 border-t text-[0.65rem] font-mono"
+          className="px-4 py-1.5 border-t border-t-sketch text-[0.65rem] font-mono"
           style={{
             backgroundColor: theme.background || '#1F1F28',
             color: theme.foreground || '#DCD7BA',
-            borderColor: 'rgba(255, 255, 255, 0.1)',
           }}
         >
           <div className="flex items-center gap-4 flex-wrap">
@@ -40,11 +39,10 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
 
       {/* Status bar - always visible at bottom */}
       <div
-        className="flex items-center justify-between px-4 py-2 border-t text-xs font-mono"
+        className="flex items-center justify-between px-4 py-2 border-t border-t-sketch text-xs font-mono"
         style={{
           backgroundColor: theme.background || '#1F1F28',
           color: theme.foreground || '#DCD7BA',
-          borderColor: 'rgba(255, 255, 255, 0.1)',
           height: '32px',
         }}
       >
