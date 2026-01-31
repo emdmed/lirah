@@ -254,7 +254,7 @@ function App() {
   };
 
   // Tree view helper functions (defined early for use in hooks)
-  const loadTreeData = async () => {
+  const loadTreeData = useCallback(async () => {
     try {
       if (!terminalSessionId) {
         console.log('Terminal session not ready');
@@ -294,7 +294,7 @@ function App() {
       setCurrentPath('Error loading directory');
       setTreeLoading(false);
     }
-  };
+  }, [terminalSessionId, initializeSearch]);
 
   // File selection handlers
   const toggleFileSelection = (filePath) => {
@@ -354,6 +354,105 @@ function App() {
       return next;
     });
   };
+
+  // Incremental tree update to prevent flickering
+  const incrementallyUpdateTree = useCallback((changes, rootPath) => {
+    console.log('[incrementallyUpdateTree] Called with rootPath:', rootPath, 'changes:', changes);
+    setTreeData(prevTreeData => {
+      let newData = [...prevTreeData];
+      console.log('[incrementallyUpdateTree] prevTreeData length:', prevTreeData.length);
+
+      // Add new untracked files to the tree
+      changes.newUntracked.forEach(({ path: filePath, stats }) => {
+        const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+        const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+        console.log('[incrementallyUpdateTree] Processing:', filePath, 'parentPath:', parentPath);
+
+        // Check if file already exists in tree
+        const fileExistsInTree = (nodes) => {
+          for (const node of nodes) {
+            if (node.path === filePath) return true;
+            if (node.children && fileExistsInTree(node.children)) return true;
+          }
+          return false;
+        };
+
+        if (fileExistsInTree(newData)) {
+          console.log('[incrementallyUpdateTree] File already exists in tree, skipping:', filePath);
+          return; // Already in tree
+        }
+
+        // Root-level file: parentPath equals the tree root
+        if (parentPath === rootPath) {
+          console.log('[incrementallyUpdateTree] Adding root-level file:', fileName);
+          newData = [...newData, {
+            name: fileName,
+            path: filePath,
+            is_dir: false,
+            depth: 0,
+            parent_path: parentPath
+          }];
+          // Sort: folders first, then files alphabetically
+          newData.sort((a, b) => {
+            if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+            return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+          });
+          return;
+        }
+
+        // Find and update the parent node for nested files
+        console.log('[incrementallyUpdateTree] Looking for parent node:', parentPath);
+        const updateNode = (nodes) => {
+          return nodes.map(node => {
+            if (node.path === parentPath) {
+              console.log('[incrementallyUpdateTree] Found parent, adding file:', fileName);
+              const newNode = { ...node };
+              if (!newNode.children) {
+                newNode.children = [];
+              }
+              // Add new file if not already present
+              if (!newNode.children.some(child => child.path === filePath)) {
+                newNode.children.push({
+                  name: fileName,
+                  path: filePath,
+                  is_dir: false,
+                  depth: node.depth + 1,
+                  parent_path: parentPath
+                });
+                // Sort children: folders first, then files alphabetically
+                newNode.children.sort((a, b) => {
+                  if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+                  return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                });
+              }
+              return newNode;
+            } else if (node.children) {
+              return { ...node, children: updateNode(node.children) };
+            }
+            return node;
+          });
+        };
+
+        newData = updateNode(newData);
+      });
+
+      console.log('[incrementallyUpdateTree] Final newData length:', newData.length);
+      return newData;
+    });
+  }, []);
+
+  // Handle git changes with incremental updates to prevent flickering
+  const handleGitChanges = useCallback((changes) => {
+    console.log('[handleGitChanges] Called with:', changes);
+    // For new untracked files only - use incremental update
+    if (changes.newUntracked.length > 0 && !changes.newDeleted.length && !changes.noLongerUntracked.length) {
+      console.log('[handleGitChanges] Adding new untracked files to tree:', changes.newUntracked, 'rootPath:', currentPath);
+      incrementallyUpdateTree(changes, currentPath);
+    } else if (changes.hasChanges) {
+      console.log('[handleGitChanges] Complex git changes detected, refreshing tree:', changes);
+      loadTreeData();
+    }
+  }, [incrementallyUpdateTree, loadTreeData, currentPath]);
 
   // Navigate to bookmark
   const navigateToBookmark = useCallback(async (bookmark) => {
@@ -975,6 +1074,7 @@ function App() {
                             successfulChecks={successfulChecks}
                             onCheckFileTypes={checkFileTypes}
                             fileWatchingEnabled={fileWatchingEnabled}
+                            onGitChanges={handleGitChanges}
                           />
                         )
                       )}

@@ -25,10 +25,11 @@ export function FileTree({
   checkingFiles,
   successfulChecks,
   onCheckFileTypes,
-  fileWatchingEnabled
+  fileWatchingEnabled,
+  onGitChanges
 }) {
-  // Fetch git stats periodically
-  const gitStats = useGitStats(currentPath, fileWatchingEnabled);
+  // Fetch git stats periodically with git changes callback
+  const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
 
   // Apply filters to get displayed nodes
   const displayedNodes = useMemo(() => {
@@ -36,7 +37,9 @@ export function FileTree({
 
     // Apply git changes filter if enabled
     if (showGitChangesOnly && gitStats.size > 0) {
+      console.log('[FileTree] Filtering by git changes. nodes:', nodes.length, 'gitStats:', gitStats.size);
       filtered = filterTreeByGitChanges(filtered, gitStats);
+      console.log('[FileTree] After filter:', filtered.length, 'nodes');
     }
 
     return filtered;
