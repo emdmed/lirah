@@ -57,7 +57,7 @@ jobs:
 
             ### Quick Install (Linux)
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/emdmed/ao-terminal/main/scripts/install.sh | sh
+            curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | sh
             ```
 
             ### Manual Download

@@ -4,7 +4,7 @@
 
 set -e
 
-REPO="emdmed/ao-terminal"
+REPO="emdmed/lirah"
 APP_NAME="nevo-terminal"
 DISPLAY_NAME="Nevo Terminal"
 
