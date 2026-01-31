@@ -35,7 +35,7 @@ export function SidebarHeader({
             variant="outline"
             className={`px-1.5 py-0 text-[0.6rem] h-4 ${viewMode === 'tree' ? 'border-primary/50 text-primary' : 'border-muted-foreground/50 text-muted-foreground'}`}
           >
-            {viewMode === 'tree' ? 'claude' : 'nav'}
+            {viewMode === 'tree' ? 'agent' : 'nav'}
           </Badge>
         </div>
 
