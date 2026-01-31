@@ -680,6 +680,7 @@ function App() {
     setTextareaVisible,
     textareaRef,
     onSendContent: sendTextareaToTerminal,
+    onToggleOrchestration: setAppendOrchestration,
   });
 
   // Help keyboard shortcut
