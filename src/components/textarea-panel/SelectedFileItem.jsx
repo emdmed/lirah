@@ -1,5 +1,5 @@
 import React from "react";
-import { X } from "lucide-react";
+import { X, Loader2, Braces } from "lucide-react";
 import { FileStateSelector } from "./FileStateSelector";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
  * @param {Function} onRemoveFile - Callback to remove file
  * @param {boolean} isSelected - Whether this item is currently selected (for keyboard nav)
  * @param {Function} itemRef - Ref callback for keyboard navigation
+ * @param {number} symbolCount - Number of symbols extracted (-1 if parsing, 0 if not parseable or no symbols)
  */
 export function SelectedFileItem({
   file,
@@ -20,7 +21,8 @@ export function SelectedFileItem({
   onRemoveFile,
   isSelected = false,
   itemRef,
-  showKeyboardHints = false
+  showKeyboardHints = false,
+  symbolCount = 0
 }) {
   return (
     <div
@@ -43,6 +45,18 @@ export function SelectedFileItem({
         <span className="text-xs truncate" title={file.absolute}>
           {file.name}
         </span>
+        {/* Symbol count indicator */}
+        {symbolCount === -1 ? (
+          <Loader2 className="w-3 h-3 animate-spin opacity-50 flex-shrink-0" title="Parsing symbols..." />
+        ) : symbolCount > 0 ? (
+          <span
+            className="flex items-center gap-0.5 text-[10px] px-1 py-0 rounded bg-accent/20 text-accent opacity-70 flex-shrink-0"
+            title={`${symbolCount} symbols extracted`}
+          >
+            <Braces className="w-2.5 h-2.5" />
+            {symbolCount}
+          </span>
+        ) : null}
       </div>
       <button
         onClick={() => onRemoveFile(file.absolute)}

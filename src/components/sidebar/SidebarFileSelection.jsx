@@ -3,7 +3,7 @@ import { Button } from "../ui/button";
 import { SelectedFileItem } from "../textarea-panel/SelectedFileItem";
 import { useFileListKeyboardNav } from "../../hooks/useFileListKeyboardNav";
 import { Badge } from "../ui/badge";
-import { File, X } from "lucide-react";
+import { File, X, Loader2, Braces } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 /**
@@ -13,13 +13,17 @@ import { useTheme } from "../../contexts/ThemeContext";
  * @param {Function} onSetFileState - Callback to set file state
  * @param {Function} onRemoveFile - Callback to remove file
  * @param {Function} onClearAllFiles - Callback to clear all files
+ * @param {Function} getSymbolCount - Function to get symbol count for a file (-1 if parsing)
+ * @param {Map} fileSymbols - Map of file paths to symbol data
  */
 export function SidebarFileSelection({
   filesWithRelativePaths,
   fileStates,
   onSetFileState,
   onRemoveFile,
-  onClearAllFiles
+  onClearAllFiles,
+  getSymbolCount,
+  fileSymbols
 }) {
   const { theme } = useTheme();
 
@@ -90,6 +94,7 @@ export function SidebarFileSelection({
       >
         {filesWithRelativePaths.map((file, index) => {
           const currentState = fileStates?.get(file.absolute) || 'modify';
+          const symbolCount = getSymbolCount ? getSymbolCount(file.absolute) : 0;
           return (
             <SelectedFileItem
               key={file.absolute}
@@ -100,6 +105,7 @@ export function SidebarFileSelection({
               isSelected={selectedIndex === index}
               itemRef={(el) => (fileRefs.current[index] = el)}
               showKeyboardHints={true}
+              symbolCount={symbolCount}
             />
           );
         })}

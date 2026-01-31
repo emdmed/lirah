@@ -24,6 +24,7 @@ import { useFileSearch } from "./hooks/useFileSearch";
 import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
+import { useFileSymbols } from "./hooks/file-analysis/useFileSymbols";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarFileSelection } from "./components/sidebar/SidebarFileSelection";
 import {
@@ -180,6 +181,18 @@ function App() {
   // Claude launcher hook
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, selectedCli);
 
+  // File symbols hook for code symbol extraction
+  const {
+    fileSymbols,
+    extractFileSymbols,
+    clearFileSymbols,
+    clearAllSymbols,
+    getSymbolCount,
+    getLineCount,
+    formatSymbols,
+    isBabelParseable,
+  } = useFileSymbols();
+
   // Switch to Claude mode (tree view)
   const switchToClaudeMode = useCallback(() => {
     setViewMode('tree');
@@ -309,6 +322,8 @@ function App() {
           nextStates.delete(filePath);
           return nextStates;
         });
+        // Clear symbols for this file
+        clearFileSymbols(filePath);
       } else {
         // Adding file
         next.add(filePath);
@@ -318,6 +333,10 @@ function App() {
           nextStates.set(filePath, 'modify');
           return nextStates;
         });
+        // Extract symbols for parseable files
+        if (isBabelParseable(filePath)) {
+          extractFileSymbols(filePath);
+        }
       }
       return next;
     });
@@ -339,6 +358,7 @@ function App() {
   const clearFileSelection = () => {
     setSelectedFiles(new Set());
     setFileStates(new Map());
+    clearAllSymbols();
   };
 
   // View git diff for a file
@@ -528,7 +548,7 @@ function App() {
       if (hasFiles) {
         const fileArray = Array.from(selectedFiles);
 
-        // Group files by state
+        // Group files by state with their symbols
         const modifyFiles = [];
         const doNotModifyFiles = [];
         const exampleFiles = [];
@@ -538,32 +558,48 @@ function App() {
           const escapedPath = escapeShellPath(relativePath);
           const state = fileStates.get(absolutePath) || 'modify';
 
+          // Only include symbols for files with 500+ lines
+          const lineCount = getLineCount(absolutePath);
+          const symbolsStr = lineCount >= 500 ? formatSymbols(absolutePath) : '';
+
+          const fileEntry = { path: escapedPath, symbols: symbolsStr };
+
           if (state === 'modify') {
-            modifyFiles.push(escapedPath);
+            modifyFiles.push(fileEntry);
           } else if (state === 'do-not-modify') {
-            doNotModifyFiles.push(escapedPath);
+            doNotModifyFiles.push(fileEntry);
           } else if (state === 'use-as-example') {
-            exampleFiles.push(escapedPath);
+            exampleFiles.push(fileEntry);
           }
         });
 
-        // Build structured format
+        // Build structured format with symbols
+        const formatFileSection = (label, files) => {
+          return files.map(f => {
+            let entry = `${label}: ${f.path}`;
+            if (f.symbols) {
+              entry += `\n  Symbols:\n${f.symbols}`;
+            }
+            return entry;
+          }).join('\n\n');
+        };
+
         const sections = [];
 
         if (modifyFiles.length > 0) {
-          sections.push(`MODIFY: ${modifyFiles.join(' ')}`);
+          sections.push(formatFileSection('MODIFY', modifyFiles));
         }
         if (doNotModifyFiles.length > 0) {
-          sections.push(`DO_NOT_MODIFY: ${doNotModifyFiles.join(' ')}`);
+          sections.push(formatFileSection('DO_NOT_MODIFY', doNotModifyFiles));
         }
         if (exampleFiles.length > 0) {
-          sections.push(`USE_AS_EXAMPLE: ${exampleFiles.join(' ')}`);
+          sections.push(formatFileSection('USE_AS_EXAMPLE', exampleFiles));
         }
 
-        const filesString = sections.join(' ');
+        const filesString = sections.join('\n\n');
 
         if (hasTextContent) {
-          fullCommand = `${textareaContent} ${filesString}`;
+          fullCommand = `${filesString}\n\n${textareaContent}`;
         } else {
           fullCommand = filesString;
         }
@@ -619,7 +655,7 @@ function App() {
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatSymbols, getLineCount]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -1093,6 +1129,8 @@ function App() {
                       onSetFileState={setFileState}
                       onRemoveFile={removeFileFromSelection}
                       onClearAllFiles={clearFileSelection}
+                      getSymbolCount={getSymbolCount}
+                      fileSymbols={fileSymbols}
                     />
                   )}
                 </SidebarContent>
