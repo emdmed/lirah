@@ -1,5 +1,5 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { HelpCircle, Eye, EyeOff, Download, Settings, Bot, Terminal } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Settings, Bot, Terminal } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { Button } from './ui/button';
@@ -9,108 +9,79 @@ const CLI_DISPLAY = {
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers });
 
   return (
-    <>
-      {/* Help content section - compact single line */}
-      {showHelp && (
-        <div
-          className="px-4 py-1.5 border-t border-t-sketch text-[0.65rem] font-mono"
-          style={{
-            backgroundColor: theme.background || '#1F1F28',
-            color: theme.foreground || '#DCD7BA',
-          }}
-        >
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="opacity-70">Ctrl+S: Nav</span>
-            <span className="opacity-70">Ctrl+K: {CLI_DISPLAY[selectedCli]?.name || 'CLI'}</span>
-            <span className="opacity-30">|</span>
-            <span className="opacity-70">Ctrl+P: Projects</span>
-            <span className="opacity-70">Ctrl+T: Focus Input</span>
-            <span className="opacity-70">Ctrl+Enter: Send</span>
-            <span className="opacity-30">|</span>
-            <span className="opacity-70">Ctrl+F: Search</span>
-            <span className="opacity-70">Ctrl+G: Git Filter</span>
-            <span className="opacity-70">Ctrl+W: Watchers</span>
-            <span className="opacity-30">|</span>
-            <span className="opacity-70">Ctrl+H: Help</span>
-          </div>
-        </div>
-      )}
-
-      {/* Status bar - always visible at bottom */}
-      <div
-        className="flex items-center justify-between px-4 py-2 border-t border-t-sketch text-xs font-mono"
-        style={{
-          backgroundColor: theme.background || '#1F1F28',
-          color: theme.foreground || '#DCD7BA',
-          height: '32px',
-        }}
-      >
-        {/* Left section: Current path */}
-        <div className="flex items-center gap-2 overflow-hidden">
-          <span className="overflow-hidden whitespace-nowrap" style={{ textOverflow: 'ellipsis' }}>
-            {currentPath || '~'}
-          </span>
-        </div>
-
-        {/* Right section: Help, Watchers, Theme switcher and session status */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={onLaunchOrchestration}
-            title="Initialize claude-orchestration in current project"
-            disabled={!sessionId}
-          >
-            <Download className="w-3 h-3" />
-            Initialize Claude Orchestration
-          </Button>
-          {selectedCli && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onOpenCliSettings}
-              title="Change CLI tool (Ctrl+K)"
-              className="gap-1.5"
-            >
-              {(() => {
-                const CliIcon = CLI_DISPLAY[selectedCli]?.icon || Terminal;
-                return <CliIcon className="w-3 h-3" />;
-              })()}
-              <span className="opacity-70">{CLI_DISPLAY[selectedCli]?.name || selectedCli}</span>
-              <Settings className="w-3 h-3 opacity-50" />
-            </Button>
-          )}
-          <button
-            onClick={onToggleHelp}
-            className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer focus-ring rounded"
-            title="Keyboard shortcuts (Ctrl+H)"
-            aria-label="Toggle keyboard shortcuts help"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={toggleWatchers}
-            className="transition-opacity cursor-pointer focus-ring rounded"
-            style={{
-              opacity: fileWatchingEnabled ? 0.5 : 0.3,
-              color: fileWatchingEnabled ? 'inherit' : '#E82424',
-            }}
-            title={`File watching: ${fileWatchingEnabled ? 'ON' : 'OFF'} (Ctrl+W)`}
-            aria-label={`Toggle file watching, currently ${fileWatchingEnabled ? 'enabled' : 'disabled'}`}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = fileWatchingEnabled ? 0.5 : 0.3; }}
-          >
-            {fileWatchingEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-          </button>
-          <ThemeSwitcher />
-        </div>
+    <div
+      className="flex items-center justify-between px-4 py-2 border-t border-t-sketch text-xs font-mono"
+      style={{
+        backgroundColor: theme.background || '#1F1F28',
+        color: theme.foreground || '#DCD7BA',
+        height: '32px',
+      }}
+    >
+      {/* Left section: Current path */}
+      <div className="flex items-center gap-2 overflow-hidden">
+        <span className="overflow-hidden whitespace-nowrap" style={{ textOverflow: 'ellipsis' }}>
+          {currentPath || '~'}
+        </span>
       </div>
-    </>
+
+      {/* Right section: Help, Watchers, Theme switcher and session status */}
+      <div className="flex items-center gap-4">
+        <Button
+          variant="outline"
+          size="xs"
+          onClick={onLaunchOrchestration}
+          title="Initialize claude-orchestration in current project"
+          disabled={!sessionId}
+        >
+          <Download className="w-3 h-3" />
+          Initialize Claude Orchestration
+        </Button>
+        {selectedCli && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onOpenCliSettings}
+            title="Change CLI tool (Ctrl+K)"
+            className="gap-1.5"
+          >
+            {(() => {
+              const CliIcon = CLI_DISPLAY[selectedCli]?.icon || Terminal;
+              return <CliIcon className="w-3 h-3" />;
+            })()}
+            <span className="opacity-70">{CLI_DISPLAY[selectedCli]?.name || selectedCli}</span>
+            <Settings className="w-3 h-3 opacity-50" />
+          </Button>
+        )}
+        <button
+          onClick={onToggleHelp}
+          className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer focus-ring rounded"
+          title="Keyboard shortcuts (Ctrl+H)"
+          aria-label="Open keyboard shortcuts"
+        >
+          <Keyboard className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={toggleWatchers}
+          className="transition-opacity cursor-pointer focus-ring rounded"
+          style={{
+            opacity: fileWatchingEnabled ? 0.5 : 0.3,
+            color: fileWatchingEnabled ? 'inherit' : '#E82424',
+          }}
+          title={`File watching: ${fileWatchingEnabled ? 'ON' : 'OFF'} (Ctrl+W)`}
+          aria-label={`Toggle file watching, currently ${fileWatchingEnabled ? 'enabled' : 'disabled'}`}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = fileWatchingEnabled ? 0.5 : 0.3; }}
+        >
+          {fileWatchingEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+        </button>
+        <ThemeSwitcher />
+      </div>
+    </div>
   );
 };

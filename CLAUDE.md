@@ -71,12 +71,15 @@ await listen('terminal-output', ({ payload }) => terminal.write(payload.data));
 | Shortcut | Action |
 |----------|--------|
 | Ctrl+S | Toggle Navigation Mode |
-| Ctrl+K | Toggle Claude Mode |
+| Ctrl+K | Launch CLI / Toggle Claude Mode |
+| Ctrl+P | Open Projects Palette |
 | Ctrl+T | Focus Textarea Panel |
 | Ctrl+Enter | Send Textarea Content |
+| Ctrl+Ctrl | Toggle Orchestration Mode (double-tap) |
 | Ctrl+F | Focus File Search |
 | Ctrl+G | Toggle Git Filter |
-| Ctrl+H | Toggle Help Modal |
+| Ctrl+W | Toggle File Watchers |
+| Ctrl+H | Open Keyboard Shortcuts Dialog |
 
 ## Debugging
 
