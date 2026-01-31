@@ -530,7 +530,8 @@ function App() {
     setViewMode,
     onLoadFlatView: loadFolders,
     onLoadTreeView: loadTreeData,
-    onLaunchClaude: launchClaude
+    onLaunchClaude: launchClaude,
+    terminalSessionId
   });
 
   // Textarea keyboard shortcuts
