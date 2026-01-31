@@ -79,33 +79,12 @@ jobs:
         run: |
           cd src-tauri/target/release/bundle
 
-          # Find all release artifacts
-          ARTIFACTS=""
+          # Generate checksums for all packages
+          find . -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) ! -name "*.sig" | while read -r f; do
+            sha256sum "$f" >> checksums.sha256
+          done
 
-          # DEB packages
-          if [ -d "deb" ]; then
-            for f in deb/*.deb; do
-              [ -f "$f" ] && ARTIFACTS="$ARTIFACTS $f"
-            done
-          fi
-
-          # RPM packages
-          if [ -d "rpm" ]; then
-            for f in rpm/*.rpm; do
-              [ -f "$f" ] && ARTIFACTS="$ARTIFACTS $f"
-            done
-          fi
-
-          # AppImage
-          if [ -d "appimage" ]; then
-            for f in appimage/*.AppImage; do
-              [ -f "$f" ] && ARTIFACTS="$ARTIFACTS $f"
-            done
-          fi
-
-          # Generate checksums
-          if [ -n "$ARTIFACTS" ]; then
-            sha256sum $ARTIFACTS > checksums.sha256
+          if [ -f checksums.sha256 ]; then
             echo "Generated checksums:"
             cat checksums.sha256
           else
