@@ -24,6 +24,7 @@ import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
+import { SidebarFileSelection } from "./components/sidebar/SidebarFileSelection";
 import {
   Sidebar,
   SidebarContent,
@@ -958,6 +959,21 @@ function App() {
                       )}
                     </SidebarGroupContent>
                   </SidebarGroup>
+                  
+                  {/* File Selection Panel */}
+                  {selectedFiles.size > 0 && (
+                    <SidebarFileSelection
+                      filesWithRelativePaths={Array.from(selectedFiles || new Set()).map(absPath => ({
+                        absolute: absPath,
+                        relative: getRelativePath(absPath, currentPath),
+                        name: absPath.split('/').pop()
+                      }))}
+                      fileStates={fileStates}
+                      onSetFileState={setFileState}
+                      onRemoveFile={removeFileFromSelection}
+                      onClearAllFiles={clearFileSelection}
+                    />
+                  )}
                 </SidebarContent>
               </Sidebar>
               {/* Resize handle */}
@@ -979,11 +995,6 @@ function App() {
               disabled={!terminalSessionId}
               selectedFiles={selectedFiles}
               currentPath={currentPath}
-              onRemoveFile={removeFileFromSelection}
-              onClearAllFiles={clearFileSelection}
-              getRelativePath={getRelativePath}
-              fileStates={fileStates}
-              onSetFileState={setFileState}
               keepFilesAfterSend={keepFilesAfterSend}
               onToggleKeepFiles={setKeepFilesAfterSend}
               selectedTemplateId={selectedTemplateId}

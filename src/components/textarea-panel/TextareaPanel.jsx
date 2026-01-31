@@ -1,7 +1,6 @@
 import React, { useRef } from "react";
 import { Textarea } from "../ui/textarea";
 import { Checkbox } from "../ui/checkbox";
-import { SelectedFilesList } from "./SelectedFilesList";
 import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
 
@@ -18,11 +17,6 @@ export function TextareaPanel({
   disabled = false,
   selectedFiles,
   currentPath,
-  onRemoveFile,
-  onClearAllFiles,
-  getRelativePath,
-  fileStates,
-  onSetFileState,
   keepFilesAfterSend = false,
   onToggleKeepFiles,
   selectedTemplateId,
@@ -31,16 +25,8 @@ export function TextareaPanel({
   appendOrchestration = true,
   onToggleOrchestration,
 }) {
-  const fileListRef = useRef(null);
 
   const handleKeyDown = (e) => {
-    // Shift+Tab: move focus to file list (if files exist)
-    if (e.shiftKey && e.key === 'Tab' && fileArray.length > 0) {
-      e.preventDefault();
-      fileListRef.current?.focus();
-      return;
-    }
-
     // Enter creates new lines (default behavior)
     // Ctrl+Enter is handled by the useTextareaShortcuts hook
     if (e.key === 'Enter' && !e.ctrlKey) {
@@ -54,11 +40,6 @@ export function TextareaPanel({
   };
 
   const fileArray = Array.from(selectedFiles || new Set());
-  const filesWithRelativePaths = fileArray.map(absPath => ({
-    absolute: absPath,
-    relative: getRelativePath(absPath, currentPath),
-    name: absPath.split('/').pop()
-  }));
 
   return (
     <div className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
@@ -106,16 +87,7 @@ export function TextareaPanel({
       </div>
 
       {/* Main content area */}
-      <div className="flex gap-2 min-h-[120px] max-h-[300px]">
-        <SelectedFilesList
-          filesWithRelativePaths={filesWithRelativePaths}
-          fileStates={fileStates}
-          onSetFileState={onSetFileState}
-          onRemoveFile={onRemoveFile}
-          onClearAllFiles={onClearAllFiles}
-          textareaRef={textareaRef}
-        />
-
+      <div className="min-h-[120px] max-h-[300px]">
         <Textarea
           ref={textareaRef}
           value={value}
@@ -125,7 +97,7 @@ export function TextareaPanel({
           placeholder={disabled ? "Waiting for terminal session..." : "Type your command here... (Ctrl+Enter to send)"}
           aria-label="Multi-line command input"
           aria-describedby="textarea-instructions"
-          className="flex-1 min-w-[250px] resize-none"
+          className="w-full h-full resize-none"
         />
       </div>
 
@@ -135,7 +107,7 @@ export function TextareaPanel({
           {selectedTemplateId && !value?.trim() ? (
             <span className="text-primary">Ctrl+Enter to send template</span>
           ) : (
-            "Ctrl+Enter: send, Tab: navigate files"
+            "Ctrl+Enter: send"
           )}
         </span>
         <ActionButtons
