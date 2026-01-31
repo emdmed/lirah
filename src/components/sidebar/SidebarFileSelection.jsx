@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Button } from "../ui/button";
 import { SelectedFileItem } from "../textarea-panel/SelectedFileItem";
 import { useFileListKeyboardNav } from "../../hooks/useFileListKeyboardNav";
 import { Badge } from "../ui/badge";
-import { File, X, Loader2, Braces } from "lucide-react";
+import { File, X } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 /**
@@ -14,7 +14,11 @@ import { useTheme } from "../../contexts/ThemeContext";
  * @param {Function} onRemoveFile - Callback to remove file
  * @param {Function} onClearAllFiles - Callback to clear all files
  * @param {Function} getSymbolCount - Function to get symbol count for a file (-1 if parsing)
+ * @param {Function} getLineCount - Function to get line count for a file
+ * @param {Function} getViewModeLabel - Function to get current view mode label
+ * @param {Function} setFileViewMode - Function to set view mode for a file
  * @param {Map} fileSymbols - Map of file paths to symbol data
+ * @param {Object} VIEW_MODES - View modes enum
  */
 export function SidebarFileSelection({
   filesWithRelativePaths,
@@ -23,7 +27,11 @@ export function SidebarFileSelection({
   onRemoveFile,
   onClearAllFiles,
   getSymbolCount,
-  fileSymbols
+  getLineCount,
+  getViewModeLabel,
+  setFileViewMode,
+  fileSymbols,
+  VIEW_MODES
 }) {
   const { theme } = useTheme();
 
@@ -39,6 +47,30 @@ export function SidebarFileSelection({
     };
     return themeStyles[theme.name?.toLowerCase()] || themeStyles.kanagawa;
   };
+
+  // Cycle through view modes: symbols -> signatures -> skeleton -> symbols
+  const cycleViewMode = useCallback((filePath) => {
+    if (!VIEW_MODES || !setFileViewMode || !getViewModeLabel) return;
+
+    const currentLabel = getViewModeLabel(filePath);
+    let nextMode;
+
+    switch (currentLabel) {
+      case 'Symbols':
+        nextMode = VIEW_MODES.SIGNATURES;
+        break;
+      case 'Signatures':
+        nextMode = VIEW_MODES.SKELETON;
+        break;
+      case 'Skeleton':
+      default:
+        nextMode = VIEW_MODES.SYMBOLS;
+        break;
+    }
+
+    setFileViewMode(filePath, nextMode);
+  }, [VIEW_MODES, setFileViewMode, getViewModeLabel]);
+
   const { selectedIndex, handleKeyDown, fileRefs } = useFileListKeyboardNav({
     filesCount: filesWithRelativePaths.length,
     onRemoveFile: (index) => {
@@ -95,6 +127,9 @@ export function SidebarFileSelection({
         {filesWithRelativePaths.map((file, index) => {
           const currentState = fileStates?.get(file.absolute) || 'modify';
           const symbolCount = getSymbolCount ? getSymbolCount(file.absolute) : 0;
+          const lineCount = getLineCount ? getLineCount(file.absolute) : 0;
+          const viewModeLabel = getViewModeLabel ? getViewModeLabel(file.absolute) : null;
+
           return (
             <SelectedFileItem
               key={file.absolute}
@@ -106,6 +141,9 @@ export function SidebarFileSelection({
               itemRef={(el) => (fileRefs.current[index] = el)}
               showKeyboardHints={true}
               symbolCount={symbolCount}
+              lineCount={lineCount}
+              viewModeLabel={viewModeLabel}
+              onCycleViewMode={cycleViewMode}
             />
           );
         })}

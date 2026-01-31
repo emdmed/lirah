@@ -1,17 +1,35 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { extractSymbols, isBabelParseable, formatSymbolsForPrompt } from '../../utils/babelSymbolParser';
+import {
+  extractSymbols,
+  extractSignatures,
+  extractSkeleton,
+  isBabelParseable,
+  formatSymbolsForPrompt,
+  formatSignaturesForPrompt,
+  formatSkeletonForPrompt,
+} from '../../utils/babelSymbolParser';
+
+// View modes for file analysis
+export const VIEW_MODES = {
+  SYMBOLS: 'symbols',       // Symbol list with line numbers (default for 500+ lines)
+  SIGNATURES: 'signatures', // Function signatures only
+  SKELETON: 'skeleton',     // Structural overview
+};
 
 /**
  * Hook for managing file symbol extraction state
  * @returns {Object} Symbol extraction state and methods
  */
 export function useFileSymbols() {
-  // Map<filePath, { symbols: Array, isParsing: boolean, error: string|null, lineCount: number }>
+  // Map<filePath, { symbols, signatures, skeleton, isParsing, error, lineCount }>
   const [fileSymbols, setFileSymbols] = useState(new Map());
 
+  // Per-file view mode override (Map<filePath, viewMode>)
+  const [fileViewModes, setFileViewModes] = useState(new Map());
+
   /**
-   * Extract symbols from a file
+   * Extract all analysis data from a file
    * @param {string} filePath - Absolute path to the file
    */
   const extractFileSymbols = useCallback(async (filePath) => {
@@ -22,7 +40,14 @@ export function useFileSymbols() {
     // Set parsing state
     setFileSymbols(prev => {
       const next = new Map(prev);
-      next.set(filePath, { symbols: [], isParsing: true, error: null, lineCount: 0 });
+      next.set(filePath, {
+        symbols: [],
+        signatures: [],
+        skeleton: null,
+        isParsing: true,
+        error: null,
+        lineCount: 0,
+      });
       return next;
     });
 
@@ -33,28 +58,75 @@ export function useFileSymbols() {
       // Count lines
       const lineCount = content.split('\n').length;
 
-      // Parse symbols
+      // Parse all three formats
       const symbols = extractSymbols(content, filePath);
+      const signatures = extractSignatures(content, filePath);
+      const skeleton = extractSkeleton(content, filePath);
 
-      // Store results with line count
+      // Store results
       setFileSymbols(prev => {
         const next = new Map(prev);
-        next.set(filePath, { symbols, isParsing: false, error: null, lineCount });
+        next.set(filePath, {
+          symbols,
+          signatures,
+          skeleton,
+          isParsing: false,
+          error: null,
+          lineCount,
+        });
         return next;
       });
     } catch (error) {
       console.error('Failed to extract symbols from:', filePath, error);
       setFileSymbols(prev => {
         const next = new Map(prev);
-        next.set(filePath, { symbols: [], isParsing: false, error: String(error), lineCount: 0 });
+        next.set(filePath, {
+          symbols: [],
+          signatures: [],
+          skeleton: null,
+          isParsing: false,
+          error: String(error),
+          lineCount: 0,
+        });
         return next;
       });
     }
   }, []);
 
   /**
-   * Clear symbols for a specific file (when deselected)
+   * Set view mode for a specific file
    * @param {string} filePath - Absolute path to the file
+   * @param {string} mode - View mode (symbols, signatures, skeleton)
+   */
+  const setFileViewMode = useCallback((filePath, mode) => {
+    setFileViewModes(prev => {
+      const next = new Map(prev);
+      next.set(filePath, mode);
+      return next;
+    });
+  }, []);
+
+  /**
+   * Get view mode for a file (defaults based on line count)
+   * @param {string} filePath - Absolute path to the file
+   * @returns {string} View mode
+   */
+  const getFileViewMode = useCallback((filePath) => {
+    // Check for explicit override
+    const override = fileViewModes.get(filePath);
+    if (override) return override;
+
+    // Default: skeleton for very large files (800+), signatures for large (300+), symbols for smaller
+    const data = fileSymbols.get(filePath);
+    if (!data) return VIEW_MODES.SYMBOLS;
+
+    if (data.lineCount >= 800) return VIEW_MODES.SKELETON;
+    if (data.lineCount >= 300) return VIEW_MODES.SIGNATURES;
+    return VIEW_MODES.SYMBOLS;
+  }, [fileViewModes, fileSymbols]);
+
+  /**
+   * Clear symbols for a specific file (when deselected)
    */
   const clearFileSymbols = useCallback((filePath) => {
     setFileSymbols(prev => {
@@ -62,19 +134,23 @@ export function useFileSymbols() {
       next.delete(filePath);
       return next;
     });
+    setFileViewModes(prev => {
+      const next = new Map(prev);
+      next.delete(filePath);
+      return next;
+    });
   }, []);
 
   /**
-   * Clear all symbols (e.g., when clearing selection)
+   * Clear all symbols
    */
   const clearAllSymbols = useCallback(() => {
     setFileSymbols(new Map());
+    setFileViewModes(new Map());
   }, []);
 
   /**
    * Get symbols for a specific file
-   * @param {string} filePath - Absolute path to the file
-   * @returns {Object|null} Symbol data or null
    */
   const getSymbolsForFile = useCallback((filePath) => {
     return fileSymbols.get(filePath) || null;
@@ -82,7 +158,6 @@ export function useFileSymbols() {
 
   /**
    * Check if any files are currently being parsed
-   * @returns {boolean}
    */
   const isAnyParsing = useCallback(() => {
     for (const data of fileSymbols.values()) {
@@ -93,8 +168,6 @@ export function useFileSymbols() {
 
   /**
    * Get symbol count for a file
-   * @param {string} filePath - Absolute path to the file
-   * @returns {number} Number of symbols, or -1 if parsing
    */
   const getSymbolCount = useCallback((filePath) => {
     const data = fileSymbols.get(filePath);
@@ -105,8 +178,6 @@ export function useFileSymbols() {
 
   /**
    * Get line count for a file
-   * @param {string} filePath - Absolute path to the file
-   * @returns {number} Number of lines, or 0 if not available
    */
   const getLineCount = useCallback((filePath) => {
     const data = fileSymbols.get(filePath);
@@ -114,20 +185,43 @@ export function useFileSymbols() {
   }, [fileSymbols]);
 
   /**
-   * Format symbols for prompt output
+   * Format file analysis for prompt output (uses appropriate mode)
    * @param {string} filePath - Absolute path to the file
-   * @returns {string} Formatted symbols string
+   * @returns {string} Formatted analysis string
    */
-  const formatSymbols = useCallback((filePath) => {
+  const formatFileAnalysis = useCallback((filePath) => {
     const data = fileSymbols.get(filePath);
-    if (!data || !data.symbols || data.symbols.length === 0) {
-      return '';
+    if (!data || data.isParsing) return '';
+
+    const mode = getFileViewMode(filePath);
+
+    switch (mode) {
+      case VIEW_MODES.SIGNATURES:
+        return formatSignaturesForPrompt(data.signatures);
+      case VIEW_MODES.SKELETON:
+        return formatSkeletonForPrompt(data.skeleton);
+      case VIEW_MODES.SYMBOLS:
+      default:
+        return formatSymbolsForPrompt(data.symbols);
     }
-    return formatSymbolsForPrompt(data.symbols);
-  }, [fileSymbols]);
+  }, [fileSymbols, getFileViewMode]);
+
+  /**
+   * Get the label for the current view mode
+   */
+  const getViewModeLabel = useCallback((filePath) => {
+    const mode = getFileViewMode(filePath);
+    switch (mode) {
+      case VIEW_MODES.SIGNATURES: return 'Signatures';
+      case VIEW_MODES.SKELETON: return 'Skeleton';
+      case VIEW_MODES.SYMBOLS:
+      default: return 'Symbols';
+    }
+  }, [getFileViewMode]);
 
   return {
     fileSymbols,
+    fileViewModes,
     extractFileSymbols,
     clearFileSymbols,
     clearAllSymbols,
@@ -135,7 +229,11 @@ export function useFileSymbols() {
     isAnyParsing,
     getSymbolCount,
     getLineCount,
-    formatSymbols,
+    setFileViewMode,
+    getFileViewMode,
+    formatFileAnalysis,
+    getViewModeLabel,
     isBabelParseable,
+    VIEW_MODES,
   };
 }

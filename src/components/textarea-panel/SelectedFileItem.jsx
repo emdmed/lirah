@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Loader2, Braces } from "lucide-react";
+import { X, Loader2, Braces, FileText, List } from "lucide-react";
 import { FileStateSelector } from "./FileStateSelector";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
  * @param {boolean} isSelected - Whether this item is currently selected (for keyboard nav)
  * @param {Function} itemRef - Ref callback for keyboard navigation
  * @param {number} symbolCount - Number of symbols extracted (-1 if parsing, 0 if not parseable or no symbols)
+ * @param {number} lineCount - Number of lines in the file
+ * @param {string} viewModeLabel - Current view mode label (Symbols, Signatures, Skeleton)
+ * @param {Function} onCycleViewMode - Callback to cycle through view modes
  */
 export function SelectedFileItem({
   file,
@@ -22,8 +25,22 @@ export function SelectedFileItem({
   isSelected = false,
   itemRef,
   showKeyboardHints = false,
-  symbolCount = 0
+  symbolCount = 0,
+  lineCount = 0,
+  viewModeLabel = null,
+  onCycleViewMode = null,
 }) {
+  // Only show view mode for large files (300+ lines)
+  const showViewMode = lineCount >= 300 && viewModeLabel;
+
+  const getViewModeIcon = () => {
+    switch (viewModeLabel) {
+      case 'Signatures': return <FileText className="w-2.5 h-2.5" />;
+      case 'Skeleton': return <List className="w-2.5 h-2.5" />;
+      default: return <Braces className="w-2.5 h-2.5" />;
+    }
+  };
+
   return (
     <div
       ref={itemRef}
@@ -45,9 +62,21 @@ export function SelectedFileItem({
         <span className="text-xs truncate" title={file.absolute}>
           {file.name}
         </span>
-        {/* Symbol count indicator */}
+        {/* Analysis indicator */}
         {symbolCount === -1 ? (
-          <Loader2 className="w-3 h-3 animate-spin opacity-50 flex-shrink-0" title="Parsing symbols..." />
+          <Loader2 className="w-3 h-3 animate-spin opacity-50 flex-shrink-0" title="Parsing..." />
+        ) : showViewMode ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCycleViewMode?.(file.absolute);
+            }}
+            className="flex items-center gap-0.5 text-[10px] px-1 py-0 rounded bg-accent/20 text-accent opacity-70 hover:opacity-100 flex-shrink-0 transition-opacity"
+            title={`${viewModeLabel} view (${lineCount} lines) - click to change`}
+          >
+            {getViewModeIcon()}
+            {viewModeLabel.slice(0, 3)}
+          </button>
         ) : symbolCount > 0 ? (
           <span
             className="flex items-center gap-0.5 text-[10px] px-1 py-0 rounded bg-accent/20 text-accent opacity-70 flex-shrink-0"

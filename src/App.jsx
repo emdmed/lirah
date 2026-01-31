@@ -189,8 +189,11 @@ function App() {
     clearAllSymbols,
     getSymbolCount,
     getLineCount,
-    formatSymbols,
+    formatFileAnalysis,
+    getViewModeLabel,
+    setFileViewMode,
     isBabelParseable,
+    VIEW_MODES,
   } = useFileSymbols();
 
   // Switch to Claude mode (tree view)
@@ -558,11 +561,12 @@ function App() {
           const escapedPath = escapeShellPath(relativePath);
           const state = fileStates.get(absolutePath) || 'modify';
 
-          // Only include symbols for files with 500+ lines
+          // Only include analysis for files with 300+ lines (auto-selects mode based on size)
           const lineCount = getLineCount(absolutePath);
-          const symbolsStr = lineCount >= 500 ? formatSymbols(absolutePath) : '';
+          const analysisStr = lineCount >= 300 ? formatFileAnalysis(absolutePath) : '';
+          const modeLabel = lineCount >= 300 ? getViewModeLabel(absolutePath) : null;
 
-          const fileEntry = { path: escapedPath, symbols: symbolsStr };
+          const fileEntry = { path: escapedPath, analysis: analysisStr, modeLabel };
 
           if (state === 'modify') {
             modifyFiles.push(fileEntry);
@@ -573,12 +577,13 @@ function App() {
           }
         });
 
-        // Build structured format with symbols
+        // Build structured format with analysis (symbols/signatures/skeleton)
         const formatFileSection = (label, files) => {
           return files.map(f => {
             let entry = `${label}: ${f.path}`;
-            if (f.symbols) {
-              entry += `\n  Symbols:\n${f.symbols}`;
+            if (f.analysis) {
+              const header = f.modeLabel || 'Analysis';
+              entry += `\n  ${header}:\n${f.analysis}`;
             }
             return entry;
           }).join('\n\n');
@@ -655,7 +660,7 @@ function App() {
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatSymbols, getLineCount]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -1130,7 +1135,11 @@ function App() {
                       onRemoveFile={removeFileFromSelection}
                       onClearAllFiles={clearFileSelection}
                       getSymbolCount={getSymbolCount}
+                      getLineCount={getLineCount}
+                      getViewModeLabel={getViewModeLabel}
+                      setFileViewMode={setFileViewMode}
                       fileSymbols={fileSymbols}
+                      VIEW_MODES={VIEW_MODES}
                     />
                   )}
                 </SidebarContent>
