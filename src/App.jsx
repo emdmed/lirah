@@ -11,6 +11,7 @@ import { InitialProjectDialog } from "./components/InitialProjectDialog";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
 import { GitDiffDialog } from "./components/GitDiffDialog";
 import { CliSelectionModal } from "./components/CliSelectionModal";
+import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { usePromptTemplates } from "./contexts/PromptTemplatesContext";
 import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./contexts/WatcherContext";
@@ -1180,7 +1181,6 @@ function App() {
             currentPath={currentPath}
             sessionId={terminalSessionId}
             theme={theme.terminal}
-            showHelp={showHelp}
             onToggleHelp={() => setShowHelp(prev => !prev)}
             onLaunchOrchestration={launchOrchestration}
             selectedCli={selectedCli}
@@ -1229,6 +1229,10 @@ function App() {
         selectedCli={selectedCli}
         onCliChange={setSelectedCli}
         cliAvailability={cliAvailability}
+      />
+      <KeyboardShortcutsDialog
+        open={showHelp}
+        onOpenChange={setShowHelp}
       />
     </SidebarProvider>
   );
