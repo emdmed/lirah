@@ -36,8 +36,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // Open terminal in DOM
     term.open(terminalRef.current);
 
-    // Fit terminal to container
-    fit.fit();
+    // Fit terminal to container with a small delay to ensure proper dimensions
+    setTimeout(() => {
+      fit.fit();
+    }, 10);
 
     setTerminal(term);
     setFitAddon(fit);
