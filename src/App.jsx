@@ -10,6 +10,7 @@ import { BookmarksPalette } from "./components/BookmarksPalette";
 import { InitialProjectDialog } from "./components/InitialProjectDialog";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
 import { GitDiffDialog } from "./components/GitDiffDialog";
+import { CliSelectionModal } from "./components/CliSelectionModal";
 import { usePromptTemplates } from "./contexts/PromptTemplatesContext";
 import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./contexts/WatcherContext";
@@ -133,6 +134,16 @@ function App() {
   const [diffDialogOpen, setDiffDialogOpen] = useState(false);
   const [diffFilePath, setDiffFilePath] = useState(null);
 
+  // CLI selection state (lazy init from localStorage to avoid race condition)
+  const [selectedCli, setSelectedCli] = useState(() => {
+    try {
+      return localStorage.getItem('nevo-terminal:selected-cli') || 'claude-code';
+    } catch {
+      return 'claude-code';
+    }
+  });
+  const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
+
   // Load keepFilesAfterSend from localStorage on mount
   useEffect(() => {
     try {
@@ -144,6 +155,15 @@ function App() {
       console.warn('Failed to load keep-files preference from localStorage:', error);
     }
   }, []);
+
+  // Save selectedCli to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('nevo-terminal:selected-cli', selectedCli);
+    } catch (error) {
+      console.warn('Failed to save CLI preference to localStorage:', error);
+    }
+  }, [selectedCli]);
 
   // Save keepFilesAfterSend to localStorage when it changes
   useEffect(() => {
@@ -158,7 +178,7 @@ function App() {
   const { initializeSearch, search, clearSearch } = useFileSearch();
 
   // Claude launcher hook
-  const { launchClaude } = useClaudeLauncher(terminalSessionId, terminalRef);
+  const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, selectedCli);
 
   // Switch to Claude mode (tree view)
   const switchToClaudeMode = useCallback(() => {
@@ -1014,6 +1034,8 @@ function App() {
             showHelp={showHelp}
             onToggleHelp={() => setShowHelp(prev => !prev)}
             onLaunchOrchestration={launchOrchestration}
+            selectedCli={selectedCli}
+            onOpenCliSettings={() => setCliSelectionModalOpen(true)}
           />
         }
       >
@@ -1051,6 +1073,13 @@ function App() {
         onNavigate={navigateToBookmark}
         onLaunchClaude={launchClaude}
         onSwitchToClaudeMode={switchToClaudeMode}
+      />
+      <CliSelectionModal
+        open={cliSelectionModalOpen}
+        onOpenChange={setCliSelectionModalOpen}
+        selectedCli={selectedCli}
+        onCliChange={setSelectedCli}
+        cliAvailability={cliAvailability}
       />
     </SidebarProvider>
   );

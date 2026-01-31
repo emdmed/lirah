@@ -1,10 +1,15 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { HelpCircle, Eye, EyeOff, Download } from 'lucide-react';
+import { HelpCircle, Eye, EyeOff, Download, Settings, Bot, Terminal } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { Button } from './ui/button';
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, onToggleHelp, onLaunchOrchestration }) => {
+const CLI_DISPLAY = {
+  'claude-code': { name: 'Claude Code', icon: Bot },
+  'opencode': { name: 'opencode', icon: Terminal }
+};
+
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers });
@@ -22,7 +27,7 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
         >
           <div className="flex items-center gap-4 flex-wrap">
             <span className="opacity-70">Ctrl+S: Nav</span>
-            <span className="opacity-70">Ctrl+K: Claude</span>
+            <span className="opacity-70">Ctrl+K: {CLI_DISPLAY[selectedCli]?.name || 'CLI'}</span>
             <span className="opacity-30">|</span>
             <span className="opacity-70">Ctrl+P: Projects</span>
             <span className="opacity-70">Ctrl+T: Focus Input</span>
@@ -65,6 +70,22 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, showHelp, o
             <Download className="w-3 h-3" />
             Initialize Claude Orchestration
           </Button>
+          {selectedCli && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={onOpenCliSettings}
+              title="Change CLI tool (Ctrl+K)"
+              className="gap-1.5"
+            >
+              {(() => {
+                const CliIcon = CLI_DISPLAY[selectedCli]?.icon || Terminal;
+                return <CliIcon className="w-3 h-3" />;
+              })()}
+              <span className="opacity-70">{CLI_DISPLAY[selectedCli]?.name || selectedCli}</span>
+              <Settings className="w-3 h-3 opacity-50" />
+            </Button>
+          )}
           <button
             onClick={onToggleHelp}
             className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer focus-ring rounded"
