@@ -52,7 +52,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Nevo Terminal ${{ github.ref_name }}'
+          releaseName: 'Lirah ${{ github.ref_name }}'
           releaseBody: |
             ## Installation
 

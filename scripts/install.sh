@@ -5,8 +5,8 @@
 set -e
 
 REPO="emdmed/lirah"
-APP_NAME="nevo-terminal"
-DISPLAY_NAME="Nevo Terminal"
+APP_NAME="lirah"
+DISPLAY_NAME="Lirah"
 
 # Colors for output
 RED='\033[0;31m'
@@ -173,9 +173,9 @@ install_rpm() {
 
 # Install using AppImage (fallback)
 install_appimage() {
-    FILENAME="${DISPLAY_NAME}-${VERSION}-${ARCH}.AppImage"
-    # Handle spaces in filename for URL encoding
-    FILENAME_URL=$(echo "$FILENAME" | sed 's/ /%20/g')
+    # Tauri generates AppImage with format: {ProductName}_{version}_{arch}.AppImage
+    FILENAME="${DISPLAY_NAME}_${VERSION_NUM}_${DEB_ARCH}.AppImage"
+    FILENAME_URL="$FILENAME"
     URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME_URL"
 
     INSTALL_DIR="$HOME/.local/bin"

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Nevo Terminal",
+  "productName": "Lirah",
   "version": "0.1.0",
   "identifier": "com.enrique.nevo-terminal",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Nevo Terminal",
+        "title": "Lirah",
         "width": 1024,
         "height": 768,
         "minWidth": 400,
