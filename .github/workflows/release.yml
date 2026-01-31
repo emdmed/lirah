@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Nevo Terminal ${{ github.ref_name }}'
+          releaseBody: |
+            ## Installation
+
+            ### Quick Install (Linux)
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/emdmed/ao-terminal/main/scripts/install.sh | sh
+            ```
+
+            ### Manual Download
+            - **Debian/Ubuntu**: Download the `.deb` file
+            - **Fedora/RHEL**: Download the `.rpm` file
+            - **Other Linux**: Download the `.AppImage` file
+
+            ## Checksums
+            See `checksums.sha256` for file verification.
+          releaseDraft: false
+          prerelease: false
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Generate checksums
+        run: |
+          cd src-tauri/target/release/bundle
+
+          # Find all release artifacts
+          ARTIFACTS=""
+
+          # DEB packages
+          if [ -d "deb" ]; then
+            for f in deb/*.deb; do
+              [ -f "$f" ] && ARTIFACTS="$ARTIFACTS $f"
+            done
+          fi
+
+          # RPM packages
+          if [ -d "rpm" ]; then
+            for f in rpm/*.rpm; do
+              [ -f "$f" ] && ARTIFACTS="$ARTIFACTS $f"
+            done
+          fi
+
+          # AppImage
+          if [ -d "appimage" ]; then
+            for f in appimage/*.AppImage; do
+              [ -f "$f" ] && ARTIFACTS="$ARTIFACTS $f"
+            done
+          fi
+
+          # Generate checksums
+          if [ -n "$ARTIFACTS" ]; then
+            sha256sum $ARTIFACTS > checksums.sha256
+            echo "Generated checksums:"
+            cat checksums.sha256
+          else
+            echo "No artifacts found!"
+            exit 1
+          fi
+
+      - name: Upload checksums to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: src-tauri/target/release/bundle/checksums.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
