@@ -24,6 +24,8 @@ export function TextareaPanel({
   onManageTemplates,
   appendOrchestration = true,
   onToggleOrchestration,
+  templateDropdownOpen,
+  onTemplateDropdownOpenChange,
 }) {
 
   const handleKeyDown = (e) => {
@@ -83,6 +85,8 @@ export function TextareaPanel({
           selectedTemplateId={selectedTemplateId}
           onSelectTemplate={onSelectTemplate}
           onManageTemplates={onManageTemplates}
+          open={templateDropdownOpen}
+          onOpenChange={onTemplateDropdownOpenChange}
         />
       </div>
 

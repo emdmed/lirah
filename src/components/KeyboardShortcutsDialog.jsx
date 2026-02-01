@@ -16,6 +16,7 @@ const shortcuts = [
       { keys: ["Ctrl", "T"], description: "Focus Textarea" },
       { keys: ["Ctrl", "Enter"], description: "Send Textarea Content" },
       { keys: ["Ctrl", "Ctrl"], description: "Toggle Orchestration Mode", note: "double-tap" },
+      { keys: ["Alt", "Alt"], description: "Open Template Selector / Clear Template", note: "double-tap" },
     ],
   },
   {

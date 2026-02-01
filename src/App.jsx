@@ -676,12 +676,14 @@ function App() {
   });
 
   // Textarea keyboard shortcuts
-  useTextareaShortcuts({
+  const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
     textareaVisible,
     setTextareaVisible,
     textareaRef,
     onSendContent: sendTextareaToTerminal,
     onToggleOrchestration: setAppendOrchestration,
+    selectedTemplateId,
+    onSelectTemplate: setSelectedTemplateId,
   });
 
   // Help keyboard shortcut
@@ -1172,6 +1174,8 @@ function App() {
               onManageTemplates={() => setManageTemplatesDialogOpen(true)}
               appendOrchestration={appendOrchestration}
               onToggleOrchestration={setAppendOrchestration}
+              templateDropdownOpen={templateDropdownOpen}
+              onTemplateDropdownOpenChange={setTemplateDropdownOpen}
             />
           )
         }

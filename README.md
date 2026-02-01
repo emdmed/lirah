@@ -122,6 +122,7 @@ npm run preview     # Preview production build
 | `Ctrl+T` | Focus Textarea Panel |
 | `Ctrl+Enter` | Send Textarea Content |
 | `Ctrl+Ctrl` | Toggle Orchestration Mode (double-tap) |
+| `Alt+Alt` | Open Template Selector / Clear Template (double-tap) |
 | `Ctrl+F` | Focus File Search |
 | `Ctrl+G` | Toggle Git Filter |
 | `Ctrl+W` | Toggle File Watchers |

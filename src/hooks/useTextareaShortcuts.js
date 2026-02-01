@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function useTextareaShortcuts({
   textareaVisible,
@@ -6,10 +6,17 @@ export function useTextareaShortcuts({
   textareaRef,
   onSendContent,
   onToggleOrchestration,
+  selectedTemplateId,
+  onSelectTemplate,
 }) {
   // Track last Ctrl keydown timestamp for double-tap detection
   const lastCtrlDownRef = useRef(0);
+  // Track last Alt keydown timestamp for double-tap detection
+  const lastAltDownRef = useRef(0);
   const DOUBLE_TAP_THRESHOLD = 300; // ms
+
+  // Template dropdown open state
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -27,6 +34,29 @@ export function useTextareaShortcuts({
         }
 
         lastCtrlDownRef.current = now;
+        return;
+      }
+
+      // Double-tap Alt: Clear selected template OR open dropdown
+      if (e.key === 'Alt' && !e.repeat) {
+        const now = Date.now();
+        const timeSinceLastAlt = now - lastAltDownRef.current;
+
+        if (timeSinceLastAlt < DOUBLE_TAP_THRESHOLD && timeSinceLastAlt > 50) {
+          // Double-tap detected (with minimum 50ms to filter out held keys)
+          e.preventDefault();
+          if (selectedTemplateId) {
+            // Clear template if one is selected
+            onSelectTemplate?.(null);
+          } else {
+            // Open dropdown if no template selected
+            setTemplateDropdownOpen(true);
+          }
+          lastAltDownRef.current = 0; // Reset to prevent triple-tap
+          return;
+        }
+
+        lastAltDownRef.current = now;
         return;
       }
 
@@ -55,5 +85,7 @@ export function useTextareaShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration]);
+  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration, selectedTemplateId, onSelectTemplate]);
+
+  return { templateDropdownOpen, setTemplateDropdownOpen };
 }

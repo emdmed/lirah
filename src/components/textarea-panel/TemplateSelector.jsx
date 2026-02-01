@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { FileText, Check, Settings, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -15,9 +16,31 @@ export function TemplateSelector({
   selectedTemplateId,
   onSelectTemplate,
   onManageTemplates,
+  open,           // Controlled open state
+  onOpenChange,   // Callback to change open state
 }) {
   const { templates } = usePromptTemplates();
   const { theme } = useTheme();
+
+  // Handle number key presses when dropdown is open
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e) => {
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= 9) {
+        const index = num - 1;
+        if (index < templates.length) {
+          e.preventDefault();
+          onSelectTemplate(templates[index].id);
+          onOpenChange?.(false);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, templates, onSelectTemplate, onOpenChange]);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
@@ -47,7 +70,7 @@ export function TemplateSelector({
           <X className="h-2.5 w-2.5 flex-shrink-0 hover:opacity-70" />
         </Badge>
       )}
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -74,7 +97,7 @@ export function TemplateSelector({
               {!selectedTemplateId && <Check className="h-3 w-3 text-primary" />}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {templates.map((template) => (
+            {templates.map((template, index) => (
               <DropdownMenuItem
                 key={template.id}
                 onClick={() => onSelectTemplate(template.id)}
@@ -82,7 +105,14 @@ export function TemplateSelector({
                   selectedTemplateId === template.id ? 'bg-primary/10' : ''
                 }`}
               >
-                <span className="truncate pr-2">{template.title}</span>
+                <span className="flex items-center">
+                  {index < 9 && (
+                    <span className="text-muted-foreground w-4 text-right mr-1.5">
+                      {index + 1}
+                    </span>
+                  )}
+                  <span className="truncate pr-2">{template.title}</span>
+                </span>
                 {selectedTemplateId === template.id && (
                   <Check className="h-3 w-3 text-primary flex-shrink-0" />
                 )}
