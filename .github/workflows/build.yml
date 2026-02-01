@@ -16,11 +16,8 @@ name: Build
 
 on:
   push:
-    branches: [main]
     tags:
       - 'v*'
-  pull_request:
-    branches: [main]
   workflow_dispatch:  # Allow manual triggers
 
 permissions:
