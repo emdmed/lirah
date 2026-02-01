@@ -9,6 +9,7 @@ Lirah is a GUI for running Claude Code, built with Tauri 2, React 19, and xterm.
 **Key Features**:
 - **Prompt Textarea**: Write multi-line prompts and send them directly to Claude Code running in the embedded terminal
 - **File Context Selection**: Select files from the filetree and mark them as "modify", "do not modify", or "use as example" to provide structured context to Claude
+- **Smart Token Optimization**: Intelligently parses JavaScript and TypeScript files to minimize token usage - small files send just paths, medium files send function signatures, large files send skeleton overviews
 - **Prompt Templates**: Save frequently used partial prompts for reuse across sessions
 - **Bidirectional Sync**: Sidebar updates when you `cd` in terminal; clicking folders navigates the terminal
 - **claude-orchestration Integration**: Includes workflow templates for common tasks (feature, bugfix, refactor, performance, review, pr, docs) with React-specific variants

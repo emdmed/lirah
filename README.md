@@ -29,6 +29,19 @@ Claude is only as good as the context you give it. Lirah makes that effortless.
 
 No more copy-pasting paths or guessing what the model "saw". Your intent is explicit. Your results are better.
 
+### Smart Token Optimization
+
+Large files shouldn't eat your context window. Lirah intelligently parses JavaScript and TypeScript files to send only what's needed.
+
+- **Files under 300 lines** → Just the file path (Claude reads directly if needed)
+- **Files 300-799 lines** → Function signatures and structure 
+- **Files 800+ lines** → Skeleton overview with imports, exports, and component map
+- **Clickable UI** → Cycle through view modes (Full/Symbols/Signature/Skeleton)
+
+Turn a 1000-line file read into a 50-line read. The LLM gets a map and can request specific ranges when needed.
+
+Supported: `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
+
 ### Prompt Editor
 
 Stop typing prompts one line at a time in a terminal.
@@ -65,13 +78,20 @@ Ships with [claude-orchestration](https://github.com/anthropics/claude-orchestra
 
 ## Installation
 
-### Prerequisites
+### Quick Install (Ubuntu/Debian)
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | sh
+```
+
+**Note**: This installer works on Ubuntu, Debian, and most Debian-based distributions. It does not work on Arch Linux or Arch-based distros.
+
+### Build from Source
+
+**Prerequisites:**
 - [Rust](https://rustup.rs/) (latest stable)
 - [Node.js](https://nodejs.org/) (v18+)
 - [Claude Code](https://claude.ai/code) CLI installed
-
-### Build from Source
 
 ```bash
 git clone https://github.com/emdmed/lirah.git
