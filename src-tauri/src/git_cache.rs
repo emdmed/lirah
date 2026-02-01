@@ -14,7 +14,7 @@ struct CacheEntry {
 }
 
 // Cache configuration
-const CACHE_TTL_SECONDS: u64 = 5;
+const CACHE_TTL_SECONDS: u64 = 1;
 const CLEANUP_INTERVAL_SECONDS: u64 = 60;
 
 // Main cache structure - uses RwLock for better read performance
