@@ -84,6 +84,27 @@ jobs:
         uses: actions/checkout@v4
 
       # ═══════════════════════════════════════════════════════════════════
+      # VERSION SYNC
+      # Extracts version from git tag and updates tauri.conf.json
+      # Ensures artifact filenames match the release tag
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Syncing version to: $VERSION"
+          # Update tauri.conf.json version using node (cross-platform)
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            config.version = '$VERSION';
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(config, null, 2) + '\n');
+          "
+          # Verify the update
+          grep '"version"' src-tauri/tauri.conf.json
+
+      # ═══════════════════════════════════════════════════════════════════
       # LINUX DEPENDENCIES
       # Required for Tauri on Linux: WebKitGTK, AppIndicator, etc.
       # libfuse2 is needed for AppImage creation
