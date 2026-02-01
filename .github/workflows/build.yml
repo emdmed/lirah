@@ -1,0 +1,288 @@
+# Multi-platform Tauri Build Workflow
+# Builds native installers for Windows, macOS, and Linux
+#
+# Triggers:
+#   - Push to main branch (builds artifacts only)
+#   - Pull requests to main (builds artifacts only)
+#   - Tags starting with 'v' (creates GitHub Release with installers)
+#
+# To extend with code signing later:
+#   - Windows: Add TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets
+#   - macOS: Add APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#            APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID secrets
+#   - See: https://v2.tauri.app/distribute/sign/
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allow manual triggers
+
+permissions:
+  contents: write  # Required for creating releases
+
+env:
+  CARGO_TERM_COLOR: always
+  # Disable incremental compilation for release builds (smaller binaries)
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false  # Continue other builds if one fails
+      matrix:
+        include:
+          # ─────────────────────────────────────────────────────────────────
+          # Linux (Ubuntu 22.04)
+          # Produces: .deb, .rpm, .AppImage
+          # Note: Ubuntu 22.04 provides glibc 2.35, compatible with most distros
+          # ─────────────────────────────────────────────────────────────────
+          - platform: linux
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+            tauri_args: ''
+
+          # ─────────────────────────────────────────────────────────────────
+          # Windows
+          # Produces: .exe (NSIS installer), .msi
+          # Note: Windows builds are unsigned by default; users will see SmartScreen warnings
+          # ─────────────────────────────────────────────────────────────────
+          - platform: windows
+            os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            tauri_args: ''
+
+          # ─────────────────────────────────────────────────────────────────
+          # macOS (Intel)
+          # Produces: .dmg, .app
+          # Note: Unsigned apps require users to right-click → Open on first launch
+          # ─────────────────────────────────────────────────────────────────
+          - platform: macos
+            os: macos-latest
+            rust_target: x86_64-apple-darwin
+            tauri_args: '--target x86_64-apple-darwin'
+
+          # ─────────────────────────────────────────────────────────────────
+          # macOS (Apple Silicon)
+          # Produces: .dmg, .app
+          # Note: macos-latest runs on M1 by default as of late 2024
+          # ─────────────────────────────────────────────────────────────────
+          - platform: macos-arm
+            os: macos-latest
+            rust_target: aarch64-apple-darwin
+            tauri_args: '--target aarch64-apple-darwin'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # ═══════════════════════════════════════════════════════════════════
+      # CHECKOUT
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ═══════════════════════════════════════════════════════════════════
+      # LINUX DEPENDENCIES
+      # Required for Tauri on Linux: WebKitGTK, AppIndicator, etc.
+      # libfuse2 is needed for AppImage creation
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2 \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      # ═══════════════════════════════════════════════════════════════════
+      # NODE.JS SETUP
+      # Using Node 20 LTS for stability
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ═══════════════════════════════════════════════════════════════════
+      # RUST SETUP
+      # Using stable toolchain; add specific targets for cross-compilation
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      # ═══════════════════════════════════════════════════════════════════
+      # RUST CACHE
+      # Caches cargo registry, index, and target directory
+      # Keyed by platform and Cargo.lock hash
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          # Include platform in cache key to avoid cross-platform issues
+          shared-key: ${{ matrix.platform }}
+
+      # ═══════════════════════════════════════════════════════════════════
+      # FRONTEND BUILD
+      # Install npm dependencies and build the frontend
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # ═══════════════════════════════════════════════════════════════════
+      # TAURI BUILD
+      # Uses the official tauri-action for consistent builds
+      # On tag push: creates/updates GitHub Release
+      # On branch push/PR: uploads as workflow artifacts
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Build Tauri application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ─────────────────────────────────────────────────────────────
+          # CODE SIGNING (uncomment and add secrets when ready)
+          # ─────────────────────────────────────────────────────────────
+          # Windows code signing:
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          #
+          # macOS code signing and notarization:
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          # Only create release when pushing a tag
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Lirah {0}', github.ref_name) || '' }}
+          releaseBody: |
+            ## Installation
+
+            ### Windows
+            - Download the `.exe` installer (NSIS) or `.msi` installer
+            - Note: Windows may show a SmartScreen warning for unsigned apps - click "More info" → "Run anyway"
+
+            ### macOS
+            - Download the `.dmg` file for your architecture:
+              - `_x64.dmg` for Intel Macs
+              - `_aarch64.dmg` for Apple Silicon (M1/M2/M3)
+            - Note: Unsigned apps require right-click → Open on first launch
+
+            ### Linux
+            - **Debian/Ubuntu**: Download the `.deb` file
+            - **Fedora/RHEL**: Download the `.rpm` file
+            - **Other distros**: Download the `.AppImage` file
+
+            ## Quick Install (Linux)
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | sh
+            ```
+          releaseDraft: false
+          prerelease: false
+          # Pass platform-specific build arguments
+          args: ${{ matrix.tauri_args }}
+
+      # ═══════════════════════════════════════════════════════════════════
+      # ARTIFACT UPLOAD (for non-release builds)
+      # Uploads build artifacts for PR/branch builds
+      # Artifacts are available in the Actions tab for 90 days
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Upload artifacts (Linux)
+        if: matrix.platform == 'linux' && !startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload artifacts (Windows)
+        if: matrix.platform == 'windows' && !startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+      - name: Upload artifacts (macOS Intel)
+        if: matrix.platform == 'macos' && !startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-intel-installers
+          path: |
+            src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app
+          if-no-files-found: error
+
+      - name: Upload artifacts (macOS ARM)
+        if: matrix.platform == 'macos-arm' && !startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm-installers
+          path: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
+          if-no-files-found: error
+
+  # ═════════════════════════════════════════════════════════════════════════
+  # CHECKSUMS JOB
+  # Generates SHA256 checksums for all release artifacts
+  # Only runs on tag pushes after all builds complete
+  # ═════════════════════════════════════════════════════════════════════════
+  checksums:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          cd artifacts
+          # Download all assets from the release
+          gh release download ${{ github.ref_name }} \
+            --repo ${{ github.repository }} \
+            --pattern '*' \
+            --skip-existing || true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          # Generate SHA256 checksums for all installer files
+          sha256sum *.exe *.msi *.dmg *.deb *.rpm *.AppImage 2>/dev/null | tee checksums.sha256 || true
+
+          if [ -s checksums.sha256 ]; then
+            echo "✓ Generated checksums:"
+            cat checksums.sha256
+          else
+            echo "⚠ No artifacts found for checksums"
+          fi
+
+      - name: Upload checksums to release
+        if: hashFiles('artifacts/checksums.sha256') != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/checksums.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
