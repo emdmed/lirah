@@ -1,31 +1,34 @@
 # Lirah
 
-A native desktop app for Claude Code. Keep your files, prompts, and terminal perfectly in sync—so you can focus on shipping, not wrangling context.
+A native desktop app for CLI agents. Keep your files, prompts, and terminal perfectly in sync—so you can focus on shipping, not wrangling context.
 
 Built with **Tauri 2** | **React 19** | **xterm.js** | **TypeScript**
+
+**Tested with**: Claude Code, opencode, and other CLI agents
 
 ## Why Lirah?
 
 | | |
 |---|---|
 | **Native & Fast** | Lightweight Tauri app, not an Electron behemoth |
-| **Better Output** | Structured context = better Claude results |
+| **Better Output** | Structured context = better AI agent results |
+| **Universal** | Works with any CLI agent (Claude Code, opencode, etc.) |
 | **Real Workflows** | Designed for actual development, not demos |
 | **Terminal-First** | Terminal-first, not terminal-hostile |
 
-If you use Claude Code seriously, Lirah becomes the place you run it.
+If you use CLI agents seriously, Lirah becomes the place you run them.
 
 ## Features
 
 ### File Context Selection
 
-Claude is only as good as the context you give it. Lirah makes that effortless.
+CLI agents are only as good as the context you give them. Lirah makes that effortless.
 
 - Select files directly from your project tree
-- Tell Claude exactly how to use each file:
-  - **Modify** — Files Claude should change
+- Tell your agent exactly how to use each file:
+  - **Modify** — Files the agent should change
   - **Do not modify** — Reference only, keep unchanged
-  - **Use as example** — Patterns for Claude to follow
+  - **Use as example** — Patterns for the agent to follow
 
 No more copy-pasting paths or guessing what the model "saw". Your intent is explicit. Your results are better.
 
@@ -33,12 +36,12 @@ No more copy-pasting paths or guessing what the model "saw". Your intent is expl
 
 Large files shouldn't eat your context window. Lirah intelligently parses JavaScript and TypeScript files to send only what's needed.
 
-- **Files under 300 lines** → Just the file path (Claude reads directly if needed)
+- **Files under 300 lines** → Just the file path (Agent reads directly if needed)
 - **Files 300-799 lines** → Function signatures and structure 
 - **Files 800+ lines** → Skeleton overview with imports, exports, and component map
 - **Clickable UI** → Cycle through view modes (Full/Symbols/Signature/Skeleton)
 
-Turn a 1000-line file read into a 50-line read. The LLM gets a map and can request specific ranges when needed.
+Turn a 1000-line file read into a 50-line read. The AI agent gets a map and can request specific ranges when needed.
 
 Supported: `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
 
@@ -47,7 +50,7 @@ Supported: `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
 Stop typing prompts one line at a time in a terminal.
 
 - Multi-line textarea for complex instructions
-- Send prompts straight into Claude Code
+- Send prompts straight into your CLI agent
 - Save and reuse prompt templates across sessions
 
 Write once. Reuse forever.
@@ -61,7 +64,7 @@ Lirah keeps your UI and terminal aligned at all times.
 
 Always know where you are, without thinking about it.
 
-### Built-In Claude Workflows
+### Built-In Workflow Templates
 
 Ships with [claude-orchestration](https://github.com/anthropics/claude-orchestration) integrations out of the box. Start strong instead of from scratch.
 
@@ -91,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.s
 **Prerequisites:**
 - [Rust](https://rustup.rs/) (latest stable)
 - [Node.js](https://nodejs.org/) (v18+)
-- [Claude Code](https://claude.ai/code) CLI installed
+- Your preferred CLI agent (Claude Code, opencode, etc.)
 
 ```bash
 git clone https://github.com/emdmed/lirah.git
@@ -117,7 +120,7 @@ npm run preview     # Preview production build
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+S` | Toggle Navigation Mode |
-| `Ctrl+K` | Launch CLI / Toggle Claude Mode |
+| `Ctrl+K` | Launch CLI / Toggle Context Mode |
 | `Ctrl+P` | Open Projects Palette |
 | `Ctrl+T` | Focus Textarea Panel |
 | `Ctrl+Enter` | Send Textarea Content |
@@ -138,7 +141,7 @@ npm run preview     # Preview production build
 
 **Dual-Mode Sidebar:**
 - **Navigation Mode** (`Ctrl+S`): Flat directory view for quick navigation
-- **Claude Mode** (`Ctrl+K`): Hierarchical tree with file selection for AI context
+- **Context Mode** (`Ctrl+K`): Hierarchical tree with file selection for AI context
 
 ### Backend (Rust/Tauri)
 

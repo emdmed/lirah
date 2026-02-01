@@ -27,7 +27,7 @@ import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { useFileSymbols } from "./hooks/file-analysis/useFileSymbols";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
-import { SidebarFileSelection } from "./components/sidebar/SidebarFileSelection";
+import { SidebarFileSelection, LARGE_FILE_INSTRUCTION } from "./components/sidebar/SidebarFileSelection";
 import {
   Sidebar,
   SidebarContent,
@@ -602,7 +602,16 @@ function App() {
           sections.push(formatFileSection('USE_AS_EXAMPLE', exampleFiles));
         }
 
-        const filesString = sections.join('\n\n');
+        // Check if any file has a digest (large file)
+        const allFiles = [...modifyFiles, ...doNotModifyFiles, ...exampleFiles];
+        const hasDigests = allFiles.some(f => f.analysis);
+
+        let filesString = sections.join('\n\n');
+
+        // Add instruction once if any files have digests
+        if (hasDigests) {
+          filesString += LARGE_FILE_INSTRUCTION;
+        }
 
         if (hasTextContent) {
           fullCommand = `${filesString}\n\n${textareaContent}`;

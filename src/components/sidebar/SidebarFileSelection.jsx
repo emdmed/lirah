@@ -7,6 +7,11 @@ import { File, X } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 /**
+ * Instruction for large files to prevent full file reads
+ */
+export const LARGE_FILE_INSTRUCTION = '\n\n[!] Grep symbol names from digests to locate code. Do NOT read full files.';
+
+/**
  * File selection panel in sidebar showing selected files with state buttons
  * @param {Array} filesWithRelativePaths - Array of file objects
  * @param {Map} fileStates - Map of file absolute paths to states
