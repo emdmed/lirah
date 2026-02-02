@@ -126,124 +126,107 @@ pub fn get_terminal_cwd(
 /// Windows-specific: Get the current working directory of a process by reading its PEB
 #[cfg(target_os = "windows")]
 fn get_process_cwd_windows(pid: u32) -> Result<String, String> {
+    use std::ffi::c_void;
     use std::mem;
-    use windows::Win32::Foundation::{CloseHandle, HANDLE};
-    use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
-    use windows::Win32::System::Threading::{
-        OpenProcess, NtQueryInformationProcess, ProcessBasicInformation,
-        PROCESS_BASIC_INFORMATION, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
-    };
-
-    // Structures for reading process memory
-    #[repr(C)]
-    struct PEB {
-        reserved1: [u8; 2],
-        being_debugged: u8,
-        reserved2: [u8; 1],
-        reserved3: [*mut std::ffi::c_void; 2],
-        ldr: *mut std::ffi::c_void,
-        process_parameters: *mut RTL_USER_PROCESS_PARAMETERS,
-    }
+    use ntapi::ntpsapi::{NtQueryInformationProcess, PROCESS_BASIC_INFORMATION, ProcessBasicInformation};
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::memoryapi::ReadProcessMemory;
+    use winapi::um::processthreadsapi::OpenProcess;
+    use winapi::um::winnt::{PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 
     #[repr(C)]
-    struct RTL_USER_PROCESS_PARAMETERS {
-        reserved1: [u8; 16],
-        reserved2: [*mut std::ffi::c_void; 10],
-        image_path_name: UNICODE_STRING,
-        command_line: UNICODE_STRING,
-        // Additional fields we need to skip to get to CurrentDirectory
-    }
-
-    #[repr(C)]
-    struct UNICODE_STRING {
+    struct UnicodeString {
         length: u16,
         maximum_length: u16,
         buffer: *mut u16,
     }
 
     #[repr(C)]
-    struct CURDIR {
-        dos_path: UNICODE_STRING,
-        handle: HANDLE,
+    struct CurDir {
+        dos_path: UnicodeString,
+        handle: *mut c_void,
     }
 
-    // RTL_USER_PROCESS_PARAMETERS with CurrentDirectory at correct offset
     #[repr(C)]
-    struct RTL_USER_PROCESS_PARAMETERS_FULL {
+    struct RtlUserProcessParameters {
         maximum_length: u32,
         length: u32,
         flags: u32,
         debug_flags: u32,
-        console_handle: *mut std::ffi::c_void,
+        console_handle: *mut c_void,
         console_flags: u32,
-        standard_input: HANDLE,
-        standard_output: HANDLE,
-        standard_error: HANDLE,
-        current_directory: CURDIR,
+        standard_input: *mut c_void,
+        standard_output: *mut c_void,
+        standard_error: *mut c_void,
+        current_directory: CurDir,
+    }
+
+    #[repr(C)]
+    struct Peb {
+        reserved1: [u8; 2],
+        being_debugged: u8,
+        reserved2: [u8; 1],
+        reserved3: [*mut c_void; 2],
+        ldr: *mut c_void,
+        process_parameters: *mut RtlUserProcessParameters,
     }
 
     unsafe {
-        // Open the process
-        let process_handle = OpenProcess(
-            PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-            false,
-            pid,
-        ).map_err(|e| format!("Failed to open process: {}", e))?;
+        let process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid);
+        if process_handle.is_null() {
+            return Err(format!("Failed to open process {}", pid));
+        }
 
-        // Get process basic information (contains PEB address)
         let mut pbi: PROCESS_BASIC_INFORMATION = mem::zeroed();
         let mut return_length: u32 = 0;
 
         let status = NtQueryInformationProcess(
             process_handle,
             ProcessBasicInformation,
-            &mut pbi as *mut _ as *mut std::ffi::c_void,
+            &mut pbi as *mut _ as *mut c_void,
             mem::size_of::<PROCESS_BASIC_INFORMATION>() as u32,
             &mut return_length,
         );
 
-        if status.is_err() {
-            let _ = CloseHandle(process_handle);
-            return Err(format!("NtQueryInformationProcess failed: {:?}", status));
+        if status != 0 {
+            CloseHandle(process_handle);
+            return Err(format!("NtQueryInformationProcess failed: 0x{:X}", status));
         }
 
-        // Read PEB from process memory
-        let mut peb: PEB = mem::zeroed();
+        let mut peb: Peb = mem::zeroed();
         let mut bytes_read: usize = 0;
 
         let result = ReadProcessMemory(
             process_handle,
-            pbi.PebBaseAddress as *const std::ffi::c_void,
-            &mut peb as *mut _ as *mut std::ffi::c_void,
-            mem::size_of::<PEB>(),
-            Some(&mut bytes_read),
+            pbi.PebBaseAddress as *const c_void,
+            &mut peb as *mut _ as *mut c_void,
+            mem::size_of::<Peb>(),
+            &mut bytes_read,
         );
 
-        if result.is_err() {
-            let _ = CloseHandle(process_handle);
-            return Err(format!("Failed to read PEB: {:?}", result));
+        if result == 0 {
+            CloseHandle(process_handle);
+            return Err("Failed to read PEB".to_string());
         }
 
-        // Read RTL_USER_PROCESS_PARAMETERS from process memory
-        let mut params: RTL_USER_PROCESS_PARAMETERS_FULL = mem::zeroed();
+        let mut params: RtlUserProcessParameters = mem::zeroed();
 
         let result = ReadProcessMemory(
             process_handle,
-            peb.process_parameters as *const std::ffi::c_void,
-            &mut params as *mut _ as *mut std::ffi::c_void,
-            mem::size_of::<RTL_USER_PROCESS_PARAMETERS_FULL>(),
-            Some(&mut bytes_read),
+            peb.process_parameters as *const c_void,
+            &mut params as *mut _ as *mut c_void,
+            mem::size_of::<RtlUserProcessParameters>(),
+            &mut bytes_read,
         );
 
-        if result.is_err() {
-            let _ = CloseHandle(process_handle);
-            return Err(format!("Failed to read process parameters: {:?}", result));
+        if result == 0 {
+            CloseHandle(process_handle);
+            return Err("Failed to read process parameters".to_string());
         }
 
-        // Read the CurrentDirectory path string
-        let path_len = params.current_directory.dos_path.length as usize / 2; // Length is in bytes, we need u16 count
+        let path_len = params.current_directory.dos_path.length as usize / 2;
         if path_len == 0 || path_len > 32768 {
-            let _ = CloseHandle(process_handle);
+            CloseHandle(process_handle);
             return Err("Invalid path length".to_string());
         }
 
@@ -251,19 +234,18 @@ fn get_process_cwd_windows(pid: u32) -> Result<String, String> {
 
         let result = ReadProcessMemory(
             process_handle,
-            params.current_directory.dos_path.buffer as *const std::ffi::c_void,
-            path_buffer.as_mut_ptr() as *mut std::ffi::c_void,
+            params.current_directory.dos_path.buffer as *const c_void,
+            path_buffer.as_mut_ptr() as *mut c_void,
             path_len * 2,
-            Some(&mut bytes_read),
+            &mut bytes_read,
         );
 
-        let _ = CloseHandle(process_handle);
+        CloseHandle(process_handle);
 
-        if result.is_err() {
-            return Err(format!("Failed to read path string: {:?}", result));
+        if result == 0 {
+            return Err("Failed to read path string".to_string());
         }
 
-        // Convert to String, removing trailing backslash if present
         let path = String::from_utf16_lossy(&path_buffer);
         let path = path.trim_end_matches('\\').to_string();
 
