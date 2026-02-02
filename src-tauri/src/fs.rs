@@ -6,6 +6,9 @@ use walkdir::WalkDir;
 use std::collections::{HashSet, HashMap};
 use std::process::Command;
 
+#[cfg(not(target_os = "linux"))]
+use sysinfo::{Pid, System};
+
 #[derive(Serialize)]
 pub struct DirectoryEntry {
     name: String,
@@ -87,18 +90,31 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
     let pid = session.child.process_id()
         .ok_or_else(|| "Failed to get process ID".to_string())?;
 
+    // On Linux, use fast /proc path
     #[cfg(target_os = "linux")]
     {
-        // On Linux, read /proc/[pid]/cwd symlink
         let cwd_link = format!("/proc/{}/cwd", pid);
         fs::read_link(&cwd_link)
             .map(|p| p.to_string_lossy().to_string())
             .map_err(|e| format!("Failed to read cwd from /proc: {}", e))
     }
 
+    // On Windows and macOS, use sysinfo crate
     #[cfg(not(target_os = "linux"))]
     {
-        Err("Getting terminal cwd is only supported on Linux".to_string())
+        let mut system = System::new();
+        let sysinfo_pid = Pid::from_u32(pid);
+        system.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::Some(&[sysinfo_pid]),
+            true,
+            sysinfo::ProcessRefreshKind::nothing().with_cwd(sysinfo::UpdateKind::Always),
+        );
+
+        system
+            .process(sysinfo_pid)
+            .and_then(|p| p.cwd())
+            .map(|cwd| cwd.to_string_lossy().to_string())
+            .ok_or_else(|| format!("Failed to get cwd for process {}", pid))
     }
 }
 

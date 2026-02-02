@@ -16,13 +16,8 @@ pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
         })
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    // Determine the shell to use based on the platform
-    let shell = get_shell();
-
-    // Create command for the shell with login flag
-    let mut cmd = CommandBuilder::new(&shell);
-    cmd.arg("-l"); // Start as login shell
-    cmd.cwd(std::env::var("HOME").unwrap_or_else(|_| "/".to_string()));
+    // Build platform-specific shell command
+    let cmd = build_shell_command();
 
     // Spawn the child process
     let child = pty_pair
@@ -69,11 +64,44 @@ pub fn resize_pty(session: &mut PtySession, rows: u16, cols: u16) -> Result<(), 
 }
 
 #[cfg(unix)]
-fn get_shell() -> String {
-    "/bin/bash".to_string()
+fn build_shell_command() -> CommandBuilder {
+    let shell = "/bin/bash".to_string();
+    let mut cmd = CommandBuilder::new(&shell);
+    cmd.arg("-l"); // Start as login shell
+    cmd.cwd(std::env::var("HOME").unwrap_or_else(|_| "/".to_string()));
+    cmd
 }
 
 #[cfg(windows)]
-fn get_shell() -> String {
+fn build_shell_command() -> CommandBuilder {
+    let shell = get_windows_shell();
+    let mut cmd = CommandBuilder::new(&shell);
+
+    // Check if using PowerShell (Core or legacy)
+    let shell_lower = shell.to_lowercase();
+    if shell_lower.contains("pwsh") || shell_lower.contains("powershell") {
+        cmd.arg("-NoLogo");
+        cmd.arg("-NoExit");
+    }
+    // For cmd.exe, no special flags needed
+
+    // Use USERPROFILE on Windows (equivalent to $HOME on Unix)
+    cmd.cwd(std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string()));
+    cmd
+}
+
+#[cfg(windows)]
+fn get_windows_shell() -> String {
+    // Prefer PowerShell Core (pwsh) if available, then legacy PowerShell, then cmd
+    if let Ok(path) = std::process::Command::new("where")
+        .arg("pwsh.exe")
+        .output()
+    {
+        if path.status.success() {
+            return "pwsh.exe".to_string();
+        }
+    }
+
+    // Fall back to legacy PowerShell or cmd
     std::env::var("COMSPEC").unwrap_or_else(|_| "powershell.exe".to_string())
 }

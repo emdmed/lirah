@@ -26,4 +26,5 @@ portable-pty = "0.8"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 notify = { version = "6.1", default-features = false, features = ["macos_fsevent"] }
+sysinfo = "0.32"
 
