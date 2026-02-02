@@ -127,7 +127,6 @@ pub fn get_terminal_cwd(
 #[cfg(target_os = "windows")]
 fn get_process_cwd_windows(pid: u32) -> Result<String, String> {
     use std::mem;
-    use std::ptr;
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
     use windows::Win32::System::Threading::{
