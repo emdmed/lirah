@@ -26,6 +26,7 @@ import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { useFileSymbols } from "./hooks/file-analysis/useFileSymbols";
+import { useTokenUsage } from "./hooks/useTokenUsage";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarFileSelection, LARGE_FILE_INSTRUCTION } from "./components/sidebar/SidebarFileSelection";
 import {
@@ -88,6 +89,9 @@ function App() {
 
   // Flat view navigation hook
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
+
+  // Token usage tracking
+  const tokenUsage = useTokenUsage(currentPath, !!currentPath);
 
   // Tree view state
   const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
@@ -1185,6 +1189,7 @@ function App() {
               onToggleOrchestration={setAppendOrchestration}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
+              tokenUsage={tokenUsage}
             />
           )
         }

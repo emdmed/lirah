@@ -26,6 +26,7 @@ export function TextareaPanel({
   onToggleOrchestration,
   templateDropdownOpen,
   onTemplateDropdownOpenChange,
+  tokenUsage,
 }) {
 
   const handleKeyDown = (e) => {
@@ -117,6 +118,7 @@ export function TextareaPanel({
         <ActionButtons
           onSend={handleSend}
           disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId)}
+          tokenUsage={tokenUsage}
         />
       </div>
     </div>

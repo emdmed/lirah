@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
-use serde::Serialize;
+use std::io::{BufRead, BufReader};
+use serde::{Serialize, Deserialize};
 use crate::state::AppState;
 use walkdir::WalkDir;
 use std::collections::{HashSet, HashMap};
@@ -508,4 +509,103 @@ pub fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResul
         is_new_file,
         is_deleted_file,
     })
+}
+
+#[derive(Serialize, Default)]
+pub struct TokenUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_input_tokens: u64,
+    pub cache_creation_input_tokens: u64,
+    pub session_file: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ClaudeMessage {
+    message: Option<MessageContent>,
+}
+
+#[derive(Deserialize)]
+struct MessageContent {
+    usage: Option<UsageData>,
+}
+
+#[derive(Deserialize)]
+struct UsageData {
+    input_tokens: Option<u64>,
+    output_tokens: Option<u64>,
+    cache_read_input_tokens: Option<u64>,
+    cache_creation_input_tokens: Option<u64>,
+}
+
+#[tauri::command]
+pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
+    // Convert project path to Claude's format: /home/user/projects/foo -> -home-user-projects-foo
+    let claude_path_segment = project_path.replace("/", "-");
+
+    // Build path to Claude sessions directory
+    let home = std::env::var("HOME").map_err(|_| "Could not get HOME directory")?;
+    let sessions_dir = PathBuf::from(&home)
+        .join(".claude")
+        .join("projects")
+        .join(&claude_path_segment);
+
+    if !sessions_dir.exists() {
+        return Ok(TokenUsage::default());
+    }
+
+    // Find the most recently modified .jsonl file
+    let mut newest_file: Option<(PathBuf, std::time::SystemTime)> = None;
+
+    let entries = fs::read_dir(&sessions_dir)
+        .map_err(|e| format!("Failed to read sessions directory: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map_or(false, |ext| ext == "jsonl") {
+            if let Ok(metadata) = path.metadata() {
+                if let Ok(modified) = metadata.modified() {
+                    if newest_file.as_ref().map_or(true, |(_, t)| modified > *t) {
+                        newest_file = Some((path, modified));
+                    }
+                }
+            }
+        }
+    }
+
+    let session_file = match newest_file {
+        Some((path, _)) => path,
+        None => return Ok(TokenUsage::default()),
+    };
+
+    // Parse the JSONL file and sum up token usage
+    let file = fs::File::open(&session_file)
+        .map_err(|e| format!("Failed to open session file: {}", e))?;
+    let reader = BufReader::new(file);
+
+    let mut usage = TokenUsage {
+        session_file: Some(session_file.to_string_lossy().to_string()),
+        ..Default::default()
+    };
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
+        // Parse each line as JSON
+        if let Ok(msg) = serde_json::from_str::<ClaudeMessage>(&line) {
+            if let Some(message) = msg.message {
+                if let Some(u) = message.usage {
+                    usage.input_tokens += u.input_tokens.unwrap_or(0);
+                    usage.output_tokens += u.output_tokens.unwrap_or(0);
+                    usage.cache_read_input_tokens += u.cache_read_input_tokens.unwrap_or(0);
+                    usage.cache_creation_input_tokens += u.cache_creation_input_tokens.unwrap_or(0);
+                }
+            }
+        }
+    }
+
+    Ok(usage)
 }

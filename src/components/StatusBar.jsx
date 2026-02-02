@@ -1,8 +1,16 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Settings, Bot, Terminal } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { Button } from './ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuShortcut,
+} from './ui/dropdown-menu';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'Claude Code', icon: Bot },
@@ -24,24 +32,14 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
       }}
     >
       {/* Left section: Current path */}
-      <div className="flex items-center gap-2 overflow-hidden">
+      <div className="flex items-center gap-4 overflow-hidden">
         <span className="overflow-hidden whitespace-nowrap" style={{ textOverflow: 'ellipsis' }}>
           {currentPath || '~'}
         </span>
       </div>
 
-      {/* Right section: Help, Watchers, Theme switcher and session status */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="xs"
-          onClick={onLaunchOrchestration}
-          title="Initialize claude-orchestration in current project"
-          disabled={!sessionId}
-        >
-          <Download className="w-3 h-3" />
-          Initialize Claude Orchestration
-        </Button>
+      {/* Right section: CLI selector, Theme, and Settings menu */}
+      <div className="flex items-center gap-2">
         {selectedCli && (
           <Button
             variant="ghost"
@@ -55,32 +53,53 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               return <CliIcon className="w-3 h-3" />;
             })()}
             <span className="opacity-70">{CLI_DISPLAY[selectedCli]?.name || selectedCli}</span>
-            <Settings className="w-3 h-3 opacity-50" />
           </Button>
         )}
-        <button
-          onClick={onToggleHelp}
-          className="opacity-50 hover:opacity-100 transition-opacity cursor-pointer focus-ring rounded"
-          title="Keyboard shortcuts (Ctrl+H)"
-          aria-label="Open keyboard shortcuts"
-        >
-          <Keyboard className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={toggleWatchers}
-          className="transition-opacity cursor-pointer focus-ring rounded"
-          style={{
-            opacity: fileWatchingEnabled ? 0.5 : 0.3,
-            color: fileWatchingEnabled ? 'inherit' : '#E82424',
-          }}
-          title={`File watching: ${fileWatchingEnabled ? 'ON' : 'OFF'} (Ctrl+W)`}
-          aria-label={`Toggle file watching, currently ${fileWatchingEnabled ? 'enabled' : 'disabled'}`}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = fileWatchingEnabled ? 0.5 : 0.3; }}
-        >
-          {fileWatchingEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-        </button>
         <ThemeSwitcher />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              title="Settings"
+              aria-label="Open settings menu"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem
+              onClick={onLaunchOrchestration}
+              disabled={!sessionId}
+              className="cursor-pointer"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Initialize Orchestration
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onToggleHelp}
+              className="cursor-pointer"
+            >
+              <Keyboard className="w-4 h-4 mr-2" />
+              Keyboard Shortcuts
+              <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={toggleWatchers}
+              className="cursor-pointer"
+            >
+              {fileWatchingEnabled ? (
+                <Eye className="w-4 h-4 mr-2" />
+              ) : (
+                <EyeOff className="w-4 h-4 mr-2" style={{ color: '#E82424' }} />
+              )}
+              File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
+              <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
