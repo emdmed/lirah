@@ -3,6 +3,7 @@ import { SidebarMenuItem } from "@/components/ui/sidebar";
 import { FolderNode } from "./FolderNode";
 import { FileNode } from "./FileNode";
 import { INDENT_PX, GUIDE_OFFSET_PX } from "./constants";
+import { normalizePath } from "@/utils/pathUtils";
 
 /**
  * Renders a tree node (file or folder) with all interactions
@@ -24,19 +25,21 @@ export function TreeNode({
   successfulChecks,
   onCheckFileTypes
 }) {
-  const isExpanded = expandedFolders.has(node.path);
-  const isCurrentPath = currentPath === node.path;
+  const normalizedNodePath = normalizePath(node.path);
+  const normalizedCurrentPath = normalizePath(currentPath);
+  const isExpanded = expandedFolders.has(normalizedNodePath);
+  const isCurrentPath = normalizedCurrentPath === normalizedNodePath;
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
-  const isSelected = selectedFiles && selectedFiles.has(node.path);
+  const isSelected = selectedFiles && selectedFiles.has(normalizedNodePath);
   const depth = node.depth || 0;
 
-  // Git stats
-  const stats = gitStats?.get(node.path);
+  // Git stats - try both normalized and original path since stats come from backend
+  const stats = gitStats?.get(node.path) || gitStats?.get(normalizedNodePath);
 
-  // Type check state
-  const typeCheckResult = typeCheckResults && typeCheckResults.get(node.path);
-  const isCheckingTypes = checkingFiles && checkingFiles.has(node.path);
-  const isTypeCheckSuccess = successfulChecks && successfulChecks.has(node.path);
+  // Type check state - use normalized paths for consistency
+  const typeCheckResult = typeCheckResults && (typeCheckResults.get(node.path) || typeCheckResults.get(normalizedNodePath));
+  const isCheckingTypes = checkingFiles && (checkingFiles.has(node.path) || checkingFiles.has(normalizedNodePath));
+  const isTypeCheckSuccess = successfulChecks && (successfulChecks.has(node.path) || successfulChecks.has(normalizedNodePath));
 
   return (
     <>

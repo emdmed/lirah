@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { normalizePath } from '../utils/pathUtils';
 
 export function useFlatViewNavigation(terminalSessionId) {
   const [folders, setFolders] = useState([]);
@@ -10,13 +11,16 @@ export function useFlatViewNavigation(terminalSessionId) {
     try {
       const gitStats = await invoke('get_git_stats', { path: dirPath });
       const deletedFiles = [];
+      const normalizedDirPath = normalizePath(dirPath);
 
       for (const [filePath, stats] of Object.entries(gitStats)) {
         if (stats.status === 'deleted') {
           // Only include deleted files from the current directory
-          const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
-          if (parentDir === dirPath) {
-            const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+          const normalizedFilePath = normalizePath(filePath);
+          const lastSlash = normalizedFilePath.lastIndexOf('/');
+          const parentDir = normalizedFilePath.substring(0, lastSlash);
+          if (parentDir === normalizedDirPath) {
+            const fileName = normalizedFilePath.substring(lastSlash + 1);
             deletedFiles.push({
               name: fileName,
               path: filePath,
@@ -41,8 +45,16 @@ export function useFlatViewNavigation(terminalSessionId) {
     }
 
     try {
-      // Escape path for shell safety (handle spaces and special characters)
-      const safePath = `'${path.replace(/'/g, "'\\''")}'`;
+      // Detect platform and escape path appropriately
+      const isWindows = navigator.platform.toLowerCase().includes('win');
+      let safePath;
+      if (isWindows) {
+        // PowerShell: use double quotes and escape internal double quotes
+        safePath = `"${path.replace(/"/g, '`"')}"`;
+      } else {
+        // Unix shells: use single quotes and escape internal single quotes
+        safePath = `'${path.replace(/'/g, "'\\''")}'`;
+      }
       const command = `cd ${safePath}\n`;
 
       await invoke('write_to_terminal', {
@@ -108,12 +120,33 @@ export function useFlatViewNavigation(terminalSessionId) {
   };
 
   const navigateToParent = async () => {
-    if (!currentPath || currentPath === '/') {
+    if (!currentPath) {
+      return;
+    }
+
+    // Normalize to forward slashes for consistent handling
+    const normalized = normalizePath(currentPath);
+
+    // Check for root paths (Unix: "/" or Windows: "C:" after normalization)
+    const isUnixRoot = normalized === '/';
+    const isWindowsRoot = /^[a-zA-Z]:$/.test(normalized) || /^[a-zA-Z]:\/+$/.test(currentPath);
+    if (isUnixRoot || isWindowsRoot) {
       return; // Already at root
     }
 
-    const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-    await loadFolders(parentPath);
+    const parts = normalized.split('/').filter(Boolean);
+    if (parts.length <= 1) {
+      // On Windows, preserve drive letter; on Unix, go to /
+      const parentPath = /^[a-zA-Z]:/.test(normalized) ? parts[0] : '/';
+      await loadFolders(parentPath);
+    } else {
+      // Remove last segment
+      parts.pop();
+      const parentPath = /^[a-zA-Z]:/.test(normalized)
+        ? parts.join('/')
+        : '/' + parts.join('/');
+      await loadFolders(parentPath);
+    }
   };
 
   return {

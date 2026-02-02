@@ -17,6 +17,7 @@ import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./contexts/WatcherContext";
 import { useBookmarks } from "./contexts/BookmarksContext";
 import { invoke } from "@tauri-apps/api/core";
+import { normalizePath } from "./utils/pathUtils";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
@@ -227,10 +228,12 @@ function App() {
   // Helper function to build tree from flat list
   const buildTreeFromFlatList = (flatList, rootPath) => {
     const nodeMap = new Map();
+    const normalizedRoot = normalizePath(rootPath);
 
-    // Initialize all nodes
+    // Initialize all nodes using normalized paths as keys
     flatList.forEach(entry => {
-      nodeMap.set(entry.path, {
+      const normalizedPath = normalizePath(entry.path);
+      nodeMap.set(normalizedPath, {
         ...entry,
         children: entry.is_dir ? [] : undefined,
         depth: entry.depth
@@ -239,14 +242,16 @@ function App() {
 
     const rootNodes = [];
 
-    // Build parent-child relationships
+    // Build parent-child relationships using normalized paths
     flatList.forEach(entry => {
-      const node = nodeMap.get(entry.path);
+      const normalizedPath = normalizePath(entry.path);
+      const normalizedParent = normalizePath(entry.parent_path);
+      const node = nodeMap.get(normalizedPath);
 
-      if (entry.parent_path === rootPath || !entry.parent_path) {
+      if (normalizedParent === normalizedRoot || !entry.parent_path) {
         rootNodes.push(node);
       } else {
-        const parent = nodeMap.get(entry.parent_path);
+        const parent = nodeMap.get(normalizedParent);
         if (parent && parent.children) {
           parent.children.push(node);
         }
@@ -315,26 +320,27 @@ function App() {
 
   // File selection handlers
   const toggleFileSelection = (filePath) => {
+    const normalizedPath = normalizePath(filePath);
     setSelectedFiles(prev => {
       const next = new Set(prev);
-      if (next.has(filePath)) {
+      if (next.has(normalizedPath)) {
         // Removing file
-        next.delete(filePath);
+        next.delete(normalizedPath);
         // Also remove from fileStates
         setFileStates(prevStates => {
           const nextStates = new Map(prevStates);
-          nextStates.delete(filePath);
+          nextStates.delete(normalizedPath);
           return nextStates;
         });
         // Clear symbols for this file
         clearFileSymbols(filePath);
       } else {
         // Adding file
-        next.add(filePath);
+        next.add(normalizedPath);
         // Set default state to 'modify'
         setFileStates(prevStates => {
           const nextStates = new Map(prevStates);
-          nextStates.set(filePath, 'modify');
+          nextStates.set(normalizedPath, 'modify');
           return nextStates;
         });
         // Extract symbols for parseable files
@@ -347,14 +353,15 @@ function App() {
   };
 
   const removeFileFromSelection = (filePath) => {
+    const normalizedPath = normalizePath(filePath);
     setSelectedFiles(prev => {
       const next = new Set(prev);
-      next.delete(filePath);
+      next.delete(normalizedPath);
       return next;
     });
     setFileStates(prev => {
       const next = new Map(prev);
-      next.delete(filePath);
+      next.delete(normalizedPath);
       return next;
     });
   };
@@ -840,8 +847,9 @@ function App() {
 
   // Helper functions for multi-file copy
   const getRelativePath = (absolutePath, cwdPath) => {
-    const normalizedCwd = cwdPath.endsWith('/') ? cwdPath.slice(0, -1) : cwdPath;
-    const normalizedFile = absolutePath.endsWith('/') ? absolutePath.slice(0, -1) : absolutePath;
+    // Normalize both paths for cross-platform compatibility
+    const normalizedCwd = normalizePath(cwdPath);
+    const normalizedFile = normalizePath(absolutePath);
 
     if (normalizedFile.startsWith(normalizedCwd + '/')) {
       return normalizedFile.slice(normalizedCwd.length + 1);
@@ -855,9 +863,15 @@ function App() {
   };
 
   const escapeShellPath = (path) => {
-    // Single quotes preserve all special characters except single quote itself
-    // To include a single quote: 'path'\''s name'
-    return `'${path.replace(/'/g, "'\\''")}'`;
+    // Detect platform and escape appropriately
+    const isWindows = navigator.platform.toLowerCase().includes('win');
+    if (isWindows) {
+      // PowerShell: use double quotes and escape internal double quotes with backtick
+      return `"${path.replace(/"/g, '`"')}"`;
+    } else {
+      // Unix shells: single quotes preserve all special characters except single quote itself
+      return `'${path.replace(/'/g, "'\\''")}'`;
+    }
   };
 
   const sendFileToTerminal = async (absolutePath) => {
@@ -894,15 +908,19 @@ function App() {
       return nodes;
     }
 
-    const matchingSet = new Set(matchingPaths);
+    // Normalize all paths for cross-platform compatibility
+    const matchingSet = new Set(matchingPaths.map(normalizePath));
     const parentPathsSet = new Set();
 
-    // Build set of all parent paths
+    // Build set of all parent paths (using normalized paths)
     matchingPaths.forEach(path => {
-      let currentPath = path;
-      while (currentPath && currentPath !== '/') {
+      let currentPath = normalizePath(path);
+      // Check for both Unix root and Windows drive root
+      while (currentPath && currentPath !== '/' && !/^[a-zA-Z]:$/.test(currentPath)) {
         const lastSlash = currentPath.lastIndexOf('/');
         if (lastSlash <= 0) break;
+        // Preserve Windows drive letter if present
+        if (lastSlash === 2 && /^[a-zA-Z]:/.test(currentPath)) break;
         currentPath = currentPath.substring(0, lastSlash);
         parentPathsSet.add(currentPath);
       }
@@ -911,8 +929,9 @@ function App() {
     const filterNodes = (nodes) => {
       return nodes
         .map(node => {
-          const isMatch = matchingSet.has(node.path);
-          const isParentOfMatch = parentPathsSet.has(node.path);
+          const normalizedNodePath = normalizePath(node.path);
+          const isMatch = matchingSet.has(normalizedNodePath);
+          const isParentOfMatch = parentPathsSet.has(normalizedNodePath);
 
           if (!isMatch && !isParentOfMatch) {
             return null; // Filter out
@@ -935,19 +954,22 @@ function App() {
   const expandSearchResults = (results) => {
     const pathsToExpand = new Set();
 
-    // Expand all parent folders of matches
+    // Expand all parent folders of matches (using normalized paths)
     results.forEach(result => {
-      let currentPath = result.path;
-      while (currentPath && currentPath !== '/') {
+      let currentPath = normalizePath(result.path);
+      // Check for both Unix root and Windows drive root
+      while (currentPath && currentPath !== '/' && !/^[a-zA-Z]:$/.test(currentPath)) {
         const lastSlash = currentPath.lastIndexOf('/');
         if (lastSlash <= 0) break;
+        // Preserve Windows drive letter if present
+        if (lastSlash === 2 && /^[a-zA-Z]:/.test(currentPath)) break;
         currentPath = currentPath.substring(0, lastSlash);
         pathsToExpand.add(currentPath);
       }
 
       // Also expand matching folders themselves
       if (result.is_dir) {
-        pathsToExpand.add(result.path);
+        pathsToExpand.add(normalizePath(result.path));
       }
     });
 
@@ -955,14 +977,15 @@ function App() {
   };
 
   const toggleFolder = (folderPath) => {
+    const normalizedPath = normalizePath(folderPath);
     setExpandedFolders(prev => {
       const next = new Set(prev);
-      if (next.has(folderPath)) {
+      if (next.has(normalizedPath)) {
         // Collapse
-        next.delete(folderPath);
+        next.delete(normalizedPath);
       } else {
         // Expand
-        next.add(folderPath);
+        next.add(normalizedPath);
       }
       return next;
     });
