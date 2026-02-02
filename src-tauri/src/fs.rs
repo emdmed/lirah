@@ -126,8 +126,8 @@ pub fn get_terminal_cwd(
 /// Windows-specific: Get the current working directory of a process by reading its PEB
 #[cfg(target_os = "windows")]
 fn get_process_cwd_windows(pid: u32) -> Result<String, String> {
-    use std::ffi::c_void;
     use std::mem;
+    use winapi::ctypes::c_void;
     use ntapi::ntpsapi::{NtQueryInformationProcess, PROCESS_BASIC_INFORMATION, ProcessBasicInformation};
     use winapi::um::handleapi::CloseHandle;
     use winapi::um::memoryapi::ReadProcessMemory;
