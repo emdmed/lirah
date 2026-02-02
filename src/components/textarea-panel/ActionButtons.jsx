@@ -20,9 +20,9 @@ const formatTokenCount = (count) => {
  * @param {Object} tokenUsage - Token usage data from Claude session
  */
 export function ActionButtons({ onSend, disabled, tokenUsage }) {
-  const hasTokens = tokenUsage && (tokenUsage.input_tokens > 0 || tokenUsage.output_tokens > 0);
-  const totalTokens = hasTokens
-    ? tokenUsage.input_tokens + tokenUsage.output_tokens
+  const hasTokens = tokenUsage && (tokenUsage.billable_input_tokens > 0 || tokenUsage.billable_output_tokens > 0);
+  const billableTotal = hasTokens
+    ? tokenUsage.billable_input_tokens + tokenUsage.billable_output_tokens
     : 0;
 
   return (
@@ -32,26 +32,26 @@ export function ActionButtons({ onSend, disabled, tokenUsage }) {
           <TooltipTrigger asChild>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono hover:text-foreground transition-colors cursor-default">
               <Coins className="w-3 h-3" />
-              <span>{formatTokenCount(totalTokens)} tokens</span>
+              <span>{formatTokenCount(billableTotal)}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={8}>
-            <div className="text-xs space-y-0.5 font-mono">
+            <div className="text-xs space-y-1 font-mono">
+              <div className="flex justify-between gap-4 font-semibold border-b border-border pb-1 mb-1">
+                <span>Billable</span>
+                <span>{billableTotal.toLocaleString()}</span>
+              </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Input</span>
-                <span>{tokenUsage.input_tokens.toLocaleString()}</span>
+                <span>{tokenUsage.billable_input_tokens.toLocaleString()}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Output</span>
-                <span>{tokenUsage.output_tokens.toLocaleString()}</span>
+                <span>{tokenUsage.billable_output_tokens.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Cache read</span>
+              <div className="flex justify-between gap-4 pt-1 border-t border-border mt-1 text-muted-foreground">
+                <span>Cache read (free)</span>
                 <span>{tokenUsage.cache_read_input_tokens.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Cache write</span>
-                <span>{tokenUsage.cache_creation_input_tokens.toLocaleString()}</span>
               </div>
             </div>
           </TooltipContent>

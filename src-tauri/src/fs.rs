@@ -517,6 +517,8 @@ pub struct TokenUsage {
     pub output_tokens: u64,
     pub cache_read_input_tokens: u64,
     pub cache_creation_input_tokens: u64,
+    pub billable_input_tokens: u64,
+    pub billable_output_tokens: u64,
     pub session_file: Option<String>,
 }
 
@@ -527,6 +529,7 @@ struct ClaudeMessage {
 
 #[derive(Deserialize)]
 struct MessageContent {
+    id: Option<String>,
     usage: Option<UsageData>,
 }
 
@@ -584,10 +587,8 @@ pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, Strin
         .map_err(|e| format!("Failed to open session file: {}", e))?;
     let reader = BufReader::new(file);
 
-    let mut usage = TokenUsage {
-        session_file: Some(session_file.to_string_lossy().to_string()),
-        ..Default::default()
-    };
+    // Use HashMap to deduplicate by message ID (streaming sends multiple updates per message)
+    let mut usage_by_msg: std::collections::HashMap<String, UsageData> = std::collections::HashMap::new();
 
     for line in reader.lines() {
         let line = match line {
@@ -598,14 +599,34 @@ pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, Strin
         // Parse each line as JSON
         if let Ok(msg) = serde_json::from_str::<ClaudeMessage>(&line) {
             if let Some(message) = msg.message {
-                if let Some(u) = message.usage {
-                    usage.input_tokens += u.input_tokens.unwrap_or(0);
-                    usage.output_tokens += u.output_tokens.unwrap_or(0);
-                    usage.cache_read_input_tokens += u.cache_read_input_tokens.unwrap_or(0);
-                    usage.cache_creation_input_tokens += u.cache_creation_input_tokens.unwrap_or(0);
+                if let (Some(id), Some(u)) = (message.id, message.usage) {
+                    // Always keep the latest usage for each message ID
+                    usage_by_msg.insert(id, u);
                 }
             }
         }
+    }
+
+    // Sum up the final usage from each unique message
+    let mut usage = TokenUsage {
+        session_file: Some(session_file.to_string_lossy().to_string()),
+        ..Default::default()
+    };
+
+    for u in usage_by_msg.values() {
+        let input = u.input_tokens.unwrap_or(0);
+        let output = u.output_tokens.unwrap_or(0);
+        let cache_read = u.cache_read_input_tokens.unwrap_or(0);
+        let cache_creation = u.cache_creation_input_tokens.unwrap_or(0);
+
+        usage.input_tokens += input;
+        usage.output_tokens += output;
+        usage.cache_read_input_tokens += cache_read;
+        usage.cache_creation_input_tokens += cache_creation;
+
+        // Billable: input + cache_creation (cache reads are discounted)
+        usage.billable_input_tokens += input + cache_creation;
+        usage.billable_output_tokens += output;
     }
 
     Ok(usage)
