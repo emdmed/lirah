@@ -2,13 +2,14 @@
 /**
  * Token Savings Benchmark
  *
- * Measures how much the Smart Token Optimization feature reduces context size
- * by comparing raw file content vs optimized output (signatures/skeleton).
+ * Measures how much the Babel parser reduces token usage by comparing:
+ * - Raw file content (what you'd send without optimization)
+ * - Parsed output (signatures or skeleton)
  *
  * Usage: node scripts/benchmark-tokens.js [path]
  */
 
-import { readFileSync, readdirSync } from 'fs';
+import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import {
   isBabelParseable,
@@ -18,9 +19,17 @@ import {
   formatSkeletonForPrompt,
 } from '../src/utils/babelSymbolParser.js';
 
-const charCount = (text) => (text || '').length;
+// Token estimation (code averages ~3.5 chars per token)
+const tokenCount = (text) => Math.ceil((text || '').length / 3.5);
 
-// Collect all parseable files recursively
+// Thresholds for optimization modes
+const THRESHOLDS = {
+  SIGNATURES: 1000,  // 1000+ tokens: use signatures
+  SKELETON: 3000,    // 3000+ tokens: use skeleton
+};
+
+const SKIP_DIRS = ['node_modules', 'dist', '.git', 'target', 'build', '.next', '.turbo', 'out', 'coverage', '.cache', '__pycache__'];
+
 function collectFiles(dir, files = []) {
   let entries;
   try {
@@ -31,24 +40,20 @@ function collectFiles(dir, files = []) {
 
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
-
     if (entry.isDirectory()) {
-      if (!['node_modules', 'dist', '.git', 'target', 'build', '.next', '.turbo', 'out', 'coverage'].includes(entry.name)) {
+      if (!SKIP_DIRS.includes(entry.name) && !entry.name.startsWith('.')) {
         collectFiles(fullPath, files);
       }
     } else if (entry.isFile() && isBabelParseable(fullPath)) {
       files.push(fullPath);
     }
   }
-
   return files;
 }
 
-// Analyze a single file
 function analyzeFile(filePath) {
   const content = readFileSync(filePath, 'utf-8');
-  const lines = content.split('\n').length;
-  const rawChars = charCount(content);
+  const rawTokens = tokenCount(content);
 
   const signatures = extractSignatures(content, filePath);
   const skeleton = extractSkeleton(content, filePath);
@@ -56,150 +61,117 @@ function analyzeFile(filePath) {
   const signaturesText = formatSignaturesForPrompt(signatures);
   const skeletonText = formatSkeletonForPrompt(skeleton);
 
-  // Count actual symbols for coverage metric
-  const componentCount = skeleton?.components?.length || 0;
-  const functionCount = skeleton?.functions?.length || 0;
-  const contextCount = skeleton?.contexts?.length || 0;
-  const totalSymbols = componentCount + functionCount + contextCount;
+  const sigTokens = tokenCount(signaturesText);
+  const skelTokens = tokenCount(skeletonText);
 
   return {
     path: filePath,
-    lines,
-    rawChars,
-    signatures: { count: signatures.length, text: signaturesText, chars: charCount(signaturesText) },
-    skeleton: { text: skeletonText, chars: charCount(skeletonText), components: componentCount, functions: functionCount },
-    totalSymbols,
+    rawTokens,
+    sigTokens,
+    skelTokens,
+    symbolCount: signatures.length,
   };
 }
 
-function getAutoMode(lines) {
-  if (lines < 300) return 'path-only';
-  if (lines < 800) return 'signatures';
+function getMode(tokens) {
+  if (tokens < THRESHOLDS.SIGNATURES) return 'none';
+  if (tokens < THRESHOLDS.SKELETON) return 'signatures';
   return 'skeleton';
 }
 
-// Main benchmark
 function runBenchmark(targetPath) {
   const basePath = targetPath || process.cwd();
-  console.log(`\n📊 Token Savings Benchmark`);
-  console.log(`   Scanning: ${basePath}\n`);
+  console.log(`\nToken Savings Benchmark`);
+  console.log(`Scanning: ${basePath}\n`);
 
   const files = collectFiles(basePath);
-  console.log(`   Found ${files.length} parseable JS/TS files\n`);
-
   if (files.length === 0) {
-    console.log('   No JS/TS files found.');
+    console.log('No JS/TS files found.');
     return;
   }
 
-  const small = [], medium = [], large = [];
-
+  const results = [];
   for (const file of files) {
     try {
-      const analysis = analyzeFile(file);
-      if (analysis.lines < 300) {
-        small.push(analysis);
-      } else if (analysis.lines < 800) {
-        medium.push(analysis);
-      } else {
-        large.push(analysis);
-      }
+      results.push(analyzeFile(file));
     } catch (err) {
-      console.warn(`   Warning: Failed to analyze ${file}: ${err.message}`);
+      // Skip unparseable files
     }
   }
 
-  console.log('─'.repeat(70));
-  console.log('FILE SIZE DISTRIBUTION');
-  console.log('─'.repeat(70));
-  console.log(`Small (<300 lines):    ${small.length} files   → No optimization (agent reads full)`);
-  console.log(`Medium (300-799):      ${medium.length} files   → Signatures mode`);
-  console.log(`Large (800+):          ${large.length} files   → Skeleton mode`);
-  console.log('─'.repeat(70));
+  // Group by optimization mode
+  const none = results.filter(r => getMode(r.rawTokens) === 'none');
+  const signatures = results.filter(r => getMode(r.rawTokens) === 'signatures');
+  const skeleton = results.filter(r => getMode(r.rawTokens) === 'skeleton');
 
-  const optimizedFiles = [...medium, ...large];
+  console.log('Files by size:');
+  console.log(`  Small (<${THRESHOLDS.SIGNATURES} tokens):    ${none.length} files - no parsing needed`);
+  console.log(`  Medium (${THRESHOLDS.SIGNATURES}-${THRESHOLDS.SKELETON - 1} tokens):  ${signatures.length} files - signatures mode`);
+  console.log(`  Large (${THRESHOLDS.SKELETON}+ tokens):     ${skeleton.length} files - skeleton mode\n`);
 
-  if (optimizedFiles.length === 0) {
-    console.log('\nNo files large enough for optimization (all <300 lines).');
-    console.log('Token optimization activates at 300+ lines.\n');
+  // Calculate totals for optimized files
+  const optimized = [...signatures, ...skeleton];
+  if (optimized.length === 0) {
+    console.log('No files large enough to benefit from parsing.');
     return;
   }
 
-  console.log('\nOPTIMIZED FILES (300+ lines)\n');
-  console.log('File'.padEnd(35) + 'Lines'.padStart(6) + 'Mode'.padStart(11) + 'Raw'.padStart(9) + 'Opt'.padStart(7) + 'Saved'.padStart(9) + '%'.padStart(6) + 'Syms'.padStart(6));
-  console.log('─'.repeat(89));
+  let totalRaw = 0;
+  let totalParsed = 0;
 
-  optimizedFiles.sort((a, b) => b.rawChars - a.rawChars);
+  console.log('File'.padEnd(40) + 'Raw'.padStart(8) + 'Parsed'.padStart(8) + 'Saved'.padStart(8) + 'Mode'.padStart(12));
+  console.log('─'.repeat(76));
 
-  for (const f of optimizedFiles.slice(0, 15)) {
-    const relPath = relative(basePath, f.path);
-    const displayPath = relPath.length > 33 ? '...' + relPath.slice(-30) : relPath;
-    const mode = getAutoMode(f.lines);
-    const modeLabel = mode === 'signatures' ? 'Signatures' : 'Skeleton';
-    const optChars = mode === 'signatures' ? f.signatures.chars : f.skeleton.chars;
-    const saved = f.rawChars - optChars;
-    const pct = ((saved / f.rawChars) * 100).toFixed(0);
+  optimized.sort((a, b) => b.rawTokens - a.rawTokens);
+
+  for (const r of optimized.slice(0, 20)) {
+    const mode = getMode(r.rawTokens);
+    const parsed = mode === 'signatures' ? r.sigTokens : r.skelTokens;
+    const saved = r.rawTokens - parsed;
+    const pct = ((saved / r.rawTokens) * 100).toFixed(0);
+
+    const relPath = relative(basePath, r.path);
+    const display = relPath.length > 38 ? '...' + relPath.slice(-35) : relPath;
 
     console.log(
-      displayPath.padEnd(35) +
-      f.lines.toString().padStart(6) +
-      modeLabel.padStart(11) +
-      f.rawChars.toString().padStart(9) +
-      optChars.toString().padStart(7) +
-      saved.toString().padStart(9) +
-      (pct + '%').padStart(6) +
-      f.signatures.count.toString().padStart(6)
+      display.padEnd(40) +
+      r.rawTokens.toLocaleString().padStart(8) +
+      parsed.toLocaleString().padStart(8) +
+      `${pct}%`.padStart(8) +
+      mode.padStart(12)
     );
+
+    totalRaw += r.rawTokens;
+    totalParsed += parsed;
   }
 
-  if (optimizedFiles.length > 15) {
-    console.log(`\n   ... and ${optimizedFiles.length - 15} more files`);
+  if (optimized.length > 20) {
+    // Add remaining files to totals
+    for (const r of optimized.slice(20)) {
+      const mode = getMode(r.rawTokens);
+      totalRaw += r.rawTokens;
+      totalParsed += mode === 'signatures' ? r.sigTokens : r.skelTokens;
+    }
+    console.log(`... and ${optimized.length - 20} more files`);
   }
 
-  // Calculate totals ONLY for optimized files
-  const totalRaw = optimizedFiles.reduce((sum, f) => sum + f.rawChars, 0);
-  const totalOpt = optimizedFiles.reduce((sum, f) => {
-    const mode = getAutoMode(f.lines);
-    return sum + (mode === 'signatures' ? f.signatures.chars : f.skeleton.chars);
-  }, 0);
-  const totalSaved = totalRaw - totalOpt;
-  const savingsPct = ((totalSaved / totalRaw) * 100).toFixed(1);
-  const totalSymbols = optimizedFiles.reduce((sum, f) => sum + f.signatures.count, 0);
+  console.log('─'.repeat(76));
 
-  console.log('\n' + '═'.repeat(70));
-  console.log('SUMMARY (optimized files only)');
-  console.log('═'.repeat(70));
-  console.log(`Files optimized:              ${optimizedFiles.length} of ${files.length} total`);
-  console.log(`Total symbols extracted:      ${totalSymbols}`);
-  console.log(`Full content (chars):         ${totalRaw.toLocaleString()}`);
-  console.log(`Optimized (chars):            ${totalOpt.toLocaleString()}`);
-  console.log(`Chars saved:                  ${totalSaved.toLocaleString()} (${savingsPct}%)`);
-  console.log('═'.repeat(70));
+  const totalSaved = totalRaw - totalParsed;
+  const totalPct = ((totalSaved / totalRaw) * 100).toFixed(1);
 
-  // Breakdown by mode
-  if (medium.length > 0) {
-    const mediumRaw = medium.reduce((sum, f) => sum + f.rawChars, 0);
-    const mediumOpt = medium.reduce((sum, f) => sum + f.signatures.chars, 0);
-    const mediumPct = (((mediumRaw - mediumOpt) / mediumRaw) * 100).toFixed(1);
-    const mediumSyms = medium.reduce((sum, f) => sum + f.signatures.count, 0);
-    console.log(`\nSignatures mode (${medium.length} files):`);
-    console.log(`  ${mediumRaw.toLocaleString()} → ${mediumOpt.toLocaleString()} chars (${mediumPct}% reduction)`);
-    console.log(`  ${mediumSyms} symbols extracted`);
-  }
+  console.log(
+    'TOTAL'.padEnd(40) +
+    totalRaw.toLocaleString().padStart(8) +
+    totalParsed.toLocaleString().padStart(8) +
+    `${totalPct}%`.padStart(8)
+  );
 
-  if (large.length > 0) {
-    const largeRaw = large.reduce((sum, f) => sum + f.rawChars, 0);
-    const largeOpt = large.reduce((sum, f) => sum + f.skeleton.chars, 0);
-    const largePct = (((largeRaw - largeOpt) / largeRaw) * 100).toFixed(1);
-    const largeComponents = large.reduce((sum, f) => sum + f.skeleton.components, 0);
-    const largeFunctions = large.reduce((sum, f) => sum + f.skeleton.functions, 0);
-    console.log(`\nSkeleton mode (${large.length} files):`);
-    console.log(`  ${largeRaw.toLocaleString()} → ${largeOpt.toLocaleString()} chars (${largePct}% reduction)`);
-    console.log(`  ${largeComponents} components, ${largeFunctions} functions`);
-  }
-
-  console.log('\n💡 Note: Savings = initial prompt reduction. Agent may still request line ranges.');
-  console.log('   Small files (<300 lines) are read fully by the agent.\n');
+  console.log(`\nSummary:`);
+  console.log(`  Files optimized: ${optimized.length}`);
+  console.log(`  Raw tokens:      ${totalRaw.toLocaleString()}`);
+  console.log(`  Parsed tokens:   ${totalParsed.toLocaleString()}`);
+  console.log(`  Tokens saved:    ${totalSaved.toLocaleString()} (${totalPct}%)\n`);
 }
 
 const targetPath = process.argv[2] || process.cwd();
