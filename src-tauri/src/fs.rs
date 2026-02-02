@@ -541,7 +541,8 @@ struct UsageData {
 #[tauri::command]
 pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
     // Convert project path to Claude's format: /home/user/projects/foo -> -home-user-projects-foo
-    let claude_path_segment = project_path.replace("/", "-");
+    // Claude Code replaces both "/" and "." with "-"
+    let claude_path_segment = project_path.replace("/", "-").replace(".", "-");
 
     // Build path to Claude sessions directory
     let home = std::env::var("HOME").map_err(|_| "Could not get HOME directory")?;
