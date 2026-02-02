@@ -6,9 +6,6 @@ use std::path::PathBuf;
 use std::process::Command;
 use walkdir::WalkDir;
 
-#[cfg(not(target_os = "linux"))]
-use sysinfo::{Pid, System};
-
 #[derive(Serialize)]
 pub struct DirectoryEntry {
     name: String,
@@ -104,57 +101,174 @@ pub fn get_terminal_cwd(
             .map_err(|e| format!("Failed to read cwd from /proc: {}", e))
     }
 
-    // On Windows and macOS, use sysinfo crate
-    #[cfg(not(target_os = "linux"))]
+    // On Windows, use Windows API to read CWD from process PEB
+    #[cfg(target_os = "windows")]
     {
+        get_process_cwd_windows(pid)
+    }
+
+    // On macOS, use sysinfo crate
+    #[cfg(target_os = "macos")]
+    {
+        use sysinfo::{Pid, System};
         let mut system = System::new_all();
         let sysinfo_pid = Pid::from_u32(pid);
-
-        // Refresh all processes to ensure we have complete process tree
         system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-        eprintln!("[CWD] Looking for process {}", pid);
+        system
+            .process(sysinfo_pid)
+            .and_then(|p| p.cwd())
+            .map(|cwd| cwd.to_string_lossy().to_string())
+            .ok_or_else(|| format!("Failed to get cwd for process {}", pid))
+    }
+}
 
-        // Try to get CWD from the shell process itself first
-        if let Some(process) = system.process(sysinfo_pid) {
-            eprintln!("[CWD] Found process: {:?}", process.name());
-            if let Some(cwd) = process.cwd() {
-                eprintln!("[CWD] Direct CWD: {:?}", cwd);
-                return Ok(cwd.to_string_lossy().to_string());
-            } else {
-                eprintln!("[CWD] Direct CWD lookup returned None");
-            }
-        } else {
-            eprintln!("[CWD] Process {} not found in system", pid);
+/// Windows-specific: Get the current working directory of a process by reading its PEB
+#[cfg(target_os = "windows")]
+fn get_process_cwd_windows(pid: u32) -> Result<String, String> {
+    use std::mem;
+    use std::ptr;
+    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
+    use windows::Win32::System::Threading::{
+        OpenProcess, NtQueryInformationProcess, ProcessBasicInformation,
+        PROCESS_BASIC_INFORMATION, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+    };
+
+    // Structures for reading process memory
+    #[repr(C)]
+    struct PEB {
+        reserved1: [u8; 2],
+        being_debugged: u8,
+        reserved2: [u8; 1],
+        reserved3: [*mut std::ffi::c_void; 2],
+        ldr: *mut std::ffi::c_void,
+        process_parameters: *mut RTL_USER_PROCESS_PARAMETERS,
+    }
+
+    #[repr(C)]
+    struct RTL_USER_PROCESS_PARAMETERS {
+        reserved1: [u8; 16],
+        reserved2: [*mut std::ffi::c_void; 10],
+        image_path_name: UNICODE_STRING,
+        command_line: UNICODE_STRING,
+        // Additional fields we need to skip to get to CurrentDirectory
+    }
+
+    #[repr(C)]
+    struct UNICODE_STRING {
+        length: u16,
+        maximum_length: u16,
+        buffer: *mut u16,
+    }
+
+    #[repr(C)]
+    struct CURDIR {
+        dos_path: UNICODE_STRING,
+        handle: HANDLE,
+    }
+
+    // RTL_USER_PROCESS_PARAMETERS with CurrentDirectory at correct offset
+    #[repr(C)]
+    struct RTL_USER_PROCESS_PARAMETERS_FULL {
+        maximum_length: u32,
+        length: u32,
+        flags: u32,
+        debug_flags: u32,
+        console_handle: *mut std::ffi::c_void,
+        console_flags: u32,
+        standard_input: HANDLE,
+        standard_output: HANDLE,
+        standard_error: HANDLE,
+        current_directory: CURDIR,
+    }
+
+    unsafe {
+        // Open the process
+        let process_handle = OpenProcess(
+            PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            false,
+            pid,
+        ).map_err(|e| format!("Failed to open process: {}", e))?;
+
+        // Get process basic information (contains PEB address)
+        let mut pbi: PROCESS_BASIC_INFORMATION = mem::zeroed();
+        let mut return_length: u32 = 0;
+
+        let status = NtQueryInformationProcess(
+            process_handle,
+            ProcessBasicInformation,
+            &mut pbi as *mut _ as *mut std::ffi::c_void,
+            mem::size_of::<PROCESS_BASIC_INFORMATION>() as u32,
+            &mut return_length,
+        );
+
+        if status.is_err() {
+            let _ = CloseHandle(process_handle);
+            return Err(format!("NtQueryInformationProcess failed: {:?}", status));
         }
 
-        // If direct lookup failed, find the deepest child process (the active foreground process)
-        // This handles cases where PowerShell spawns child processes
-        fn find_deepest_child_cwd(system: &System, parent_pid: Pid, depth: usize) -> Option<String> {
-            let children: Vec<_> = system
-                .processes()
-                .values()
-                .filter(|p| p.parent() == Some(parent_pid))
-                .collect();
+        // Read PEB from process memory
+        let mut peb: PEB = mem::zeroed();
+        let mut bytes_read: usize = 0;
 
-            eprintln!("[CWD] {} Found {} children for pid {:?}", "  ".repeat(depth), children.len(), parent_pid);
+        let result = ReadProcessMemory(
+            process_handle,
+            pbi.PebBaseAddress as *const std::ffi::c_void,
+            &mut peb as *mut _ as *mut std::ffi::c_void,
+            mem::size_of::<PEB>(),
+            Some(&mut bytes_read),
+        );
 
-            // Recursively check children for CWD
-            for child in &children {
-                eprintln!("[CWD] {} Checking child: {:?} (pid {:?})", "  ".repeat(depth), child.name(), child.pid());
-                if let Some(cwd) = find_deepest_child_cwd(system, child.pid(), depth + 1) {
-                    return Some(cwd);
-                }
-            }
-
-            // No children with CWD found, try this process
-            let cwd = system.process(parent_pid)?.cwd().map(|p| p.to_string_lossy().to_string());
-            eprintln!("[CWD] {} Process {:?} cwd: {:?}", "  ".repeat(depth), parent_pid, cwd);
-            cwd
+        if result.is_err() {
+            let _ = CloseHandle(process_handle);
+            return Err(format!("Failed to read PEB: {:?}", result));
         }
 
-        find_deepest_child_cwd(&system, sysinfo_pid, 0)
-            .ok_or_else(|| format!("Failed to get cwd for process {} or its children", pid))
+        // Read RTL_USER_PROCESS_PARAMETERS from process memory
+        let mut params: RTL_USER_PROCESS_PARAMETERS_FULL = mem::zeroed();
+
+        let result = ReadProcessMemory(
+            process_handle,
+            peb.process_parameters as *const std::ffi::c_void,
+            &mut params as *mut _ as *mut std::ffi::c_void,
+            mem::size_of::<RTL_USER_PROCESS_PARAMETERS_FULL>(),
+            Some(&mut bytes_read),
+        );
+
+        if result.is_err() {
+            let _ = CloseHandle(process_handle);
+            return Err(format!("Failed to read process parameters: {:?}", result));
+        }
+
+        // Read the CurrentDirectory path string
+        let path_len = params.current_directory.dos_path.length as usize / 2; // Length is in bytes, we need u16 count
+        if path_len == 0 || path_len > 32768 {
+            let _ = CloseHandle(process_handle);
+            return Err("Invalid path length".to_string());
+        }
+
+        let mut path_buffer: Vec<u16> = vec![0u16; path_len];
+
+        let result = ReadProcessMemory(
+            process_handle,
+            params.current_directory.dos_path.buffer as *const std::ffi::c_void,
+            path_buffer.as_mut_ptr() as *mut std::ffi::c_void,
+            path_len * 2,
+            Some(&mut bytes_read),
+        );
+
+        let _ = CloseHandle(process_handle);
+
+        if result.is_err() {
+            return Err(format!("Failed to read path string: {:?}", result));
+        }
+
+        // Convert to String, removing trailing backslash if present
+        let path = String::from_utf16_lossy(&path_buffer);
+        let path = path.trim_end_matches('\\').to_string();
+
+        Ok(path)
     }
 }
 
