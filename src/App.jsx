@@ -10,6 +10,7 @@ import { BookmarksPalette } from "./components/BookmarksPalette";
 import { InitialProjectDialog } from "./components/InitialProjectDialog";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
 import { GitDiffDialog } from "./components/GitDiffDialog";
+import { SaveFileGroupDialog } from "./components/SaveFileGroupDialog";
 import { CliSelectionModal } from "./components/CliSelectionModal";
 import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { usePromptTemplates } from "./contexts/PromptTemplatesContext";
@@ -139,6 +140,9 @@ function App() {
   // Git diff dialog state
   const [diffDialogOpen, setDiffDialogOpen] = useState(false);
   const [diffFilePath, setDiffFilePath] = useState(null);
+
+  // File groups dialog state
+  const [saveFileGroupDialogOpen, setSaveFileGroupDialogOpen] = useState(false);
 
   // CLI selection state (lazy init from localStorage to avoid race condition)
   const [selectedCli, setSelectedCli] = useState(() => {
@@ -369,6 +373,22 @@ function App() {
     clearAllSymbols();
   };
 
+  // Helper function for relative paths (used by file groups and terminal)
+  const getRelativePath = (absolutePath, cwdPath) => {
+    const normalizedCwd = cwdPath.endsWith('/') ? cwdPath.slice(0, -1) : cwdPath;
+    const normalizedFile = absolutePath.endsWith('/') ? absolutePath.slice(0, -1) : absolutePath;
+
+    if (normalizedFile.startsWith(normalizedCwd + '/')) {
+      return normalizedFile.slice(normalizedCwd.length + 1);
+    }
+
+    if (normalizedFile === normalizedCwd) {
+      return '.';
+    }
+
+    return absolutePath;
+  };
+
   // View git diff for a file
   const viewFileDiff = useCallback((filePath) => {
     setDiffFilePath(filePath);
@@ -382,6 +402,40 @@ function App() {
       return next;
     });
   };
+
+  // File groups handlers
+  const handleLoadFileGroup = useCallback((group) => {
+    // Replace current selection with group files
+    const newSelectedFiles = new Set();
+    const newFileStates = new Map();
+
+    group.files.forEach(file => {
+      // Convert relative path to absolute
+      const absolutePath = `${currentPath}/${file.relativePath}`;
+      newSelectedFiles.add(absolutePath);
+      newFileStates.set(absolutePath, file.state);
+
+      // Extract symbols for parseable files
+      if (isBabelParseable(absolutePath)) {
+        extractFileSymbols(absolutePath);
+      }
+    });
+
+    setSelectedFiles(newSelectedFiles);
+    setFileStates(newFileStates);
+  }, [currentPath, isBabelParseable, extractFileSymbols]);
+
+  const handleSaveFileGroup = useCallback(() => {
+    setSaveFileGroupDialogOpen(true);
+  }, []);
+
+  // Get files data for saving to group
+  const getFilesForGroup = useCallback(() => {
+    return Array.from(selectedFiles).map(absolutePath => ({
+      relativePath: getRelativePath(absolutePath, currentPath),
+      state: fileStates.get(absolutePath) || 'modify'
+    }));
+  }, [selectedFiles, fileStates, currentPath]);
 
   // Incremental tree update to prevent flickering
   const incrementallyUpdateTree = useCallback((changes, rootPath) => {
@@ -842,22 +896,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, sidebarOpen]);
 
-  // Helper functions for multi-file copy
-  const getRelativePath = (absolutePath, cwdPath) => {
-    const normalizedCwd = cwdPath.endsWith('/') ? cwdPath.slice(0, -1) : cwdPath;
-    const normalizedFile = absolutePath.endsWith('/') ? absolutePath.slice(0, -1) : absolutePath;
-
-    if (normalizedFile.startsWith(normalizedCwd + '/')) {
-      return normalizedFile.slice(normalizedCwd.length + 1);
-    }
-
-    if (normalizedFile === normalizedCwd) {
-      return '.';
-    }
-
-    return absolutePath;
-  };
-
   const escapeShellPath = (path) => {
     // Single quotes preserve all special characters except single quote itself
     // To include a single quote: 'path'\''s name'
@@ -1190,6 +1228,9 @@ function App() {
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
               tokenUsage={tokenUsage}
+              projectPath={currentPath}
+              onLoadGroup={handleLoadFileGroup}
+              onSaveGroup={handleSaveFileGroup}
             />
           )
         }
@@ -1233,6 +1274,12 @@ function App() {
         onOpenChange={setDiffDialogOpen}
         filePath={diffFilePath}
         repoPath={currentPath}
+      />
+      <SaveFileGroupDialog
+        open={saveFileGroupDialogOpen}
+        onOpenChange={setSaveFileGroupDialogOpen}
+        projectPath={currentPath}
+        files={getFilesForGroup()}
       />
       <InitialProjectDialog
         open={initialProjectDialogOpen}

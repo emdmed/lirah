@@ -3,6 +3,7 @@ import { Textarea } from "../ui/textarea";
 import { Checkbox } from "../ui/checkbox";
 import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
+import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 
 /**
  * Main textarea panel component for multi-line input with file selection
@@ -27,6 +28,9 @@ export function TextareaPanel({
   templateDropdownOpen,
   onTemplateDropdownOpenChange,
   tokenUsage,
+  projectPath,
+  onLoadGroup,
+  onSaveGroup,
 }) {
 
   const handleKeyDown = (e) => {
@@ -82,13 +86,21 @@ export function TextareaPanel({
             </div>
           )}
         </div>
-        <TemplateSelector
-          selectedTemplateId={selectedTemplateId}
-          onSelectTemplate={onSelectTemplate}
-          onManageTemplates={onManageTemplates}
-          open={templateDropdownOpen}
-          onOpenChange={onTemplateDropdownOpenChange}
-        />
+        <div className="flex items-center gap-2">
+          <FileGroupsDropdown
+            projectPath={projectPath}
+            onLoadGroup={onLoadGroup}
+            onSaveGroup={onSaveGroup}
+            hasSelectedFiles={fileArray.length > 0}
+          />
+          <TemplateSelector
+            selectedTemplateId={selectedTemplateId}
+            onSelectTemplate={onSelectTemplate}
+            onManageTemplates={onManageTemplates}
+            open={templateDropdownOpen}
+            onOpenChange={onTemplateDropdownOpenChange}
+          />
+        </div>
       </div>
 
       {/* Main content area */}
