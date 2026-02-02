@@ -1,10 +1,10 @@
+use crate::state::AppState;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use serde::Serialize;
-use crate::state::AppState;
-use walkdir::WalkDir;
-use std::collections::{HashSet, HashMap};
 use std::process::Command;
+use walkdir::WalkDir;
 
 #[cfg(not(target_os = "linux"))]
 use sysinfo::{Pid, System};
@@ -41,14 +41,16 @@ pub fn read_directory(path: Option<String>) -> Result<Vec<DirectoryEntry>, Strin
         std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?
     };
 
-    let entries = fs::read_dir(&dir_path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries =
+        fs::read_dir(&dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     let mut result = Vec::new();
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let metadata = entry.metadata().map_err(|e| format!("Failed to read metadata: {}", e))?;
+        let metadata = entry
+            .metadata()
+            .map_err(|e| format!("Failed to read metadata: {}", e))?;
         let path = entry.path();
         let name = path
             .file_name()
@@ -64,19 +66,20 @@ pub fn read_directory(path: Option<String>) -> Result<Vec<DirectoryEntry>, Strin
     }
 
     // Sort: directories first, then files, both alphabetically
-    result.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    result.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     Ok(result)
 }
 
 #[tauri::command]
-pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Result<String, String> {
+pub fn get_terminal_cwd(
+    session_id: String,
+    state: tauri::State<AppState>,
+) -> Result<String, String> {
     let state_lock = state
         .lock()
         .map_err(|e| format!("Failed to lock state: {}", e))?;
@@ -87,7 +90,9 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
         .ok_or_else(|| format!("Session not found: {}", session_id))?;
 
     // Get the PID of the child process (shell)
-    let pid = session.child.process_id()
+    let pid = session
+        .child
+        .process_id()
         .ok_or_else(|| "Failed to get process ID".to_string())?;
 
     // On Linux, use fast /proc path
@@ -107,7 +112,7 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
         system.refresh_processes_specifics(
             sysinfo::ProcessesToUpdate::Some(&[sysinfo_pid]),
             true,
-            sysinfo::ProcessRefreshKind::nothing().with_cwd(sysinfo::UpdateKind::Always),
+            sysinfo::ProcessRefreshKind::new().with_cwd(sysinfo::UpdateKind::Always),
         );
 
         system
@@ -120,15 +125,14 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
 
 #[tauri::command]
 pub fn read_file_content(path: String) -> Result<String, String> {
-    fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read file: {}", e))
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 #[tauri::command]
 pub fn read_directory_recursive(
     path: Option<String>,
     max_depth: Option<usize>,
-    max_files: Option<usize>
+    max_files: Option<usize>,
 ) -> Result<Vec<RecursiveDirectoryEntry>, String> {
     let root_path = if let Some(p) = path {
         PathBuf::from(p)
@@ -227,12 +231,10 @@ pub fn read_directory_recursive(
     }
 
     // Sort: directories first, then files, both alphabetically
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     Ok(entries)
@@ -295,7 +297,14 @@ fn get_git_diff_stats(repo_path: &PathBuf) -> Result<HashMap<String, GitStats>, 
                 None
             };
 
-            stats_map.insert(absolute_path_str, GitStats { added, deleted, status });
+            stats_map.insert(
+                absolute_path_str,
+                GitStats {
+                    added,
+                    deleted,
+                    status,
+                },
+            );
         }
     }
 
@@ -333,11 +342,14 @@ fn get_git_diff_stats(repo_path: &PathBuf) -> Result<HashMap<String, GitStats>, 
                 0
             };
 
-            stats_map.insert(absolute_path_str, GitStats {
-                added: line_count,
-                deleted: 0,
-                status: Some("untracked".to_string()),
-            });
+            stats_map.insert(
+                absolute_path_str,
+                GitStats {
+                    added: line_count,
+                    deleted: 0,
+                    status: Some("untracked".to_string()),
+                },
+            );
         }
     }
 
@@ -345,7 +357,10 @@ fn get_git_diff_stats(repo_path: &PathBuf) -> Result<HashMap<String, GitStats>, 
 }
 
 #[tauri::command]
-pub fn get_git_stats(path: Option<String>, state: tauri::State<AppState>) -> Result<HashMap<String, GitStats>, String> {
+pub fn get_git_stats(
+    path: Option<String>,
+    state: tauri::State<AppState>,
+) -> Result<HashMap<String, GitStats>, String> {
     let repo_path = if let Some(p) = path {
         PathBuf::from(p)
     } else {
@@ -353,7 +368,8 @@ pub fn get_git_stats(path: Option<String>, state: tauri::State<AppState>) -> Res
     };
 
     // Canonicalize path for consistent cache keys
-    let canonical_path = repo_path.canonicalize()
+    let canonical_path = repo_path
+        .canonicalize()
         .unwrap_or_else(|_| repo_path.clone());
 
     // Try cache first
@@ -377,7 +393,9 @@ pub fn get_git_stats(path: Option<String>, state: tauri::State<AppState>) -> Res
             .lock()
             .map_err(|e| format!("Failed to lock state: {}", e))?;
 
-        state_lock.git_cache.set(canonical_path.clone(), stats.clone());
+        state_lock
+            .git_cache
+            .set(canonical_path.clone(), stats.clone());
 
         // Try to setup watcher (best-effort, ignore errors)
         let _ = state_lock.git_cache.setup_watcher(canonical_path);
@@ -480,8 +498,7 @@ pub fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResul
 
     // Get new content from disk (current working tree)
     let new_content = if file.exists() {
-        fs::read_to_string(&file)
-            .map_err(|e| format!("Failed to read file: {}", e))?
+        fs::read_to_string(&file).map_err(|e| format!("Failed to read file: {}", e))?
     } else {
         String::new()
     };
