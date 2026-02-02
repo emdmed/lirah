@@ -107,19 +107,54 @@ pub fn get_terminal_cwd(
     // On Windows and macOS, use sysinfo crate
     #[cfg(not(target_os = "linux"))]
     {
-        let mut system = System::new();
+        let mut system = System::new_all();
         let sysinfo_pid = Pid::from_u32(pid);
-        system.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::Some(&[sysinfo_pid]),
-            true,
-            sysinfo::ProcessRefreshKind::new().with_cwd(sysinfo::UpdateKind::Always),
-        );
 
-        system
-            .process(sysinfo_pid)
-            .and_then(|p| p.cwd())
-            .map(|cwd| cwd.to_string_lossy().to_string())
-            .ok_or_else(|| format!("Failed to get cwd for process {}", pid))
+        // Refresh all processes to ensure we have complete process tree
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        eprintln!("[CWD] Looking for process {}", pid);
+
+        // Try to get CWD from the shell process itself first
+        if let Some(process) = system.process(sysinfo_pid) {
+            eprintln!("[CWD] Found process: {:?}", process.name());
+            if let Some(cwd) = process.cwd() {
+                eprintln!("[CWD] Direct CWD: {:?}", cwd);
+                return Ok(cwd.to_string_lossy().to_string());
+            } else {
+                eprintln!("[CWD] Direct CWD lookup returned None");
+            }
+        } else {
+            eprintln!("[CWD] Process {} not found in system", pid);
+        }
+
+        // If direct lookup failed, find the deepest child process (the active foreground process)
+        // This handles cases where PowerShell spawns child processes
+        fn find_deepest_child_cwd(system: &System, parent_pid: Pid, depth: usize) -> Option<String> {
+            let children: Vec<_> = system
+                .processes()
+                .values()
+                .filter(|p| p.parent() == Some(parent_pid))
+                .collect();
+
+            eprintln!("[CWD] {} Found {} children for pid {:?}", "  ".repeat(depth), children.len(), parent_pid);
+
+            // Recursively check children for CWD
+            for child in &children {
+                eprintln!("[CWD] {} Checking child: {:?} (pid {:?})", "  ".repeat(depth), child.name(), child.pid());
+                if let Some(cwd) = find_deepest_child_cwd(system, child.pid(), depth + 1) {
+                    return Some(cwd);
+                }
+            }
+
+            // No children with CWD found, try this process
+            let cwd = system.process(parent_pid)?.cwd().map(|p| p.to_string_lossy().to_string());
+            eprintln!("[CWD] {} Process {:?} cwd: {:?}", "  ".repeat(depth), parent_pid, cwd);
+            cwd
+        }
+
+        find_deepest_child_cwd(&system, sysinfo_pid, 0)
+            .ok_or_else(|| format!("Failed to get cwd for process {} or its children", pid))
     }
 }
 
