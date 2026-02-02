@@ -1,5 +1,8 @@
 import { parse } from '@babel/parser';
-import traverse from '@babel/traverse';
+import _traverse from '@babel/traverse';
+
+// Handle ESM/CJS interop for @babel/traverse
+const traverse = _traverse.default || _traverse;
 
 const BABEL_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.mts', '.cts'];
 
@@ -19,6 +22,73 @@ export const isBabelParseable = (path) => {
  */
 const isPascalCase = (name) => {
   return /^[A-Z][a-zA-Z0-9]*$/.test(name);
+};
+
+/**
+ * Check if a call expression is a React HOC pattern (forwardRef, memo, etc.)
+ * @param {object} node - CallExpression node
+ * @returns {{type: string, innerFn: object|null}|null}
+ */
+const getReactHOCInfo = (node) => {
+  if (node.type !== 'CallExpression') return null;
+
+  const callee = node.callee;
+  let hocType = null;
+
+  // React.forwardRef, React.memo, React.lazy
+  if (callee.type === 'MemberExpression' &&
+      callee.object?.name === 'React' &&
+      callee.property?.name) {
+    const method = callee.property.name;
+    if (['forwardRef', 'memo', 'lazy'].includes(method)) {
+      hocType = method;
+    }
+  }
+
+  // Direct imports: forwardRef(), memo()
+  if (callee.type === 'Identifier') {
+    const name = callee.name;
+    if (['forwardRef', 'memo', 'lazy'].includes(name)) {
+      hocType = name;
+    }
+  }
+
+  if (!hocType) return null;
+
+  // Get the inner function from the first argument
+  const firstArg = node.arguments[0];
+  let innerFn = null;
+
+  if (firstArg?.type === 'ArrowFunctionExpression' ||
+      firstArg?.type === 'FunctionExpression') {
+    innerFn = firstArg;
+  }
+
+  return { type: hocType, innerFn };
+};
+
+/**
+ * Check if a call expression is React.createContext
+ * @param {object} node - CallExpression node
+ * @returns {boolean}
+ */
+const isCreateContext = (node) => {
+  if (node.type !== 'CallExpression') return false;
+  const callee = node.callee;
+
+  // React.createContext()
+  if (callee.type === 'MemberExpression' &&
+      callee.object?.name === 'React' &&
+      callee.property?.name === 'createContext') {
+    return true;
+  }
+
+  // createContext() - direct import
+  if (callee.type === 'Identifier' && callee.name === 'createContext') {
+    return true;
+  }
+
+  return false;
 };
 
 /**
@@ -83,7 +153,7 @@ export const extractSymbols = (code, filePath = '') => {
         seenNames.add(name);
         symbols.push({
           name,
-          type: 'arrow-function',
+          type: isPascalCase(name) ? 'component' : 'arrow-function',
           line: path.node.loc?.start?.line || 0,
           endLine: init.loc?.end?.line || path.node.loc?.end?.line || 0,
         });
@@ -95,9 +165,34 @@ export const extractSymbols = (code, filePath = '') => {
         seenNames.add(name);
         symbols.push({
           name,
-          type: 'function',
+          type: isPascalCase(name) ? 'component' : 'function',
           line: path.node.loc?.start?.line || 0,
           endLine: init.loc?.end?.line || path.node.loc?.end?.line || 0,
+        });
+        return;
+      }
+
+      // React HOC patterns: React.forwardRef, React.memo, etc.
+      const hocInfo = getReactHOCInfo(init);
+      if (hocInfo) {
+        seenNames.add(name);
+        symbols.push({
+          name,
+          type: `component (${hocInfo.type})`,
+          line: path.node.loc?.start?.line || 0,
+          endLine: init.loc?.end?.line || path.node.loc?.end?.line || 0,
+        });
+        return;
+      }
+
+      // React.createContext
+      if (isCreateContext(init)) {
+        seenNames.add(name);
+        symbols.push({
+          name,
+          type: 'context',
+          line: path.node.loc?.start?.line || 0,
+          endLine: path.node.loc?.end?.line || 0,
         });
         return;
       }
@@ -314,6 +409,7 @@ export const extractSignatures = (code, filePath = '') => {
       const init = path.node.init;
       if (!init) return;
 
+      // Plain arrow function or function expression
       if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') {
         seenNames.add(name);
         const params = getParamsString(init.params);
@@ -323,6 +419,33 @@ export const extractSignatures = (code, filePath = '') => {
         signatures.push({
           name,
           signature: `${async}const ${name} = (${params})${returnType} => ...`,
+          line: path.node.loc?.start?.line || 0,
+        });
+        return;
+      }
+
+      // React HOC patterns: forwardRef, memo, etc.
+      const hocInfo = getReactHOCInfo(init);
+      if (hocInfo) {
+        seenNames.add(name);
+        let params = '?';
+        if (hocInfo.innerFn) {
+          params = getParamsString(hocInfo.innerFn.params);
+        }
+        signatures.push({
+          name,
+          signature: `const ${name} = ${hocInfo.type}((${params}) => ...)`,
+          line: path.node.loc?.start?.line || 0,
+        });
+        return;
+      }
+
+      // React.createContext
+      if (isCreateContext(init)) {
+        seenNames.add(name);
+        signatures.push({
+          name,
+          signature: `const ${name} = createContext(...)`,
           line: path.node.loc?.start?.line || 0,
         });
       }
@@ -433,15 +556,32 @@ export const extractSkeleton = (code, filePath = '') => {
       const init = path.node.init;
       if (!name || !init) return;
 
+      // Plain arrow function or function expression
       if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') {
         if (isPascalCase(name)) {
           skeleton.components.push({ name, line: path.node.loc?.start?.line || 0 });
         } else {
           skeleton.functions.push({ name, line: path.node.loc?.start?.line || 0 });
         }
-      } else {
-        skeleton.constants++;
+        return;
       }
+
+      // React HOC patterns: forwardRef, memo, etc.
+      const hocInfo = getReactHOCInfo(init);
+      if (hocInfo) {
+        skeleton.components.push({ name, line: path.node.loc?.start?.line || 0, hoc: hocInfo.type });
+        return;
+      }
+
+      // React.createContext
+      if (isCreateContext(init)) {
+        skeleton.contexts = skeleton.contexts || [];
+        skeleton.contexts.push({ name, line: path.node.loc?.start?.line || 0 });
+        return;
+      }
+
+      // Other constants
+      skeleton.constants++;
     },
 
     CallExpression(path) {
@@ -515,9 +655,18 @@ export const formatSkeletonForPrompt = (skeleton) => {
     lines.push(`    Exports: ${exportNames}`);
   }
 
-  // Components
+  // Components (including HOC-wrapped)
   if (skeleton.components.length > 0) {
-    lines.push(`    Components: ${skeleton.components.map(c => `${c.name}:${c.line}`).join(', ')}`);
+    const componentList = skeleton.components.map(c => {
+      const hocSuffix = c.hoc ? ` (${c.hoc})` : '';
+      return `${c.name}${hocSuffix}:${c.line}`;
+    }).join(', ');
+    lines.push(`    Components: ${componentList}`);
+  }
+
+  // Contexts
+  if (skeleton.contexts?.length > 0) {
+    lines.push(`    Contexts: ${skeleton.contexts.map(c => `${c.name}:${c.line}`).join(', ')}`);
   }
 
   // Functions
