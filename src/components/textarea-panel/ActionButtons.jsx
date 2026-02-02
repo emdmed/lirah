@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "../ui/button";
 import { Send, Coins } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 const formatTokenCount = (count) => {
   if (count >= 1000000) {
@@ -21,16 +22,40 @@ const formatTokenCount = (count) => {
 export function ActionButtons({ onSend, disabled, tokenUsage }) {
   const hasTokens = tokenUsage && (tokenUsage.input_tokens > 0 || tokenUsage.output_tokens > 0);
   const totalTokens = hasTokens
-    ? tokenUsage.input_tokens + tokenUsage.cache_read_input_tokens + tokenUsage.cache_creation_input_tokens + tokenUsage.output_tokens
+    ? tokenUsage.input_tokens + tokenUsage.output_tokens
     : 0;
 
   return (
     <div className="flex items-center gap-3">
       {hasTokens && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-          <Coins className="w-3 h-3" />
-          <span>{formatTokenCount(totalTokens)} tokens</span>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono hover:text-foreground transition-colors cursor-default">
+              <Coins className="w-3 h-3" />
+              <span>{formatTokenCount(totalTokens)} tokens</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={8}>
+            <div className="text-xs space-y-0.5 font-mono">
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Input</span>
+                <span>{tokenUsage.input_tokens.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Output</span>
+                <span>{tokenUsage.output_tokens.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Cache read</span>
+                <span>{tokenUsage.cache_read_input_tokens.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Cache write</span>
+                <span>{tokenUsage.cache_creation_input_tokens.toLocaleString()}</span>
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )}
       <Button
         size="sm"
