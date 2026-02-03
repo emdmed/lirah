@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:build": "tauri build",
+    "tauri:build": "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 tauri build",
     "benchmark:tokens": "node scripts/benchmark-tokens.js"
   },
   "dependencies": {

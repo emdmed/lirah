@@ -95,6 +95,23 @@ curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.s
 - [Rust](https://rustup.rs/) (latest stable)
 - [Node.js](https://nodejs.org/) (v18+)
 - Your preferred CLI agent (Claude Code, opencode, etc.)
+- System libraries: `libcairo2-dev` `pkg-config`
+
+**Linux Users:**
+```bash
+# Install dependencies automatically
+./scripts/install-deps.sh
+
+# Or install manually:
+# Ubuntu/Debian
+sudo apt install libcairo2-dev pkg-config
+
+# Fedora/CentOS
+sudo dnf install cairo-devel pkg-config
+
+# Arch Linux
+sudo pacman -S cairo pkgconf
+```
 
 ```bash
 git clone https://github.com/emdmed/lirah.git
