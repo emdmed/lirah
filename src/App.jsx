@@ -21,13 +21,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
-import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
+import { useTextareaShortcuts, saveLastPrompt } from "./hooks/useTextareaShortcuts";
 import { useFileSearch } from "./hooks/useFileSearch";
 import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
 import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { useFileSymbols } from "./hooks/file-analysis/useFileSymbols";
 import { useTokenUsage } from "./hooks/useTokenUsage";
+import { useProjectCompact, estimateTokens, formatTokenCount } from "./hooks/useProjectCompact";
+import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarFileSelection, LARGE_FILE_INSTRUCTION } from "./components/sidebar/SidebarFileSelection";
 import {
@@ -94,6 +96,9 @@ function App() {
   // Token usage tracking
   const tokenUsage = useTokenUsage(currentPath, !!currentPath);
 
+  // Project compacting hook
+  const { isCompacting, progress: compactProgress, compactProject } = useProjectCompact();
+
   // Tree view state
   const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'tree'
   const [treeData, setTreeData] = useState([]);
@@ -153,6 +158,10 @@ function App() {
     }
   });
   const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
+
+  // Compact project confirmation state
+  const [compactConfirmOpen, setCompactConfirmOpen] = useState(false);
+  const [pendingCompactResult, setPendingCompactResult] = useState(null);
 
   // Load keepFilesAfterSend from localStorage on mount
   useEffect(() => {
@@ -427,6 +436,74 @@ function App() {
 
   const handleSaveFileGroup = useCallback(() => {
     setSaveFileGroupDialogOpen(true);
+  }, []);
+
+  // Compact project handler
+  const handleCompactProject = useCallback(async () => {
+    if (isCompacting || !currentPath) return;
+
+    try {
+      // Use existing allFiles state if available, otherwise fetch
+      let files = allFiles;
+      if (!files || files.length === 0) {
+        files = await invoke('read_directory_recursive', {
+          path: currentPath,
+          maxDepth: 10,
+          maxFiles: 10000
+        });
+      }
+
+      const result = await compactProject(currentPath, files);
+
+      // null means no parseable files found (handled by button UI)
+      if (!result) {
+        return;
+      }
+
+      const { output, originalSize } = result;
+
+      // Calculate token estimates (~4 chars per token)
+      const compactedTokens = estimateTokens(output);
+      const originalTokens = Math.ceil(originalSize / 4);
+      const fileCountMatch = output.match(/# Files: (\d+)/);
+      const fileCount = fileCountMatch ? parseInt(fileCountMatch[1], 10) : 0;
+
+      // Calculate compression percentage
+      const compressionPercent = originalSize > 0
+        ? Math.round((1 - output.length / originalSize) * 100)
+        : 0;
+
+      // Store result and show confirmation dialog
+      setPendingCompactResult({
+        output,
+        tokenEstimate: compactedTokens,
+        formattedTokens: formatTokenCount(compactedTokens),
+        originalTokens,
+        formattedOriginalTokens: formatTokenCount(originalTokens),
+        fileCount,
+        compressionPercent,
+      });
+      setCompactConfirmOpen(true);
+    } catch (error) {
+      console.error('Failed to compact project:', error);
+    }
+  }, [isCompacting, currentPath, allFiles, compactProject]);
+
+  // Confirm compact insertion
+  const handleConfirmCompact = useCallback(() => {
+    if (pendingCompactResult?.output) {
+      setTextareaContent(prev => {
+        const separator = prev.trim() ? '\n\n' : '';
+        return pendingCompactResult.output + separator + prev;
+      });
+      setTextareaVisible(true);
+    }
+    setPendingCompactResult(null);
+  }, [pendingCompactResult]);
+
+  // Cancel compact insertion
+  const handleCancelCompact = useCallback(() => {
+    setPendingCompactResult(null);
   }, []);
 
   // Get files data for saving to group
@@ -718,6 +795,9 @@ function App() {
         terminalRef.current.focus();
       }
 
+      // Save prompt before clearing (for Ctrl+Z restore)
+      saveLastPrompt(textareaContent);
+
       // Clear textarea content (always)
       setTextareaContent('');
 
@@ -751,6 +831,7 @@ function App() {
     onToggleOrchestration: setAppendOrchestration,
     selectedTemplateId,
     onSelectTemplate: setSelectedTemplateId,
+    onRestoreLastPrompt: setTextareaContent,
   });
 
   // Help keyboard shortcut
@@ -888,13 +969,19 @@ function App() {
         searchInputRef.current?.focus();
       }
 
+      // Ctrl+Shift+P to compact whole project
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        handleCompactProject();
+      }
+
       // Note: Ctrl+G is handled in the terminal component's keyboard handler
       // to work both when terminal is focused and when sidebar is focused
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, sidebarOpen]);
+  }, [viewMode, sidebarOpen, handleCompactProject]);
 
   const escapeShellPath = (path) => {
     // Single quotes preserve all special characters except single quote itself
@@ -1231,6 +1318,9 @@ function App() {
               projectPath={currentPath}
               onLoadGroup={handleLoadFileGroup}
               onSaveGroup={handleSaveFileGroup}
+              onCompactProject={handleCompactProject}
+              isCompacting={isCompacting}
+              compactProgress={compactProgress}
             />
           )
         }
@@ -1298,6 +1388,18 @@ function App() {
       <KeyboardShortcutsDialog
         open={showHelp}
         onOpenChange={setShowHelp}
+      />
+      <CompactConfirmDialog
+        open={compactConfirmOpen}
+        onOpenChange={setCompactConfirmOpen}
+        fileCount={pendingCompactResult?.fileCount || 0}
+        tokenEstimate={pendingCompactResult?.tokenEstimate || 0}
+        formattedTokens={pendingCompactResult?.formattedTokens || '0'}
+        originalTokens={pendingCompactResult?.originalTokens || 0}
+        formattedOriginalTokens={pendingCompactResult?.formattedOriginalTokens || '0'}
+        compressionPercent={pendingCompactResult?.compressionPercent || 0}
+        onConfirm={handleConfirmCompact}
+        onCancel={handleCancelCompact}
       />
     </SidebarProvider>
   );

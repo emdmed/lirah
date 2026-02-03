@@ -76,6 +76,8 @@ await listen('terminal-output', ({ payload }) => terminal.write(payload.data));
 | Ctrl+P | Open Projects Palette |
 | Ctrl+T | Focus Textarea Panel |
 | Ctrl+Enter | Send Textarea Content |
+| Ctrl+Shift+Z | Restore Last Prompt (when textarea empty) |
+| Ctrl+Shift+P | Compact Whole Project |
 | Ctrl+Ctrl | Toggle Orchestration Mode (double-tap) |
 | Alt+Alt | Open Template Selector / Clear Template (double-tap) |
 | Ctrl+F | Focus File Search |

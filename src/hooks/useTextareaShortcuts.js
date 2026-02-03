@@ -1,5 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 
+const LAST_PROMPT_KEY = 'nevo-terminal:last-prompt';
+
+/**
+ * Save prompt to localStorage before clearing
+ * @param {string} prompt - The prompt content to save
+ */
+export const saveLastPrompt = (prompt) => {
+  if (!prompt?.trim()) return;
+  try {
+    localStorage.setItem(LAST_PROMPT_KEY, prompt);
+  } catch (error) {
+    console.warn('Failed to save last prompt:', error);
+  }
+};
+
+/**
+ * Restore last prompt from localStorage
+ * @returns {string|null} - The last saved prompt or null
+ */
+export const getLastPrompt = () => {
+  try {
+    return localStorage.getItem(LAST_PROMPT_KEY);
+  } catch (error) {
+    console.warn('Failed to get last prompt:', error);
+    return null;
+  }
+};
+
 export function useTextareaShortcuts({
   textareaVisible,
   setTextareaVisible,
@@ -8,6 +36,7 @@ export function useTextareaShortcuts({
   onToggleOrchestration,
   selectedTemplateId,
   onSelectTemplate,
+  onRestoreLastPrompt,
 }) {
   // Track last Ctrl keydown timestamp for double-tap detection
   const lastCtrlDownRef = useRef(0);
@@ -80,12 +109,29 @@ export function useTextareaShortcuts({
         }
         return;
       }
+
+      // Ctrl+Shift+Z: Restore last prompt (only when textarea is focused and empty)
+      if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
+        if (document.activeElement === textareaRef.current) {
+          const textarea = textareaRef.current;
+          // Only restore if textarea is empty (don't interfere with normal undo)
+          if (!textarea.value?.trim()) {
+            const lastPrompt = getLastPrompt();
+            if (lastPrompt) {
+              e.preventDefault();
+              e.stopPropagation();
+              onRestoreLastPrompt?.(lastPrompt);
+            }
+          }
+        }
+        return;
+      }
     };
 
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration, selectedTemplateId, onSelectTemplate]);
+  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt]);
 
   return { templateDropdownOpen, setTemplateDropdownOpen };
 }

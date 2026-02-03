@@ -15,6 +15,8 @@ const shortcuts = [
     items: [
       { keys: ["Ctrl", "T"], description: "Focus Textarea" },
       { keys: ["Ctrl", "Enter"], description: "Send Textarea Content" },
+      { keys: ["Ctrl", "Shift", "Z"], description: "Restore Last Prompt", note: "when empty" },
+      { keys: ["Ctrl", "Shift", "P"], description: "Compact Whole Project" },
       { keys: ["Ctrl", "Ctrl"], description: "Toggle Orchestration Mode", note: "double-tap" },
       { keys: ["Alt", "Alt"], description: "Open Template Selector / Clear Template", note: "double-tap" },
     ],

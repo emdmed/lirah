@@ -4,6 +4,7 @@ import { Checkbox } from "../ui/checkbox";
 import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
+import { CompactProjectButton } from "./CompactProjectButton";
 
 /**
  * Main textarea panel component for multi-line input with file selection
@@ -31,6 +32,9 @@ export function TextareaPanel({
   projectPath,
   onLoadGroup,
   onSaveGroup,
+  onCompactProject,
+  isCompacting,
+  compactProgress,
 }) {
 
   const handleKeyDown = (e) => {
@@ -87,6 +91,12 @@ export function TextareaPanel({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <CompactProjectButton
+            onClick={onCompactProject}
+            isCompacting={isCompacting}
+            progress={compactProgress}
+            disabled={disabled}
+          />
           <FileGroupsDropdown
             projectPath={projectPath}
             onLoadGroup={onLoadGroup}
