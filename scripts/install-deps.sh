@@ -48,7 +48,7 @@ is_package_installed() {
     
     case $pkg_manager in
         "apt")
-            dpkg -l | grep -q "^ii.*$pkg"
+            dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "^install ok installed$"
             ;;
         "dnf"|"yum")
             rpm -q "$pkg" &> /dev/null
@@ -57,7 +57,7 @@ is_package_installed() {
             pacman -Q "$pkg" &> /dev/null
             ;;
         "zypper")
-            zypper search -i "$pkg" &> /dev/null
+            rpm -q "$pkg" &> /dev/null
             ;;
         *)
             return 1
@@ -100,7 +100,7 @@ install_packages() {
         *)
             print_error "Unsupported package manager. Please install manually:"
             echo "  - libcairo2-dev (Ubuntu/Debian) or cairo-devel (Fedora/CentOS) or cairo (Arch)"
-            echo "  - pkg-config (Ubuntu/Debian) or pkgconf (Arch)"
+            echo "  - pkg-config (Ubuntu/Debian) or pkgconfig (Fedora/CentOS) or pkgconf (Arch)"
             exit 1
             ;;
     esac

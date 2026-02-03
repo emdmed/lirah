@@ -6,6 +6,49 @@ Built with **Tauri 2** | **React 19** | **xterm.js** | **TypeScript**
 
 **Tested with**: Claude Code, opencode, and other CLI agents
 
+## Installation
+
+### Quick Install (Ubuntu/Debian)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | sh
+```
+
+**Note**: This installer works on Ubuntu, Debian, and most Debian-based distributions. It does not work on Arch Linux or Arch-based distros.
+
+### Build from Source
+
+**Prerequisites:**
+- [Rust](https://rustup.rs/) (latest stable)
+- [Node.js](https://nodejs.org/) (v18+)
+- Your preferred CLI agent (Claude Code, opencode, etc.)
+- System libraries: `libcairo2-dev` `pkg-config`
+
+**Linux Users:**
+```bash
+# Install dependencies automatically
+./scripts/install-deps.sh
+
+# Or install manually:
+# Ubuntu/Debian
+sudo apt install libcairo2-dev pkg-config
+
+# Fedora/CentOS
+sudo dnf install cairo-devel pkgconfig
+
+# Arch Linux
+sudo pacman -S cairo pkgconf
+```
+
+```bash
+git clone https://github.com/emdmed/lirah.git
+cd lirah
+npm install
+npm run tauri:build
+```
+
+The built application will be in `src-tauri/target/release/`.
+
 ## Why Lirah?
 
 | | |
@@ -78,49 +121,6 @@ Ships with [claude-orchestration](https://github.com/anthropics/claude-orchestra
 | Pull Request | PR preparation |
 | Documentation | Docs generation |
 | React | React-specific variants |
-
-## Installation
-
-### Quick Install (Ubuntu/Debian)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | sh
-```
-
-**Note**: This installer works on Ubuntu, Debian, and most Debian-based distributions. It does not work on Arch Linux or Arch-based distros.
-
-### Build from Source
-
-**Prerequisites:**
-- [Rust](https://rustup.rs/) (latest stable)
-- [Node.js](https://nodejs.org/) (v18+)
-- Your preferred CLI agent (Claude Code, opencode, etc.)
-- System libraries: `libcairo2-dev` `pkg-config`
-
-**Linux Users:**
-```bash
-# Install dependencies automatically
-./scripts/install-deps.sh
-
-# Or install manually:
-# Ubuntu/Debian
-sudo apt install libcairo2-dev pkg-config
-
-# Fedora/CentOS
-sudo dnf install cairo-devel pkg-config
-
-# Arch Linux
-sudo pacman -S cairo pkgconf
-```
-
-```bash
-git clone https://github.com/emdmed/lirah.git
-cd lirah
-npm install
-npm run tauri:build
-```
-
-The built application will be in `src-tauri/target/release/`.
 
 ## Development
 
