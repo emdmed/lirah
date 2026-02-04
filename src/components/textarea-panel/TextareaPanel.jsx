@@ -1,10 +1,12 @@
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import { Textarea } from "../ui/textarea";
 import { Checkbox } from "../ui/checkbox";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 import { CompactProjectButton } from "./CompactProjectButton";
+import { X } from "lucide-react";
 
 /**
  * Main textarea panel component for multi-line input with file selection
@@ -35,7 +37,56 @@ export function TextareaPanel({
   onCompactProject,
   isCompacting,
   compactProgress,
+  selectedElements,
+  onClearElements,
 }) {
+  // Get relative path helper
+  const getRelativePath = (filePath) => {
+    if (!filePath || !currentPath) return filePath || '';
+    const normalizedCwd = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
+    if (filePath.startsWith(normalizedCwd + '/')) {
+      return filePath.slice(normalizedCwd.length + 1);
+    }
+    return filePath;
+  };
+
+  // Count total selected elements and build tooltip content
+  const { elementCount, elementsTooltipContent } = useMemo(() => {
+    if (!selectedElements || selectedElements.size === 0) {
+      return { elementCount: 0, elementsTooltipContent: null };
+    }
+    let count = 0;
+    const fileEntries = [];
+    selectedElements.forEach((elements, filePath) => {
+      count += elements.length;
+      const relativePath = getRelativePath(filePath);
+      fileEntries.push({ path: relativePath, elements });
+    });
+
+    const content = (
+      <div className="flex flex-col gap-2">
+        {fileEntries.map(({ path, elements }) => (
+          <div key={path}>
+            <div className="text-blue-400 font-medium mb-1">{path}</div>
+            <div className="flex flex-col gap-0.5 pl-2 border-l border-blue-500/30">
+              {elements.map(el => {
+                const lineInfo = el.line === el.endLine ? `L${el.line}` : `L${el.line}-${el.endLine}`;
+                return (
+                  <div key={el.key} className="flex items-center gap-2">
+                    <span className="text-foreground">{el.displayName}</span>
+                    <span className="text-muted-foreground text-[10px]">{el.type}</span>
+                    <span className="text-muted-foreground text-[10px] ml-auto">{lineInfo}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+
+    return { elementCount: count, elementsTooltipContent: content };
+  }, [selectedElements, currentPath]);
 
   const handleKeyDown = (e) => {
     // Enter creates new lines (default behavior)
@@ -113,6 +164,34 @@ export function TextareaPanel({
         </div>
       </div>
 
+      {/* Selected elements indicator */}
+      {elementCount > 0 && (
+        <div className="flex items-center gap-2 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-xs">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 cursor-default">
+                <span className="text-blue-400 font-medium">
+                  {elementCount} element{elementCount !== 1 ? 's' : ''} selected
+                </span>
+                <span className="text-muted-foreground">
+                  from {selectedElements.size} file{selectedElements.size !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-md text-left p-3">
+              {elementsTooltipContent}
+            </TooltipContent>
+          </Tooltip>
+          <button
+            onClick={onClearElements}
+            className="ml-auto p-0.5 hover:bg-white/10 rounded"
+            title="Clear selected elements"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
       {/* Main content area */}
       <div className="min-h-[120px] max-h-[300px]">
         <Textarea
@@ -139,7 +218,7 @@ export function TextareaPanel({
         </span>
         <ActionButtons
           onSend={handleSend}
-          disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId)}
+          disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0)}
           tokenUsage={tokenUsage}
         />
       </div>

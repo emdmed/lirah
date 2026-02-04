@@ -19,7 +19,7 @@ export function FolderNode({ node, depth, isExpanded, isCurrentPath, onToggle })
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
       className={`p-0 cursor-pointer h-4 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
     >
-      <div className="flex items-center w-full gap-0.5">
+      <div className="flex items-center w-full">
         <div className="w-2.5 flex items-center">
           {isExpanded ? (
             <ChevronDown className="w-2.5 h-2.5" />
@@ -28,7 +28,7 @@ export function FolderNode({ node, depth, isExpanded, isCurrentPath, onToggle })
           )}
         </div>
         <Folder className="w-2.5 h-2.5 text-folder" />
-        <span className="truncate" title={node.name}>{node.name}</span>
+        <span className="truncate pl-px" title={node.name}>{node.name}</span>
       </div>
     </SidebarMenuButton>
   );

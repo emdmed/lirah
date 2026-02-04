@@ -1,5 +1,5 @@
 import React from "react";
-import { File, FileX, GitBranch, Search } from "lucide-react";
+import { GitBranch, Search } from "lucide-react";
 import { GitStatsBadge } from "./GitStatsBadge";
 import { INDENT_PX } from "./constants";
 import { isBabelParseable } from "@/utils/babelSymbolParser";
@@ -39,43 +39,14 @@ export function FileNode({
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`flex h-4 items-center justify-between w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${
+      className={`flex h-4 items-center justify-between w-full ${isCurrentPath ? 'bg-accent' : ''} ${
         isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
       } ${isDeleted ? 'opacity-60' : ''}`}
     >
-      {/* Main file display */}
-      <div
-        className={`flex items-center justify-start min-w-0 gap-0.5 flex-1 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
-        onClick={handleFileClick}
-      >
-        {/* Git diff button inline */}
-        {hasGitChanges && !isDeleted && (
-          <button
-            className="p-0.5 transition-opacity duration-200 rounded opacity-60 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDiff?.(node.path);
-            }}
-            title="View git diff"
-          >
-            <GitBranch className="w-2.5 h-2.5" />
-          </button>
-        )}
-        {isDeleted ? (
-          <FileX className="w-2.5 h-2.5 flex-shrink-0 text-git-deleted" />
-        ) : (
-          <File className={`w-2.5 h-2.5 flex-shrink-0 ${isUntracked ? 'text-git-added' : ''}`} />
-        )}
-        <span className={`truncate text-[11px] leading-none ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`}>{node.name}</span>
-
-        {/* Git stats badge */}
-        {hasGitChanges && <GitStatsBadge stats={stats} />}
-      </div>
-
       {/* Element picker button - only for parseable files in Claude mode */}
       {isTextareaPanelOpen && isParseable && !isDeleted && (
         <button
-          className="p-0.5 transition-opacity duration-200 rounded opacity-40 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
+          className="p-0 mr-1 transition-opacity duration-200 rounded opacity-40 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onOpenElementPicker?.(node.path);
@@ -85,6 +56,30 @@ export function FileNode({
           <Search className="w-2.5 h-2.5" />
         </button>
       )}
+
+      {/* Main file display */}
+      <div
+        className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
+        onClick={handleFileClick}
+      >
+        {/* Git diff button inline */}
+        {hasGitChanges && !isDeleted && (
+          <button
+            className="p-0 transition-opacity duration-200 rounded opacity-60 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDiff?.(node.path);
+            }}
+            title="View git diff"
+          >
+            <GitBranch className="w-2.5 h-2.5" />
+          </button>
+        )}
+        <span className={`truncate text-[11px] leading-none ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`}>{node.name}</span>
+
+        {/* Git stats badge */}
+        {hasGitChanges && <GitStatsBadge stats={stats} />}
+      </div>
     </div>
   );
 }

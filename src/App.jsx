@@ -1375,6 +1375,8 @@ function App() {
               onCompactProject={handleCompactProject}
               isCompacting={isCompacting}
               compactProgress={compactProgress}
+              selectedElements={selectedElements}
+              onClearElements={clearSelectedElements}
             />
           )
         }
