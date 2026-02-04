@@ -163,6 +163,7 @@ function App() {
   // Compact project confirmation state
   const [compactConfirmOpen, setCompactConfirmOpen] = useState(false);
   const [pendingCompactResult, setPendingCompactResult] = useState(null);
+  const [compactedProject, setCompactedProject] = useState(null);
 
   // Element picker state
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
@@ -498,9 +499,14 @@ function App() {
   // Confirm compact insertion
   const handleConfirmCompact = useCallback(() => {
     if (pendingCompactResult?.output) {
-      setTextareaContent(prev => {
-        const separator = prev.trim() ? '\n\n' : '';
-        return pendingCompactResult.output + separator + prev;
+      setCompactedProject({
+        output: pendingCompactResult.output,
+        fileCount: pendingCompactResult.fileCount,
+        tokenEstimate: pendingCompactResult.tokenEstimate,
+        formattedTokens: pendingCompactResult.formattedTokens,
+        originalTokens: pendingCompactResult.originalTokens,
+        formattedOriginalTokens: pendingCompactResult.formattedOriginalTokens,
+        compressionPercent: pendingCompactResult.compressionPercent,
       });
       setTextareaVisible(true);
     }
@@ -510,6 +516,7 @@ function App() {
   // Cancel compact insertion
   const handleCancelCompact = useCallback(() => {
     setPendingCompactResult(null);
+    setCompactedProject(null);
   }, []);
 
   // Element picker handlers
@@ -701,16 +708,26 @@ function App() {
     const hasFiles = selectedFiles.size > 0;
     const hasTemplate = !!selectedTemplateId;
     const hasElements = selectedElements.size > 0;
+    const hasCompactedProject = !!compactedProject?.output;
 
-    if (!hasTextContent && !hasFiles && !hasTemplate && !hasElements) {
+    if (!hasTextContent && !hasFiles && !hasTemplate && !hasElements && !hasCompactedProject) {
       return;
     }
 
     try {
       let fullCommand = '';
 
+      // Add compacted project at the beginning if it exists
+      if (hasCompactedProject) {
+        fullCommand = compactedProject.output;
+      }
+
       if (hasTextContent) {
-        fullCommand = textareaContent;
+        if (fullCommand) {
+          fullCommand += '\n\n' + textareaContent;
+        } else {
+          fullCommand = textareaContent;
+        }
       }
 
       if (hasFiles) {
@@ -858,10 +875,13 @@ function App() {
         clearFileSelection();
         clearSelectedElements();
       }
+
+      // Clear compacted project after sending
+      setCompactedProject(null);
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -1375,6 +1395,8 @@ function App() {
               onCompactProject={handleCompactProject}
               isCompacting={isCompacting}
               compactProgress={compactProgress}
+              compactedProject={compactedProject}
+              onClearCompactedProject={() => setCompactedProject(null)}
               selectedElements={selectedElements}
               onClearElements={clearSelectedElements}
             />

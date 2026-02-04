@@ -88,7 +88,7 @@ export function CompactConfirmDialog({
             Cancel
           </Button>
           <Button onClick={handleConfirm}>
-            Add to Textarea
+            Confirm
           </Button>
         </DialogFooter>
       </DialogContent>

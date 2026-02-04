@@ -37,6 +37,8 @@ export function TextareaPanel({
   onCompactProject,
   isCompacting,
   compactProgress,
+  compactedProject,
+  onClearCompactedProject,
   selectedElements,
   onClearElements,
 }) {
@@ -186,6 +188,39 @@ export function TextareaPanel({
             onClick={onClearElements}
             className="ml-auto p-0.5 hover:bg-white/10 rounded"
             title="Clear selected elements"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Compacted project indicator */}
+      {compactedProject && (
+        <div className="flex items-center gap-2 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded text-xs">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 cursor-default">
+                <span className="text-green-400 font-medium">
+                  Project compacted
+                </span>
+                <span className="text-muted-foreground">
+                  {compactedProject.fileCount} files ~{compactedProject.formattedTokens} tokens
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-md text-left p-3">
+              <div className="space-y-1">
+                <div>Compacted project will be appended to the prompt when sent to terminal</div>
+                <div className="text-muted-foreground text-xs">
+                  {compactedProject.compressionPercent}% compression ({compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens)
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+          <button
+            onClick={onClearCompactedProject}
+            className="ml-auto p-0.5 hover:bg-white/10 rounded"
+            title="Clear compacted project"
           >
             <X className="w-3 h-3" />
           </button>
