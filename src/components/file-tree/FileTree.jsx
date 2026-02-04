@@ -26,7 +26,8 @@ export function FileTree({
   successfulChecks,
   onCheckFileTypes,
   fileWatchingEnabled,
-  onGitChanges
+  onGitChanges,
+  onOpenElementPicker,
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
@@ -68,6 +69,7 @@ export function FileTree({
           checkingFiles={checkingFiles}
           successfulChecks={successfulChecks}
           onCheckFileTypes={onCheckFileTypes}
+          onOpenElementPicker={onOpenElementPicker}
         />
       ))}
     </SidebarMenu>

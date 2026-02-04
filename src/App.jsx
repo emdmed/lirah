@@ -30,6 +30,7 @@ import { useFileSymbols } from "./hooks/file-analysis/useFileSymbols";
 import { useTokenUsage } from "./hooks/useTokenUsage";
 import { useProjectCompact, estimateTokens, formatTokenCount } from "./hooks/useProjectCompact";
 import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
+import { ElementPickerDialog } from "./components/ElementPickerDialog";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarFileSelection, LARGE_FILE_INSTRUCTION } from "./components/sidebar/SidebarFileSelection";
 import {
@@ -162,6 +163,11 @@ function App() {
   // Compact project confirmation state
   const [compactConfirmOpen, setCompactConfirmOpen] = useState(false);
   const [pendingCompactResult, setPendingCompactResult] = useState(null);
+
+  // Element picker state
+  const [elementPickerOpen, setElementPickerOpen] = useState(false);
+  const [elementPickerFilePath, setElementPickerFilePath] = useState(null);
+  const [selectedElements, setSelectedElements] = useState(new Map()); // Map<filePath, element[]>
 
   // Load keepFilesAfterSend from localStorage on mount
   useEffect(() => {
@@ -506,6 +512,28 @@ function App() {
     setPendingCompactResult(null);
   }, []);
 
+  // Element picker handlers
+  const handleOpenElementPicker = useCallback((filePath) => {
+    setElementPickerFilePath(filePath);
+    setElementPickerOpen(true);
+  }, []);
+
+  const handleAddElements = useCallback((filePath, elements) => {
+    setSelectedElements(prev => {
+      const next = new Map(prev);
+      const existing = next.get(filePath) || [];
+      // Merge with existing, avoiding duplicates by key
+      const existingKeys = new Set(existing.map(e => e.key));
+      const newElements = elements.filter(e => !existingKeys.has(e.key));
+      next.set(filePath, [...existing, ...newElements]);
+      return next;
+    });
+  }, []);
+
+  const clearSelectedElements = useCallback(() => {
+    setSelectedElements(new Map());
+  }, []);
+
   // Get files data for saving to group
   const getFilesForGroup = useCallback(() => {
     return Array.from(selectedFiles).map(absolutePath => ({
@@ -672,8 +700,9 @@ function App() {
     const hasTextContent = textareaContent?.trim();
     const hasFiles = selectedFiles.size > 0;
     const hasTemplate = !!selectedTemplateId;
+    const hasElements = selectedElements.size > 0;
 
-    if (!hasTextContent && !hasFiles && !hasTemplate) {
+    if (!hasTextContent && !hasFiles && !hasTemplate && !hasElements) {
       return;
     }
 
@@ -755,6 +784,29 @@ function App() {
         }
       }
 
+      // Add selected elements from element picker
+      if (hasElements) {
+        const elementsOutput = [];
+        selectedElements.forEach((elements, filePath) => {
+          if (elements.length === 0) return;
+          const relativePath = getRelativePath(filePath, currentPath);
+          const escapedPath = escapeShellPath(relativePath);
+          const elementLines = elements.map(el => {
+            const lineInfo = el.line === el.endLine
+              ? `line ${el.line}`
+              : `lines ${el.line}-${el.endLine}`;
+            return `  - ${el.displayName} (${el.type}): ${lineInfo}`;
+          });
+          elementsOutput.push(`ELEMENTS from ${escapedPath}:\n${elementLines.join('\n')}`);
+        });
+
+        if (elementsOutput.length > 0) {
+          const elementsString = elementsOutput.join('\n\n');
+          const separator = fullCommand.trim() ? '\n\n' : '';
+          fullCommand = fullCommand + separator + elementsString;
+        }
+      }
+
       // Append selected template content if any
       if (selectedTemplateId) {
         const template = getTemplateById(selectedTemplateId);
@@ -804,11 +856,12 @@ function App() {
       // Clear file selection only if persistence is disabled
       if (!keepFilesAfterSend) {
         clearFileSelection();
+        clearSelectedElements();
       }
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements]);
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -1258,6 +1311,7 @@ function App() {
                             onCheckFileTypes={checkFileTypes}
                             fileWatchingEnabled={fileWatchingEnabled}
                             onGitChanges={handleGitChanges}
+                            onOpenElementPicker={handleOpenElementPicker}
                           />
                         )
                       )}
@@ -1400,6 +1454,13 @@ function App() {
         compressionPercent={pendingCompactResult?.compressionPercent || 0}
         onConfirm={handleConfirmCompact}
         onCancel={handleCancelCompact}
+      />
+      <ElementPickerDialog
+        open={elementPickerOpen}
+        onOpenChange={setElementPickerOpen}
+        filePath={elementPickerFilePath}
+        currentPath={currentPath}
+        onAddElements={handleAddElements}
       />
     </SidebarProvider>
   );

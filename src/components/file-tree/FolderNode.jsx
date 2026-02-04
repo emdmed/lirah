@@ -17,17 +17,17 @@ export function FolderNode({ node, depth, isExpanded, isCurrentPath, onToggle })
       size="sm"
       onClick={() => onToggle(node.path)}
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`p-0 cursor-pointer h-5 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
+      className={`p-0 cursor-pointer h-4 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
     >
-      <div className="flex items-center w-full">
-        <div className="w-3 flex items-center">
+      <div className="flex items-center w-full gap-0.5">
+        <div className="w-2.5 flex items-center">
           {isExpanded ? (
-            <ChevronDown className="w-3 h-3" />
+            <ChevronDown className="w-2.5 h-2.5" />
           ) : (
-            <ChevronRight className="w-3xs h-3" />
+            <ChevronRight className="w-2.5 h-2.5" />
           )}
         </div>
-        <Folder className="w-3 h-3 ml-1 mr-1 text-folder" />
+        <Folder className="w-2.5 h-2.5 text-folder" />
         <span className="truncate" title={node.name}>{node.name}</span>
       </div>
     </SidebarMenuButton>

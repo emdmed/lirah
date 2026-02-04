@@ -22,7 +22,8 @@ export function TreeNode({
   typeCheckResults,
   checkingFiles,
   successfulChecks,
-  onCheckFileTypes
+  onCheckFileTypes,
+  onOpenElementPicker,
 }) {
   const isExpanded = expandedFolders.has(node.path);
   const isCurrentPath = currentPath === node.path;
@@ -72,6 +73,7 @@ export function TreeNode({
             isCheckingTypes={isCheckingTypes}
             isTypeCheckSuccess={isTypeCheckSuccess}
             onCheckFileTypes={onCheckFileTypes}
+            onOpenElementPicker={onOpenElementPicker}
           />
         )}
       </SidebarMenuItem>
@@ -95,6 +97,7 @@ export function TreeNode({
             checkingFiles={checkingFiles}
             successfulChecks={successfulChecks}
             onCheckFileTypes={onCheckFileTypes}
+            onOpenElementPicker={onOpenElementPicker}
           />
         ))
       )}
