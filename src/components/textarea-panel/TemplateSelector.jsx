@@ -40,7 +40,7 @@ export function TemplateSelector({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, templates, onSelectTemplate, onOpenChange]);
+  }, [open, templates.length, onSelectTemplate, onOpenChange]);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 

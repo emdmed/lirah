@@ -4,6 +4,146 @@
  */
 
 export const themes = {
+  'catppuccin-mocha': {
+    name: 'Catppuccin Mocha',
+    type: 'dark',
+    // Terminal colors - Catppuccin Mocha
+    terminal: {
+      foreground: '#cdd6f4',      // Text
+      background: '#1e1e2e',      // Base
+      cursor: '#f5e0dc',          // Rosewater
+      cursorAccent: '#1e1e2e',    // Base
+      selectionBackground: '#585b70', // Surface0
+      selectionForeground: '#cdd6f4', // Text
+
+      // Normal colors
+      black: '#45475a',           // Surface1
+      red: '#f38ba8',             // Red
+      green: '#a6e3a1',           // Green
+      yellow: '#f9e2af',          // Yellow
+      blue: '#89b4fa',            // Blue
+      magenta: '#f5c2e7',         // Pink
+      cyan: '#94e2d5',            // Teal
+      white: '#bac2de',           // Subtext1
+
+      // Bright colors
+      brightBlack: '#6c7086',     // Surface2
+      brightRed: '#eba0ac',       // Maroon
+      brightGreen: '#94e2d5',     // Teal
+      brightYellow: '#f9e2af',    // Yellow
+      brightBlue: '#89dceb',      // Sky
+      brightMagenta: '#f5c2e7',   // Pink
+      brightCyan: '#89dceb',      // Sky
+      brightWhite: '#cdd6f4',     // Text
+    },
+    // UI colors
+    ui: {
+      background: 'hsl(240 21% 15%)',
+      foreground: 'hsl(226 64% 88%)',
+      card: 'hsl(240 21% 23%)',
+      cardForeground: 'hsl(226 64% 88%)',
+      popover: 'hsl(240 21% 23%)',
+      popoverForeground: 'hsl(226 64% 88%)',
+      primary: 'hsl(219 80% 76%)',
+      primaryForeground: 'hsl(240 21% 15%)',
+      secondary: 'hsl(240 21% 29%)',
+      secondaryForeground: 'hsl(226 64% 88%)',
+      muted: 'hsl(240 21% 29%)',
+      mutedForeground: 'hsl(226 34% 68%)',
+      accent: 'hsl(331 74% 86%)',
+      accentForeground: 'hsl(240 21% 15%)',
+      destructive: 'hsl(346 77% 78%)',
+      destructiveForeground: 'hsl(226 64% 88%)',
+      border: 'hsl(240 21% 35%)',
+      input: 'hsl(240 21% 29%)',
+      inputBackground: 'hsl(240 21% 11%)',
+      ring: 'hsl(219 80% 76%)',
+      sidebar: 'hsl(240 21% 15%)',
+      sidebarForeground: 'hsl(226 64% 88%)',
+      sidebarPrimary: 'hsl(219 80% 76%)',
+      sidebarPrimaryForeground: 'hsl(240 21% 15%)',
+      sidebarAccent: 'hsl(240 21% 29%)',
+      sidebarAccentForeground: 'hsl(226 64% 88%)',
+      sidebarBorder: 'hsl(240 21% 35%)',
+      sidebarRing: 'hsl(219 80% 76%)',
+      // Semantic colors
+      folder: '38 100% 80%',            // Catppuccin yellow for folder icons
+      gitAdded: '145 80% 77%',          // Catppuccin green for +lines
+      gitDeleted: '346 77% 78%',         // Catppuccin red for -lines
+      treeGuide: '226 64% 88% / 0.1',    // Text with opacity for tree guide lines
+    },
+  },
+
+  'ristretto': {
+    name: 'Ristretto',
+    type: 'dark',
+    // Terminal colors - Omarchy Ristretto
+    terminal: {
+      foreground: '#d4c4b0',      // Latte
+      background: '#151515',      // Espresso
+      cursor: '#a47c5b',          // Macchiato
+      cursorAccent: '#151515',    // Espresso
+      selectionBackground: '#2a2a2a', // Crema
+      selectionForeground: '#d4c4b0', // Latte
+
+      // Normal colors
+      black: '#151515',           // Espresso
+      red: '#e67e80',             // Cinnamon
+      green: '#a7c080',           // Matcha
+      yellow: '#dbbc7f',          // Honey
+      blue: '#8caaee',            // Blueberry
+      magenta: '#d4a1c4',         // Plum
+      cyan: '#81b5c7',            // Mint
+      white: '#d4c4b0',           // Latte
+
+      // Bright colors
+      brightBlack: '#2a2a2a',     // Crema
+      brightRed: '#f48c8c',       // Cherry
+      brightGreen: '#b3d391',     // Lime
+      brightYellow: '#e4cc99',    // Butter
+      brightBlue: '#99c1f1',      // Sky
+      brightMagenta: '#e4b8d2',   // Rose
+      brightCyan: '#9dc9cd',      // Aqua
+      brightWhite: '#e5d5c0',     // Milk
+    },
+    // UI colors
+    ui: {
+      background: 'hsl(0 0% 8%)',
+      foreground: 'hsl(30 15% 81%)',
+      card: 'hsl(0 0% 12%)',
+      cardForeground: 'hsl(30 15% 81%)',
+      popover: 'hsl(0 0% 12%)',
+      popoverForeground: 'hsl(30 15% 81%)',
+      primary: 'hsl(25 25% 67%)',
+      primaryForeground: 'hsl(0 0% 8%)',
+      secondary: 'hsl(0 0% 18%)',
+      secondaryForeground: 'hsl(30 15% 81%)',
+      muted: 'hsl(0 0% 18%)',
+      mutedForeground: 'hsl(30 10% 60%)',
+      accent: 'hsl(340 30% 72%)',
+      accentForeground: 'hsl(0 0% 8%)',
+      destructive: 'hsl(0 55% 68%)',
+      destructiveForeground: 'hsl(30 15% 81%)',
+      border: 'hsl(0 0% 22%)',
+      input: 'hsl(0 0% 18%)',
+      inputBackground: 'hsl(0 0% 6%)',
+      ring: 'hsl(25 25% 67%)',
+      sidebar: 'hsl(0 0% 8%)',
+      sidebarForeground: 'hsl(30 15% 81%)',
+      sidebarPrimary: 'hsl(25 25% 67%)',
+      sidebarPrimaryForeground: 'hsl(0 0% 8%)',
+      sidebarAccent: 'hsl(0 0% 18%)',
+      sidebarAccentForeground: 'hsl(30 15% 81%)',
+      sidebarBorder: 'hsl(0 0% 22%)',
+      sidebarRing: 'hsl(25 25% 67%)',
+      // Semantic colors
+      folder: '45 65% 58%',            // Omarchy warm brown for folder icons
+      gitAdded: '75 25% 67%',           // Omarchy green for +lines
+      gitDeleted: '0 55% 68%',          // Omarchy red for -lines
+      treeGuide: '30 15% 81% / 0.1',    // Latte with opacity for tree guide lines
+    },
+  },
+
   kanagawa: {
     name: 'Kanagawa',
     type: 'dark',
