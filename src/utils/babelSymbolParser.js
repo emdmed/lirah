@@ -457,6 +457,42 @@ export const extractSignatures = (code, filePath = '') => {
 };
 
 /**
+ * Extract dependency names from a useEffect dependency array
+ * @param {object} node - AST node for the dependency array argument
+ * @returns {string[]|null} - Array of dependency names, null if no deps, or '?' if unparseable
+ */
+const extractDependencyArray = (node) => {
+  if (!node) return null; // No dependency array provided
+
+  if (node.type === 'ArrayExpression') {
+    return node.elements.map(el => {
+      if (!el) return '?';
+      if (el.type === 'Identifier') return el.name;
+      if (el.type === 'MemberExpression') {
+        // Handle things like obj.prop or obj.nested.prop
+        const parts = [];
+        let current = el;
+        while (current.type === 'MemberExpression') {
+          if (current.property?.name) {
+            parts.unshift(current.property.name);
+          } else if (current.property?.type === 'Identifier') {
+            parts.unshift(current.property.name);
+          }
+          current = current.object;
+        }
+        if (current.type === 'Identifier') {
+          parts.unshift(current.name);
+        }
+        return parts.join('.') || '?';
+      }
+      return '?';
+    });
+  }
+
+  return '?'; // Unparseable (e.g., spread, variable reference)
+};
+
+/**
  * Extract skeleton/outline view from source code
  * @param {string} code - Source code to parse
  * @param {string} filePath - File path for determining parser plugins
@@ -492,7 +528,7 @@ export const extractSkeleton = (code, filePath = '') => {
     exports: [],
     components: [],
     functions: [],
-    hooks: { useState: 0, useEffect: 0, useCallback: 0, useMemo: 0, useRef: 0, custom: [] },
+    hooks: { useState: 0, useEffect: [], useCallback: 0, useMemo: 0, useRef: 0, custom: [] },
     constants: 0,
     classes: [],
     interfaces: [],
@@ -588,7 +624,13 @@ export const extractSkeleton = (code, filePath = '') => {
       const callee = path.node.callee;
       if (callee.type === 'Identifier' && callee.name.startsWith('use')) {
         const hookName = callee.name;
-        if (skeleton.hooks[hookName] !== undefined) {
+        const line = path.node.loc?.start?.line || 0;
+
+        // Special handling for useEffect - extract dependencies
+        if (hookName === 'useEffect') {
+          const deps = extractDependencyArray(path.node.arguments[1]);
+          skeleton.hooks.useEffect.push({ line, deps });
+        } else if (skeleton.hooks[hookName] !== undefined) {
           skeleton.hooks[hookName]++;
         } else {
           if (!skeleton.hooks.custom.includes(hookName)) {
@@ -677,13 +719,25 @@ export const formatSkeletonForPrompt = (skeleton) => {
   // Hooks summary
   const hookCounts = [];
   if (skeleton.hooks.useState > 0) hookCounts.push(`useState(${skeleton.hooks.useState})`);
-  if (skeleton.hooks.useEffect > 0) hookCounts.push(`useEffect(${skeleton.hooks.useEffect})`);
   if (skeleton.hooks.useCallback > 0) hookCounts.push(`useCallback(${skeleton.hooks.useCallback})`);
   if (skeleton.hooks.useMemo > 0) hookCounts.push(`useMemo(${skeleton.hooks.useMemo})`);
   if (skeleton.hooks.useRef > 0) hookCounts.push(`useRef(${skeleton.hooks.useRef})`);
   if (skeleton.hooks.custom.length > 0) hookCounts.push(...skeleton.hooks.custom);
   if (hookCounts.length > 0) {
     lines.push(`    Hooks: ${hookCounts.join(', ')}`);
+  }
+
+  // useEffect with dependencies (separate line for clarity)
+  if (skeleton.hooks.useEffect.length > 0) {
+    const effectDetails = skeleton.hooks.useEffect.map(eff => {
+      const depsStr = eff.deps === null
+        ? 'no deps'
+        : eff.deps === '?'
+          ? '?'
+          : `[${eff.deps.join(', ')}]`;
+      return `${depsStr}:${eff.line}`;
+    }).join(', ');
+    lines.push(`    useEffect: ${effectDetails}`);
   }
 
   // Constants
