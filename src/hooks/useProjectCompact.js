@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { isBabelParseable, extractSkeleton, formatSkeletonForPrompt } from '../utils/babelSymbolParser';
+import { isBabelParseable, extractSkeleton as extractBabelSkeleton, formatSkeletonForPrompt as formatBabelSkeleton } from '../utils/babelSymbolParser';
+import { isPythonParseable, extractSkeleton as extractPythonSkeleton, formatSkeletonForPrompt as formatPythonSkeleton } from '../utils/pythonSymbolParser';
 
 /**
  * Estimate token count for a string
@@ -75,8 +76,8 @@ export function useProjectCompact() {
         }
       }
 
-      // Only include Babel-parseable files
-      return isBabelParseable(file.path);
+      // Include Babel-parseable files (JS/TS) and Python files
+      return isBabelParseable(file.path) || isPythonParseable(file.path);
     });
   }, []);
 
@@ -102,7 +103,11 @@ export function useProjectCompact() {
             const contentSize = content.length;
             const lines = content.split('\n');
             const lineCount = lines.length;
-            const skeleton = extractSkeleton(content, file.path);
+
+            // Use appropriate parser based on file type
+            const skeleton = isPythonParseable(file.path)
+              ? await extractPythonSkeleton(content, file.path)
+              : extractBabelSkeleton(content, file.path);
 
             // Get relative path
             const relativePath = file.path.startsWith(rootPath + '/')
@@ -162,7 +167,10 @@ export function useProjectCompact() {
       lines.push(`## ${result.path} (${result.lineCount} lines)`);
 
       if (result.skeleton) {
-        const skeletonOutput = formatSkeletonForPrompt(result.skeleton);
+        // Use appropriate formatter based on file type
+        const skeletonOutput = isPythonParseable(result.path)
+          ? formatPythonSkeleton(result.skeleton)
+          : formatBabelSkeleton(result.skeleton);
         if (skeletonOutput) {
           lines.push(skeletonOutput);
         }
