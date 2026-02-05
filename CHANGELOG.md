@@ -2,9 +2,11 @@
 
 All notable changes to Lirah will be documented in this file.
 
-## [Unreleased]
+## [0.1.11] - 2026-02-05
 
 ### Features
+
+- **Element Picker** - Select specific code elements (functions, components, classes, hooks) from files instead of entire files. Features Python parser via rustpython-parser, enhanced JS/TS symbol extraction, and interactive dialog with bulk selection capabilities.
 
 - **Compact Project** (`Ctrl+Shift+P`) - Generate a compact representation of your entire project optimized for token efficiency. Intelligently parses JS/TS files to extract function signatures and skeletons instead of full content.
 
@@ -26,6 +28,15 @@ All notable changes to Lirah will be documented in this file.
 - Fixed token estimation and formatting
 - Fixed dependency installation issues
 - Improved handling of large files with forced grep
+
+### UI Enhancements
+
+- Improved file tree styling with better visual hierarchy and spacing
+- Enhanced terminal focus indicator with ring border
+- Refined git diff badges and file node layout
+- Cleaner element picker button integration in file tree
+
+## [Unreleased]
 
 ## [0.1.9] - 2025-01-15
 

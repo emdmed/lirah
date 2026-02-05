@@ -855,7 +855,7 @@ function App() {
         } catch (error) {
           console.error('Failed to send Enter:', error);
         }
-      }, 100);
+      }, 500);
 
       console.log('Sent to terminal:', fullCommand);
 
