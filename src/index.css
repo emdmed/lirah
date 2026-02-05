@@ -1,18 +1,26 @@
 @import "tailwindcss";
 
+/* Local Typestar OCR font declaration */
 @font-face {
   font-family: 'Typestar OCR';
-  src: url('./assets/fonts/Typestar-OCR.otf') format('opentype');
+  src: url('/Typestar-OCR.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
-  font-display: swap;
 }
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
   /* Font family */
-  --font-mono: "Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  --font-mono: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  
+  /* Consistent font scale for OCR A */
+  --font-xs: 10px;
+  --font-sm: 11px;
+  --font-base: 12px;
+  --font-lg: 13px;
+  --font-xl: 14px;
+  --font-2xl: 16px;
 
   /* Default theme colors - will be overridden by ThemeProvider */
   --color-border: hsl(240 13% 20%);
@@ -58,7 +66,7 @@ body,
 
 body {
   /* Background color will be set dynamically by ThemeProvider */
-  font-family: "Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  font-family: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
 }
 
 :root {
@@ -160,6 +168,12 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Filetree font enforcement */
+.filetree-container {
+  font-family: var(--font-mono) !important;
+  font-size: var(--font-sm);
+}
+
 /* Engineering sketch dashed borders */
 .border-sketch {
   border-style: dashed !important;
@@ -198,3 +212,12 @@ body {
 /* .terminal-wrapper.terminal-focused::after { */
 /*   opacity: 1; */
 /* } */
+
+/* Font test indicator - remove after confirming Typestar OCR works */
+.font-test-indicator {
+  font-family: 'Typestar OCR', monospace !important;
+  background: rgba(255, 255, 0, 0.1) !important;
+  border: 2px solid yellow !important;
+  padding: 4px 8px !important;
+  margin: 4px !important;
+}

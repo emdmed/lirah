@@ -51,7 +51,7 @@ export function FileTree({
   }
 
   return (
-    <SidebarMenu>
+    <SidebarMenu className="filetree-container">
       {displayedNodes.map((node) => (
         <TreeNode
           key={node.path}

@@ -75,7 +75,7 @@ export function FileNode({
             <GitBranch className="w-2.5 h-2.5" />
           </button>
         )}
-        <span className={`truncate text-[11px] leading-none ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`}>{node.name}</span>
+        <span className={`truncate leading-none ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
 
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}
