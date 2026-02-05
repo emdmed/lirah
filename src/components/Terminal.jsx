@@ -1,9 +1,9 @@
 import { useRef, useEffect, forwardRef } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter }, ref) => {
+export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange }, ref) => {
   const terminalRef = useRef(null);
-  const { handleResize, sessionId } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter);
+  const { handleResize, sessionId, isFocused } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange);
 
   // Notify parent when session is ready
   useEffect(() => {
@@ -33,6 +33,7 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchF
 
   return (
     <div
+      className={`p-2 mt-2 terminal-wrapper${isFocused ? 'border-ring outline-none ring-2 ring-ring ring-offset-1 ring-offset-background rounded-md' : ''}`}
       style={{
         width: '100%',
         flex: 1,

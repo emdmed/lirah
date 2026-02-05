@@ -6,11 +6,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import '@xterm/xterm/css/xterm.css';
 
-export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter) {
+export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Initialize terminal
   useEffect(() => {
@@ -154,6 +155,29 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     }
   }, [fitAddon, terminal, sessionId]);
 
+  // Track focus state via the underlying textarea element
+  useEffect(() => {
+    if (!terminal?.textarea) return;
+
+    const textarea = terminal.textarea;
+    const handleFocus = () => {
+      setIsFocused(true);
+      onFocusChange?.(true);
+    };
+    const handleBlur = () => {
+      setIsFocused(false);
+      onFocusChange?.(false);
+    };
+
+    textarea.addEventListener('focus', handleFocus);
+    textarea.addEventListener('blur', handleBlur);
+
+    return () => {
+      textarea.removeEventListener('focus', handleFocus);
+      textarea.removeEventListener('blur', handleBlur);
+    };
+  }, [terminal, onFocusChange]);
+
   // Update theme
   useEffect(() => {
     if (terminal && theme) {
@@ -177,6 +201,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     terminal,
     sessionId,
     isReady,
+    isFocused,
     handleResize,
   };
 }

@@ -48,7 +48,9 @@
   --radius-sm: calc(0.5rem - 4px);
 }
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -88,6 +90,7 @@ body {
     border-style: dashed;
     border-color: rgba(255, 255, 255, 0.12);
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -177,3 +180,21 @@ body {
   border-inline-end-style: dashed !important;
   border-inline-end-color: rgba(255, 255, 255, 0.12);
 }
+
+/* Terminal focus indicator */
+/* .terminal-wrapper::after { */
+/*   content: ''; */
+/*   position: absolute; */
+/*   inset: -4px; */
+/*   border-width: 1px; */
+/*   border-style: solid !important; */
+/*   border-radius: 0rem; */
+/*   opacity: 0; */
+/*   transition: opacity 150ms ease; */
+/*   pointer-events: none; */
+/*   z-index: 1; */
+/* } */
+/**/
+/* .terminal-wrapper.terminal-focused::after { */
+/*   opacity: 1; */
+/* } */
