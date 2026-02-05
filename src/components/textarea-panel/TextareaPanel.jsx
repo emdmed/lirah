@@ -196,7 +196,7 @@ export function TextareaPanel({
 
       {/* Compacted project indicator */}
       {compactedProject && (
-        <div className="flex items-center gap-2 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded text-xs">
+        <div className="flex items-center gap-2 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded text-xs w-fit">
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 cursor-default">

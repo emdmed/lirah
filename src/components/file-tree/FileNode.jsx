@@ -39,14 +39,14 @@ export function FileNode({
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`flex h-4 items-center justify-between w-full ${isCurrentPath ? 'bg-accent' : ''} ${
+      className={`flex h-4 items-center gap-1 w-full ${isCurrentPath ? 'bg-accent' : ''} ${
         isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
       } ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Element picker button - only for parseable files in Claude mode */}
       {isTextareaPanelOpen && isParseable && !isDeleted && (
         <button
-          className="p-0 mr-1 transition-opacity duration-200 rounded opacity-40 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
+          className="p-0 transition-opacity duration-200 rounded opacity-40 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onOpenElementPicker?.(node.path);
@@ -59,7 +59,7 @@ export function FileNode({
 
       {/* Main file display */}
       <div
-        className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
+        className={`flex items-center justify-start min-w-0 flex-1 gap-1 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
         onClick={handleFileClick}
       >
         {/* Git diff button inline */}
