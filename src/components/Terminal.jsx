@@ -33,7 +33,12 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchF
 
   return (
     <div
-      className={`p-2 mt-2 terminal-wrapper${isFocused ? 'border-ring outline-none ring-2 ring-ring ring-offset-1 ring-offset-background rounded-md' : ''}`}
+
+      className={`p-2 mt-2 terminal-wrapper${isFocused
+        ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-2'
+        : ''
+        }`}
+
       style={{
         width: '100%',
         flex: 1,
