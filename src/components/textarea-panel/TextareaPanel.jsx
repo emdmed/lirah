@@ -43,6 +43,7 @@ export function TextareaPanel({
   selectedElements,
   onClearElements,
   atMentionActive = false,
+  atMentionQuery = '',
   atMentionResults = null,
   atMentionSelectedIndex = 0,
   onAtMentionNavigate,
@@ -97,9 +98,17 @@ export function TextareaPanel({
     return { elementCount: count, elementsTooltipContent: content };
   }, [selectedElements, currentPath]);
 
+  // Sort results matching AtMentionModal order: files first, dirs last
+  const sortedAtMentionResults = useMemo(() => {
+    if (!atMentionResults) return [];
+    const files = atMentionResults.filter(r => !r.is_dir);
+    const dirs = atMentionResults.filter(r => r.is_dir);
+    return [...files, ...dirs].slice(0, 12);
+  }, [atMentionResults]);
+
   const handleKeyDown = (e) => {
     // Handle @ mention modal navigation
-    if (atMentionActive && atMentionResults && atMentionResults.length > 0) {
+    if (atMentionActive && sortedAtMentionResults.length > 0) {
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         onAtMentionNavigate('up');
@@ -112,7 +121,7 @@ export function TextareaPanel({
       }
       if (e.key === 'Enter' && !e.ctrlKey) {
         e.preventDefault();
-        const selectedFile = atMentionResults[atMentionSelectedIndex];
+        const selectedFile = sortedAtMentionResults[atMentionSelectedIndex];
         if (selectedFile) {
           onAtMentionSelect(selectedFile.path, selectedFile.is_dir);
         }
@@ -275,13 +284,14 @@ export function TextareaPanel({
           className="w-full h-full resize-none"
         />
         {/* @ mention autocomplete modal */}
-        {atMentionActive && atMentionResults && atMentionResults.length > 0 && (
+        {atMentionActive && sortedAtMentionResults.length > 0 && (
           <AtMentionModal
             results={atMentionResults}
             selectedIndex={atMentionSelectedIndex}
             onSelect={onAtMentionSelect}
             currentPath={currentPath}
-            position="top"
+            query={atMentionQuery}
+            selectedFiles={selectedFiles}
           />
         )}
       </div>

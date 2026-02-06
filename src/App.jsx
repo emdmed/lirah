@@ -991,26 +991,31 @@ function App() {
     setAtMentionSelectedIndex(0);
   };
 
+  // Sort results same as AtMentionModal: files first, dirs last
+  const atMentionDisplayedResults = useMemo(() => {
+    if (!searchResults) return [];
+    const files = searchResults.filter(r => !r.is_dir);
+    const dirs = searchResults.filter(r => r.is_dir);
+    return [...files, ...dirs].slice(0, 12);
+  }, [searchResults]);
+
   // Navigate @ mention modal (skip directories, only select files)
   const handleAtMentionNavigate = (direction) => {
-    if (!searchResults || searchResults.length === 0) return;
-
-    const displayedResults = searchResults.slice(0, 10);
+    if (atMentionDisplayedResults.length === 0) return;
 
     setAtMentionSelectedIndex(prev => {
       let newIndex = prev;
-      const maxIndex = displayedResults.length - 1;
+      const maxIndex = atMentionDisplayedResults.length - 1;
 
-      // Move in the specified direction
       if (direction === 'up') {
         newIndex = prev > 0 ? prev - 1 : maxIndex;
       } else {
         newIndex = prev < maxIndex ? prev + 1 : 0;
       }
 
-      // Skip directories - find next file
+      // Skip directories
       let attempts = 0;
-      while (displayedResults[newIndex]?.is_dir && attempts < displayedResults.length) {
+      while (atMentionDisplayedResults[newIndex]?.is_dir && attempts < atMentionDisplayedResults.length) {
         if (direction === 'up') {
           newIndex = newIndex > 0 ? newIndex - 1 : maxIndex;
         } else {
@@ -1019,11 +1024,7 @@ function App() {
         attempts++;
       }
 
-      // If all items are directories, stay at current position
-      if (attempts >= displayedResults.length) {
-        return prev;
-      }
-
+      if (attempts >= atMentionDisplayedResults.length) return prev;
       return newIndex;
     });
   };
@@ -1100,11 +1101,10 @@ function App() {
   }, [atMentionQuery]);
 
   // Reset selected index to first file when search results change
+  // (files are sorted first in atMentionDisplayedResults, so index 0 is always a file if any exist)
   useEffect(() => {
-    if (atMentionQuery !== null && searchResults) {
-      const displayedResults = searchResults.slice(0, 10);
-      const firstFileIndex = displayedResults.findIndex(r => !r.is_dir);
-      setAtMentionSelectedIndex(firstFileIndex >= 0 ? firstFileIndex : 0);
+    if (atMentionQuery !== null) {
+      setAtMentionSelectedIndex(0);
     }
   }, [searchResults, atMentionQuery]);
 
@@ -1503,6 +1503,7 @@ function App() {
               selectedElements={selectedElements}
               onClearElements={clearSelectedElements}
               atMentionActive={atMentionQuery !== null}
+              atMentionQuery={atMentionQuery || ''}
               atMentionResults={searchResults}
               atMentionSelectedIndex={atMentionSelectedIndex}
               onAtMentionNavigate={handleAtMentionNavigate}
