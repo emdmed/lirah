@@ -110,6 +110,9 @@ function App() {
   const [searchResults, setSearchResults] = useState(null);
   const [allFiles, setAllFiles] = useState([]); // Flat list for indexing
 
+  // @ mention search state (separate from sidebar search)
+  const [atMentionResults, setAtMentionResults] = useState(null);
+
   // Git filter state
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
 
@@ -993,11 +996,11 @@ function App() {
 
   // Sort results same as AtMentionModal: files first, dirs last
   const atMentionDisplayedResults = useMemo(() => {
-    if (!searchResults) return [];
-    const files = searchResults.filter(r => !r.is_dir);
-    const dirs = searchResults.filter(r => r.is_dir);
+    if (!atMentionResults) return [];
+    const files = atMentionResults.filter(r => !r.is_dir);
+    const dirs = atMentionResults.filter(r => r.is_dir);
     return [...files, ...dirs].slice(0, 12);
-  }, [searchResults]);
+  }, [atMentionResults]);
 
   // Navigate @ mention modal (skip directories, only select files)
   const handleAtMentionNavigate = (direction) => {
@@ -1093,20 +1096,34 @@ function App() {
     });
   }, [treeData]);
 
-  // Sync @ mention to search query and reset to first file (not directory)
-  useEffect(() => {
-    if (atMentionQuery !== null) {
-      setSearchQuery(atMentionQuery);
-    }
-  }, [atMentionQuery]);
+  
 
-  // Reset selected index to first file when search results change
-  // (files are sorted first in atMentionDisplayedResults, so index 0 is always a file if any exist)
+  // @ mention search effect (separate from sidebar search)
+  useEffect(() => {
+    if (atMentionQuery === null) {
+      setAtMentionResults(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (!atMentionQuery || atMentionQuery.trim() === '') {
+        setAtMentionResults(null);
+        return;
+      }
+
+      const results = search(atMentionQuery);
+      setAtMentionResults(results);
+    }, 200); // 200ms debounce
+
+    return () => clearTimeout(timer);
+  }, [atMentionQuery, search]);
+
+  // Reset selected index to first file when @ mention results change
   useEffect(() => {
     if (atMentionQuery !== null) {
       setAtMentionSelectedIndex(0);
     }
-  }, [searchResults, atMentionQuery]);
+  }, [atMentionResults, atMentionQuery]);
 
   // Debounced search effect
   useEffect(() => {
@@ -1400,7 +1417,6 @@ function App() {
                     onAddBookmark={() => setAddBookmarkDialogOpen(true)}
                     onNavigateBookmark={navigateToBookmark}
                     hasTerminalSession={!!terminalSessionId}
-                    isAtMentionActive={atMentionQuery !== null}
                   />
                   <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                     <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
@@ -1504,7 +1520,7 @@ function App() {
               onClearElements={clearSelectedElements}
               atMentionActive={atMentionQuery !== null}
               atMentionQuery={atMentionQuery || ''}
-              atMentionResults={searchResults}
+              atMentionResults={atMentionResults}
               atMentionSelectedIndex={atMentionSelectedIndex}
               onAtMentionNavigate={handleAtMentionNavigate}
               onAtMentionSelect={handleAtMentionSelect}
