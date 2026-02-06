@@ -6,6 +6,7 @@ import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 import { CompactProjectButton } from "./CompactProjectButton";
+import { AtMentionModal } from "../AtMentionModal";
 import { X } from "lucide-react";
 
 /**
@@ -41,6 +42,12 @@ export function TextareaPanel({
   onClearCompactedProject,
   selectedElements,
   onClearElements,
+  atMentionActive = false,
+  atMentionResults = null,
+  atMentionSelectedIndex = 0,
+  onAtMentionNavigate,
+  onAtMentionSelect,
+  onAtMentionClose,
 }) {
   // Get relative path helper
   const getRelativePath = (filePath) => {
@@ -91,6 +98,33 @@ export function TextareaPanel({
   }, [selectedElements, currentPath]);
 
   const handleKeyDown = (e) => {
+    // Handle @ mention modal navigation
+    if (atMentionActive && atMentionResults && atMentionResults.length > 0) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        onAtMentionNavigate('up');
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        onAtMentionNavigate('down');
+        return;
+      }
+      if (e.key === 'Enter' && !e.ctrlKey) {
+        e.preventDefault();
+        const selectedFile = atMentionResults[atMentionSelectedIndex];
+        if (selectedFile) {
+          onAtMentionSelect(selectedFile.path, selectedFile.is_dir);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onAtMentionClose();
+        return;
+      }
+    }
+
     // Enter creates new lines (default behavior)
     // Ctrl+Enter is handled by the useTextareaShortcuts hook
     if (e.key === 'Enter' && !e.ctrlKey) {
@@ -228,7 +262,7 @@ export function TextareaPanel({
       )}
 
       {/* Main content area */}
-      <div className="min-h-[120px] max-h-[300px]">
+      <div className="min-h-[120px] max-h-[300px] relative">
         <Textarea
           ref={textareaRef}
           value={value}
@@ -240,6 +274,16 @@ export function TextareaPanel({
           aria-describedby="textarea-instructions"
           className="w-full h-full resize-none"
         />
+        {/* @ mention autocomplete modal */}
+        {atMentionActive && atMentionResults && atMentionResults.length > 0 && (
+          <AtMentionModal
+            results={atMentionResults}
+            selectedIndex={atMentionSelectedIndex}
+            onSelect={onAtMentionSelect}
+            currentPath={currentPath}
+            position="top"
+          />
+        )}
       </div>
 
       {/* Footer row: instructions + action buttons */}

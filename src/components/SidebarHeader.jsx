@@ -16,7 +16,8 @@ export function SidebarHeader({
   fileWatchingEnabled,
   onAddBookmark,
   onNavigateBookmark,
-  hasTerminalSession
+  hasTerminalSession,
+  isAtMentionActive = false
 }) {
   return (
     <div className="px-3 py-2 border-b border-b-sketch flex flex-col gap-2 flex-shrink-0">
@@ -75,7 +76,7 @@ export function SidebarHeader({
           <Input
             ref={searchInputRef}
             type="text"
-            placeholder="Search files..."
+            placeholder={isAtMentionActive ? "Filtering by @ mention..." : "Search files..."}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="h-7 pl-7 pr-7 py-0 text-xs leading-7 bg-muted/30 border-muted/50 focus:bg-background focus:border-primary/50"

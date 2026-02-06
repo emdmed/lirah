@@ -123,6 +123,8 @@ function App() {
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [fileStates, setFileStates] = useState(new Map()); // Map<filePath, 'modify'|'do-not-modify'|'use-as-example'>
   const [keepFilesAfterSend, setKeepFilesAfterSend] = useState(false);
+  const [atMentionQuery, setAtMentionQuery] = useState(null);
+  const [atMentionSelectedIndex, setAtMentionSelectedIndex] = useState(0);
 
   // Help state
   const [showHelp, setShowHelp] = useState(false);
@@ -973,9 +975,93 @@ function App() {
     }
   }, [detectedCwd, viewMode]);
 
+  // Extract @ mention from textarea content
+  const extractAtMention = (text) => {
+    if (viewMode !== 'tree') return null;
+    const match = text.match(/@([^\s@]*)$/);
+    return match ? match[1] : null;
+  };
+
+  // Handle textarea changes to detect @ mentions
+  const handleTextareaChange = (newValue) => {
+    setTextareaContent(newValue);
+    const mention = extractAtMention(newValue);
+    setAtMentionQuery(mention);
+    // Reset selected index when query changes
+    setAtMentionSelectedIndex(0);
+  };
+
+  // Navigate @ mention modal (skip directories, only select files)
+  const handleAtMentionNavigate = (direction) => {
+    if (!searchResults || searchResults.length === 0) return;
+
+    const displayedResults = searchResults.slice(0, 10);
+
+    setAtMentionSelectedIndex(prev => {
+      let newIndex = prev;
+      const maxIndex = displayedResults.length - 1;
+
+      // Move in the specified direction
+      if (direction === 'up') {
+        newIndex = prev > 0 ? prev - 1 : maxIndex;
+      } else {
+        newIndex = prev < maxIndex ? prev + 1 : 0;
+      }
+
+      // Skip directories - find next file
+      let attempts = 0;
+      while (displayedResults[newIndex]?.is_dir && attempts < displayedResults.length) {
+        if (direction === 'up') {
+          newIndex = newIndex > 0 ? newIndex - 1 : maxIndex;
+        } else {
+          newIndex = newIndex < maxIndex ? newIndex + 1 : 0;
+        }
+        attempts++;
+      }
+
+      // If all items are directories, stay at current position
+      if (attempts >= displayedResults.length) {
+        return prev;
+      }
+
+      return newIndex;
+    });
+  };
+
+  // Select file from @ mention modal
+  const handleAtMentionSelect = (filePath, isDirectory) => {
+    if (!filePath) return;
+
+    // Only allow selecting files, not directories
+    if (isDirectory) {
+      return;
+    }
+
+    // Add file to selection
+    toggleFileSelection(filePath);
+
+    // Remove @ mention from textarea
+    const newContent = textareaContent.replace(/@[^\s@]*$/, '');
+    setTextareaContent(newContent);
+    setAtMentionQuery(null);
+    setAtMentionSelectedIndex(0);
+
+    // Focus back on textarea
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
+  // Close @ mention modal
+  const handleAtMentionClose = () => {
+    setAtMentionQuery(null);
+    setAtMentionSelectedIndex(0);
+  };
+
   // Search handler functions
   const handleSearchChange = (query) => {
     setSearchQuery(query);
+    setAtMentionQuery(null); // Clear @ mention when manual search is used
   };
 
   const handleSearchClear = () => {
@@ -1005,6 +1091,22 @@ function App() {
       return newValue;
     });
   }, [treeData]);
+
+  // Sync @ mention to search query and reset to first file (not directory)
+  useEffect(() => {
+    if (atMentionQuery !== null) {
+      setSearchQuery(atMentionQuery);
+    }
+  }, [atMentionQuery]);
+
+  // Reset selected index to first file when search results change
+  useEffect(() => {
+    if (atMentionQuery !== null && searchResults) {
+      const displayedResults = searchResults.slice(0, 10);
+      const firstFileIndex = displayedResults.findIndex(r => !r.is_dir);
+      setAtMentionSelectedIndex(firstFileIndex >= 0 ? firstFileIndex : 0);
+    }
+  }, [searchResults, atMentionQuery]);
 
   // Debounced search effect
   useEffect(() => {
@@ -1298,6 +1400,7 @@ function App() {
                     onAddBookmark={() => setAddBookmarkDialogOpen(true)}
                     onNavigateBookmark={navigateToBookmark}
                     hasTerminalSession={!!terminalSessionId}
+                    isAtMentionActive={atMentionQuery !== null}
                   />
                   <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                     <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
@@ -1372,7 +1475,7 @@ function App() {
           textareaVisible && (
             <TextareaPanel
               value={textareaContent}
-              onChange={setTextareaContent}
+              onChange={handleTextareaChange}
               onSend={sendTextareaToTerminal}
               onClose={() => setTextareaVisible(false)}
               textareaRef={textareaRef}
@@ -1399,6 +1502,12 @@ function App() {
               onClearCompactedProject={() => setCompactedProject(null)}
               selectedElements={selectedElements}
               onClearElements={clearSelectedElements}
+              atMentionActive={atMentionQuery !== null}
+              atMentionResults={searchResults}
+              atMentionSelectedIndex={atMentionSelectedIndex}
+              onAtMentionNavigate={handleAtMentionNavigate}
+              onAtMentionSelect={handleAtMentionSelect}
+              onAtMentionClose={handleAtMentionClose}
             />
           )
         }
