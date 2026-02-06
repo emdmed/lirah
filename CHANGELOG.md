@@ -4,11 +4,13 @@ All notable changes to Lirah will be documented in this file.
 
 ## [0.1.11] - 2026-02-05
 
-### Features
+### 🚀 Features
 
 - **Element Picker** - Select specific code elements (functions, components, classes, hooks) from files instead of entire files. Features Python parser via rustpython-parser, enhanced JS/TS symbol extraction, and interactive dialog with bulk selection capabilities.
 
-- **Compact Project** (`Ctrl+Shift+P`) - Generate a compact representation of your entire project optimized for token efficiency. Intelligently parses JS/TS files to extract function signatures and skeletons instead of full content.
+- **Enhanced Compact Project** (`Ctrl+Shift+P`) - Extended project compaction with Python support and useEffect hook detection. Generate intelligent representations of your entire project optimized for token efficiency.
+
+- **Theme System** - New theme configuration with Catppuccin Mocha dark theme and Typestar-OCR font support.
 
 - **File Groups** - Save and restore frequently used file selections. Groups are persisted in localStorage and filtered by current project path.
 
@@ -20,21 +22,35 @@ All notable changes to Lirah will be documented in this file.
 
 - **Install Dependencies Script** - New `scripts/install-deps.sh` to simplify dependency setup.
 
-### Fixes
+### 🔄 Updates
+
+- **Enhanced Symbol Parsers** - Improved JavaScript/TypeScript symbol extraction and new Python symbol parser for better code analysis.
+- **Better Element Detection** - Enhanced detection for React hooks, custom hooks, classes with decorators, and TypeScript interfaces.
+- **Improved File Selection State Management** - Better handling of file and element selection states with enhanced clearing functionality.
+- **Enhanced Error Handling** - Improved parsing error management with better fallback behavior for unparsable files.
+
+### 🐛 Fixes
 
 - Fixed git diff mismatch between git status and displayed diffs
 - Fixed Claude project path parsing and detection
 - Fixed Babel symbol parser for extracting function signatures
 - Fixed token estimation and formatting
+- Fixed template selector functionality issues
 - Fixed dependency installation issues
 - Improved handling of large files with forced grep
 
-### UI Enhancements
+### 🎨 UI Enhancements
 
-- Improved file tree styling with better visual hierarchy and spacing
-- Enhanced terminal focus indicator with ring border
-- Refined git diff badges and file node layout
-- Cleaner element picker button integration in file tree
+- **File Tree Improvements** - Enhanced visual hierarchy with better spacing, compact node heights, and refined git badge integration
+- **Terminal Focus Indicator** - Added ring border outline for better focus feedback
+- **Element Picker Integration** - Clean search icon buttons for parseable files in Claude mode
+- **Dialog Layout Improvements** - Better spacing, button layout, and loading states
+- **Enhanced Interactions** - Smoother transitions, better hover states, and improved checkbox styling
+- **Typography Refinements** - Consistent font sizing using CSS variables and improved line heights
+
+### 📦 Dependencies
+
+- Added `rustpython-parser = "0.4"` for Python code parsing capability
 
 ## [Unreleased]
 
