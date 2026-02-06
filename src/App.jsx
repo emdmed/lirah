@@ -986,13 +986,13 @@ function App() {
   };
 
   // Handle textarea changes to detect @ mentions
-  const handleTextareaChange = (newValue) => {
+  const handleTextareaChange = useCallback((newValue) => {
     setTextareaContent(newValue);
     const mention = extractAtMention(newValue);
     setAtMentionQuery(mention);
     // Reset selected index when query changes
     setAtMentionSelectedIndex(0);
-  };
+  }, [extractAtMention]);
 
   // Sort results same as AtMentionModal: files first, dirs last
   const atMentionDisplayedResults = useMemo(() => {
@@ -1003,7 +1003,7 @@ function App() {
   }, [atMentionResults]);
 
   // Navigate @ mention modal (skip directories, only select files)
-  const handleAtMentionNavigate = (direction) => {
+  const handleAtMentionNavigate = useCallback((direction) => {
     if (atMentionDisplayedResults.length === 0) return;
 
     setAtMentionSelectedIndex(prev => {
@@ -1030,10 +1030,10 @@ function App() {
       if (attempts >= atMentionDisplayedResults.length) return prev;
       return newIndex;
     });
-  };
+  }, [atMentionDisplayedResults]);
 
   // Select file from @ mention modal
-  const handleAtMentionSelect = (filePath, isDirectory) => {
+  const handleAtMentionSelect = useCallback((filePath, isDirectory) => {
     if (!filePath) return;
 
     // Only allow selecting files, not directories
@@ -1054,24 +1054,24 @@ function App() {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
-  };
+  }, [toggleFileSelection, textareaContent]);
 
   // Close @ mention modal
-  const handleAtMentionClose = () => {
+  const handleAtMentionClose = useCallback(() => {
     setAtMentionQuery(null);
     setAtMentionSelectedIndex(0);
-  };
+  }, []);
 
   // Search handler functions
-  const handleSearchChange = (query) => {
+  const handleSearchChange = useCallback((query) => {
     setSearchQuery(query);
     setAtMentionQuery(null); // Clear @ mention when manual search is used
-  };
+  }, []);
 
-  const handleSearchClear = () => {
+  const handleSearchClear = useCallback(() => {
     setSearchQuery('');
     setSearchResults(null);
-  };
+  }, []);
 
   const handleToggleGitFilter = useCallback(() => {
     setShowGitChangesOnly(prev => {
@@ -1098,6 +1098,14 @@ function App() {
 
   
 
+  // Memoized @ mention search function
+  const performAtMentionSearch = useCallback((query) => {
+    if (!query || query.trim() === '') {
+      return null;
+    }
+    return search(query);
+  }, [search]);
+
   // @ mention search effect (separate from sidebar search)
   useEffect(() => {
     if (atMentionQuery === null) {
@@ -1106,17 +1114,12 @@ function App() {
     }
 
     const timer = setTimeout(() => {
-      if (!atMentionQuery || atMentionQuery.trim() === '') {
-        setAtMentionResults(null);
-        return;
-      }
-
-      const results = search(atMentionQuery);
+      const results = performAtMentionSearch(atMentionQuery);
       setAtMentionResults(results);
     }, 200); // 200ms debounce
 
     return () => clearTimeout(timer);
-  }, [atMentionQuery, search]);
+  }, [atMentionQuery, performAtMentionSearch]);
 
   // Reset selected index to first file when @ mention results change
   useEffect(() => {
@@ -1520,7 +1523,7 @@ function App() {
               onClearElements={clearSelectedElements}
               atMentionActive={atMentionQuery !== null}
               atMentionQuery={atMentionQuery || ''}
-              atMentionResults={atMentionResults}
+              atMentionResults={atMentionDisplayedResults}
               atMentionSelectedIndex={atMentionSelectedIndex}
               onAtMentionNavigate={handleAtMentionNavigate}
               onAtMentionSelect={handleAtMentionSelect}

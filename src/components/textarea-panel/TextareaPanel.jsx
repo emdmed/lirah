@@ -98,13 +98,8 @@ export function TextareaPanel({
     return { elementCount: count, elementsTooltipContent: content };
   }, [selectedElements, currentPath]);
 
-  // Sort results matching AtMentionModal order: files first, dirs last
-  const sortedAtMentionResults = useMemo(() => {
-    if (!atMentionResults) return [];
-    const files = atMentionResults.filter(r => !r.is_dir);
-    const dirs = atMentionResults.filter(r => r.is_dir);
-    return [...files, ...dirs].slice(0, 12);
-  }, [atMentionResults]);
+  // Remove duplicate sorting - use pre-sorted results from parent
+  const sortedAtMentionResults = atMentionResults || [];
 
   const handleKeyDown = (e) => {
     // Handle @ mention modal navigation

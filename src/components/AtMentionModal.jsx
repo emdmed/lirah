@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, memo } from 'react';
 import { File, Folder, CornerDownLeft } from 'lucide-react';
 
 /**
@@ -6,7 +6,7 @@ import { File, Folder, CornerDownLeft } from 'lucide-react';
  * Appears above the textarea when the user types @filename.
  * Keyboard: ArrowUp/Down to navigate, Enter to select, Esc to dismiss.
  */
-export function AtMentionModal({
+const AtMentionModal = memo(function AtMentionModal({
   results,
   selectedIndex,
   onSelect,
@@ -173,4 +173,4 @@ export function AtMentionModal({
       )}
     </div>
   );
-}
+});
