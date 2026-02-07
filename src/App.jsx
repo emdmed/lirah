@@ -774,6 +774,7 @@ function App() {
 
   // Close @ mention modal
   const handleAtMentionClose = useCallback(() => {
+    setTextareaContent(prev => prev.replace(/@[^\s@]*$/, ''));
     setAtMentionQuery(null);
     setAtMentionSelectedIndex(0);
   }, []);
