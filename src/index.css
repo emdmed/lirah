@@ -131,10 +131,11 @@ body {
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 
-/* Custom scrollbar - consistent thin width, no resize on hover */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-track {
@@ -150,15 +151,16 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Disable overlay scrollbar behavior */
 ::-webkit-scrollbar-button {
   display: none;
 }
 
-/* Firefox scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+/* Firefox scrollbar (not applied in WebKit/Tauri) */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
 }
 
 /* Force scrollbar to always show at same size */
@@ -172,6 +174,7 @@ body {
 .filetree-container {
   font-family: var(--font-mono) !important;
   font-size: var(--font-sm);
+  line-height: 1.4;
 }
 
 /* Engineering sketch dashed borders */

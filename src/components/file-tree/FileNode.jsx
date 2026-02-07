@@ -39,43 +39,49 @@ export function FileNode({
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`flex h-4 items-center gap-1 w-full ${isCurrentPath ? 'bg-accent' : ''} ${
+      className={`flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${
         isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
       } ${isDeleted ? 'opacity-60' : ''}`}
     >
-      {/* Element picker button - only for parseable files in Claude mode */}
-      {isTextareaPanelOpen && isParseable && !isDeleted && (
-        <button
-          className="p-0 transition-opacity duration-200 rounded opacity-40 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenElementPicker?.(node.path);
-          }}
-          title="Pick elements from file"
-        >
-          <Search className="w-2.5 h-2.5" />
-        </button>
-      )}
+      {/* Element picker button - always rendered for alignment, enabled for parseable files in Claude mode */}
+      <button
+        className={`p-0 transition-opacity duration-200 rounded flex-shrink-0 ${
+          isTextareaPanelOpen && isParseable && !isDeleted
+            ? 'opacity-40 hover:opacity-100 hover:bg-white/10 cursor-pointer'
+            : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenElementPicker?.(node.path);
+        }}
+        title="Pick elements from file"
+        tabIndex={isTextareaPanelOpen && isParseable && !isDeleted ? 0 : -1}
+      >
+        <Search className="w-2.5 h-2.5" />
+      </button>
 
       {/* Main file display */}
       <div
-        className={`flex items-center justify-start min-w-0 flex-1 gap-1 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
+        className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
         onClick={handleFileClick}
       >
-        {/* Git diff button inline */}
-        {hasGitChanges && !isDeleted && (
-          <button
-            className="p-0 transition-opacity duration-200 rounded opacity-60 hover:opacity-100 hover:bg-white/10 flex-shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDiff?.(node.path);
-            }}
-            title="View git diff"
-          >
-            <GitBranch className="w-2.5 h-2.5" />
-          </button>
-        )}
-        <span className={`truncate leading-none ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
+        {/* Git diff button - always rendered for alignment, enabled when file has git changes */}
+        <button
+          className={`p-0 transition-opacity duration-200 rounded flex-shrink-0 ${
+            hasGitChanges && !isDeleted
+              ? 'opacity-60 hover:opacity-100 hover:bg-white/10 cursor-pointer'
+              : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewDiff?.(node.path);
+          }}
+          title="View git diff"
+          tabIndex={hasGitChanges && !isDeleted ? 0 : -1}
+        >
+          <GitBranch className="w-2.5 h-2.5" />
+        </button>
+        <span className={`truncate leading-normal ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
 
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}

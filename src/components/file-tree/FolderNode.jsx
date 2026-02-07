@@ -17,7 +17,7 @@ export function FolderNode({ node, depth, isExpanded, isCurrentPath, onToggle })
       size="sm"
       onClick={() => onToggle(node.path)}
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`p-0 cursor-pointer h-4 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
+      className={`p-0 cursor-pointer h-[18px] focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
     >
       <div className="flex items-center w-full">
         <div className="w-2.5 flex items-center">
