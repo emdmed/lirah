@@ -4,9 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from './ui/dialog';
-import { Button } from './ui/button';
 import { useBookmarks } from '../contexts/BookmarksContext';
 import { FolderOpen } from 'lucide-react';
 
@@ -93,35 +91,40 @@ export function InitialProjectDialog({ open, onOpenChange, onNavigate, onLaunchC
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto py-1">
-          {sortedBookmarks.map((bookmark, index) => (
-            <button
-              key={bookmark.id}
-              ref={index === selectedIndex ? selectedItemRef : null}
-              onClick={() => handleSelectBookmark(bookmark)}
-              className={`flex flex-col items-start px-3 py-2 rounded text-left transition-colors ${
-                index === selectedIndex
-                  ? 'bg-white/10'
-                  : 'hover:bg-white/5'
-              }`}
-            >
-              <span className="text-sm font-medium">{bookmark.name}</span>
-              <span className="text-xs opacity-50">{bookmark.path}</span>
-            </button>
-          ))}
+        <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-md p-2 border-sketch">
+          {sortedBookmarks.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-sm opacity-50">
+              <div className="text-center">
+                <p>No bookmarks yet.</p>
+                <p className="text-xs mt-2">
+                  Open the sidebar (Ctrl+S) and click the star icon to add one.
+                </p>
+              </div>
+            </div>
+          ) : (
+            sortedBookmarks.map((bookmark, index) => (
+              <button
+                key={bookmark.id}
+                ref={index === selectedIndex ? selectedItemRef : null}
+                onClick={() => handleSelectBookmark(bookmark)}
+                className={`flex flex-col items-start gap-1 px-4 py-3 rounded-md text-left transition-colors ${
+                  index === selectedIndex
+                    ? 'bg-white/10 outline outline-1 outline-dashed outline-ring/70'
+                    : 'hover:bg-white/5'
+                }`}
+              >
+                <span className="font-medium">{bookmark.name}</span>
+                <span className="text-xs opacity-50">{bookmark.path}</span>
+              </button>
+            ))
+          )}
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={handleSkip}>
-            Skip (Esc)
-          </Button>
-          <Button
-            onClick={() => sortedBookmarks[selectedIndex] && handleSelectBookmark(sortedBookmarks[selectedIndex])}
-            disabled={sortedBookmarks.length === 0}
-          >
-            Confirm (Enter)
-          </Button>
-        </DialogFooter>
+        <div className="flex items-center gap-4 text-xs opacity-50 border-t pt-2">
+          <span>↑↓ Navigate</span>
+          <span>Enter Select</span>
+          <span>ESC Close</span>
+        </div>
       </DialogContent>
     </Dialog>
   );
