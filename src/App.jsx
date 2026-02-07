@@ -654,6 +654,14 @@ function App() {
   // Monitor terminal CWD changes
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen && fileWatchingEnabled);
 
+  // Auto-uncheck orchestration if .claude/orchestration.md doesn't exist in project root
+  useEffect(() => {
+    if (!detectedCwd) return;
+    invoke('read_file_content', { path: `${detectedCwd}/.claude/orchestration.md` })
+      .then(() => setAppendOrchestration(true))
+      .catch(() => setAppendOrchestration(false));
+  }, [detectedCwd]);
+
   // Fetch data when sidebar opens (mode-specific)
   useEffect(() => {
     if (sidebarOpen) {
