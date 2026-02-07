@@ -6,7 +6,7 @@ import { File, Folder, CornerDownLeft } from 'lucide-react';
  * Appears above the textarea when the user types @filename.
  * Keyboard: ArrowUp/Down to navigate, Enter to select, Esc to dismiss.
  */
-const AtMentionModal = memo(function AtMentionModal({
+export const AtMentionModal = memo(function AtMentionModal({
   results,
   selectedIndex,
   onSelect,

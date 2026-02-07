@@ -21,7 +21,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
-import { useTextareaShortcuts, saveLastPrompt } from "./hooks/useTextareaShortcuts";
+import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
 import { useFileSearch } from "./hooks/useFileSearch";
 import { useHelpShortcut } from "./hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "./hooks/useBookmarksShortcut";
@@ -29,10 +29,13 @@ import { useClaudeLauncher } from "./hooks/useClaudeLauncher";
 import { useFileSymbols } from "./hooks/file-analysis/useFileSymbols";
 import { useTokenUsage } from "./hooks/useTokenUsage";
 import { useProjectCompact, estimateTokens, formatTokenCount } from "./hooks/useProjectCompact";
+import { useTypeChecker } from "./hooks/useTypeChecker";
+import { usePromptSender } from "./hooks/usePromptSender";
+import { buildTreeFromFlatList, incrementallyUpdateTree } from "./utils/treeOperations";
 import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { ElementPickerDialog } from "./components/ElementPickerDialog";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
-import { SidebarFileSelection, LARGE_FILE_INSTRUCTION } from "./components/sidebar/SidebarFileSelection";
+import { SidebarFileSelection } from "./components/sidebar/SidebarFileSelection";
 import {
   Sidebar,
   SidebarContent,
@@ -143,10 +146,14 @@ function App() {
   const [manageTemplatesDialogOpen, setManageTemplatesDialogOpen] = useState(false);
   const [appendOrchestration, setAppendOrchestration] = useState(true);
 
-  // Type check state
-  const [typeCheckResults, setTypeCheckResults] = useState(new Map());
-  const [checkingFiles, setCheckingFiles] = useState(new Set());
-  const [successfulChecks, setSuccessfulChecks] = useState(new Set()); // Files that passed (no errors)
+  // Type checker hook
+  const {
+    checkFileTypes,
+    typeCheckResults,
+    checkingFiles,
+    successfulChecks,
+    resetTypeChecker,
+  } = useTypeChecker(currentPath, { setTextareaVisible, setTextareaContent });
 
   // Git diff dialog state
   const [diffDialogOpen, setDiffDialogOpen] = useState(false);
@@ -252,52 +259,6 @@ function App() {
       console.error('Failed to launch orchestration:', error);
     }
   }, [terminalSessionId]);
-
-  // Helper function to build tree from flat list
-  const buildTreeFromFlatList = (flatList, rootPath) => {
-    const nodeMap = new Map();
-
-    // Initialize all nodes
-    flatList.forEach(entry => {
-      nodeMap.set(entry.path, {
-        ...entry,
-        children: entry.is_dir ? [] : undefined,
-        depth: entry.depth
-      });
-    });
-
-    const rootNodes = [];
-
-    // Build parent-child relationships
-    flatList.forEach(entry => {
-      const node = nodeMap.get(entry.path);
-
-      if (entry.parent_path === rootPath || !entry.parent_path) {
-        rootNodes.push(node);
-      } else {
-        const parent = nodeMap.get(entry.parent_path);
-        if (parent && parent.children) {
-          parent.children.push(node);
-        }
-      }
-    });
-
-    // Sort recursively: folders first, alphabetically
-    const sortChildren = (nodes) => {
-      nodes.forEach(node => {
-        if (node.children && node.children.length > 0) {
-          sortChildren(node.children);
-        }
-      });
-      nodes.sort((a, b) => {
-        if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-      });
-    };
-
-    sortChildren(rootNodes);
-    return rootNodes;
-  };
 
   // Tree view helper functions (defined early for use in hooks)
   const loadTreeData = useCallback(async () => {
@@ -555,89 +516,8 @@ function App() {
   }, [selectedFiles, fileStates, currentPath]);
 
   // Incremental tree update to prevent flickering
-  const incrementallyUpdateTree = useCallback((changes, rootPath) => {
-    console.log('[incrementallyUpdateTree] Called with rootPath:', rootPath, 'changes:', changes);
-    setTreeData(prevTreeData => {
-      let newData = [...prevTreeData];
-      console.log('[incrementallyUpdateTree] prevTreeData length:', prevTreeData.length);
-
-      // Add new untracked files to the tree
-      changes.newUntracked.forEach(({ path: filePath, stats }) => {
-        const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
-        const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-        console.log('[incrementallyUpdateTree] Processing:', filePath, 'parentPath:', parentPath);
-
-        // Check if file already exists in tree
-        const fileExistsInTree = (nodes) => {
-          for (const node of nodes) {
-            if (node.path === filePath) return true;
-            if (node.children && fileExistsInTree(node.children)) return true;
-          }
-          return false;
-        };
-
-        if (fileExistsInTree(newData)) {
-          console.log('[incrementallyUpdateTree] File already exists in tree, skipping:', filePath);
-          return; // Already in tree
-        }
-
-        // Root-level file: parentPath equals the tree root
-        if (parentPath === rootPath) {
-          console.log('[incrementallyUpdateTree] Adding root-level file:', fileName);
-          newData = [...newData, {
-            name: fileName,
-            path: filePath,
-            is_dir: false,
-            depth: 0,
-            parent_path: parentPath
-          }];
-          // Sort: folders first, then files alphabetically
-          newData.sort((a, b) => {
-            if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-            return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-          });
-          return;
-        }
-
-        // Find and update the parent node for nested files
-        console.log('[incrementallyUpdateTree] Looking for parent node:', parentPath);
-        const updateNode = (nodes) => {
-          return nodes.map(node => {
-            if (node.path === parentPath) {
-              console.log('[incrementallyUpdateTree] Found parent, adding file:', fileName);
-              const newNode = { ...node };
-              if (!newNode.children) {
-                newNode.children = [];
-              }
-              // Add new file if not already present
-              if (!newNode.children.some(child => child.path === filePath)) {
-                newNode.children.push({
-                  name: fileName,
-                  path: filePath,
-                  is_dir: false,
-                  depth: node.depth + 1,
-                  parent_path: parentPath
-                });
-                // Sort children: folders first, then files alphabetically
-                newNode.children.sort((a, b) => {
-                  if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-                  return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-                });
-              }
-              return newNode;
-            } else if (node.children) {
-              return { ...node, children: updateNode(node.children) };
-            }
-            return node;
-          });
-        };
-
-        newData = updateNode(newData);
-      });
-
-      console.log('[incrementallyUpdateTree] Final newData length:', newData.length);
-      return newData;
-    });
+  const handleIncrementalUpdate = useCallback((changes, rootPath) => {
+    setTreeData(prevTreeData => incrementallyUpdateTree(prevTreeData, changes, rootPath));
   }, []);
 
   // Handle git changes with incremental updates to prevent flickering
@@ -646,12 +526,12 @@ function App() {
     // For new untracked files only - use incremental update
     if (changes.newUntracked.length > 0 && !changes.newDeleted.length && !changes.noLongerUntracked.length) {
       console.log('[handleGitChanges] Adding new untracked files to tree:', changes.newUntracked, 'rootPath:', currentPath);
-      incrementallyUpdateTree(changes, currentPath);
+      handleIncrementalUpdate(changes, currentPath);
     } else if (changes.hasChanges) {
       console.log('[handleGitChanges] Complex git changes detected, refreshing tree:', changes);
       loadTreeData();
     }
-  }, [incrementallyUpdateTree, loadTreeData, currentPath]);
+  }, [handleIncrementalUpdate, loadTreeData, currentPath]);
 
   // Navigate to bookmark
   const navigateToBookmark = useCallback(async (bookmark) => {
@@ -704,189 +584,27 @@ function App() {
   }, [terminalSessionId, viewMode, loadFolders, loadTreeData, updateBookmark, terminalRef]);
 
   // Send textarea content to terminal
-  const sendTextareaToTerminal = useCallback(async () => {
-    if (!terminalSessionId) {
-      return;
-    }
-
-    const hasTextContent = textareaContent?.trim();
-    const hasFiles = selectedFiles.size > 0;
-    const hasTemplate = !!selectedTemplateId;
-    const hasElements = selectedElements.size > 0;
-    const hasCompactedProject = !!compactedProject?.output;
-
-    if (!hasTextContent && !hasFiles && !hasTemplate && !hasElements && !hasCompactedProject) {
-      return;
-    }
-
-    try {
-      let fullCommand = '';
-
-      // Add compacted project at the beginning if it exists
-      if (hasCompactedProject) {
-        fullCommand = compactedProject.output;
-      }
-
-      if (hasTextContent) {
-        if (fullCommand) {
-          fullCommand += '\n\n' + textareaContent;
-        } else {
-          fullCommand = textareaContent;
-        }
-      }
-
-      if (hasFiles) {
-        const fileArray = Array.from(selectedFiles);
-
-        // Group files by state with their symbols
-        const modifyFiles = [];
-        const doNotModifyFiles = [];
-        const exampleFiles = [];
-
-        fileArray.forEach(absolutePath => {
-          const relativePath = getRelativePath(absolutePath, currentPath);
-          const escapedPath = escapeShellPath(relativePath);
-          const state = fileStates.get(absolutePath) || 'modify';
-
-          // Only include analysis for files with 300+ lines (auto-selects mode based on size)
-          const lineCount = getLineCount(absolutePath);
-          const analysisStr = lineCount >= 300 ? formatFileAnalysis(absolutePath) : '';
-          const modeLabel = lineCount >= 300 ? getViewModeLabel(absolutePath) : null;
-
-          const fileEntry = { path: escapedPath, analysis: analysisStr, modeLabel };
-
-          if (state === 'modify') {
-            modifyFiles.push(fileEntry);
-          } else if (state === 'do-not-modify') {
-            doNotModifyFiles.push(fileEntry);
-          } else if (state === 'use-as-example') {
-            exampleFiles.push(fileEntry);
-          }
-        });
-
-        // Build structured format with analysis (symbols/signatures/skeleton)
-        const formatFileSection = (label, files) => {
-          return files.map(f => {
-            let entry = `${label}: ${f.path}`;
-            if (f.analysis) {
-              const header = f.modeLabel || 'Analysis';
-              entry += `\n  ${header}:\n${f.analysis}`;
-            }
-            return entry;
-          }).join('\n\n');
-        };
-
-        const sections = [];
-
-        if (modifyFiles.length > 0) {
-          sections.push(formatFileSection('MODIFY', modifyFiles));
-        }
-        if (doNotModifyFiles.length > 0) {
-          sections.push(formatFileSection('DO_NOT_MODIFY', doNotModifyFiles));
-        }
-        if (exampleFiles.length > 0) {
-          sections.push(formatFileSection('USE_AS_EXAMPLE', exampleFiles));
-        }
-
-        // Check if any file has a digest (large file)
-        const allFiles = [...modifyFiles, ...doNotModifyFiles, ...exampleFiles];
-        const hasDigests = allFiles.some(f => f.analysis);
-
-        let filesString = sections.join('\n\n');
-
-        // Add instruction once if any files have digests
-        if (hasDigests) {
-          filesString += LARGE_FILE_INSTRUCTION;
-        }
-
-        if (hasTextContent) {
-          fullCommand = `${filesString}\n\n${textareaContent}`;
-        } else {
-          fullCommand = filesString;
-        }
-      }
-
-      // Add selected elements from element picker
-      if (hasElements) {
-        const elementsOutput = [];
-        selectedElements.forEach((elements, filePath) => {
-          if (elements.length === 0) return;
-          const relativePath = getRelativePath(filePath, currentPath);
-          const escapedPath = escapeShellPath(relativePath);
-          const elementLines = elements.map(el => {
-            const lineInfo = el.line === el.endLine
-              ? `line ${el.line}`
-              : `lines ${el.line}-${el.endLine}`;
-            return `  - ${el.displayName} (${el.type}): ${lineInfo}`;
-          });
-          elementsOutput.push(`ELEMENTS from ${escapedPath}:\n${elementLines.join('\n')}`);
-        });
-
-        if (elementsOutput.length > 0) {
-          const elementsString = elementsOutput.join('\n\n');
-          const separator = fullCommand.trim() ? '\n\n' : '';
-          fullCommand = fullCommand + separator + elementsString;
-        }
-      }
-
-      // Append selected template content if any
-      if (selectedTemplateId) {
-        const template = getTemplateById(selectedTemplateId);
-        if (template) {
-          const separator = fullCommand.trim() ? '\n\n' : '';
-          fullCommand = fullCommand + separator + template.content;
-        }
-      }
-
-      // Append orchestration prompt if checkbox is checked
-      if (appendOrchestration) {
-        const separator = fullCommand.trim() ? '\n\n' : '';
-        fullCommand = fullCommand + separator + 'Read and follow .claude/orchestration.md';
-      }
-
-      // Send text content first
-      await invoke('write_to_terminal', {
-        sessionId: terminalSessionId,
-        data: fullCommand
-      });
-
-      // Small delay then send Enter (carriage return) to submit
-      setTimeout(async () => {
-        try {
-          await invoke('write_to_terminal', {
-            sessionId: terminalSessionId,
-            data: '\r'
-          });
-        } catch (error) {
-          console.error('Failed to send Enter:', error);
-        }
-      }, 500);
-
-      console.log('Sent to terminal:', fullCommand);
-
-      // Focus terminal
-      if (terminalRef.current?.focus) {
-        terminalRef.current.focus();
-      }
-
-      // Save prompt before clearing (for Ctrl+Z restore)
-      saveLastPrompt(textareaContent);
-
-      // Clear textarea content (always)
-      setTextareaContent('');
-
-      // Clear file selection only if persistence is disabled
-      if (!keepFilesAfterSend) {
-        clearFileSelection();
-        clearSelectedElements();
-      }
-
-      // Clear compacted project after sending
-      setCompactedProject(null);
-    } catch (error) {
-      console.error('Failed to send to terminal:', error);
-    }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject]);
+  const sendTextareaToTerminal = usePromptSender({
+    terminalSessionId,
+    terminalRef,
+    textareaContent,
+    selectedFiles,
+    currentPath,
+    fileStates,
+    keepFilesAfterSend,
+    selectedTemplateId,
+    getTemplateById,
+    appendOrchestration,
+    formatFileAnalysis,
+    getLineCount,
+    getViewModeLabel,
+    selectedElements,
+    compactedProject,
+    setTextareaContent,
+    setCompactedProject,
+    clearFileSelection,
+    clearSelectedElements,
+  });
 
   // Keyboard shortcuts hook
   useViewModeShortcuts({
@@ -929,9 +647,7 @@ function App() {
     if (!sidebarOpen) {
       setExpandedFolders(new Set());
       setExpandedAnalysis(new Set());
-      setTypeCheckResults(new Map());
-      setCheckingFiles(new Set());
-      setSuccessfulChecks(new Set());
+      resetTypeChecker();
     }
   }, [sidebarOpen]);
 
@@ -1292,97 +1008,6 @@ function App() {
     });
   };
 
-
-  // Type check functions
-  const checkFileTypes = async (filePath) => {
-    if (checkingFiles.has(filePath)) {
-      return; // Prevent duplicate checks
-    }
-
-    console.log('🔍 Starting type check for:', filePath);
-    setCheckingFiles(prev => new Set(prev).add(filePath));
-
-    try {
-      const result = await invoke('check_file_types', {
-        filePath: filePath,
-        projectRoot: currentPath
-      });
-
-      console.log('✅ Type check result:', result);
-      setTypeCheckResults(prev => new Map(prev).set(filePath, result));
-
-      // Open textarea and append errors if there are any
-      if (result.error_count > 0 || result.warning_count > 0) {
-        console.log(`⚠️ Found ${result.error_count} errors and ${result.warning_count} warnings`);
-        setTextareaVisible(true);
-
-        const errorText = formatTypeCheckErrors(result);
-        setTextareaContent(prev => {
-          const separator = prev.trim() ? '\n\n---\n\n' : '';
-          return prev + separator + errorText;
-        });
-      } else {
-        console.log('✨ No errors found! Showing green button for 3 seconds');
-        // Success case - no errors! Only show visual feedback (green button)
-        setSuccessfulChecks(prev => new Set(prev).add(filePath));
-
-        // Clear success state after 3 seconds
-        setTimeout(() => {
-          setSuccessfulChecks(prev => {
-            const next = new Set(prev);
-            next.delete(filePath);
-            return next;
-          });
-        }, 3000);
-      }
-    } catch (error) {
-      console.error('❌ Type check failed:', filePath, error);
-
-      setTextareaVisible(true);
-      const errorMsg = `Type check failed for ${filePath}:\n${error}`;
-      setTextareaContent(prev => {
-        const separator = prev.trim() ? '\n\n---\n\n' : '';
-        return prev + separator + errorMsg;
-      });
-    } finally {
-      setCheckingFiles(prev => {
-        const next = new Set(prev);
-        next.delete(filePath);
-        return next;
-      });
-    }
-  };
-
-  const formatTypeCheckErrors = (result) => {
-    const lines = [];
-
-    lines.push(`Type Check Results: ${result.file_path}`);
-    lines.push(`Errors: ${result.error_count}, Warnings: ${result.warning_count}`);
-    lines.push(`Duration: ${result.execution_time_ms}ms`);
-    lines.push('');
-
-    const errors = result.errors.filter(e => e.severity === 'error');
-    const warnings = result.errors.filter(e => e.severity === 'warning');
-
-    if (errors.length > 0) {
-      lines.push('ERRORS:');
-      errors.forEach(err => {
-        lines.push(`  Line ${err.line}, Col ${err.column}: ${err.code}`);
-        lines.push(`    ${err.message}`);
-      });
-      lines.push('');
-    }
-
-    if (warnings.length > 0) {
-      lines.push('WARNINGS:');
-      warnings.forEach(warn => {
-        lines.push(`  Line ${warn.line}, Col ${warn.column}: ${warn.code}`);
-        lines.push(`    ${warn.message}`);
-      });
-    }
-
-    return lines.join('\n');
-  };
 
   // Create filtered tree data for display (search filter only)
   const displayedTreeData = useMemo(() => {
