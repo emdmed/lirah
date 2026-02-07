@@ -1153,6 +1153,9 @@ function App() {
               onAtMentionNavigate={handleAtMentionNavigate}
               onAtMentionSelect={handleAtMentionSelect}
               onAtMentionClose={handleAtMentionClose}
+              fileStates={fileStates}
+              onSetFileState={setFileState}
+              onToggleFile={toggleFileSelection}
             />
           )
         }

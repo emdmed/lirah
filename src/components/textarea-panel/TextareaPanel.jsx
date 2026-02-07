@@ -49,6 +49,9 @@ export function TextareaPanel({
   onAtMentionNavigate,
   onAtMentionSelect,
   onAtMentionClose,
+  fileStates,
+  onSetFileState,
+  onToggleFile,
 }) {
   // Get relative path helper
   const getRelativePath = (filePath) => {
@@ -118,7 +121,13 @@ export function TextareaPanel({
         e.preventDefault();
         const selectedFile = sortedAtMentionResults[atMentionSelectedIndex];
         if (selectedFile) {
-          onAtMentionSelect(selectedFile.path, selectedFile.is_dir);
+          const isAlreadySelected = selectedFiles instanceof Set && selectedFiles.has(selectedFile.path);
+          if (isAlreadySelected) {
+            // File already added (e.g. via arrow keys), just close the modal
+            onAtMentionClose();
+          } else {
+            onAtMentionSelect(selectedFile.path, selectedFile.is_dir);
+          }
         }
         return;
       }
@@ -126,6 +135,25 @@ export function TextareaPanel({
         e.preventDefault();
         onAtMentionClose();
         return;
+      }
+      // Left/Right arrow keys to cycle file mode (selects the file first if needed)
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const selectedFile = sortedAtMentionResults[atMentionSelectedIndex];
+        if (selectedFile && !selectedFile.is_dir) {
+          e.preventDefault();
+          const isAlreadySelected = selectedFiles instanceof Set && selectedFiles.has(selectedFile.path);
+          if (!isAlreadySelected) {
+            // Add the file without closing the modal
+            onToggleFile(selectedFile.path);
+          }
+          const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
+          const currentState = (fileStates && fileStates.get(selectedFile.path)) || 'modify';
+          const currentIndex = FILE_STATES.indexOf(currentState);
+          const direction = e.key === 'ArrowRight' ? 1 : -1;
+          const nextIndex = (currentIndex + direction + FILE_STATES.length) % FILE_STATES.length;
+          onSetFileState(selectedFile.path, FILE_STATES[nextIndex]);
+          return;
+        }
       }
     }
 
@@ -287,6 +315,7 @@ export function TextareaPanel({
             currentPath={currentPath}
             query={atMentionQuery}
             selectedFiles={selectedFiles}
+            fileStates={fileStates}
           />
         )}
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo, memo } from 'react';
-import { File, Folder, CornerDownLeft } from 'lucide-react';
+import { File, Folder, CornerDownLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * Autocomplete modal for @ mention file selection.
@@ -13,6 +13,7 @@ export const AtMentionModal = memo(function AtMentionModal({
   currentPath,
   query = '',
   selectedFiles,
+  fileStates,
 }) {
   const listRef = useRef(null);
   const selectedItemRef = useRef(null);
@@ -95,6 +96,10 @@ export const AtMentionModal = memo(function AtMentionModal({
             navigate
           </span>
           <span className="flex items-center gap-1">
+            <kbd className="px-1 rounded bg-muted/50 border border-sketch text-[9px] font-mono">←→</kbd>
+            mode
+          </span>
+          <span className="flex items-center gap-1">
             <kbd className="px-1 rounded bg-muted/50 border border-sketch text-[9px] font-mono">↵</kbd>
             select
           </span>
@@ -146,12 +151,23 @@ export const AtMentionModal = memo(function AtMentionModal({
                 </span>
               </span>
 
-              {/* Already-selected indicator */}
-              {isAlreadySelected && !isDir && (
-                <span className="text-primary text-[9px] flex-shrink-0 px-1 rounded bg-primary/10 border border-primary/20">
-                  added
-                </span>
-              )}
+              {/* Already-selected indicator with mode */}
+              {isAlreadySelected && !isDir && (() => {
+                const MODES = [
+                  { value: 'modify', label: 'modify', cls: 'text-primary bg-primary/10 border-primary/20' },
+                  { value: 'do-not-modify', label: 'no modify', cls: 'text-destructive bg-destructive/10 border-destructive/20' },
+                  { value: 'use-as-example', label: 'example', cls: 'text-accent bg-accent/10 border-accent/20' },
+                ];
+                const state = (fileStates && fileStates.get(result.path)) || 'modify';
+                const mode = MODES.find(m => m.value === state) || MODES[0];
+                return (
+                  <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border font-medium ${mode.cls}`} style={{ fontSize: 'var(--font-xs)' }}>
+                    {isSelected && <ChevronLeft className="w-2.5 h-2.5 opacity-40" />}
+                    {mode.label}
+                    {isSelected && <ChevronRight className="w-2.5 h-2.5 opacity-40" />}
+                  </span>
+                );
+              })()}
 
               {/* Enter hint on selected row */}
               {isSelected && !isDir && !isAlreadySelected && (
