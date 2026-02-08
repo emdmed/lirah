@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Terminal } from "./components/Terminal";
 import { Layout } from "./components/Layout";
 import { StatusBar } from "./components/StatusBar";
+import { TitleBar } from "./components/TitleBar";
 import { FileTree } from "./components/file-tree/file-tree";
 import { SidebarHeader } from "./components/SidebarHeader";
 import { FlatViewMenu } from "./components/FlatViewMenu";
@@ -57,6 +58,12 @@ function App() {
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showTitleBar, setShowTitleBar] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nevo-terminal:show-title-bar');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch { return true; }
+  });
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
   const [terminalSessionId, setTerminalSessionId] = useState(null);
@@ -212,6 +219,15 @@ function App() {
       console.warn('Failed to save keep-files preference to localStorage:', error);
     }
   }, [keepFilesAfterSend]);
+
+  // Save showTitleBar to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('nevo-terminal:show-title-bar', JSON.stringify(showTitleBar));
+    } catch (error) {
+      console.warn('Failed to save title bar preference to localStorage:', error);
+    }
+  }, [showTitleBar]);
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
@@ -1147,6 +1163,7 @@ function App() {
             />
           )
         }
+        titleBar={showTitleBar && <TitleBar theme={theme.terminal} />}
         statusBar={
           <StatusBar
             viewMode={viewMode}
@@ -1157,6 +1174,8 @@ function App() {
             onLaunchOrchestration={launchOrchestration}
             selectedCli={selectedCli}
             onOpenCliSettings={() => setCliSelectionModalOpen(true)}
+            showTitleBar={showTitleBar}
+            onToggleTitleBar={() => setShowTitleBar(prev => !prev)}
           />
         }
       >

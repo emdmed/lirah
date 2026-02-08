@@ -1,6 +1,7 @@
-export function Layout({ sidebar, children, statusBar, textarea }) {
+export function Layout({ sidebar, children, statusBar, textarea, titleBar }) {
   return (
     <div className="p-1 flex flex-col" style={{ width: '100%', height: '100%' }}>
+      {titleBar}
       <div className="flex flex-1 min-h-0">
         {sidebar}
         <div className="flex-1 flex flex-col px-2 min-h-0">

@@ -1,5 +1,5 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { Button } from './ui/button';
@@ -17,7 +17,7 @@ const CLI_DISPLAY = {
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers });
@@ -97,6 +97,17 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               )}
               File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
               <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onToggleTitleBar}
+              className="cursor-pointer"
+            >
+              {showTitleBar ? (
+                <PanelTop className="w-4 h-4 mr-2" />
+              ) : (
+                <PanelTopClose className="w-4 h-4 mr-2" style={{ color: '#E82424' }} />
+              )}
+              Title Bar: {showTitleBar ? 'ON' : 'OFF'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

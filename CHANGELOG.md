@@ -2,6 +2,26 @@
 
 All notable changes to Lirah will be documented in this file.
 
+## [0.1.12] - 2026-02-08
+
+### 🚀 Features
+
+- **Windows Support** - Full Windows compatibility with PowerShell integration, Windows CWD detection via `sysinfo` crate, and platform-aware path handling throughout the app.
+- **Orchestration Auto-Detection** - Orchestration mode now automatically disables when a project has no `.orchestration/` folder, with updated status bar indicator.
+
+### 🐛 Fixes
+
+- Fixed path normalization across platforms with new `pathUtils.js` utility module
+- Fixed file tree view rendering issues on Windows (hidden/system directories, symlink traversal)
+- Fixed flat view navigation for Windows path separators
+- Fixed shell path escaping for PowerShell compatibility
+- Fixed `notify` crate configuration for cross-platform support
+
+### 📦 Dependencies
+
+- Added `sysinfo = "0.33"` (Windows) for process CWD detection
+- Updated `notify` to use default features for cross-platform support
+
 ## [0.1.11] - 2026-02-07
 
 ### 🚀 Features
