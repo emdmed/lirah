@@ -8,6 +8,7 @@ import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 import { CompactProjectButton } from "./CompactProjectButton";
 import { AtMentionModal } from "../AtMentionModal";
 import { X } from "lucide-react";
+import { getRelativePath } from "../../utils/pathUtils";
 
 /**
  * Main textarea panel component for multi-line input with file selection
@@ -53,16 +54,6 @@ export function TextareaPanel({
   onSetFileState,
   onToggleFile,
 }) {
-  // Get relative path helper
-  const getRelativePath = (filePath) => {
-    if (!filePath || !currentPath) return filePath || '';
-    const normalizedCwd = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
-    if (filePath.startsWith(normalizedCwd + '/')) {
-      return filePath.slice(normalizedCwd.length + 1);
-    }
-    return filePath;
-  };
-
   // Count total selected elements and build tooltip content
   const { elementCount, elementsTooltipContent } = useMemo(() => {
     if (!selectedElements || selectedElements.size === 0) {
@@ -72,7 +63,7 @@ export function TextareaPanel({
     const fileEntries = [];
     selectedElements.forEach((elements, filePath) => {
       count += elements.length;
-      const relativePath = getRelativePath(filePath);
+      const relativePath = getRelativePath(filePath, currentPath);
       fileEntries.push({ path: relativePath, elements });
     });
 

@@ -11,6 +11,7 @@ import { DiffContent } from './DiffContent';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { basename } from '../utils/pathUtils';
 
 /**
  * Dialog that shows side-by-side git diff for a specific file
@@ -114,7 +115,7 @@ export function GitDiffDialog({
   }, [open, hasMultipleFiles, goToPrevFile, goToNextFile]);
 
   // Extract filename from path for display
-  const fileName = filePath ? filePath.split('/').pop() : '';
+  const fileName = filePath ? basename(filePath) : '';
   const relativePath = filePath && repoPath
     ? filePath.replace(repoPath + '/', '')
     : filePath;

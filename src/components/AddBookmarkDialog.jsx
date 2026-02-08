@@ -10,6 +10,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useBookmarks } from '../contexts/BookmarksContext';
+import { basename } from '../utils/pathUtils';
 
 export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
   const { addBookmark } = useBookmarks();
@@ -19,8 +20,8 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
   // Auto-fill name with directory basename when dialog opens
   useEffect(() => {
     if (open && currentPath) {
-      const basename = currentPath.split('/').filter(Boolean).pop() || 'root';
-      setName(basename);
+      const dirName = basename(currentPath) || 'root';
+      setName(dirName);
       setError('');
     }
   }, [open, currentPath]);

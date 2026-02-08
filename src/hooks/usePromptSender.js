@@ -2,25 +2,7 @@ import { useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { saveLastPrompt } from "./useTextareaShortcuts";
 import { LARGE_FILE_INSTRUCTION } from "../components/sidebar/SidebarFileSelection";
-
-function escapeShellPath(path) {
-  return `'${path.replace(/'/g, "'\\''")}'`;
-}
-
-function getRelativePath(absolutePath, cwdPath) {
-  const normalizedCwd = cwdPath.endsWith('/') ? cwdPath.slice(0, -1) : cwdPath;
-  const normalizedFile = absolutePath.endsWith('/') ? absolutePath.slice(0, -1) : absolutePath;
-
-  if (normalizedFile.startsWith(normalizedCwd + '/')) {
-    return normalizedFile.slice(normalizedCwd.length + 1);
-  }
-
-  if (normalizedFile === normalizedCwd) {
-    return '.';
-  }
-
-  return absolutePath;
-}
+import { escapeShellPath, getRelativePath } from "../utils/pathUtils";
 
 function buildFilesSections(selectedFiles, currentPath, fileStates, { getLineCount, formatFileAnalysis, getViewModeLabel }) {
   const fileArray = Array.from(selectedFiles);

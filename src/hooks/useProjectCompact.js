@@ -69,7 +69,7 @@ export function useProjectCompact() {
       if (file.is_dir) return false;
 
       // Check if any parent directory should be skipped
-      const pathParts = file.path.split('/');
+      const pathParts = file.path.split(/[/\\]/);
       for (const part of pathParts) {
         if (SKIP_DIRECTORIES.has(part)) {
           return false;

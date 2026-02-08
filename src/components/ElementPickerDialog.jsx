@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { extractSkeleton as extractBabelSkeleton, isBabelParseable } from "@/utils/babelSymbolParser";
+import { normalizePath, getRelativePath } from "@/utils/pathUtils";
 import { extractSkeleton as extractPythonSkeleton, isPythonParseable } from "@/utils/pythonSymbolParser";
 
 /**
@@ -205,11 +206,7 @@ export function ElementPickerDialog({
   // Get relative path for display
   const relativePath = useMemo(() => {
     if (!filePath || !currentPath) return filePath || '';
-    const normalizedCwd = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
-    if (filePath.startsWith(normalizedCwd + '/')) {
-      return filePath.slice(normalizedCwd.length + 1);
-    }
-    return filePath;
+    return getRelativePath(filePath, currentPath);
   }, [filePath, currentPath]);
 
   // Load and parse file when dialog opens

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo, memo } from 'react';
 import { File, Folder, CornerDownLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getRelativePath } from '../utils/pathUtils';
 
 /**
  * Autocomplete modal for @ mention file selection.
@@ -38,16 +39,6 @@ export const AtMentionModal = memo(function AtMentionModal({
   if (!displayedResults || displayedResults.length === 0) {
     return null;
   }
-
-  // Helper to get relative path
-  const getRelativePath = (filePath) => {
-    if (!filePath || !currentPath) return filePath || '';
-    const normalizedCwd = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
-    if (filePath.startsWith(normalizedCwd + '/')) {
-      return filePath.slice(normalizedCwd.length + 1);
-    }
-    return filePath;
-  };
 
   // Split a relative path into directory part and filename
   const splitPath = (relativePath) => {
@@ -115,7 +106,7 @@ export const AtMentionModal = memo(function AtMentionModal({
         {displayedResults.map((result, index) => {
           const isSelected = index === selectedIndex;
           const isDir = result.is_dir;
-          const relativePath = getRelativePath(result.path);
+          const relativePath = getRelativePath(result.path, currentPath);
           const { dir, name } = splitPath(relativePath);
           const isAlreadySelected = alreadySelected.has(result.path);
 

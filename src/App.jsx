@@ -32,6 +32,7 @@ import { useProjectCompact, estimateTokens, formatTokenCount } from "./hooks/use
 import { useTypeChecker } from "./hooks/useTypeChecker";
 import { usePromptSender } from "./hooks/usePromptSender";
 import { buildTreeFromFlatList, incrementallyUpdateTree } from "./utils/treeOperations";
+import { IS_WINDOWS, escapeShellPath, getRelativePath, basename, lastSepIndex } from "./utils/pathUtils";
 import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { ElementPickerDialog } from "./components/ElementPickerDialog";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
@@ -50,8 +51,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react";
-
-const IS_WINDOWS = navigator.platform.startsWith('Win');
 
 function App() {
   const { theme } = useTheme();
@@ -357,22 +356,6 @@ function App() {
     clearAllSymbols();
   };
 
-  // Helper function for relative paths (used by file groups and terminal)
-  const getRelativePath = (absolutePath, cwdPath) => {
-    const normalizedCwd = cwdPath.endsWith('/') ? cwdPath.slice(0, -1) : cwdPath;
-    const normalizedFile = absolutePath.endsWith('/') ? absolutePath.slice(0, -1) : absolutePath;
-
-    if (normalizedFile.startsWith(normalizedCwd + '/')) {
-      return normalizedFile.slice(normalizedCwd.length + 1);
-    }
-
-    if (normalizedFile === normalizedCwd) {
-      return '.';
-    }
-
-    return absolutePath;
-  };
-
   // View git diff for a file
   const viewFileDiff = useCallback((filePath) => {
     setDiffFilePath(filePath);
@@ -544,14 +527,8 @@ function App() {
 
     try {
       // Shell escape the path
-      let command;
-      if (IS_WINDOWS) {
-        const safePath = `"${bookmark.path.replace(/"/g, '`"')}"`;
-        command = `cd ${safePath}\r`;
-      } else {
-        const safePath = `'${bookmark.path.replace(/'/g, "'\\''")}'`;
-        command = `cd ${safePath}\r`;
-      }
+      const safePath = escapeShellPath(bookmark.path);
+      const command = `cd ${safePath}\r`;
 
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
@@ -911,12 +888,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, sidebarOpen, handleCompactProject]);
 
-  const escapeShellPath = (path) => {
-    // Single quotes preserve all special characters except single quote itself
-    // To include a single quote: 'path'\''s name'
-    return `'${path.replace(/'/g, "'\\''")}'`;
-  };
-
   const sendFileToTerminal = async (absolutePath) => {
     if (!terminalSessionId) {
       console.warn('Terminal session not ready');
@@ -958,7 +929,7 @@ function App() {
     matchingPaths.forEach(path => {
       let currentPath = path;
       while (currentPath && currentPath !== '/') {
-        const lastSlash = currentPath.lastIndexOf('/');
+        const lastSlash = lastSepIndex(currentPath);
         if (lastSlash <= 0) break;
         currentPath = currentPath.substring(0, lastSlash);
         parentPathsSet.add(currentPath);
@@ -996,7 +967,7 @@ function App() {
     results.forEach(result => {
       let currentPath = result.path;
       while (currentPath && currentPath !== '/') {
-        const lastSlash = currentPath.lastIndexOf('/');
+        const lastSlash = lastSepIndex(currentPath);
         if (lastSlash <= 0) break;
         currentPath = currentPath.substring(0, lastSlash);
         pathsToExpand.add(currentPath);
@@ -1108,7 +1079,7 @@ function App() {
                       filesWithRelativePaths={Array.from(selectedFiles || new Set()).map(absPath => ({
                         absolute: absPath,
                         relative: getRelativePath(absPath, currentPath),
-                        name: absPath.split('/').pop()
+                        name: basename(absPath)
                       }))}
                       fileStates={fileStates}
                       onSetFileState={setFileState}
