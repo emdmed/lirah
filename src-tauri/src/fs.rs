@@ -110,7 +110,7 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
         let mut system = System::new();
         let refresh = ProcessRefreshKind::nothing()
             .with_cwd(UpdateKind::Always)
-            .with_parent(UpdateKind::Always);
+;
 
         // Refresh all processes so we can walk the process tree
         system.refresh_processes_specifics(
