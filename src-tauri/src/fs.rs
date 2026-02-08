@@ -182,7 +182,32 @@ pub fn read_directory_recursive(
             // Skip ignored directories
             if e.file_type().is_dir() {
                 if let Some(name) = e.file_name().to_str() {
-                    return !ignore_dirs.contains(name);
+                    if ignore_dirs.contains(name) {
+                        return false;
+                    }
+                    // Skip hidden directories (starting with .)
+                    if name.starts_with('.') {
+                        return false;
+                    }
+                }
+
+                // On Windows, skip directories with hidden/system attributes
+                // and skip symlinks/junctions at the filter level to prevent traversal
+                #[cfg(target_os = "windows")]
+                {
+                    if e.path_is_symlink() {
+                        return false;
+                    }
+                    if let Ok(metadata) = std::fs::metadata(e.path()) {
+                        use std::os::windows::fs::MetadataExt;
+                        let attrs = metadata.file_attributes();
+                        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+                        const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+                        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+                        if attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
+                            return false;
+                        }
+                    }
                 }
             }
             true
