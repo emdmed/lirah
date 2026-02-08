@@ -7,7 +7,7 @@
  */
 // Normalize path separators for consistent comparison
 function normalizePath(p) {
-  return p ? p.replace(/\\/g, '/') : p;
+  return p ? p.replace(/\\/g, '/').replace(/\/+$/, '') : p;
 }
 
 export function buildTreeFromFlatList(flatList, rootPath) {
