@@ -180,7 +180,7 @@ export function usePromptSender({
       // Append orchestration prompt if checkbox is checked
       if (appendOrchestration) {
         const separator = fullCommand.trim() ? '\n\n' : '';
-        fullCommand = fullCommand + separator + 'Read and follow .claude/orchestration.md';
+        fullCommand = fullCommand + separator + 'Read and follow .orchestration/orchestration.md';
       }
 
       // Send text content first

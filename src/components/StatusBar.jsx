@@ -75,7 +75,7 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               className="cursor-pointer"
             >
               <Download className="w-4 h-4 mr-2" />
-              Initialize Orchestration
+              Add Agentic-Orchestration
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
