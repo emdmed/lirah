@@ -71,14 +71,14 @@ export function TextareaPanel({
       <div className="flex flex-col gap-2">
         {fileEntries.map(({ path, elements }) => (
           <div key={path}>
-            <div className="text-blue-400 font-medium mb-1">{path}</div>
-            <div className="flex flex-col gap-0.5 pl-2 border-l border-blue-500/30">
+            <div className="text-primary font-medium mb-1">{path}</div>
+            <div className="flex flex-col gap-0.5 pl-2 border-l border-border/30">
               {elements.map(el => {
-                const lineInfo = el.line === el.endLine ? `L${el.line}` : `L${el.line}-${el.endLine}`;
+                const lineInfo = el.line === el.endLine ? `${el.line}` : `${el.line}-${el.endLine}`;
                 return (
                   <div key={el.key} className="flex items-center gap-2">
-                    <span className="text-foreground">{el.displayName}</span>
                     <span className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>{el.type}</span>
+                    <span className="text-foreground">{el.displayName}</span>
                     <span className="text-muted-foreground ml-auto" style={{ fontSize: 'var(--font-xs)' }}>{lineInfo}</span>
                   </div>
                 );
@@ -225,11 +225,11 @@ export function TextareaPanel({
 
       {/* Selected elements indicator */}
       {elementCount > 0 && (
-        <div className="flex items-center gap-2 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded" style={{ fontSize: 'var(--font-xs)' }}>
+        <div className="flex items-center gap-2 px-2 py-1 bg-secondary border border-secondary rounded w-fit" style={{ fontSize: 'var(--font-xs)' }}>
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 cursor-default">
-                <span className="text-blue-400 font-medium">
+                <span className="text-primary font-medium">
                   {elementCount} element{elementCount !== 1 ? 's' : ''} selected
                 </span>
                 <span className="text-muted-foreground">
@@ -268,7 +268,7 @@ export function TextareaPanel({
             <TooltipContent side="top" className="max-w-md text-left p-3">
               <div className="space-y-1">
                 <div>Compacted project will be appended to the prompt when sent to terminal</div>
-                  <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
+                <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
                   {compactedProject.compressionPercent}% compression ({compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens)
                 </div>
               </div>

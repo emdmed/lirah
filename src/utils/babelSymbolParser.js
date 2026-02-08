@@ -685,75 +685,69 @@ export const formatSkeletonForPrompt = (skeleton) => {
 
   const lines = [];
 
-  // Imports summary
+  // Imports - local paths (file relationships), external just counted
   if (skeleton.imports.length > 0) {
-    const sources = skeleton.imports.map(i => i.source).join(', ');
-    lines.push(`    Imports: ${sources}`);
+    const local = skeleton.imports.filter(i => i.source.startsWith('.'));
+    const extCount = skeleton.imports.length - local.length;
+    const parts = [];
+    if (extCount > 0) parts.push(`${extCount} ext`);
+    parts.push(...local.map(i => i.source));
+    lines.push(`imports: ${parts.join(', ')}`);
   }
 
-  // Exports summary
+  // Exports (API surface - high value)
   if (skeleton.exports.length > 0) {
-    const exportNames = skeleton.exports.map(e => e.type === 'default' ? `${e.name} (default)` : e.name).join(', ');
-    lines.push(`    Exports: ${exportNames}`);
+    const exportNames = skeleton.exports.map(e => e.type === 'default' ? `${e.name}*` : e.name).join(', ');
+    lines.push(`exports: ${exportNames}`);
   }
 
   // Components (including HOC-wrapped)
   if (skeleton.components.length > 0) {
-    const componentList = skeleton.components.map(c => {
-      const hocSuffix = c.hoc ? ` (${c.hoc})` : '';
-      return `${c.name}${hocSuffix}:${c.line}`;
-    }).join(', ');
-    lines.push(`    Components: ${componentList}`);
+    const componentList = skeleton.components.map(c => c.hoc ? `${c.name}(${c.hoc}):${c.line}` : `${c.name}:${c.line}`).join(', ');
+    lines.push(`components: ${componentList}`);
   }
 
   // Contexts
   if (skeleton.contexts?.length > 0) {
-    lines.push(`    Contexts: ${skeleton.contexts.map(c => `${c.name}:${c.line}`).join(', ')}`);
+    lines.push(`contexts: ${skeleton.contexts.map(c => `${c.name}:${c.line}`).join(', ')}`);
   }
 
   // Functions
   if (skeleton.functions.length > 0) {
-    lines.push(`    Functions: ${skeleton.functions.map(f => `${f.name}:${f.line}`).join(', ')}`);
+    lines.push(`fn: ${skeleton.functions.map(f => `${f.name}:${f.line}`).join(', ')}`);
   }
 
   // Hooks summary
-  const hookCounts = [];
-  if (skeleton.hooks.useState > 0) hookCounts.push(`useState(${skeleton.hooks.useState})`);
-  if (skeleton.hooks.useCallback > 0) hookCounts.push(`useCallback(${skeleton.hooks.useCallback})`);
-  if (skeleton.hooks.useMemo > 0) hookCounts.push(`useMemo(${skeleton.hooks.useMemo})`);
-  if (skeleton.hooks.useRef > 0) hookCounts.push(`useRef(${skeleton.hooks.useRef})`);
-  if (skeleton.hooks.custom.length > 0) hookCounts.push(...skeleton.hooks.custom);
-  if (hookCounts.length > 0) {
-    lines.push(`    Hooks: ${hookCounts.join(', ')}`);
-  }
+  const hookParts = [];
+  if (skeleton.hooks.useState > 0) hookParts.push(`useState(${skeleton.hooks.useState})`);
+  if (skeleton.hooks.useCallback > 0) hookParts.push(`useCallback(${skeleton.hooks.useCallback})`);
+  if (skeleton.hooks.useMemo > 0) hookParts.push(`useMemo(${skeleton.hooks.useMemo})`);
+  if (skeleton.hooks.useRef > 0) hookParts.push(`useRef(${skeleton.hooks.useRef})`);
+  if (skeleton.hooks.custom.length > 0) hookParts.push(...skeleton.hooks.custom);
 
-  // useEffect with dependencies (separate line for clarity)
+  // useEffect with dependencies (merged into hooks line)
   if (skeleton.hooks.useEffect.length > 0) {
-    const effectDetails = skeleton.hooks.useEffect.map(eff => {
-      const depsStr = eff.deps === null
-        ? 'no deps'
-        : eff.deps === '?'
-          ? '?'
-          : `[${eff.deps.join(', ')}]`;
-      return `${depsStr}:${eff.line}`;
-    }).join(', ');
-    lines.push(`    useEffect: ${effectDetails}`);
+    const effects = skeleton.hooks.useEffect.map(eff => {
+      if (eff.deps === null) return `useEffect(∞):${eff.line}`;
+      if (eff.deps === '?') return `useEffect(?):${eff.line}`;
+      return `useEffect([${eff.deps.join(',')}]):${eff.line}`;
+    });
+    hookParts.push(...effects);
   }
 
-  // Constants
-  if (skeleton.constants > 0) {
-    lines.push(`    Constants: ${skeleton.constants}`);
+  if (hookParts.length > 0) {
+    lines.push(`hooks: ${hookParts.join(', ')}`);
   }
 
   // Classes
   if (skeleton.classes.length > 0) {
-    lines.push(`    Classes: ${skeleton.classes.map(c => `${c.name}:${c.line}`).join(', ')}`);
+    lines.push(`classes: ${skeleton.classes.map(c => `${c.name}:${c.line}`).join(', ')}`);
   }
 
   // Types/Interfaces
   if (skeleton.interfaces.length > 0 || skeleton.types.length > 0) {
     const typeNames = [...skeleton.interfaces, ...skeleton.types].map(t => `${t.name}:${t.line}`).join(', ');
-    lines.push(`    Types: ${typeNames}`);
+    lines.push(`types: ${typeNames}`);
   }
 
   return lines.join('\n');

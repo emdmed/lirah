@@ -32,39 +32,34 @@ export const formatSkeletonForPrompt = (skeleton) => {
 
   const lines = [];
 
-  // Imports summary
+  // Imports - local (file relationships) vs external (just counted)
   if (skeleton.imports.length > 0) {
-    const modules = skeleton.imports.map(i => i.module).join(', ');
-    lines.push(`    Imports: ${modules}`);
+    const local = skeleton.imports.filter(i => i.module.startsWith('.'));
+    const extCount = skeleton.imports.length - local.length;
+    const parts = [];
+    if (extCount > 0) parts.push(`${extCount} ext`);
+    parts.push(...local.map(i => i.module));
+    lines.push(`imports: ${parts.join(', ')}`);
   }
 
-  // Classes
+  // Classes (with bases and decorators - high value for Python)
   if (skeleton.classes.length > 0) {
     const classList = skeleton.classes.map(c => {
       const parts = [c.name];
-      if (c.decorators.length > 0) {
-        parts.push(`@${c.decorators[0]}`);
-      }
-      if (c.bases.length > 0) {
-        parts.push(`(${c.bases.join(', ')})`);
-      }
+      if (c.decorators.length > 0) parts.push(`@${c.decorators[0]}`);
+      if (c.bases.length > 0) parts.push(`(${c.bases.join(',')})`);
       return `${parts.join(' ')}:${c.line}`;
     }).join(', ');
-    lines.push(`    Classes: ${classList}`);
+    lines.push(`classes: ${classList}`);
   }
 
   // Functions
   if (skeleton.functions.length > 0) {
     const funcList = skeleton.functions.map(f => {
-      const deco = f.decorators.length > 0 ? ` @${f.decorators[0]}` : '';
-      return `${f.name}${deco}:${f.line}`;
+      const deco = f.decorators.length > 0 ? `@${f.decorators[0]} ` : '';
+      return `${deco}${f.name}:${f.line}`;
     }).join(', ');
-    lines.push(`    Functions: ${funcList}`);
-  }
-
-  // Constants
-  if (skeleton.constants > 0) {
-    lines.push(`    Constants: ${skeleton.constants}`);
+    lines.push(`fn: ${funcList}`);
   }
 
   return lines.join('\n');

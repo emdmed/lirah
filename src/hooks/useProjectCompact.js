@@ -156,18 +156,13 @@ export function useProjectCompact() {
   const formatOutput = useCallback((results) => {
     const lines = [];
 
-    lines.push('# Project Compact');
-    lines.push(`# Files: ${results.length}`);
-    lines.push('');
-
     // Sort by path for consistent output
     results.sort((a, b) => a.path.localeCompare(b.path));
 
     for (const result of results) {
-      lines.push(`## ${result.path} (${result.lineCount} lines)`);
+      lines.push(`## ${result.path}`);
 
       if (result.skeleton) {
-        // Use appropriate formatter based on file type
         const skeletonOutput = isPythonParseable(result.path)
           ? formatPythonSkeleton(result.skeleton)
           : formatBabelSkeleton(result.skeleton);
@@ -175,8 +170,6 @@ export function useProjectCompact() {
           lines.push(skeletonOutput);
         }
       }
-
-      lines.push('');
     }
 
     return lines.join('\n');

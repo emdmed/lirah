@@ -8,8 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Loader2, Check } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { extractSkeleton as extractBabelSkeleton, isBabelParseable } from "@/utils/babelSymbolParser";
 import { normalizePath, getRelativePath } from "@/utils/pathUtils";
@@ -316,7 +315,7 @@ export function ElementPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-xl max-h-[80vh]  flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Search className="w-5 h-5" />
@@ -360,12 +359,14 @@ export function ElementPickerDialog({
                       ) : (
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       )}
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={() => toggleGroupSelection(group)}
-                        onClick={(e) => e.stopPropagation()}
-                        className={someSelected ? 'opacity-50' : ''}
-                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-5 px-1.5 text-[10px]"
+                        onClick={(e) => { e.stopPropagation(); toggleGroupSelection(group); }}
+                      >
+                        {allSelected ? 'none' : 'all'}
+                      </Button>
                       <span className="font-medium text-sm flex-1">
                         {group.type}
                       </span>
@@ -382,17 +383,15 @@ export function ElementPickerDialog({
                             className="flex items-center gap-2 py-1 pl-6 hover:bg-muted/30 rounded cursor-pointer"
                             onClick={() => toggleElement(el.key)}
                           >
-                            <Checkbox
-                              checked={selectedKeys.has(el.key)}
-                              onCheckedChange={() => toggleElement(el.key)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
+                            <span className="w-4 h-4 flex items-center justify-center">
+                              {selectedKeys.has(el.key) && <Check className="w-3.5 h-3.5 text-primary" />}
+                            </span>
                             <span className="text-sm flex-1 truncate">
                               {el.displayName}
                             </span>
                             {el.line > 0 && (
                               <span className="text-xs text-muted-foreground font-mono">
-                                {el.line === el.endLine ? `L${el.line}` : `L${el.line}-${el.endLine}`}
+                                {el.line === el.endLine ? `${el.line}` : `${el.line}-${el.endLine}`}
                               </span>
                             )}
                           </div>

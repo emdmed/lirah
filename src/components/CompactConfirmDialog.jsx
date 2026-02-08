@@ -78,7 +78,7 @@ export function CompactConfirmDialog({
               )}
               <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>Currently supports JavaScript/TypeScript only. Python coming soon.</span>
+                <span>Supports JavaScript, TypeScript, and Python files.</span>
               </div>
             </div>
           </DialogDescription>
