@@ -143,7 +143,7 @@ pub fn read_directory_recursive(
     max_depth: Option<usize>,
     max_files: Option<usize>
 ) -> Result<Vec<RecursiveDirectoryEntry>, String> {
-    let root_path = if let Some(p) = path {
+    let root_path = if let Some(ref p) = path {
         PathBuf::from(p)
     } else {
         std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?
@@ -151,6 +151,8 @@ pub fn read_directory_recursive(
 
     let max_depth = max_depth.unwrap_or(10);
     let max_files = max_files.unwrap_or(10000);
+
+    eprintln!("[DEBUG] read_directory_recursive: path={:?}, root_path={:?}", path, root_path);
 
     // Directories to ignore
     let ignore_dirs: HashSet<&str> = [
@@ -170,7 +172,7 @@ pub fn read_directory_recursive(
     .copied()
     .collect();
 
-    let mut entries = Vec::new();
+    let mut entries: Vec<RecursiveDirectoryEntry> = Vec::new();
     let root_path_str = root_path.to_string_lossy().to_string();
 
     // Walk directory tree
@@ -215,7 +217,10 @@ pub fn read_directory_recursive(
     {
         // Check if we've reached the file limit
         if entries.len() >= max_files {
-            eprintln!("Warning: Reached max file limit of {}", max_files);
+            eprintln!("Warning: Reached max file limit of {}. Last 5 paths:", max_files);
+            for e in entries.iter().rev().take(5) {
+                eprintln!("  - {}", e.path);
+            }
             break;
         }
 
