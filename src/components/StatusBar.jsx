@@ -68,21 +68,21 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               <MoreVertical className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-80 text-xs [&_[role=menuitem]]:py-1 [&_[role=menuitem]]:text-xs [&_[role=menuitem]_svg]:size-3">
             <DropdownMenuItem
               onClick={onLaunchOrchestration}
               disabled={!sessionId}
               className="cursor-pointer"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Add Agentic-Orchestration
+              <Download className="mr-1.5" />
+              Add Orchestration
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={onToggleHelp}
               className="cursor-pointer"
             >
-              <Keyboard className="w-4 h-4 mr-2" />
+              <Keyboard className="mr-1.5" />
               Keyboard Shortcuts
               <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
             </DropdownMenuItem>
@@ -91,9 +91,9 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               className="cursor-pointer"
             >
               {fileWatchingEnabled ? (
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="mr-1.5" />
               ) : (
-                <EyeOff className="w-4 h-4 mr-2" style={{ color: '#E82424' }} />
+                <EyeOff className="mr-1.5" style={{ color: '#E82424' }} />
               )}
               File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
               <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
@@ -103,9 +103,9 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               className="cursor-pointer"
             >
               {showTitleBar ? (
-                <PanelTop className="w-4 h-4 mr-2" />
+                <PanelTop className="mr-1.5" />
               ) : (
-                <PanelTopClose className="w-4 h-4 mr-2" style={{ color: '#E82424' }} />
+                <PanelTopClose className="mr-1.5" style={{ color: '#E82424' }} />
               )}
               Title Bar: {showTitleBar ? 'ON' : 'OFF'}
             </DropdownMenuItem>
