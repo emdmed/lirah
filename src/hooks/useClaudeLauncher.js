@@ -58,9 +58,9 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
 
       let command;
       if (cliExists) {
-        command = cliConfig.command + '\n';
+        command = cliConfig.command + '\r';
       } else if (cliConfig.fallback) {
-        command = cliConfig.fallback + '\n';
+        command = cliConfig.fallback + '\r';
       } else {
         console.error(`${selectedCli} is not available and has no fallback`);
         return;

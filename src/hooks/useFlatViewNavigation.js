@@ -69,10 +69,10 @@ export function useFlatViewNavigation(terminalSessionId) {
       if (IS_WINDOWS) {
         // PowerShell: use double quotes, escape internal double quotes
         const safePath = `"${path.replace(/"/g, '`"')}"`;
-        command = `cd ${safePath}\n`;
+        command = `cd ${safePath}\r`;
       } else {
         const safePath = `'${path.replace(/'/g, "'\\''")}'`;
-        command = `cd ${safePath}\n`;
+        command = `cd ${safePath}\r`;
       }
 
       await invoke('write_to_terminal', {

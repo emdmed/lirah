@@ -5,13 +5,22 @@
 /**
  * Build a hierarchical tree from a flat list of file entries.
  */
+// Normalize path separators for consistent comparison
+function normalizePath(p) {
+  return p ? p.replace(/\\/g, '/') : p;
+}
+
 export function buildTreeFromFlatList(flatList, rootPath) {
+  const normalizedRoot = normalizePath(rootPath);
   const nodeMap = new Map();
 
   // Initialize all nodes
   flatList.forEach(entry => {
-    nodeMap.set(entry.path, {
+    const normalizedPath = normalizePath(entry.path);
+    nodeMap.set(normalizedPath, {
       ...entry,
+      path: normalizedPath,
+      parent_path: normalizePath(entry.parent_path),
       children: entry.is_dir ? [] : undefined,
       depth: entry.depth
     });
@@ -21,12 +30,14 @@ export function buildTreeFromFlatList(flatList, rootPath) {
 
   // Build parent-child relationships
   flatList.forEach(entry => {
-    const node = nodeMap.get(entry.path);
+    const normalizedPath = normalizePath(entry.path);
+    const normalizedParent = normalizePath(entry.parent_path);
+    const node = nodeMap.get(normalizedPath);
 
-    if (entry.parent_path === rootPath || !entry.parent_path) {
+    if (normalizedParent === normalizedRoot || !normalizedParent) {
       rootNodes.push(node);
     } else {
-      const parent = nodeMap.get(entry.parent_path);
+      const parent = nodeMap.get(normalizedParent);
       if (parent && parent.children) {
         parent.children.push(node);
       }
@@ -93,11 +104,14 @@ function addChildToParent(nodes, parentPath, childNode) {
  * Returns a new tree array with the changes applied.
  */
 export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
+  const normalizedRoot = normalizePath(rootPath);
   let newData = [...prevTreeData];
 
   changes.newUntracked.forEach(({ path: filePath, stats }) => {
-    const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
-    const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+    const normalized = normalizePath(filePath);
+    const lastSep = normalized.lastIndexOf('/');
+    const parentPath = normalized.substring(0, lastSep);
+    const fileName = normalized.substring(lastSep + 1);
 
     if (fileExistsInTree(newData, filePath)) {
       return; // Already in tree
@@ -111,7 +125,7 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
     };
 
     // Root-level file
-    if (parentPath === rootPath) {
+    if (parentPath === normalizedRoot) {
       newNode.depth = 0;
       newData = [...newData, newNode];
       newData.sort((a, b) => {

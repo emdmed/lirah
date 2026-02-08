@@ -51,6 +51,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Folder, File, ChevronUp, ChevronRight, ChevronDown } from "lucide-react";
 
+const IS_WINDOWS = navigator.platform.startsWith('Win');
+
 function App() {
   const { theme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
@@ -249,7 +251,7 @@ function App() {
     try {
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
-        data: 'npx claude-orchestration\n'
+        data: 'npx claude-orchestration\r'
       });
 
       if (terminalRef.current?.focus) {
@@ -542,8 +544,14 @@ function App() {
 
     try {
       // Shell escape the path
-      const safePath = `'${bookmark.path.replace(/'/g, "'\\''")}'`;
-      const command = `cd ${safePath}\n`;
+      let command;
+      if (IS_WINDOWS) {
+        const safePath = `"${bookmark.path.replace(/"/g, '`"')}"`;
+        command = `cd ${safePath}\r`;
+      } else {
+        const safePath = `'${bookmark.path.replace(/'/g, "'\\''")}'`;
+        command = `cd ${safePath}\r`;
+      }
 
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
