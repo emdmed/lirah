@@ -266,7 +266,7 @@ function App() {
     try {
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
-        data: 'npx claude-orchestration\r'
+        data: 'npx agentic-orchestration\r'
       });
 
       if (terminalRef.current?.focus) {
