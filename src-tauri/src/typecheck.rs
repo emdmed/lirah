@@ -25,7 +25,12 @@ pub struct TypeCheckResult {
 /// Build the tsc command to check a single file
 /// TypeScript will automatically find and use tsconfig.json if present
 fn get_tsc_command(file_path: &str) -> Command {
-    let mut cmd = Command::new("tsc");
+    #[cfg(target_os = "windows")]
+    let tsc_cmd = "tsc.cmd";
+    #[cfg(not(target_os = "windows"))]
+    let tsc_cmd = "tsc";
+
+    let mut cmd = Command::new(tsc_cmd);
     cmd.arg("--noEmit");
     cmd.arg("--skipLibCheck");  // Performance optimization
     cmd.arg("--jsx").arg("react-jsx");  // Support JSX syntax

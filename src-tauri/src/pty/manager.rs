@@ -19,10 +19,19 @@ pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
     // Determine the shell to use based on the platform
     let shell = get_shell();
 
-    // Create command for the shell with login flag
+    // Create command for the shell
     let mut cmd = CommandBuilder::new(&shell);
-    cmd.arg("-l"); // Start as login shell
-    cmd.cwd(std::env::var("HOME").unwrap_or_else(|_| "/".to_string()));
+
+    // Start as login shell on Unix only
+    #[cfg(unix)]
+    cmd.arg("-l");
+
+    cmd.cwd(home_dir().unwrap_or_else(|| {
+        #[cfg(unix)]
+        { "/".to_string() }
+        #[cfg(windows)]
+        { "C:\\".to_string() }
+    }));
 
     // Spawn the child process
     let child = pty_pair
@@ -66,6 +75,13 @@ pub fn resize_pty(session: &mut PtySession, rows: u16, cols: u16) -> Result<(), 
             pixel_height: 0,
         })
         .map_err(|e| format!("Failed to resize PTY: {}", e))
+}
+
+fn home_dir() -> Option<String> {
+    #[cfg(unix)]
+    { std::env::var("HOME").ok() }
+    #[cfg(windows)]
+    { std::env::var("USERPROFILE").ok() }
 }
 
 #[cfg(unix)]

@@ -14,6 +14,7 @@ use python_parser::parse_python_skeleton;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Disable GTK overlay scrolling to prevent scrollbars resizing on hover
+    #[cfg(target_os = "linux")]
     std::env::set_var("GTK_OVERLAY_SCROLLING", "0");
 
     tauri::Builder::default()

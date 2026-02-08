@@ -7,6 +7,13 @@ use walkdir::WalkDir;
 use std::collections::{HashSet, HashMap};
 use std::process::Command;
 
+fn home_dir() -> Option<String> {
+    #[cfg(unix)]
+    { std::env::var("HOME").ok() }
+    #[cfg(windows)]
+    { std::env::var("USERPROFILE").ok() }
+}
+
 #[derive(Serialize)]
 pub struct DirectoryEntry {
     name: String,
@@ -97,9 +104,26 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
             .map_err(|e| format!("Failed to read cwd from /proc: {}", e))
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
     {
-        Err("Getting terminal cwd is only supported on Linux".to_string())
+        use sysinfo::{Pid, System, ProcessRefreshKind, UpdateKind};
+        let mut system = System::new();
+        let refresh = ProcessRefreshKind::new().with_cwd(UpdateKind::Always);
+        system.refresh_process_specifics(Pid::from_u32(pid), refresh);
+        if let Some(process) = system.process(Pid::from_u32(pid)) {
+            if let Some(cwd) = process.cwd() {
+                Ok(cwd.to_string_lossy().to_string())
+            } else {
+                Err("Could not get process CWD".to_string())
+            }
+        } else {
+            Err(format!("Process {} not found", pid))
+        }
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+        Err("Getting terminal cwd is not supported on this platform".to_string())
     }
 }
 
@@ -545,10 +569,13 @@ struct UsageData {
 pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
     // Convert project path to Claude's format: /home/user/projects/foo -> -home-user-projects-foo
     // Claude Code replaces both "/" and "." with "-"
-    let claude_path_segment = project_path.replace("/", "-").replace(".", "-");
+    let claude_path_segment = project_path
+        .replace("\\", "-")
+        .replace("/", "-")
+        .replace(".", "-");
 
     // Build path to Claude sessions directory
-    let home = std::env::var("HOME").map_err(|_| "Could not get HOME directory")?;
+    let home = home_dir().ok_or("Could not get home directory")?;
     let sessions_dir = PathBuf::from(&home)
         .join(".claude")
         .join("projects")

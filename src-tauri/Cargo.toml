@@ -25,6 +25,9 @@ serde_json = "1"
 portable-pty = "0.8"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
-notify = { version = "6.1", default-features = false, features = ["macos_fsevent"] }
+notify = "6.1"
 rustpython-parser = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+sysinfo = "0.33"
 
