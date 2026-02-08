@@ -91,5 +91,5 @@ fn get_shell() -> String {
 
 #[cfg(windows)]
 fn get_shell() -> String {
-    std::env::var("COMSPEC").unwrap_or_else(|_| "powershell.exe".to_string())
+    "powershell.exe".to_string()
 }

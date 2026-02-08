@@ -1,6 +1,28 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
+const IS_WINDOWS = navigator.platform.startsWith('Win');
+const SEP = IS_WINDOWS ? '\\' : '/';
+
+function lastSepIndex(p) {
+  return Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+}
+
+function isRoot(p) {
+  if (!p) return true;
+  if (p === '/') return true;
+  // Windows drive root like "C:\" or "C:"
+  return /^[A-Za-z]:[\\/]?$/.test(p);
+}
+
+function parentPath(p) {
+  const i = lastSepIndex(p);
+  if (i <= 0) return IS_WINDOWS ? p.slice(0, 3) : '/';
+  // Keep drive root on Windows (e.g. "C:\")
+  if (IS_WINDOWS && i <= 2) return p.slice(0, 3);
+  return p.slice(0, i);
+}
+
 export function useFlatViewNavigation(terminalSessionId) {
   const [folders, setFolders] = useState([]);
   const [currentPath, setCurrentPath] = useState('');
@@ -14,9 +36,10 @@ export function useFlatViewNavigation(terminalSessionId) {
       for (const [filePath, stats] of Object.entries(gitStats)) {
         if (stats.status === 'deleted') {
           // Only include deleted files from the current directory
-          const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+          const sepIdx = lastSepIndex(filePath);
+          const parentDir = filePath.substring(0, sepIdx);
           if (parentDir === dirPath) {
-            const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+            const fileName = filePath.substring(sepIdx + 1);
             deletedFiles.push({
               name: fileName,
               path: filePath,
@@ -41,9 +64,16 @@ export function useFlatViewNavigation(terminalSessionId) {
     }
 
     try {
-      // Escape path for shell safety (handle spaces and special characters)
-      const safePath = `'${path.replace(/'/g, "'\\''")}'`;
-      const command = `cd ${safePath}\n`;
+      // Escape path for shell safety
+      let command;
+      if (IS_WINDOWS) {
+        // PowerShell: use double quotes, escape internal double quotes
+        const safePath = `"${path.replace(/"/g, '`"')}"`;
+        command = `cd ${safePath}\n`;
+      } else {
+        const safePath = `'${path.replace(/'/g, "'\\''")}'`;
+        command = `cd ${safePath}\n`;
+      }
 
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
@@ -108,12 +138,11 @@ export function useFlatViewNavigation(terminalSessionId) {
   };
 
   const navigateToParent = async () => {
-    if (!currentPath || currentPath === '/') {
+    if (isRoot(currentPath)) {
       return; // Already at root
     }
 
-    const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-    await loadFolders(parentPath);
+    await loadFolders(parentPath(currentPath));
   };
 
   return {
