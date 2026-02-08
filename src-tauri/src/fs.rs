@@ -108,20 +108,40 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
     {
         use sysinfo::{Pid, System, ProcessRefreshKind, UpdateKind, ProcessesToUpdate};
         let mut system = System::new();
-        let refresh = ProcessRefreshKind::nothing().with_cwd(UpdateKind::Always);
+        let refresh = ProcessRefreshKind::nothing()
+            .with_cwd(UpdateKind::Always)
+            .with_parent(UpdateKind::Always);
+
+        // Refresh all processes so we can walk the process tree
         system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
+            ProcessesToUpdate::All,
             false,
             refresh,
         );
-        if let Some(process) = system.process(Pid::from_u32(pid)) {
+
+        // On Windows, portable-pty returns the conpty host PID.
+        // The actual shell (PowerShell) is a child of that process.
+        // Walk down the process tree to find the deepest child.
+        let mut target_pid = Pid::from_u32(pid);
+        loop {
+            let children: Vec<Pid> = system.processes().values()
+                .filter(|p| p.parent() == Some(target_pid))
+                .map(|p| p.pid())
+                .collect();
+            if children.is_empty() {
+                break;
+            }
+            target_pid = children[0];
+        }
+
+        if let Some(process) = system.process(target_pid) {
             if let Some(cwd) = process.cwd() {
                 Ok(cwd.to_string_lossy().to_string())
             } else {
-                Err("Could not get process CWD".to_string())
+                Err(format!("Could not get CWD for process {} (walked from {})", target_pid, pid))
             }
         } else {
-            Err(format!("Process {} not found", pid))
+            Err(format!("Process {} not found", target_pid))
         }
     }
 
