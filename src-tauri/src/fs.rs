@@ -198,7 +198,7 @@ pub fn read_directory_recursive(
                     if e.path_is_symlink() {
                         return false;
                     }
-                    if let Ok(metadata) = std::fs::metadata(e.path()) {
+                    if let Ok(metadata) = std::fs::symlink_metadata(e.path()) {
                         use std::os::windows::fs::MetadataExt;
                         let attrs = metadata.file_attributes();
                         const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
