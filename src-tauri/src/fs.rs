@@ -112,49 +112,21 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
             .with_cwd(UpdateKind::Always)
 ;
 
-        // Refresh all processes so we can walk the process tree
         system.refresh_processes_specifics(
-            ProcessesToUpdate::All,
+            ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
             false,
             refresh,
         );
 
-        // Debug: log the initial PID and its info
-        let initial_pid = Pid::from_u32(pid);
-        if let Some(p) = system.process(initial_pid) {
-            eprintln!("[DEBUG CWD] Initial PID {}: name={:?}, cwd={:?}", pid, p.name(), p.cwd());
-        } else {
-            eprintln!("[DEBUG CWD] Initial PID {} not found in sysinfo", pid);
-        }
-
-        // Walk down the process tree to find the deepest child (the actual shell)
-        let mut target_pid = initial_pid;
-        let mut depth = 0;
-        loop {
-            let children: Vec<(Pid, String)> = system.processes().values()
-                .filter(|p| p.parent() == Some(target_pid))
-                .map(|p| (p.pid(), p.name().to_string_lossy().to_string()))
-                .collect();
-            if children.is_empty() {
-                break;
-            }
-            eprintln!("[DEBUG CWD] PID {} children: {:?}", target_pid, children);
-            target_pid = children[0].0;
-            depth += 1;
-            if depth > 10 { break; } // safety
-        }
-
-        eprintln!("[DEBUG CWD] Final target PID: {} (walked {} levels from {})", target_pid, depth, pid);
-
-        if let Some(process) = system.process(target_pid) {
-            eprintln!("[DEBUG CWD] Target process: name={:?}, cwd={:?}", process.name(), process.cwd());
+        // Query CWD directly — PowerShell's prompt function syncs OS-level CWD
+        if let Some(process) = system.process(Pid::from_u32(pid)) {
             if let Some(cwd) = process.cwd() {
                 Ok(cwd.to_string_lossy().to_string())
             } else {
-                Err(format!("Could not get CWD for process {} (walked from {})", target_pid, pid))
+                Err("Could not get process CWD".to_string())
             }
         } else {
-            Err(format!("Process {} not found", target_pid))
+            Err(format!("Process {} not found", pid))
         }
     }
 

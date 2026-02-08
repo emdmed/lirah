@@ -26,6 +26,16 @@ pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
     #[cfg(unix)]
     cmd.arg("-l");
 
+    // On Windows, PowerShell's Set-Location (cd) doesn't call Win32 SetCurrentDirectory,
+    // so the OS-level CWD never updates. Override the prompt function to sync them,
+    // allowing sysinfo to read the actual CWD.
+    #[cfg(windows)]
+    {
+        cmd.arg("-NoExit");
+        cmd.arg("-Command");
+        cmd.arg("function prompt { [System.IO.Directory]::SetCurrentDirectory($PWD.Path); \"PS $($PWD.Path)> \" }");
+    }
+
     cmd.cwd(home_dir().unwrap_or_else(|| {
         #[cfg(unix)]
         { "/".to_string() }
