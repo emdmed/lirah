@@ -106,10 +106,14 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
 
     #[cfg(target_os = "windows")]
     {
-        use sysinfo::{Pid, System, ProcessRefreshKind, UpdateKind};
+        use sysinfo::{Pid, System, ProcessRefreshKind, UpdateKind, ProcessesToUpdate};
         let mut system = System::new();
-        let refresh = ProcessRefreshKind::new().with_cwd(UpdateKind::Always);
-        system.refresh_process_specifics(Pid::from_u32(pid), refresh);
+        let refresh = ProcessRefreshKind::nothing().with_cwd(UpdateKind::Always);
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
+            false,
+            refresh,
+        );
         if let Some(process) = system.process(Pid::from_u32(pid)) {
             if let Some(cwd) = process.cwd() {
                 Ok(cwd.to_string_lossy().to_string())
