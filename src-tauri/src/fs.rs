@@ -119,22 +119,35 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
             refresh,
         );
 
-        // On Windows, portable-pty returns the conpty host PID.
-        // The actual shell (PowerShell) is a child of that process.
-        // Walk down the process tree to find the deepest child.
-        let mut target_pid = Pid::from_u32(pid);
+        // Debug: log the initial PID and its info
+        let initial_pid = Pid::from_u32(pid);
+        if let Some(p) = system.process(initial_pid) {
+            eprintln!("[DEBUG CWD] Initial PID {}: name={:?}, cwd={:?}", pid, p.name(), p.cwd());
+        } else {
+            eprintln!("[DEBUG CWD] Initial PID {} not found in sysinfo", pid);
+        }
+
+        // Walk down the process tree to find the deepest child (the actual shell)
+        let mut target_pid = initial_pid;
+        let mut depth = 0;
         loop {
-            let children: Vec<Pid> = system.processes().values()
+            let children: Vec<(Pid, String)> = system.processes().values()
                 .filter(|p| p.parent() == Some(target_pid))
-                .map(|p| p.pid())
+                .map(|p| (p.pid(), p.name().to_string_lossy().to_string()))
                 .collect();
             if children.is_empty() {
                 break;
             }
-            target_pid = children[0];
+            eprintln!("[DEBUG CWD] PID {} children: {:?}", target_pid, children);
+            target_pid = children[0].0;
+            depth += 1;
+            if depth > 10 { break; } // safety
         }
 
+        eprintln!("[DEBUG CWD] Final target PID: {} (walked {} levels from {})", target_pid, depth, pid);
+
         if let Some(process) = system.process(target_pid) {
+            eprintln!("[DEBUG CWD] Target process: name={:?}, cwd={:?}", process.name(), process.cwd());
             if let Some(cwd) = process.cwd() {
                 Ok(cwd.to_string_lossy().to_string())
             } else {
