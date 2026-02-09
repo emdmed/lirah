@@ -30,6 +30,7 @@ export function TextareaPanel({
   onManageTemplates,
   appendOrchestration = true,
   onToggleOrchestration,
+  orchestrationTokenEstimate,
   templateDropdownOpen,
   onTemplateDropdownOpenChange,
   tokenUsage,
@@ -180,6 +181,9 @@ export function TextareaPanel({
                 className="text-muted-foreground cursor-pointer select-none" style={{ fontSize: 'var(--font-xs)' }}
               >
                 orchestration
+                {appendOrchestration && orchestrationTokenEstimate != null && (
+                  <span className="text-muted-foreground/60 ml-1">(~{orchestrationTokenEstimate} tokens)</span>
+                )}
               </label>
             </div>
           )}

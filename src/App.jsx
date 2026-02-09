@@ -153,6 +153,7 @@ function App() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [manageTemplatesDialogOpen, setManageTemplatesDialogOpen] = useState(false);
   const [appendOrchestration, setAppendOrchestration] = useState(true);
+  const [orchestrationTokenEstimate, setOrchestrationTokenEstimate] = useState(null);
 
   // Type checker hook
   const {
@@ -656,11 +657,41 @@ function App() {
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebarOpen && fileWatchingEnabled);
 
   // Auto-uncheck orchestration if .orchestration/orchestration.md doesn't exist in project root
+  // Also estimate token usage from all orchestration workflow files
   useEffect(() => {
     if (!detectedCwd) return;
     invoke('read_file_content', { path: `${detectedCwd}/.orchestration/orchestration.md` })
-      .then(() => setAppendOrchestration(true))
-      .catch(() => setAppendOrchestration(false));
+      .then(async (orchestrationContent) => {
+        setAppendOrchestration(true);
+        // Read all workflow files to estimate total token cost
+        try {
+          const entries = await invoke('read_directory_recursive', {
+            path: `${detectedCwd}/.orchestration`,
+            maxDepth: 5,
+            maxFiles: 100
+          });
+          const mdFiles = entries.filter(e => e.name.endsWith('.md'));
+          let totalChars = orchestrationContent.length;
+          const contents = await Promise.all(
+            mdFiles
+              .filter(e => e.path !== `${detectedCwd}/.orchestration/orchestration.md`)
+              .map(e => invoke('read_file_content', { path: e.path }).catch(() => ''))
+          );
+          totalChars += contents.reduce((sum, c) => sum + c.length, 0);
+          // ~4 chars per token on average, orchestration.md is always sent + avg 1 workflow
+          const avgWorkflowChars = contents.length > 0
+            ? contents.reduce((sum, c) => sum + c.length, 0) / contents.length
+            : 0;
+          const estimatedTokens = Math.round((orchestrationContent.length + avgWorkflowChars) / 4);
+          setOrchestrationTokenEstimate(estimatedTokens);
+        } catch {
+          setOrchestrationTokenEstimate(null);
+        }
+      })
+      .catch(() => {
+        setAppendOrchestration(false);
+        setOrchestrationTokenEstimate(null);
+      });
   }, [detectedCwd]);
 
   // Fetch data when sidebar opens (mode-specific)
@@ -1137,6 +1168,7 @@ function App() {
               onManageTemplates={() => setManageTemplatesDialogOpen(true)}
               appendOrchestration={appendOrchestration}
               onToggleOrchestration={setAppendOrchestration}
+              orchestrationTokenEstimate={orchestrationTokenEstimate}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
               tokenUsage={tokenUsage}
