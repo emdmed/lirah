@@ -74,61 +74,59 @@ export function TemplateSelector({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            size="icon-sm"
-            className="h-5 w-5"
+            size="sm"
             aria-label="Select prompt template"
             title={selectedTemplate ? `Template: ${selectedTemplate.title}` : "Select prompt template"}
           >
             <FileText className={`h-3 w-3 ${selectedTemplateId ? 'text-primary' : ''}`} />
           </Button>
         </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="top" className="w-48 text-xs">
-        {templates.length === 0 ? (
-          <DropdownMenuItem disabled className="text-[10px] text-muted-foreground">
-            No templates available
-          </DropdownMenuItem>
-        ) : (
-          <>
-            <DropdownMenuItem
-              onClick={() => onSelectTemplate(null)}
-              className="flex items-center justify-between text-[10px] py-1.5"
-            >
-              <span className="text-muted-foreground">No template</span>
-              {!selectedTemplateId && <Check className="h-3 w-3 text-primary" />}
+        <DropdownMenuContent align="end" side="top" className="w-48 text-xs">
+          {templates.length === 0 ? (
+            <DropdownMenuItem disabled className="text-[10px] text-muted-foreground">
+              No templates available
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {templates.map((template, index) => (
+          ) : (
+            <>
               <DropdownMenuItem
-                key={template.id}
-                onClick={() => onSelectTemplate(template.id)}
-                className={`flex items-center justify-between text-[10px] py-1.5 ${
-                  selectedTemplateId === template.id ? 'bg-primary/10' : ''
-                }`}
+                onClick={() => onSelectTemplate(null)}
+                className="flex items-center justify-between text-[10px] py-1.5"
               >
-                <span className="flex items-center">
-                  {index < 9 && (
-                    <span className="text-muted-foreground w-4 text-right mr-1.5">
-                      {index + 1}
-                    </span>
-                  )}
-                  <span className="truncate pr-2">{template.title}</span>
-                </span>
-                {selectedTemplateId === template.id && (
-                  <Check className="h-3 w-3 text-primary flex-shrink-0" />
-                )}
+                <span className="text-muted-foreground">No template</span>
+                {!selectedTemplateId && <Check className="h-3 w-3 text-primary" />}
               </DropdownMenuItem>
-            ))}
-          </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem 
-          onClick={onManageTemplates}
-          className="text-[10px] py-1.5"
-        >
-          <Settings className="h-3 w-3 mr-1.5" />
-          Manage Templates...
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+              <DropdownMenuSeparator />
+              {templates.map((template, index) => (
+                <DropdownMenuItem
+                  key={template.id}
+                  onClick={() => onSelectTemplate(template.id)}
+                  className={`flex items-center justify-between text-[10px] py-1.5 ${selectedTemplateId === template.id ? 'bg-primary/10' : ''
+                    }`}
+                >
+                  <span className="flex items-center">
+                    {index < 9 && (
+                      <span className="text-muted-foreground w-4 text-right mr-1.5">
+                        {index + 1}
+                      </span>
+                    )}
+                    <span className="truncate pr-2">{template.title}</span>
+                  </span>
+                  {selectedTemplateId === template.id && (
+                    <Check className="h-3 w-3 text-primary flex-shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={onManageTemplates}
+            className="text-[10px] py-1.5"
+          >
+            <Settings className="h-3 w-3 mr-1.5" />
+            Manage Templates...
+          </DropdownMenuItem>
+        </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );

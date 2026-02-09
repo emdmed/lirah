@@ -94,22 +94,21 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
           size="sm"
           onClick={onClick}
           disabled={disabled || isCompacting}
-          className={`h-7 px-2 transition-all duration-300 ${
-            isCompacting
+          className={`transition-all duration-300 ${isCompacting
               ? 'animate-pulse'
               : 'text-muted-foreground hover:text-foreground'
-          }`}
+            }`}
           style={activeStyle}
         >
           {isCompacting ? (
             <>
-              <config.Icon className={`h-4 w-4 mr-1.5 ${config.iconClass}`} />
+              <config.Icon className={`h-3 w-3 mr-1.5 ${config.iconClass}`} />
               <span className="text-xs font-mono font-medium">
                 {config.text}
               </span>
             </>
           ) : (
-            <Layers className="h-4 w-4" />
+            <Layers className="h-3 w-3" />
           )}
         </Button>
       </TooltipTrigger>
