@@ -192,10 +192,6 @@ pub fn read_directory_recursive(
                     if ignore_dirs.contains(name) {
                         return false;
                     }
-                    // Skip hidden directories (starting with .)
-                    if name.starts_with('.') {
-                        return false;
-                    }
                 }
 
                 // On Windows, skip directories with hidden/system attributes

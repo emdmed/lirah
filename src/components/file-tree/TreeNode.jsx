@@ -30,6 +30,7 @@ export function TreeNode({
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
   const isSelected = selectedFiles && selectedFiles.has(node.path);
   const depth = node.depth || 0;
+  const isDotfile = node.name?.startsWith('.');
 
   // Git stats
   const stats = gitStats?.get(node.path);
@@ -41,7 +42,7 @@ export function TreeNode({
 
   return (
     <>
-      <SidebarMenuItem className="my-0 p-0 w-full">
+      <SidebarMenuItem className="my-0 p-0 w-full" style={isDotfile ? { opacity: 0.45 } : undefined}>
         {node.is_dir ? (
           <FolderNode
             node={node}
