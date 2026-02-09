@@ -56,7 +56,7 @@ export const themes = {
       destructiveForeground: 'hsl(226 64% 88%)',
       border: 'hsl(240 21% 35%)',
       input: 'hsl(240 21% 29%)',
-      inputBackground: 'hsl(240 21% 11%)',
+      inputBackground: 'hsl(240 21% 8%)',
       ring: 'hsl(219 80% 76%)',
       sidebar: 'hsl(240 21% 15%)',
       sidebarForeground: 'hsl(226 64% 88%)',
@@ -126,7 +126,7 @@ export const themes = {
       destructiveForeground: 'hsl(30 15% 81%)',
       border: 'hsl(0 0% 22%)',
       input: 'hsl(0 0% 18%)',
-      inputBackground: 'hsl(0 0% 6%)',
+      inputBackground: 'hsl(0 0% 3%)',
       ring: 'hsl(25 25% 67%)',
       sidebar: 'hsl(0 0% 8%)',
       sidebarForeground: 'hsl(30 15% 81%)',
@@ -196,7 +196,7 @@ export const themes = {
       destructiveForeground: 'hsl(45 26% 80%)',
       border: 'hsl(240 13% 20%)',
       input: 'hsl(240 13% 20%)',
-      inputBackground: 'hsl(240 13% 10%)',
+      inputBackground: 'hsl(240 13% 7%)',
       ring: 'hsl(225 46% 67%)',
       sidebar: 'hsl(240 13% 14%)',
       sidebarForeground: 'hsl(45 26% 80%)',
@@ -264,7 +264,7 @@ export const themes = {
       destructiveForeground: 'hsl(0 0% 100%)',
       border: 'hsl(220 13% 91%)',
       input: 'hsl(220 13% 91%)',
-      inputBackground: 'hsl(220 13% 96%)',
+      inputBackground: 'hsl(220 13% 92%)',
       ring: 'hsl(213 32% 52%)',
       sidebar: 'hsl(220 16% 96%)',
       sidebarForeground: 'hsl(222 16% 28%)',
@@ -332,7 +332,7 @@ export const themes = {
       destructiveForeground: 'hsl(60 30% 96%)',
       border: 'hsl(232 14% 31%)',
       input: 'hsl(232 14% 31%)',
-      inputBackground: 'hsl(231 15% 14%)',
+      inputBackground: 'hsl(231 15% 10%)',
       ring: 'hsl(265 89% 78%)',
       sidebar: 'hsl(231 15% 18%)',
       sidebarForeground: 'hsl(60 30% 96%)',
@@ -400,7 +400,7 @@ export const themes = {
       destructiveForeground: 'hsl(60 30% 96%)',
       border: 'hsl(55 11% 22%)',
       input: 'hsl(55 11% 22%)',
-      inputBackground: 'hsl(70 8% 10%)',
+      inputBackground: 'hsl(70 8% 7%)',
       ring: 'hsl(81 88% 67%)',
       sidebar: 'hsl(70 8% 15%)',
       sidebarForeground: 'hsl(60 30% 96%)',
@@ -466,7 +466,7 @@ export const themes = {
       destructiveForeground: 'hsl(156 72% 67%)',
       border: 'hsl(0 0% 15%)',
       input: 'hsl(0 0% 15%)',
-      inputBackground: 'hsl(0 0% 3%)',
+      inputBackground: 'hsl(0 0% 1%)',
       ring: 'hsl(156 72% 67%)',
       sidebar: 'hsl(0 0% 0%)',
       sidebarForeground: 'hsl(156 72% 67%)',
@@ -536,7 +536,7 @@ export const themes = {
       destructiveForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
       border: 'hsl(0 0% 30%)',              // bg3 #665c54
       input: 'hsl(0 0% 25%)',               // bg2 #504945
-      inputBackground: 'hsl(0 0% 11%)',     // darker than bg0_h
+      inputBackground: 'hsl(0 0% 7%)',     // darker than bg0_h
       ring: 'hsl(24 75% 59%)',              // orange #fe8019
       sidebar: 'hsl(0 0% 16%)',             // bg0_h #1d2021
       sidebarForeground: 'hsl(39 27% 83%)', // fg1 #ebdbb2
@@ -551,6 +551,75 @@ export const themes = {
       gitAdded: '61 66% 44%',         // Gruvbox bright green for +lines
       gitDeleted: '0 100% 60%',       // Gruvbox bright red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
+    },
+  },
+  retro: {
+    name: 'Retro',
+    type: 'dark',
+    // Terminal colors - Botanical (prussian blue bg, cream/lime/teal accents)
+    terminal: {
+      foreground: '#A8D5A6',      // Celadon
+      background: '#020D1C',      // Prussian Blue
+      cursor: '#F4F7A3',          // Lime Cream
+      cursorAccent: '#020D1C',    // Prussian Blue
+      selectionBackground: '#17594F', // Pine Teal
+      selectionForeground: '#FEFFC7', // Cream
+
+      // Normal colors
+      black: '#020D1C',           // Prussian Blue
+      red: '#F4F7A3',             // Lime Cream
+      green: '#A8D5A6',           // Celadon
+      yellow: '#F4F7A3',          // Lime Cream
+      blue: '#17594F',            // Pine Teal
+      magenta: '#FEFFC7',         // Cream
+      cyan: '#17594F',            // Pine Teal
+      white: '#A8D5A6',           // Celadon
+
+      // Bright colors
+      brightBlack: '#17594F',     // Pine Teal
+      brightRed: '#FEFFC7',       // Cream
+      brightGreen: '#FEFFC7',     // Cream
+      brightYellow: '#FEFFC7',    // Cream
+      brightBlue: '#A8D5A6',      // Celadon
+      brightMagenta: '#F4F7A3',   // Lime Cream
+      brightCyan: '#A8D5A6',      // Celadon
+      brightWhite: '#FEFFC7',     // Cream
+    },
+    // UI colors — only: Prussian Blue, Celadon, Lime Cream, Pine Teal, Cream
+    ui: {
+      background: '#020D1C',                   // Prussian Blue
+      foreground: '#A8D5A6',                   // Celadon
+      card: '#020D1C',                         // Prussian Blue
+      cardForeground: '#A8D5A6',               // Celadon
+      popover: '#020D1C',                      // Prussian Blue
+      popoverForeground: '#A8D5A6',            // Celadon
+      primary: '#F4F7A3',                      // Lime Cream
+      primaryForeground: '#020D1C',            // Prussian Blue
+      secondary: '#17594F',                    // Pine Teal
+      secondaryForeground: '#FEFFC7',          // Cream
+      muted: '#17594F',                        // Pine Teal
+      mutedForeground: '#A8D5A6',              // Celadon
+      accent: '#A8D5A6',                       // Celadon
+      accentForeground: '#020D1C',             // Prussian Blue
+      destructive: '#F4F7A3',                  // Lime Cream
+      destructiveForeground: '#020D1C',        // Prussian Blue
+      border: '#17594F',                       // Pine Teal
+      input: '#020D1C',                        // Prussian Blue
+      inputBackground: '#010812',              // Deeper Prussian Blue
+      ring: '#A8D5A6',                         // Celadon
+      sidebar: '#020D1C',                      // Prussian Blue
+      sidebarForeground: '#A8D5A6',            // Celadon
+      sidebarPrimary: '#F4F7A3',               // Lime Cream
+      sidebarPrimaryForeground: '#020D1C',     // Prussian Blue
+      sidebarAccent: '#17594F',                // Pine Teal
+      sidebarAccentForeground: '#FEFFC7',      // Cream
+      sidebarBorder: '#17594F',                // Pine Teal
+      sidebarRing: '#A8D5A6',                  // Celadon
+      // Semantic colors
+      folder: '62 84% 80%',                    // Lime Cream for folder icons
+      gitAdded: '117 36% 74%',                 // Celadon for +lines
+      gitDeleted: '62 84% 80%',                // Lime Cream for -lines
+      treeGuide: '117 36% 74% / 0.15',         // Celadon with opacity
     },
   },
 };
