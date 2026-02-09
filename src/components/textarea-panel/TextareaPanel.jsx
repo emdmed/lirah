@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useState } from "react";
 import { Textarea } from "../ui/textarea";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
@@ -6,6 +6,7 @@ import { ActionButtons } from "./ActionButtons";
 import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 import { CompactProjectButton } from "./CompactProjectButton";
+import { CompactSectionsDialog } from "./CompactSectionsDialog";
 import { AtMentionModal } from "../AtMentionModal";
 import { X } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
@@ -42,6 +43,7 @@ export function TextareaPanel({
   compactProgress,
   compactedProject,
   onClearCompactedProject,
+  onUpdateCompactedProject,
   selectedElements,
   onClearElements,
   atMentionActive = false,
@@ -92,6 +94,8 @@ export function TextareaPanel({
 
     return { elementCount: count, elementsTooltipContent: content };
   }, [selectedElements, currentPath]);
+
+  const [compactDialogOpen, setCompactDialogOpen] = useState(false);
 
   // Remove duplicate sorting - use pre-sorted results from parent
   const sortedAtMentionResults = atMentionResults || [];
@@ -260,7 +264,10 @@ export function TextareaPanel({
         <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 border border-primary/20 rounded w-fit" style={{ fontSize: 'var(--font-xs)' }}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 cursor-default">
+              <div
+                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setCompactDialogOpen(true)}
+              >
                 <span className="text-primary font-medium">
                   Project compacted
                 </span>
@@ -271,7 +278,7 @@ export function TextareaPanel({
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-md text-left p-3">
               <div className="space-y-1">
-                <div>Compacted project will be appended to the prompt when sent to terminal</div>
+                <div>Click to toggle sections on/off</div>
                 <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
                   {compactedProject.compressionPercent}% compression ({compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens)
                 </div>
@@ -286,6 +293,16 @@ export function TextareaPanel({
             <X className="w-3 h-3" />
           </button>
         </div>
+      )}
+
+      {/* Compact sections dialog */}
+      {compactedProject && (
+        <CompactSectionsDialog
+          open={compactDialogOpen}
+          onOpenChange={setCompactDialogOpen}
+          compactedProject={compactedProject}
+          onUpdateCompactedProject={onUpdateCompactedProject}
+        />
       )}
 
       {/* Main content area */}

@@ -469,12 +469,14 @@ function App() {
     if (pendingCompactResult?.output) {
       setCompactedProject({
         output: pendingCompactResult.output,
+        fullOutput: pendingCompactResult.output,
         fileCount: pendingCompactResult.fileCount,
         tokenEstimate: pendingCompactResult.tokenEstimate,
         formattedTokens: pendingCompactResult.formattedTokens,
         originalTokens: pendingCompactResult.originalTokens,
         formattedOriginalTokens: pendingCompactResult.formattedOriginalTokens,
         compressionPercent: pendingCompactResult.compressionPercent,
+        disabledPaths: [],
       });
       setTextareaVisible(true);
     }
@@ -1180,6 +1182,7 @@ function App() {
               compactProgress={compactProgress}
               compactedProject={compactedProject}
               onClearCompactedProject={() => setCompactedProject(null)}
+              onUpdateCompactedProject={setCompactedProject}
               selectedElements={selectedElements}
               onClearElements={clearSelectedElements}
               atMentionActive={atMentionQuery !== null}
