@@ -22,36 +22,50 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
     // Create command: wrap in bwrap sandbox on Unix if requested
     #[cfg(unix)]
     let mut cmd = if sandbox {
-        let mut c = CommandBuilder::new("bwrap");
+        let mut c = CommandBuilder::new("/usr/bin/bwrap");
         c.args(&[
             "--ro-bind", "/", "/",
             "--dev", "/dev",
             "--proc", "/proc",
             "--tmpfs", "/tmp",
         ]);
-        // Home read-only, with specific writable paths
+        // Writable paths inside home
         if let Some(ref home) = home_dir() {
-            c.args(&["--ro-bind", home, home]);
-            // Writable: Claude config
+            // Claude config
             let claude_dir = format!("{}/.claude", home);
             if std::path::Path::new(&claude_dir).exists() {
                 c.args(&["--bind", &claude_dir, &claude_dir]);
             }
-            // Writable: app configs
+            // App configs
             let config_dir = format!("{}/.config", home);
             if std::path::Path::new(&config_dir).exists() {
                 c.args(&["--bind", &config_dir, &config_dir]);
             }
+            // Shell history/cache
+            let cache_dir = format!("{}/.cache", home);
+            if std::path::Path::new(&cache_dir).exists() {
+                c.args(&["--bind", &cache_dir, &cache_dir]);
+            }
+            // npm/node (Claude Code needs this)
+            let npm_dir = format!("{}/.npm", home);
+            if std::path::Path::new(&npm_dir).exists() {
+                c.args(&["--bind", &npm_dir, &npm_dir]);
+            }
+            let local_dir = format!("{}/.local", home);
+            if std::path::Path::new(&local_dir).exists() {
+                c.args(&["--bind", &local_dir, &local_dir]);
+            }
         }
-        // Writable: project directory
+        // Writable: project directory (validate it's a real path)
         if let Some(ref proj) = project_dir {
-            c.args(&["--bind", proj, proj]);
+            if std::path::Path::new(proj).is_dir() {
+                c.args(&["--bind", proj, proj]);
+            }
         }
         c.args(&[
             "--unshare-pid",
             "--unshare-uts",
             "--unshare-ipc",
-            "--die-with-parent",
             "--", &shell, "-l",
         ]);
         c
@@ -82,10 +96,12 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
     }));
 
     // Spawn the child process
+    eprintln!("[sandbox] sandbox={}, project_dir={:?}", sandbox, project_dir);
     let child = pty_pair
         .slave
         .spawn_command(cmd)
         .map_err(|e| format!("Failed to spawn shell: {}", e))?;
+    eprintln!("[sandbox] spawned pid={:?}", child.process_id());
 
     // Take writer from master before moving it
     let master = pty_pair.master;

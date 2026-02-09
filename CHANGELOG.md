@@ -13,7 +13,7 @@ All notable changes to Lirah will be documented in this file.
   - PID namespace isolation (`--unshare-pid`) — sandboxed processes cannot see or signal host processes
   - UTS namespace isolation (`--unshare-uts`) — hostname changes don't leak to the host
   - IPC namespace isolation (`--unshare-ipc`) — prevents shared memory attacks across boundary
-  - Auto-cleanup (`--die-with-parent`) — sandbox is killed if Lirah exits
+  - Scoped writable paths for `~/.claude`, `~/.config`, `~/.cache`, `~/.npm`, `~/.local` — only essential directories are writable
 
 ### 🚀 Features
 
