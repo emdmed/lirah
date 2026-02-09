@@ -440,8 +440,7 @@ function App() {
       // Calculate token estimates (~4 chars per token)
       const compactedTokens = estimateTokens(output);
       const originalTokens = Math.ceil(originalSize / 4);
-      const fileCountMatch = output.match(/# Files: (\d+)/);
-      const fileCount = fileCountMatch ? parseInt(fileCountMatch[1], 10) : 0;
+      const fileCount = (output.match(/^## /gm) || []).length;
 
       // Calculate compression percentage
       const compressionPercent = originalSize > 0

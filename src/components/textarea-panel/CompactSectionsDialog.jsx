@@ -4,9 +4,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "../ui/dialog";
-import { Checkbox } from "../ui/checkbox";
-import { ChevronRight, ChevronDown, Folder, File } from "lucide-react";
+import { Button } from "../ui/button";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { estimateTokens, formatTokenCount } from "../../hooks/useProjectCompact";
 
 /**
@@ -49,7 +51,6 @@ function groupByDirectory(sections) {
     if (!tree[dirPath]) tree[dirPath] = [];
     tree[dirPath].push({ ...section, fileName });
   }
-  // Sort directories
   return Object.entries(tree).sort(([a], [b]) => a.localeCompare(b));
 }
 
@@ -81,7 +82,6 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
 
   const sections = useMemo(() => {
     const parsed = parseSections(compactedProject?.fullOutput || compactedProject?.output);
-    // Precompute tokens per section
     return parsed.map(s => ({
       ...s,
       tokens: estimateTokens(`## ${s.path}\n${s.content}`),
@@ -89,7 +89,6 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
   }, [compactedProject]);
   const grouped = useMemo(() => groupByDirectory(sections), [sections]);
 
-  // Real-time token estimate based on current toggle state
   const liveTokenEstimate = useMemo(() => {
     return sections.reduce((sum, s) => disabledPaths.has(s.path) ? sum : sum + s.tokens, 0);
   }, [sections, disabledPaths]);
@@ -150,77 +149,89 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-sm flex items-center gap-2">
-            <span>Compacted Sections ({enabledCount}/{sections.length} files)</span>
-            <span className="text-muted-foreground font-normal">~{formatTokenCount(liveTokenEstimate)} tokens</span>
-          </DialogTitle>
+          <DialogTitle>Compacted Sections</DialogTitle>
+          <DialogDescription>
+            {enabledCount}/{sections.length} files · ~{formatTokenCount(liveTokenEstimate)} tokens
+          </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto flex-1 -mx-2 px-2">
           {grouped.map(([dirPath, files]) => {
             const filePaths = files.map(f => f.path);
-            const allDisabled = filePaths.every(p => disabledPaths.has(p));
-            const someDisabled = filePaths.some(p => disabledPaths.has(p));
+            const enabledInDir = filePaths.filter(p => !disabledPaths.has(p)).length;
+            const allDisabled = enabledInDir === 0;
             const collapsed = collapsedDirs.has(dirPath);
+            const dirTokens = files.reduce((sum, f) => disabledPaths.has(f.path) ? sum : sum + f.tokens, 0);
 
             return (
-              <div key={dirPath} className="mb-1">
-                <div className="flex items-center gap-1.5 py-1 hover:bg-muted/50 rounded px-1 cursor-pointer select-none">
-                  <button
+              <div key={dirPath} className="mb-0.5">
+                {/* Directory row */}
+                <div
+                  className={`flex items-center gap-1.5 py-1 rounded px-1 select-none transition-opacity ${allDisabled ? 'opacity-35' : ''}`}
+                >
+                  <div
+                    className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => toggleDirCollapse(dirPath)}
-                    className="p-0 bg-transparent border-none cursor-pointer text-muted-foreground"
                   >
                     {collapsed
-                      ? <ChevronRight className="w-3 h-3" />
-                      : <ChevronDown className="w-3 h-3" />
+                      ? <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                      : <ChevronDown className="w-3 h-3 text-muted-foreground" />
                     }
-                  </button>
-                  <Checkbox
-                    checked={!allDisabled && (someDisabled ? 'indeterminate' : true)}
-                    onCheckedChange={() => toggleDir(dirPath, filePaths)}
-                  />
-                  <Folder className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground font-mono">{dirPath}</span>
-                  <span className="text-xs text-muted-foreground/60 ml-auto">
-                    {filePaths.length - filePaths.filter(p => disabledPaths.has(p)).length}/{filePaths.length}
-                    {' · '}
-                    {formatTokenCount(files.reduce((sum, f) => disabledPaths.has(f.path) ? sum : sum + f.tokens, 0))}
-                  </span>
+                    <span
+                      className="shrink-0 px-1 py-0 rounded-full bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
+                      style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
+                      onClick={(e) => { e.stopPropagation(); toggleDir(dirPath, filePaths); }}
+                    >
+                      {formatTokenCount(dirTokens)}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-mono hover:text-foreground transition-colors">
+                      {dirPath}
+                    </span>
+                    <span className="text-muted-foreground/50 font-mono" style={{ fontSize: '9px' }}>
+                      {enabledInDir}/{filePaths.length}
+                    </span>
+                  </div>
                 </div>
+                {/* Files */}
                 {!collapsed && (
-                  <div className="ml-5 border-l border-border/30 pl-2">
-                    {files.map(file => (
-                      <div
-                        key={file.path}
-                        className="flex items-center gap-1.5 py-0.5 hover:bg-muted/30 rounded px-1 cursor-pointer select-none"
-                        onClick={() => togglePath(file.path)}
-                      >
-                        <Checkbox
-                          checked={!disabledPaths.has(file.path)}
-                          onCheckedChange={() => togglePath(file.path)}
-                        />
-                        <File className="w-3 h-3 text-muted-foreground" />
-                        <span className={`text-xs font-mono ${disabledPaths.has(file.path) ? 'text-muted-foreground/40 line-through' : 'text-foreground'}`}>
-                          {file.fileName}
-                        </span>
-                        <span className={`text-xs ml-auto ${disabledPaths.has(file.path) ? 'text-muted-foreground/30' : 'text-muted-foreground/60'}`}>
-                          {formatTokenCount(file.tokens)}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="ml-4 border-l border-border/20 pl-1.5">
+                    {files.map(file => {
+                      const isDisabled = disabledPaths.has(file.path);
+                      return (
+                        <div
+                          key={file.path}
+                          className={`flex items-center gap-1.5 py-0.5 rounded px-1 select-none transition-all ${
+                            isDisabled
+                              ? 'opacity-30 hover:opacity-50'
+                              : 'opacity-100'
+                          }`}
+                        >
+                          <span
+                            className="shrink-0 px-1 py-0 rounded-full bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
+                            style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
+                            onClick={() => togglePath(file.path)}
+                          >
+                            {formatTokenCount(file.tokens)}
+                          </span>
+                          <span className={`text-xs font-mono transition-all ${isDisabled ? 'line-through' : 'text-foreground'}`}>
+                            {file.fileName}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-        <div className="flex justify-end pt-2 border-t border-border">
-          <button
-            onClick={handleApply}
-            className="px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
-          >
+        <DialogFooter className="gap-2 sm:gap-2 border-t border-border pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleApply}>
             Apply
-          </button>
-        </div>
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
