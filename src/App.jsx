@@ -1251,6 +1251,7 @@ function App() {
           onSearchFocus={handleSearchFocus}
           onToggleGitFilter={handleToggleGitFilter}
           sandboxEnabled={sandboxEnabled}
+          projectDir={currentPath}
         />
       </Layout>
       <AddBookmarkDialog

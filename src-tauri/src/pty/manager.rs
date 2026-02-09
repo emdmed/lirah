@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use crate::state::PtySession;
 
-pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool) -> Result<PtySession, String> {
+pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String>) -> Result<PtySession, String> {
     let pty_system = NativePtySystem::default();
 
     // Create a new PTY with the specified size
@@ -29,11 +29,31 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool) -> Result<PtySession, Stri
             "--proc", "/proc",
             "--tmpfs", "/tmp",
         ]);
-        // Bind home directory read-write
-        if let Some(home) = home_dir() {
-            c.args(&["--bind", &home, &home]);
+        // Home read-only, with specific writable paths
+        if let Some(ref home) = home_dir() {
+            c.args(&["--ro-bind", home, home]);
+            // Writable: Claude config
+            let claude_dir = format!("{}/.claude", home);
+            if std::path::Path::new(&claude_dir).exists() {
+                c.args(&["--bind", &claude_dir, &claude_dir]);
+            }
+            // Writable: app configs
+            let config_dir = format!("{}/.config", home);
+            if std::path::Path::new(&config_dir).exists() {
+                c.args(&["--bind", &config_dir, &config_dir]);
+            }
         }
-        c.args(&["--unshare-pid", "--", &shell, "-l"]);
+        // Writable: project directory
+        if let Some(ref proj) = project_dir {
+            c.args(&["--bind", proj, proj]);
+        }
+        c.args(&[
+            "--unshare-pid",
+            "--unshare-uts",
+            "--unshare-ipc",
+            "--die-with-parent",
+            "--", &shell, "-l",
+        ]);
         c
     } else {
         let mut c = CommandBuilder::new(&shell);

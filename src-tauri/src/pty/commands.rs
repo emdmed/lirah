@@ -11,6 +11,7 @@ pub fn spawn_terminal(
     rows: u16,
     cols: u16,
     sandbox: bool,
+    project_dir: Option<String>,
     app: AppHandle,
     state: tauri::State<AppState>,
 ) -> Result<String, String> {
@@ -18,7 +19,7 @@ pub fn spawn_terminal(
     let session_id = Uuid::new_v4().to_string();
 
     // Spawn the PTY
-    let session = manager::spawn_pty(rows, cols, sandbox)?;
+    let session = manager::spawn_pty(rows, cols, sandbox, project_dir)?;
 
     // Clone the master for the reader thread
     let mut reader = session

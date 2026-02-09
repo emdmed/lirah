@@ -2,6 +2,30 @@
 
 All notable changes to Lirah will be documented in this file.
 
+## [0.1.13] - 2026-02-10
+
+### 🔒 Security
+
+- **Bubblewrap Sandbox** - Optional sandboxing for terminal sessions using bubblewrap (bwrap). Wraps the PTY shell in a Linux namespace with defense-in-depth filesystem and process isolation:
+  - Read-only root filesystem (`--ro-bind / /`)
+  - Read-only home directory with scoped write access to the active project, `~/.claude`, and `~/.config`
+  - Isolated `/tmp` via private tmpfs
+  - PID namespace isolation (`--unshare-pid`) — sandboxed processes cannot see or signal host processes
+  - UTS namespace isolation (`--unshare-uts`) — hostname changes don't leak to the host
+  - IPC namespace isolation (`--unshare-ipc`) — prevents shared memory attacks across boundary
+  - Auto-cleanup (`--die-with-parent`) — sandbox is killed if Lirah exits
+
+### 🚀 Features
+
+- **Sandbox Toggle** - Toggle sandbox on/off from the StatusBar settings dropdown. Terminal automatically restarts with the new setting. State persisted in localStorage.
+- **Sandbox Indicator** - Lock/unlock icon in the sidebar "agent"/"nav" badge shows sandbox status at a glance.
+- **Terminal Restart on Toggle** - Toggling sandbox cleanly closes the old PTY session and spawns a fresh one with the updated config.
+
+### 🐛 Fixes
+
+- Fixed CWD detection for sandboxed terminals by resolving bwrap's child process PID via `/proc/[pid]/task/[tid]/children`
+- Fixed leaked PTY sessions when restarting terminal by explicitly closing the old session before remounting
+
 ## [0.1.12] - 2026-02-08
 
 ### 🚀 Features
