@@ -9,6 +9,10 @@ All notable changes to Lirah will be documented in this file.
 - **Windows Support** - Full Windows compatibility with PowerShell integration, Windows CWD detection via `sysinfo` crate, and platform-aware path handling throughout the app.
 - **Orchestration Auto-Detection** - Orchestration mode now automatically disables when a project has no `.orchestration/` folder, with updated status bar indicator.
 
+### 🔄 Updates
+
+- Renamed orchestration command from `npx claude-orchestration` to `npx agentic-orchestration`
+
 ### 🐛 Fixes
 
 - Fixed path normalization across platforms with new `pathUtils.js` utility module
