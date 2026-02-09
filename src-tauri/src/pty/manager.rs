@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use crate::state::PtySession;
 
-pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
+pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool) -> Result<PtySession, String> {
     let pty_system = NativePtySystem::default();
 
     // Create a new PTY with the specified size
@@ -19,12 +19,30 @@ pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
     // Determine the shell to use based on the platform
     let shell = get_shell();
 
-    // Create command for the shell
-    let mut cmd = CommandBuilder::new(&shell);
-
-    // Start as login shell on Unix only
+    // Create command: wrap in bwrap sandbox on Unix if requested
     #[cfg(unix)]
-    cmd.arg("-l");
+    let mut cmd = if sandbox {
+        let mut c = CommandBuilder::new("bwrap");
+        c.args(&[
+            "--ro-bind", "/", "/",
+            "--dev", "/dev",
+            "--proc", "/proc",
+            "--tmpfs", "/tmp",
+        ]);
+        // Bind home directory read-write
+        if let Some(home) = home_dir() {
+            c.args(&["--bind", &home, &home]);
+        }
+        c.args(&["--unshare-pid", "--", &shell, "-l"]);
+        c
+    } else {
+        let mut c = CommandBuilder::new(&shell);
+        c.arg("-l");
+        c
+    };
+
+    #[cfg(not(unix))]
+    let mut cmd = CommandBuilder::new(&shell);
 
     // On Windows, PowerShell's Set-Location (cd) doesn't call Win32 SetCurrentDirectory,
     // so the OS-level CWD never updates. Override the prompt function to sync them,
@@ -60,6 +78,7 @@ pub fn spawn_pty(rows: u16, cols: u16) -> Result<PtySession, String> {
         child,
         writer,
         shutdown: Arc::new(AtomicBool::new(false)),
+        sandboxed: sandbox,
     })
 }
 

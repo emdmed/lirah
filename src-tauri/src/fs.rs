@@ -7,6 +7,22 @@ use walkdir::WalkDir;
 use std::collections::{HashSet, HashMap};
 use std::process::Command;
 
+/// Find a child process of the given PID by reading /proc/[pid]/task/[tid]/children
+#[cfg(target_os = "linux")]
+fn find_child_pid(parent_pid: u32) -> Option<u32> {
+    // Try /proc/[pid]/task/[pid]/children first (requires CONFIG_PROC_CHILDREN)
+    let children_path = format!("/proc/{}/task/{}/children", parent_pid, parent_pid);
+    if let Ok(content) = fs::read_to_string(&children_path) {
+        if let Some(first) = content.split_whitespace().next() {
+            if let Ok(child_pid) = first.parse::<u32>() {
+                // Recurse to find the deepest child (shell, not intermediate bwrap)
+                return Some(find_child_pid(child_pid).unwrap_or(child_pid));
+            }
+        }
+    }
+    None
+}
+
 fn home_dir() -> Option<String> {
     #[cfg(unix)]
     { std::env::var("HOME").ok() }
@@ -91,14 +107,22 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
         .get(&session_id)
         .ok_or_else(|| format!("Session not found: {}", session_id))?;
 
-    // Get the PID of the child process (shell)
+    // Get the PID of the child process (shell or bwrap wrapper)
     let pid = session.child.process_id()
         .ok_or_else(|| "Failed to get process ID".to_string())?;
 
     #[cfg(target_os = "linux")]
     {
+        // When sandboxed, the child PID is bwrap, not the shell.
+        // Find the shell by looking for bwrap's child process.
+        let target_pid = if session.sandboxed {
+            find_child_pid(pid).unwrap_or(pid)
+        } else {
+            pid
+        };
+
         // On Linux, read /proc/[pid]/cwd symlink
-        let cwd_link = format!("/proc/{}/cwd", pid);
+        let cwd_link = format!("/proc/{}/cwd", target_pid);
         fs::read_link(&cwd_link)
             .map(|p| p.to_string_lossy().to_string())
             .map_err(|e| format!("Failed to read cwd from /proc: {}", e))

@@ -9,6 +9,7 @@ pub struct PtySession {
     pub child: Box<dyn Child + Send>,
     pub writer: Box<dyn Write + Send>,
     pub shutdown: Arc<AtomicBool>,
+    pub sandboxed: bool,
 }
 
 pub struct AppStateData {

@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { BookmarksDropdown } from './BookmarksDropdown';
-import { Search, X, GitBranch, Star } from 'lucide-react';
+import { Search, X, GitBranch, Star, Lock, LockOpen } from 'lucide-react';
 
 export function SidebarHeader({
   viewMode,
@@ -16,7 +16,8 @@ export function SidebarHeader({
   fileWatchingEnabled,
   onAddBookmark,
   onNavigateBookmark,
-  hasTerminalSession
+  hasTerminalSession,
+  sandboxEnabled
 }) {
   return (
     <div className="px-3 py-2 border-b border-b-sketch flex flex-col gap-2 flex-shrink-0">
@@ -32,6 +33,7 @@ export function SidebarHeader({
           <span
             className={`text-xs font-medium px-1 mt-1 rounded ${viewMode === 'tree' ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-muted/10'}`}
           >
+            {sandboxEnabled ? <Lock className="w-3 h-3 inline mr-0.5" /> : <LockOpen className="w-3 h-3 inline mr-0.5" />}
             {viewMode === 'tree' ? 'agent' : 'nav'}
           </span>
         </div>

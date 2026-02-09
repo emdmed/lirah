@@ -181,6 +181,17 @@ function App() {
   });
   const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
 
+  // Sandbox state
+  const [sandboxEnabled, setSandboxEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nevo-terminal:sandbox-enabled');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch { return false; }
+  });
+
+  // Terminal restart key — incrementing forces Terminal remount
+  const [terminalKey, setTerminalKey] = useState(0);
+
   // Compact project confirmation state
   const [compactConfirmOpen, setCompactConfirmOpen] = useState(false);
   const [pendingCompactResult, setPendingCompactResult] = useState(null);
@@ -229,6 +240,15 @@ function App() {
       console.warn('Failed to save title bar preference to localStorage:', error);
     }
   }, [showTitleBar]);
+
+  // Save sandboxEnabled to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('nevo-terminal:sandbox-enabled', JSON.stringify(sandboxEnabled));
+    } catch (error) {
+      console.warn('Failed to save sandbox preference to localStorage:', error);
+    }
+  }, [sandboxEnabled]);
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
@@ -1081,6 +1101,7 @@ function App() {
                     onAddBookmark={() => setAddBookmarkDialogOpen(true)}
                     onNavigateBookmark={navigateToBookmark}
                     hasTerminalSession={!!terminalSessionId}
+                    sandboxEnabled={sandboxEnabled}
                   />
                   <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                     <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
@@ -1210,15 +1231,26 @@ function App() {
             onOpenCliSettings={() => setCliSelectionModalOpen(true)}
             showTitleBar={showTitleBar}
             onToggleTitleBar={() => setShowTitleBar(prev => !prev)}
+            sandboxEnabled={sandboxEnabled}
+            onToggleSandbox={() => {
+              setSandboxEnabled(prev => !prev);
+              if (terminalSessionId) {
+                invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
+              }
+              setTerminalSessionId(null);
+              setTerminalKey(k => k + 1);
+            }}
           />
         }
       >
         <Terminal
+          key={terminalKey}
           ref={terminalRef}
           theme={theme.terminal}
           onSessionReady={(id) => setTerminalSessionId(id)}
           onSearchFocus={handleSearchFocus}
           onToggleGitFilter={handleToggleGitFilter}
+          sandboxEnabled={sandboxEnabled}
         />
       </Layout>
       <AddBookmarkDialog
