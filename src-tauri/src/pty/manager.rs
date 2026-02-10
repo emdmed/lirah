@@ -29,28 +29,12 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             "--proc", "/proc",
             "--bind", "/tmp", "/tmp",
         ]);
-        // Writable paths inside home
+        // Home directory writable (Claude Code needs broad write access:
+        // shell dotfiles, .claude, .config, .cache, .npm, .local, etc.)
         if let Some(ref home) = home_dir() {
-            let writable_dirs = [
-                ".claude",     // Claude config
-                ".config",     // App configs
-                ".cache",      // Shell/app cache
-                ".npm",        // npm cache (npx needs this)
-                ".local",      // mise, pip, local installs
-                ".anthropic",  // Claude Code API keys
-                ".nvm",        // nvm-managed node
-                ".fnm",        // fnm-managed node
-                ".volta",      // volta-managed node
-                ".bun",        // bun runtime
-            ];
-            for dir in &writable_dirs {
-                let path = format!("{}/{}", home, dir);
-                if std::path::Path::new(&path).exists() {
-                    c.args(&["--bind", &path, &path]);
-                }
-            }
+            c.args(&["--bind", home, home]);
         }
-        // Writable: project directory (validate it's a real path)
+        // Writable: project directory (may be outside home)
         if let Some(ref proj) = project_dir {
             if std::path::Path::new(proj).is_dir() {
                 c.args(&["--bind", proj, proj]);
