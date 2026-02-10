@@ -1,9 +1,9 @@
 import { useRef, useEffect, forwardRef } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, projectDir }, ref) => {
+export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, projectDir, onSandboxFailed }, ref) => {
   const terminalRef = useRef(null);
-  const { handleResize, sessionId, isFocused } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, projectDir);
+  const { handleResize, sessionId, isFocused, sandboxFailed } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, projectDir);
 
   // Notify parent when session is ready
   useEffect(() => {
@@ -11,6 +11,13 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchF
       onSessionReady(sessionId);
     }
   }, [sessionId, onSessionReady]);
+
+  // Notify parent if sandbox failed
+  useEffect(() => {
+    if (sandboxFailed && onSandboxFailed) {
+      onSandboxFailed();
+    }
+  }, [sandboxFailed, onSandboxFailed]);
 
   // Setup resize observer
   useEffect(() => {

@@ -14,12 +14,13 @@ pub fn spawn_terminal(
     project_dir: Option<String>,
     app: AppHandle,
     state: tauri::State<AppState>,
-) -> Result<String, String> {
+) -> Result<serde_json::Value, String> {
     // Generate a unique session ID
     let session_id = Uuid::new_v4().to_string();
 
     // Spawn the PTY
     let session = manager::spawn_pty(rows, cols, sandbox, project_dir)?;
+    let actually_sandboxed = session.sandboxed;
 
     // Clone the master for the reader thread
     let mut reader = session
@@ -84,7 +85,10 @@ pub fn spawn_terminal(
         .pty_sessions
         .insert(session_id.clone(), session);
 
-    Ok(session_id)
+    Ok(serde_json::json!({
+        "session_id": session_id,
+        "sandboxed": actually_sandboxed,
+    }))
 }
 
 #[tauri::command]

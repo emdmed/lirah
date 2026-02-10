@@ -25,7 +25,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
         let mut c = CommandBuilder::new("/usr/bin/bwrap");
         c.args(&[
             "--ro-bind", "/", "/",
-            "--dev-bind", "/dev", "/dev",
+            "--dev", "/dev",
             "--proc", "/proc",
             "--bind", "/tmp", "/tmp",
         ]);
@@ -37,12 +37,18 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             let protected_paths = [
                 ".ssh",
                 ".gnupg",
-                ".config/autostart",
                 ".bashrc",
                 ".bash_profile",
                 ".profile",
                 ".zshrc",
                 ".zprofile",
+                ".pam_environment",
+                ".gitconfig",
+                ".config/git",
+                ".config/autostart",
+                ".config/systemd/user",
+                ".config/environment.d",
+                ".local/bin",
             ];
             for subpath in &protected_paths {
                 let full = format!("{}/{}", home, subpath);
@@ -59,6 +65,9 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
         }
         c.args(&[
             "--unshare-uts",
+            "--unshare-ipc",
+            "--unshare-pid",
+            "--new-session",
             "--die-with-parent",
             "--", &shell, "-l",
         ]);

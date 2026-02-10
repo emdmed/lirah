@@ -191,6 +191,7 @@ function App() {
 
   // Terminal restart key — incrementing forces Terminal remount
   const [terminalKey, setTerminalKey] = useState(0);
+  const [sandboxFailed, setSandboxFailed] = useState(false);
 
   // Compact project confirmation state
   const [compactConfirmOpen, setCompactConfirmOpen] = useState(false);
@@ -1232,8 +1233,10 @@ function App() {
             showTitleBar={showTitleBar}
             onToggleTitleBar={() => setShowTitleBar(prev => !prev)}
             sandboxEnabled={sandboxEnabled}
+            sandboxFailed={sandboxFailed}
             onToggleSandbox={() => {
               setSandboxEnabled(prev => !prev);
+              setSandboxFailed(false);
               if (terminalSessionId) {
                 invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
               }
@@ -1252,6 +1255,7 @@ function App() {
           onToggleGitFilter={handleToggleGitFilter}
           sandboxEnabled={sandboxEnabled}
           projectDir={currentPath}
+          onSandboxFailed={() => setSandboxFailed(true)}
         />
         <GitDiffDialog
           open={diffDialogOpen}

@@ -1,5 +1,5 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { Button } from './ui/button';
@@ -17,7 +17,7 @@ const CLI_DISPLAY = {
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, onToggleSandbox }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, onToggleSandbox }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers });
@@ -113,12 +113,14 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               onClick={onToggleSandbox}
               className="cursor-pointer"
             >
-              {sandboxEnabled ? (
+              {sandboxEnabled && sandboxFailed ? (
+                <ShieldAlert className="mr-1.5" style={{ color: '#FF9E3B' }} />
+              ) : sandboxEnabled ? (
                 <Shield className="mr-1.5" />
               ) : (
                 <ShieldOff className="mr-1.5" style={{ color: '#E82424' }} />
               )}
-              Sandbox: {sandboxEnabled ? 'ON' : 'OFF'}
+              Sandbox: {sandboxEnabled && sandboxFailed ? 'FAILED' : sandboxEnabled ? 'ON' : 'OFF'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

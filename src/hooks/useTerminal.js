@@ -12,6 +12,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [sessionId, setSessionId] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [sandboxFailed, setSandboxFailed] = useState(false);
 
   // Initialize terminal
   useEffect(() => {
@@ -96,8 +97,14 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         const cols = terminal.cols;
 
         // Spawn terminal backend
-        const id = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, projectDir: projectDir || null });
+        const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, projectDir: projectDir || null });
+        const id = result.session_id;
         setSessionId(id);
+
+        // Check if sandbox was requested but failed
+        if (sandboxEnabled && !result.sandboxed) {
+          setSandboxFailed(true);
+        }
 
         // Listen for terminal output
         unlisten = await listen('terminal-output', (event) => {
@@ -202,6 +209,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     sessionId,
     isReady,
     isFocused,
+    sandboxFailed,
     handleResize,
   };
 }
