@@ -29,32 +29,25 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             "--proc", "/proc",
             "--bind", "/tmp", "/tmp",
         ]);
-        // Home directory: read-only base, with specific writable subdirectories.
-        // This prevents modification of sensitive files like ~/.bashrc, ~/.ssh/,
-        // ~/.gnupg/, ~/.config/autostart/, etc.
+        // Home directory: writable by default, with sensitive paths read-only
         if let Some(ref home) = home_dir() {
-            c.args(&["--ro-bind", home, home]);
+            c.args(&["--bind", home, home]);
 
-            // Writable subdirectories that Claude Code needs
-            let writable_subdirs = [
-                ".claude",
-                ".config/claude-code",
-                ".cache",
-                ".npm",
-                ".local/share",
-                ".local/state",
-                ".nvm",
-                ".cargo",
-                ".rustup",
-                ".bun",
-                ".pnpm",
-                ".yarn",
+            // Sensitive paths that should be read-only inside the sandbox
+            let protected_paths = [
+                ".ssh",
+                ".gnupg",
+                ".config/autostart",
+                ".bashrc",
+                ".bash_profile",
+                ".profile",
+                ".zshrc",
+                ".zprofile",
             ];
-            for subdir in &writable_subdirs {
-                let full = format!("{}/{}", home, subdir);
-                let path = std::path::Path::new(&full);
-                if path.exists() {
-                    c.args(&["--bind", &full, &full]);
+            for subpath in &protected_paths {
+                let full = format!("{}/{}", home, subpath);
+                if std::path::Path::new(&full).exists() {
+                    c.args(&["--ro-bind", &full, &full]);
                 }
             }
         }
