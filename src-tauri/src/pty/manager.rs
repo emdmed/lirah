@@ -93,11 +93,35 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
 
     // Spawn the child process
     eprintln!("[sandbox] sandbox={}, project_dir={:?}", sandbox, project_dir);
-    let child = pty_pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| format!("Failed to spawn shell: {}", e))?;
-    eprintln!("[sandbox] spawned pid={:?}", child.process_id());
+    #[cfg(unix)]
+    let (child, actually_sandboxed) = if sandbox {
+        // Ensure bwrap AppArmor profile exists on Ubuntu before first attempt
+        ensure_bwrap_apparmor();
+        match pty_pair.slave.spawn_command(cmd) {
+            Ok(child) => (child, true),
+            Err(e) => {
+                eprintln!("[sandbox] bwrap failed ({}), falling back to unsandboxed", e);
+                let mut fallback = CommandBuilder::new(&shell);
+                fallback.arg("-l");
+                fallback.env("TERM", "xterm-256color");
+                fallback.cwd(home_dir().unwrap_or_else(|| "/".to_string()));
+                let child = pty_pair.slave.spawn_command(fallback)
+                    .map_err(|e| format!("Failed to spawn shell: {}", e))?;
+                (child, false)
+            }
+        }
+    } else {
+        let child = pty_pair.slave.spawn_command(cmd)
+            .map_err(|e| format!("Failed to spawn shell: {}", e))?;
+        (child, false)
+    };
+    #[cfg(not(unix))]
+    let (child, actually_sandboxed) = {
+        let child = pty_pair.slave.spawn_command(cmd)
+            .map_err(|e| format!("Failed to spawn shell: {}", e))?;
+        (child, false)
+    };
+    eprintln!("[sandbox] spawned pid={:?}, sandboxed={}", child.process_id(), actually_sandboxed);
 
     // Take writer from master before moving it
     let master = pty_pair.master;
@@ -110,7 +134,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
         child,
         writer,
         shutdown: Arc::new(AtomicBool::new(false)),
-        sandboxed: sandbox,
+        sandboxed: actually_sandboxed,
     })
 }
 
@@ -136,6 +160,65 @@ pub fn resize_pty(session: &mut PtySession, rows: u16, cols: u16) -> Result<(), 
             pixel_height: 0,
         })
         .map_err(|e| format!("Failed to resize PTY: {}", e))
+}
+
+/// On Ubuntu 24.04+, AppArmor restricts unprivileged user namespaces.
+/// bwrap needs a profile that grants `userns,` permission (same as Flatpak).
+/// This checks once per process whether the profile exists and installs it via pkexec if needed.
+#[cfg(unix)]
+fn ensure_bwrap_apparmor() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let profile_path = "/etc/apparmor.d/bwrap";
+        let sysctl_path = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns";
+
+        // Only relevant if AppArmor restricts unprivileged userns
+        let restricted = std::fs::read_to_string(sysctl_path)
+            .map(|v| v.trim() == "1")
+            .unwrap_or(false);
+        if !restricted {
+            eprintln!("[sandbox] AppArmor userns restriction not active, skipping profile setup");
+            return;
+        }
+
+        // Check if profile already exists
+        if std::path::Path::new(profile_path).exists() {
+            eprintln!("[sandbox] bwrap AppArmor profile already installed");
+            return;
+        }
+
+        eprintln!("[sandbox] AppArmor restricts userns; installing bwrap profile via pkexec...");
+
+        let profile_content = r#"abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+"#;
+
+        // Write profile and reload via pkexec (GUI sudo prompt)
+        let script = format!(
+            "echo '{}' > {} && apparmor_parser -r {}",
+            profile_content, profile_path, profile_path
+        );
+        let status = std::process::Command::new("pkexec")
+            .args(["bash", "-c", &script])
+            .status();
+
+        match status {
+            Ok(s) if s.success() => {
+                eprintln!("[sandbox] bwrap AppArmor profile installed successfully");
+            }
+            Ok(s) => {
+                eprintln!("[sandbox] pkexec exited with {}, sandbox may not work", s);
+            }
+            Err(e) => {
+                eprintln!("[sandbox] failed to run pkexec: {}, sandbox may not work", e);
+            }
+        }
+    });
 }
 
 fn home_dir() -> Option<String> {
