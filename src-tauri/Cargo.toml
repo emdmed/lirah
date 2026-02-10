@@ -28,6 +28,6 @@ walkdir = "2"
 notify = "6.1"
 rustpython-parser = "0.4"
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 sysinfo = "0.33"
 

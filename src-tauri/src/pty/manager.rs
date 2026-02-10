@@ -20,7 +20,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
     let shell = get_shell();
 
     // Create command: wrap in bwrap sandbox on Unix if requested
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     let mut cmd = if sandbox {
         let mut c = CommandBuilder::new("/usr/bin/bwrap");
         c.args(&[
@@ -52,6 +52,13 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
         c
     };
 
+    #[cfg(all(unix, not(target_os = "linux")))]
+    let mut cmd = {
+        let mut c = CommandBuilder::new(&shell);
+        c.arg("-l");
+        c
+    };
+
     #[cfg(not(unix))]
     let mut cmd = CommandBuilder::new(&shell);
 
@@ -77,7 +84,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
 
     // Spawn the child process
     eprintln!("[sandbox] sandbox={}, project_dir={:?}", sandbox, project_dir);
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     let (child, actually_sandboxed) = if sandbox {
         // Ensure bwrap AppArmor profile exists on Ubuntu before first attempt
         ensure_bwrap_apparmor();
@@ -99,7 +106,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             .map_err(|e| format!("Failed to spawn shell: {}", e))?;
         (child, false)
     };
-    #[cfg(not(unix))]
+    #[cfg(not(target_os = "linux"))]
     let (child, actually_sandboxed) = {
         let child = pty_pair.slave.spawn_command(cmd)
             .map_err(|e| format!("Failed to spawn shell: {}", e))?;
@@ -149,7 +156,7 @@ pub fn resize_pty(session: &mut PtySession, rows: u16, cols: u16) -> Result<(), 
 /// On Ubuntu 24.04+, AppArmor restricts unprivileged user namespaces.
 /// bwrap needs a profile that grants `userns,` permission (same as Flatpak).
 /// This checks once per process whether the profile exists and installs it via pkexec if needed.
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn ensure_bwrap_apparmor() {
     use std::sync::Once;
     static ONCE: Once = Once::new();
