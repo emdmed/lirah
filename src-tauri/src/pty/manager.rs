@@ -25,35 +25,29 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
         let mut c = CommandBuilder::new("/usr/bin/bwrap");
         c.args(&[
             "--ro-bind", "/", "/",
-            "--dev", "/dev",
+            "--dev-bind", "/dev", "/dev",
             "--proc", "/proc",
-            "--tmpfs", "/tmp",
+            "--bind", "/tmp", "/tmp",
         ]);
         // Writable paths inside home
         if let Some(ref home) = home_dir() {
-            // Claude config
-            let claude_dir = format!("{}/.claude", home);
-            if std::path::Path::new(&claude_dir).exists() {
-                c.args(&["--bind", &claude_dir, &claude_dir]);
-            }
-            // App configs
-            let config_dir = format!("{}/.config", home);
-            if std::path::Path::new(&config_dir).exists() {
-                c.args(&["--bind", &config_dir, &config_dir]);
-            }
-            // Shell history/cache
-            let cache_dir = format!("{}/.cache", home);
-            if std::path::Path::new(&cache_dir).exists() {
-                c.args(&["--bind", &cache_dir, &cache_dir]);
-            }
-            // npm/node (Claude Code needs this)
-            let npm_dir = format!("{}/.npm", home);
-            if std::path::Path::new(&npm_dir).exists() {
-                c.args(&["--bind", &npm_dir, &npm_dir]);
-            }
-            let local_dir = format!("{}/.local", home);
-            if std::path::Path::new(&local_dir).exists() {
-                c.args(&["--bind", &local_dir, &local_dir]);
+            let writable_dirs = [
+                ".claude",     // Claude config
+                ".config",     // App configs
+                ".cache",      // Shell/app cache
+                ".npm",        // npm cache (npx needs this)
+                ".local",      // mise, pip, local installs
+                ".anthropic",  // Claude Code API keys
+                ".nvm",        // nvm-managed node
+                ".fnm",        // fnm-managed node
+                ".volta",      // volta-managed node
+                ".bun",        // bun runtime
+            ];
+            for dir in &writable_dirs {
+                let path = format!("{}/{}", home, dir);
+                if std::path::Path::new(&path).exists() {
+                    c.args(&["--bind", &path, &path]);
+                }
             }
         }
         // Writable: project directory (validate it's a real path)
@@ -63,9 +57,8 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             }
         }
         c.args(&[
-            "--unshare-pid",
             "--unshare-uts",
-            "--unshare-ipc",
+            "--die-with-parent",
             "--", &shell, "-l",
         ]);
         c
@@ -87,6 +80,9 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
         cmd.arg("-Command");
         cmd.arg("function prompt { [System.IO.Directory]::SetCurrentDirectory($PWD.Path); \"PS $($PWD.Path)> \" }");
     }
+
+    // Set TERM so the shell knows terminal capabilities (line wrapping, cursor movement, etc.)
+    cmd.env("TERM", "xterm-256color");
 
     cmd.cwd(home_dir().unwrap_or_else(|| {
         #[cfg(unix)]
@@ -151,7 +147,8 @@ fn home_dir() -> Option<String> {
 
 #[cfg(unix)]
 fn get_shell() -> String {
-    "/bin/bash".to_string()
+    // Use the user's configured shell, fall back to /bin/bash
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
 }
 
 #[cfg(windows)]
