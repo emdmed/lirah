@@ -4,7 +4,7 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar }) {
       {titleBar}
       <div className="flex flex-1 min-h-0">
         {sidebar}
-        <div className="flex-1 flex flex-col px-2 min-h-0">
+        <div className="flex-1 flex flex-col px-2 min-h-0 relative">
           {children}
           {textarea && (
             <div className="flex-shrink-0">

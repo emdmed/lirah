@@ -1253,6 +1253,12 @@ function App() {
           sandboxEnabled={sandboxEnabled}
           projectDir={currentPath}
         />
+        <GitDiffDialog
+          open={diffDialogOpen}
+          onOpenChange={setDiffDialogOpen}
+          filePath={diffFilePath}
+          repoPath={currentPath}
+        />
       </Layout>
       <AddBookmarkDialog
         open={addBookmarkDialogOpen}
@@ -1267,12 +1273,6 @@ function App() {
       <ManageTemplatesDialog
         open={manageTemplatesDialogOpen}
         onOpenChange={setManageTemplatesDialogOpen}
-      />
-      <GitDiffDialog
-        open={diffDialogOpen}
-        onOpenChange={setDiffDialogOpen}
-        filePath={diffFilePath}
-        repoPath={currentPath}
       />
       <SaveFileGroupDialog
         open={saveFileGroupDialogOpen}
