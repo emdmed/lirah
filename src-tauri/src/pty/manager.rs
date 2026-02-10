@@ -29,10 +29,34 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             "--proc", "/proc",
             "--bind", "/tmp", "/tmp",
         ]);
-        // Home directory writable (Claude Code needs broad write access:
-        // shell dotfiles, .claude, .config, .cache, .npm, .local, etc.)
+        // Home directory: read-only base, with specific writable subdirectories.
+        // This prevents modification of sensitive files like ~/.bashrc, ~/.ssh/,
+        // ~/.gnupg/, ~/.config/autostart/, etc.
         if let Some(ref home) = home_dir() {
-            c.args(&["--bind", home, home]);
+            c.args(&["--ro-bind", home, home]);
+
+            // Writable subdirectories that Claude Code needs
+            let writable_subdirs = [
+                ".claude",
+                ".config/claude-code",
+                ".cache",
+                ".npm",
+                ".local/share",
+                ".local/state",
+                ".nvm",
+                ".cargo",
+                ".rustup",
+                ".bun",
+                ".pnpm",
+                ".yarn",
+            ];
+            for subdir in &writable_subdirs {
+                let full = format!("{}/{}", home, subdir);
+                let path = std::path::Path::new(&full);
+                if path.exists() {
+                    c.args(&["--bind", &full, &full]);
+                }
+            }
         }
         // Writable: project directory (may be outside home)
         if let Some(ref proj) = project_dir {
