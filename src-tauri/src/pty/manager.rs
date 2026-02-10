@@ -50,6 +50,17 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
                 ".config/systemd/user",
                 ".config/environment.d",
                 ".local/bin",
+                // Shell configs
+                ".config/fish",
+                ".config/nushell",
+                // Desktop environment startup scripts
+                ".config/plasma-workspace/env",
+                ".config/hypr",
+                ".xinitrc",
+                ".xprofile",
+                // File handler and .desktop registration
+                ".config/mimeapps.list",
+                ".local/share/applications",
             ];
             for subpath in &protected_paths {
                 let full = format!("{}/{}", home, subpath);
@@ -68,6 +79,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             "--unshare-uts",
             "--unshare-ipc",
             "--unshare-pid",
+            "--unshare-cgroup",
             "--new-session",
             "--die-with-parent",
             // Mount /proc after --unshare-pid so it's scoped to sandbox PIDs
