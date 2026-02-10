@@ -599,10 +599,10 @@ export const themes = {
       secondaryForeground: '#FEFFC7',          // Cream
       muted: '#17594F',                        // Pine Teal
       mutedForeground: '#A8D5A6',              // Celadon
-      accent: '#A8D5A6',                       // Celadon
+      accent: '#D5FF8C',                       // Lime Green
       accentForeground: '#020D1C',             // Prussian Blue
-      destructive: '#F4F7A3',                  // Lime Cream
-      destructiveForeground: '#020D1C',        // Prussian Blue
+      destructive: '#F5254E',                  // Red
+      destructiveForeground: '#FEFFC7',        // Cream
       border: '#17594F',                       // Pine Teal
       input: '#020D1C',                        // Prussian Blue
       inputBackground: '#010812',              // Deeper Prussian Blue
@@ -618,7 +618,7 @@ export const themes = {
       // Semantic colors
       folder: '62 84% 80%',                    // Lime Cream for folder icons
       gitAdded: '117 36% 74%',                 // Celadon for +lines
-      gitDeleted: '62 84% 80%',                // Lime Cream for -lines
+      gitDeleted: '349 92% 55%',                // Red for -lines
       treeGuide: '117 36% 74% / 0.15',         // Celadon with opacity
     },
   },

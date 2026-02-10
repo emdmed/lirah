@@ -4,7 +4,7 @@ All notable changes to Lirah will be documented in this file.
 
 ## [0.1.13] - 2026-02-10
 
-### 🔒 Security
+### Security
 
 - **Bubblewrap Sandbox** - Optional sandboxing for terminal sessions using bubblewrap (bwrap). Wraps the PTY shell in a Linux namespace with defense-in-depth filesystem and process isolation:
   - Read-only root filesystem (`--ro-bind / /`)
@@ -15,97 +15,97 @@ All notable changes to Lirah will be documented in this file.
   - IPC namespace isolation (`--unshare-ipc`) — prevents shared memory attacks across boundary
   - Scoped writable paths for `~/.claude`, `~/.config`, `~/.cache`, `~/.npm`, `~/.local` — only essential directories are writable
 
-### 🚀 Features
+### Added
 
+- **macOS Support** - Full macOS compatibility with platform-aware PTY spawning, CWD detection via `lsof`, and conditional sandbox support (Linux-only)
 - **Sandbox Toggle** - Toggle sandbox on/off from the StatusBar settings dropdown. Terminal automatically restarts with the new setting. State persisted in localStorage.
-- **Sandbox Indicator** - Lock/unlock icon in the sidebar "agent"/"nav" badge shows sandbox status at a glance.
-- **Terminal Restart on Toggle** - Toggling sandbox cleanly closes the old PTY session and spawns a fresh one with the updated config.
+- **Sandbox Indicator** - Lock/unlock icon in the sidebar badge shows sandbox status at a glance
+- **Terminal Restart on Toggle** - Toggling sandbox cleanly closes the old PTY session and spawns a fresh one with the updated config
+- **Retro Theme** - New retro-inspired theme option in the theme selector
+- **Compact Sections Dialog** - New dialog for selectively compacting project sections instead of the entire project at once
+- **Show Dotfiles** - Dotfiles are now visible in the file tree
+- **Orchestration Token Estimation** - Orchestration mode now estimates and displays the additional tokens used by workflow templates
 
-### 🐛 Fixes
+### Changed
 
-- Fixed CWD detection for sandboxed terminals by resolving bwrap's child process PID via `/proc/[pid]/task/[tid]/children`
-- Fixed leaked PTY sessions when restarting terminal by explicitly closing the old session before remounting
+- **Rust `fs` Module Split** - Refactored monolithic `fs.rs` into submodules (`commands`, `cwd`, `directory`, `git`, `tokens`) for better maintainability
+- Consistent button styling across dialogs and panels
+- Refined input background colors across all themes
+
+### Fixed
+
+- CWD detection for sandboxed terminals by resolving bwrap's child process PID via `/proc/[pid]/task/[tid]/children`
+- Leaked PTY sessions when restarting terminal by explicitly closing the old session before remounting
+- Sandbox compatibility on Ubuntu
 
 ## [0.1.12] - 2026-02-08
 
-### 🚀 Features
+### Added
 
-- **Windows Support** - Full Windows compatibility with PowerShell integration, Windows CWD detection via `sysinfo` crate, and platform-aware path handling throughout the app.
-- **Orchestration Auto-Detection** - Orchestration mode now automatically disables when a project has no `.orchestration/` folder, with updated status bar indicator.
+- **Windows Support** - Full Windows compatibility with PowerShell integration, Windows CWD detection via `sysinfo` crate, and platform-aware path handling throughout the app
+- **Orchestration Auto-Detection** - Orchestration mode now automatically disables when a project has no `.orchestration/` folder, with updated status bar indicator
 
-### 🔄 Updates
+### Changed
 
 - Renamed orchestration command from `npx claude-orchestration` to `npx agentic-orchestration`
 
-### 🐛 Fixes
+### Fixed
 
-- Fixed path normalization across platforms with new `pathUtils.js` utility module
-- Fixed file tree view rendering issues on Windows (hidden/system directories, symlink traversal)
-- Fixed flat view navigation for Windows path separators
-- Fixed shell path escaping for PowerShell compatibility
-- Fixed `notify` crate configuration for cross-platform support
+- Path normalization across platforms with new `pathUtils.js` utility module
+- File tree view rendering issues on Windows (hidden/system directories, symlink traversal)
+- Flat view navigation for Windows path separators
+- Shell path escaping for PowerShell compatibility
+- `notify` crate configuration for cross-platform support
 
-### 📦 Dependencies
+### Dependencies
 
 - Added `sysinfo = "0.33"` (Windows) for process CWD detection
 - Updated `notify` to use default features for cross-platform support
 
 ## [0.1.11] - 2026-02-07
 
-### 🚀 Features
+### Added
 
 - **Element Picker** - Select specific code elements (functions, components, classes, hooks) from files instead of entire files. Features Python parser via rustpython-parser, enhanced JS/TS symbol extraction, and interactive dialog with bulk selection capabilities.
-
 - **@-Mention File Search** (`@` in textarea) - Type `@` in the textarea to search and insert file paths inline. Fast recursive search with keyboard navigation.
-
 - **Initial Project Dialog** - On launch, presents bookmarked projects for quick selection with keyboard navigation and auto-launch into Claude mode.
-
 - **Enhanced Compact Project** (`Ctrl+Shift+P`) - Extended project compaction with Python support and useEffect hook detection. Generate intelligent representations of your entire project optimized for token efficiency.
-
 - **Theme System** - New theme configuration with Catppuccin Mocha dark theme and Typestar-OCR font support.
-
 - **File Groups** - Save and restore frequently used file selections. Groups are persisted in localStorage and filtered by current project path.
-
 - **Token Usage Display** - Real-time session token usage (input/output) shown in the status bar, polling Claude Code's session files every 5 seconds.
-
 - **Last Prompt Restoration** (`Ctrl+Shift+Z`) - Restore your previous prompt when the textarea is empty.
-
 - **Token Benchmarking Tools** - Scripts for measuring and comparing token improvements.
-
 - **Install Dependencies Script** - New `scripts/install-deps.sh` to simplify dependency setup.
 
-### 🔄 Updates
+### Changed
 
-- **Enhanced Symbol Parsers** - Improved JavaScript/TypeScript symbol extraction and new Python symbol parser for better code analysis.
-- **Better Element Detection** - Enhanced detection for React hooks, custom hooks, classes with decorators, and TypeScript interfaces.
-- **Improved File Selection State Management** - Better handling of file and element selection states with enhanced clearing functionality.
-- **Enhanced Error Handling** - Improved parsing error management with better fallback behavior for unparsable files.
-- **Keyboard Shortcuts Dialog** - Improved layout and styling for better readability.
+- Enhanced JavaScript/TypeScript symbol extraction and new Python symbol parser for better code analysis
+- Improved detection for React hooks, custom hooks, classes with decorators, and TypeScript interfaces
+- Better handling of file and element selection states with enhanced clearing functionality
+- Improved parsing error management with better fallback behavior for unparsable files
+- Keyboard shortcuts dialog layout and styling improvements
+- Initial project dialog styling with dashed borders, selected item outline, and keyboard hints
+- File tree visual hierarchy with better spacing, compact node heights, and refined git badge integration
+- Terminal focus indicator with ring border outline
+- Element picker integration with search icon buttons for parseable files in Claude mode
+- Dialog layout spacing, button layout, and loading states
+- Smoother transitions, better hover states, and improved checkbox styling
+- Consistent font sizing using CSS variables and improved line heights
+- Consistent dashed border styling across dialogs and panels
 
-### 🐛 Fixes
+### Fixed
 
-- Fixed git diff mismatch between git status and displayed diffs
-- Fixed Claude project path parsing and detection
-- Fixed Babel symbol parser for extracting function signatures
-- Fixed token estimation and formatting
-- Fixed template selector functionality issues
-- Fixed dependency installation issues
-- Fixed @-mention modal selection and search behavior
-- Fixed scrollbar styling
-- Improved handling of large files with forced grep
+- Git diff mismatch between git status and displayed diffs
+- Claude project path parsing and detection
+- Babel symbol parser for extracting function signatures
+- Token estimation and formatting
+- Template selector functionality issues
+- Dependency installation issues
+- @-mention modal selection and search behavior
+- Scrollbar styling
+- Handling of large files with forced grep
 
-### 🎨 UI Enhancements
-
-- **Initial Project Dialog** - Dashed border styling, selected item outline, and keyboard hints consistent with project design language
-- **File Tree Improvements** - Enhanced visual hierarchy with better spacing, compact node heights, and refined git badge integration
-- **Terminal Focus Indicator** - Added ring border outline for better focus feedback
-- **Element Picker Integration** - Clean search icon buttons for parseable files in Claude mode
-- **Dialog Layout Improvements** - Better spacing, button layout, and loading states
-- **Enhanced Interactions** - Smoother transitions, better hover states, and improved checkbox styling
-- **Typography Refinements** - Consistent font sizing using CSS variables and improved line heights
-- **Engineering Sketch Borders** - Consistent dashed border styling across dialogs and panels
-
-### 📦 Dependencies
+### Dependencies
 
 - Added `rustpython-parser = "0.4"` for Python code parsing capability
 
@@ -115,7 +115,7 @@ All notable changes to Lirah will be documented in this file.
 
 Initial tracked release.
 
-### Features
+### Added
 
 - Embedded terminal with PTY support
 - File browser sidebar with bidirectional sync
