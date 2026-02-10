@@ -23,11 +23,12 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
     #[cfg(target_os = "linux")]
     let mut cmd = if sandbox {
         let mut c = CommandBuilder::new("/usr/bin/bwrap");
+        // Clear all inherited env vars to prevent leaking secrets
+        c.args(&["--clearenv"]);
         c.args(&[
             "--ro-bind", "/", "/",
             "--dev", "/dev",
-            "--proc", "/proc",
-            "--bind", "/tmp", "/tmp",
+            "--tmpfs", "/tmp",
         ]);
         // Home directory: writable by default, with sensitive paths read-only
         if let Some(ref home) = home_dir() {
@@ -69,8 +70,25 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             "--unshare-pid",
             "--new-session",
             "--die-with-parent",
-            "--", &shell, "-l",
+            // Mount /proc after --unshare-pid so it's scoped to sandbox PIDs
+            "--proc", "/proc",
         ]);
+        // Re-export only essential env vars
+        let passthrough_vars = [
+            "HOME", "USER", "LOGNAME", "PATH", "SHELL", "TERM",
+            "LANG", "LC_ALL", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
+            "DISPLAY", "WAYLAND_DISPLAY",
+            // Claude Code / Node.js needs
+            "NODE_HOME", "NVM_DIR", "npm_config_prefix",
+            // API keys Claude Code needs to function
+            "ANTHROPIC_API_KEY", "CLAUDE_API_KEY",
+        ];
+        for var in &passthrough_vars {
+            if let Ok(val) = std::env::var(var) {
+                c.args(&["--setenv", var, &val]);
+            }
+        }
+        c.args(&["--", &shell, "-l"]);
         c
     } else {
         let mut c = CommandBuilder::new(&shell);
