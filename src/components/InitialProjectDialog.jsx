@@ -107,11 +107,12 @@ export function InitialProjectDialog({ open, onOpenChange, onNavigate, onLaunchC
                 key={bookmark.id}
                 ref={index === selectedIndex ? selectedItemRef : null}
                 onClick={() => handleSelectBookmark(bookmark)}
-                className={`flex flex-col items-start gap-1 px-4 py-3 rounded-md text-left transition-colors ${
+                className={`flex flex-col items-start gap-1 px-4 py-3 text-left font-mono border border-sketch shadow-xs transition-colors ${
                   index === selectedIndex
-                    ? 'bg-white/10 outline outline-1 outline-dashed outline-ring/70'
+                    ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-0'
                     : 'hover:bg-white/5'
                 }`}
+                style={{ backgroundColor: 'var(--color-input-background)' }}
               >
                 <span className="font-medium">{bookmark.name}</span>
                 <span className="text-xs opacity-50">{bookmark.path}</span>
