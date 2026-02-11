@@ -37,6 +37,7 @@ const shortcuts = [
     icon: <Keyboard className="w-4 h-4" />,
     items: [
       { keys: ["Ctrl", "W"], description: "Toggle File Watchers" },
+      { keys: ["Ctrl", "`"], description: "Toggle Secondary Terminal" },
       { keys: ["Ctrl", "H"], description: "Toggle This Dialog" },
     ],
   },

@@ -36,6 +36,7 @@ import { buildTreeFromFlatList, incrementallyUpdateTree } from "./utils/treeOper
 import { IS_WINDOWS, escapeShellPath, getRelativePath, basename, lastSepIndex } from "./utils/pathUtils";
 import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { ElementPickerDialog } from "./components/ElementPickerDialog";
+import { SecondaryTerminal } from "./components/SecondaryTerminal";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarFileSelection } from "./components/sidebar/SidebarFileSelection";
 import {
@@ -208,6 +209,13 @@ function App() {
   const [elementPickerOpen, setElementPickerOpen] = useState(false);
   const [elementPickerFilePath, setElementPickerFilePath] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Map()); // Map<filePath, element[]>
+
+  // Secondary terminal state
+  const [secondaryVisible, setSecondaryVisible] = useState(false);
+  const [secondaryFocused, setSecondaryFocused] = useState(false);
+  const [secondarySessionId, setSecondarySessionId] = useState(null);
+  const [secondaryKey, setSecondaryKey] = useState(0);
+  const secondaryTerminalRef = useRef(null);
 
   // Load keepFilesAfterSend from localStorage on mount
   useEffect(() => {
@@ -646,7 +654,8 @@ function App() {
     onLoadFlatView: loadFolders,
     onLoadTreeView: loadTreeData,
     onLaunchClaude: launchClaude,
-    terminalSessionId
+    terminalSessionId,
+    secondaryTerminalFocused: secondaryFocused,
   });
 
   // Textarea keyboard shortcuts
@@ -659,18 +668,21 @@ function App() {
     selectedTemplateId,
     onSelectTemplate: setSelectedTemplateId,
     onRestoreLastPrompt: setTextareaContent,
+    secondaryTerminalFocused: secondaryFocused,
   });
 
   // Help keyboard shortcut
   useHelpShortcut({
     showHelp,
     setShowHelp,
+    secondaryTerminalFocused: secondaryFocused,
   });
 
   // Bookmarks keyboard shortcut
   useBookmarksShortcut({
     bookmarksPaletteOpen,
     setBookmarksPaletteOpen,
+    secondaryTerminalFocused: secondaryFocused,
   });
 
   // Clear folder expansion state when sidebar closes
@@ -941,9 +953,34 @@ function App() {
     }
   }, [viewMode, sidebarOpen]);
 
+  // Close secondary terminal handler
+  const closeSecondaryTerminal = useCallback(() => {
+    if (secondarySessionId) {
+      invoke('close_terminal', { sessionId: secondarySessionId }).catch(console.error);
+      setSecondarySessionId(null);
+    }
+    setSecondaryVisible(false);
+    setSecondaryFocused(false);
+    setSecondaryKey(k => k + 1);
+  }, [secondarySessionId]);
+
   // Keyboard shortcuts - for non-terminal focus
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ctrl+` to toggle secondary terminal
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (secondaryVisible) {
+          closeSecondaryTerminal();
+        } else {
+          setSecondaryVisible(true);
+        }
+        return;
+      }
+
+      if (secondaryFocused) return;
+
       // Ctrl+F or Cmd+F to focus search in tree mode
       if ((e.ctrlKey || e.metaKey) && e.key === 'f' && viewMode === 'tree' && sidebarOpen) {
         e.preventDefault();
@@ -960,9 +997,9 @@ function App() {
       // to work both when terminal is focused and when sidebar is focused
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, sidebarOpen, handleCompactProject]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [viewMode, sidebarOpen, handleCompactProject, secondaryVisible, secondaryFocused, closeSecondaryTerminal]);
 
   const sendFileToTerminal = async (absolutePath) => {
     if (!terminalSessionId) {
@@ -1263,6 +1300,7 @@ function App() {
                 setTerminalKey(k => k + 1);
               }
             }}
+            secondaryTerminalFocused={secondaryFocused}
             onToggleSandbox={() => {
               setSandboxEnabled(prev => !prev);
               setSandboxFailed(false);
@@ -1273,6 +1311,25 @@ function App() {
               setTerminalKey(k => k + 1);
             }}
           />
+        }
+        secondaryTerminal={
+          secondaryVisible && (
+            <>
+              {/* Resize handle between primary and secondary */}
+              <div
+                className="w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50 shrink-0"
+              />
+              <SecondaryTerminal
+                key={secondaryKey}
+                ref={secondaryTerminalRef}
+                theme={theme.terminal}
+                visible={secondaryVisible}
+                onClose={closeSecondaryTerminal}
+                onFocusChange={setSecondaryFocused}
+                onSessionReady={setSecondarySessionId}
+              />
+            </>
+          )
         }
       >
         <Terminal

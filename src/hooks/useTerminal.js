@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import '@xterm/xterm/css/xterm.css';
 
-export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null) {
+export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -56,6 +56,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     if (!terminal) return;
 
     const disposable = terminal.attachCustomKeyEventHandler((event) => {
+      // In secondary mode, pass all keys through to the terminal (nvim/lazygit need them)
+      if (secondaryMode) {
+        return true;
+      }
+
       // Intercept Ctrl+F or Cmd+F
       if ((event.ctrlKey || event.metaKey) && event.key === 'f' && event.type === 'keydown') {
         event.preventDefault();
@@ -82,7 +87,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         disposable.dispose();
       }
     };
-  }, [terminal, onSearchFocus, onToggleGitFilter]);
+  }, [terminal, onSearchFocus, onToggleGitFilter, secondaryMode]);
 
   // Spawn terminal process
   useEffect(() => {
@@ -121,6 +126,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         });
 
         setIsReady(true);
+
+        // Send initial command if provided (for secondary terminal)
+        if (initialCommand) {
+          setTimeout(() => {
+            invoke('write_to_terminal', { sessionId: id, data: initialCommand + '\n' }).catch((error) => {
+              console.error('Failed to send initial command:', error);
+            });
+          }, 300);
+        }
       } catch (error) {
         console.error('Failed to initialize terminal:', error);
         terminal.write(`\r\n\x1b[1;31mError: ${error}\x1b[0m\r\n`);

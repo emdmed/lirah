@@ -9,10 +9,12 @@ export function useViewModeShortcuts({
   onLoadFlatView,
   onLoadTreeView,
   onLaunchClaude,
-  terminalSessionId
+  terminalSessionId,
+  secondaryTerminalFocused,
 }) {
   useEffect(() => {
     const handleKeyDown = async (e) => {
+      if (secondaryTerminalFocused) return;
       if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
         e.stopPropagation();
@@ -76,5 +78,5 @@ export function useViewModeShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude, terminalSessionId]);
+  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude, terminalSessionId, secondaryTerminalFocused]);
 }

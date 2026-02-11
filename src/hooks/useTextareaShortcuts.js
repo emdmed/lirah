@@ -37,6 +37,7 @@ export function useTextareaShortcuts({
   selectedTemplateId,
   onSelectTemplate,
   onRestoreLastPrompt,
+  secondaryTerminalFocused,
 }) {
   // Track last Ctrl keydown timestamp for double-tap detection
   const lastCtrlDownRef = useRef(0);
@@ -49,6 +50,8 @@ export function useTextareaShortcuts({
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (secondaryTerminalFocused) return;
+
       // Double-tap Ctrl: Toggle orchestration mode
       if (e.key === 'Control' && !e.repeat) {
         const now = Date.now();
@@ -131,7 +134,7 @@ export function useTextareaShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt]);
+  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt, secondaryTerminalFocused]);
 
   return { templateDropdownOpen, setTemplateDropdownOpen };
 }

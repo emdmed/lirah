@@ -17,10 +17,10 @@ const CLI_DISPLAY = {
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
-  useWatcherShortcut({ onToggle: toggleWatchers });
+  useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
 
   return (
     <div
