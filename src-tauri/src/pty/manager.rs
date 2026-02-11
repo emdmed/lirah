@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use crate::state::PtySession;
 
-pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String>) -> Result<PtySession, String> {
+pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> Result<PtySession, String> {
     let pty_system = NativePtySystem::default();
 
     // Create a new PTY with the specified size
@@ -74,6 +74,9 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, project_dir: Option<String
             if std::path::Path::new(proj).is_dir() {
                 c.args(&["--bind", proj, proj]);
             }
+        }
+        if sandbox_no_net {
+            c.args(&["--unshare-net"]);
         }
         c.args(&[
             "--unshare-uts",

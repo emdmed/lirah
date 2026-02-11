@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import '@xterm/xterm/css/xterm.css';
 
-export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, projectDir = null) {
+export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -97,7 +97,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         const cols = terminal.cols;
 
         // Spawn terminal backend
-        const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, projectDir: projectDir || null });
+        const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null });
         const id = result.session_id;
         setSessionId(id);
 

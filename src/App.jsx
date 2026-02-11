@@ -188,6 +188,12 @@ function App() {
       return saved !== null ? JSON.parse(saved) : false;
     } catch { return false; }
   });
+  const [networkIsolation, setNetworkIsolation] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nevo-terminal:network-isolation');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch { return false; }
+  });
 
   // Terminal restart key — incrementing forces Terminal remount
   const [terminalKey, setTerminalKey] = useState(0);
@@ -250,6 +256,15 @@ function App() {
       console.warn('Failed to save sandbox preference to localStorage:', error);
     }
   }, [sandboxEnabled]);
+
+  // Save networkIsolation to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('nevo-terminal:network-isolation', JSON.stringify(networkIsolation));
+    } catch (error) {
+      console.warn('Failed to save network isolation preference to localStorage:', error);
+    }
+  }, [networkIsolation]);
 
   // Search hook
   const { initializeSearch, search, clearSearch } = useFileSearch();
@@ -1234,6 +1249,16 @@ function App() {
             onToggleTitleBar={() => setShowTitleBar(prev => !prev)}
             sandboxEnabled={sandboxEnabled}
             sandboxFailed={sandboxFailed}
+            networkIsolation={networkIsolation}
+            onToggleNetworkIsolation={() => {
+              setNetworkIsolation(prev => !prev);
+              if (sandboxEnabled && terminalSessionId) {
+                invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
+                setTerminalSessionId(null);
+                setSandboxFailed(false);
+                setTerminalKey(k => k + 1);
+              }
+            }}
             onToggleSandbox={() => {
               setSandboxEnabled(prev => !prev);
               setSandboxFailed(false);
@@ -1254,6 +1279,7 @@ function App() {
           onSearchFocus={handleSearchFocus}
           onToggleGitFilter={handleToggleGitFilter}
           sandboxEnabled={sandboxEnabled}
+          networkIsolation={networkIsolation}
           projectDir={currentPath}
           onSandboxFailed={() => setSandboxFailed(true)}
         />

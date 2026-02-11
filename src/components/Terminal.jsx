@@ -1,9 +1,9 @@
 import { useRef, useEffect, forwardRef } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, projectDir, onSandboxFailed }, ref) => {
+export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed }, ref) => {
   const terminalRef = useRef(null);
-  const { handleResize, sessionId, isFocused, sandboxFailed } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, projectDir);
+  const { handleResize, sessionId, isFocused, sandboxFailed } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir);
 
   // Notify parent when session is ready
   useEffect(() => {

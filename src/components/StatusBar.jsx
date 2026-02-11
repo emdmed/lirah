@@ -1,5 +1,5 @@
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { Button } from './ui/button';
@@ -17,7 +17,7 @@ const CLI_DISPLAY = {
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, onToggleSandbox }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers });
@@ -55,6 +55,37 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
             <span className="opacity-70">{CLI_DISPLAY[selectedCli]?.name || selectedCli}</span>
           </Button>
         )}
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleSandbox}
+            title={`Sandbox: ${sandboxEnabled && sandboxFailed ? 'FAILED' : sandboxEnabled ? 'ON' : 'OFF'}`}
+            className="gap-1 px-1.5"
+          >
+            {sandboxEnabled && sandboxFailed ? (
+              <ShieldAlert className="w-3 h-3" style={{ color: '#FF9E3B' }} />
+            ) : sandboxEnabled ? (
+              <Shield className="w-3 h-3" />
+            ) : (
+              <ShieldOff className="w-3 h-3" style={{ color: '#E82424' }} />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={onToggleNetworkIsolation}
+            disabled={!sandboxEnabled}
+            title={`Network: ${networkIsolation && sandboxEnabled ? 'ISOLATED' : 'ALLOWED'}`}
+            className="gap-1 px-1.5"
+          >
+            {networkIsolation && sandboxEnabled ? (
+              <WifiOff className="w-3 h-3" />
+            ) : (
+              <Wifi className="w-3 h-3" style={sandboxEnabled ? {} : { opacity: 0.4 }} />
+            )}
+          </Button>
+        </div>
         <ThemeSwitcher />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -108,19 +139,6 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
                 <PanelTopClose className="mr-1.5" style={{ color: '#E82424' }} />
               )}
               Title Bar: {showTitleBar ? 'ON' : 'OFF'}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onToggleSandbox}
-              className="cursor-pointer"
-            >
-              {sandboxEnabled && sandboxFailed ? (
-                <ShieldAlert className="mr-1.5" style={{ color: '#FF9E3B' }} />
-              ) : sandboxEnabled ? (
-                <Shield className="mr-1.5" />
-              ) : (
-                <ShieldOff className="mr-1.5" style={{ color: '#E82424' }} />
-              )}
-              Sandbox: {sandboxEnabled && sandboxFailed ? 'FAILED' : sandboxEnabled ? 'ON' : 'OFF'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
