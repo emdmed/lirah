@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState, forwardRef } from 'react';
+import { useRef, useEffect, useState, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
 
-const SecondaryTerminalInstance = forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand }, ref) => {
+const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir }, ref) => {
   const terminalRef = useRef(null);
 
   const { handleResize, sessionId, isFocused } = useTerminal(
@@ -14,7 +14,7 @@ const SecondaryTerminalInstance = forwardRef(({ theme, onFocusChange, onSessionR
     onFocusChange,
     false, // sandboxEnabled
     false, // networkIsolation
-    null,  // projectDir
+    projectDir,
     initialCommand,
     true,  // secondaryMode
   );
@@ -23,16 +23,25 @@ const SecondaryTerminalInstance = forwardRef(({ theme, onFocusChange, onSessionR
     if (sessionId && onSessionReady) onSessionReady(sessionId);
   }, [sessionId, onSessionReady]);
 
+  const resizeTimerRef = useRef(null);
+  const debouncedResize = useCallback(() => {
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(() => {
+      handleResize();
+    }, 100);
+  }, [handleResize]);
+
   useEffect(() => {
     if (!terminalRef.current) return;
-    const resizeObserver = new ResizeObserver(() => handleResize());
+    const resizeObserver = new ResizeObserver(debouncedResize);
     resizeObserver.observe(terminalRef.current);
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', debouncedResize);
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', debouncedResize);
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, [handleResize]);
+  }, [debouncedResize]);
 
   return (
     <div
@@ -48,11 +57,11 @@ const SecondaryTerminalInstance = forwardRef(({ theme, onFocusChange, onSessionR
       />
     </div>
   );
-});
+}));
 
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
-export const SecondaryTerminal = forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady }, ref) => {
+export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir }, ref) => {
   const [selectedCommand, setSelectedCommand] = useState(null);
 
   if (!visible) return null;
@@ -73,9 +82,10 @@ export const SecondaryTerminal = forwardRef(({ theme, visible, onClose, onFocusC
         onFocusChange={onFocusChange}
         onSessionReady={onSessionReady}
         initialCommand={selectedCommand}
+        projectDir={projectDir}
       />
     </div>
   );
-});
+}));
 
 SecondaryTerminal.displayName = 'SecondaryTerminal';

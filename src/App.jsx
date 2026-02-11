@@ -1327,6 +1327,7 @@ function App() {
                 onClose={closeSecondaryTerminal}
                 onFocusChange={setSecondaryFocused}
                 onSessionReady={setSecondarySessionId}
+                projectDir={currentPath}
               />
             </>
           )

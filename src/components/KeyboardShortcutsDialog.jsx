@@ -8,7 +8,7 @@ const shortcuts = [
     items: [
       { keys: ["Ctrl", "S"], description: "Toggle Navigation Mode" },
       { keys: ["Ctrl", "K"], description: "Launch CLI / Toggle Claude Mode" },
-      { keys: ["Ctrl", "P"], description: "Open Projects Palette" },
+      { keys: ["Ctrl", "P"], description: "Open Bookmarks Palette" },
     ],
   },
   {

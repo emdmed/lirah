@@ -1,7 +1,7 @@
-import { useRef, useEffect, forwardRef } from 'react';
+import { useRef, useEffect, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed }, ref) => {
+export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed }, ref) => {
   const terminalRef = useRef(null);
   const { handleResize, sessionId, isFocused, sandboxFailed } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir);
 
@@ -19,24 +19,29 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchF
     }
   }, [sandboxFailed, onSandboxFailed]);
 
+  // Debounced resize — wait for layout to settle before fitting terminal
+  const resizeTimerRef = useRef(null);
+  const debouncedResize = useCallback(() => {
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(() => {
+      handleResize();
+    }, 100);
+  }, [handleResize]);
+
   // Setup resize observer
   useEffect(() => {
     if (!terminalRef.current) return;
 
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize();
-    });
-
+    const resizeObserver = new ResizeObserver(debouncedResize);
     resizeObserver.observe(terminalRef.current);
-
-    // Also handle window resize
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', debouncedResize);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', debouncedResize);
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, [handleResize]);
+  }, [debouncedResize]);
 
   return (
     <div
@@ -63,6 +68,6 @@ export const Terminal = forwardRef(({ theme, onResize, onSessionReady, onSearchF
       />
     </div>
   );
-});
+}));
 
 Terminal.displayName = 'Terminal';

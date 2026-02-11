@@ -2,7 +2,7 @@
 
 All notable changes to Lirah will be documented in this file.
 
-## [0.1.13] - 2026-02-10
+## [0.1.12] - 2026-02-11
 
 ### Security
 
@@ -17,6 +17,8 @@ All notable changes to Lirah will be documented in this file.
 
 ### Added
 
+- **Secondary Terminal** - Open a second terminal side-by-side with `Ctrl+\``. Supports launching predefined commands (lazygit, nvim, etc.) via a picker dialog. Opens in the same working directory as the primary terminal.
+- **Windows Support** - Full Windows compatibility with PowerShell integration, Windows CWD detection via `sysinfo` crate, and platform-aware path handling throughout the app
 - **macOS Support** - Full macOS compatibility with platform-aware PTY spawning, CWD detection via `lsof`, and conditional sandbox support (Linux-only)
 - **Sandbox Toggle** - Toggle sandbox on/off from the StatusBar settings dropdown. Terminal automatically restarts with the new setting. State persisted in localStorage.
 - **Sandbox Indicator** - Lock/unlock icon in the sidebar badge shows sandbox status at a glance
@@ -25,32 +27,23 @@ All notable changes to Lirah will be documented in this file.
 - **Compact Sections Dialog** - New dialog for selectively compacting project sections instead of the entire project at once
 - **Show Dotfiles** - Dotfiles are now visible in the file tree
 - **Orchestration Token Estimation** - Orchestration mode now estimates and displays the additional tokens used by workflow templates
+- **Orchestration Auto-Detection** - Orchestration mode now automatically disables when a project has no `.orchestration/` folder, with updated status bar indicator
 
 ### Changed
 
 - **Rust `fs` Module Split** - Refactored monolithic `fs.rs` into submodules (`commands`, `cwd`, `directory`, `git`, `tokens`) for better maintainability
+- **Keyboard Shortcuts Dialog** - Fixed "Open Projects Palette" label to "Open Bookmarks Palette" to match actual functionality
+- Renamed orchestration command from `npx claude-orchestration` to `npx agentic-orchestration`
 - Consistent button styling across dialogs and panels
 - Refined input background colors across all themes
 
 ### Fixed
 
+- Slow UI when opening secondary terminal — debounced ResizeObserver callbacks, added `overflow-hidden` to primary terminal container, wrapped terminal components in `React.memo()`
+- Secondary terminal now spawns in the primary terminal's working directory instead of defaulting to home
 - CWD detection for sandboxed terminals by resolving bwrap's child process PID via `/proc/[pid]/task/[tid]/children`
 - Leaked PTY sessions when restarting terminal by explicitly closing the old session before remounting
 - Sandbox compatibility on Ubuntu
-
-## [0.1.12] - 2026-02-08
-
-### Added
-
-- **Windows Support** - Full Windows compatibility with PowerShell integration, Windows CWD detection via `sysinfo` crate, and platform-aware path handling throughout the app
-- **Orchestration Auto-Detection** - Orchestration mode now automatically disables when a project has no `.orchestration/` folder, with updated status bar indicator
-
-### Changed
-
-- Renamed orchestration command from `npx claude-orchestration` to `npx agentic-orchestration`
-
-### Fixed
-
 - Path normalization across platforms with new `pathUtils.js` utility module
 - File tree view rendering issues on Windows (hidden/system directories, symlink traversal)
 - Flat view navigation for Windows path separators

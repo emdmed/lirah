@@ -134,12 +134,17 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, proj
     // Set TERM so the shell knows terminal capabilities (line wrapping, cursor movement, etc.)
     cmd.env("TERM", "xterm-256color");
 
-    cmd.cwd(home_dir().unwrap_or_else(|| {
-        #[cfg(unix)]
-        { "/".to_string() }
-        #[cfg(windows)]
-        { "C:\\".to_string() }
-    }));
+    let start_dir = project_dir
+        .as_ref()
+        .filter(|p| std::path::Path::new(p).is_dir())
+        .cloned()
+        .unwrap_or_else(|| home_dir().unwrap_or_else(|| {
+            #[cfg(unix)]
+            { "/".to_string() }
+            #[cfg(windows)]
+            { "C:\\".to_string() }
+        }));
+    cmd.cwd(&start_dir);
 
     // Spawn the child process
     eprintln!("[sandbox] sandbox={}, project_dir={:?}", sandbox, project_dir);
@@ -154,7 +159,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, proj
                 let mut fallback = CommandBuilder::new(&shell);
                 fallback.arg("-l");
                 fallback.env("TERM", "xterm-256color");
-                fallback.cwd(home_dir().unwrap_or_else(|| "/".to_string()));
+                fallback.cwd(&start_dir);
                 let child = pty_pair.slave.spawn_command(fallback)
                     .map_err(|e| format!("Failed to spawn shell: {}", e))?;
                 (child, false)
