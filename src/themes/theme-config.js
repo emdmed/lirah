@@ -556,7 +556,7 @@ export const themes = {
   retro: {
     name: 'Retro',
     type: 'dark',
-    // Terminal colors - Botanical (prussian blue bg, cream/lime/teal accents)
+    // Terminal colors - Retro CRT (prussian blue bg, warm phosphor palette)
     terminal: {
       foreground: '#A8D5A6',      // Celadon
       background: '#020D1C',      // Prussian Blue
@@ -567,22 +567,22 @@ export const themes = {
 
       // Normal colors
       black: '#020D1C',           // Prussian Blue
-      red: '#F4F7A3',             // Lime Cream
+      red: '#E05A4F',             // Warm Retro Red
       green: '#A8D5A6',           // Celadon
-      yellow: '#F4F7A3',          // Lime Cream
-      blue: '#17594F',            // Pine Teal
-      magenta: '#FEFFC7',         // Cream
-      cyan: '#17594F',            // Pine Teal
-      white: '#A8D5A6',           // Celadon
+      yellow: '#E8C547',          // Amber Gold
+      blue: '#5B9BD5',            // Soft Retro Blue
+      magenta: '#C78DCA',         // Lavender Phosphor
+      cyan: '#5EC4B6',            // Aqua Teal
+      white: '#D4D4C8',           // Warm Off-White
 
       // Bright colors
-      brightBlack: '#17594F',     // Pine Teal
-      brightRed: '#FEFFC7',       // Cream
-      brightGreen: '#FEFFC7',     // Cream
-      brightYellow: '#FEFFC7',    // Cream
-      brightBlue: '#A8D5A6',      // Celadon
-      brightMagenta: '#F4F7A3',   // Lime Cream
-      brightCyan: '#A8D5A6',      // Celadon
+      brightBlack: '#3A5F5A',     // Muted Teal
+      brightRed: '#F47868',       // Bright Coral
+      brightGreen: '#C8F7A8',     // Bright Lime
+      brightYellow: '#F4F7A3',    // Lime Cream
+      brightBlue: '#7BBEF0',      // Sky Blue
+      brightMagenta: '#E0A8E3',   // Bright Lavender
+      brightCyan: '#7EE8D7',      // Bright Aqua
       brightWhite: '#FEFFC7',     // Cream
     },
     // UI colors — only: Prussian Blue, Celadon, Lime Cream, Pine Teal, Cream

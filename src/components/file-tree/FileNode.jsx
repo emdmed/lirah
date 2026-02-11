@@ -39,17 +39,15 @@ export function FileNode({
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${
-        isTextareaPanelOpen && isSelected ? 'bg-blue-500/20' : ''
-      } ${isDeleted ? 'opacity-60' : ''}`}
+      className={`flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'outline-1 outline-dashed outline-ring/70 bg-primary/10' : ''
+        } ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Element picker button - always rendered for alignment, enabled for parseable files in Claude mode */}
       <button
-        className={`p-0 transition-opacity duration-200 rounded flex-shrink-0 ${
-          isTextareaPanelOpen && isParseable && !isDeleted
+        className={`p-0 transition-opacity duration-200 rounded flex-shrink-0 ${isTextareaPanelOpen && isParseable && !isDeleted
             ? 'opacity-40 hover:opacity-100 hover:bg-white/10 cursor-pointer'
             : 'opacity-0 pointer-events-none'
-        }`}
+          }`}
         onClick={(e) => {
           e.stopPropagation();
           onOpenElementPicker?.(node.path);
@@ -67,11 +65,10 @@ export function FileNode({
       >
         {/* Git diff button - always rendered for alignment, enabled when file has git changes */}
         <button
-          className={`p-0 transition-opacity duration-200 rounded flex-shrink-0 ${
-            hasGitChanges && !isDeleted
+          className={`p-0 transition-opacity duration-200 rounded flex-shrink-0 ${hasGitChanges && !isDeleted
               ? 'opacity-60 hover:opacity-100 hover:bg-white/10 cursor-pointer'
               : 'opacity-0 pointer-events-none'
-          }`}
+            }`}
           onClick={(e) => {
             e.stopPropagation();
             onViewDiff?.(node.path);

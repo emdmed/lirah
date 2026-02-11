@@ -25,13 +25,14 @@ export function SidebarHeader({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span
-            className="text-xl font-bold leading-tight"
-            style={{ fontFamily: "'Grenze Gotisch', serif", display: 'flex', alignItems: 'center' }}
+            className="font-bold leading-tight"
+            style={{ fontFamily: "'Grenze Gotisch', serif", display: 'flex', alignItems: 'center', fontSize: '18px' }}
           >
             Lirah
           </span>
           <span
-            className={`text-xs font-medium px-1 mt-1 rounded ${viewMode === 'tree' ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-muted/10'}`}
+            className={`font-medium px-1 mt-0.5 rounded ${viewMode === 'tree' ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-muted/10'}`}
+            style={{ fontSize: 'var(--font-xs)' }}
           >
             {sandboxEnabled ? <Shield className="w-3 h-3 inline mr-0.5" /> : <Eye className="w-3 h-3 inline mr-0.5" />}
             {viewMode === 'tree' ? 'agent' : 'nav'}
@@ -80,7 +81,8 @@ export function SidebarHeader({
             placeholder="Search files..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-7 pl-7 pr-7 py-0 text-xs leading-7 bg-muted/30 border-muted/50 focus:bg-background focus:border-primary/50"
+            className="h-7 pl-7 pr-7 py-0 leading-7 bg-muted/30 border border-sketch focus-visible:outline-1 focus-visible:outline-dashed focus-visible:outline-ring/70 focus-visible:outline-offset-0 focus-visible:ring-0 focus:bg-background"
+            style={{ fontSize: 'var(--font-xs)' }}
           />
           {searchQuery && (
             <button
