@@ -166,6 +166,10 @@ npm run preview     # Preview production build
 - **CWD Detection**: Linux-only via `/proc/[pid]/cwd` symlink resolution
 - **Filesystem Operations**: Directory reading, file content, git stats
 
+## Changelog
+
+See the [CHANGELOG](./CHANGELOG.md) for release history and notable changes.
+
 ## License
 
 [MIT](LICENSE)
