@@ -546,14 +546,6 @@ function App() {
     setSelectedElements(new Map());
   }, []);
 
-  // Get files data for saving to group
-  const getFilesForGroup = useCallback(() => {
-    return Array.from(selectedFiles).map(absolutePath => ({
-      relativePath: getRelativePath(absolutePath, currentPath),
-      state: fileStates.get(absolutePath) || 'modify'
-    }));
-  }, [selectedFiles, fileStates, currentPath]);
-
   // Incremental tree update to prevent flickering
   const handleIncrementalUpdate = useCallback((changes, rootPath) => {
     setTreeData(prevTreeData => incrementallyUpdateTree(prevTreeData, changes, rootPath));
@@ -1094,6 +1086,22 @@ function App() {
     return filtered;
   }, [treeData, searchResults]);
 
+  // Memoize computed props to avoid new references every render
+  const filesWithRelativePaths = useMemo(() => {
+    return Array.from(selectedFiles).map(absPath => ({
+      absolute: absPath,
+      relative: getRelativePath(absPath, currentPath),
+      name: basename(absPath)
+    }));
+  }, [selectedFiles, currentPath]);
+
+  const filesForGroup = useMemo(() => {
+    return Array.from(selectedFiles).map(absolutePath => ({
+      relativePath: getRelativePath(absolutePath, currentPath),
+      state: fileStates.get(absolutePath) || 'modify'
+    }));
+  }, [selectedFiles, fileStates, currentPath]);
+
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} className={isResizing ? 'select-none' : ''} style={{ height: '100%' }}>
       <Layout
@@ -1161,11 +1169,7 @@ function App() {
                   {/* File Selection Panel */}
                   {selectedFiles.size > 0 && (
                     <SidebarFileSelection
-                      filesWithRelativePaths={Array.from(selectedFiles || new Set()).map(absPath => ({
-                        absolute: absPath,
-                        relative: getRelativePath(absPath, currentPath),
-                        name: basename(absPath)
-                      }))}
+                      filesWithRelativePaths={filesWithRelativePaths}
                       fileStates={fileStates}
                       onSetFileState={setFileState}
                       onRemoveFile={removeFileFromSelection}
@@ -1308,7 +1312,7 @@ function App() {
         open={saveFileGroupDialogOpen}
         onOpenChange={setSaveFileGroupDialogOpen}
         projectPath={currentPath}
-        files={getFilesForGroup()}
+        files={filesForGroup}
       />
       <InitialProjectDialog
         open={initialProjectDialogOpen}
