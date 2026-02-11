@@ -23,7 +23,7 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
       try {
         const statsData = await invoke('get_git_stats', { path: currentPath });
         const newStats = new Map(Object.entries(statsData));
-        
+
         // Detect specific git changes for targeted updates
         if (onGitChanges) {
           const changes = detectGitChanges(prevStatsRef.current, newStats);
@@ -32,8 +32,11 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
             onGitChanges(changes);
           }
         }
-        
-        setGitStats(newStats);
+
+        // Only update state if contents actually changed to avoid unnecessary re-renders
+        if (!mapsEqual(prevStatsRef.current, newStats)) {
+          setGitStats(newStats);
+        }
         prevStatsRef.current = newStats;
       } catch (error) {
         console.warn('Failed to load git stats:', error);
@@ -53,6 +56,16 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
   }, [currentPath, enabled, onGitChanges]);
 
   return { gitStats };
+}
+
+function mapsEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const [key, valA] of a) {
+    const valB = b.get(key);
+    if (!valB) return false;
+    if (valA.status !== valB.status || valA.added !== valB.added || valA.deleted !== valB.deleted) return false;
+  }
+  return true;
 }
 
 /**

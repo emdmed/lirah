@@ -358,7 +358,7 @@ function App() {
   }, [terminalSessionId, initializeSearch]);
 
   // File selection handlers
-  const toggleFileSelection = (filePath) => {
+  const toggleFileSelection = useCallback((filePath) => {
     setSelectedFiles(prev => {
       const next = new Set(prev);
       if (next.has(filePath)) {
@@ -388,9 +388,9 @@ function App() {
       }
       return next;
     });
-  };
+  }, [clearFileSymbols, isBabelParseable, extractFileSymbols]);
 
-  const removeFileFromSelection = (filePath) => {
+  const removeFileFromSelection = useCallback((filePath) => {
     setSelectedFiles(prev => {
       const next = new Set(prev);
       next.delete(filePath);
@@ -401,7 +401,7 @@ function App() {
       next.delete(filePath);
       return next;
     });
-  };
+  }, []);
 
   const clearFileSelection = () => {
     setSelectedFiles(new Set());
@@ -415,13 +415,13 @@ function App() {
     setDiffDialogOpen(true);
   }, []);
 
-  const setFileState = (filePath, state) => {
+  const setFileState = useCallback((filePath, state) => {
     setFileStates(prev => {
       const next = new Map(prev);
       next.set(filePath, state);
       return next;
     });
-  };
+  }, []);
 
   // File groups handlers
   const handleLoadFileGroup = useCallback((group) => {
@@ -772,11 +772,11 @@ function App() {
   }, [detectedCwd, viewMode]);
 
   // Extract @ mention from textarea content
-  const extractAtMention = (text) => {
+  const extractAtMention = useCallback((text) => {
     if (viewMode !== 'tree') return null;
     const match = text.match(/@([^\s@]*)$/);
     return match ? match[1] : null;
-  };
+  }, [viewMode]);
 
   // Handle textarea changes to detect @ mentions
   const handleTextareaChange = useCallback((newValue) => {
@@ -1001,7 +1001,7 @@ function App() {
 
 
   // Tree filtering function for search
-  const filterTreeBySearch = (nodes, matchingPaths) => {
+  const filterTreeBySearch = useCallback((nodes, matchingPaths) => {
     if (!matchingPaths || matchingPaths.length === 0) {
       return nodes;
     }
@@ -1041,10 +1041,10 @@ function App() {
     };
 
     return filterNodes(nodes);
-  };
+  }, []);
 
   // Auto-expand function for search results
-  const expandSearchResults = (results) => {
+  const expandSearchResults = useCallback((results) => {
     const pathsToExpand = new Set();
 
     // Expand all parent folders of matches
@@ -1064,7 +1064,7 @@ function App() {
     });
 
     setExpandedFolders(pathsToExpand);
-  };
+  }, []);
 
   const toggleFolder = (folderPath) => {
     setExpandedFolders(prev => {
