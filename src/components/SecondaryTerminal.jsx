@@ -73,7 +73,7 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
 
   if (selectedCommand === null) {
     return (
-      <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+      <div style={containerStyle}>
         <SecondaryTerminalPicker onSelect={setSelectedCommand} />
       </div>
     );
