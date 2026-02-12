@@ -38,10 +38,12 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // Open terminal in DOM
     term.open(terminalRef.current);
 
-    // Fit terminal to container with a small delay to ensure proper dimensions
-    setTimeout(() => {
+    // Initial fit
+    try {
       fit.fit();
-    }, 10);
+    } catch (e) {
+      // Container may not have dimensions yet, spawn effect will re-fit
+    }
 
     setTerminal(term);
     setFitAddon(fit);
@@ -126,6 +128,18 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         });
 
         setIsReady(true);
+
+        // Sync dimensions: fit may have changed cols/rows after initial spawn
+        try {
+          fitAddon.fit();
+          const fittedRows = terminal.rows;
+          const fittedCols = terminal.cols;
+          if (fittedRows !== rows || fittedCols !== cols) {
+            await invoke('resize_terminal', { sessionId: id, rows: fittedRows, cols: fittedCols });
+          }
+        } catch (e) {
+          console.debug('Post-spawn fit skipped:', e.message);
+        }
 
         // Send initial command if provided (for secondary terminal)
         if (initialCommand) {
