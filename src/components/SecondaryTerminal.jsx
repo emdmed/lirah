@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir }, ref) => {
   const terminalRef = useRef(null);
@@ -45,10 +46,10 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
   return (
     <div
-      className={`p-2 mt-2 terminal-wrapper ${isFocused
+      className={`px-2 terminal-wrapper ${isFocused
         ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-2'
         : ''
-      }`}
+        }`}
       style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}
     >
       <div
@@ -61,10 +62,14 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
-export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir }, ref) => {
+export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen }, ref) => {
   const [selectedCommand, setSelectedCommand] = useState(null);
 
   if (!visible) return null;
+
+  const containerStyle = fullscreen
+    ? { position: 'absolute', inset: 0, zIndex: 40, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)' }
+    : { position: 'absolute', top: 0, right: 0, bottom: 0, width: '50%', zIndex: 40, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)' };
 
   if (selectedCommand === null) {
     return (
@@ -75,7 +80,14 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
   }
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+    <div style={containerStyle}>
+      <button
+        onClick={onToggleFullscreen}
+        className="absolute top-2 right-2 z-50 p-1 text-muted-foreground hover:text-foreground transition-colors opacity-50 hover:opacity-100"
+        title={fullscreen ? 'Restore' : 'Maximize'}
+      >
+        {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+      </button>
       <SecondaryTerminalInstance
         ref={ref}
         theme={theme}

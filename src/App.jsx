@@ -213,6 +213,7 @@ function App() {
   // Secondary terminal state
   const [secondaryVisible, setSecondaryVisible] = useState(false);
   const [secondaryFocused, setSecondaryFocused] = useState(false);
+  const [secondaryFullscreen, setSecondaryFullscreen] = useState(false);
   const [secondarySessionId, setSecondarySessionId] = useState(null);
   const [secondaryKey, setSecondaryKey] = useState(0);
   const secondaryTerminalRef = useRef(null);
@@ -961,6 +962,7 @@ function App() {
     }
     setSecondaryVisible(false);
     setSecondaryFocused(false);
+    setSecondaryFullscreen(false);
     setSecondaryKey(k => k + 1);
   }, [secondarySessionId]);
 
@@ -1314,22 +1316,18 @@ function App() {
         }
         secondaryTerminal={
           secondaryVisible && (
-            <>
-              {/* Resize handle between primary and secondary */}
-              <div
-                className="w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50 shrink-0"
-              />
-              <SecondaryTerminal
-                key={secondaryKey}
-                ref={secondaryTerminalRef}
-                theme={theme.terminal}
-                visible={secondaryVisible}
-                onClose={closeSecondaryTerminal}
-                onFocusChange={setSecondaryFocused}
-                onSessionReady={setSecondarySessionId}
-                projectDir={currentPath}
-              />
-            </>
+            <SecondaryTerminal
+              key={secondaryKey}
+              ref={secondaryTerminalRef}
+              theme={theme.terminal}
+              visible={secondaryVisible}
+              onClose={closeSecondaryTerminal}
+              onFocusChange={setSecondaryFocused}
+              onSessionReady={setSecondarySessionId}
+              projectDir={currentPath}
+              fullscreen={secondaryFullscreen}
+              onToggleFullscreen={() => setSecondaryFullscreen(f => !f)}
+            />
           )
         }
       >
