@@ -966,6 +966,13 @@ function App() {
     setSecondaryKey(k => k + 1);
   }, [secondarySessionId]);
 
+  // Handle picker visibility to blur primary terminal
+  const handlePickerVisibilityChange = useCallback((isVisible) => {
+    if (isVisible && terminalRef.current?.blur) {
+      terminalRef.current.blur();
+    }
+  }, []);
+
   // Keyboard shortcuts - for non-terminal focus
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1327,6 +1334,7 @@ function App() {
               projectDir={currentPath}
               fullscreen={secondaryFullscreen}
               onToggleFullscreen={() => setSecondaryFullscreen(f => !f)}
+              onPickerVisibilityChange={handlePickerVisibilityChange}
             />
           )
         }

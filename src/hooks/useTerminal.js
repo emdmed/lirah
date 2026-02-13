@@ -220,7 +220,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     }
   }, [terminal, theme]);
 
-  // Expose focus method to parent via ref
+  // Expose focus and blur methods to parent via ref
   useImperativeHandle(imperativeRef, () => ({
     focus: () => {
       if (terminal && isReady) {
@@ -228,6 +228,13 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         return true;
       }
       console.warn('Terminal not ready for focus');
+      return false;
+    },
+    blur: () => {
+      if (terminal && isReady) {
+        terminal.blur();
+        return true;
+      }
       return false;
     }
   }), [terminal, isReady]);

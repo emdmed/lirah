@@ -24,6 +24,17 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     if (sessionId && onSessionReady) onSessionReady(sessionId);
   }, [sessionId, onSessionReady]);
 
+  // Focus terminal when session is ready and initialCommand is set
+  useEffect(() => {
+    if (sessionId && initialCommand && ref?.current?.focus) {
+      // Small delay to ensure terminal is fully initialized
+      const timer = setTimeout(() => {
+        ref.current.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionId, initialCommand, ref]);
+
   const resizeTimerRef = useRef(null);
   const debouncedResize = useCallback(() => {
     if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
@@ -62,8 +73,15 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
-export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen }, ref) => {
+export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange }, ref) => {
   const [selectedCommand, setSelectedCommand] = useState(null);
+
+  // Notify parent when picker visibility changes
+  useEffect(() => {
+    if (visible) {
+      onPickerVisibilityChange?.(selectedCommand === null);
+    }
+  }, [visible, selectedCommand, onPickerVisibilityChange]);
 
   if (!visible) return null;
 
