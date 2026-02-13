@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, useImperativeHandle, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -13,6 +13,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [isReady, setIsReady] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [sandboxFailed, setSandboxFailed] = useState(false);
+  const isFocusedRef = useRef(false);
 
   // Initialize terminal
   useEffect(() => {
@@ -196,12 +197,18 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
 
     const textarea = terminal.textarea;
     const handleFocus = () => {
-      setIsFocused(true);
-      onFocusChange?.(true);
+      if (!isFocusedRef.current) {
+        isFocusedRef.current = true;
+        setIsFocused(true);
+        onFocusChange?.(true);
+      }
     };
     const handleBlur = () => {
-      setIsFocused(false);
-      onFocusChange?.(false);
+      if (isFocusedRef.current) {
+        isFocusedRef.current = false;
+        setIsFocused(false);
+        onFocusChange?.(false);
+      }
     };
 
     textarea.addEventListener('focus', handleFocus);
