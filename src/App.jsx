@@ -171,8 +171,8 @@ function App() {
       await new Promise(resolve => setTimeout(resolve, 100));
       await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
       updateBookmark(bookmark.id, { lastAccessedAt: Date.now() });
-      if (viewMode === 'flat') loadFolders();
-      else if (viewMode === 'tree') treeView.loadTreeData();
+      if (viewMode === 'flat') await loadFolders();
+      else if (viewMode === 'tree') await treeView.loadTreeData();
       terminalRef.current?.focus?.();
     } catch (error) {
       console.error('Failed to navigate to bookmark:', error);
@@ -185,9 +185,8 @@ function App() {
     setSplashStep('navigate');
     setSplashVisible(true);
 
-    // Step 1: Navigate
+    // Step 1: Navigate (waits for filetree to fully load)
     await navigateToBookmark(bookmark);
-    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Step 2: Start Claude
     setSplashStep('claude');
