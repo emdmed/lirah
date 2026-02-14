@@ -3,9 +3,7 @@ import { Terminal } from "./components/Terminal";
 import { Layout } from "./components/Layout";
 import { StatusBar } from "./components/StatusBar";
 import { TitleBar } from "./components/TitleBar";
-import { FileTree } from "./components/file-tree/file-tree";
-import { SidebarHeader } from "./components/SidebarHeader";
-import { FlatViewMenu } from "./components/FlatViewMenu";
+import { LeftSidebar } from "./components/LeftSidebar";
 import { AddBookmarkDialog } from "./components/AddBookmarkDialog";
 import { BookmarksPalette } from "./components/BookmarksPalette";
 import { InitialProjectDialog } from "./components/InitialProjectDialog";
@@ -35,14 +33,7 @@ import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { ElementPickerDialog } from "./components/ElementPickerDialog";
 import { SecondaryTerminal } from "./components/SecondaryTerminal";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
-import { SidebarFileSelection } from "./components/sidebar/SidebarFileSelection";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 // Domain hooks
 import { useSecondaryTerminal } from "./hooks/useSecondaryTerminal";
@@ -51,7 +42,7 @@ import { useTerminalSettings } from "./hooks/useTerminalSettings";
 import { useCompact } from "./hooks/useCompact";
 import { useElementPicker } from "./hooks/useElementPicker";
 import { useAtMention } from "./hooks/useAtMention";
-import { useFileSelection } from "./hooks/useFileSelection";
+import { useFileSelection } from "./contexts/FileSelectionContext";
 import { useSidebarSearch } from "./hooks/useSidebarSearch";
 import { useTreeView } from "./hooks/useTreeView";
 import { useSidebar } from "./hooks/useSidebar";
@@ -85,21 +76,23 @@ function App() {
 
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
 
-  const {
-    checkFileTypes, typeCheckResults, checkingFiles, successfulChecks, resetTypeChecker,
-  } = useTypeChecker(currentPath, { setTextareaVisible, setTextareaContent });
+  const typeChecker = useTypeChecker(currentPath, { setTextareaVisible, setTextareaContent });
 
-  const sidebar = useSidebar({ resetTypeChecker });
+  const sidebar = useSidebar({ resetTypeChecker: typeChecker.resetTypeChecker });
 
-  const {
-    fileSymbols, extractFileSymbols, clearFileSymbols, clearAllSymbols,
-    getSymbolCount, getLineCount, formatFileAnalysis, getViewModeLabel,
-    setFileViewMode, isBabelParseable, VIEW_MODES,
-  } = useFileSymbols();
+  const fileSymbolsHook = useFileSymbols();
+  const { extractFileSymbols, clearFileSymbols, clearAllSymbols, isBabelParseable, formatFileAnalysis, getLineCount, getViewModeLabel } = fileSymbolsHook;
 
-  const fileSelection = useFileSelection({
-    currentPath, clearFileSymbols, isBabelParseable, extractFileSymbols, clearAllSymbols,
-  });
+  const fileSelection = useFileSelection();
+
+  // Register symbol callbacks and currentPath with file selection context
+  useEffect(() => {
+    fileSelection.registerSymbolCallbacks({ clearFileSymbols, isBabelParseable, extractFileSymbols, clearAllSymbols });
+  }, [clearFileSymbols, isBabelParseable, extractFileSymbols, clearAllSymbols]);
+
+  useEffect(() => {
+    fileSelection.registerCurrentPath(currentPath);
+  }, [currentPath]);
 
   const secondary = useSecondaryTerminal(terminalRef);
 
@@ -355,83 +348,30 @@ function App() {
       <Layout
         sidebar={
           sidebar.sidebarOpen && (
-            <>
-              <Sidebar collapsible="none" className="border-e border-e-sketch m-0 p-1 shrink-0 overflow-hidden" style={{ height: '100%', display: 'flex', flexDirection: 'column', width: sidebar.sidebarWidth }}>
-                <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                  <SidebarHeader
-                    viewMode={viewMode}
-                    currentPath={currentPath}
-                    onNavigateParent={navigateToParent}
-                    searchQuery={sidebarSearch.searchQuery}
-                    onSearchChange={(query) => { sidebarSearch.handleSearchChange(query); atMention.setAtMentionQuery(null); }}
-                    onSearchClear={sidebarSearch.handleSearchClear}
-                    showSearch={viewMode === 'tree'}
-                    searchInputRef={searchInputRef}
-                    showGitChangesOnly={treeView.showGitChangesOnly}
-                    onToggleGitFilter={treeView.handleToggleGitFilter}
-                    fileWatchingEnabled={fileWatchingEnabled}
-                    onAddBookmark={() => dialogs.setAddBookmarkDialogOpen(true)}
-                    onNavigateBookmark={navigateToBookmark}
-                    hasTerminalSession={!!terminalSessionId}
-                    sandboxEnabled={settings.sandboxEnabled}
-                  />
-                  <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                    <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-                      {viewMode === 'flat' ? (
-                        <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={loadFolders} />
-                      ) : (
-                        treeView.treeLoading ? (
-                          <div className="p-4 text-center">
-                            <div className="text-sm opacity-60">Loading directory tree...</div>
-                          </div>
-                        ) : (
-                          <FileTree
-                            nodes={treeView.displayedTreeData}
-                            searchQuery={sidebarSearch.searchQuery}
-                            expandedFolders={treeView.expandedFolders}
-                            currentPath={currentPath}
-                            showGitChangesOnly={treeView.showGitChangesOnly}
-                            onToggle={treeView.toggleFolder}
-                            onSendToTerminal={sendFileToTerminal}
-                            onViewDiff={viewFileDiff}
-                            selectedFiles={fileSelection.selectedFiles}
-                            onToggleFileSelection={fileSelection.toggleFileSelection}
-                            isTextareaPanelOpen={textareaVisible}
-                            typeCheckResults={typeCheckResults}
-                            checkingFiles={checkingFiles}
-                            successfulChecks={successfulChecks}
-                            onCheckFileTypes={checkFileTypes}
-                            fileWatchingEnabled={fileWatchingEnabled}
-                            onGitChanges={handleGitChanges}
-                            onOpenElementPicker={elementPicker.handleOpenElementPicker}
-                          />
-                        )
-                      )}
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-
-                  {fileSelection.selectedFiles.size > 0 && (
-                    <SidebarFileSelection
-                      filesWithRelativePaths={fileSelection.filesWithRelativePaths}
-                      fileStates={fileSelection.fileStates}
-                      onSetFileState={fileSelection.setFileState}
-                      onRemoveFile={fileSelection.removeFileFromSelection}
-                      onClearAllFiles={fileSelection.clearFileSelection}
-                      getSymbolCount={getSymbolCount}
-                      getLineCount={getLineCount}
-                      getViewModeLabel={getViewModeLabel}
-                      setFileViewMode={setFileViewMode}
-                      fileSymbols={fileSymbols}
-                      VIEW_MODES={VIEW_MODES}
-                    />
-                  )}
-                </SidebarContent>
-              </Sidebar>
-              <div
-                className={`w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50 shrink-0 ${sidebar.isResizing ? 'bg-primary/50' : ''}`}
-                onMouseDown={sidebar.handleResizeStart}
-              />
-            </>
+            <LeftSidebar
+              sidebar={sidebar}
+              search={sidebarSearch}
+              searchInputRef={searchInputRef}
+              onSearchChange={(query) => { sidebarSearch.handleSearchChange(query); atMention.setAtMentionQuery(null); }}
+              treeView={treeView}
+              typeChecker={typeChecker}
+              fileSymbols={fileSymbolsHook}
+              viewMode={viewMode}
+              currentPath={currentPath}
+              folders={folders}
+              fileWatchingEnabled={fileWatchingEnabled}
+              isTextareaPanelOpen={textareaVisible}
+              onNavigateParent={navigateToParent}
+              onFolderClick={loadFolders}
+              onAddBookmark={() => dialogs.setAddBookmarkDialogOpen(true)}
+              onNavigateBookmark={navigateToBookmark}
+              hasTerminalSession={!!terminalSessionId}
+              sandboxEnabled={settings.sandboxEnabled}
+              onSendToTerminal={sendFileToTerminal}
+              onViewDiff={viewFileDiff}
+              onGitChanges={handleGitChanges}
+              onOpenElementPicker={elementPicker.handleOpenElementPicker}
+            />
           )
         }
         textarea={

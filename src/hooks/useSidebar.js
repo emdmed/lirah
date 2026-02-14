@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 export function useSidebar({ resetTypeChecker }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -35,10 +35,10 @@ export function useSidebar({ resetTypeChecker }) {
     }
   }, [sidebarOpen, resetTypeChecker]);
 
-  return {
+  return useMemo(() => ({
     sidebarOpen, setSidebarOpen,
     sidebarWidth,
     isResizing,
     handleResizeStart,
-  };
+  }), [sidebarOpen, sidebarWidth, isResizing, handleResizeStart]);
 }

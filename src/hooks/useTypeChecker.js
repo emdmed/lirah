@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 function formatTypeCheckErrors(result) {
@@ -104,12 +104,12 @@ export function useTypeChecker(currentPath, { setTextareaVisible, setTextareaCon
     setSuccessfulChecks(new Set());
   }, []);
 
-  return {
+  return useMemo(() => ({
     checkFileTypes,
     formatTypeCheckErrors,
     checkingFiles,
     typeCheckResults,
     successfulChecks,
     resetTypeChecker,
-  };
+  }), [checkFileTypes, formatTypeCheckErrors, checkingFiles, typeCheckResults, successfulChecks, resetTypeChecker]);
 }

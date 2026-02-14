@@ -131,7 +131,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     return filtered;
   }, [treeData, searchResults, filterTreeBySearch]);
 
-  return {
+  return useMemo(() => ({
     treeData, setTreeData,
     treeLoading,
     expandedFolders, setExpandedFolders,
@@ -145,5 +145,9 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     expandSearchResults,
     handleToggleGitFilter,
     displayedTreeData,
-  };
+  }), [
+    treeData, treeLoading, expandedFolders, showGitChangesOnly, allFiles,
+    loadTreeData, handleIncrementalUpdate, handleGitChanges, toggleFolder,
+    filterTreeBySearch, expandSearchResults, handleToggleGitFilter, displayedTreeData,
+  ]);
 }

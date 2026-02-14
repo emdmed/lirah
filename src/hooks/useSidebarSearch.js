@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useFileSearch } from "./useFileSearch";
 
 export function useSidebarSearch() {
@@ -27,12 +27,12 @@ export function useSidebarSearch() {
     setSearchResults(null);
   }, []);
 
-  return {
+  return useMemo(() => ({
     searchQuery, setSearchQuery,
     searchResults, setSearchResults,
     initializeSearch,
     search,
     handleSearchChange,
     handleSearchClear,
-  };
+  }), [searchQuery, searchResults, initializeSearch, search, handleSearchChange, handleSearchClear]);
 }

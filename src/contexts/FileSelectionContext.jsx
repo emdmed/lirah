@@ -1,9 +1,23 @@
-import { useState, useMemo, useCallback } from "react";
-import { getRelativePath, basename } from "../utils/pathUtils";
+import { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import { getRelativePath, basename } from '../utils/pathUtils';
 
-export function useFileSelection({ currentPath, clearFileSymbols, isBabelParseable, extractFileSymbols, clearAllSymbols }) {
+const FileSelectionContext = createContext(undefined);
+
+export function FileSelectionProvider({ children }) {
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [fileStates, setFileStates] = useState(new Map());
+
+  // These will be set by App once fileSymbols hook is ready
+  const [symbolCallbacks, setSymbolCallbacks] = useState(null);
+  const [currentPath, setCurrentPath] = useState('');
+
+  const registerSymbolCallbacks = useCallback((callbacks) => {
+    setSymbolCallbacks(callbacks);
+  }, []);
+
+  const registerCurrentPath = useCallback((path) => {
+    setCurrentPath(path);
+  }, []);
 
   const toggleFileSelection = useCallback((filePath) => {
     setSelectedFiles(prev => {
@@ -15,7 +29,7 @@ export function useFileSelection({ currentPath, clearFileSymbols, isBabelParseab
           nextStates.delete(filePath);
           return nextStates;
         });
-        clearFileSymbols(filePath);
+        symbolCallbacks?.clearFileSymbols(filePath);
       } else {
         next.add(filePath);
         setFileStates(prevStates => {
@@ -23,13 +37,13 @@ export function useFileSelection({ currentPath, clearFileSymbols, isBabelParseab
           nextStates.set(filePath, 'modify');
           return nextStates;
         });
-        if (isBabelParseable(filePath)) {
-          extractFileSymbols(filePath);
+        if (symbolCallbacks?.isBabelParseable(filePath)) {
+          symbolCallbacks.extractFileSymbols(filePath);
         }
       }
       return next;
     });
-  }, [clearFileSymbols, isBabelParseable, extractFileSymbols]);
+  }, [symbolCallbacks]);
 
   const removeFileFromSelection = useCallback((filePath) => {
     setSelectedFiles(prev => {
@@ -47,8 +61,8 @@ export function useFileSelection({ currentPath, clearFileSymbols, isBabelParseab
   const clearFileSelection = useCallback(() => {
     setSelectedFiles(new Set());
     setFileStates(new Map());
-    clearAllSymbols();
-  }, [clearAllSymbols]);
+    symbolCallbacks?.clearAllSymbols();
+  }, [symbolCallbacks]);
 
   const setFileState = useCallback((filePath, state) => {
     setFileStates(prev => {
@@ -80,16 +94,16 @@ export function useFileSelection({ currentPath, clearFileSymbols, isBabelParseab
       const absolutePath = `${currentPath}/${file.relativePath}`;
       newSelectedFiles.add(absolutePath);
       newFileStates.set(absolutePath, file.state);
-      if (isBabelParseable(absolutePath)) {
-        extractFileSymbols(absolutePath);
+      if (symbolCallbacks?.isBabelParseable(absolutePath)) {
+        symbolCallbacks.extractFileSymbols(absolutePath);
       }
     });
     setSelectedFiles(newSelectedFiles);
     setFileStates(newFileStates);
-  }, [currentPath, isBabelParseable, extractFileSymbols]);
+  }, [currentPath, symbolCallbacks]);
 
-  return {
-    selectedFiles, setSelectedFiles,
+  const value = useMemo(() => ({
+    selectedFiles,
     fileStates,
     toggleFileSelection,
     removeFileFromSelection,
@@ -98,5 +112,25 @@ export function useFileSelection({ currentPath, clearFileSymbols, isBabelParseab
     filesWithRelativePaths,
     filesForGroup,
     handleLoadFileGroup,
-  };
+    registerSymbolCallbacks,
+    registerCurrentPath,
+  }), [
+    selectedFiles, fileStates, toggleFileSelection, removeFileFromSelection,
+    clearFileSelection, setFileState, filesWithRelativePaths, filesForGroup,
+    handleLoadFileGroup, registerSymbolCallbacks, registerCurrentPath,
+  ]);
+
+  return (
+    <FileSelectionContext.Provider value={value}>
+      {children}
+    </FileSelectionContext.Provider>
+  );
+}
+
+export function useFileSelection() {
+  const context = useContext(FileSelectionContext);
+  if (context === undefined) {
+    throw new Error('useFileSelection must be used within a FileSelectionProvider');
+  }
+  return context;
 }

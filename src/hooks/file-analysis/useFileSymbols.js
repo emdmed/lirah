@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   extractSymbols,
@@ -219,7 +219,7 @@ export function useFileSymbols() {
     }
   }, [getFileViewMode]);
 
-  return {
+  return useMemo(() => ({
     fileSymbols,
     fileViewModes,
     extractFileSymbols,
@@ -235,5 +235,9 @@ export function useFileSymbols() {
     getViewModeLabel,
     isBabelParseable,
     VIEW_MODES,
-  };
+  }), [
+    fileSymbols, fileViewModes, extractFileSymbols, clearFileSymbols, clearAllSymbols,
+    getSymbolsForFile, isAnyParsing, getSymbolCount, getLineCount, setFileViewMode,
+    getFileViewMode, formatFileAnalysis, getViewModeLabel, isBabelParseable,
+  ]);
 }

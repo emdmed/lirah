@@ -6,6 +6,7 @@ import { WatcherProvider } from "./contexts/WatcherContext";
 import { BookmarksProvider } from "./contexts/BookmarksContext";
 import { PromptTemplatesProvider } from "./contexts/PromptTemplatesContext";
 import { FileGroupsProvider } from "./contexts/FileGroupsContext";
+import { FileSelectionProvider } from "./contexts/FileSelectionContext";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <BookmarksProvider>
           <PromptTemplatesProvider>
             <FileGroupsProvider>
-              <App />
+              <FileSelectionProvider>
+                <App />
+              </FileSelectionProvider>
             </FileGroupsProvider>
           </PromptTemplatesProvider>
         </BookmarksProvider>
