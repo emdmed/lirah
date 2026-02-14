@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff, Coins } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff, Coins, BarChart3 } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { useTokenBudget } from '../contexts/TokenBudgetContext';
@@ -119,7 +119,7 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
   );
 }
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings, onOpenDashboard }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
@@ -142,6 +142,16 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
 
       {/* Right section: Budget, CLI selector, Theme, and Settings menu */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={onOpenDashboard}
+          title="Token Metrics (Ctrl+Shift+D)"
+          className="gap-1 px-1.5"
+        >
+          <BarChart3 className="w-3 h-3" />
+          <span className="opacity-70">Metrics</span>
+        </Button>
         <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
         {selectedCli && (
           <Button

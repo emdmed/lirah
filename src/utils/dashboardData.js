@@ -5,6 +5,8 @@ import { groupByDay, groupByWeek, groupByMonth } from './timeRanges';
 const MODEL_PRICING = {
   'claude-opus-4-6': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
   'claude-opus-4-6-20250820': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
+  'claude-opus-4-5': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
+  'claude-opus-4-5-20251101': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
   'claude-sonnet-4-5': { input: 3, output: 15, cacheRead: 0.375, cacheWrite: 3.75 },
   'claude-sonnet-4-5-20250929': { input: 3, output: 15, cacheRead: 0.375, cacheWrite: 3.75 },
   'default': { input: 3, output: 15, cacheRead: 0.375, cacheWrite: 3.75 },

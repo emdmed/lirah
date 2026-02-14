@@ -1,6 +1,8 @@
 export const ANTHROPIC_PRICING = {
   models: {
     'claude-opus-4-6': { input: 15.0, output: 75.0 },
+    'claude-opus-4-6-20250820': { input: 15.0, output: 75.0 },
+    'claude-opus-4-5': { input: 15.0, output: 75.0 },
     'claude-opus-4-5-20251101': { input: 15.0, output: 75.0 },
     'claude-sonnet-4-5-20250929': { input: 3.0, output: 15.0 },
   },

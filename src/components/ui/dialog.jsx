@@ -48,11 +48,12 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  overlayClassName,
   ...props
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <DialogPrimitive.Content
           data-slot="dialog-content"

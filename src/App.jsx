@@ -461,6 +461,7 @@ function App() {
               }
             }}
             secondaryTerminalFocused={secondary.secondaryFocused}
+            onOpenDashboard={() => setDashboardOpen(true)}
             onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
             onToggleSandbox={() => {
               settings.setSandboxEnabled(prev => !prev);

@@ -29,12 +29,7 @@ export function UsageSummaryPanel({ sessionData, tokenUsage, colors = {} }) {
 
   const modelDisplay = model.toLowerCase().includes('opus') ? 'Opus' : model.toLowerCase().includes('sonnet') ? 'Sonnet' : model;
 
-  const c = {
-    input: colors.input || '#89b4fa',
-    output: colors.output || '#a6e3a1',
-    cacheRead: colors.cacheRead || '#f5c2e7',
-    text: colors.text || '#cdd6f4',
-  };
+  const c = colors;
 
   return (
     <Card className="bg-background border-sketch h-full flex flex-col font-mono">
@@ -52,9 +47,9 @@ export function UsageSummaryPanel({ sessionData, tokenUsage, colors = {} }) {
         </div>
 
         <div className="mt-auto pt-2 border-t border-sketch">
-          <div className="text-[10px] text-muted-foreground">
-            <span className="">Model:</span>{' '}
-            <span className="">{modelDisplay}</span>
+          <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
+            <span>Model:</span>{' '}
+            <span>{modelDisplay}</span>
           </div>
         </div>
       </CardContent>

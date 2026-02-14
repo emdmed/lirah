@@ -239,6 +239,187 @@ fn calculate_cost(input_tokens: u64, output_tokens: u64, cache_read: u64, cache_
     input_cost + output_cost + cache_read_cost + cache_write_cost
 }
 
+#[derive(Serialize)]
+pub struct AllProjectsStats {
+    pub projects: Vec<ProjectSummary>,
+    pub totals: AllProjectsTotals,
+}
+
+#[derive(Serialize)]
+pub struct ProjectSummary {
+    pub path: String,
+    pub name: String,
+    pub total_tokens: u64,
+    pub total_cost: f64,
+    pub session_count: u64,
+    pub message_count: u64,
+    pub last_activity: String,
+    pub daily_average: u64,
+    pub model_split: HashMap<String, f64>,
+    pub daily_activity: Vec<DailyActivity>,
+    pub sessions: Vec<SessionInfo>,
+}
+
+#[derive(Serialize)]
+pub struct AllProjectsTotals {
+    pub all_projects_tokens: u64,
+    pub all_projects_cost: f64,
+    pub total_sessions: u64,
+}
+
+#[tauri::command]
+pub fn get_all_projects_stats() -> Result<AllProjectsStats, String> {
+    let home = super::home_dir().ok_or("Could not get home directory")?;
+    let projects_dir = PathBuf::from(&home).join(".claude").join("projects");
+
+    if !projects_dir.exists() {
+        return Ok(AllProjectsStats {
+            projects: vec![],
+            totals: AllProjectsTotals {
+                all_projects_tokens: 0,
+                all_projects_cost: 0.0,
+                total_sessions: 0,
+            },
+        });
+    }
+
+    let entries = fs::read_dir(&projects_dir)
+        .map_err(|e| format!("Failed to read projects directory: {}", e))?;
+
+    let mut projects = Vec::new();
+    let mut total_tokens: u64 = 0;
+    let mut total_cost: f64 = 0.0;
+    let mut total_sessions: u64 = 0;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let raw_dir_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        // Directory names encode paths: -home-enrique-projects-foo becomes "foo"
+        // Try to extract the last path component by finding common parent patterns
+        let dir_name = {
+            let trimmed = raw_dir_name.trim_start_matches('-');
+            // Look for "projects-" and take everything after the last occurrence
+            if let Some(pos) = trimmed.rfind("projects-") {
+                trimmed[pos + 9..].to_string()
+            } else {
+                // Fallback: take the last segment after the last dash
+                trimmed.rsplit_once('-')
+                    .map(|(_, last)| last.to_string())
+                    .unwrap_or_else(|| trimmed.to_string())
+            }
+        };
+
+        // Parse all session files in this project directory
+        let session_entries = match fs::read_dir(&path) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let mut sessions: Vec<SessionInfo> = Vec::new();
+        let mut model_usage: HashMap<String, DailyActivity> = HashMap::new();
+        let mut model_tokens: HashMap<String, u64> = HashMap::new();
+
+        for se in session_entries.flatten() {
+            let sp = se.path();
+            if sp.extension().map_or(false, |ext| ext == "jsonl") {
+                if let Ok(session_info) = parse_session_file(&sp) {
+                    let model = session_info.model.clone();
+                    let ts = session_info.timestamp.clone();
+
+                    let session_tokens = session_info.input_tokens + session_info.output_tokens + session_info.cache_read_input_tokens;
+                    *model_tokens.entry(model.clone().unwrap_or_default()).or_insert(0) += session_tokens;
+
+                    if !ts.is_empty() {
+                        if let Some(date) = parse_timestamp(&ts) {
+                            let key = format!("{}:{}", model.as_deref().unwrap_or("unknown"), date);
+                            let entry = model_usage.entry(key).or_insert_with(|| DailyActivity {
+                                date: date.clone(),
+                                model: model.clone(),
+                                ..Default::default()
+                            });
+                            entry.input_tokens += session_info.input_tokens;
+                            entry.output_tokens += session_info.output_tokens;
+                            entry.cache_read_input_tokens += session_info.cache_read_input_tokens;
+                            entry.cache_creation_input_tokens += session_info.cache_creation_input_tokens;
+                            entry.billable_input_tokens += session_info.billable_input_tokens;
+                            entry.billable_output_tokens += session_info.billable_output_tokens;
+                            entry.message_count += session_info.message_count;
+                        }
+                    }
+
+                    sessions.push(session_info);
+                }
+            }
+        }
+
+        if sessions.is_empty() {
+            continue;
+        }
+
+        sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        let proj_tokens: u64 = sessions.iter().map(|s| s.input_tokens + s.output_tokens + s.cache_read_input_tokens).sum();
+        let proj_messages: u64 = sessions.iter().map(|s| s.message_count).sum();
+
+        let mut daily_activity: Vec<DailyActivity> = model_usage.into_values().collect();
+        daily_activity.sort_by(|a, b| b.date.cmp(&a.date));
+        for activity in &mut daily_activity {
+            activity.cost = calculate_cost(activity.input_tokens, activity.output_tokens, activity.cache_read_input_tokens, activity.cache_creation_input_tokens, activity.model.as_deref().unwrap_or("claude-sonnet-4-5-20250929"));
+        }
+
+        let proj_cost: f64 = daily_activity.iter().map(|a| a.cost).sum();
+        let last_activity = sessions.first().map(|s| s.timestamp.clone()).unwrap_or_default();
+        let last_activity_date = if last_activity.len() >= 10 { last_activity[..10].to_string() } else { last_activity.clone() };
+
+        // Calculate daily average
+        let unique_days: std::collections::HashSet<&str> = daily_activity.iter().map(|a| a.date.as_str()).collect();
+        let day_count = unique_days.len().max(1) as u64;
+        let daily_average = proj_tokens / day_count;
+
+        // Model split as percentages
+        let total_model_tokens: u64 = model_tokens.values().sum();
+        let model_split: HashMap<String, f64> = model_tokens.into_iter().map(|(k, v)| {
+            (k, if total_model_tokens > 0 { v as f64 / total_model_tokens as f64 } else { 0.0 })
+        }).collect();
+
+        let session_count = sessions.len() as u64;
+
+        total_tokens += proj_tokens;
+        total_cost += proj_cost;
+        total_sessions += session_count;
+
+        projects.push(ProjectSummary {
+            path: raw_dir_name,
+            name: dir_name,
+            total_tokens: proj_tokens,
+            total_cost: proj_cost,
+            session_count,
+            message_count: proj_messages,
+            last_activity: last_activity_date,
+            daily_average,
+            model_split,
+            daily_activity,
+            sessions,
+        });
+    }
+
+    // Sort by cost descending
+    projects.sort_by(|a, b| b.total_cost.partial_cmp(&a.total_cost).unwrap_or(std::cmp::Ordering::Equal));
+
+    Ok(AllProjectsStats {
+        projects,
+        totals: AllProjectsTotals {
+            all_projects_tokens: total_tokens,
+            all_projects_cost: total_cost,
+            total_sessions,
+        },
+    })
+}
+
 fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
     let file = fs::File::open(path)
         .map_err(|e| format!("Failed to open session file: {}", e))?;
@@ -264,7 +445,11 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
             }
             if let Some(message) = msg.message {
                 if model.is_none() {
-                    model = message.model;
+                    if let Some(ref m) = message.model {
+                        if !m.starts_with('<') {
+                            model = Some(m.clone());
+                        }
+                    }
                 }
                 if let (Some(id), Some(u)) = (message.id, message.usage) {
                     usage_by_msg.insert(id, u);

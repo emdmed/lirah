@@ -38,13 +38,7 @@ export function TokenLineChart({ data, timeRange, colors }) {
     return data.map(item => ({ ...item, displayDate: item.date }));
   }, [data]);
 
-  const chartColors = colors || {
-    input: '#89b4fa',
-    output: '#a6e3a1',
-    cacheRead: '#f5c2e7',
-    text: '#cdd6f4',
-    grid: '#45475a',
-  };
+  const chartColors = colors || {};
 
   if (!processedData.length) {
     return (
