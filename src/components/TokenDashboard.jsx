@@ -43,6 +43,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
   const [allProjectsLoading, setAllProjectsLoading] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [contentReady, setContentReady] = useState(false);
+  const [showCacheTokens, setShowCacheTokens] = useState(false);
 
   // Defer heavy content rendering until after the dialog shell has painted.
   // Double rAF ensures the browser completes a full paint cycle before mounting charts.
@@ -283,9 +284,19 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
               <div className="flex-1 grid grid-cols-3 gap-3 min-h-0">
                 <div className="col-span-2 bg-background rounded border border-sketch p-3 flex flex-col min-h-0">
-                  <div className="text-xs font-medium mb-2 shrink-0">Token Usage Over Time</div>
+                  <div className="flex items-center justify-between mb-2 shrink-0">
+                    <div className="text-xs font-medium">Token Usage Over Time</div>
+                    <Button
+                      variant={showCacheTokens ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-5 text-[10px] px-1.5"
+                      onClick={() => setShowCacheTokens(v => !v)}
+                    >
+                      Cache
+                    </Button>
+                  </div>
                   <div className="flex-1 min-h-0">
-                    <TokenLineChart data={chartData} timeRange={timeRange} colors={chartColors} />
+                    <TokenLineChart data={chartData} timeRange={timeRange} colors={chartColors} showCache={showCacheTokens} />
                   </div>
                 </div>
 

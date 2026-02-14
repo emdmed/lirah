@@ -7,6 +7,7 @@ import { LeftSidebar } from "./components/LeftSidebar";
 import { AddBookmarkDialog } from "./components/AddBookmarkDialog";
 import { BookmarksPalette } from "./components/BookmarksPalette";
 import { InitialProjectDialog } from "./components/InitialProjectDialog";
+import { SplashScreen } from "./components/SplashScreen";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
 import { GitDiffDialog } from "./components/GitDiffDialog";
 import { SaveFileGroupDialog } from "./components/SaveFileGroupDialog";
@@ -75,6 +76,11 @@ function App() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [appendOrchestration, setAppendOrchestration] = useState(true);
   const [orchestrationTokenEstimate, setOrchestrationTokenEstimate] = useState(null);
+
+  // Splash screen state
+  const [splashVisible, setSplashVisible] = useState(false);
+  const [splashStep, setSplashStep] = useState('navigate');
+  const [splashProjectName, setSplashProjectName] = useState('');
 
   // Domain hooks
   const settings = useTerminalSettings();
@@ -172,6 +178,25 @@ function App() {
       console.error('Failed to navigate to bookmark:', error);
     }
   }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark]);
+
+  // Handle project selection from initial dialog (with splash screen)
+  const handleSelectProject = useCallback(async (bookmark) => {
+    setSplashProjectName(bookmark.name);
+    setSplashStep('navigate');
+    setSplashVisible(true);
+
+    // Step 1: Navigate
+    await navigateToBookmark(bookmark);
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Step 2: Start Claude
+    setSplashStep('claude');
+    switchToClaudeMode();
+    launchClaude();
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    setSplashStep('done');
+  }, [navigateToBookmark, switchToClaudeMode, launchClaude]);
 
   // Git changes handler (needs currentPath for incremental updates)
   const handleGitChanges = useCallback((changes) => {
@@ -534,9 +559,7 @@ function App() {
       <InitialProjectDialog
         open={dialogs.initialProjectDialogOpen}
         onOpenChange={dialogs.setInitialProjectDialogOpen}
-        onNavigate={navigateToBookmark}
-        onLaunchClaude={launchClaude}
-        onSwitchToClaudeMode={switchToClaudeMode}
+        onSelectProject={handleSelectProject}
       />
       <CliSelectionModal
         open={dialogs.cliSelectionModalOpen}
@@ -585,6 +608,12 @@ function App() {
         refreshStats={refreshProjectStats}
         projectPath={currentPath}
         theme={theme}
+      />
+      <SplashScreen
+        visible={splashVisible}
+        projectName={splashProjectName}
+        currentStep={splashStep}
+        onComplete={() => setSplashVisible(false)}
       />
     </SidebarProvider>
     </TokenBudgetProvider>

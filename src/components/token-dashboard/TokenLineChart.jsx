@@ -32,7 +32,7 @@ function CustomTooltip({ active, payload, label, colors }) {
   );
 }
 
-export function TokenLineChart({ data, timeRange, colors }) {
+export function TokenLineChart({ data, timeRange, colors, showCache = false }) {
   const processedData = useMemo(() => {
     if (!data || data.length === 0) return [];
     return data.map(item => ({ ...item, displayDate: item.date }));
@@ -102,14 +102,16 @@ export function TokenLineChart({ data, timeRange, colors }) {
           fill="url(#colorOutput)"
           strokeWidth={1.5}
         />
-        <Area
-          type="monotone"
-          dataKey="cacheRead"
-          name="Cache"
-          stroke={chartColors.cacheRead}
-          fill="url(#colorCache)"
-          strokeWidth={1.5}
-        />
+        {showCache && (
+          <Area
+            type="monotone"
+            dataKey="cacheRead"
+            name="Cache"
+            stroke={chartColors.cacheRead}
+            fill="url(#colorCache)"
+            strokeWidth={1.5}
+          />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   );
