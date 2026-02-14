@@ -49,16 +49,20 @@ function DialogContent({
   className,
   children,
   overlayClassName,
+  instant,
   ...props
 }) {
+  const baseAnimation = instant
+    ? "relative grid w-full max-w-lg gap-4 border border-sketch p-6 shadow-xs font-mono rounded-none"
+    : "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative grid w-full max-w-lg gap-4 border border-sketch p-6 shadow-xs font-mono duration-200 rounded-none";
   return (
     <DialogPortal>
-      <DialogOverlay className={overlayClassName} />
+      <DialogOverlay className={instant ? "!animate-none !duration-0" : overlayClassName} />
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <DialogPrimitive.Content
           data-slot="dialog-content"
           className={cn(
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative grid w-full max-w-lg gap-4 border border-sketch p-6 shadow-xs font-mono duration-200 rounded-none",
+            baseAnimation,
             className
           )}
           style={{ backgroundColor: 'var(--color-input-background)' }}

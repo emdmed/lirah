@@ -44,14 +44,17 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [contentReady, setContentReady] = useState(false);
 
-  // Defer heavy content rendering until after the dialog has painted
+  // Defer heavy content rendering until after the dialog shell has painted.
+  // Double rAF ensures the browser completes a full paint cycle before mounting charts.
   useEffect(() => {
     if (open) {
-      // Let the dialog shell paint first, then mount heavy components
-      const frame = requestAnimationFrame(() => {
-        setContentReady(true);
+      let cancelled = false;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) setContentReady(true);
+        });
       });
-      return () => cancelAnimationFrame(frame);
+      return () => { cancelled = true; };
     } else {
       setContentReady(false);
     }
@@ -178,7 +181,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] h-[92vh] max-w-[1400px] max-h-[900px] p-0 flex flex-col overflow-hidden font-mono !duration-0 !animate-none" overlayClassName="!duration-0 !animate-none">
+      <DialogContent className="w-[95vw] h-[92vh] max-w-[1400px] max-h-[900px] p-0 flex flex-col overflow-hidden font-mono" instant>
         <DialogHeader className="px-4 py-3 pr-10 border-b border-sketch shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base font-semibold">

@@ -89,7 +89,13 @@ fn parse_timestamp(ts: &str) -> Option<String> {
 }
 
 #[tauri::command]
-pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
+pub async fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
+    tauri::async_runtime::spawn_blocking(move || get_session_token_usage_internal(&project_path))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+}
+
+fn get_session_token_usage_internal(project_path: &str) -> Result<TokenUsage, String> {
     let claude_path_segment = project_path
         .replace("\\", "-")
         .replace("/", "-")
@@ -131,8 +137,10 @@ pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, Strin
 }
 
 #[tauri::command]
-pub fn get_project_stats(project_path: String) -> Result<ProjectStats, String> {
-    get_project_stats_internal(&project_path)
+pub async fn get_project_stats(project_path: String) -> Result<ProjectStats, String> {
+    tauri::async_runtime::spawn_blocking(move || get_project_stats_internal(&project_path))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }
 
 fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String> {
@@ -268,7 +276,13 @@ pub struct AllProjectsTotals {
 }
 
 #[tauri::command]
-pub fn get_all_projects_stats() -> Result<AllProjectsStats, String> {
+pub async fn get_all_projects_stats() -> Result<AllProjectsStats, String> {
+    tauri::async_runtime::spawn_blocking(move || get_all_projects_stats_internal())
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+}
+
+fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
     let home = super::home_dir().ok_or("Could not get home directory")?;
     let projects_dir = PathBuf::from(&home).join(".claude").join("projects");
 

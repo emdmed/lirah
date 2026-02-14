@@ -1,18 +1,15 @@
 import { formatTokenCount, formatCost } from '../../utils/tokenCalculations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Gauge, Target, ArrowRightLeft, DollarSign } from 'lucide-react';
 
-function MetricCard({ label, value, color }) {
+function StatRow({ icon: Icon, label, value, color }) {
   return (
-    <div
-      className="rounded px-2 py-1.5 text-center border"
-      style={{
-        backgroundColor: color ? `${color}15` : undefined,
-        color: color || undefined,
-        borderColor: color ? `${color}33` : undefined,
-      }}
-    >
-      <div className="font-bold leading-tight" style={{ fontSize: 'var(--font-sm)' }}>{value}</div>
-      <div className="opacity-80 leading-tight mt-0.5" style={{ fontSize: 'var(--font-xs)' }}>{label}</div>
+    <div className="flex items-center gap-2 py-0.5">
+      <Icon size={12} style={{ color }} />
+      <div className="flex-1 flex justify-between items-center text-xs font-mono">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{value}</span>
+      </div>
     </div>
   );
 }
@@ -44,17 +41,19 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
   const cacheHitRatePercent = Math.round(cacheHitRate * 100);
   const outputRatioDisplay = outputInputRatio.toFixed(2);
 
+  const c = colors;
+
   return (
     <Card className="bg-background border-sketch h-full flex flex-col font-mono">
       <CardHeader className="pb-2 pt-3 px-3">
         <CardTitle className="text-xs font-medium">Efficiency</CardTitle>
       </CardHeader>
       <CardContent className="pt-0 px-3 pb-3 flex-1 flex flex-col">
-        <div className="grid grid-cols-2 gap-2">
-          <MetricCard label="Tok/Msg" value={formatTokenCount(averageTokensPerMessage)} color={colors.input} />
-          <MetricCard label="Cache Hit" value={`${cacheHitRatePercent}%`} color={colors.output} />
-          <MetricCard label="Out/In" value={outputRatioDisplay} color={colors.cacheRead} />
-          <MetricCard label="$/Msg" value={formatCost(costPerMessage)} color={colors.input} />
+        <div className="space-y-0.5">
+          <StatRow icon={Gauge} label="Tok/Msg" value={formatTokenCount(averageTokensPerMessage)} color={c.input} />
+          <StatRow icon={Target} label="Cache Hit" value={`${cacheHitRatePercent}%`} color={c.output} />
+          <StatRow icon={ArrowRightLeft} label="Out/In Ratio" value={outputRatioDisplay} color={c.cacheRead} />
+          <StatRow icon={DollarSign} label="$/Msg" value={formatCost(costPerMessage)} color={c.input} />
         </div>
 
         <div className="mt-auto pt-2 border-t border-sketch">
