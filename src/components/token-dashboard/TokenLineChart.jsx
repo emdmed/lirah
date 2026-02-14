@@ -32,7 +32,7 @@ function CustomTooltip({ active, payload, label, colors }) {
   );
 }
 
-export function TokenLineChart({ data, timeRange, colors, compact }) {
+export function TokenLineChart({ data, timeRange, colors }) {
   const processedData = useMemo(() => {
     if (!data || data.length === 0) return [];
     return data.map(item => ({ ...item, displayDate: item.date }));
@@ -54,10 +54,8 @@ export function TokenLineChart({ data, timeRange, colors, compact }) {
     );
   }
 
-  const height = compact ? 160 : 250;
-
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={processedData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="colorInput" x1="0" y1="0" x2="0" y2="1">

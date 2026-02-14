@@ -33,7 +33,7 @@ export function useTokenUsage(projectPath, enabled = true) {
     }
   }, [projectPath, enabled]);
 
-  // Only poll for current session token usage (not projectStats)
+  // Fetch project stats once, then start polling only session usage
   useEffect(() => {
     if (!enabled || !projectPath) {
       if (checkIntervalRef.current) {
@@ -43,25 +43,22 @@ export function useTokenUsage(projectPath, enabled = true) {
       return;
     }
 
-    checkUsage();
+    // Fetch full stats once on mount, then poll lightweight session usage
+    fetchProjectStats();
 
-    checkIntervalRef.current = setInterval(() => {
+    // Delay first session poll to avoid overlapping with fetchProjectStats on startup
+    const initialTimeout = setTimeout(() => {
       checkUsage();
-    }, 5000);
+      checkIntervalRef.current = setInterval(checkUsage, 5000);
+    }, 2000);
 
     return () => {
+      clearTimeout(initialTimeout);
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current);
       }
     };
-  }, [projectPath, enabled, checkUsage]);
-
-  // Fetch project stats only once on mount or when explicitly requested
-  useEffect(() => {
-    if (enabled && projectPath) {
-      fetchProjectStats();
-    }
-  }, [projectPath, enabled, fetchProjectStats]);
+  }, [projectPath, enabled, checkUsage, fetchProjectStats]);
 
   const refreshProjectStats = useCallback(() => {
     fetchProjectStats();

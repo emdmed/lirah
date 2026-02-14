@@ -27,6 +27,7 @@ pub struct SessionInfo {
     pub cache_creation_input_tokens: u64,
     pub billable_input_tokens: u64,
     pub billable_output_tokens: u64,
+    pub message_count: u64,
     pub timestamp: String,
 }
 
@@ -89,20 +90,43 @@ fn parse_timestamp(ts: &str) -> Option<String> {
 
 #[tauri::command]
 pub fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
-    let stats = get_project_stats_internal(&project_path)?;
-    if let Some(session) = stats.sessions.first() {
-        Ok(TokenUsage {
-            input_tokens: session.input_tokens,
-            output_tokens: session.output_tokens,
-            cache_read_input_tokens: session.cache_read_input_tokens,
-            cache_creation_input_tokens: session.cache_creation_input_tokens,
-            billable_input_tokens: session.billable_input_tokens,
-            billable_output_tokens: session.billable_output_tokens,
-            model: session.model.clone(),
-            session_file: Some(session.session_file.clone()),
-        })
-    } else {
-        Ok(TokenUsage::default())
+    let claude_path_segment = project_path
+        .replace("\\", "-")
+        .replace("/", "-")
+        .replace(".", "-");
+
+    let home = super::home_dir().ok_or("Could not get home directory")?;
+    let sessions_dir = PathBuf::from(&home)
+        .join(".claude")
+        .join("projects")
+        .join(&claude_path_segment);
+
+    if !sessions_dir.exists() {
+        return Ok(TokenUsage::default());
+    }
+
+    // Find only the most recently modified .jsonl file
+    let latest = fs::read_dir(&sessions_dir)
+        .map_err(|e| format!("Failed to read sessions directory: {}", e))?
+        .flatten()
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+
+    match latest {
+        Some(entry) => {
+            let session = parse_session_file(&entry.path())?;
+            Ok(TokenUsage {
+                input_tokens: session.input_tokens,
+                output_tokens: session.output_tokens,
+                cache_read_input_tokens: session.cache_read_input_tokens,
+                cache_creation_input_tokens: session.cache_creation_input_tokens,
+                billable_input_tokens: session.billable_input_tokens,
+                billable_output_tokens: session.billable_output_tokens,
+                model: session.model,
+                session_file: Some(session.session_file),
+            })
+        }
+        None => Ok(TokenUsage::default()),
     }
 }
 
@@ -154,7 +178,7 @@ fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String
                         entry.cache_creation_input_tokens += session_info.cache_creation_input_tokens;
                         entry.billable_input_tokens += session_info.billable_input_tokens;
                         entry.billable_output_tokens += session_info.billable_output_tokens;
-                        entry.message_count += 1;
+                        entry.message_count += session_info.message_count;
                     }
                 }
                 
@@ -184,7 +208,7 @@ fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String
     daily_activity.sort_by(|a, b| b.date.cmp(&a.date));
 
     for activity in &mut daily_activity {
-        activity.cost = calculate_cost(activity.billable_input_tokens, activity.billable_output_tokens, activity.model.as_deref().unwrap_or("claude-sonnet-4-5-20250929"));
+        activity.cost = calculate_cost(activity.input_tokens, activity.output_tokens, activity.cache_read_input_tokens, activity.cache_creation_input_tokens, activity.model.as_deref().unwrap_or("claude-sonnet-4-5-20250929"));
     }
 
     Ok(ProjectStats {
@@ -200,17 +224,19 @@ fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String
     })
 }
 
-fn calculate_cost(input_tokens: u64, output_tokens: u64, model: &str) -> f64 {
-    let (input_rate, output_rate) = if model.contains("opus") {
-        (15.0, 75.0)
+fn calculate_cost(input_tokens: u64, output_tokens: u64, cache_read: u64, cache_creation: u64, model: &str) -> f64 {
+    let (input_rate, output_rate, cache_read_rate, cache_write_rate) = if model.contains("opus") {
+        (15.0, 75.0, 1.88, 18.75)
     } else {
-        (3.0, 15.0)
+        (3.0, 15.0, 0.375, 3.75)
     };
-    
+
     let input_cost = (input_tokens as f64 / 1_000_000.0) * input_rate;
     let output_cost = (output_tokens as f64 / 1_000_000.0) * output_rate;
-    
-    input_cost + output_cost
+    let cache_read_cost = (cache_read as f64 / 1_000_000.0) * cache_read_rate;
+    let cache_write_cost = (cache_creation as f64 / 1_000_000.0) * cache_write_rate;
+
+    input_cost + output_cost + cache_read_cost + cache_write_cost
 }
 
 fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
@@ -262,6 +288,8 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
     let billable_input_tokens = input_tokens + cache_creation;
     let billable_output_tokens = output_tokens;
 
+    let message_count = usage_by_msg.len() as u64;
+
     Ok(SessionInfo {
         session_id,
         session_file: path.to_string_lossy().to_string(),
@@ -272,6 +300,7 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
         cache_creation_input_tokens: cache_creation,
         billable_input_tokens,
         billable_output_tokens,
+        message_count,
         timestamp: timestamp.unwrap_or_default(),
     })
 }

@@ -30,8 +30,8 @@ export function prepareChartData(statsCache, timeRange = 'daily') {
 
   const data = statsCache.dailyActivity.map(day => {
     const model = day.model || 'claude-sonnet-4-5-20250929';
-    const inputTokens = (day.billable_input_tokens || day.input_tokens || day.messageCount * 500) || 0;
-    const outputTokens = (day.billable_output_tokens || day.output_tokens || day.toolCallCount * 800) || 0;
+    const inputTokens = (day.billable_input_tokens || day.input_tokens || 0);
+    const outputTokens = (day.billable_output_tokens || day.output_tokens || 0);
     const cacheRead = (day.cache_read_input_tokens || day.cacheRead || 0);
     const cacheWrite = (day.cache_creation_input_tokens || day.cacheWrite || 0);
     
@@ -93,54 +93,45 @@ export function calculateEfficiencyMetrics(statsCache, currentUsage = null) {
   if (!statsCache || !statsCache.dailyActivity) {
     return {
       averageTokensPerMessage: 0,
-      averageTokensPerSession: 0,
       cacheHitRate: 0,
-      contextUtilization: 0,
+      outputInputRatio: 0,
       costPerMessage: 0,
-      costPerSession: 0,
       estimatedMonthlyCost: 0,
-      peakUsageHour: 'N/A',
       mostActiveDay: 'N/A',
     };
   }
 
   let totalTokens = 0;
   let totalMessages = 0;
-  let totalSessions = 0;
   let totalCost = 0;
   let cacheReadTokens = 0;
   let inputTokens = 0;
-  
+  let outputTokens = 0;
+
   const dayOfWeekTotals = {};
-  const hourTotals = {};
 
   statsCache.dailyActivity.forEach(day => {
-    const input = (day.billable_input_tokens || day.inputTokens || day.messageCount * 500) || 0;
-    const output = (day.billable_output_tokens || day.outputTokens || day.toolCallCount * 800) || 0;
-    const cacheRead = (day.cache_read_tokens || day.cacheRead || 0);
-    
+    const input = (day.billable_input_tokens || day.input_tokens || 0);
+    const output = (day.billable_output_tokens || day.output_tokens || 0);
+    const cacheRead = (day.cache_read_input_tokens || day.cacheRead || 0);
+
     totalTokens += input + output + cacheRead;
     inputTokens += input;
+    outputTokens += output;
     cacheReadTokens += cacheRead;
-    totalMessages += (day.messageCount || 0);
-    totalSessions += 1;
+    totalMessages += (day.message_count || 0);
     totalCost += (day.cost || 0);
-    
+
     const date = new Date(day.date);
     const dayName = format(date, 'EEEE');
     dayOfWeekTotals[dayName] = (dayOfWeekTotals[dayName] || 0) + input + output + cacheRead;
-    
-    const hour = day.peakHour || 12;
-    hourTotals[hour] = (hourTotals[hour] || 0) + input + output + cacheRead;
   });
 
   const mostActiveDay = Object.entries(dayOfWeekTotals)
     .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-  
-  const peakUsageHour = Object.entries(hourTotals)
-    .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
 
-  const last7Days = statsCache.dailyActivity.slice(-7);
+  // Data is sorted descending by date from the backend, so slice(0, 7) gets the most recent
+  const last7Days = statsCache.dailyActivity.slice(0, 7);
   const avgDailyCost = last7Days.length > 0
     ? last7Days.reduce((sum, d) => sum + (d.cost || 0), 0) / last7Days.length
     : 0;
@@ -149,19 +140,15 @@ export function calculateEfficiencyMetrics(statsCache, currentUsage = null) {
     ? cacheReadTokens / (inputTokens + cacheReadTokens)
     : 0;
 
-  const currentInput = currentUsage?.billable_input_tokens || 0;
-  const currentOutput = currentUsage?.billable_output_tokens || 0;
-  const contextUtilization = (currentInput + currentOutput) / 200000;
+  // Output/input ratio: how many output tokens per input token (higher = more generation per context)
+  const outputInputRatio = inputTokens > 0 ? outputTokens / inputTokens : 0;
 
   return {
     averageTokensPerMessage: totalMessages > 0 ? totalTokens / totalMessages : 0,
-    averageTokensPerSession: totalSessions > 0 ? totalTokens / totalSessions : 0,
     cacheHitRate,
-    contextUtilization: Math.min(contextUtilization, 1),
+    outputInputRatio,
     costPerMessage: totalMessages > 0 ? totalCost / totalMessages : 0,
-    costPerSession: totalSessions > 0 ? totalCost / totalSessions : 0,
     estimatedMonthlyCost: avgDailyCost * 30,
-    peakUsageHour,
     mostActiveDay,
   };
 }

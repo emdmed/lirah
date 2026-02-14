@@ -180,22 +180,22 @@ body {
 /* Engineering sketch dashed borders */
 .border-sketch {
   border-style: dashed !important;
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
 }
 
 .border-t-sketch {
   border-top-style: dashed !important;
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
 }
 
 .border-b-sketch {
   border-bottom-style: dashed !important;
-  border-bottom-color: rgba(255, 255, 255, 0.12);
+  border-bottom-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
 }
 
 .border-e-sketch {
   border-inline-end-style: dashed !important;
-  border-inline-end-color: rgba(255, 255, 255, 0.12);
+  border-inline-end-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
 }
 
 /* Terminal focus indicator */

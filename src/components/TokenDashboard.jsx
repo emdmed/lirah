@@ -127,7 +127,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] h-[92vh] max-w-[1400px] max-h-[900px] p-0 flex flex-col overflow-hidden font-mono">
-        <DialogHeader className="px-4 py-3 border-b border-sketch shrink-0">
+        <DialogHeader className="px-4 py-3 pr-10 border-b border-sketch shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base font-semibold">
               Token Usage Dashboard
@@ -209,7 +209,6 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                   data={chartData} 
                   timeRange={timeRange}
                   colors={chartColors}
-                  compact
                 />
               </div>
             </div>
@@ -247,10 +246,11 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
               <UsageSummaryPanel
                 sessionData={currentSessionData}
                 tokenUsage={tokenUsage}
+                colors={chartColors}
               />
 
               {/* Efficiency */}
-              <SessionEfficiencyPanel metrics={efficiencyMetrics} />
+              <SessionEfficiencyPanel metrics={efficiencyMetrics} colors={chartColors} />
             </div>
           </div>
 
@@ -258,22 +258,16 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
           <div className="bg-background rounded border border-sketch p-3 shrink-0">
             <div className="text-xs font-medium mb-2">Cost Breakdown</div>
             <div className="flex items-center gap-6 text-xs">
-              {modelBreakdown.map((mb, idx) => {
-                const modelRates = mb.model?.toLowerCase().includes('opus')
-                  ? { input: 15, output: 75 }
-                  : { input: 3, output: 15 };
-                const inputCost = (mb.tokens || 0) * modelRates.input / 1_000_000;
-                return (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded" 
-                      style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
-                    />
-                    <span className="text-muted-foreground">{formatModelName(mb.model)}:</span>
-                    <span className="font-medium">{formatCost(mb.cost)}</span>
-                  </div>
-                );
-              })}
+              {modelBreakdown.map((mb, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded"
+                    style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
+                  />
+                  <span className="text-muted-foreground">{formatModelName(mb.model)}:</span>
+                  <span className="font-medium">{formatCost(mb.cost)}</span>
+                </div>
+              ))}
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-muted-foreground">Total:</span>
                 <span className="font-bold text-lg">{formatCost(totalStats.cost)}</span>
