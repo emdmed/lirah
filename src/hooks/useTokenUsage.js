@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export function useTokenUsage(projectPath, enabled = true) {
   const [tokenUsage, setTokenUsage] = useState(null);
+  const [projectStats, setProjectStats] = useState(null);
   const lastUsageRef = useRef(null);
   const checkIntervalRef = useRef(null);
 
@@ -12,17 +13,27 @@ export function useTokenUsage(projectPath, enabled = true) {
     try {
       const usage = await invoke('get_session_token_usage', { projectPath });
 
-      // Only update if values changed
       const usageKey = `${usage.input_tokens}-${usage.output_tokens}`;
       if (usageKey !== lastUsageRef.current) {
         lastUsageRef.current = usageKey;
         setTokenUsage(usage);
       }
     } catch (error) {
-      // Session files might not exist yet, ignore
     }
   }, [projectPath, enabled]);
 
+  const fetchProjectStats = useCallback(async () => {
+    if (!projectPath || !enabled) return;
+
+    try {
+      const stats = await invoke('get_project_stats', { projectPath });
+      setProjectStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch project stats:', error);
+    }
+  }, [projectPath, enabled]);
+
+  // Only poll for current session token usage (not projectStats)
   useEffect(() => {
     if (!enabled || !projectPath) {
       if (checkIntervalRef.current) {
@@ -32,11 +43,11 @@ export function useTokenUsage(projectPath, enabled = true) {
       return;
     }
 
-    // Initial check
     checkUsage();
 
-    // Poll every 5 seconds
-    checkIntervalRef.current = setInterval(checkUsage, 5000);
+    checkIntervalRef.current = setInterval(() => {
+      checkUsage();
+    }, 5000);
 
     return () => {
       if (checkIntervalRef.current) {
@@ -45,5 +56,16 @@ export function useTokenUsage(projectPath, enabled = true) {
     };
   }, [projectPath, enabled, checkUsage]);
 
-  return tokenUsage;
+  // Fetch project stats only once on mount or when explicitly requested
+  useEffect(() => {
+    if (enabled && projectPath) {
+      fetchProjectStats();
+    }
+  }, [projectPath, enabled, fetchProjectStats]);
+
+  const refreshProjectStats = useCallback(() => {
+    fetchProjectStats();
+  }, [fetchProjectStats]);
+
+  return { tokenUsage, projectStats, refreshProjectStats };
 }

@@ -1,7 +1,9 @@
+import { useState, useRef, useEffect } from 'react';
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff, Coins } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
+import { useTokenBudget } from '../contexts/TokenBudgetContext';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -17,7 +19,107 @@ const CLI_DISPLAY = {
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused }) => {
+function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
+  const { checkBudgetStatus, currentUsage, getBudget, formatTokenCount, formatCost } = useTokenBudget();
+  const [popupOpen, setPopupOpen] = useState(false);
+  const popupRef = useRef(null);
+
+  const budget = getBudget(projectPath);
+  const { status, percentage } = checkBudgetStatus(projectPath);
+
+  useEffect(() => {
+    if (!popupOpen) return;
+    const handleClick = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) setPopupOpen(false);
+    };
+    const handleEsc = (e) => { if (e.key === 'Escape') setPopupOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleEsc);
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleEsc); };
+  }, [popupOpen]);
+
+  const barColor = status === 'critical' ? '#E82424' : status === 'warning' ? '#FF9E3B' : '#76946A';
+
+  if (!budget) {
+    return (
+      <Button variant="ghost" size="xs" onClick={onOpenBudgetSettings} title="Set token budget" className="gap-1 px-1.5">
+        <Coins className="w-3 h-3" />
+        <span className="opacity-70 text-xs">Budget</span>
+      </Button>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setPopupOpen(!popupOpen)}
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-white/10 transition-colors"
+        title="Token budget"
+      >
+        <Coins className="w-3 h-3" />
+        <div className="flex items-center gap-1">
+          <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, backgroundColor: barColor }} />
+          </div>
+          <span className="opacity-70">{Math.round(percentage)}%</span>
+        </div>
+        <span className="opacity-50">{formatCost(currentUsage.cost)}</span>
+      </button>
+
+      {popupOpen && (
+        <div
+          ref={popupRef}
+          className="absolute bottom-full right-0 mb-2 w-64 rounded-md border border-border bg-popover p-3 shadow-md z-50"
+        >
+          <div className="text-xs font-medium mb-3">Token Budget</div>
+
+          {budget.dailyLimit && (
+            <div className="space-y-1 mb-3">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Today</span>
+                <span className="font-mono">{Math.round(percentage)}%</span>
+              </div>
+              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, backgroundColor: barColor }} />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                <span>{currentUsage.total.toLocaleString()} / {budget.dailyLimit.toLocaleString()}</span>
+                <span>{formatCost(currentUsage.cost)}</span>
+              </div>
+            </div>
+          )}
+
+          {budget.weeklyLimit && (
+            <div className="space-y-1 mb-3">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">This Week</span>
+                <span className="font-mono">{Math.round(Math.min((currentUsage.total / budget.weeklyLimit) * 100, 100))}%</span>
+              </div>
+              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min((currentUsage.total / budget.weeklyLimit) * 100, 100)}%`,
+                    backgroundColor: (currentUsage.total / budget.weeklyLimit) >= 0.95 ? '#E82424' : (currentUsage.total / budget.weeklyLimit) >= 0.8 ? '#FF9E3B' : '#76946A',
+                  }}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground font-mono">
+                {currentUsage.total.toLocaleString()} / {budget.weeklyLimit.toLocaleString()}
+              </div>
+            </div>
+          )}
+
+          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setPopupOpen(false); onOpenBudgetSettings(); }}>
+            Budget Settings
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
@@ -38,8 +140,9 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
         </span>
       </div>
 
-      {/* Right section: CLI selector, Theme, and Settings menu */}
+      {/* Right section: Budget, CLI selector, Theme, and Settings menu */}
       <div className="flex items-center gap-2">
+        <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
         {selectedCli && (
           <Button
             variant="ghost"

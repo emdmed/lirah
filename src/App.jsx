@@ -31,6 +31,10 @@ import { usePromptSender } from "./hooks/usePromptSender";
 import { escapeShellPath, getRelativePath } from "./utils/pathUtils";
 import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { ElementPickerDialog } from "./components/ElementPickerDialog";
+import { TokenBudgetDialog } from "./components/TokenBudgetDialog";
+import { TokenAlertBanner } from "./components/TokenAlertBanner";
+import { TokenDashboard } from "./components/TokenDashboard";
+import { TokenBudgetProvider } from "./contexts/TokenBudgetContext";
 import { SecondaryTerminal } from "./components/SecondaryTerminal";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -66,6 +70,8 @@ function App() {
   const [viewMode, setViewMode] = useState('flat');
 
   // Template/orchestration state
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [appendOrchestration, setAppendOrchestration] = useState(true);
   const [orchestrationTokenEstimate, setOrchestrationTokenEstimate] = useState(null);
@@ -112,7 +118,7 @@ function App() {
     }
   }, [sidebarSearch.searchResults]);
 
-  const tokenUsage = useTokenUsage(currentPath, !!currentPath);
+  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, !!currentPath);
 
   const compact = useCompact({
     currentPath,
@@ -338,12 +344,21 @@ function App() {
         e.preventDefault();
         compact.handleCompactProject();
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+        e.preventDefault();
+        setBudgetDialogOpen(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setDashboardOpen(true);
+      }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [viewMode, sidebar.sidebarOpen, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal]);
 
   return (
+    <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={sidebar.isResizing ? 'select-none' : ''} style={{ height: '100%' }}>
       <Layout
         sidebar={
@@ -446,6 +461,7 @@ function App() {
               }
             }}
             secondaryTerminalFocused={secondary.secondaryFocused}
+            onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
             onToggleSandbox={() => {
               settings.setSandboxEnabled(prev => !prev);
               settings.setSandboxFailed(false);
@@ -551,7 +567,26 @@ function App() {
         currentPath={currentPath}
         onAddElements={elementPicker.handleAddElements}
       />
+      <TokenAlertBanner
+        projectPath={currentPath}
+        onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
+      />
+      <TokenBudgetDialog
+        open={budgetDialogOpen}
+        onOpenChange={setBudgetDialogOpen}
+        projectPath={currentPath}
+      />
+      <TokenDashboard
+        open={dashboardOpen}
+        onOpenChange={setDashboardOpen}
+        tokenUsage={tokenUsage}
+        projectStats={projectStats}
+        refreshStats={refreshProjectStats}
+        projectPath={currentPath}
+        theme={theme}
+      />
     </SidebarProvider>
+    </TokenBudgetProvider>
   );
 }
 

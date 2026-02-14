@@ -10,6 +10,8 @@ import { CompactSectionsDialog } from "./CompactSectionsDialog";
 import { AtMentionModal } from "../AtMentionModal";
 import { X } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
+import { TokenCostEstimate } from "../TokenCostEstimate";
+import { useTokenBudget } from "../../contexts/TokenBudgetContext";
 
 /**
  * Main textarea panel component for multi-line input with file selection
@@ -57,6 +59,10 @@ export function TextareaPanel({
   onSetFileState,
   onToggleFile,
 }) {
+  const { checkBudgetStatus } = useTokenBudget();
+  const budgetStatus = checkBudgetStatus(currentPath);
+  const budgetExhausted = budgetStatus.status === 'critical' && budgetStatus.percentage >= 100;
+
   // Count total selected elements and build tooltip content
   const { elementCount, elementsTooltipContent } = useMemo(() => {
     if (!selectedElements || selectedElements.size === 0) {
@@ -334,16 +340,23 @@ export function TextareaPanel({
 
       {/* Footer row: instructions + action buttons */}
       <div className="flex items-center justify-between">
-        <span id="textarea-instructions" className="text-muted-foreground font-mono" style={{ fontSize: 'var(--font-xs)' }}>
-          {selectedTemplateId && !value?.trim() ? (
-            <span className="text-primary">Ctrl+Enter to send template</span>
-          ) : (
-            "Ctrl+Enter: send"
-          )}
-        </span>
+        <div className="flex items-center gap-3">
+          <span id="textarea-instructions" className="text-muted-foreground font-mono" style={{ fontSize: 'var(--font-xs)' }}>
+            {selectedTemplateId && !value?.trim() ? (
+              <span className="text-primary">Ctrl+Enter to send template</span>
+            ) : (
+              "Ctrl+Enter: send"
+            )}
+          </span>
+          <TokenCostEstimate
+            textareaContent={value}
+            selectedFiles={selectedFiles}
+            projectPath={currentPath}
+          />
+        </div>
         <ActionButtons
           onSend={handleSend}
-          disabled={disabled || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0)}
+          disabled={disabled || budgetExhausted || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0)}
           tokenUsage={tokenUsage}
         />
       </div>

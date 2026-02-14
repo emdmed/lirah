@@ -33,6 +33,14 @@ const shortcuts = [
     ],
   },
   {
+    category: "Token Usage",
+    icon: <Zap className="w-4 h-4" />,
+    items: [
+      { keys: ["Ctrl", "Shift", "D"], description: "Open Token Dashboard" },
+      { keys: ["Ctrl", "Shift", "B"], description: "Open Budget Settings" },
+    ],
+  },
+  {
     category: "System",
     icon: <Keyboard className="w-4 h-4" />,
     items: [
