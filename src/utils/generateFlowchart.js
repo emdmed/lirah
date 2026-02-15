@@ -49,7 +49,7 @@ function splitTopLevel(str) {
 }
 
 function extractInfo(content) {
-  const info = { components: [], functions: [], hooks: [], localImports: [], constants: [], raw: content.trim() };
+  const info = { components: [], functions: [], hooks: [], localImports: [], constants: [], renders: [], raw: content.trim() };
 
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
@@ -64,6 +64,18 @@ function extractInfo(content) {
     }
     if (trimmed.startsWith('const:')) {
       info.constants = splitTopLevel(trimmed.slice('const:'.length));
+    }
+    if (trimmed.startsWith('renders:')) {
+      const items = splitTopLevel(trimmed.slice('renders:'.length));
+      for (const item of items) {
+        // Parse format: Component(prop1,prop2) or Component()
+        const match = item.match(/^([A-Z][a-zA-Z0-9.]*)\(([^)]*)\)$/);
+        if (match) {
+          const component = match[1];
+          const props = match[2] ? match[2].split(',').filter(p => p) : [];
+          info.renders.push({ component, props });
+        }
+      }
     }
     if (trimmed.startsWith('imports:')) {
       const items = splitTopLevel(trimmed.slice('imports:'.length));
@@ -90,9 +102,48 @@ function resolveImportPath(fromPath, importPath) {
 }
 
 /**
+ * Parse component params string to extract prop names.
+ * e.g., "Button({ name, icon })" -> ["name", "icon"]
+ * e.g., "Button(props)" -> ["props"]
+ */
+function parseComponentProps(componentStr) {
+  const match = componentStr.match(/\(([^)]*)\)/);
+  if (!match) return [];
+  
+  const params = match[1].trim();
+  if (!params) return [];
+  
+  // Handle destructured params: { prop1, prop2 }
+  if (params.startsWith('{') && params.endsWith('}')) {
+    const inner = params.slice(1, -1).trim();
+    if (!inner) return [];
+    // Split by comma and extract prop names
+    return inner.split(',').map(p => {
+      const trimmed = p.trim();
+      // Handle default values: prop = defaultValue
+      const defaultMatch = trimmed.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/);
+      if (defaultMatch) return defaultMatch[1];
+      // Handle rest params: ...rest
+      const restMatch = trimmed.match(/^\.\.\.([a-zA-Z_$][a-zA-Z0-9_$]*)$/);
+      if (restMatch) return `...${restMatch[1]}`;
+      // Regular prop name
+      return trimmed;
+    }).filter(Boolean);
+  }
+  
+  // Handle single param like props or single destructured array [...]
+  if (params.startsWith('[') && params.endsWith(']')) {
+    return [params];
+  }
+  
+  // Single param like props
+  return [params];
+}
+
+/**
  * @returns {{ groups: Array, nodes: Map, edges: Array }}
  *   groups: [{ dir, label, nodeIds }]
- *   nodes: Map<id, { id, path, fileName, components, functions, hooks, exports, raw }>
+ *   nodes: Map<id, { id, path, fileName, components, functions, hooks, exports, raw, propsReceived, propsPassed }>
  *   edges: [{ from, to }]
  */
 export function buildGraphData(compactedOutput) {
@@ -111,6 +162,18 @@ export function buildGraphData(compactedOutput) {
     pathMap.set(noExt, fi.path);
     if (noExt.endsWith('/index')) {
       pathMap.set(noExt.replace(/\/index$/, ''), fi.path);
+    }
+  }
+
+  // Build component name to node ID mapping
+  const componentToNode = new Map();
+  for (const fi of fileInfos) {
+    for (const comp of fi.info.components) {
+      // Extract component name (remove params)
+      const compName = comp.split('(')[0];
+      if (compName) {
+        componentToNode.set(compName, fi.path);
+      }
     }
   }
 
@@ -133,6 +196,31 @@ export function buildGraphData(compactedOutput) {
     for (const fi of files) {
       const id = fi.path;
       const fileName = fi.path.split('/').pop().replace(/\.\w+$/, '');
+      
+      // Extract props received from component signatures
+      const propsReceived = [];
+      for (const comp of fi.info.components) {
+        const compProps = parseComponentProps(comp);
+        if (compProps.length > 0) {
+          propsReceived.push(...compProps);
+        }
+      }
+      
+      // Build props passed map: targetNodeId -> [propNames]
+      const propsPassed = new Map();
+      for (const render of fi.info.renders) {
+        const targetNodeId = componentToNode.get(render.component);
+        if (targetNodeId) {
+          if (propsPassed.has(targetNodeId)) {
+            const existing = propsPassed.get(targetNodeId);
+            const newProps = [...new Set([...existing, ...render.props])];
+            propsPassed.set(targetNodeId, newProps);
+          } else {
+            propsPassed.set(targetNodeId, render.props);
+          }
+        }
+      }
+      
       nodes.set(id, {
         id,
         path: fi.path,
@@ -142,6 +230,8 @@ export function buildGraphData(compactedOutput) {
         hooks: fi.info.hooks,
         constants: fi.info.constants,
         raw: fi.info.raw,
+        propsReceived: [...new Set(propsReceived)], // deduplicate
+        propsPassed,
       });
       nodeIds.push(id);
     }

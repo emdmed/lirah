@@ -391,6 +391,7 @@ export const extractSkeleton = (code, filePath = '') => {
     classes: [],
     interfaces: [],
     types: [],
+    jsxUsage: [],
   };
 
   // Collect export info: name -> 'default' | 'named'
@@ -543,6 +544,57 @@ export const extractSkeleton = (code, filePath = '') => {
         skeleton.types.push({ name, line: path.node.loc?.start?.line || 0 });
       }
     },
+
+    JSXOpeningElement(path) {
+      const nameNode = path.node.name;
+      let componentName = null;
+
+      if (nameNode.type === 'JSXIdentifier') {
+        componentName = nameNode.name;
+      } else if (nameNode.type === 'JSXMemberExpression') {
+        // Handle namespaced components like Form.Input
+        const parts = [];
+        let current = nameNode;
+        while (current) {
+          if (current.type === 'JSXIdentifier') {
+            parts.unshift(current.name);
+            break;
+          } else if (current.type === 'JSXMemberExpression') {
+            parts.unshift(current.property.name);
+            current = current.object;
+          } else {
+            break;
+          }
+        }
+        componentName = parts.join('.');
+      }
+
+      // Only capture PascalCase components (React components, not HTML elements)
+      if (!componentName || !isPascalCase(componentName.split('.')[0])) {
+        return;
+      }
+
+      // Extract prop names from JSX attributes
+      const props = [];
+      for (const attr of path.node.attributes) {
+        if (attr.type === 'JSXAttribute' && attr.name?.type === 'JSXIdentifier') {
+          props.push(attr.name.name);
+        } else if (attr.type === 'JSXSpreadAttribute') {
+          props.push('...');
+        }
+      }
+
+      // Check if component already exists in jsxUsage and merge props
+      const existing = skeleton.jsxUsage.find(u => u.component === componentName);
+      if (existing) {
+        // Merge new props, deduplicate
+        const existingProps = new Set(existing.props);
+        props.forEach(p => existingProps.add(p));
+        existing.props = [...existingProps];
+      } else {
+        skeleton.jsxUsage.push({ component: componentName, props });
+      }
+    },
   });
 
   // Apply export markers to components, functions, classes
@@ -572,6 +624,14 @@ export const formatSkeletonForPrompt = (skeleton) => {
     if (extCount > 0) parts.push(`${extCount} ext`);
     parts.push(...[...new Set(local.map(i => i.source))]);
     lines.push(`imports: ${parts.join(', ')}`);
+  }
+
+  if (skeleton.jsxUsage.length > 0) {
+    const rendersList = skeleton.jsxUsage.map(u => {
+      const propsStr = u.props.join(',');
+      return `${u.component}(${propsStr})`;
+    }).join(', ');
+    lines.push(`renders: ${rendersList}`);
   }
 
   if (skeleton.components.length > 0) {

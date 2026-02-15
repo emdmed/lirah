@@ -63,6 +63,11 @@ export function SplashScreen({ visible, projectName, currentStep, onComplete }) 
       }`}
       style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
     >
+      {/* Branding */}
+      <div className="mb-8" style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
+        Lirah
+      </div>
+
       <div className="flex flex-col items-center">
         {/* Project name label */}
         <div className="border border-sketch px-4 py-2 shadow-xs"

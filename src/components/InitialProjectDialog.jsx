@@ -75,6 +75,12 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
+        <div className="flex justify-center pb-2">
+          <span style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
+            Lirah
+          </span>
+        </div>
+
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderOpen className="w-5 h-5" />

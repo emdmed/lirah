@@ -30,7 +30,7 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
         ? Math.round((1 - output.length / originalSize) * 100)
         : 0;
 
-      setCompactedProject({
+      const compacted = {
         output,
         fullOutput: output,
         fileCount,
@@ -40,10 +40,13 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
         formattedOriginalTokens: formatTokenCount(originalTokens),
         compressionPercent,
         disabledPaths: [],
-      });
+      };
+      setCompactedProject(compacted);
       setTextareaVisible(true);
+      return compacted;
     } catch (error) {
       console.error('Failed to compact project:', error);
+      return null;
     }
   }, [isCompacting, currentPath, allFiles, compactProject]);
 

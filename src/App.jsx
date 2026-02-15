@@ -554,6 +554,16 @@ function App() {
         projectPath={currentPath}
         files={fileSelection.filesForGroup}
       />
+      {dialogs.initialProjectDialogOpen && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center"
+          style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
+        >
+          <div style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
+            Lirah
+          </div>
+        </div>
+      )}
       <InitialProjectDialog
         open={dialogs.initialProjectDialogOpen}
         onOpenChange={dialogs.setInitialProjectDialogOpen}

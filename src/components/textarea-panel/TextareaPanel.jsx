@@ -3,6 +3,7 @@ import { Textarea } from "../ui/textarea";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { ActionButtons } from "./ActionButtons";
+import { Button } from "../ui/button";
 import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 import { CompactProjectButton } from "./CompactProjectButton";
@@ -10,7 +11,7 @@ import { CompactSectionsDialog } from "./CompactSectionsDialog";
 import { FlowchartDialog } from "./FlowchartDialog";
 import { buildGraphData } from "../../utils/generateFlowchart";
 import { AtMentionModal } from "../AtMentionModal";
-import { X, GitBranch } from "lucide-react";
+import { X, Map } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
 import { TokenCostEstimate } from "../TokenCostEstimate";
 import { useTokenBudget } from "../../contexts/TokenBudgetContext";
@@ -224,6 +225,25 @@ export function TextareaPanel({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  const result = await onCompactProject();
+                  if (result) setFlowchartOpen(true);
+                }}
+                disabled={disabled || isCompacting}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Map className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              <span className="text-xs">Compact & open flowchart</span>
+            </TooltipContent>
+          </Tooltip>
           <CompactProjectButton
             onClick={onCompactProject}
             isCompacting={isCompacting}
@@ -307,7 +327,7 @@ export function TextareaPanel({
                 className="p-0.5 hover:bg-white/10 rounded text-primary hover:text-primary/80"
                 title="View flowchart"
               >
-                <GitBranch className="w-3 h-3" />
+                <Map className="w-3 h-3" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">Flowchart</TooltipContent>

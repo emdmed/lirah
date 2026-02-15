@@ -71,6 +71,24 @@ export const themes = {
       gitAdded: '145 80% 77%',          // Catppuccin green for +lines
       gitDeleted: '346 77% 78%',         // Catppuccin red for -lines
       treeGuide: '226 64% 88% / 0.1',    // Text with opacity for tree guide lines
+      // Flowchart colors
+      flowchart: {
+        component: '#7dd3fc',
+        componentBg: 'rgba(125,211,252,0.15)',
+        function: '#fbbf24',
+        functionBg: 'rgba(251,191,36,0.15)',
+        hook: '#a78bfa',
+        hookBg: 'rgba(167,139,250,0.15)',
+        constant: '#94a3b8',
+        constantBg: 'rgba(148,163,184,0.12)',
+        props: '#4ade80',
+        propsBg: 'rgba(74,222,128,0.15)',
+        propsStroke: 'rgba(74,222,128,0.4)',
+        edge: 'rgba(148,163,184,0.4)',
+        highlight: '#7dd3fc',
+        text: '#e2e8f0',
+        mutedText: '#64748b',
+      },
     },
   },
 
@@ -141,6 +159,24 @@ export const themes = {
       gitAdded: '75 25% 67%',           // Omarchy green for +lines
       gitDeleted: '0 55% 68%',          // Omarchy red for -lines
       treeGuide: '30 15% 81% / 0.1',    // Latte with opacity for tree guide lines
+      // Flowchart colors
+      flowchart: {
+        component: '#e6c384',
+        componentBg: 'rgba(230,195,132,0.15)',
+        function: '#dca561',
+        functionBg: 'rgba(220,165,97,0.15)',
+        hook: '#a48ec7',
+        hookBg: 'rgba(164,142,199,0.15)',
+        constant: '#c5b8a5',
+        constantBg: 'rgba(197,184,165,0.12)',
+        props: '#98bb6c',
+        propsBg: 'rgba(152,187,108,0.15)',
+        propsStroke: 'rgba(152,187,108,0.4)',
+        edge: 'rgba(197,184,165,0.4)',
+        highlight: '#e6c384',
+        text: '#d4c4b0',
+        mutedText: '#8a7f72',
+      },
     },
   },
 
@@ -211,142 +247,24 @@ export const themes = {
       gitAdded: '95 40% 56%',         // Spring Green for +lines
       gitDeleted: '359 50% 51%',      // Samurai Red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
-    },
-  },
-
-  light: {
-    name: 'Light',
-    type: 'light',
-    // Terminal colors (xterm.js)
-    terminal: {
-      foreground: '#2e3440',
-      background: '#f8f9fa',
-      cursor: '#5e81ac',
-      cursorAccent: '#f8f9fa',
-      selectionBackground: '#88c0d0',
-      selectionForeground: '#2e3440',
-
-      black: '#2e3440',
-      red: '#bf616a',
-      green: '#a3be8c',
-      yellow: '#ebcb8b',
-      blue: '#5e81ac',
-      magenta: '#b48ead',
-      cyan: '#88c0d0',
-      white: '#e5e9f0',
-
-      brightBlack: '#4c566a',
-      brightRed: '#bf616a',
-      brightGreen: '#a3be8c',
-      brightYellow: '#ebcb8b',
-      brightBlue: '#81a1c1',
-      brightMagenta: '#b48ead',
-      brightCyan: '#8fbcbb',
-      brightWhite: '#eceff4',
-    },
-    // UI colors
-    ui: {
-      background: 'hsl(0 0% 100%)',
-      foreground: 'hsl(222 16% 28%)',
-      card: 'hsl(0 0% 100%)',
-      cardForeground: 'hsl(222 16% 28%)',
-      popover: 'hsl(0 0% 100%)',
-      popoverForeground: 'hsl(222 16% 28%)',
-      primary: 'hsl(213 32% 52%)',
-      primaryForeground: 'hsl(0 0% 100%)',
-      secondary: 'hsl(220 16% 96%)',
-      secondaryForeground: 'hsl(222 16% 28%)',
-      muted: 'hsl(220 16% 96%)',
-      mutedForeground: 'hsl(220 9% 46%)',
-      accent: 'hsl(213 32% 52%)',
-      accentForeground: 'hsl(0 0% 100%)',
-      destructive: 'hsl(0 60% 51%)',
-      destructiveForeground: 'hsl(0 0% 100%)',
-      border: 'hsl(220 13% 91%)',
-      input: 'hsl(220 13% 91%)',
-      inputBackground: 'hsl(220 13% 92%)',
-      ring: 'hsl(213 32% 52%)',
-      sidebar: 'hsl(220 16% 96%)',
-      sidebarForeground: 'hsl(222 16% 28%)',
-      sidebarPrimary: 'hsl(213 32% 52%)',
-      sidebarPrimaryForeground: 'hsl(0 0% 100%)',
-      sidebarAccent: 'hsl(0 0% 100%)',
-      sidebarAccentForeground: 'hsl(222 16% 28%)',
-      sidebarBorder: 'hsl(220 13% 91%)',
-      sidebarRing: 'hsl(213 32% 52%)',
-      // Semantic colors
-      folder: '35 80% 50%',           // Warm orange for folder icons
-      gitAdded: '96 44% 68%',         // Light green for +lines
-      gitDeleted: '354 70% 54%',      // Red for -lines
-      treeGuide: '0 0% 0% / 0.1',     // Black with opacity for tree guide lines
-    },
-  },
-
-  dracula: {
-    name: 'Dracula',
-    type: 'dark',
-    // Terminal colors
-    terminal: {
-      foreground: '#f8f8f2',
-      background: '#282a36',
-      cursor: '#f8f8f2',
-      cursorAccent: '#282a36',
-      selectionBackground: '#44475a',
-      selectionForeground: '#f8f8f2',
-
-      black: '#21222c',
-      red: '#ff5555',
-      green: '#50fa7b',
-      yellow: '#f1fa8c',
-      blue: '#bd93f9',
-      magenta: '#ff79c6',
-      cyan: '#8be9fd',
-      white: '#f8f8f2',
-
-      brightBlack: '#6272a4',
-      brightRed: '#ff6e6e',
-      brightGreen: '#69ff94',
-      brightYellow: '#ffffa5',
-      brightBlue: '#d6acff',
-      brightMagenta: '#ff92df',
-      brightCyan: '#a4ffff',
-      brightWhite: '#ffffff',
-    },
-    // UI colors
-    ui: {
-      background: 'hsl(231 15% 18%)',
-      foreground: 'hsl(60 30% 96%)',
-      card: 'hsl(232 14% 21%)',
-      cardForeground: 'hsl(60 30% 96%)',
-      popover: 'hsl(232 14% 21%)',
-      popoverForeground: 'hsl(60 30% 96%)',
-      primary: 'hsl(265 89% 78%)',
-      primaryForeground: 'hsl(231 15% 18%)',
-      secondary: 'hsl(232 14% 31%)',
-      secondaryForeground: 'hsl(60 30% 96%)',
-      muted: 'hsl(232 14% 31%)',
-      mutedForeground: 'hsl(231 15% 72%)',
-      accent: 'hsl(326 100% 74%)',
-      accentForeground: 'hsl(231 15% 18%)',
-      destructive: 'hsl(0 100% 67%)',
-      destructiveForeground: 'hsl(60 30% 96%)',
-      border: 'hsl(232 14% 31%)',
-      input: 'hsl(232 14% 31%)',
-      inputBackground: 'hsl(231 15% 10%)',
-      ring: 'hsl(265 89% 78%)',
-      sidebar: 'hsl(231 15% 18%)',
-      sidebarForeground: 'hsl(60 30% 96%)',
-      sidebarPrimary: 'hsl(265 89% 78%)',
-      sidebarPrimaryForeground: 'hsl(231 15% 18%)',
-      sidebarAccent: 'hsl(232 14% 31%)',
-      sidebarAccentForeground: 'hsl(60 30% 96%)',
-      sidebarBorder: 'hsl(232 14% 31%)',
-      sidebarRing: 'hsl(265 89% 78%)',
-      // Semantic colors
-      folder: '65 92% 76%',           // Dracula yellow for folder icons
-      gitAdded: '135 94% 65%',        // Dracula green for +lines
-      gitDeleted: '0 100% 67%',       // Dracula red for -lines
-      treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
+      // Flowchart colors
+      flowchart: {
+        component: '#7aa2f7',
+        componentBg: 'rgba(122,162,247,0.15)',
+        function: '#ff9e64',
+        functionBg: 'rgba(255,158,100,0.15)',
+        hook: '#bb9af7',
+        hookBg: 'rgba(187,154,247,0.15)',
+        constant: '#9aa5ce',
+        constantBg: 'rgba(154,165,206,0.12)',
+        props: '#73daca',
+        propsBg: 'rgba(115,218,202,0.15)',
+        propsStroke: 'rgba(115,218,202,0.4)',
+        edge: 'rgba(154,165,206,0.4)',
+        highlight: '#7aa2f7',
+        text: '#c0caf5',
+        mutedText: '#565f89',
+      },
     },
   },
 
@@ -415,6 +333,24 @@ export const themes = {
       gitAdded: '80 76% 53%',         // Monokai green for +lines
       gitDeleted: '338 95% 56%',      // Monokai pink/red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
+      // Flowchart colors
+      flowchart: {
+        component: '#a6e22e',
+        componentBg: 'rgba(166,226,46,0.15)',
+        function: '#e6db74',
+        functionBg: 'rgba(230,219,116,0.15)',
+        hook: '#ae81ff',
+        hookBg: 'rgba(174,129,255,0.15)',
+        constant: '#f8f8f2',
+        constantBg: 'rgba(248,248,242,0.12)',
+        props: '#66d9ef',
+        propsBg: 'rgba(102,217,239,0.15)',
+        propsStroke: 'rgba(102,217,239,0.4)',
+        edge: 'rgba(248,248,242,0.4)',
+        highlight: '#a6e22e',
+        text: '#f8f8f2',
+        mutedText: '#75715e',
+      },
     },
   },
 
@@ -481,6 +417,24 @@ export const themes = {
       gitAdded: '156 72% 67%',        // Emerald for +lines
       gitDeleted: '156 72% 47%',      // Darker emerald for -lines
       treeGuide: '156 72% 67% / 0.15', // Emerald with opacity for tree guide lines
+      // Flowchart colors (monochrome emerald)
+      flowchart: {
+        component: '#34d399',
+        componentBg: 'rgba(52,211,153,0.15)',
+        function: '#34d399',
+        functionBg: 'rgba(52,211,153,0.15)',
+        hook: '#34d399',
+        hookBg: 'rgba(52,211,153,0.15)',
+        constant: '#34d399',
+        constantBg: 'rgba(52,211,153,0.12)',
+        props: '#34d399',
+        propsBg: 'rgba(52,211,153,0.15)',
+        propsStroke: 'rgba(52,211,153,0.4)',
+        edge: 'rgba(52,211,153,0.4)',
+        highlight: '#34d399',
+        text: '#34d399',
+        mutedText: '#10b981',
+      },
     },
   },
 
@@ -551,6 +505,24 @@ export const themes = {
       gitAdded: '61 66% 44%',         // Gruvbox bright green for +lines
       gitDeleted: '0 100% 60%',       // Gruvbox bright red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
+      // Flowchart colors
+      flowchart: {
+        component: '#fabd2f',
+        componentBg: 'rgba(250,189,47,0.15)',
+        function: '#fe8019',
+        functionBg: 'rgba(254,128,25,0.15)',
+        hook: '#d3869b',
+        hookBg: 'rgba(211,134,155,0.15)',
+        constant: '#bdae93',
+        constantBg: 'rgba(189,174,147,0.12)',
+        props: '#b8bb26',
+        propsBg: 'rgba(184,187,38,0.15)',
+        propsStroke: 'rgba(184,187,38,0.4)',
+        edge: 'rgba(189,174,147,0.4)',
+        highlight: '#fabd2f',
+        text: '#ebdbb2',
+        mutedText: '#928374',
+      },
     },
   },
   retro: {
@@ -620,6 +592,24 @@ export const themes = {
       gitAdded: '117 36% 74%',                 // Celadon for +lines
       gitDeleted: '349 92% 55%',                // Red for -lines
       treeGuide: '117 36% 74% / 0.15',         // Celadon with opacity
+      // Flowchart colors
+      flowchart: {
+        component: '#F4F7A3',
+        componentBg: 'rgba(244,247,163,0.15)',
+        function: '#D5FF8C',
+        functionBg: 'rgba(213,255,140,0.15)',
+        hook: '#E0A8E3',
+        hookBg: 'rgba(224,168,227,0.15)',
+        constant: '#FEFFC7',
+        constantBg: 'rgba(254,255,199,0.12)',
+        props: '#7EE8D7',
+        propsBg: 'rgba(126,232,215,0.15)',
+        propsStroke: 'rgba(126,232,215,0.4)',
+        edge: 'rgba(254,255,199,0.4)',
+        highlight: '#F4F7A3',
+        text: '#FEFFC7',
+        mutedText: '#A8D5A6',
+      },
     },
   },
 };
@@ -650,6 +640,16 @@ export function saveTheme(themeName) {
       localStorage.setItem('nevo-theme', themeName);
     }
   } catch (error) {
-    console.warn('Failed to save theme to localStorage:', error);
+    console.warn('Failed to save theme from localStorage:', error);
   }
+}
+
+/**
+ * Get flowchart colors for the current theme
+ * @returns {Object} Flowchart color configuration
+ */
+export function getFlowchartColors() {
+  const themeName = loadTheme();
+  const theme = themes[themeName] || themes[defaultTheme];
+  return theme.ui.flowchart || themes[defaultTheme].ui.flowchart;
 }
