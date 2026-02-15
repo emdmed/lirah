@@ -159,7 +159,15 @@ const TYPE_COLORS = {
   constant: '#94a3b8',
 };
 
-function GraphNode({ node, rect, expanded, highlighted, dimmed, onToggle }) {
+const TAG_BG = {
+  component: 'rgba(125,211,252,0.15)',
+  function: 'rgba(251,191,36,0.15)',
+  hook: 'rgba(167,139,250,0.15)',
+  constant: 'rgba(148,163,184,0.12)',
+};
+const TAG_LABELS = { component: 'COMP', function: 'FN', hook: 'HOOK', constant: 'CONST' };
+
+const GraphNode = React.memo(function GraphNode({ node, rect, expanded, highlighted, dimmed, onToggle }) {
   const details = expanded ? getDetailLines(node) : [];
   const opacity = dimmed ? 0.25 : 1;
 
@@ -189,9 +197,9 @@ function GraphNode({ node, rect, expanded, highlighted, dimmed, onToggle }) {
         {node.fileName}
       </text>
       {expanded && details.map((d, i) => {
-        const typeTag = { component: 'COMP', function: 'FN', hook: 'HOOK', constant: 'CONST' }[d.type] || d.type;
+        const typeTag = TAG_LABELS[d.type] || d.type;
         const color = TYPE_COLORS[d.type] || '#94a3b8';
-        const tagBg = { component: 'rgba(125,211,252,0.15)', function: 'rgba(251,191,36,0.15)', hook: 'rgba(167,139,250,0.15)', constant: 'rgba(148,163,184,0.12)' }[d.type] || 'rgba(148,163,184,0.1)';
+        const tagBg = TAG_BG[d.type] || 'rgba(148,163,184,0.1)';
         const tagW = measureText(typeTag) + 6;
         const tagX = rect.x + NODE_PAD_X;
         const tagY = rect.y + NODE_H_COLLAPSED + NODE_PAD_Y + i * NODE_LINE_H;
@@ -230,7 +238,7 @@ function GraphNode({ node, rect, expanded, highlighted, dimmed, onToggle }) {
       })}
     </g>
   );
-}
+});
 
 export function FlowchartDialog({ open, onOpenChange, graphData }) {
   const svgRef = useRef(null);
@@ -238,7 +246,9 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
   const [expandedNodes, setExpandedNodes] = useState(() => new Set());
   const [selectedNode, setSelectedNode] = useState(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const panState = useRef({ active: false, startX: 0, startY: 0, tx: 0, ty: 0 });
+  const graphGRef = useRef(null);
 
   const { groups = [], nodes = new Map(), edges = [] } = graphData || {};
 
@@ -247,7 +257,9 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
     if (open) {
       setExpandedNodes(new Set());
       setSelectedNode(null);
-      setTransform({ x: 40, y: 40, scale: 1 });
+      const t = { x: 40, y: 40, scale: 1 };
+      transformRef.current = t;
+      setTransform(t);
     }
   }, [open]);
 
@@ -351,34 +363,51 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
     return labels;
   }, [connectedIds, selectedNode, positioned, nodes, transform, containerSize]);
 
+  // Apply transform directly to DOM for smooth pan/zoom without React re-renders
+  const applyTransform = useCallback((t) => {
+    transformRef.current = t;
+    if (graphGRef.current) {
+      graphGRef.current.setAttribute('transform', `translate(${t.x},${t.y}) scale(${t.scale})`);
+    }
+  }, []);
+
+  // Sync React state from ref (for ghost labels etc.)
+  const syncTransformState = useCallback(() => {
+    setTransform({ ...transformRef.current });
+  }, []);
+
   // Pan handlers — middle mouse button only, always pans even over nodes
   const onPanStart = useCallback((e) => {
     if (e.button !== 1) return; // middle button only
     e.preventDefault();
-    panState.current = { active: true, startX: e.clientX, startY: e.clientY, tx: transform.x, ty: transform.y };
-  }, [transform]);
+    panState.current = { active: true, startX: e.clientX, startY: e.clientY, tx: transformRef.current.x, ty: transformRef.current.y };
+  }, []);
 
   const onPanMove = useCallback((e) => {
     if (!panState.current.active) return;
     const ps = panState.current;
-    setTransform(t => ({
-      ...t,
+    applyTransform({
+      ...transformRef.current,
       x: ps.tx + (e.clientX - ps.startX),
       y: ps.ty + (e.clientY - ps.startY),
-    }));
-  }, []);
+    });
+  }, [applyTransform]);
 
   const onPanEnd = useCallback((e) => {
     if (e.button !== 1) return;
     panState.current.active = false;
-  }, []);
+    syncTransformState();
+  }, [syncTransformState]);
 
   // Wheel zoom via callback ref to ensure listener attaches after mount
   const wheelHandler = useRef(null);
   wheelHandler.current = (e) => {
     e.preventDefault();
+    const t = transformRef.current;
     const delta = e.deltaY > 0 ? 0.92 : 1.08;
-    setTransform(t => ({ ...t, scale: Math.min(Math.max(t.scale * delta, 0.1), 5) }));
+    const newScale = Math.min(Math.max(t.scale * delta, 0.1), 5);
+    applyTransform({ ...t, scale: newScale });
+    syncTransformState();
   };
 
   const containerRef = useCallback((el) => {
@@ -434,7 +463,7 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
           onMouseDown={onPanStart}
           onMouseMove={onPanMove}
           onMouseUp={onPanEnd}
-          onMouseLeave={() => { panState.current.active = false; }}
+          onMouseLeave={() => { if (panState.current.active) { panState.current.active = false; syncTransformState(); } }}
           onAuxClick={(e) => e.preventDefault()}
         >
           <svg
@@ -443,7 +472,7 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
             height="100%"
             style={{ display: 'block' }}
           >
-            <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            <g ref={graphGRef} transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
               {/* Group backgrounds */}
               {groupRects.map(g => g.label !== null && (
                 <g key={g.dir}>
@@ -548,9 +577,9 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
 
         <DialogFooter className="gap-2 sm:gap-2 border-t border-border pt-4">
           <div className="flex gap-1 mr-auto">
-            <Button variant="outline" size="sm" onClick={() => setTransform(t => ({ ...t, scale: Math.max(t.scale / 1.3, 0.1) }))}>-</Button>
-            <Button variant="outline" size="sm" onClick={() => setTransform({ x: 40, y: 40, scale: 1 })}>Reset</Button>
-            <Button variant="outline" size="sm" onClick={() => setTransform(t => ({ ...t, scale: Math.min(t.scale * 1.3, 5) }))}>+</Button>
+            <Button variant="outline" size="sm" onClick={() => { const t = transformRef.current; const n = { ...t, scale: Math.max(t.scale / 1.3, 0.1) }; applyTransform(n); syncTransformState(); }}>-</Button>
+            <Button variant="outline" size="sm" onClick={() => { const n = { x: 40, y: 40, scale: 1 }; applyTransform(n); syncTransformState(); }}>Reset</Button>
+            <Button variant="outline" size="sm" onClick={() => { const t = transformRef.current; const n = { ...t, scale: Math.min(t.scale * 1.3, 5) }; applyTransform(n); syncTransformState(); }}>+</Button>
           </div>
           <Button variant="outline" onClick={() => {
             const all = expandedNodes.size > 0 ? new Set() : new Set([...nodes.keys()]);
