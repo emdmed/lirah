@@ -6,36 +6,20 @@ const traverse = _traverse.default || _traverse;
 
 const BABEL_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.mts', '.cts'];
 
-/**
- * Check if a file path is parseable by Babel
- * @param {string} path - File path to check
- * @returns {boolean}
- */
 export const isBabelParseable = (path) => {
   return BABEL_EXTENSIONS.some(ext => path.endsWith(ext));
 };
 
-/**
- * Check if a name follows PascalCase convention (likely a React component)
- * @param {string} name - Identifier name
- * @returns {boolean}
- */
 const isPascalCase = (name) => {
   return /^[A-Z][a-zA-Z0-9]*$/.test(name);
 };
 
-/**
- * Check if a call expression is a React HOC pattern (forwardRef, memo, etc.)
- * @param {object} node - CallExpression node
- * @returns {{type: string, innerFn: object|null}|null}
- */
 const getReactHOCInfo = (node) => {
   if (node.type !== 'CallExpression') return null;
 
   const callee = node.callee;
   let hocType = null;
 
-  // React.forwardRef, React.memo, React.lazy
   if (callee.type === 'MemberExpression' &&
       callee.object?.name === 'React' &&
       callee.property?.name) {
@@ -45,7 +29,6 @@ const getReactHOCInfo = (node) => {
     }
   }
 
-  // Direct imports: forwardRef(), memo()
   if (callee.type === 'Identifier') {
     const name = callee.name;
     if (['forwardRef', 'memo', 'lazy'].includes(name)) {
@@ -55,7 +38,6 @@ const getReactHOCInfo = (node) => {
 
   if (!hocType) return null;
 
-  // Get the inner function from the first argument
   const firstArg = node.arguments[0];
   let innerFn = null;
 
@@ -67,23 +49,16 @@ const getReactHOCInfo = (node) => {
   return { type: hocType, innerFn };
 };
 
-/**
- * Check if a call expression is React.createContext
- * @param {object} node - CallExpression node
- * @returns {boolean}
- */
 const isCreateContext = (node) => {
   if (node.type !== 'CallExpression') return false;
   const callee = node.callee;
 
-  // React.createContext()
   if (callee.type === 'MemberExpression' &&
       callee.object?.name === 'React' &&
       callee.property?.name === 'createContext') {
     return true;
   }
 
-  // createContext() - direct import
   if (callee.type === 'Identifier' && callee.name === 'createContext') {
     return true;
   }
@@ -91,16 +66,90 @@ const isCreateContext = (node) => {
   return false;
 };
 
-/**
- * Extract code symbols from JavaScript/TypeScript source code
- * @param {string} code - Source code to parse
- * @param {string} filePath - File path for determining parser plugins
- * @returns {Array<{name: string, type: string, line: number, endLine: number}>}
- */
+const extractDependencyArray = (node) => {
+  if (!node) return null;
+
+  if (node.type === 'ArrayExpression') {
+    return node.elements.map(el => {
+      if (!el) return '?';
+      if (el.type === 'Identifier') return el.name;
+      if (el.type === 'MemberExpression') {
+        const parts = [];
+        let current = el;
+        while (current.type === 'MemberExpression') {
+          if (current.property?.name) {
+            parts.unshift(current.property.name);
+          }
+          current = current.object;
+        }
+        if (current.type === 'Identifier') {
+          parts.unshift(current.name);
+        }
+        return parts.join('.') || '?';
+      }
+      return '?';
+    });
+  }
+
+  return '?';
+};
+
+const getParamsString = (params) => {
+  return params.map(param => {
+    if (param.type === 'Identifier') {
+      const typeAnnotation = param.typeAnnotation?.typeAnnotation;
+      const typeName = typeAnnotation ? `: ${getTypeName(typeAnnotation)}` : '';
+      return `${param.name}${typeName}`;
+    }
+    if (param.type === 'AssignmentPattern') {
+      const left = param.left;
+      if (left.type === 'Identifier') {
+        return `${left.name} = ...`;
+      }
+    }
+    if (param.type === 'RestElement') {
+      return `...${param.argument?.name || 'args'}`;
+    }
+    if (param.type === 'ObjectPattern') {
+      const keys = param.properties.map(p => {
+        if (p.type === 'RestElement') return `...${p.argument?.name || 'rest'}`;
+        return p.key?.name || '?';
+      });
+      return `{ ${keys.join(', ')} }`;
+    }
+    if (param.type === 'ArrayPattern') {
+      return '[ ... ]';
+    }
+    return '?';
+  }).join(', ');
+};
+
+const getTypeName = (typeAnnotation) => {
+  if (!typeAnnotation) return 'any';
+  switch (typeAnnotation.type) {
+    case 'TSStringKeyword': return 'string';
+    case 'TSNumberKeyword': return 'number';
+    case 'TSBooleanKeyword': return 'boolean';
+    case 'TSVoidKeyword': return 'void';
+    case 'TSAnyKeyword': return 'any';
+    case 'TSNullKeyword': return 'null';
+    case 'TSUndefinedKeyword': return 'undefined';
+    case 'TSArrayType': return `${getTypeName(typeAnnotation.elementType)}[]`;
+    case 'TSTypeReference': return typeAnnotation.typeName?.name || 'unknown';
+    case 'TSUnionType': return typeAnnotation.types.map(getTypeName).join(' | ');
+    case 'TSFunctionType': return '(...) => ...';
+    default: return 'unknown';
+  }
+};
+
+const getReturnType = (node) => {
+  const returnType = node.returnType?.typeAnnotation;
+  return returnType ? `: ${getTypeName(returnType)}` : '';
+};
+
 export const extractSymbols = (code, filePath = '') => {
   const symbols = [];
   const isTypeScript = filePath.endsWith('.ts') || filePath.endsWith('.tsx') || filePath.endsWith('.mts') || filePath.endsWith('.cts');
-  const hasJsx = filePath.endsWith('.jsx') || filePath.endsWith('.tsx');
 
   const plugins = [
     'jsx',
@@ -120,14 +169,12 @@ export const extractSymbols = (code, filePath = '') => {
       errorRecovery: true,
     });
   } catch (error) {
-    console.warn('Babel parse error:', error.message);
     return symbols;
   }
 
   const seenNames = new Set();
 
   traverse(ast, {
-    // Function declarations: function foo() {}
     FunctionDeclaration(path) {
       if (path.node.id?.name && !seenNames.has(path.node.id.name)) {
         seenNames.add(path.node.id.name);
@@ -140,7 +187,6 @@ export const extractSymbols = (code, filePath = '') => {
       }
     },
 
-    // Variable declarations: const/let/var
     VariableDeclarator(path) {
       const name = path.node.id?.name;
       if (!name || seenNames.has(name)) return;
@@ -148,8 +194,7 @@ export const extractSymbols = (code, filePath = '') => {
       const init = path.node.init;
       if (!init) return;
 
-      // Arrow function: const foo = () => {}
-      if (init.type === 'ArrowFunctionExpression') {
+      if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') {
         seenNames.add(name);
         symbols.push({
           name,
@@ -160,19 +205,6 @@ export const extractSymbols = (code, filePath = '') => {
         return;
       }
 
-      // Function expression: const foo = function() {}
-      if (init.type === 'FunctionExpression') {
-        seenNames.add(name);
-        symbols.push({
-          name,
-          type: isPascalCase(name) ? 'component' : 'function',
-          line: path.node.loc?.start?.line || 0,
-          endLine: init.loc?.end?.line || path.node.loc?.end?.line || 0,
-        });
-        return;
-      }
-
-      // React HOC patterns: React.forwardRef, React.memo, etc.
       const hocInfo = getReactHOCInfo(init);
       if (hocInfo) {
         seenNames.add(name);
@@ -185,7 +217,6 @@ export const extractSymbols = (code, filePath = '') => {
         return;
       }
 
-      // React.createContext
       if (isCreateContext(init)) {
         seenNames.add(name);
         symbols.push({
@@ -197,7 +228,6 @@ export const extractSymbols = (code, filePath = '') => {
         return;
       }
 
-      // Other const declarations (objects, primitives, etc.)
       seenNames.add(name);
       symbols.push({
         name,
@@ -207,99 +237,33 @@ export const extractSymbols = (code, filePath = '') => {
       });
     },
 
-    // useEffect and other hook calls
     CallExpression(path) {
       const callee = path.node.callee;
-
-      // Direct hook calls: useEffect(() => {})
       if (callee.type === 'Identifier' && callee.name.startsWith('use')) {
-        const hookName = callee.name;
         symbols.push({
-          name: hookName,
+          name: callee.name,
           type: 'hook',
           line: path.node.loc?.start?.line || 0,
           endLine: path.node.loc?.end?.line || 0,
         });
       }
     },
-
-    // JSX elements - track PascalCase components
-    JSXOpeningElement(path) {
-      const name = path.node.name;
-      let componentName = null;
-
-      if (name.type === 'JSXIdentifier') {
-        componentName = name.name;
-      } else if (name.type === 'JSXMemberExpression') {
-        // e.g., Sidebar.Content
-        componentName = getJSXMemberName(name);
-      }
-
-      if (componentName && isPascalCase(componentName.split('.')[0])) {
-        const key = `jsx:${componentName}`;
-        if (!seenNames.has(key)) {
-          seenNames.add(key);
-          symbols.push({
-            name: componentName,
-            type: 'component',
-            line: path.node.loc?.start?.line || 0,
-            endLine: path.node.loc?.end?.line || 0,
-          });
-        }
-      }
-    },
   });
 
-  // Sort by line number
   symbols.sort((a, b) => a.line - b.line);
-
   return symbols;
 };
 
-/**
- * Get the full name of a JSX member expression (e.g., Sidebar.Content)
- * @param {object} node - JSX member expression node
- * @returns {string}
- */
-function getJSXMemberName(node) {
-  if (node.type === 'JSXIdentifier') {
-    return node.name;
-  }
-  if (node.type === 'JSXMemberExpression') {
-    return `${getJSXMemberName(node.object)}.${node.property.name}`;
-  }
-  return '';
-}
-
-/**
- * Format symbols for prompt output
- * @param {Array} symbols - Array of symbol objects
- * @returns {string}
- */
 export const formatSymbolsForPrompt = (symbols) => {
-  if (!symbols || symbols.length === 0) {
-    return '';
-  }
-
-  const lines = symbols.map(sym => {
-    const lineRange = sym.line === sym.endLine
-      ? `${sym.line}`
-      : `${sym.line}-${sym.endLine}`;
+  if (!symbols || symbols.length === 0) return '';
+  return symbols.map(sym => {
+    const lineRange = sym.line === sym.endLine ? `${sym.line}` : `${sym.line}-${sym.endLine}`;
     return `    ${sym.name} (${sym.type}): ${lineRange}`;
-  });
-
-  return lines.join('\n');
+  }).join('\n');
 };
 
-/**
- * Extract function signatures (without bodies) from source code
- * @param {string} code - Source code to parse
- * @param {string} filePath - File path for determining parser plugins
- * @returns {Array<{name: string, signature: string, line: number}>}
- */
 export const extractSignatures = (code, filePath = '') => {
   const signatures = [];
-  const lines = code.split('\n');
   const isTypeScript = filePath.endsWith('.ts') || filePath.endsWith('.tsx') || filePath.endsWith('.mts') || filePath.endsWith('.cts');
 
   const plugins = [
@@ -320,69 +284,10 @@ export const extractSignatures = (code, filePath = '') => {
       errorRecovery: true,
     });
   } catch (error) {
-    console.warn('Babel parse error:', error.message);
     return signatures;
   }
 
   const seenNames = new Set();
-
-  /**
-   * Generate parameter string from AST params
-   */
-  const getParamsString = (params) => {
-    return params.map(param => {
-      if (param.type === 'Identifier') {
-        const typeAnnotation = param.typeAnnotation?.typeAnnotation;
-        const typeName = typeAnnotation ? `: ${getTypeName(typeAnnotation)}` : '';
-        return `${param.name}${typeName}`;
-      }
-      if (param.type === 'AssignmentPattern') {
-        const left = param.left;
-        if (left.type === 'Identifier') {
-          return `${left.name} = ...`;
-        }
-      }
-      if (param.type === 'RestElement') {
-        return `...${param.argument?.name || 'args'}`;
-      }
-      if (param.type === 'ObjectPattern') {
-        return '{ ... }';
-      }
-      if (param.type === 'ArrayPattern') {
-        return '[ ... ]';
-      }
-      return '?';
-    }).join(', ');
-  };
-
-  /**
-   * Get type name from TypeScript type annotation
-   */
-  const getTypeName = (typeAnnotation) => {
-    if (!typeAnnotation) return 'any';
-    switch (typeAnnotation.type) {
-      case 'TSStringKeyword': return 'string';
-      case 'TSNumberKeyword': return 'number';
-      case 'TSBooleanKeyword': return 'boolean';
-      case 'TSVoidKeyword': return 'void';
-      case 'TSAnyKeyword': return 'any';
-      case 'TSNullKeyword': return 'null';
-      case 'TSUndefinedKeyword': return 'undefined';
-      case 'TSArrayType': return `${getTypeName(typeAnnotation.elementType)}[]`;
-      case 'TSTypeReference': return typeAnnotation.typeName?.name || 'unknown';
-      case 'TSUnionType': return typeAnnotation.types.map(getTypeName).join(' | ');
-      case 'TSFunctionType': return '(...) => ...';
-      default: return 'unknown';
-    }
-  };
-
-  /**
-   * Get return type from function
-   */
-  const getReturnType = (node) => {
-    const returnType = node.returnType?.typeAnnotation;
-    return returnType ? `: ${getTypeName(returnType)}` : '';
-  };
 
   traverse(ast, {
     FunctionDeclaration(path) {
@@ -409,7 +314,6 @@ export const extractSignatures = (code, filePath = '') => {
       const init = path.node.init;
       if (!init) return;
 
-      // Plain arrow function or function expression
       if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') {
         seenNames.add(name);
         const params = getParamsString(init.params);
@@ -424,7 +328,6 @@ export const extractSignatures = (code, filePath = '') => {
         return;
       }
 
-      // React HOC patterns: forwardRef, memo, etc.
       const hocInfo = getReactHOCInfo(init);
       if (hocInfo) {
         seenNames.add(name);
@@ -440,7 +343,6 @@ export const extractSignatures = (code, filePath = '') => {
         return;
       }
 
-      // React.createContext
       if (isCreateContext(init)) {
         seenNames.add(name);
         signatures.push({
@@ -456,48 +358,6 @@ export const extractSignatures = (code, filePath = '') => {
   return signatures;
 };
 
-/**
- * Extract dependency names from a useEffect dependency array
- * @param {object} node - AST node for the dependency array argument
- * @returns {string[]|null} - Array of dependency names, null if no deps, or '?' if unparseable
- */
-const extractDependencyArray = (node) => {
-  if (!node) return null; // No dependency array provided
-
-  if (node.type === 'ArrayExpression') {
-    return node.elements.map(el => {
-      if (!el) return '?';
-      if (el.type === 'Identifier') return el.name;
-      if (el.type === 'MemberExpression') {
-        // Handle things like obj.prop or obj.nested.prop
-        const parts = [];
-        let current = el;
-        while (current.type === 'MemberExpression') {
-          if (current.property?.name) {
-            parts.unshift(current.property.name);
-          } else if (current.property?.type === 'Identifier') {
-            parts.unshift(current.property.name);
-          }
-          current = current.object;
-        }
-        if (current.type === 'Identifier') {
-          parts.unshift(current.name);
-        }
-        return parts.join('.') || '?';
-      }
-      return '?';
-    });
-  }
-
-  return '?'; // Unparseable (e.g., spread, variable reference)
-};
-
-/**
- * Extract skeleton/outline view from source code
- * @param {string} code - Source code to parse
- * @param {string} filePath - File path for determining parser plugins
- * @returns {Object} Skeleton data with counts and structure
- */
 export const extractSkeleton = (code, filePath = '') => {
   const isTypeScript = filePath.endsWith('.ts') || filePath.endsWith('.tsx') || filePath.endsWith('.mts') || filePath.endsWith('.cts');
 
@@ -519,21 +379,22 @@ export const extractSkeleton = (code, filePath = '') => {
       errorRecovery: true,
     });
   } catch (error) {
-    console.warn('Babel parse error:', error.message);
     return null;
   }
 
   const skeleton = {
     imports: [],
-    exports: [],
     components: [],
     functions: [],
-    hooks: { useState: 0, useEffect: [], useCallback: 0, useMemo: 0, useRef: 0, custom: [] },
-    constants: 0,
+    hooks: { useState: [], useEffect: [], useCallback: 0, useMemo: 0, useRef: 0, custom: [] },
+    constants: [],
     classes: [],
     interfaces: [],
     types: [],
   };
+
+  // Collect export info: name -> 'default' | 'named'
+  const exportMap = new Map();
 
   traverse(ast, {
     ImportDeclaration(path) {
@@ -549,9 +410,9 @@ export const extractSkeleton = (code, filePath = '') => {
     ExportDefaultDeclaration(path) {
       const decl = path.node.declaration;
       if (decl.type === 'Identifier') {
-        skeleton.exports.push({ name: decl.name, type: 'default' });
+        exportMap.set(decl.name, 'default');
       } else if (decl.type === 'FunctionDeclaration' && decl.id) {
-        skeleton.exports.push({ name: decl.id.name, type: 'default' });
+        exportMap.set(decl.id.name, 'default');
       }
     },
 
@@ -559,75 +420,97 @@ export const extractSkeleton = (code, filePath = '') => {
       if (path.node.declaration) {
         const decl = path.node.declaration;
         if (decl.type === 'FunctionDeclaration' && decl.id) {
-          skeleton.exports.push({ name: decl.id.name, type: 'named' });
+          exportMap.set(decl.id.name, 'named');
         } else if (decl.type === 'VariableDeclaration') {
           decl.declarations.forEach(d => {
             if (d.id?.name) {
-              skeleton.exports.push({ name: d.id.name, type: 'named' });
+              exportMap.set(d.id.name, 'named');
             }
           });
         }
       }
       if (path.node.specifiers) {
         path.node.specifiers.forEach(s => {
-          skeleton.exports.push({ name: s.exported?.name || s.local.name, type: 'named' });
+          exportMap.set(s.exported?.name || s.local.name, 'named');
         });
       }
     },
 
     FunctionDeclaration(path) {
+      if (path.parent.type !== 'Program' && path.parent.type !== 'ExportNamedDeclaration' && path.parent.type !== 'ExportDefaultDeclaration') return;
       const name = path.node.id?.name;
       if (!name) return;
 
-      // Check if it's a React component (PascalCase + returns JSX)
+      const params = getParamsString(path.node.params);
+      const isAsync = path.node.async || false;
+      const entry = { name, line: path.node.loc?.start?.line || 0, params, async: isAsync };
+
       if (isPascalCase(name)) {
-        skeleton.components.push({ name, line: path.node.loc?.start?.line || 0 });
+        skeleton.components.push(entry);
       } else {
-        skeleton.functions.push({ name, line: path.node.loc?.start?.line || 0 });
+        skeleton.functions.push(entry);
       }
     },
 
     VariableDeclarator(path) {
+      const declParent = path.parentPath?.parent;
+      if (declParent?.type !== 'Program' && declParent?.type !== 'ExportNamedDeclaration' && declParent?.type !== 'ExportDefaultDeclaration') return;
       const name = path.node.id?.name;
       const init = path.node.init;
       if (!name || !init) return;
 
-      // Plain arrow function or function expression
       if (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') {
+        const params = getParamsString(init.params);
+        const isAsync = init.async || false;
+        const entry = { name, line: path.node.loc?.start?.line || 0, params, async: isAsync };
+
         if (isPascalCase(name)) {
-          skeleton.components.push({ name, line: path.node.loc?.start?.line || 0 });
+          skeleton.components.push(entry);
         } else {
-          skeleton.functions.push({ name, line: path.node.loc?.start?.line || 0 });
+          skeleton.functions.push(entry);
         }
         return;
       }
 
-      // React HOC patterns: forwardRef, memo, etc.
       const hocInfo = getReactHOCInfo(init);
       if (hocInfo) {
-        skeleton.components.push({ name, line: path.node.loc?.start?.line || 0, hoc: hocInfo.type });
+        let params = '?';
+        if (hocInfo.innerFn) {
+          params = getParamsString(hocInfo.innerFn.params);
+        }
+        skeleton.components.push({ name, line: path.node.loc?.start?.line || 0, hoc: hocInfo.type, params, async: false });
         return;
       }
 
-      // React.createContext
       if (isCreateContext(init)) {
         skeleton.contexts = skeleton.contexts || [];
         skeleton.contexts.push({ name, line: path.node.loc?.start?.line || 0 });
         return;
       }
 
-      // Other constants
-      skeleton.constants++;
+      skeleton.constants.push(name);
     },
 
     CallExpression(path) {
       const callee = path.node.callee;
       if (callee.type === 'Identifier' && callee.name.startsWith('use')) {
+        // Only capture hooks inside top-level functions (components)
+        const funcScope = path.scope.getFunctionParent();
+        if (funcScope && funcScope.parent?.block?.type !== 'Program') return;
         const hookName = callee.name;
         const line = path.node.loc?.start?.line || 0;
 
-        // Special handling for useEffect - extract dependencies
-        if (hookName === 'useEffect') {
+        if (hookName === 'useState') {
+          let varName = null;
+          const parent = path.parent;
+          if (parent?.type === 'VariableDeclarator' && parent.id?.type === 'ArrayPattern') {
+            const first = parent.id.elements[0];
+            if (first?.type === 'Identifier') {
+              varName = first.name;
+            }
+          }
+          skeleton.hooks.useState.push(varName || '?');
+        } else if (hookName === 'useEffect') {
           const deps = extractDependencyArray(path.node.arguments[1]);
           skeleton.hooks.useEffect.push({ line, deps });
         } else if (skeleton.hooks[hookName] !== undefined) {
@@ -662,75 +545,80 @@ export const extractSkeleton = (code, filePath = '') => {
     },
   });
 
+  // Apply export markers to components, functions, classes
+  for (const entry of [...skeleton.components, ...skeleton.functions, ...skeleton.classes]) {
+    const exportType = exportMap.get(entry.name);
+    if (exportType === 'default') entry.exportMarker = '*';
+    else if (exportType === 'named') entry.exportMarker = '+';
+  }
+
   return skeleton;
 };
 
-/**
- * Format signatures for prompt output
- * @param {Array} signatures - Array of signature objects
- * @returns {string}
- */
 export const formatSignaturesForPrompt = (signatures) => {
   if (!signatures || signatures.length === 0) return '';
   return signatures.map(s => `    ${s.signature}  // line ${s.line}`).join('\n');
 };
 
-/**
- * Format skeleton for prompt output
- * @param {Object} skeleton - Skeleton data object
- * @returns {string}
- */
 export const formatSkeletonForPrompt = (skeleton) => {
   if (!skeleton) return '';
 
   const lines = [];
 
-  // Imports - local paths (file relationships), external just counted
   if (skeleton.imports.length > 0) {
     const local = skeleton.imports.filter(i => i.source.startsWith('.'));
     const extCount = skeleton.imports.length - local.length;
     const parts = [];
     if (extCount > 0) parts.push(`${extCount} ext`);
-    parts.push(...local.map(i => i.source));
+    parts.push(...[...new Set(local.map(i => i.source))]);
     lines.push(`imports: ${parts.join(', ')}`);
   }
 
-  // Exports (API surface - high value)
-  if (skeleton.exports.length > 0) {
-    const exportNames = skeleton.exports.map(e => e.type === 'default' ? `${e.name}*` : e.name).join(', ');
-    lines.push(`exports: ${exportNames}`);
-  }
-
-  // Components (including HOC-wrapped)
   if (skeleton.components.length > 0) {
-    const componentList = skeleton.components.map(c => c.hoc ? `${c.name}(${c.hoc}):${c.line}` : `${c.name}:${c.line}`).join(', ');
+    const componentList = skeleton.components.map(c => {
+      const marker = c.exportMarker || '';
+      const params = c.params !== undefined ? `(${c.params})` : '';
+      const hoc = c.hoc ? `(${c.hoc})` : '';
+      return `${c.name}${hoc}${params}${marker}:${c.line}`;
+    }).join(', ');
     lines.push(`components: ${componentList}`);
   }
 
-  // Contexts
   if (skeleton.contexts?.length > 0) {
     lines.push(`contexts: ${skeleton.contexts.map(c => `${c.name}:${c.line}`).join(', ')}`);
   }
 
-  // Functions
   if (skeleton.functions.length > 0) {
-    lines.push(`fn: ${skeleton.functions.map(f => `${f.name}:${f.line}`).join(', ')}`);
+    const funcList = skeleton.functions.map(f => {
+      const marker = f.exportMarker || '';
+      const asyncPrefix = f.async ? 'async ' : '';
+      const params = f.params !== undefined ? `(${f.params})` : '';
+      return `${asyncPrefix}${f.name}${params}${marker}:${f.line}`;
+    }).join(', ');
+    lines.push(`fn: ${funcList}`);
   }
 
-  // Hooks summary
+  if (skeleton.constants.length > 0) {
+    const names = skeleton.constants;
+    if (names.length > 5) {
+      lines.push(`const: ${names.slice(0, 5).join(', ')} +${names.length - 5} more`);
+    } else {
+      lines.push(`const: ${names.join(', ')}`);
+    }
+  }
+
   const hookParts = [];
-  if (skeleton.hooks.useState > 0) hookParts.push(`useState(${skeleton.hooks.useState})`);
+  if (skeleton.hooks.useState.length > 0) hookParts.push(`useState: ${skeleton.hooks.useState.join(', ')}`);
   if (skeleton.hooks.useCallback > 0) hookParts.push(`useCallback(${skeleton.hooks.useCallback})`);
   if (skeleton.hooks.useMemo > 0) hookParts.push(`useMemo(${skeleton.hooks.useMemo})`);
   if (skeleton.hooks.useRef > 0) hookParts.push(`useRef(${skeleton.hooks.useRef})`);
   if (skeleton.hooks.custom.length > 0) hookParts.push(...skeleton.hooks.custom);
 
-  // useEffect with dependencies (merged into hooks line)
   if (skeleton.hooks.useEffect.length > 0) {
     const effects = skeleton.hooks.useEffect.map(eff => {
-      if (eff.deps === null) return `useEffect(∞):${eff.line}`;
-      if (eff.deps === '?') return `useEffect(?):${eff.line}`;
-      return `useEffect([${eff.deps.join(',')}]):${eff.line}`;
+      if (eff.deps === null) return `useEffect(∞)`;
+      if (eff.deps === '?') return `useEffect(?)`;
+      return `useEffect([${eff.deps.join(',')}])`;
     });
     hookParts.push(...effects);
   }
@@ -739,12 +627,14 @@ export const formatSkeletonForPrompt = (skeleton) => {
     lines.push(`hooks: ${hookParts.join(', ')}`);
   }
 
-  // Classes
   if (skeleton.classes.length > 0) {
-    lines.push(`classes: ${skeleton.classes.map(c => `${c.name}:${c.line}`).join(', ')}`);
+    const classList = skeleton.classes.map(c => {
+      const marker = c.exportMarker || '';
+      return `${c.name}${marker}:${c.line}`;
+    }).join(', ');
+    lines.push(`classes: ${classList}`);
   }
 
-  // Types/Interfaces
   if (skeleton.interfaces.length > 0 || skeleton.types.length > 0) {
     const typeNames = [...skeleton.interfaces, ...skeleton.types].map(t => `${t.name}:${t.line}`).join(', ');
     lines.push(`types: ${typeNames}`);

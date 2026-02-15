@@ -10,6 +10,8 @@ import {
 import { Button } from "../ui/button";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { estimateTokens, formatTokenCount } from "../../hooks/useProjectCompact";
+import { buildGraphData } from "../../utils/generateFlowchart";
+import { FlowchartDialog } from "./FlowchartDialog";
 
 /**
  * Parse compacted output into sections by file path
@@ -68,6 +70,7 @@ function rebuildOutput(sections, disabledPaths) {
  * Dialog for toggling compacted project sections on/off
  */
 export function CompactSectionsDialog({ open, onOpenChange, compactedProject, onUpdateCompactedProject }) {
+  const [flowchartOpen, setFlowchartOpen] = useState(false);
   const [disabledPaths, setDisabledPaths] = useState(() => new Set(compactedProject?.disabledPaths || []));
   const [collapsedDirs, setCollapsedDirs] = useState(() => {
     const parsed = parseSections(compactedProject?.fullOutput || compactedProject?.output);
@@ -123,6 +126,11 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
       return next;
     });
   }, []);
+
+  const graphData = useMemo(() => {
+    const fullOutput = compactedProject?.fullOutput || compactedProject?.output;
+    return buildGraphData(fullOutput);
+  }, [compactedProject]);
 
   const enabledCount = sections.length - disabledPaths.size;
 
@@ -225,6 +233,9 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
           })}
         </div>
         <DialogFooter className="gap-2 sm:gap-2 border-t border-border pt-4">
+          <Button variant="outline" className="mr-auto" onClick={() => setFlowchartOpen(true)}>
+            Flowchart
+          </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -233,6 +244,11 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
           </Button>
         </DialogFooter>
       </DialogContent>
+      <FlowchartDialog
+        open={flowchartOpen}
+        onOpenChange={setFlowchartOpen}
+        graphData={graphData}
+      />
     </Dialog>
   );
 }
