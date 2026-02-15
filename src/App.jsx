@@ -30,7 +30,6 @@ import { useTokenUsage } from "./hooks/useTokenUsage";
 import { useTypeChecker } from "./hooks/useTypeChecker";
 import { usePromptSender } from "./hooks/usePromptSender";
 import { escapeShellPath, getRelativePath } from "./utils/pathUtils";
-import { CompactConfirmDialog } from "./components/CompactConfirmDialog";
 import { ElementPickerDialog } from "./components/ElementPickerDialog";
 import { TokenBudgetDialog } from "./components/TokenBudgetDialog";
 import { TokenAlertBanner } from "./components/TokenAlertBanner";
@@ -570,18 +569,6 @@ function App() {
       <KeyboardShortcutsDialog
         open={dialogs.showHelp}
         onOpenChange={dialogs.setShowHelp}
-      />
-      <CompactConfirmDialog
-        open={compact.compactConfirmOpen}
-        onOpenChange={compact.setCompactConfirmOpen}
-        fileCount={compact.pendingCompactResult?.fileCount || 0}
-        tokenEstimate={compact.pendingCompactResult?.tokenEstimate || 0}
-        formattedTokens={compact.pendingCompactResult?.formattedTokens || '0'}
-        originalTokens={compact.pendingCompactResult?.originalTokens || 0}
-        formattedOriginalTokens={compact.pendingCompactResult?.formattedOriginalTokens || '0'}
-        compressionPercent={compact.pendingCompactResult?.compressionPercent || 0}
-        onConfirm={compact.handleConfirmCompact}
-        onCancel={compact.handleCancelCompact}
       />
       <ElementPickerDialog
         open={elementPicker.elementPickerOpen}

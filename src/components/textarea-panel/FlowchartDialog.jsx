@@ -276,9 +276,85 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
     return set;
   }, [selectedNode, edges]);
 
-  // Pan handlers
+  // Ghost labels for off-screen connected nodes
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+  const resizeObserverRef = useRef(null);
+
+  const ghostLabels = useMemo(() => {
+    if (!connectedIds || !selectedNode || containerSize.w === 0) return [];
+    const { x: tx, y: ty, scale } = transform;
+    const vw = containerSize.w;
+    const vh = containerSize.h;
+    const PAD = 8;
+    const labels = [];
+
+    for (const id of connectedIds) {
+      if (id === selectedNode) continue;
+      const rect = positioned.get(id);
+      if (!rect) continue;
+      const node = nodes.get(id);
+      if (!node) continue;
+
+      // Node center in screen space
+      const sx = tx + (rect.x + rect.w / 2) * scale;
+      const sy = ty + (rect.y + rect.h / 2) * scale;
+
+      // Check if visible (with some margin)
+      const margin = 20;
+      if (sx >= -margin && sx <= vw + margin && sy >= -margin && sy <= vh + margin) continue;
+
+      // Determine which edge(s) the node is beyond
+      const offLeft = sx < -margin;
+      const offRight = sx > vw + margin;
+      const offTop = sy < -margin;
+      const offBottom = sy > vh + margin;
+
+      // Position: snap to edge, clamp the other axis
+      let lx, ly, anchor, arrow;
+      if (offLeft && !offTop && !offBottom) {
+        lx = PAD; ly = Math.max(PAD + 10, Math.min(vh - PAD - 10, sy)); anchor = 'start'; arrow = '← ';
+      } else if (offRight && !offTop && !offBottom) {
+        lx = vw - PAD; ly = Math.max(PAD + 10, Math.min(vh - PAD - 10, sy)); anchor = 'end'; arrow = '→ ';
+      } else if (offTop && !offLeft && !offRight) {
+        lx = Math.max(PAD + 40, Math.min(vw - PAD - 40, sx)); ly = PAD + 10; anchor = 'middle'; arrow = '↑ ';
+      } else if (offBottom && !offLeft && !offRight) {
+        lx = Math.max(PAD + 40, Math.min(vw - PAD - 40, sx)); ly = vh - PAD - 6; anchor = 'middle'; arrow = '↓ ';
+      } else if (offLeft && offTop) {
+        lx = PAD; ly = PAD + 10; anchor = 'start'; arrow = '↖ ';
+      } else if (offRight && offTop) {
+        lx = vw - PAD; ly = PAD + 10; anchor = 'end'; arrow = '↗ ';
+      } else if (offLeft && offBottom) {
+        lx = PAD; ly = vh - PAD - 6; anchor = 'start'; arrow = '↙ ';
+      } else if (offRight && offBottom) {
+        lx = vw - PAD; ly = vh - PAD - 6; anchor = 'end'; arrow = '↘ ';
+      } else {
+        continue;
+      }
+
+      labels.push({ id, name: node.fileName, x: lx, y: ly, anchor, arrow });
+    }
+
+    // De-overlap: spread labels that are too close together
+    const LABEL_H = 22;
+    labels.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < labels.length; i++) {
+      const prev = labels[i - 1];
+      const curr = labels[i];
+      const overlap = (prev.y + LABEL_H) - curr.y;
+      if (overlap > 0) {
+        curr.y += overlap;
+        // Clamp within viewport
+        curr.y = Math.min(curr.y, vh - PAD - 6);
+      }
+    }
+
+    return labels;
+  }, [connectedIds, selectedNode, positioned, nodes, transform, containerSize]);
+
+  // Pan handlers — middle mouse button only, always pans even over nodes
   const onPanStart = useCallback((e) => {
-    if (e.target.closest('g[style]')) return; // don't pan when clicking nodes
+    if (e.button !== 1) return; // middle button only
+    e.preventDefault();
     panState.current = { active: true, startX: e.clientX, startY: e.clientY, tx: transform.x, ty: transform.y };
   }, [transform]);
 
@@ -292,7 +368,8 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
     }));
   }, []);
 
-  const onPanEnd = useCallback(() => {
+  const onPanEnd = useCallback((e) => {
+    if (e.button !== 1) return;
     panState.current.active = false;
   }, []);
 
@@ -308,11 +385,20 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
     if (containerElRef.current) {
       containerElRef.current.removeEventListener('wheel', containerElRef.current._wheelFn);
     }
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
     containerElRef.current = el;
     if (el) {
       const fn = (e) => wheelHandler.current(e);
       el._wheelFn = fn;
       el.addEventListener('wheel', fn, { passive: false });
+      const ro = new ResizeObserver(([entry]) => {
+        setContainerSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+      });
+      ro.observe(el);
+      resizeObserverRef.current = ro;
     }
   }, []);
 
@@ -337,18 +423,19 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
         <DialogHeader>
           <DialogTitle>Project Flowchart</DialogTitle>
           <DialogDescription>
-            Click a node to expand its details. Scroll to zoom, drag to pan.
+            Click a node to expand its details. Scroll to zoom, middle-click drag to pan.
           </DialogDescription>
         </DialogHeader>
 
         <div
           ref={containerRef}
           className="flex-1 overflow-hidden border border-border rounded-md bg-background/50"
-          style={{ cursor: panState.current.active ? 'grabbing' : 'grab' }}
+          style={{ cursor: panState.current.active ? 'grabbing' : 'default' }}
           onMouseDown={onPanStart}
           onMouseMove={onPanMove}
           onMouseUp={onPanEnd}
-          onMouseLeave={onPanEnd}
+          onMouseLeave={() => { panState.current.active = false; }}
+          onAuxClick={(e) => e.preventDefault()}
         >
           <svg
             ref={svgRef}
@@ -416,6 +503,46 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
                 );
               })}
             </g>
+
+            {/* Ghost labels for off-screen connected nodes (screen-space) */}
+            {ghostLabels.map(gl => {
+              const labelText = `${gl.arrow}${gl.name}`;
+              const textW = measureText(labelText);
+              const boxW = textW + 16;
+              const boxH = 20;
+              // Compute box x based on text anchor
+              const boxX = gl.anchor === 'start' ? gl.x
+                : gl.anchor === 'end' ? gl.x - boxW
+                : gl.x - boxW / 2;
+              const textX = gl.anchor === 'start' ? gl.x + 8
+                : gl.anchor === 'end' ? gl.x - 8
+                : gl.x;
+              return (
+                <g key={`ghost-${gl.id}`} style={{ pointerEvents: 'none' }}>
+                  <rect
+                    x={boxX}
+                    y={gl.y - boxH / 2}
+                    width={boxW}
+                    height={boxH}
+                    rx={4}
+                    fill="rgba(15,23,42,0.85)"
+                    stroke="rgba(125,211,252,0.4)"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={textX}
+                    y={gl.y + 4}
+                    textAnchor={gl.anchor}
+                    fill="#7dd3fc"
+                    fontSize={11}
+                    fontFamily="monospace"
+                    fontWeight={500}
+                  >
+                    {labelText}
+                  </text>
+                </g>
+              );
+            })}
           </svg>
         </div>
 

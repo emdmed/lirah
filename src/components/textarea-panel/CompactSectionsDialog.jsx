@@ -96,14 +96,32 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
     return sections.reduce((sum, s) => disabledPaths.has(s.path) ? sum : sum + s.tokens, 0);
   }, [sections, disabledPaths]);
 
+  const applyDisabledPaths = useCallback((newDisabledPaths) => {
+    const fullOutput = compactedProject?.fullOutput || compactedProject?.output;
+    const allSections = parseSections(fullOutput);
+    const newOutput = rebuildOutput(allSections, newDisabledPaths);
+    const enabledSections = allSections.filter(s => !newDisabledPaths.has(s.path));
+    const newTokenEstimate = estimateTokens(newOutput);
+    onUpdateCompactedProject({
+      ...compactedProject,
+      output: newOutput,
+      fullOutput: fullOutput,
+      fileCount: enabledSections.length,
+      tokenEstimate: newTokenEstimate,
+      formattedTokens: formatTokenCount(newTokenEstimate),
+      disabledPaths: Array.from(newDisabledPaths),
+    });
+  }, [compactedProject, onUpdateCompactedProject]);
+
   const togglePath = useCallback((path) => {
     setDisabledPaths(prev => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
+      applyDisabledPaths(next);
       return next;
     });
-  }, []);
+  }, [applyDisabledPaths]);
 
   const toggleDir = useCallback((dirPath, filePaths) => {
     setDisabledPaths(prev => {
@@ -114,18 +132,36 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
       } else {
         filePaths.forEach(p => next.add(p));
       }
+      applyDisabledPaths(next);
       return next;
     });
-  }, []);
+  }, [applyDisabledPaths]);
+
+  const allDirPaths = useMemo(() => {
+    const dirs = new Set();
+    for (const s of sections) {
+      const parts = s.path.split('/');
+      parts.pop();
+      dirs.add(parts.join('/') || '.');
+    }
+    return dirs;
+  }, [sections]);
 
   const toggleDirCollapse = useCallback((dirPath) => {
     setCollapsedDirs(prev => {
-      const next = new Set(prev);
-      if (next.has(dirPath)) next.delete(dirPath);
-      else next.add(dirPath);
-      return next;
+      if (prev.has(dirPath)) {
+        // Opening this dir — collapse all others
+        const next = new Set(allDirPaths);
+        next.delete(dirPath);
+        return next;
+      } else {
+        // Collapsing this dir
+        const next = new Set(prev);
+        next.add(dirPath);
+        return next;
+      }
     });
-  }, []);
+  }, [allDirPaths]);
 
   const graphData = useMemo(() => {
     const fullOutput = compactedProject?.fullOutput || compactedProject?.output;
@@ -134,24 +170,6 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
 
   const enabledCount = sections.length - disabledPaths.size;
 
-  const handleApply = useCallback(() => {
-    const fullOutput = compactedProject?.fullOutput || compactedProject?.output;
-    const allSections = parseSections(fullOutput);
-    const newOutput = rebuildOutput(allSections, disabledPaths);
-    const enabledSections = allSections.filter(s => !disabledPaths.has(s.path));
-
-    const newTokenEstimate = estimateTokens(newOutput);
-    onUpdateCompactedProject({
-      ...compactedProject,
-      output: newOutput,
-      fullOutput: fullOutput,
-      fileCount: enabledSections.length,
-      tokenEstimate: newTokenEstimate,
-      formattedTokens: formatTokenCount(newTokenEstimate),
-      disabledPaths: Array.from(disabledPaths),
-    });
-    onOpenChange(false);
-  }, [compactedProject, disabledPaths, onUpdateCompactedProject, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -237,10 +255,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
             Flowchart
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleApply}>
-            Apply
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>

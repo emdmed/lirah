@@ -7,8 +7,10 @@ import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
 import { CompactProjectButton } from "./CompactProjectButton";
 import { CompactSectionsDialog } from "./CompactSectionsDialog";
+import { FlowchartDialog } from "./FlowchartDialog";
+import { buildGraphData } from "../../utils/generateFlowchart";
 import { AtMentionModal } from "../AtMentionModal";
-import { X } from "lucide-react";
+import { X, GitBranch } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
 import { TokenCostEstimate } from "../TokenCostEstimate";
 import { useTokenBudget } from "../../contexts/TokenBudgetContext";
@@ -102,6 +104,13 @@ export function TextareaPanel({
   }, [selectedElements, currentPath]);
 
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
+  const [flowchartOpen, setFlowchartOpen] = useState(false);
+
+  const graphData = useMemo(() => {
+    if (!compactedProject) return null;
+    const fullOutput = compactedProject.fullOutput || compactedProject.output;
+    return buildGraphData(fullOutput);
+  }, [compactedProject]);
 
   // Remove duplicate sorting - use pre-sorted results from parent
   const sortedAtMentionResults = atMentionResults || [];
@@ -278,7 +287,7 @@ export function TextareaPanel({
                   Project compacted
                 </span>
                 <span className="text-muted-foreground">
-                  {compactedProject.fileCount} files ~{compactedProject.formattedTokens} tokens
+                  {compactedProject.fileCount} files · ~{compactedProject.formattedTokens} tokens · {compactedProject.compressionPercent}% smaller
                 </span>
               </div>
             </TooltipTrigger>
@@ -286,14 +295,26 @@ export function TextareaPanel({
               <div className="space-y-1">
                 <div>Click to toggle sections on/off</div>
                 <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
-                  {compactedProject.compressionPercent}% compression ({compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens)
+                  {compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens
                 </div>
               </div>
             </TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setFlowchartOpen(true)}
+                className="p-0.5 hover:bg-white/10 rounded text-primary hover:text-primary/80"
+                title="View flowchart"
+              >
+                <GitBranch className="w-3 h-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Flowchart</TooltipContent>
+          </Tooltip>
           <button
             onClick={onClearCompactedProject}
-            className="ml-auto p-0.5 hover:bg-white/10 rounded"
+            className="p-0.5 hover:bg-white/10 rounded"
             title="Clear compacted project"
           >
             <X className="w-3 h-3" />
@@ -308,6 +329,13 @@ export function TextareaPanel({
           onOpenChange={setCompactDialogOpen}
           compactedProject={compactedProject}
           onUpdateCompactedProject={onUpdateCompactedProject}
+        />
+      )}
+      {compactedProject && graphData && (
+        <FlowchartDialog
+          open={flowchartOpen}
+          onOpenChange={setFlowchartOpen}
+          graphData={graphData}
         />
       )}
 

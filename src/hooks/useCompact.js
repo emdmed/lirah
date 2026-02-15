@@ -4,8 +4,6 @@ import { useProjectCompact, estimateTokens, formatTokenCount } from "./useProjec
 
 export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
   const { isCompacting, progress: compactProgress, compactProject } = useProjectCompact();
-  const [compactConfirmOpen, setCompactConfirmOpen] = useState(false);
-  const [pendingCompactResult, setPendingCompactResult] = useState(null);
   const [compactedProject, setCompactedProject] = useState(null);
 
   const handleCompactProject = useCallback(async () => {
@@ -32,52 +30,32 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
         ? Math.round((1 - output.length / originalSize) * 100)
         : 0;
 
-      setPendingCompactResult({
+      setCompactedProject({
         output,
+        fullOutput: output,
+        fileCount,
         tokenEstimate: compactedTokens,
         formattedTokens: formatTokenCount(compactedTokens),
         originalTokens,
         formattedOriginalTokens: formatTokenCount(originalTokens),
-        fileCount,
         compressionPercent,
+        disabledPaths: [],
       });
-      setCompactConfirmOpen(true);
+      setTextareaVisible(true);
     } catch (error) {
       console.error('Failed to compact project:', error);
     }
   }, [isCompacting, currentPath, allFiles, compactProject]);
 
-  const handleConfirmCompact = useCallback(() => {
-    if (pendingCompactResult?.output) {
-      setCompactedProject({
-        output: pendingCompactResult.output,
-        fullOutput: pendingCompactResult.output,
-        fileCount: pendingCompactResult.fileCount,
-        tokenEstimate: pendingCompactResult.tokenEstimate,
-        formattedTokens: pendingCompactResult.formattedTokens,
-        originalTokens: pendingCompactResult.originalTokens,
-        formattedOriginalTokens: pendingCompactResult.formattedOriginalTokens,
-        compressionPercent: pendingCompactResult.compressionPercent,
-        disabledPaths: [],
-      });
-      setTextareaVisible(true);
-    }
-    setPendingCompactResult(null);
-  }, [pendingCompactResult, setTextareaVisible]);
-
   const handleCancelCompact = useCallback(() => {
-    setPendingCompactResult(null);
     setCompactedProject(null);
   }, []);
 
   return {
     isCompacting,
     compactProgress,
-    compactConfirmOpen, setCompactConfirmOpen,
-    pendingCompactResult,
     compactedProject, setCompactedProject,
     handleCompactProject,
-    handleConfirmCompact,
     handleCancelCompact,
   };
 }
