@@ -38,7 +38,31 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
 
   const handleIncrementalUpdate = useCallback((changes, rootPath) => {
     setTreeData(prev => incrementallyUpdateTree(prev, changes, rootPath));
-  }, []);
+
+    // Update allFiles and search index with new untracked files
+    if (changes.newUntracked.length > 0) {
+      setAllFiles(prev => {
+        const existingPaths = new Set(prev.map(f => f.path));
+        const newEntries = changes.newUntracked
+          .filter(({ path }) => !existingPaths.has(path))
+          .map(({ path }) => {
+            const lastSep = path.lastIndexOf('/');
+            return {
+              name: path.substring(lastSep + 1),
+              path,
+              is_dir: false,
+              parent_path: path.substring(0, lastSep),
+            };
+          });
+        if (newEntries.length > 0) {
+          const updated = [...prev, ...newEntries];
+          initializeSearch(updated);
+          return updated;
+        }
+        return prev;
+      });
+    }
+  }, [initializeSearch]);
 
   const handleGitChanges = useCallback((changes) => {
     if (changes.newUntracked.length > 0 && !changes.newDeleted.length && !changes.noLongerUntracked.length) {

@@ -42,7 +42,7 @@ function buildFilesSections(selectedFiles, currentPath, fileStates, { getLineCou
   };
 
   const sections = [];
-  if (modifyFiles.length > 0) sections.push(formatFileSection('MODIFY', modifyFiles));
+  if (modifyFiles.length > 0) sections.push(formatFileSection('CAN_MODIFY', modifyFiles));
   if (doNotModifyFiles.length > 0) sections.push(formatFileSection('DO_NOT_MODIFY', doNotModifyFiles));
   if (exampleFiles.length > 0) sections.push(formatFileSection('USE_AS_EXAMPLE', exampleFiles));
 
@@ -162,7 +162,7 @@ export function usePromptSender({
       // Append orchestration prompt if checkbox is checked
       if (appendOrchestration) {
         const separator = fullCommand.trim() ? '\n\n' : '';
-        fullCommand = fullCommand + separator + 'Read and follow .orchestration/orchestration.md';
+        fullCommand = fullCommand + separator + 'Follow .orchestration/orchestration.md (read it only if not already read in this conversation)';
       }
 
       // Send text content first
