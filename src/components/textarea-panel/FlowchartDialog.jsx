@@ -37,7 +37,7 @@ const COL_THRESHOLD = 5;
 function expandSignature(sig) {
   // Find the last top-level parenthesized group: "Name(hoc)(params)" or "Name(params)"
   // Walk backwards to find the last matching '(' for the trailing ')'
-  const trimmed = sig.replace(/[*!]$/, ''); // strip export markers
+  const trimmed = sig.replace(/[*!+]$/, ''); // strip export markers
   if (!trimmed.endsWith(')')) return [sig];
   let depth = 0;
   let lastOpenIdx = -1;
@@ -56,10 +56,11 @@ function expandSignature(sig) {
   if (params.length <= COL_THRESHOLD) return [sig];
   const open = hasBraces ? '({' : '(';
   const close = hasBraces ? '})' : ')';
+  const WRAP_SIZE = Math.min(3, Math.ceil(params.length / Math.ceil(params.length / 3)));
   const lines = [`${prefix}${open}`];
-  for (let i = 0; i < params.length; i += COL_THRESHOLD) {
-    const chunk = params.slice(i, i + COL_THRESHOLD);
-    const trailing = i + COL_THRESHOLD < params.length ? ',' : '';
+  for (let i = 0; i < params.length; i += WRAP_SIZE) {
+    const chunk = params.slice(i, i + WRAP_SIZE);
+    const trailing = i + WRAP_SIZE < params.length ? ',' : '';
     lines.push(`  ${chunk.join(', ')}${trailing}`);
   }
   lines.push(close);
@@ -80,7 +81,10 @@ function getDetailGroups(node) {
     const labels = [];
     for (const item of items) {
       const cleaned = strip ? item.replace(/:\d+$/, '') : item;
-      labels.push(...expandSignature(cleaned));
+      const lines = expandSignature(cleaned);
+      for (let i = 0; i < lines.length; i++) {
+        labels.push({ text: lines[i], cont: i > 0 });
+      }
     }
     groups.push({ type, labels });
   }
@@ -111,7 +115,9 @@ function computeDetailLayout(groups) {
     const colWidths = columns.map(col => {
       let w = 0;
       for (const label of col) {
-        w = Math.max(w, tagW + 4 + measureText(label) + NODE_PAD_X * 2);
+        const lText = typeof label === 'object' ? label.text : label;
+        const lTagW = (typeof label === 'object' && label.cont) ? 0 : tagW + 4;
+        w = Math.max(w, lTagW + measureText(lText) + NODE_PAD_X * 2);
       }
       return w;
     });
@@ -325,16 +331,19 @@ const GraphNode = React.memo(function GraphNode({ node, rect, expanded, highligh
       for (let ci = 0; ci < row.columns.length; ci++) {
         const col = row.columns[ci];
         for (let li = 0; li < col.length; li++) {
+          const label = col[li];
+          const isCont = typeof label === 'object' && label.cont;
+          const labelText = typeof label === 'object' ? label.text : label;
           const itemX = rect.x + NODE_PAD_X + colX;
           const itemY = rect.y + NODE_H_COLLAPSED + NODE_PAD_Y + (lineOffset + li) * NODE_LINE_H;
           detailElements.push(
             <g key={`${row.type}-${ci}-${li}`}>
-              <rect x={itemX} y={itemY - 4} width={tagW} height={13} rx={2} fill={tagBg} />
-              <text x={itemX + 3} y={itemY + 7} fill={color} fontSize={8} fontFamily="monospace" fontWeight={600}>
+              {!isCont && <rect x={itemX} y={itemY - 4} width={tagW} height={13} rx={2} fill={tagBg} />}
+              {!isCont && <text x={itemX + 3} y={itemY + 7} fill={color} fontSize={8} fontFamily="monospace" fontWeight={600}>
                 {typeTag}
-              </text>
-              <text x={itemX + tagW + 4} y={itemY + 8} fill={color} fontSize={10} fontFamily="monospace" opacity={0.85}>
-                {col[li]}
+              </text>}
+              <text x={isCont ? itemX : itemX + tagW + 4} y={itemY + 8} fill={color} fontSize={10} fontFamily="monospace" opacity={0.85}>
+                {labelText}
               </text>
             </g>
           );
