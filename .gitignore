@@ -25,3 +25,4 @@ dist-ssr
 win-macOs-support.md
 /docs
 .claude
+.orchestration

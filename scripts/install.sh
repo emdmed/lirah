@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 # Nevo Terminal Installation Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/emdmed/ao-terminal/main/scripts/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
 
-set -e
+set -euo pipefail
 
 REPO="emdmed/lirah"
 APP_NAME="lirah"
@@ -51,16 +51,27 @@ detect_distro() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         DISTRO_ID="$ID"
-        DISTRO_ID_LIKE="$ID_LIKE"
+        DISTRO_ID_LIKE="${ID_LIKE:-}"
     else
         error "Cannot detect distribution (missing /etc/os-release)"
     fi
     info "Detected distribution: $DISTRO_ID"
 }
 
+# Fetch a URL to stdout (uses curl or wget)
+fetch() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- "$1"
+    else
+        error "Neither curl nor wget found. Please install one of them."
+    fi
+}
+
 # Get latest release version from GitHub
 get_latest_version() {
-    VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    VERSION=$(fetch "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
     if [ -z "$VERSION" ]; then
         error "Failed to get latest version from GitHub"
     fi
@@ -108,7 +119,7 @@ get_checksum() {
     FILENAME="$1"
     CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.sha256"
 
-    CHECKSUM=$(curl -fsSL "$CHECKSUMS_URL" 2>/dev/null | grep "$FILENAME" | cut -d' ' -f1)
+    CHECKSUM=$(fetch "$CHECKSUMS_URL" 2>/dev/null | grep -F "$FILENAME" | grep -v '\.sig' | cut -d' ' -f1)
     if [ -z "$CHECKSUM" ]; then
         warn "Could not fetch checksum for $FILENAME"
         echo ""
@@ -175,8 +186,7 @@ install_rpm() {
 install_appimage() {
     # Tauri generates AppImage with format: {ProductName}_{version}_{arch}.AppImage
     FILENAME="${DISPLAY_NAME}_${VERSION_NUM}_${DEB_ARCH}.AppImage"
-    FILENAME_URL="$FILENAME"
-    URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME_URL"
+    URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
 
     INSTALL_DIR="$HOME/.local/bin"
     APPIMAGE_PATH="$INSTALL_DIR/${APP_NAME}.AppImage"
@@ -184,12 +194,13 @@ install_appimage() {
     mkdir -p "$INSTALL_DIR"
 
     download "$URL" "$APPIMAGE_PATH"
-    chmod +x "$APPIMAGE_PATH"
 
     CHECKSUM=$(get_checksum "$FILENAME")
     if [ -n "$CHECKSUM" ]; then
         verify_checksum "$APPIMAGE_PATH" "$CHECKSUM"
     fi
+
+    chmod +x "$APPIMAGE_PATH"
 
     # Create desktop entry
     DESKTOP_DIR="$HOME/.local/share/applications"
@@ -207,7 +218,11 @@ Categories=Development;Utility;
 StartupWMClass=$APP_NAME
 EOF
 
+    # Create symlink so 'lirah' works as a command
+    ln -sf "$APPIMAGE_PATH" "$INSTALL_DIR/$APP_NAME"
+
     info "AppImage installed to: $APPIMAGE_PATH"
+    info "Symlinked as: $INSTALL_DIR/$APP_NAME"
     info "Desktop entry created at: $DESKTOP_DIR/${APP_NAME}.desktop"
 
     # Check if ~/.local/bin is in PATH
@@ -219,7 +234,208 @@ EOF
             ;;
     esac
 
-    info "Installation complete! You can run '$APP_NAME.AppImage' or launch from your application menu."
+    info "Installation complete! Run '$APP_NAME' from terminal or launch from your application menu."
+}
+
+# Prompt user to install a single dependency
+prompt_install() {
+    PKG_NAME="$1"
+    INSTALL_CMD="$2"
+    printf "${YELLOW}[MISSING]${NC} %s is not installed.\n" "$PKG_NAME"
+    printf "  Install with: %s\n" "$INSTALL_CMD"
+    printf "  Install now? [y/N] "
+    read -r REPLY < /dev/tty
+    case "$REPLY" in
+        [yY]|[yY][eE][sS])
+            info "Installing $PKG_NAME..."
+            eval "$INSTALL_CMD" || { warn "Failed to install $PKG_NAME"; return 1; }
+            info "$PKG_NAME installed successfully"
+            ;;
+        *)
+            warn "Skipping $PKG_NAME"
+            return 1
+            ;;
+    esac
+}
+
+# Check if a command exists
+has_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Check if a package is installed (distro-specific)
+has_pkg() {
+    PKG="$1"
+    case "$DISTRO_ID" in
+        ubuntu|debian|linuxmint|pop|elementary|zorin|kali)
+            dpkg -s "$PKG" >/dev/null 2>&1
+            ;;
+        arch|manjaro|endeavouros|garuda|artix)
+            pacman -Qi "$PKG" >/dev/null 2>&1 || pacman -Qg "$PKG" >/dev/null 2>&1 || return 1
+            ;;
+        fedora|rhel|centos|rocky|alma|nobara)
+            rpm -q "$PKG" >/dev/null 2>&1
+            ;;
+        opensuse*|suse|sles)
+            rpm -q "$PKG" >/dev/null 2>&1
+            ;;
+        *)
+            # Fallback: check ID_LIKE
+            case "$DISTRO_ID_LIKE" in
+                *debian*|*ubuntu*) dpkg -s "$PKG" >/dev/null 2>&1 ;;
+                *fedora*|*rhel*|*suse*) rpm -q "$PKG" >/dev/null 2>&1 ;;
+                *) return 1 ;;
+            esac
+            ;;
+    esac
+}
+
+# Check and prompt for Tauri build dependencies
+check_tauri_deps() {
+    info "Checking Tauri build dependencies..."
+    MISSING=0
+
+    # Common tools (check via command)
+    for CMD in curl wget file; do
+        if ! has_cmd "$CMD"; then
+            case "$DISTRO_ID" in
+                ubuntu|debian|linuxmint|pop|elementary|zorin|kali)
+                    prompt_install "$CMD" "sudo apt install -y $CMD" || MISSING=$((MISSING + 1))
+                    ;;
+                arch|manjaro|endeavouros|garuda|artix)
+                    prompt_install "$CMD" "sudo pacman -S --needed --noconfirm $CMD" || MISSING=$((MISSING + 1))
+                    ;;
+                fedora|rhel|centos|rocky|alma|nobara)
+                    prompt_install "$CMD" "sudo dnf install -y $CMD" || MISSING=$((MISSING + 1))
+                    ;;
+                *)
+                    warn "$CMD is missing — please install it manually"
+                    MISSING=$((MISSING + 1))
+                    ;;
+            esac
+        fi
+    done
+
+    # Distro-specific library packages
+    case "$DISTRO_ID" in
+        ubuntu|debian|linuxmint|pop|elementary|zorin|kali)
+            DEB_DEPS="libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libgtk-3-dev"
+            for PKG in $DEB_DEPS; do
+                if ! has_pkg "$PKG"; then
+                    prompt_install "$PKG" "sudo apt install -y $PKG" || MISSING=$((MISSING + 1))
+                fi
+            done
+            ;;
+        arch|manjaro|endeavouros|garuda|artix)
+            ARCH_DEPS="webkit2gtk-4.1 base-devel openssl gtk3 appmenu-gtk-module libappindicator-gtk3 librsvg xdotool"
+            for PKG in $ARCH_DEPS; do
+                if ! has_pkg "$PKG"; then
+                    prompt_install "$PKG" "sudo pacman -S --needed --noconfirm $PKG" || MISSING=$((MISSING + 1))
+                fi
+            done
+            ;;
+        fedora|rhel|centos|rocky|alma|nobara)
+            FED_DEPS="webkit2gtk4.1-devel openssl-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel libxdo-devel"
+            for PKG in $FED_DEPS; do
+                if ! has_pkg "$PKG"; then
+                    prompt_install "$PKG" "sudo dnf install -y $PKG" || MISSING=$((MISSING + 1))
+                fi
+            done
+            # C development group
+            if ! dnf group info "C Development Tools and Libraries" 2>/dev/null | grep -q "Installed"; then
+                prompt_install "C Development Tools" "sudo dnf group install -y 'C Development Tools and Libraries'" || MISSING=$((MISSING + 1))
+            fi
+            ;;
+        opensuse*|suse|sles)
+            SUSE_DEPS="webkit2gtk3-devel libopenssl-devel gtk3-devel libappindicator3-devel librsvg-devel libxdo-devel"
+            for PKG in $SUSE_DEPS; do
+                if ! has_pkg "$PKG"; then
+                    prompt_install "$PKG" "sudo zypper install -y $PKG" || MISSING=$((MISSING + 1))
+                fi
+            done
+            ;;
+        *)
+            case "$DISTRO_ID_LIKE" in
+                *debian*|*ubuntu*)
+                    DEB_DEPS="libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libgtk-3-dev"
+                    for PKG in $DEB_DEPS; do
+                        if ! has_pkg "$PKG"; then
+                            prompt_install "$PKG" "sudo apt install -y $PKG" || MISSING=$((MISSING + 1))
+                        fi
+                    done
+                    ;;
+                *fedora*|*rhel*)
+                    FED_DEPS="webkit2gtk4.1-devel openssl-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel libxdo-devel"
+                    for PKG in $FED_DEPS; do
+                        if ! has_pkg "$PKG"; then
+                            prompt_install "$PKG" "sudo dnf install -y $PKG" || MISSING=$((MISSING + 1))
+                        fi
+                    done
+                    ;;
+                *)
+                    warn "Unknown distro — cannot check Tauri dependencies automatically"
+                    warn "See https://v2.tauri.app/start/prerequisites/ for required packages"
+                    ;;
+            esac
+            ;;
+    esac
+
+    # Check Rust toolchain
+    if ! has_cmd rustc; then
+        printf "${YELLOW}[MISSING]${NC} Rust toolchain is not installed.\n"
+        printf "  Install with: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh\n"
+        printf "  Install now? [y/N] "
+        read -r REPLY < /dev/tty
+        case "$REPLY" in
+            [yY]|[yY][eE][sS])
+                fetch https://sh.rustup.rs | sh -s -- -y || { warn "Failed to install Rust"; MISSING=$((MISSING + 1)); }
+                . "$HOME/.cargo/env"
+                info "Rust installed successfully"
+                ;;
+            *)
+                warn "Skipping Rust — required for building Tauri apps"
+                MISSING=$((MISSING + 1))
+                ;;
+        esac
+    else
+        info "Rust $(rustc --version | cut -d' ' -f2) found"
+    fi
+
+    # Check Node.js
+    if ! has_cmd node; then
+        printf "${YELLOW}[MISSING]${NC} Node.js is not installed.\n"
+        printf "  Recommended: install via nvm (https://github.com/nvm-sh/nvm)\n"
+        printf "  Install nvm + Node.js now? [y/N] "
+        read -r REPLY < /dev/tty
+        case "$REPLY" in
+            [yY]|[yY][eE][sS])
+                fetch https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash || { warn "Failed to install nvm"; MISSING=$((MISSING + 1)); }
+                export NVM_DIR="${HOME}/.nvm"
+                # shellcheck source=/dev/null
+                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                nvm install --lts || { warn "Failed to install Node.js"; MISSING=$((MISSING + 1)); }
+                info "Node.js $(node --version) installed successfully"
+                ;;
+            *)
+                warn "Skipping Node.js — required for building the frontend"
+                MISSING=$((MISSING + 1))
+                ;;
+        esac
+    else
+        info "Node.js $(node --version) found"
+    fi
+
+    if [ "$MISSING" -gt 0 ]; then
+        warn "$MISSING dependency/dependencies were skipped or failed to install"
+        printf "  Continue with installation anyway? [y/N] "
+        read -r REPLY < /dev/tty
+        case "$REPLY" in
+            [yY]|[yY][eE][sS]) ;;
+            *) error "Aborting installation due to missing dependencies" ;;
+        esac
+    else
+        info "All Tauri dependencies are satisfied!"
+    fi
 }
 
 # Main installation logic
@@ -233,6 +449,10 @@ main() {
 
     detect_arch
     detect_distro
+
+    # Check Tauri build dependencies before proceeding
+    check_tauri_deps
+
     get_latest_version
 
     # Determine installation method based on distro
