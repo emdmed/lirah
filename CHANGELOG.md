@@ -2,6 +2,52 @@
 
 All notable changes to Lirah will be documented in this file.
 
+## [0.1.13] - 2026-02-16
+
+### Added
+
+- **Token Usage Dashboard v2** - Complete overhaul of token analytics with comprehensive visualizations:
+  - Calendar heatmap showing daily token usage patterns
+  - Historical browser for exploring past sessions with detailed metrics
+  - Model insights panel breaking down usage by AI model (Claude 3.5 Sonnet, GPT-4o, etc.)
+  - Model pie chart for visual cost distribution
+  - Project comparison tool for analyzing token usage across multiple projects
+  - Session efficiency panel tracking cost per message and success rates
+  - Interactive token line chart with time range filtering and cache token toggle
+  - Usage summary panel with real-time statistics
+  - Export functionality for generating detailed usage reports
+  - Filter panel with date range, project, and model filtering capabilities
+
+- **Flowchart Generation** - Generate visual flowcharts from natural language descriptions using Mermaid syntax. Accessible from the textarea panel to create diagrams for architecture, workflows, and processes.
+
+- **Auto Commit** - Automatic commit generation and staging with AI assistance. Features configurable commit message templates, keyboard shortcuts in the commit dialog (Ctrl+Enter to commit, Escape to cancel), and integration with the existing git workflow.
+
+- **Auto Changelog** - Automated changelog generation based on recent commits. Analyzes commit history and suggests changelog entries following Keep a Changelog format.
+
+- **nvim & lazygit Shortcuts** - Quick launch shortcuts for opening neovim and lazygit directly in the current working directory. Accessible via the secondary terminal picker or dedicated keybindings.
+
+- **Token Alert Banner** - Visual warning banner when approaching or exceeding configured token budget thresholds.
+
+- **Token Cost Estimation** - Real-time cost estimates displayed in the textarea panel showing anticipated token usage before sending prompts.
+
+- **Export Report Dialog** - Dedicated dialog for exporting token usage data in multiple formats (JSON, CSV) with date range and filter selection.
+
+### Changed
+
+- **Major App Refactoring** - Significant restructuring of React components and hooks for improved maintainability and performance
+- **Improved File Context & Orchestration** - Enhanced file selection context with better state management and orchestration workflow integration
+- **Token Dashboard Performance** - Optimized rendering with deferred loading, data caching, and improved chart performance
+- **Splash Screen Improvements** - Enhanced loading experience with better visual feedback
+- **Install Script** - Robust installation script with dependency checks, CLI symlink creation, and improved fetch handling
+- **Secondary Terminal** - Better integration with quick-launch shortcuts and directory synchronization
+
+### Fixed
+
+- Token calculation accuracy for various file types
+- Dashboard data loading and caching issues
+- File tree selection state management
+- Dialog focus and keyboard navigation
+
 ## [0.1.12] - 2026-02-11
 
 ### Security
