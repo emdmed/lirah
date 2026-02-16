@@ -224,7 +224,7 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               <MoreVertical className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80 text-xs [&_[role=menuitem]]:py-1 [&_[role=menuitem]]:text-xs [&_[role=menuitem]_svg]:size-3">
+          <DropdownMenuContent align="end" className="w-120 text-xs [&_[role=menuitem]]:py-1 [&_[role=menuitem]]:text-xs [&_[role=menuitem]_svg]:size-3">
             <DropdownMenuItem
               onClick={onLaunchOrchestration}
               disabled={!sessionId}

@@ -7,6 +7,7 @@ export function useSecondaryTerminal(terminalRef) {
   const [secondaryFullscreen, setSecondaryFullscreen] = useState(false);
   const [secondarySessionId, setSecondarySessionId] = useState(null);
   const [secondaryKey, setSecondaryKey] = useState(0);
+  const [pendingCommand, setPendingCommand] = useState(null);
   const secondaryTerminalRef = useRef(null);
 
   const closeSecondaryTerminal = useCallback(() => {
@@ -17,8 +18,16 @@ export function useSecondaryTerminal(terminalRef) {
     setSecondaryVisible(false);
     setSecondaryFocused(false);
     setSecondaryFullscreen(false);
+    setPendingCommand(null);
     setSecondaryKey(k => k + 1);
   }, [secondarySessionId]);
+
+  const openWithCommand = useCallback((command) => {
+    if (secondaryVisible) closeSecondaryTerminal();
+    setPendingCommand(command);
+    setSecondaryVisible(true);
+    setSecondaryFullscreen(true);
+  }, [secondaryVisible, closeSecondaryTerminal]);
 
   const handlePickerVisibilityChange = useCallback((isVisible) => {
     if (isVisible && terminalRef.current?.blur) {
@@ -39,5 +48,8 @@ export function useSecondaryTerminal(terminalRef) {
     secondaryTerminalRef,
     closeSecondaryTerminal,
     handlePickerVisibilityChange,
+    pendingCommand,
+    setPendingCommand,
+    openWithCommand,
   };
 }

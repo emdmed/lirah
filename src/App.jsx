@@ -375,6 +375,18 @@ function App() {
         else secondary.setSecondaryVisible(true);
         return;
       }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'l') {
+        e.preventDefault();
+        e.stopPropagation();
+        secondary.openWithCommand('lazygit');
+        return;
+      }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'n') {
+        e.preventDefault();
+        e.stopPropagation();
+        secondary.openWithCommand('nvim');
+        return;
+      }
       if (secondary.secondaryFocused) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'f' && viewMode === 'tree' && sidebar.sidebarOpen) {
         e.preventDefault();
@@ -403,7 +415,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [viewMode, sidebar.sidebarOpen, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, autoCommit.trigger, autoCommit.stage, autoCommit.quickCommit, currentPath]);
+  }, [viewMode, sidebar.sidebarOpen, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.stage, autoCommit.quickCommit, currentPath]);
 
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
@@ -541,6 +553,7 @@ function App() {
               fullscreen={secondary.secondaryFullscreen}
               onToggleFullscreen={() => secondary.setSecondaryFullscreen(f => !f)}
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
+              initialCommand={secondary.pendingCommand}
             />
           )
         }

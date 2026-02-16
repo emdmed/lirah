@@ -73,8 +73,8 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
-export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange }, ref) => {
-  const [selectedCommand, setSelectedCommand] = useState(null);
+export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange, initialCommand: initialCommandProp }, ref) => {
+  const [selectedCommand, setSelectedCommand] = useState(initialCommandProp || null);
 
   // Notify parent when picker visibility changes
   useEffect(() => {
