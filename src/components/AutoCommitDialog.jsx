@@ -75,6 +75,15 @@ export function AutoCommitDialog({ autoCommit }) {
                 <textarea
                   value={commitMessage}
                   onChange={(e) => setCommitMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && stage === 'ready' && commitMessage.trim()) {
+                      e.preventDefault();
+                      confirm(commitMessage);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancel();
+                    }
+                  }}
                   className="w-full h-20 text-sm font-mono bg-background border border-border rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
                   disabled={stage === 'committing'}
                 />
