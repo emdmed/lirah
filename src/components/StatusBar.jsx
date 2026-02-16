@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff, Coins, BarChart3 } from 'lucide-react';
+import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff, Coins, BarChart3, FileText, FileX, Loader2, Check, AlertTriangle } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { useTokenBudget } from '../contexts/TokenBudgetContext';
@@ -119,7 +119,7 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
   );
 }
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings, onOpenDashboard }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus, onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
@@ -142,6 +142,18 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
 
       {/* Right section: Budget, CLI selector, Theme, and Settings menu */}
       <div className="flex items-center gap-2">
+        {changelogStatus && (
+          <span className="flex items-center gap-1 px-1.5 text-xs opacity-80">
+            {changelogStatus === 'updating' && <Loader2 className="w-3 h-3 animate-spin" />}
+            {changelogStatus === 'done' && <Check className="w-3 h-3" style={{ color: '#76946A' }} />}
+            {changelogStatus === 'error' && <AlertTriangle className="w-3 h-3" style={{ color: '#E82424' }} />}
+            <span>
+              {changelogStatus === 'updating' && 'Updating changelog...'}
+              {changelogStatus === 'done' && 'Changelog updated'}
+              {changelogStatus === 'error' && 'Changelog failed'}
+            </span>
+          </span>
+        )}
         <Button
           variant="ghost"
           size="xs"
@@ -241,6 +253,28 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
               )}
               File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
               <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onOpenAutoChangelogDialog}
+              className="cursor-pointer"
+            >
+              {autoChangelogEnabled ? (
+                <FileText className="mr-1.5" style={{ color: '#76946A' }} />
+              ) : (
+                <FileX className="mr-1.5" style={{ color: '#E82424' }} />
+              )}
+              Auto Changelog...
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onOpenAutoCommitConfig}
+              className="cursor-pointer"
+            >
+              {(() => {
+                const Icon = CLI_DISPLAY[autoCommitCli]?.icon || Bot;
+                return <Icon className="mr-1.5" />;
+              })()}
+              Auto Commit...
+              <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={onToggleTitleBar}

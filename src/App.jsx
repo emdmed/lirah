@@ -50,6 +50,11 @@ import { useFileSelection } from "./contexts/FileSelectionContext";
 import { useSidebarSearch } from "./hooks/useSidebarSearch";
 import { useTreeView } from "./hooks/useTreeView";
 import { useSidebar } from "./hooks/useSidebar";
+import { useAutoChangelog } from "./hooks/useAutoChangelog";
+import { AutoChangelogDialog } from "./components/AutoChangelogDialog";
+import { useAutoCommit } from "./hooks/useAutoCommit";
+import { AutoCommitDialog } from "./components/AutoCommitDialog";
+import { AutoCommitConfigDialog } from "./components/AutoCommitConfigDialog";
 
 function App() {
   const { theme } = useTheme();
@@ -72,6 +77,8 @@ function App() {
   // Template/orchestration state
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [autoChangelogDialogOpen, setAutoChangelogDialogOpen] = useState(false);
+  const [autoCommitConfigOpen, setAutoCommitConfigOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [appendOrchestration, setAppendOrchestration] = useState(true);
   const [orchestrationTokenEstimate, setOrchestrationTokenEstimate] = useState(null);
@@ -106,6 +113,16 @@ function App() {
   }, [currentPath]);
 
   const secondary = useSecondaryTerminal(terminalRef);
+
+  const { changelogStatus, dismissChangelogStatus } = useAutoChangelog(
+    currentPath,
+    settings.autoChangelogEnabled,
+    settings.autoChangelogTarget,
+    settings.autoChangelogTrigger,
+    settings.autoChangelogCli,
+  );
+
+  const autoCommit = useAutoCommit(settings.autoCommitCli, settings.autoCommitCustomPrompt);
 
   const sidebarSearch = useSidebarSearch();
 
@@ -375,10 +392,18 @@ function App() {
         e.preventDefault();
         setDashboardOpen(true);
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === ' ') {
+        e.preventDefault();
+        if (autoCommit.stage === 'idle') {
+          autoCommit.trigger(currentPath);
+        } else {
+          autoCommit.quickCommit();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [viewMode, sidebar.sidebarOpen, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal]);
+  }, [viewMode, sidebar.sidebarOpen, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, autoCommit.trigger, autoCommit.stage, autoCommit.quickCommit, currentPath]);
 
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
@@ -486,6 +511,11 @@ function App() {
             secondaryTerminalFocused={secondary.secondaryFocused}
             onOpenDashboard={() => setDashboardOpen(true)}
             onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
+            autoChangelogEnabled={settings.autoChangelogEnabled}
+            changelogStatus={changelogStatus}
+            onOpenAutoChangelogDialog={() => setAutoChangelogDialogOpen(true)}
+            autoCommitCli={settings.autoCommitCli}
+            onOpenAutoCommitConfig={() => setAutoCommitConfigOpen(true)}
             onToggleSandbox={() => {
               settings.setSandboxEnabled(prev => !prev);
               settings.setSandboxFailed(false);
@@ -596,6 +626,20 @@ function App() {
         onOpenChange={setBudgetDialogOpen}
         projectPath={currentPath}
       />
+      <AutoChangelogDialog
+        open={autoChangelogDialogOpen}
+        onOpenChange={setAutoChangelogDialogOpen}
+        enabled={settings.autoChangelogEnabled}
+        trigger={settings.autoChangelogTrigger}
+        targetFile={settings.autoChangelogTarget}
+        cli={settings.autoChangelogCli}
+        onSave={({ enabled, trigger, targetFile, cli }) => {
+          settings.setAutoChangelogEnabled(enabled);
+          settings.setAutoChangelogTrigger(trigger);
+          settings.setAutoChangelogTarget(targetFile);
+          settings.setAutoChangelogCli(cli);
+        }}
+      />
       <TokenDashboard
         open={dashboardOpen}
         onOpenChange={setDashboardOpen}
@@ -604,6 +648,17 @@ function App() {
         refreshStats={refreshProjectStats}
         projectPath={currentPath}
         theme={theme}
+      />
+      <AutoCommitDialog autoCommit={autoCommit} />
+      <AutoCommitConfigDialog
+        open={autoCommitConfigOpen}
+        onOpenChange={setAutoCommitConfigOpen}
+        cli={settings.autoCommitCli}
+        customPrompt={settings.autoCommitCustomPrompt}
+        onSave={({ cli, customPrompt }) => {
+          settings.setAutoCommitCli(cli);
+          settings.setAutoCommitCustomPrompt(customPrompt);
+        }}
       />
       <SplashScreen
         visible={splashVisible}

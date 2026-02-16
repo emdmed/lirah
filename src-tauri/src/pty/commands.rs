@@ -2,8 +2,10 @@ use tauri::{AppHandle, Emitter};
 use std::io::Read;
 use std::sync::atomic::Ordering;
 use std::thread;
+use std::path::PathBuf;
 use uuid::Uuid;
 use crate::state::AppState;
+use crate::commit_watcher::CommitWatcherStore;
 use crate::pty::manager;
 
 #[tauri::command]
@@ -154,4 +156,207 @@ pub fn close_terminal(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn spawn_hidden_terminal(
+    project_dir: String,
+    command: String,
+    app: AppHandle,
+    state: tauri::State<AppState>,
+) -> Result<String, String> {
+    use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    let session_id = Uuid::new_v4().to_string();
+    eprintln!("[hidden-terminal] Spawning: {} in {}", command, project_dir);
+
+    let pty_system = NativePtySystem::default();
+    let pty_pair = pty_system
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("Failed to open PTY: {}", e))?;
+
+    // Parse the command: run via shell -c
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    let mut cmd = CommandBuilder::new(&shell);
+    cmd.args(&["-lc", &command]);
+    cmd.env("TERM", "xterm-256color");
+    cmd.cwd(&project_dir);
+
+    let child = pty_pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| format!("Failed to spawn hidden terminal: {}", e))?;
+
+    let master = pty_pair.master;
+    let writer = master
+        .take_writer()
+        .map_err(|e| format!("Failed to take writer: {}", e))?;
+
+    let mut reader = master
+        .try_clone_reader()
+        .map_err(|e| format!("Failed to clone reader: {}", e))?;
+
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_flag = shutdown.clone();
+
+    let session_id_clone = session_id.clone();
+    let app_clone = app.clone();
+    let state_inner = state.inner().clone();
+
+    thread::spawn(move || {
+        let mut buf = [0u8; 8192];
+        loop {
+            if shutdown_flag.load(Ordering::SeqCst) {
+                break;
+            }
+            match reader.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    if shutdown_flag.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let _ = app_clone.emit(
+                        "hidden-terminal-output",
+                        serde_json::json!({
+                            "session_id": session_id_clone,
+                            "data": data,
+                        }),
+                    );
+                }
+                Ok(_) => {
+                    // Process exited - auto-cleanup
+                    let _ = app_clone.emit(
+                        "hidden-terminal-closed",
+                        serde_json::json!({"session_id": session_id_clone}),
+                    );
+                    // Remove from state
+                    if let Ok(mut st) = state_inner.lock() {
+                        st.pty_sessions.remove(&session_id_clone);
+                    }
+                    break;
+                }
+                Err(_) => {
+                    let _ = app_clone.emit(
+                        "hidden-terminal-closed",
+                        serde_json::json!({"session_id": session_id_clone, "error": true}),
+                    );
+                    if let Ok(mut st) = state_inner.lock() {
+                        st.pty_sessions.remove(&session_id_clone);
+                    }
+                    break;
+                }
+            }
+        }
+    });
+
+    let session = crate::state::PtySession {
+        master,
+        child,
+        writer,
+        shutdown,
+        sandboxed: false,
+    };
+
+    state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?
+        .pty_sessions
+        .insert(session_id.clone(), session);
+
+    Ok(session_id)
+}
+
+#[tauri::command]
+pub fn start_commit_watcher(
+    repo_path: String,
+    app: AppHandle,
+    store: tauri::State<CommitWatcherStore>,
+) -> Result<(), String> {
+    let path = PathBuf::from(&repo_path);
+    crate::commit_watcher::start_watcher(path, app, store.inner().clone())
+}
+
+#[tauri::command]
+pub fn stop_commit_watcher(
+    repo_path: String,
+    store: tauri::State<CommitWatcherStore>,
+) -> Result<(), String> {
+    let path = PathBuf::from(&repo_path);
+    crate::commit_watcher::stop_watcher(&path, store.inner())
+}
+
+#[tauri::command]
+pub fn get_committable_files(repo_path: String) -> Result<Vec<serde_json::Value>, String> {
+    let output = std::process::Command::new("git")
+        .args(&["status", "--porcelain"])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to run git status: {}", e))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut files = Vec::new();
+
+    for line in stdout.lines() {
+        if line.len() < 4 { continue; }
+        let status_code = &line[0..2];
+        let path = line[3..].trim().to_string();
+
+        // Determine status label
+        let status = match status_code.trim() {
+            "M" | "MM" | "AM" => "modified",
+            "A" => "added",
+            "D" => "deleted",
+            "R" | "RM" => "renamed",
+            "??" => "untracked",
+            _ => "modified",
+        };
+
+        // Filter out excluded paths and extensions
+        let lower = path.to_lowercase();
+        if lower.starts_with(".claude/") || lower == ".claude" {
+            continue;
+        }
+        if lower.ends_with(".env") || lower.ends_with(".txt") {
+            continue;
+        }
+        if lower.ends_with(".md") {
+            let filename = path.rsplit('/').next().unwrap_or(&path).to_lowercase();
+            if !filename.starts_with("readme") {
+                continue;
+            }
+        }
+
+        files.push(serde_json::json!({ "path": path, "status": status }));
+    }
+
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn run_git_command(repo_path: String, args: Vec<String>) -> Result<String, String> {
+    let output = std::process::Command::new("git")
+        .args(&args)
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to run git: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        if !stderr.is_empty() {
+            return Err(stderr);
+        }
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }

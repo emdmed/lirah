@@ -25,6 +25,12 @@ export function useTerminalSettings() {
   const [networkIsolation, setNetworkIsolation] = useLocalStorageState('nevo-terminal:network-isolation', false);
   const [showTitleBar, setShowTitleBar] = useLocalStorageState('nevo-terminal:show-title-bar', true);
   const [keepFilesAfterSend, setKeepFilesAfterSend] = useLocalStorageState('nevo-terminal:keep-files-after-send', false);
+  const [autoChangelogEnabled, setAutoChangelogEnabled] = useLocalStorageState('nevo-terminal:auto-changelog-enabled', false);
+  const [autoChangelogTarget, setAutoChangelogTarget] = useLocalStorageState('nevo-terminal:auto-changelog-target', 'CHANGELOG.md');
+  const [autoChangelogTrigger, setAutoChangelogTrigger] = useLocalStorageState('nevo-terminal:auto-changelog-trigger', 'commit');
+  const [autoChangelogCli, setAutoChangelogCli] = useLocalStorageState('nevo-terminal:auto-changelog-cli', 'claude-code');
+  const [autoCommitCli, setAutoCommitCli] = useLocalStorageState('nevo-terminal:auto-commit-cli', 'claude-code');
+  const [autoCommitCustomPrompt, setAutoCommitCustomPrompt] = useLocalStorageState('nevo-terminal:auto-commit-custom-prompt', '');
 
   const [selectedCli, setSelectedCli] = useState(() => {
     try {
@@ -47,5 +53,11 @@ export function useTerminalSettings() {
     showTitleBar, setShowTitleBar,
     keepFilesAfterSend, setKeepFilesAfterSend,
     selectedCli, setSelectedCli,
+    autoChangelogEnabled, setAutoChangelogEnabled,
+    autoChangelogTarget, setAutoChangelogTarget,
+    autoChangelogTrigger, setAutoChangelogTrigger,
+    autoChangelogCli, setAutoChangelogCli,
+    autoCommitCli, setAutoCommitCli,
+    autoCommitCustomPrompt, setAutoCommitCustomPrompt,
   };
 }
