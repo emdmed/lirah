@@ -360,3 +360,26 @@ pub fn run_git_command(repo_path: String, args: Vec<String>) -> Result<String, S
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
+
+#[tauri::command(async)]
+pub fn generate_commit_message(project_dir: String, cli: String, prompt: String) -> Result<String, String> {
+    let command = match cli.as_str() {
+        "opencode" => format!("opencode run -m opencode/kimi-k2.5-free '{}'", prompt.replace('\'', "'\\''")),
+        _ => format!("claude --print '{}'", prompt.replace('\'', "'\\''")),
+    };
+
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    let output = std::process::Command::new(&shell)
+        .args(&["-lc", &command])
+        .current_dir(&project_dir)
+        .env("TERM", "xterm-256color")
+        .output()
+        .map_err(|e| format!("Failed to run LLM command: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(format!("LLM command failed: {}", stderr));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}

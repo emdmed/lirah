@@ -1,15 +1,5 @@
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-
-const stripAnsi = (str) => str
-  .replace(/\x1b\[[0-9;?<>=!]*[a-zA-Z~]/g, '') // CSI sequences (all variants: ?25h, <u, etc.)
-  .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC sequences
-  .replace(/\x1b[()][A-Z0-9]/g, '')          // Character set selection
-  .replace(/\x1b[>=<]/g, '')                  // Keypad/cursor modes
-  .replace(/\x1b\x1b/g, '')                  // Double escape
-  .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '') // Control characters
-  .replace(/\[<\d*[a-zA-Z]/g, '');            // Stray bracketed sequences without ESC
 
 const DEFAULT_PROMPT = 'Generate a concise conventional commit message for this diff. Reply with ONLY the commit message, no explanation, no markdown formatting, no backticks:';
 
@@ -53,53 +43,24 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       const stagedDiff = await invoke('run_git_command', { repoPath: currentPath, args: ['diff', '--staged'] });
       setDiff(stagedDiff);
 
-      // Generate commit message via hidden terminal
+      // Generate commit message via deterministic backend command
       setStage('generating-message');
 
       const truncatedDiff = stagedDiff.length > 8000 ? stagedDiff.slice(0, 8000) + '\n... (truncated)' : stagedDiff;
-      const escaped = truncatedDiff.replace(/'/g, "'\\''");
       const basePrompt = customPrompt.trim()
         ? `${DEFAULT_PROMPT}\n\nAdditional instructions: ${customPrompt.trim()}`
         : DEFAULT_PROMPT;
-      const prompt = `${basePrompt}\n\n${escaped}`;
-      const escapedPrompt = prompt.replace(/'/g, "'\\''");
-      const command = cli === 'opencode'
-        ? `opencode run -m opencode/kimi-k2.5-free '${escapedPrompt}'`
-        : `claude --print '${escapedPrompt}'`;
+      const prompt = `${basePrompt}\n\n${truncatedDiff}`;
 
-      const sessionId = await invoke('spawn_hidden_terminal', {
+      const msg = await invoke('generate_commit_message', {
         projectDir: currentPath,
-        command,
+        cli,
+        prompt,
       });
 
-      // Collect output from hidden terminal
-      let output = '';
-      const unlistenOutput = await listen('hidden-terminal-output', (event) => {
-        if (event.payload.session_id === sessionId) {
-          output += event.payload.data;
-        }
-      });
-
-      const unlistenClose = await listen('hidden-terminal-closed', (event) => {
-        if (event.payload.session_id === sessionId) {
-          unlistenOutput();
-          unlistenClose();
-
-          if (event.payload.error) {
-            setError('Failed to generate commit message');
-            setStage('error');
-            return;
-          }
-
-          // Clean up the output
-          const cleaned = stripAnsi(output).trim();
-          // Take last meaningful line(s) - the actual commit message
-          const lines = cleaned.split('\n').filter(l => l.trim().length > 0);
-          const msg = lines.length > 0 ? lines.join('\n') : 'chore: update files';
-          setCommitMessage(msg);
-          setStage('ready');
-        }
-      });
+      const lines = msg.split('\n').filter(l => l.trim().length > 0);
+      setCommitMessage(lines.length > 0 ? lines.join('\n') : 'chore: update files');
+      setStage('ready');
     } catch (err) {
       setError(err.toString());
       setStage('error');
