@@ -14,6 +14,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [isFocused, setIsFocused] = useState(false);
   const [sandboxFailed, setSandboxFailed] = useState(false);
   const isFocusedRef = useRef(false);
+  const sessionIdRef = useRef(null);
 
   // Initialize terminal
   useEffect(() => {
@@ -107,6 +108,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // Spawn terminal backend
         const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null });
         const id = result.session_id;
+        sessionIdRef.current = id;
         setSessionId(id);
 
         // Check if sandbox was requested but failed
@@ -162,8 +164,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       if (unlisten) {
         unlisten();
       }
-      if (sessionId) {
-        invoke('close_terminal', { sessionId }).catch((error) => {
+      const id = sessionIdRef.current;
+      if (id) {
+        sessionIdRef.current = null;
+        invoke('close_terminal', { sessionId: id }).catch((error) => {
           console.error('Failed to close terminal:', error);
         });
       }
