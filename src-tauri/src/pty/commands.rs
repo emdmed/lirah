@@ -322,21 +322,6 @@ pub fn get_committable_files(repo_path: String) -> Result<Vec<serde_json::Value>
             _ => "modified",
         };
 
-        // Filter out excluded paths and extensions
-        let lower = path.to_lowercase();
-        if lower.starts_with(".claude/") || lower == ".claude" {
-            continue;
-        }
-        if lower.ends_with(".env") || lower.ends_with(".txt") {
-            continue;
-        }
-        if lower.ends_with(".md") {
-            let filename = path.rsplit('/').next().unwrap_or(&path).to_lowercase();
-            if !filename.starts_with("readme") {
-                continue;
-            }
-        }
-
         files.push(serde_json::json!({ "path": path, "status": status }));
     }
 

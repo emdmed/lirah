@@ -24,7 +24,18 @@ export function AutoCommitDialog({ autoCommit }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) cancel(); }}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className="sm:max-w-[600px] max-w-[90vw]"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && stage === 'ready' && commitMessage.trim()) {
+            e.preventDefault();
+            confirm(commitMessage);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancel();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {stage === 'error' ? 'Auto Commit - Error' : 'Auto Commit'}
@@ -50,7 +61,7 @@ export function AutoCommitDialog({ autoCommit }) {
                       <span className={statusColors[f.status] || 'text-gray-400'}>
                         {statusIcons[f.status] || '?'}
                       </span>
-                      <span className="text-muted-foreground">{f.path}</span>
+                      <span className="text-muted-foreground break-all min-w-0">{f.path}</span>
                     </div>
                   ))}
                 </div>
@@ -66,7 +77,7 @@ export function AutoCommitDialog({ autoCommit }) {
                     <span className={statusColors[f.status] || 'text-gray-400'}>
                       {statusIcons[f.status] || '?'}
                     </span>
-                    <span className="text-muted-foreground">{f.path}</span>
+                    <span className="text-muted-foreground break-all min-w-0">{f.path}</span>
                   </div>
                 ))}
               </div>
@@ -75,15 +86,6 @@ export function AutoCommitDialog({ autoCommit }) {
                 <textarea
                   value={commitMessage}
                   onChange={(e) => setCommitMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && stage === 'ready' && commitMessage.trim()) {
-                      e.preventDefault();
-                      confirm(commitMessage);
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault();
-                      cancel();
-                    }
-                  }}
                   className="w-full h-20 text-sm font-mono bg-background border border-border rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
                   disabled={stage === 'committing'}
                 />
@@ -92,19 +94,24 @@ export function AutoCommitDialog({ autoCommit }) {
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={cancel} disabled={stage === 'committing'}>
-            Cancel
-          </Button>
-          {(stage === 'ready' || stage === 'committing') && (
-            <Button
-              size="sm"
-              onClick={() => confirm(commitMessage)}
-              disabled={stage === 'committing' || !commitMessage.trim()}
-            >
-              {stage === 'committing' ? 'Committing...' : 'Commit'}
+        <DialogFooter className="flex items-center justify-between sm:justify-between">
+          <span className="text-xs text-muted-foreground">
+            Enter to commit · Esc to cancel
+          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={cancel} disabled={stage === 'committing'}>
+              Cancel
             </Button>
-          )}
+            {(stage === 'ready' || stage === 'committing') && (
+              <Button
+                size="sm"
+                onClick={() => confirm(commitMessage)}
+                disabled={stage === 'committing' || !commitMessage.trim()}
+              >
+                {stage === 'committing' ? 'Committing...' : 'Commit'}
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
