@@ -22,10 +22,10 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onSe
   // Debounced resize — wait for layout to settle before fitting terminal
   const resizeTimerRef = useRef(null);
   const debouncedResize = useCallback(() => {
-    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-    resizeTimerRef.current = setTimeout(() => {
+    if (resizeTimerRef.current) cancelAnimationFrame(resizeTimerRef.current);
+    resizeTimerRef.current = requestAnimationFrame(() => {
       handleResize();
-    }, 100);
+    });
   }, [handleResize]);
 
   // Setup resize observer
@@ -39,7 +39,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onSe
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      if (resizeTimerRef.current) cancelAnimationFrame(resizeTimerRef.current);
     };
   }, [debouncedResize]);
 

@@ -87,7 +87,7 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
 
   const containerStyle = fullscreen
     ? { position: 'absolute', inset: 0, zIndex: 40, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)' }
-    : { position: 'absolute', top: 0, right: 0, bottom: 0, width: '50%', zIndex: 40, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)' };
+    : { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)', borderLeft: '1px solid var(--color-border)' };
 
   if (selectedCommand === null) {
     return (
