@@ -119,7 +119,7 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
   );
 }
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus, onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig }) => {
+export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus, onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
@@ -134,10 +134,15 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
       }}
     >
       {/* Left section: Current path */}
-      <div className="flex items-center gap-4 overflow-hidden">
+      <div className="flex items-center gap-2 overflow-hidden">
         <span className="overflow-hidden whitespace-nowrap" style={{ textOverflow: 'ellipsis' }}>
-          {currentPath || '~'}
+          {currentPath ? currentPath.split('/').pop() || '~' : '~'}
         </span>
+        {branchName && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/70">
+            {branchName}
+          </span>
+        )}
       </div>
 
       {/* Right section: Budget, CLI selector, Theme, and Settings menu */}

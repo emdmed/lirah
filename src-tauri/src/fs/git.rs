@@ -200,6 +200,26 @@ pub fn get_file_watchers_status(state: tauri::State<AppState>) -> Result<bool, S
 }
 
 #[tauri::command]
+pub fn get_current_branch(repo_path: String) -> Result<Option<String>, String> {
+    let repo = PathBuf::from(&repo_path);
+    let git_dir = repo.join(".git");
+    if !git_dir.exists() {
+        return Ok(None);
+    }
+
+    let head_path = git_dir.join("HEAD");
+    let head_content = std::fs::read_to_string(&head_path)
+        .map_err(|e| format!("Failed to read HEAD: {}", e))?;
+    let trimmed = head_content.trim();
+
+    let branch = trimmed
+        .strip_prefix("ref: refs/heads/")
+        .map(|s| s.to_string());
+
+    Ok(branch)
+}
+
+#[tauri::command]
 pub fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
     let repo = PathBuf::from(&repo_path);
     let file = PathBuf::from(&file_path);

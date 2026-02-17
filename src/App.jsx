@@ -19,6 +19,7 @@ import { useWatcher } from "./contexts/WatcherContext";
 import { useBookmarks } from "./contexts/BookmarksContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
+import { useBranchName } from "./hooks/useBranchName";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
@@ -310,6 +311,9 @@ function App() {
   // Monitor terminal CWD
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled);
 
+  // Get current git branch
+  const branchName = useBranchName(detectedCwd);
+
   // Auto-check orchestration
   useEffect(() => {
     if (!detectedCwd) return;
@@ -537,6 +541,7 @@ function App() {
               setTerminalSessionId(null);
               setTerminalKey(k => k + 1);
             }}
+            branchName={branchName}
           />
         }
         secondaryTerminal={
