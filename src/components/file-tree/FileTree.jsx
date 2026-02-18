@@ -37,7 +37,7 @@ export function FileTree({
     let filtered = nodes;
 
     // Apply git changes filter if enabled
-    if (showGitChangesOnly && gitStats.size > 0) {
+    if (showGitChangesOnly) {
       console.log('[FileTree] Filtering by git changes. nodes:', nodes.length, 'gitStats:', gitStats.size);
       filtered = filterTreeByGitChanges(filtered, gitStats);
       console.log('[FileTree] After filter:', filtered.length, 'nodes');
@@ -47,7 +47,7 @@ export function FileTree({
   }, [nodes, showGitChangesOnly, gitStats]);
 
   if (!displayedNodes || displayedNodes.length === 0) {
-    return <EmptyState searchQuery={searchQuery} />;
+    return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} />;
   }
 
   return (
