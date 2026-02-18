@@ -223,6 +223,7 @@ export const StatusBar = ({
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
+  const [showNetworkConfirm, setShowNetworkConfirm] = useState(false);
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
 
@@ -239,6 +240,19 @@ export const StatusBar = ({
   const confirmSandboxToggle = () => {
     setShowSandboxConfirm(false);
     onToggleSandbox();
+  };
+
+  const handleNetworkToggle = () => {
+    if (sessionId) {
+      setShowNetworkConfirm(true);
+    } else {
+      onToggleNetworkIsolation();
+    }
+  };
+
+  const confirmNetworkToggle = () => {
+    setShowNetworkConfirm(false);
+    onToggleNetworkIsolation();
   };
 
   return (
@@ -303,7 +317,7 @@ export const StatusBar = ({
           )}
           <div className="w-px h-3 bg-border/30 mx-0.5" />
           <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
-          <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={onToggleNetworkIsolation} />
+          <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
         </div>
 
         <div className="w-px h-4 bg-border/50 mx-1" />
@@ -363,21 +377,52 @@ export const StatusBar = ({
 
     {/* Sandbox Toggle Confirmation Dialog */}
     <Dialog open={showSandboxConfirm} onOpenChange={setShowSandboxConfirm}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-warning" />
-            Toggle Sandbox Mode?
-          </DialogTitle>
-          <DialogDescription>
-            This will close your current terminal session. Any running processes will be terminated. You'll need to restart your CLI agent after toggling.
+      <DialogContent className="sm:max-w-[440px] border-destructive/30 border-sketch bg-destructive/5">
+        <DialogHeader className="gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            </div>
+            <DialogTitle className="text-base font-semibold">
+              Toggle Sandbox Mode?
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+            This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated. You'll need to restart your CLI agent after toggling.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowSandboxConfirm(false)}>
+        <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
+          <Button variant="outline" size="sm" onClick={() => setShowSandboxConfirm(false)} className="border-sketch">
             Cancel
           </Button>
-          <Button variant="default" size="sm" onClick={confirmSandboxToggle}>
+          <Button variant="destructive" size="sm" onClick={confirmSandboxToggle}>
+            Continue
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Network Isolation Toggle Confirmation Dialog */}
+    <Dialog open={showNetworkConfirm} onOpenChange={setShowNetworkConfirm}>
+      <DialogContent className="sm:max-w-[440px] border-destructive/30 border-sketch bg-destructive/5">
+        <DialogHeader className="gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            </div>
+            <DialogTitle className="text-base font-semibold">
+              Toggle Network Isolation?
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+            This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated. You'll need to restart your CLI agent after toggling.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
+          <Button variant="outline" size="sm" onClick={() => setShowNetworkConfirm(false)} className="border-sketch">
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" onClick={confirmNetworkToggle}>
             Continue
           </Button>
         </DialogFooter>
