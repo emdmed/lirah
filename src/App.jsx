@@ -333,10 +333,63 @@ function App() {
     secondaryTerminalFocused: secondary.secondaryFocused,
   });
 
+  // Clear folder expansion when sidebar closes
+  useEffect(() => {
+    if (!sidebar.sidebarOpen) {
+      treeView.setExpandedFolders(new Set());
+    }
+  }, [sidebar.sidebarOpen]);
+
+  // Monitor terminal CWD
+  const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled);
+
+  // Calculate orchestration token estimate when enabled
+  const calculateOrchestrationEstimate = useCallback(async (cwd) => {
+    if (!cwd) return;
+    try {
+      // Read the orchestration.md file and estimate tokens from its content
+      // When orchestration is enabled, Claude will read this file, consuming those tokens
+      const orchestrationContent = await invoke('read_file_content', { path: `${cwd}/.orchestration/orchestration.md` });
+      const commandText = 'Follow .orchestration/orchestration.md (read it only if not already read in this conversation)';
+      // Total tokens = command text (~20) + file content that will be read
+      const commandTokens = Math.round(commandText.length / 4);
+      const contentTokens = Math.round(orchestrationContent.length / 4);
+      setOrchestrationTokenEstimate(commandTokens + contentTokens);
+    } catch {
+      setOrchestrationTokenEstimate(null);
+    }
+  }, []);
+
+  // Handle orchestration toggle
+  const handleToggleOrchestration = useCallback((value) => {
+    const nextValue = typeof value === 'function' ? value(appendOrchestration) : value;
+    setAppendOrchestration(nextValue);
+    if (nextValue && detectedCwd) {
+      calculateOrchestrationEstimate(detectedCwd);
+    } else if (!nextValue) {
+      setOrchestrationTokenEstimate(null);
+    }
+  }, [detectedCwd, calculateOrchestrationEstimate, appendOrchestration]);
+
+  // Get current git branch
+  const branchName = useBranchName(detectedCwd);
+
+  // Auto-check orchestration
+  useEffect(() => {
+    if (!detectedCwd) return;
+    invoke('read_file_content', { path: `${detectedCwd}/.orchestration/orchestration.md` })
+      .then(() => {
+        setAppendOrchestration(true);
+        calculateOrchestrationEstimate(detectedCwd);
+      })
+      .catch(() => { setAppendOrchestration(false); setOrchestrationTokenEstimate(null); });
+  }, [detectedCwd, calculateOrchestrationEstimate]);
+
+  // Keyboard shortcuts (must come after orchestration functions)
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
     textareaVisible, setTextareaVisible, textareaRef,
     onSendContent: sendTextareaToTerminal,
-    onToggleOrchestration: setAppendOrchestration,
+    onToggleOrchestration: handleToggleOrchestration,
     selectedTemplateId, onSelectTemplate: setSelectedTemplateId,
     onRestoreLastPrompt: setTextareaContent,
     secondaryTerminalFocused: secondary.secondaryFocused,
@@ -352,44 +405,6 @@ function App() {
     setBookmarksPaletteOpen: dialogs.setBookmarksPaletteOpen,
     secondaryTerminalFocused: secondary.secondaryFocused,
   });
-
-  // Clear folder expansion when sidebar closes
-  useEffect(() => {
-    if (!sidebar.sidebarOpen) {
-      treeView.setExpandedFolders(new Set());
-    }
-  }, [sidebar.sidebarOpen]);
-
-  // Monitor terminal CWD
-  const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled);
-
-  // Get current git branch
-  const branchName = useBranchName(detectedCwd);
-
-  // Auto-check orchestration
-  useEffect(() => {
-    if (!detectedCwd) return;
-    invoke('read_file_content', { path: `${detectedCwd}/.orchestration/orchestration.md` })
-      .then(async (orchestrationContent) => {
-        setAppendOrchestration(true);
-        try {
-          const entries = await invoke('read_directory_recursive', {
-            path: `${detectedCwd}/.orchestration`, maxDepth: 5, maxFiles: 100
-          });
-          const mdFiles = entries.filter(e => e.name.endsWith('.md'));
-          let totalChars = orchestrationContent.length;
-          const contents = await Promise.all(
-            mdFiles.filter(e => e.path !== `${detectedCwd}/.orchestration/orchestration.md`)
-              .map(e => invoke('read_file_content', { path: e.path }).catch(() => ''))
-          );
-          totalChars += contents.reduce((sum, c) => sum + c.length, 0);
-          const avgWorkflowChars = contents.length > 0
-            ? contents.reduce((sum, c) => sum + c.length, 0) / contents.length : 0;
-          setOrchestrationTokenEstimate(Math.round((orchestrationContent.length + avgWorkflowChars) / 4));
-        } catch { setOrchestrationTokenEstimate(null); }
-      })
-      .catch(() => { setAppendOrchestration(false); setOrchestrationTokenEstimate(null); });
-  }, [detectedCwd]);
 
   // Fetch data when sidebar opens
   useEffect(() => {
@@ -522,7 +537,7 @@ function App() {
               onSelectTemplate={setSelectedTemplateId}
               onManageTemplates={() => dialogs.setManageTemplatesDialogOpen(true)}
               appendOrchestration={appendOrchestration}
-              onToggleOrchestration={setAppendOrchestration}
+              onToggleOrchestration={handleToggleOrchestration}
               orchestrationTokenEstimate={orchestrationTokenEstimate}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}

@@ -51,6 +51,12 @@
   --color-popover: hsl(240 13% 16%);
   --color-popover-foreground: hsl(45 26% 80%);
 
+  /* Status colors */
+  --color-status-critical: #E82424;
+  --color-status-warning: #FF9E3B;
+  --color-status-success: #76946A;
+  --color-status-info: #6B8CCE;
+
   --radius-lg: 0.5rem;
   --radius-md: calc(0.5rem - 2px);
   --radius-sm: calc(0.5rem - 4px);
@@ -223,4 +229,18 @@ body {
   border: 2px solid yellow !important;
   padding: 4px 8px !important;
   margin: 4px !important;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+  
+  .transition-all,
+  .transition-colors,
+  .transition-opacity,
+  .transition-transform {
+    transition-duration: 0.01ms !important;
+  }
 }

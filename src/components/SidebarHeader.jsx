@@ -32,7 +32,7 @@ export function SidebarHeader({
             Lirah
           </span>
           <Badge
-            variant={viewMode === "tree" ? "outline" : "seondary"}
+            variant={viewMode === "tree" ? "outline" : "secondary"}
             className="gap-1"
           >
             {sandboxEnabled ? <Shield className="w-3 h-3 inline mr-0.5" /> : <Eye className="w-3 h-3 inline mr-0.5" />}

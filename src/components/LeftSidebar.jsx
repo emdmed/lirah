@@ -74,7 +74,10 @@ export function LeftSidebar({
               ) : (
                 treeLoading ? (
                   <div className="p-4 text-center">
-                    <div className="text-sm opacity-60">Loading directory tree...</div>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      <div className="text-sm opacity-60">Loading directory tree...</div>
+                    </div>
                   </div>
                 ) : (
                   <FileTree

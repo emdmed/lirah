@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { Input } from './ui/input';
 import { useBookmarks } from '../contexts/BookmarksContext';
-import { Search } from 'lucide-react';
+import { EmptyState } from './EmptyState';
+import { Search, Star, Bookmark } from 'lucide-react';
 
 export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
   const { bookmarks } = useBookmarks();
@@ -107,18 +108,19 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
           {/* Bookmarks list */}
           <div className="flex-1 overflow-y-auto">
             {filteredBookmarks.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-sm opacity-50">
-                {bookmarks.length === 0 ? (
-                  <div className="text-center">
-                    <p>No bookmarks yet.</p>
-                    <p className="text-xs mt-2">
-                      Open the sidebar (Ctrl+S) and click the star icon to add one.
-                    </p>
-                  </div>
-                ) : (
-                  <p>No bookmarks match your search.</p>
-                )}
-              </div>
+              bookmarks.length === 0 ? (
+                <EmptyState
+                  icon={Bookmark}
+                  title="No bookmarks yet"
+                  description="Save frequently used directories for quick access. Open the sidebar (Ctrl+S) and click the star icon to add one."
+                />
+              ) : (
+                <EmptyState
+                  icon={Search}
+                  title="No bookmarks match your search"
+                  description="Try a different search term or clear the search to see all bookmarks"
+                />
+              )
             ) : (
               <div className="flex flex-col gap-1">
                 {filteredBookmarks.map((bookmark, index) => (

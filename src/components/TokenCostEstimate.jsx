@@ -5,7 +5,7 @@ import { estimatePromptCost } from '../config/pricing';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
 
-export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath }) {
+export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath, orchestrationTokenEstimate }) {
   const { checkBudgetStatus, getBudget, currentUsage } = useTokenBudget();
 
   const estimate = useMemo(() => {
@@ -22,15 +22,27 @@ export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath 
       tokens += selectedFiles.size * 200; // average per file
     }
 
+    // Orchestration context - only add when explicitly enabled (> 0)
+    if (orchestrationTokenEstimate != null && orchestrationTokenEstimate > 0) {
+      tokens += orchestrationTokenEstimate;
+    }
+
     // System overhead
     tokens += 500;
 
     return tokens;
-  }, [textareaContent, selectedFiles]);
+  }, [textareaContent, selectedFiles, orchestrationTokenEstimate]);
 
   const cost = useMemo(() => estimatePromptCost(estimate, DEFAULT_MODEL), [estimate]);
 
-  if (estimate <= 500) return null; // Only system overhead, nothing to show
+  // Only show estimate when there's actual user content (not just system overhead)
+  // Note: orchestrationTokenEstimate must be > 0 and not null to count as user content
+  const hasUserContent = (textareaContent?.length > 0) || 
+                         (selectedFiles?.size > 0) || 
+                         (orchestrationTokenEstimate != null && orchestrationTokenEstimate > 0);
+  
+  // Don't show estimate if there's no user content (avoid showing just the 500 base system prompt)
+  if (!hasUserContent) return null;
 
   const budget = getBudget(projectPath);
   const { status } = checkBudgetStatus(projectPath);
@@ -51,7 +63,10 @@ export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath 
         <div className="space-y-1">
           <div>Prompt text: ~{textareaContent ? Math.ceil(textareaContent.length / 4) : 0}</div>
           <div>Files: ~{selectedFiles ? selectedFiles.size * 200 : 0}</div>
-          <div>System: ~500</div>
+          {orchestrationTokenEstimate != null && orchestrationTokenEstimate > 0 && (
+            <div>Orchestration: ~{orchestrationTokenEstimate.toLocaleString()}</div>
+          )}
+          <div>Base system prompt: ~500</div>
           {budget?.dailyLimit && (
             <div className="pt-1 border-t border-border mt-1">
               Remaining: {Math.max(0, budget.dailyLimit - currentUsage.total).toLocaleString()} tokens

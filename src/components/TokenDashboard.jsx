@@ -13,7 +13,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, FileSpreadsheet, FileJson, RefreshCw, FileText } from 'lucide-react';
+import { Download, FileSpreadsheet, FileJson, RefreshCw, FileText, BarChart3 } from 'lucide-react';
+import { EmptyState } from './EmptyState';
 import { TokenLineChart } from './token-dashboard/TokenLineChart';
 import { SessionEfficiencyPanel } from './token-dashboard/SessionEfficiencyPanel';
 import { UsageSummaryPanel } from './token-dashboard/UsageSummaryPanel';
@@ -322,7 +323,12 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                         </div>
                       ))}
                       {modelBreakdown.length === 0 && (
-                        <div className="text-xs text-muted-foreground text-center py-2">No data</div>
+                        <EmptyState
+                          icon={BarChart3}
+                          title="No model data yet"
+                          description="Start using Claude Code to see token usage analytics by model"
+                          className="py-4"
+                        />
                       )}
                     </div>
                   </div>

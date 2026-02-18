@@ -186,21 +186,35 @@ export function TextareaPanel({
     <div className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        {/* Configuration Zone */}
+        <div className="flex items-center gap-3 bg-secondary/20 rounded px-2 py-1">
           {onToggleOrchestration && (
             <div className="flex items-center gap-2">
-              <Checkbox
-                id="orchestration"
-                checked={appendOrchestration}
-                onCheckedChange={onToggleOrchestration}
-                disabled={disabled}
-              />
-              <label htmlFor="orchestration" className="text-muted-foreground cursor-pointer select-none text-xs">
-                orchestration
-                {appendOrchestration && orchestrationTokenEstimate != null && (
-                  <span className="text-muted-foreground/60 ml-1">(~{orchestrationTokenEstimate} tokens)</span>
-                )}
-              </label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="orchestration"
+                      checked={appendOrchestration}
+                      onCheckedChange={onToggleOrchestration}
+                      disabled={disabled}
+                    />
+                    <label htmlFor="orchestration" className="text-muted-foreground cursor-pointer select-none text-xs">
+                      orchestration
+                      {appendOrchestration && orchestrationTokenEstimate != null && (
+                        <span className="text-muted-foreground/60 ml-1">(~{orchestrationTokenEstimate.toLocaleString()})</span>
+                      )}
+                    </label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <span className="text-xs">
+                    {appendOrchestration && orchestrationTokenEstimate != null
+                      ? `Adds ~${orchestrationTokenEstimate.toLocaleString()} tokens to prompt`
+                      : 'Enable to append orchestration context'}
+                  </span>
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-muted-foreground/40 text-[10px] cursor-help">Ctrl+Ctrl</span>
@@ -210,6 +224,9 @@ export function TextareaPanel({
                 </TooltipContent>
               </Tooltip>
             </div>
+          )}
+          {onToggleOrchestration && onToggleKeepFiles && (
+            <div className="w-px h-3 bg-border/30" />
           )}
           {onToggleKeepFiles && (
             <div className="flex items-center gap-2">
@@ -225,36 +242,47 @@ export function TextareaPanel({
             </div>
           )}
         </div>
+
+        {/* Actions Zone */}
         <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCompactAndFlowchart}
-                disabled={disabled || isCompacting}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Map className="h-3 w-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8}>
-              <span className="text-xs">Compact & open flowchart</span>
-            </TooltipContent>
-          </Tooltip>
-          <CompactProjectButton
-            onClick={onCompactProject}
-            isCompacting={isCompacting}
-            progress={compactProgress}
-            disabled={disabled}
-          />
-          <FileGroupsDropdown
-            projectPath={projectPath}
-            onLoadGroup={onLoadGroup}
-            onSaveGroup={onSaveGroup}
-            hasSelectedFiles={fileArray.length > 0}
-          />
-          <div className="flex items-center gap-1">
+          {/* Project Operations */}
+          <div className="flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCompactAndFlowchart}
+                  disabled={disabled || isCompacting}
+                  className="text-muted-foreground hover:text-foreground transition-colors px-1.5"
+                >
+                  <Map className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span className="text-xs">Compact & open flowchart</span>
+              </TooltipContent>
+            </Tooltip>
+            <div className="w-px h-3 bg-border/30" />
+            <CompactProjectButton
+              onClick={onCompactProject}
+              isCompacting={isCompacting}
+              progress={compactProgress}
+              disabled={disabled}
+            />
+            <div className="w-px h-3 bg-border/30" />
+            <FileGroupsDropdown
+              projectPath={projectPath}
+              onLoadGroup={onLoadGroup}
+              onSaveGroup={onSaveGroup}
+              hasSelectedFiles={fileArray.length > 0}
+            />
+          </div>
+
+          <div className="w-px h-4 bg-border/50" />
+
+          {/* Prompt Operations */}
+          <div className="flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1">
             <TemplateSelector
               selectedTemplateId={selectedTemplateId}
               onSelectTemplate={onSelectTemplate}
@@ -264,7 +292,7 @@ export function TextareaPanel({
             />
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="text-muted-foreground/40 text-[10px] cursor-help">Alt+Alt</span>
+                <span className="text-muted-foreground/40 text-[10px] cursor-help px-1">Alt+Alt</span>
               </TooltipTrigger>
               <TooltipContent side="bottom">
                 <span className="text-xs">Double-tap Alt to {selectedTemplateId ? 'clear' : 'open'}</span>
@@ -411,6 +439,7 @@ export function TextareaPanel({
             textareaContent={value}
             selectedFiles={selectedFiles}
             projectPath={currentPath}
+            orchestrationTokenEstimate={appendOrchestration ? orchestrationTokenEstimate : null}
           />
         </div>
         <ActionButtons

@@ -3,7 +3,7 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
-  Coins, BarChart3, FileText, FileX, Loader2, Check, AlertTriangle
+  Coins, BarChart3, FileText, FileX, Loader2, Check, AlertTriangle, AlertCircle
 } from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
@@ -14,6 +14,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
 } from './ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 const CLI_DISPLAY = {
@@ -22,9 +30,9 @@ const CLI_DISPLAY = {
 };
 
 const STATUS_COLORS = {
-  critical: '#E82424',
-  warning: '#FF9E3B',
-  success: '#76946A'
+  critical: 'var(--color-status-critical, #E82424)',
+  warning: 'var(--color-status-warning, #FF9E3B)',
+  success: 'var(--color-status-success, #76946A)'
 };
 
 function CliIcon({ cli }) {
@@ -214,12 +222,27 @@ export const StatusBar = ({
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
+  const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
 
   const cliName = CLI_DISPLAY[selectedCli]?.name || selectedCli;
 
+  const handleSandboxToggle = () => {
+    if (sessionId) {
+      setShowSandboxConfirm(true);
+    } else {
+      onToggleSandbox();
+    }
+  };
+
+  const confirmSandboxToggle = () => {
+    setShowSandboxConfirm(false);
+    onToggleSandbox();
+  };
+
   return (
+    <>
     <div
       className="flex items-center justify-between px-4 py-2 border-t border-t-sketch text-xs font-mono"
       style={{
@@ -239,87 +262,127 @@ export const StatusBar = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        {changelogStatus && <ChangelogStatus status={changelogStatus} />}
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="xs" onClick={onOpenDashboard} className="gap-1 px-1.5">
-              <BarChart3 className="w-3 h-3" />
-              <span className="opacity-70">Metrics</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Token Metrics (Ctrl+Shift+D)</TooltipContent>
-        </Tooltip>
-
-        <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
-
-        {selectedCli && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1.5">
-                <CliIcon cli={selectedCli} />
-                <span className="opacity-70">{cliName}</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
-          </Tooltip>
+      <div className="flex items-center gap-1">
+        {/* Status Zone */}
+        {changelogStatus && (
+          <>
+            <ChangelogStatus status={changelogStatus} />
+            <div className="w-px h-4 bg-border/50 mx-1" />
+          </>
         )}
 
-        <div className="flex items-center gap-0.5">
-          <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={onToggleSandbox} />
+        {/* Data & Analytics Zone */}
+        <div className="flex items-center gap-1 bg-secondary/30 rounded px-1.5 py-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="xs" onClick={onOpenDashboard} className="gap-1 px-1.5 h-5">
+                <BarChart3 className="w-3 h-3" />
+                <span className="opacity-70">Metrics</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Token Metrics (Ctrl+Shift+D)</TooltipContent>
+          </Tooltip>
+          <div className="w-px h-3 bg-border/30 mx-0.5" />
+          <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
+        </div>
+
+        <div className="w-px h-4 bg-border/50 mx-1" />
+
+        {/* Environment Zone */}
+        <div className="flex items-center gap-0.5 bg-secondary/30 rounded px-1.5 py-0.5">
+          {selectedCli && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1.5 px-1.5 h-5">
+                  <CliIcon cli={selectedCli} />
+                  <span className="opacity-70">{cliName}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
+            </Tooltip>
+          )}
+          <div className="w-px h-3 bg-border/30 mx-0.5" />
+          <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
           <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={onToggleNetworkIsolation} />
         </div>
 
-        <ThemeSwitcher />
+        <div className="w-px h-4 bg-border/50 mx-1" />
 
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Settings</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end" className="w-100 text-xs">
-            <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1">
-              <Download className="mr-2 w-3 h-3" />
-              Add Orchestration
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
-              <Keyboard className="mr-2 w-3 h-3" />
-              Keyboard Shortcuts
-              <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1">
-              {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-              File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
-              <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1">
-              {autoChangelogEnabled ? (
-                <FileText className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.success }} />
-              ) : (
-                <FileX className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />
-              )}
-              Auto Changelog...
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onOpenAutoCommitConfig} className="cursor-pointer py-1">
-              <CliIcon cli={autoCommitCli} />
-              <span className="ml-2">Auto Commit...</span>
-              <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
-              {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-              Title Bar: {showTitleBar ? 'ON' : 'OFF'}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* App Controls Zone */}
+        <div className="flex items-center gap-0.5">
+          <ThemeSwitcher />
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Settings</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-100 text-xs">
+              <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1">
+                <Download className="mr-2 w-3 h-3" />
+                Add Orchestration
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
+                <Keyboard className="mr-2 w-3 h-3" />
+                Keyboard Shortcuts
+                <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1">
+                {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
+                File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
+                <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1">
+                {autoChangelogEnabled ? (
+                  <FileText className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.success }} />
+                ) : (
+                  <FileX className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />
+                )}
+                Auto Changelog...
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenAutoCommitConfig} className="cursor-pointer py-1">
+                <CliIcon cli={autoCommitCli} />
+                <span className="ml-2">Auto Commit...</span>
+                <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
+                {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
+                Title Bar: {showTitleBar ? 'ON' : 'OFF'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
+
+    {/* Sandbox Toggle Confirmation Dialog */}
+    <Dialog open={showSandboxConfirm} onOpenChange={setShowSandboxConfirm}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-warning" />
+            Toggle Sandbox Mode?
+          </DialogTitle>
+          <DialogDescription>
+            This will close your current terminal session. Any running processes will be terminated. You'll need to restart your CLI agent after toggling.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowSandboxConfirm(false)}>
+            Cancel
+          </Button>
+          <Button variant="default" size="sm" onClick={confirmSandboxToggle}>
+            Continue
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 };
