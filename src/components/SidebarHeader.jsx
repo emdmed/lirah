@@ -1,4 +1,5 @@
 import { Button } from './ui/button';
+import { Badge} from "./ui/badge"
 import { Input } from './ui/input';
 import { BookmarksDropdown } from './BookmarksDropdown';
 import { Search, X, GitBranch, Star, Shield, Eye } from 'lucide-react';
@@ -25,18 +26,18 @@ export function SidebarHeader({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span
-            className="font-bold leading-tight"
-            style={{ fontFamily: "'Grenze Gotisch', serif", display: 'flex', alignItems: 'center', fontSize: '18px' }}
+            className="font-bold leading-tight text-2xl text-primary pb-1"
+            style={{ fontFamily: "'Grenze Gotisch', serif", display: 'flex', alignItems: 'center'}}
           >
             Lirah
           </span>
-          <span
-            className={`font-medium px-1 mt-0.5 rounded ${viewMode === 'tree' ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-muted/10'}`}
-            style={{ fontSize: 'var(--font-xs)' }}
+          <Badge
+            variant={viewMode === "tree" ? "outline" : "seondary"}
+            className="gap-1"
           >
             {sandboxEnabled ? <Shield className="w-3 h-3 inline mr-0.5" /> : <Eye className="w-3 h-3 inline mr-0.5" />}
             {viewMode === 'tree' ? 'agent' : 'nav'}
-          </span>
+          </Badge>
         </div>
 
         {/* Action buttons */}

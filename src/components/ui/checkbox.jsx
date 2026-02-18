@@ -47,7 +47,7 @@ const Checkbox = React.forwardRef(({
         onClick={handleVisualClick}
         role="presentation"
         className={cn(
-          "h-4 w-4 shrink-0 rounded-sm border border-input bg-background",
+          "h-4 w-4 shrink-0 border border-secondary border-dashed bg-background",
           "peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2",
           "peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
           "peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary",
@@ -57,7 +57,7 @@ const Checkbox = React.forwardRef(({
         )}
       >
         {checked && (
-          <Check className="h-3 w-3 text-current" strokeWidth={3} />
+          <Check className="h-3 w-3 text-current translate-y-[1px] translate-x-[1px]" strokeWidth={4} />
         )}
       </div>
     </div>

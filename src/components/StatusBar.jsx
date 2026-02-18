@@ -9,6 +9,7 @@ import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { useTokenBudget } from '../contexts/TokenBudgetContext';
 import { Button } from './ui/button';
+import { Badge } from "./ui/badge.jsx"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
@@ -232,9 +233,9 @@ export const StatusBar = ({
           {currentPath ? currentPath.split('/').pop() || '~' : '~'}
         </span>
         {branchName && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/70">
+          <Badge variant="secondary">
             {branchName}
-          </span>
+          </Badge>
         )}
       </div>
 
