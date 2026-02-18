@@ -8,7 +8,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronDown, ChevronRight, Loader2, Check } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { RetroSpinner } from "./ui/RetroSpinner";
 import { invoke } from "@tauri-apps/api/core";
 import { extractSkeleton as extractBabelSkeleton, isBabelParseable } from "@/utils/babelSymbolParser";
 import { normalizePath, getRelativePath } from "@/utils/pathUtils";
@@ -329,7 +330,7 @@ export function ElementPickerDialog({
         <div className="flex-1 overflow-y-auto min-h-0 py-2">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <RetroSpinner size={24} lineWidth={2} />
             </div>
           ) : error ? (
             <div className="text-center py-8 text-sm text-destructive">

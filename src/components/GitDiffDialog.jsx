@@ -3,7 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from './ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
-import { Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { RetroSpinner } from './ui/RetroSpinner';
 import { basename } from '../utils/pathUtils';
 
 /**
@@ -201,7 +202,7 @@ export function GitDiffDialog({
       >
         {loading ? (
           <div className="flex items-center justify-center p-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <RetroSpinner size={24} lineWidth={2} />
           </div>
         ) : error ? (
           <div className="p-4 text-center text-red-400">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Check, FolderOpen, Terminal } from 'lucide-react';
+import { Check, FolderOpen, Terminal } from 'lucide-react';
+import { RetroSpinner } from './ui/RetroSpinner';
 
 const steps = [
   { id: 'navigate', label: 'Navigating to project', icon: FolderOpen },
@@ -18,7 +19,7 @@ function StepIndicator({ step, status, index }) {
         style={{ backgroundColor: status === 'done' ? 'var(--color-input-background)' : 'transparent' }}
       >
         {status === 'active' ? (
-          <Loader2 className="w-3 h-3 animate-spin opacity-70" />
+          <RetroSpinner size={14} lineWidth={2} />
         ) : status === 'done' ? (
           <Check className="w-3 h-3 opacity-70" />
         ) : (

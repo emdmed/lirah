@@ -13,7 +13,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, FileSpreadsheet, FileJson, RefreshCw, FileText, BarChart3 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileJson, FileText, BarChart3 } from 'lucide-react';
+import { RetroSpinner } from './ui/RetroSpinner';
 import { EmptyState } from './EmptyState';
 import { TokenLineChart } from './token-dashboard/TokenLineChart';
 import { SessionEfficiencyPanel } from './token-dashboard/SessionEfficiencyPanel';
@@ -176,7 +177,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
   const LoadingSpinner = () => (
     <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-mono">
-      <RefreshCw size={14} className="animate-spin mr-2" />
+      <RetroSpinner size={14} lineWidth={2} className="mr-2" />
       Loading...
     </div>
   );
@@ -243,7 +244,11 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                 onClick={handleRefresh}
                 disabled={refreshing}
               >
-                <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? (
+                  <RetroSpinner size={12} lineWidth={1.5} />
+                ) : (
+                  <span className="w-3 h-3" />
+                )}
                 Refresh
               </Button>
             </div>

@@ -1,5 +1,6 @@
 import React from "react";
-import { X, Loader2, Braces, FileText, List } from "lucide-react";
+import { X, Braces, FileText, List } from "lucide-react";
+import { RetroSpinner } from "../ui/RetroSpinner";
 import { FileStateSelector } from "./FileStateSelector";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +65,7 @@ export function SelectedFileItem({
         </span>
         {/* Analysis indicator */}
         {symbolCount === -1 ? (
-          <Loader2 className="w-3 h-3 animate-spin opacity-50 flex-shrink-0" title="Parsing..." />
+          <RetroSpinner size={12} lineWidth={1.5} className="opacity-50 flex-shrink-0" />
         ) : showViewMode ? (
           <button
             onClick={(e) => {

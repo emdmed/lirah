@@ -3,8 +3,9 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
-  Coins, BarChart3, FileText, FileX, Loader2, Check, AlertTriangle, AlertCircle
+  Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle
 } from 'lucide-react';
+import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { useTokenBudget } from '../contexts/TokenBudgetContext';
@@ -156,17 +157,21 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
 
 function ChangelogStatus({ status }) {
   const config = useMemo(() => ({
-    updating: { icon: Loader2, text: 'Updating changelog...', className: 'animate-spin' },
+    updating: { component: RetroSpinner, text: 'Updating changelog...', props: { size: 12, lineWidth: 1.5 } },
     done: { icon: Check, text: 'Changelog updated', color: STATUS_COLORS.success },
     error: { icon: AlertTriangle, text: 'Changelog failed', color: STATUS_COLORS.critical }
   }), []);
 
-  const { icon: Icon, text, className, color } = config[status] || {};
-  if (!Icon) return null;
+  const { component: Component, icon: Icon, text, props, color } = config[status] || {};
+  if (!Component && !Icon) return null;
 
   return (
     <span className="flex items-center gap-1 px-1.5 text-xs opacity-80">
-      <Icon className={`w-3 h-3 ${className || ''}`} style={color ? { color } : undefined} />
+      {Component ? (
+        <Component {...props} />
+      ) : (
+        <Icon className="w-3 h-3" style={color ? { color } : undefined} />
+      )}
       <span>{text}</span>
     </span>
   );

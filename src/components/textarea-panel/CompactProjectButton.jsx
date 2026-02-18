@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { RetroSpinner } from "../ui/RetroSpinner";
 import { Layers, Scan, Zap, Sparkles, FileX } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
@@ -24,7 +25,7 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
       case 'parsing':
         return { Icon: Zap, iconClass: 'animate-bounce', text: progressText };
       case 'finishing':
-        return { Icon: Sparkles, iconClass: 'animate-spin', text: 'Finishing...' };
+        return { Component: RetroSpinner, props: { size: 12, lineWidth: 1.5 }, text: 'Finishing...' };
       case 'empty':
         return { Icon: FileX, iconClass: '', text: 'No files' };
       default:
@@ -40,7 +41,11 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
         variant="outline"
         className="text-[10px] px-1.5 py-0.5 gap-1 font-semibold font-mono border border-sketch rounded-none whitespace-nowrap animate-pulse bg-primary/15 text-primary"
       >
-        <config.Icon className={`h-3 w-3 ${config.iconClass}`} />
+        {config.Component ? (
+          <config.Component {...config.props} />
+        ) : (
+          <config.Icon className={`h-3 w-3 ${config.iconClass}`} />
+        )}
         {config.text}
       </Badge>
     );

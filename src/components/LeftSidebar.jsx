@@ -3,6 +3,7 @@ import { SidebarHeader } from "./SidebarHeader";
 import { FlatViewMenu } from "./FlatViewMenu";
 import { SidebarFileSelection } from "./sidebar/SidebarFileSelection";
 import { useFileSelection } from "../contexts/FileSelectionContext";
+import { RetroSpinner } from "./ui/RetroSpinner";
 import {
   Sidebar,
   SidebarContent,
@@ -75,8 +76,8 @@ export function LeftSidebar({
                 treeLoading ? (
                   <div className="p-4 text-center">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                      <div className="text-sm opacity-60">Loading directory tree...</div>
+                      <RetroSpinner size={20} lineWidth={2} />
+                      <div className="text-sm opacity-60 font-mono">Loading directory tree...</div>
                     </div>
                   </div>
                 ) : (
