@@ -348,12 +348,23 @@ pub fn run_git_command(repo_path: String, args: Vec<String>) -> Result<String, S
 
 #[tauri::command(async)]
 pub fn generate_commit_message(project_dir: String, cli: String, prompt: String) -> Result<String, String> {
-    let command = match cli.as_str() {
-        "opencode" => format!("opencode run -m opencode/kimi-k2.5-free '{}'", prompt.replace('\'', "'\\''")),
-        _ => format!("claude --print '{}'", prompt.replace('\'', "'\\''")),
+    let escaped_prompt = prompt.replace('\'', "'\\''");
+    
+    // Try with free model first
+    let (command, fallback_command) = match cli.as_str() {
+        "opencode" => (
+            format!("opencode run -m opencode/kimi-k2.5-free '{}'", escaped_prompt),
+            Some(format!("opencode run -m opencode/kimi-k2.5 '{}'", escaped_prompt)),
+        ),
+        _ => (
+            format!("claude --print '{}'", escaped_prompt),
+            None,
+        ),
     };
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    
+    // First attempt with free model
     let output = std::process::Command::new(&shell)
         .args(&["-lc", &command])
         .current_dir(&project_dir)
@@ -361,10 +372,29 @@ pub fn generate_commit_message(project_dir: String, cli: String, prompt: String)
         .output()
         .map_err(|e| format!("Failed to run LLM command: {}", e))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    }
+
+    // If free model failed and we have a fallback (paid model), try it silently
+    if let Some(fallback) = fallback_command {
+        let fallback_output = std::process::Command::new(&shell)
+            .args(&["-lc", &fallback])
+            .current_dir(&project_dir)
+            .env("TERM", "xterm-256color")
+            .output()
+            .map_err(|e| format!("Failed to run LLM command: {}", e))?;
+
+        if fallback_output.status.success() {
+            return Ok(String::from_utf8_lossy(&fallback_output.stdout).trim().to_string());
+        }
+        
+        // Both failed - return error from paid model attempt
+        let stderr = String::from_utf8_lossy(&fallback_output.stderr).to_string();
         return Err(format!("LLM command failed: {}", stderr));
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    // No fallback available, return original error
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    Err(format!("LLM command failed: {}", stderr))
 }

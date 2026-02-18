@@ -74,7 +74,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     try {
       await invoke('run_git_command', { repoPath, args: ['commit', '-m', editedMessage] });
       setStage('done');
-      setTimeout(reset, 1500);
+      setTimeout(reset, 2000);
     } catch (err) {
       setError(err.toString());
       setStage('error');

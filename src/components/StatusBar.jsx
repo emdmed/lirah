@@ -1,70 +1,96 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ThemeSwitcher } from './ThemeSwitcher';
-import { Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical, PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff, Coins, BarChart3, FileText, FileX, Loader2, Check, AlertTriangle } from 'lucide-react';
+import {
+  Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical,
+  PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
+  Coins, BarChart3, FileText, FileX, Loader2, Check, AlertTriangle
+} from 'lucide-react';
 import { useWatcher } from '../contexts/WatcherContext';
 import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
 import { useTokenBudget } from '../contexts/TokenBudgetContext';
 import { Button } from './ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuShortcut,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
 } from './ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'Claude Code', icon: Bot },
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
+const STATUS_COLORS = {
+  critical: '#E82424',
+  warning: '#FF9E3B',
+  success: '#76946A'
+};
+
+function CliIcon({ cli }) {
+  const Icon = CLI_DISPLAY[cli]?.icon || Terminal;
+  return <Icon className="w-3 h-3" />;
+}
+
 function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
-  const { checkBudgetStatus, currentUsage, getBudget, formatTokenCount, formatCost } = useTokenBudget();
+  const { checkBudgetStatus, currentUsage, getBudget, formatCost } = useTokenBudget();
   const [popupOpen, setPopupOpen] = useState(false);
   const popupRef = useRef(null);
 
   const budget = getBudget(projectPath);
   const { status, percentage } = checkBudgetStatus(projectPath);
 
+  const closePopup = useCallback(() => setPopupOpen(false), []);
+
   useEffect(() => {
     if (!popupOpen) return;
-    const handleClick = (e) => {
-      if (popupRef.current && !popupRef.current.contains(e.target)) setPopupOpen(false);
+    const handleClickOutside = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) closePopup();
     };
-    const handleEsc = (e) => { if (e.key === 'Escape') setPopupOpen(false); };
-    document.addEventListener('mousedown', handleClick);
+    const handleEsc = (e) => { if (e.key === 'Escape') closePopup(); };
+    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEsc);
-    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleEsc); };
-  }, [popupOpen]);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [popupOpen, closePopup]);
 
-  const barColor = status === 'critical' ? '#E82424' : status === 'warning' ? '#FF9E3B' : '#76946A';
+  const barColor = STATUS_COLORS[status] || STATUS_COLORS.success;
 
   if (!budget) {
     return (
-      <Button variant="ghost" size="xs" onClick={onOpenBudgetSettings} title="Set token budget" className="gap-1 px-1.5">
-        <Coins className="w-3 h-3" />
-        <span className="opacity-70 text-xs">Budget</span>
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="xs" onClick={onOpenBudgetSettings} className="gap-1 px-1.5">
+            <Coins className="w-3 h-3" />
+            <span className="opacity-70 text-xs">Budget</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Set token budget</TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
     <div className="relative">
-      <button
-        onClick={() => setPopupOpen(!popupOpen)}
-        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-white/10 transition-colors"
-        title="Token budget"
-      >
-        <Coins className="w-3 h-3" />
-        <div className="flex items-center gap-1">
-          <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, backgroundColor: barColor }} />
-          </div>
-          <span className="opacity-70">{Math.round(percentage)}%</span>
-        </div>
-        <span className="opacity-50">{formatCost(currentUsage.cost)}</span>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => setPopupOpen(!popupOpen)}
+            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-white/10 transition-colors"
+          >
+            <Coins className="w-3 h-3" />
+            <div className="flex items-center gap-1">
+              <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, backgroundColor: barColor }} />
+              </div>
+              <span className="opacity-70">{Math.round(percentage)}%</span>
+            </div>
+            <span className="opacity-50">{formatCost(currentUsage.cost)}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Token budget usage</TooltipContent>
+      </Tooltip>
 
       {popupOpen && (
         <div
@@ -100,7 +126,7 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${Math.min((currentUsage.total / budget.weeklyLimit) * 100, 100)}%`,
-                    backgroundColor: (currentUsage.total / budget.weeklyLimit) >= 0.95 ? '#E82424' : (currentUsage.total / budget.weeklyLimit) >= 0.8 ? '#FF9E3B' : '#76946A',
+                    backgroundColor: (currentUsage.total / budget.weeklyLimit) >= 0.95 ? STATUS_COLORS.critical : (currentUsage.total / budget.weeklyLimit) >= 0.8 ? STATUS_COLORS.warning : STATUS_COLORS.success,
                   }}
                 />
               </div>
@@ -110,7 +136,7 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
             </div>
           )}
 
-          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setPopupOpen(false); onOpenBudgetSettings(); }}>
+          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { closePopup(); onOpenBudgetSettings(); }}>
             Budget Settings
           </Button>
         </div>
@@ -119,10 +145,78 @@ function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
   );
 }
 
-export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHelp, onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar, onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation, onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused, onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus, onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName }) => {
+function ChangelogStatus({ status }) {
+  const config = useMemo(() => ({
+    updating: { icon: Loader2, text: 'Updating changelog...', className: 'animate-spin' },
+    done: { icon: Check, text: 'Changelog updated', color: STATUS_COLORS.success },
+    error: { icon: AlertTriangle, text: 'Changelog failed', color: STATUS_COLORS.critical }
+  }), []);
+
+  const { icon: Icon, text, className, color } = config[status] || {};
+  if (!Icon) return null;
+
+  return (
+    <span className="flex items-center gap-1 px-1.5 text-xs opacity-80">
+      <Icon className={`w-3 h-3 ${className || ''}`} style={color ? { color } : undefined} />
+      <span>{text}</span>
+    </span>
+  );
+}
+
+function SandboxButton({ enabled, failed, onToggle }) {
+  const getIcon = () => {
+    if (enabled && failed) return <ShieldAlert className="w-3 h-3" style={{ color: STATUS_COLORS.warning }} />;
+    if (enabled) return <Shield className="w-3 h-3" />;
+    return <ShieldOff className="w-3 h-3" style={{ color: STATUS_COLORS.critical }} />;
+  };
+
+  const getTooltip = () => {
+    if (enabled && failed) return 'Sandbox: FAILED';
+    if (enabled) return 'Sandbox: ON';
+    return 'Sandbox: OFF';
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="xs" onClick={onToggle} className="gap-1 px-1.5">
+          {getIcon()}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{getTooltip()}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function NetworkButton({ isolated, enabled, onToggle }) {
+  const icon = isolated && enabled ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" style={enabled ? {} : { opacity: 0.4 }} />;
+  const tooltip = isolated && enabled ? 'Network: ISOLATED' : 'Network: ALLOWED';
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="xs" onClick={onToggle} disabled={!enabled} className="gap-1 px-1.5">
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export const StatusBar = ({
+  viewMode, currentPath, sessionId, theme, onToggleHelp,
+  onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar,
+  onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
+  onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
+  onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
+  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName
+}) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
+
+  const cliName = CLI_DISPLAY[selectedCli]?.name || selectedCli;
 
   return (
     <div
@@ -133,9 +227,8 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
         height: '32px',
       }}
     >
-      {/* Left section: Current path */}
       <div className="flex items-center gap-2 overflow-hidden">
-        <span className="overflow-hidden whitespace-nowrap" style={{ textOverflow: 'ellipsis' }}>
+        <span className="overflow-hidden whitespace-nowrap text-ellipsis">
           {currentPath ? currentPath.split('/').pop() || '~' : '~'}
         </span>
         {branchName && (
@@ -145,151 +238,82 @@ export const StatusBar = ({ viewMode, currentPath, sessionId, theme, onToggleHel
         )}
       </div>
 
-      {/* Right section: Budget, CLI selector, Theme, and Settings menu */}
       <div className="flex items-center gap-2">
-        {changelogStatus && (
-          <span className="flex items-center gap-1 px-1.5 text-xs opacity-80">
-            {changelogStatus === 'updating' && <Loader2 className="w-3 h-3 animate-spin" />}
-            {changelogStatus === 'done' && <Check className="w-3 h-3" style={{ color: '#76946A' }} />}
-            {changelogStatus === 'error' && <AlertTriangle className="w-3 h-3" style={{ color: '#E82424' }} />}
-            <span>
-              {changelogStatus === 'updating' && 'Updating changelog...'}
-              {changelogStatus === 'done' && 'Changelog updated'}
-              {changelogStatus === 'error' && 'Changelog failed'}
-            </span>
-          </span>
-        )}
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={onOpenDashboard}
-          title="Token Metrics (Ctrl+Shift+D)"
-          className="gap-1 px-1.5"
-        >
-          <BarChart3 className="w-3 h-3" />
-          <span className="opacity-70">Metrics</span>
-        </Button>
-        <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
-        {selectedCli && (
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onOpenCliSettings}
-            title="Change CLI tool (Ctrl+K)"
-            className="gap-1.5"
-          >
-            {(() => {
-              const CliIcon = CLI_DISPLAY[selectedCli]?.icon || Terminal;
-              return <CliIcon className="w-3 h-3" />;
-            })()}
-            <span className="opacity-70">{CLI_DISPLAY[selectedCli]?.name || selectedCli}</span>
-          </Button>
-        )}
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onToggleSandbox}
-            title={`Sandbox: ${sandboxEnabled && sandboxFailed ? 'FAILED' : sandboxEnabled ? 'ON' : 'OFF'}`}
-            className="gap-1 px-1.5"
-          >
-            {sandboxEnabled && sandboxFailed ? (
-              <ShieldAlert className="w-3 h-3" style={{ color: '#FF9E3B' }} />
-            ) : sandboxEnabled ? (
-              <Shield className="w-3 h-3" />
-            ) : (
-              <ShieldOff className="w-3 h-3" style={{ color: '#E82424' }} />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onToggleNetworkIsolation}
-            disabled={!sandboxEnabled}
-            title={`Network: ${networkIsolation && sandboxEnabled ? 'ISOLATED' : 'ALLOWED'}`}
-            className="gap-1 px-1.5"
-          >
-            {networkIsolation && sandboxEnabled ? (
-              <WifiOff className="w-3 h-3" />
-            ) : (
-              <Wifi className="w-3 h-3" style={sandboxEnabled ? {} : { opacity: 0.4 }} />
-            )}
-          </Button>
-        </div>
-        <ThemeSwitcher />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              title="Settings"
-              aria-label="Open settings menu"
-            >
-              <MoreVertical className="w-4 h-4" />
+        {changelogStatus && <ChangelogStatus status={changelogStatus} />}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="xs" onClick={onOpenDashboard} className="gap-1 px-1.5">
+              <BarChart3 className="w-3 h-3" />
+              <span className="opacity-70">Metrics</span>
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-120 text-xs [&_[role=menuitem]]:py-1 [&_[role=menuitem]]:text-xs [&_[role=menuitem]_svg]:size-3">
-            <DropdownMenuItem
-              onClick={onLaunchOrchestration}
-              disabled={!sessionId}
-              className="cursor-pointer"
-            >
-              <Download className="mr-1.5" />
+          </TooltipTrigger>
+          <TooltipContent>Token Metrics (Ctrl+Shift+D)</TooltipContent>
+        </Tooltip>
+
+        <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
+
+        {selectedCli && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1.5">
+                <CliIcon cli={selectedCli} />
+                <span className="opacity-70">{cliName}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
+          </Tooltip>
+        )}
+
+        <div className="flex items-center gap-0.5">
+          <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={onToggleSandbox} />
+          <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={onToggleNetworkIsolation} />
+        </div>
+
+        <ThemeSwitcher />
+
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" className="w-56 text-xs">
+            <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1.5">
+              <Download className="mr-2 w-3 h-3" />
               Add Orchestration
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onToggleHelp}
-              className="cursor-pointer"
-            >
-              <Keyboard className="mr-1.5" />
+            <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1.5">
+              <Keyboard className="mr-2 w-3 h-3" />
               Keyboard Shortcuts
               <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={toggleWatchers}
-              className="cursor-pointer"
-            >
-              {fileWatchingEnabled ? (
-                <Eye className="mr-1.5" />
-              ) : (
-                <EyeOff className="mr-1.5" style={{ color: '#E82424' }} />
-              )}
+            <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1.5">
+              {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
               File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
               <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onOpenAutoChangelogDialog}
-              className="cursor-pointer"
-            >
+            <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1.5">
               {autoChangelogEnabled ? (
-                <FileText className="mr-1.5" style={{ color: '#76946A' }} />
+                <FileText className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.success }} />
               ) : (
-                <FileX className="mr-1.5" style={{ color: '#E82424' }} />
+                <FileX className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />
               )}
               Auto Changelog...
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onOpenAutoCommitConfig}
-              className="cursor-pointer"
-            >
-              {(() => {
-                const Icon = CLI_DISPLAY[autoCommitCli]?.icon || Bot;
-                return <Icon className="mr-1.5" />;
-              })()}
-              Auto Commit...
+            <DropdownMenuItem onClick={onOpenAutoCommitConfig} className="cursor-pointer py-1.5">
+              <CliIcon cli={autoCommitCli} />
+              <span className="ml-2">Auto Commit...</span>
               <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onToggleTitleBar}
-              className="cursor-pointer"
-            >
-              {showTitleBar ? (
-                <PanelTop className="mr-1.5" />
-              ) : (
-                <PanelTopClose className="mr-1.5" style={{ color: '#E82424' }} />
-              )}
+            <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1.5">
+              {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
               Title Bar: {showTitleBar ? 'ON' : 'OFF'}
             </DropdownMenuItem>
           </DropdownMenuContent>
