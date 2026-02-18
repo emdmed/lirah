@@ -284,23 +284,23 @@ export const StatusBar = ({
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
-          <DropdownMenuContent align="end" className="w-56 text-xs">
-            <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1.5">
+          <DropdownMenuContent align="end" className="w-100 text-xs">
+            <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1">
               <Download className="mr-2 w-3 h-3" />
               Add Orchestration
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1.5">
+            <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
               <Keyboard className="mr-2 w-3 h-3" />
               Keyboard Shortcuts
               <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1.5">
+            <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1">
               {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
               File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
               <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1.5">
+            <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1">
               {autoChangelogEnabled ? (
                 <FileText className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.success }} />
               ) : (
@@ -308,12 +308,12 @@ export const StatusBar = ({
               )}
               Auto Changelog...
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onOpenAutoCommitConfig} className="cursor-pointer py-1.5">
+            <DropdownMenuItem onClick={onOpenAutoCommitConfig} className="cursor-pointer py-1">
               <CliIcon cli={autoCommitCli} />
               <span className="ml-2">Auto Commit...</span>
               <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1.5">
+            <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
               {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
               Title Bar: {showTitleBar ? 'ON' : 'OFF'}
             </DropdownMenuItem>
