@@ -1,9 +1,9 @@
 import { useRef, useEffect, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed }, ref) => {
+export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed }, ref) => {
   const terminalRef = useRef(null);
-  const { handleResize, sessionId, isFocused, sandboxFailed } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir);
+  const { handleResize, sessionId, isReady, isFocused, sandboxFailed } = useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir);
 
   // Notify parent when session is ready
   useEffect(() => {
@@ -11,6 +11,13 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onSe
       onSessionReady(sessionId);
     }
   }, [sessionId, onSessionReady]);
+
+  // Notify parent when terminal is fully ready
+  useEffect(() => {
+    if (isReady && onReady) {
+      onReady();
+    }
+  }, [isReady, onReady]);
 
   // Notify parent if sandbox failed
   useEffect(() => {

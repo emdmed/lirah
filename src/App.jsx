@@ -88,12 +88,31 @@ function App() {
   const [splashVisible, setSplashVisible] = useState(false);
   const [splashStep, setSplashStep] = useState('navigate');
   const [splashProjectName, setSplashProjectName] = useState('');
+  const [terminalReady, setTerminalReady] = useState(false);
 
   // Domain hooks
   const settings = useTerminalSettings();
   const dialogs = useDialogs();
 
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
+  
+  // Refs for splash screen to access current values in async callbacks
+  const foldersRef = useRef(folders);
+  const currentPathRef = useRef(currentPath);
+  const terminalReadyRef = useRef(terminalReady);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    foldersRef.current = folders;
+  }, [folders]);
+  
+  useEffect(() => {
+    currentPathRef.current = currentPath;
+  }, [currentPath]);
+  
+  useEffect(() => {
+    terminalReadyRef.current = terminalReady;
+  }, [terminalReady]);
 
   const typeChecker = useTypeChecker(currentPath, { setTextareaVisible, setTextareaContent });
 
@@ -201,15 +220,47 @@ function App() {
     setSplashProjectName(bookmark.name);
     setSplashStep('navigate');
     setSplashVisible(true);
+    setTerminalReady(false);
 
-    // Step 1: Navigate (waits for filetree to fully load)
+    // Step 1: Navigate and wait for filetree to fully load
     await navigateToBookmark(bookmark);
+    
+    // Wait for navigation to actually complete (folders loaded)
+    // Use a polling approach with refs to access current values
+    await new Promise(resolve => {
+      const checkNavigation = setInterval(() => {
+        if (foldersRef.current.length > 0 && currentPathRef.current) {
+          clearInterval(checkNavigation);
+          resolve();
+        }
+      }, 50);
+      // Timeout after 5 seconds to prevent infinite wait
+      setTimeout(() => {
+        clearInterval(checkNavigation);
+        resolve();
+      }, 5000);
+    });
 
-    // Step 2: Start Claude
+    // Step 2: Start Claude (wait for terminal to be ready first)
     setSplashStep('claude');
     switchToClaudeMode();
+    
+    // Wait for terminal to be ready before launching Claude
+    await new Promise(resolve => {
+      const checkReady = setInterval(() => {
+        if (terminalReadyRef.current) {
+          clearInterval(checkReady);
+          resolve();
+        }
+      }, 50);
+      // Timeout after 3 seconds
+      setTimeout(() => {
+        clearInterval(checkReady);
+        resolve();
+      }, 3000);
+    });
+    
     launchClaude();
-    await new Promise(resolve => setTimeout(resolve, 500));
 
     setSplashStep('done');
   }, [navigateToBookmark, switchToClaudeMode, launchClaude]);
@@ -568,6 +619,7 @@ function App() {
           ref={terminalRef}
           theme={theme.terminal}
           onSessionReady={(id) => setTerminalSessionId(id)}
+          onReady={() => setTerminalReady(true)}
           onSearchFocus={handleSearchFocus}
           onToggleGitFilter={treeView.handleToggleGitFilter}
           sandboxEnabled={settings.sandboxEnabled}
