@@ -201,6 +201,14 @@ export function TextareaPanel({
                   <span className="text-muted-foreground/60 ml-1">(~{orchestrationTokenEstimate} tokens)</span>
                 )}
               </label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground/40 text-[10px] cursor-help">Ctrl+Ctrl</span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <span className="text-xs">Double-tap Ctrl to toggle</span>
+                </TooltipContent>
+              </Tooltip>
             </div>
           )}
           {onToggleKeepFiles && (
@@ -246,13 +254,23 @@ export function TextareaPanel({
             onSaveGroup={onSaveGroup}
             hasSelectedFiles={fileArray.length > 0}
           />
-          <TemplateSelector
-            selectedTemplateId={selectedTemplateId}
-            onSelectTemplate={onSelectTemplate}
-            onManageTemplates={onManageTemplates}
-            open={templateDropdownOpen}
-            onOpenChange={onTemplateDropdownOpenChange}
-          />
+          <div className="flex items-center gap-1">
+            <TemplateSelector
+              selectedTemplateId={selectedTemplateId}
+              onSelectTemplate={onSelectTemplate}
+              onManageTemplates={onManageTemplates}
+              open={templateDropdownOpen}
+              onOpenChange={onTemplateDropdownOpenChange}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-muted-foreground/40 text-[10px] cursor-help">Alt+Alt</span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <span className="text-xs">Double-tap Alt to {selectedTemplateId ? 'clear' : 'open'}</span>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
 

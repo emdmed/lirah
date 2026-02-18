@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { buildTreeFromFlatList, incrementallyUpdateTree } from "../utils/treeOperations";
 import { lastSepIndex } from "../utils/pathUtils";
+import { useToast } from "../contexts/ToastContext";
 
 export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults }) {
   const [treeData, setTreeData] = useState([]);
@@ -9,6 +10,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
   const [allFiles, setAllFiles] = useState([]);
+  const { error } = useToast();
 
   const loadTreeData = useCallback(async () => {
     try {
@@ -28,11 +30,21 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
       setAllFiles(allEntries);
       setTreeLoading(false);
       initializeSearch(allEntries);
-    } catch (error) {
-      console.error('Failed to load tree data:', error);
+    } catch (err) {
+      console.error('Failed to load tree data:', err);
+      const errorMessage = err?.message || err?.toString() || 'Unknown error';
       setTreeData([]);
       setCurrentPath('Error loading directory');
       setTreeLoading(false);
+      error(`Failed to load directory tree: ${errorMessage}`, {
+        duration: 8000,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            loadTreeData();
+          }
+        }
+      });
     }
   }, [terminalSessionId, setCurrentPath, initializeSearch]);
 

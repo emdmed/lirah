@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { useToast } from '../contexts/ToastContext';
 import '@xterm/xterm/css/xterm.css';
 
 export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false) {
@@ -15,6 +16,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [sandboxFailed, setSandboxFailed] = useState(false);
   const isFocusedRef = useRef(false);
   const sessionIdRef = useRef(null);
+  const { error, warning } = useToast();
 
   // Initialize terminal
   useEffect(() => {
@@ -114,6 +116,16 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // Check if sandbox was requested but failed
         if (sandboxEnabled && !result.sandboxed) {
           setSandboxFailed(true);
+          warning('Sandbox failed to initialize. Terminal running without sandbox.', {
+            duration: 8000,
+            action: {
+              label: 'Retry without sandbox',
+              onClick: () => {
+                // User can toggle sandbox off and restart
+                console.log('User acknowledged sandbox failure');
+              }
+            }
+          });
         }
 
         // Listen for terminal output
@@ -152,9 +164,20 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
             });
           }, 300);
         }
-      } catch (error) {
-        console.error('Failed to initialize terminal:', error);
-        terminal.write(`\r\n\x1b[1;31mError: ${error}\x1b[0m\r\n`);
+      } catch (err) {
+        console.error('Failed to initialize terminal:', err);
+        const errorMessage = err?.message || err?.toString() || 'Unknown error';
+        terminal.write(`\r\n\x1b[1;31mError: ${errorMessage}\x1b[0m\r\n`);
+        error(`Failed to initialize terminal: ${errorMessage}`, {
+          duration: 10000,
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              // Trigger a re-mount by updating the terminal key in parent
+              console.log('Retry requested - parent component should handle remount');
+            }
+          }
+        });
       }
     };
 

@@ -36,6 +36,7 @@ import { TokenBudgetDialog } from "./components/TokenBudgetDialog";
 import { TokenAlertBanner } from "./components/TokenAlertBanner";
 import { TokenDashboard } from "./components/TokenDashboard";
 import { TokenBudgetProvider } from "./contexts/TokenBudgetContext";
+import { ToastContainer } from "./components/ToastContainer";
 import { SecondaryTerminal } from "./components/SecondaryTerminal";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -736,6 +737,7 @@ function App() {
         currentStep={splashStep}
         onComplete={() => setSplashVisible(false)}
       />
+      <ToastContainer />
     </SidebarProvider>
     </TokenBudgetProvider>
   );

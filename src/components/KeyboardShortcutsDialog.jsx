@@ -53,13 +53,15 @@ const shortcuts = [
 ]
 
 function KeyCombo({ keys, note, highlight = false }) {
+  const isDoubleTap = note === 'double-tap'
   return (
     <div className='flex items-center gap-1'>
       {keys.map((key, index) => (
         <span key={index} className='flex items-center gap-1'>
-          {index > 0 && <span className='text-muted-foreground text-xs'>+</span>}
+          {index > 0 && !isDoubleTap && <span className='text-muted-foreground text-xs'>+</span>}
+          {isDoubleTap && index > 0 && <span className='text-muted-foreground text-xs mx-0.5'>⇢</span>}
           <kbd className={`px-2 py-1 text-xs font-mono border border-sketch rounded-none transition-all ${
-            highlight
+            highlight || isDoubleTap
               ? 'bg-primary/10 border-primary/30 text-primary'
               : 'bg-muted/50 border-muted/30 hover:bg-muted'
           }`}>
@@ -67,8 +69,11 @@ function KeyCombo({ keys, note, highlight = false }) {
           </kbd>
         </span>
       ))}
-      {note && (
+      {note && !isDoubleTap && (
         <span className='text-xs text-muted-foreground ml-2 italic'>{note}</span>
+      )}
+      {isDoubleTap && (
+        <span className='text-xs text-primary ml-1 font-medium'>×2</span>
       )}
     </div>
   )

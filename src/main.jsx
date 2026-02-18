@@ -7,22 +7,25 @@ import { BookmarksProvider } from "./contexts/BookmarksContext";
 import { PromptTemplatesProvider } from "./contexts/PromptTemplatesContext";
 import { FileGroupsProvider } from "./contexts/FileGroupsContext";
 import { FileSelectionProvider } from "./contexts/FileSelectionContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <WatcherProvider>
-        <BookmarksProvider>
-          <PromptTemplatesProvider>
-            <FileGroupsProvider>
-              <FileSelectionProvider>
-                <App />
-              </FileSelectionProvider>
-            </FileGroupsProvider>
-          </PromptTemplatesProvider>
-        </BookmarksProvider>
-      </WatcherProvider>
-    </ThemeProvider>
+    <ToastProvider>
+      <ThemeProvider>
+        <WatcherProvider>
+          <BookmarksProvider>
+            <PromptTemplatesProvider>
+              <FileGroupsProvider>
+                <FileSelectionProvider>
+                  <App />
+                </FileSelectionProvider>
+              </FileGroupsProvider>
+            </PromptTemplatesProvider>
+          </BookmarksProvider>
+        </WatcherProvider>
+      </ThemeProvider>
+    </ToastProvider>
   </React.StrictMode>,
 );
