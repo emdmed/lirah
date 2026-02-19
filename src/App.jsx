@@ -161,7 +161,7 @@ function App() {
     }
   }, [sidebarSearch.searchResults]);
 
-  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, !!currentPath);
+  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, !!currentPath && !secondary.secondaryFullscreen);
 
   const compact = useCompact({
     currentPath,
@@ -341,7 +341,7 @@ function App() {
   }, [sidebar.sidebarOpen]);
 
   // Monitor terminal CWD
-  const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled);
+  const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled && !secondary.secondaryFullscreen);
 
   // Calculate orchestration token estimate when enabled
   const calculateOrchestrationEstimate = useCallback(async (cwd) => {
@@ -372,7 +372,7 @@ function App() {
   }, [detectedCwd, calculateOrchestrationEstimate, appendOrchestration]);
 
   // Get current git branch
-  const branchName = useBranchName(detectedCwd);
+  const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd);
 
   // Auto-check orchestration
   useEffect(() => {
@@ -505,7 +505,7 @@ function App() {
               viewMode={viewMode}
               currentPath={currentPath}
               folders={folders}
-              fileWatchingEnabled={fileWatchingEnabled}
+              fileWatchingEnabled={fileWatchingEnabled && !secondary.secondaryFullscreen}
               isTextareaPanelOpen={textareaVisible}
               onNavigateParent={navigateToParent}
               onFolderClick={loadFolders}
