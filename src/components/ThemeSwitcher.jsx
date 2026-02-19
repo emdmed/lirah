@@ -9,30 +9,6 @@ import {
 } from './ui/dropdown-menu';
 import { Palette, Check } from 'lucide-react';
 
-/**
- * Color palette preview showing 4 key colors from a theme
- */
-function ThemePalette({ theme }) {
-  const colors = [
-    theme.terminal.background,
-    theme.terminal.foreground,
-    theme.terminal.blue,
-    theme.terminal.green,
-  ];
-
-  return (
-    <div className="flex gap-0.5">
-      {colors.map((color, i) => (
-        <span
-          key={i}
-          className="w-3 h-3 rounded-sm border border-border/50"
-          style={{ backgroundColor: color }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function ThemeSwitcher() {
   const { currentTheme, themes, changeTheme } = useTheme();
 
@@ -59,17 +35,14 @@ export function ThemeSwitcher() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-48">
         {Object.entries(themes).map(([key, theme]) => (
           <DropdownMenuItem
             key={key}
             onClick={() => changeTheme(key)}
             className="flex items-center justify-between cursor-pointer"
           >
-            <span className="flex items-center gap-2">
-              <ThemePalette theme={theme} />
-              <span className="text-sm">{theme.name}</span>
-            </span>
+            <span className="text-sm">{theme.name}</span>
             {currentTheme === key && <Check className="h-4 w-4" />}
           </DropdownMenuItem>
         ))}
