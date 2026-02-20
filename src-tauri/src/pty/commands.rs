@@ -346,9 +346,43 @@ pub fn run_git_command(repo_path: String, args: Vec<String>) -> Result<String, S
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+const DEFAULT_PROMPT: &str = "Generate a concise conventional commit message for this diff. Reply with ONLY the commit message, no explanation, no markdown formatting, no backticks:";
+
 #[tauri::command(async)]
-pub fn generate_commit_message(project_dir: String, cli: String, prompt: String) -> Result<String, String> {
-    let escaped_prompt = prompt.replace('\'', "'\\''");
+pub fn generate_commit_message(project_dir: String, cli: String, custom_prompt: Option<String>) -> Result<String, String> {
+    // Get staged diff using git diff --cached via shell command
+    let diff_output = std::process::Command::new("git")
+        .args(&["diff", "--cached", "--no-color"])
+        .current_dir(&project_dir)
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+
+    if !diff_output.status.success() {
+        let stderr = String::from_utf8_lossy(&diff_output.stderr).to_string();
+        return Err(format!("git diff failed: {}", stderr));
+    }
+
+    let diff = String::from_utf8_lossy(&diff_output.stdout);
+    
+    if diff.trim().is_empty() {
+        return Err("No staged changes found. Please stage files first.".to_string());
+    }
+
+    // Build the prompt
+    let base_prompt = custom_prompt.as_ref()
+        .map(|p| format!("{}\n\nAdditional instructions: {}", DEFAULT_PROMPT, p.trim()))
+        .unwrap_or_else(|| DEFAULT_PROMPT.to_string());
+    
+    // Truncate diff if too large (keep it under ~100KB for safety)
+    let max_diff_size = 100_000;
+    let truncated_diff = if diff.len() > max_diff_size {
+        format!("{}\n\n... (diff truncated, showing first {} characters)", &diff[..max_diff_size], max_diff_size)
+    } else {
+        diff.to_string()
+    };
+    
+    let full_prompt = format!("{}\n\n{}", base_prompt, truncated_diff);
+    let escaped_prompt = full_prompt.replace('\'', "'\\''");
     
     // Try with free model first
     let (command, fallback_command) = match cli.as_str() {
