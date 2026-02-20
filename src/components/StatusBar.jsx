@@ -3,7 +3,8 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
-  Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle
+  Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
+  CheckCircle2, ListTodo
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../contexts/WatcherContext';
@@ -24,6 +25,7 @@ import {
   DialogFooter,
 } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'Claude Code', icon: Bot },
@@ -224,7 +226,8 @@ export const StatusBar = ({
   onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
-  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName
+  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
+  onToggleBranchTasks, branchTasksOpen
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
@@ -278,6 +281,25 @@ export const StatusBar = ({
           <Badge variant="secondary">
             {branchName}
           </Badge>
+        )}
+        {branchName && branchName !== 'main' && branchName !== 'master' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="xs" 
+                onClick={onToggleBranchTasks}
+                className={cn(
+                  "gap-1 px-1.5 h-5 transition-colors",
+                  branchTasksOpen && "bg-white/10"
+                )}
+              >
+                <ListTodo className="w-3 h-3" />
+                <span className="opacity-70">Tasks</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Branch Tasks (Ctrl+Shift+T)</TooltipContent>
+          </Tooltip>
         )}
       </div>
 

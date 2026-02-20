@@ -10,6 +10,7 @@ import { InitialProjectDialog } from "./components/InitialProjectDialog";
 import { SplashScreen } from "./components/SplashScreen";
 import { ManageTemplatesDialog } from "./components/ManageTemplatesDialog";
 import { GitDiffDialog } from "./components/GitDiffDialog";
+import { BranchCompletedTasksDialog } from "./components/BranchCompletedTasksDialog";
 import { SaveFileGroupDialog } from "./components/SaveFileGroupDialog";
 import { CliSelectionModal } from "./components/CliSelectionModal";
 import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
@@ -57,6 +58,7 @@ import { AutoChangelogDialog } from "./components/AutoChangelogDialog";
 import { useAutoCommit } from "./hooks/useAutoCommit";
 import { AutoCommitDialog } from "./components/AutoCommitDialog";
 import { AutoCommitConfigDialog } from "./components/AutoCommitConfigDialog";
+import { useBranchTasks } from "./hooks/useBranchTasks";
 
 function App() {
   const { theme } = useTheme();
@@ -144,6 +146,8 @@ function App() {
   );
 
   const autoCommit = useAutoCommit(settings.autoCommitCli, settings.autoCommitCustomPrompt);
+
+  const branchTasks = useBranchTasks(settings.selectedCli);
 
   const sidebarSearch = useSidebarSearch();
 
@@ -499,10 +503,14 @@ function App() {
           autoCommit.quickCommit();
         }
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        dialogs.setBranchTasksOpen(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit]);
+  }, [compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit, dialogs.setBranchTasksOpen]);
 
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
@@ -625,6 +633,8 @@ function App() {
               setTerminalKey(k => k + 1);
             }, [settings.setSandboxEnabled, settings.setSandboxFailed, terminalSessionId])}
             branchName={branchName}
+            onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
+            branchTasksOpen={dialogs.branchTasksOpen}
           />
         }
         secondaryTerminal={
@@ -664,6 +674,13 @@ function App() {
           onOpenChange={dialogs.setDiffDialogOpen}
           filePath={dialogs.diffFilePath}
           repoPath={currentPath}
+        />
+        <BranchCompletedTasksDialog
+          open={dialogs.branchTasksOpen}
+          onOpenChange={dialogs.setBranchTasksOpen}
+          repoPath={currentPath}
+          branchTasks={branchTasks}
+          currentBranch={branchName}
         />
       </Layout>
       <AddBookmarkDialog

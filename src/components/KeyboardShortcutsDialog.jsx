@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Keyboard, Search, Command, Zap } from 'lucide-react'
+import { Keyboard, Search, Command, Zap, GitBranch } from 'lucide-react'
 
 const shortcuts = [
   {
@@ -39,6 +39,13 @@ const shortcuts = [
     items: [
       { keys: ['Ctrl', 'Shift', 'D'], description: 'Open Token Dashboard' },
       { keys: ['Ctrl', 'Shift', 'B'], description: 'Open Budget Settings' },
+    ],
+  },
+  {
+    category: 'Git & Branch',
+    icon: <GitBranch className='w-4 h-4' />,
+    items: [
+      { keys: ['Ctrl', 'Shift', 'T'], description: 'Toggle Branch Tasks' },
     ],
   },
   {

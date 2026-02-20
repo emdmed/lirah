@@ -10,6 +10,7 @@ export function useDialogs() {
   const [diffFilePath, setDiffFilePath] = useState(null);
   const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [branchTasksOpen, setBranchTasksOpen] = useState(false);
 
   return {
     addBookmarkDialogOpen, setAddBookmarkDialogOpen,
@@ -21,5 +22,6 @@ export function useDialogs() {
     diffFilePath, setDiffFilePath,
     cliSelectionModalOpen, setCliSelectionModalOpen,
     showHelp, setShowHelp,
+    branchTasksOpen, setBranchTasksOpen,
   };
 }
