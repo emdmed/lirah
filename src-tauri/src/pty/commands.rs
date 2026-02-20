@@ -557,16 +557,15 @@ pub fn generate_branch_tasks(
     };
     
     let full_prompt = format!("{}{}\n\n{}", TASK_GENERATION_PROMPT, files_section, truncated_diff);
-    let escaped_prompt = full_prompt.replace('\'', "'\\''");
     
     // Try with free model first
     let (command, fallback_command) = match cli.as_str() {
         "opencode" => (
-            format!("opencode run -m opencode/kimi-k2.5 '{}'", escaped_prompt),
-            Some(format!("opencode run -m opencode/glm-5-free '{}'", escaped_prompt)),
+            "opencode run -m opencode/kimi-k2.5".to_string(),
+            Some("opencode run -m opencode/glm-5-free".to_string()),
         ),
         _ => (
-            format!("claude --print '{}'", escaped_prompt),
+            "claude --print".to_string(),
             None,
         ),
     };
@@ -575,12 +574,23 @@ pub fn generate_branch_tasks(
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
     
-    // First attempt with free model
+    // First attempt with free model - pass prompt via stdin to avoid arg length limits
     let output = std::process::Command::new(&shell)
         .args(&["-lc", &command])
         .current_dir(&project_dir)
         .env("TERM", "xterm-256color")
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(full_prompt.as_bytes())?;
+                stdin.flush()?;
+            }
+            child.wait_with_output()
+        })
         .map_err(|e| format!("Failed to run LLM command: {}", e))?;
     
     eprintln!("[generate_branch_tasks] Command exit status: {}", output.status);
@@ -593,12 +603,23 @@ pub fn generate_branch_tasks(
         eprintln!("[generate_branch_tasks] Primary command failed, trying fallback");
         let stderr = String::from_utf8_lossy(&output.stderr);
         eprintln!("[generate_branch_tasks] Primary stderr: {}", stderr);
-        // Try fallback
+        // Try fallback - also pass prompt via stdin
         let fallback_output = std::process::Command::new(&shell)
             .args(&["-lc", &fallback])
             .current_dir(&project_dir)
             .env("TERM", "xterm-256color")
-            .output()
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                if let Some(mut stdin) = child.stdin.take() {
+                    stdin.write_all(full_prompt.as_bytes())?;
+                    stdin.flush()?;
+                }
+                child.wait_with_output()
+            })
             .map_err(|e| format!("Failed to run LLM command: {}", e))?;
 
         if fallback_output.status.success() {

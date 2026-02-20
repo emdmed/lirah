@@ -94,7 +94,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
 
   return (
     <div 
-      className="absolute top-2 right-2 z-50 w-80 max-h-[70vh] flex flex-col border border-dashed border-border shadow-lg bg-background"
+      className="absolute top-2 right-2 z-50 w-80 max-h-[70vh] flex flex-col border border-dashed border-primary shadow bg-background"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-2 border-b border-dashed border-border flex-shrink-0">
@@ -118,7 +118,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+      <div className="flex-1 overflow-y-auto p-1 space-y-3">
         {/* On base branch warning */}
         {currentBranch === baseBranch && (
           <div className="flex items-start gap-2 p-3 border border-dashed border-yellow-500/40 bg-yellow-500/5">
@@ -134,14 +134,14 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
 
         {/* Loading States */}
         {!baseBranch && (
-          <div className="flex items-center gap-2 py-4">
+          <div className="flex items-center gap-2 py-4 justify-center">
             <RetroSpinner size={13} />
             <span className="text-xs text-muted-foreground font-mono">Detecting base branch...</span>
           </div>
         )}
         
         {(stage === 'loading' || stage === 'generating') && (
-          <div className="flex items-center gap-2 py-4">
+          <div className="flex items-center gap-2 py-4 justify-center">
             <RetroSpinner size={13} />
             <span className="text-xs text-muted-foreground font-mono">
               {stage === 'generating' ? '' : 'Loading...'}
@@ -182,13 +182,13 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
               return (
                 <div 
                   key={index}
-                  className="border border-dashed border-border overflow-hidden"
+                  className="border-b border-dashed border-border overflow-hidden"
                 >
                   {/* Task Header */}
                   <button
                     onClick={() => hasFiles && toggleTaskExpansion(index)}
                     className={cn(
-                      "w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors",
+                      "w-full flex items-start gap-2 p-1 text-left hover:bg-muted/30 transition-colors",
                       hasFiles && "cursor-pointer"
                     )}
                   >
