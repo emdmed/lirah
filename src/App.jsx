@@ -436,7 +436,23 @@ function App() {
     }
   }, [detectedCwd, viewMode]);
 
-  // Global keyboard shortcuts
+  // Global keyboard shortcuts - use refs to avoid unstable dependencies
+  const viewModeRef = useRef(viewMode);
+  const sidebarOpenRef = useRef(sidebar.sidebarOpen);
+  const autoCommitStageRef = useRef(autoCommit.stage);
+  
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+  
+  useEffect(() => {
+    sidebarOpenRef.current = sidebar.sidebarOpen;
+  }, [sidebar.sidebarOpen]);
+  
+  useEffect(() => {
+    autoCommitStageRef.current = autoCommit.stage;
+  }, [autoCommit.stage]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === '`') {
@@ -459,7 +475,7 @@ function App() {
         return;
       }
       if (secondary.secondaryFocused) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && viewMode === 'tree' && sidebar.sidebarOpen) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && viewModeRef.current === 'tree' && sidebarOpenRef.current) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
@@ -477,8 +493,8 @@ function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === ' ') {
         e.preventDefault();
-        if (autoCommit.stage === 'idle') {
-          autoCommit.trigger(currentPath);
+        if (autoCommitStageRef.current === 'idle') {
+          autoCommit.trigger(currentPathRef.current);
         } else {
           autoCommit.quickCommit();
         }
@@ -486,7 +502,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [viewMode, sidebar.sidebarOpen, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.stage, autoCommit.quickCommit, currentPath]);
+  }, [compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit]);
 
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
@@ -498,7 +514,7 @@ function App() {
               sidebar={sidebar}
               search={sidebarSearch}
               searchInputRef={searchInputRef}
-              onSearchChange={(query) => { sidebarSearch.handleSearchChange(query); atMention.setAtMentionQuery(null); }}
+              onSearchChange={useCallback((query) => { sidebarSearch.handleSearchChange(query); atMention.setAtMentionQuery(null); }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery])}
               treeView={treeView}
               typeChecker={typeChecker}
               fileSymbols={fileSymbolsHook}
@@ -573,7 +589,7 @@ function App() {
             currentPath={currentPath}
             sessionId={terminalSessionId}
             theme={theme.terminal}
-            onToggleHelp={() => dialogs.setShowHelp(prev => !prev)}
+            onToggleHelp={useCallback(() => dialogs.setShowHelp(prev => !prev), [dialogs.setShowHelp])}
             onLaunchOrchestration={launchOrchestration}
             selectedCli={settings.selectedCli}
             onOpenCliSettings={() => dialogs.setCliSelectionModalOpen(true)}
@@ -582,7 +598,7 @@ function App() {
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
             networkIsolation={settings.networkIsolation}
-            onToggleNetworkIsolation={() => {
+            onToggleNetworkIsolation={useCallback(() => {
               settings.setNetworkIsolation(prev => !prev);
               if (settings.sandboxEnabled && terminalSessionId) {
                 invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
@@ -590,7 +606,7 @@ function App() {
                 settings.setSandboxFailed(false);
                 setTerminalKey(k => k + 1);
               }
-            }}
+            }, [settings.setNetworkIsolation, settings.sandboxEnabled, terminalSessionId, settings.setSandboxFailed])}
             secondaryTerminalFocused={secondary.secondaryFocused}
             onOpenDashboard={() => setDashboardOpen(true)}
             onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
@@ -599,7 +615,7 @@ function App() {
             onOpenAutoChangelogDialog={() => setAutoChangelogDialogOpen(true)}
             autoCommitCli={settings.autoCommitCli}
             onOpenAutoCommitConfig={() => setAutoCommitConfigOpen(true)}
-            onToggleSandbox={() => {
+            onToggleSandbox={useCallback(() => {
               settings.setSandboxEnabled(prev => !prev);
               settings.setSandboxFailed(false);
               if (terminalSessionId) {
@@ -607,7 +623,7 @@ function App() {
               }
               setTerminalSessionId(null);
               setTerminalKey(k => k + 1);
-            }}
+            }, [settings.setSandboxEnabled, settings.setSandboxFailed, terminalSessionId])}
             branchName={branchName}
           />
         }

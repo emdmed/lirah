@@ -90,7 +90,7 @@ export function useProjectCompact() {
   const processFilesInBatches = useCallback(async (files, rootPath) => {
     const results = [];
     let originalSize = 0;
-    const batchSize = 10;
+    const batchSize = 50; // Increased from 10 to 50 for better throughput
 
     for (let i = 0; i < files.length; i += batchSize) {
       const batch = files.slice(i, i + batchSize);
@@ -141,8 +141,11 @@ export function useProjectCompact() {
         phase: 'parsing',
       });
 
-      // Slight delay for visual feedback
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Yield to main thread for UI updates (minimal delay)
+      if (typeof scheduler !== 'undefined' && scheduler.yield) {
+        await scheduler.yield();
+      }
+      // No artificial delay - let the browser schedule naturally
     }
 
     return { results, originalSize };
@@ -190,16 +193,13 @@ export function useProjectCompact() {
     setProgress({ current: 0, total: 0, phase: 'scanning' });
 
     try {
-      // Dramatic pause before starting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Filter to parseable files
       const parseableFiles = filterParseableFiles(allFiles);
 
       if (parseableFiles.length === 0) {
-        // Show "no files" state briefly
+        // Show "no files" state briefly (minimal delay for UX)
         setProgress({ current: 0, total: 0, phase: 'empty' });
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 300));
         setIsCompacting(false);
         setProgress(null);
         return null; // Signal no files found
@@ -210,9 +210,9 @@ export function useProjectCompact() {
       // Process files in batches
       const { results, originalSize } = await processFilesInBatches(parseableFiles, rootPath);
 
-      // Brief pause before finishing
+      // Brief pause before finishing (minimal delay for UX)
       setProgress({ current: parseableFiles.length, total: parseableFiles.length, phase: 'finishing' });
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Format output
       const output = formatOutput(results);
