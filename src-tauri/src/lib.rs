@@ -2,6 +2,7 @@ mod state;
 mod pty;
 mod fs;
 mod git_cache;
+mod directory_cache;
 mod typecheck;
 mod python_parser;
 mod commit_watcher;

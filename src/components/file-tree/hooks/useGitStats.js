@@ -48,8 +48,8 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
     // Initial fetch
     fetchGitStats();
 
-    // Set up 1-second interval
-    const interval = setInterval(fetchGitStats, 1000);
+    // Set up 3-second interval (was 1s - reduced to minimize git process spawning)
+    const interval = setInterval(fetchGitStats, 3000);
 
     // Cleanup on unmount or path change
     return () => clearInterval(interval);

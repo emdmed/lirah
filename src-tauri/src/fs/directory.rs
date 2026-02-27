@@ -1,10 +1,11 @@
+use crate::state::AppState;
+use serde::Serialize;
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::collections::HashSet;
-use serde::Serialize;
 use walkdir::WalkDir;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct DirectoryEntry {
     name: String,
     path: String,
@@ -21,21 +22,36 @@ pub struct RecursiveDirectoryEntry {
 }
 
 #[tauri::command]
-pub fn read_directory(path: Option<String>) -> Result<Vec<DirectoryEntry>, String> {
+pub fn read_directory(
+    path: Option<String>,
+    state: tauri::State<AppState>,
+) -> Result<Vec<DirectoryEntry>, String> {
     let dir_path = if let Some(p) = path {
         PathBuf::from(p)
     } else {
         std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?
     };
 
-    let entries = fs::read_dir(&dir_path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    // Try cache first
+    {
+        let state_lock = state
+            .lock()
+            .map_err(|e| format!("Failed to lock state: {}", e))?;
+        if let Some(cached) = state_lock.directory_cache.get(&dir_path) {
+            return Ok((*cached).clone());
+        }
+    }
+
+    let entries =
+        fs::read_dir(&dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     let mut result = Vec::new();
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let metadata = entry.metadata().map_err(|e| format!("Failed to read metadata: {}", e))?;
+        let metadata = entry
+            .metadata()
+            .map_err(|e| format!("Failed to read metadata: {}", e))?;
         let path = entry.path();
         let name = path
             .file_name()
@@ -51,28 +67,33 @@ pub fn read_directory(path: Option<String>) -> Result<Vec<DirectoryEntry>, Strin
     }
 
     // Sort: directories first, then files, both alphabetically
-    result.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    result.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
+
+    // Store in cache
+    {
+        let state_lock = state
+            .lock()
+            .map_err(|e| format!("Failed to lock state: {}", e))?;
+        state_lock.directory_cache.set(dir_path, result.clone());
+    }
 
     Ok(result)
 }
 
 #[tauri::command]
 pub fn read_file_content(path: String) -> Result<String, String> {
-    fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read file: {}", e))
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 #[tauri::command]
 pub fn read_directory_recursive(
     path: Option<String>,
     max_depth: Option<usize>,
-    max_files: Option<usize>
+    max_files: Option<usize>,
 ) -> Result<Vec<RecursiveDirectoryEntry>, String> {
     let root_path = if let Some(ref p) = path {
         PathBuf::from(p)
@@ -131,7 +152,12 @@ pub fn read_directory_recursive(
                         const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
                         const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
                         const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-                        if attrs & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
+                        if attrs
+                            & (FILE_ATTRIBUTE_HIDDEN
+                                | FILE_ATTRIBUTE_SYSTEM
+                                | FILE_ATTRIBUTE_REPARSE_POINT)
+                            != 0
+                        {
                             return false;
                         }
                     }
@@ -142,7 +168,10 @@ pub fn read_directory_recursive(
     {
         // Check if we've reached the file limit
         if entries.len() >= max_files {
-            eprintln!("Warning: Reached max file limit of {}. Last 5 paths:", max_files);
+            eprintln!(
+                "Warning: Reached max file limit of {}. Last 5 paths:",
+                max_files
+            );
             for e in entries.iter().rev().take(5) {
                 eprintln!("  - {}", e.path);
             }
@@ -195,12 +224,10 @@ pub fn read_directory_recursive(
     }
 
     // Sort: directories first, then files, both alphabetically
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     Ok(entries)

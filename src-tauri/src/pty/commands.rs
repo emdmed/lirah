@@ -1,12 +1,12 @@
-use tauri::{AppHandle, Emitter};
-use std::io::Read;
-use std::sync::atomic::Ordering;
-use std::thread;
-use std::path::PathBuf;
-use uuid::Uuid;
-use crate::state::AppState;
 use crate::commit_watcher::CommitWatcherStore;
 use crate::pty::manager;
+use crate::state::AppState;
+use std::io::Read;
+use std::path::PathBuf;
+use std::sync::atomic::Ordering;
+use std::thread;
+use tauri::{AppHandle, Emitter};
+use uuid::Uuid;
 
 #[tauri::command]
 pub fn spawn_terminal(
@@ -56,18 +56,24 @@ pub fn spawn_terminal(
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
 
                     // Emit event to frontend
-                    let _ = app_clone.emit("terminal-output", serde_json::json!({
-                        "session_id": session_id_clone,
-                        "data": data,
-                    }));
+                    let _ = app_clone.emit(
+                        "terminal-output",
+                        serde_json::json!({
+                            "session_id": session_id_clone,
+                            "data": data,
+                        }),
+                    );
                 }
                 Ok(_) => {
                     // EOF reached, process exited
                     if !shutdown_flag.load(Ordering::SeqCst) {
-                        let _ = app_clone.emit("terminal-output", serde_json::json!({
-                            "session_id": session_id_clone,
-                            "data": "\r\n[Process exited]\r\n",
-                        }));
+                        let _ = app_clone.emit(
+                            "terminal-output",
+                            serde_json::json!({
+                                "session_id": session_id_clone,
+                                "data": "\r\n[Process exited]\r\n",
+                            }),
+                        );
                     }
                     break;
                 }
@@ -308,7 +314,9 @@ pub fn get_committable_files(repo_path: String) -> Result<Vec<serde_json::Value>
     let mut files = Vec::new();
 
     for line in stdout.lines() {
-        if line.len() < 4 { continue; }
+        if line.len() < 4 {
+            continue;
+        }
         let status_code = &line[0..2];
         let path = line[3..].trim().to_string();
 
@@ -370,7 +378,11 @@ Requirements:
 Git diff to analyze:";
 
 #[tauri::command(async)]
-pub fn generate_commit_message(project_dir: String, cli: String, custom_prompt: Option<String>) -> Result<String, String> {
+pub fn generate_commit_message(
+    project_dir: String,
+    cli: String,
+    custom_prompt: Option<String>,
+) -> Result<String, String> {
     // Get staged diff using git diff --cached via shell command
     let diff_output = std::process::Command::new("git")
         .args(&["diff", "--cached", "--no-color"])
@@ -384,41 +396,55 @@ pub fn generate_commit_message(project_dir: String, cli: String, custom_prompt: 
     }
 
     let diff = String::from_utf8_lossy(&diff_output.stdout);
-    
+
     if diff.trim().is_empty() {
         return Err("No staged changes found. Please stage files first.".to_string());
     }
 
     // Build the prompt
-    let base_prompt = custom_prompt.as_ref()
-        .map(|p| format!("{}\n\nAdditional instructions: {}", DEFAULT_PROMPT, p.trim()))
+    let base_prompt = custom_prompt
+        .as_ref()
+        .map(|p| {
+            format!(
+                "{}\n\nAdditional instructions: {}",
+                DEFAULT_PROMPT,
+                p.trim()
+            )
+        })
         .unwrap_or_else(|| DEFAULT_PROMPT.to_string());
-    
+
     // Truncate diff if too large (keep it under ~100KB for safety)
     let max_diff_size = 100_000;
     let truncated_diff = if diff.len() > max_diff_size {
-        format!("{}\n\n... (diff truncated, showing first {} characters)", &diff[..max_diff_size], max_diff_size)
+        format!(
+            "{}\n\n... (diff truncated, showing first {} characters)",
+            &diff[..max_diff_size],
+            max_diff_size
+        )
     } else {
         diff.to_string()
     };
-    
+
     let full_prompt = format!("{}\n\n{}", base_prompt, truncated_diff);
     let escaped_prompt = full_prompt.replace('\'', "'\\''");
-    
+
     // Try with free model first
     let (command, fallback_command) = match cli.as_str() {
         "opencode" => (
             format!("opencode run -m opencode/kimi-k2.5 '{}'", escaped_prompt),
-            Some(format!("opencode run -m opencode/glm-5-free '{}'", escaped_prompt)),
+            Some(format!(
+                "opencode run -m opencode/glm-5-free '{}'",
+                escaped_prompt
+            )),
         ),
         _ => (
-            format!("claude --print '{}'", escaped_prompt),
+            format!("claude --model sonnet --print '{}'", escaped_prompt),
             None,
         ),
     };
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-    
+
     // First attempt with free model
     let output = std::process::Command::new(&shell)
         .args(&["-lc", &command])
@@ -441,9 +467,11 @@ pub fn generate_commit_message(project_dir: String, cli: String, custom_prompt: 
             .map_err(|e| format!("Failed to run LLM command: {}", e))?;
 
         if fallback_output.status.success() {
-            return Ok(String::from_utf8_lossy(&fallback_output.stdout).trim().to_string());
+            return Ok(String::from_utf8_lossy(&fallback_output.stdout)
+                .trim()
+                .to_string());
         }
-        
+
         // Both failed - return error from paid model attempt
         let stdout = String::from_utf8_lossy(&fallback_output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&fallback_output.stderr).to_string();
@@ -479,7 +507,10 @@ pub fn generate_branch_tasks(
     current_branch: String,
     cli: String,
 ) -> Result<GenerateTasksResult, String> {
-    eprintln!("[generate_branch_tasks] Starting with cli={}, base_branch={}, current_branch={}", cli, base_branch, current_branch);
+    eprintln!(
+        "[generate_branch_tasks] Starting with cli={}, base_branch={}, current_branch={}",
+        cli, base_branch, current_branch
+    );
     eprintln!("[generate_branch_tasks] Project dir: {}", project_dir);
 
     // Get diff between base branch and current HEAD
@@ -497,23 +528,23 @@ pub fn generate_branch_tasks(
 
     let diff = String::from_utf8_lossy(&diff_output.stdout);
     eprintln!("[generate_branch_tasks] Diff length: {} bytes", diff.len());
-    
+
     if diff.trim().is_empty() {
         eprintln!("[generate_branch_tasks] No diff found - empty changes");
-        
+
         // Get the latest commit hash even when no diff
         let hash_output = std::process::Command::new("git")
             .args(&["rev-parse", "HEAD"])
             .current_dir(&project_dir)
             .output();
-        
+
         let last_commit_hash = match hash_output {
             Ok(output) if output.status.success() => {
                 String::from_utf8_lossy(&output.stdout).trim().to_string()
             }
             _ => String::new(),
         };
-        
+
         return Ok(GenerateTasksResult {
             base_branch,
             current_branch,
@@ -539,7 +570,10 @@ pub fn generate_branch_tasks(
         vec![]
     };
 
-    eprintln!("[generate_branch_tasks] Found {} changed files", changed_files.len());
+    eprintln!(
+        "[generate_branch_tasks] Found {} changed files",
+        changed_files.len()
+    );
 
     // Build the prompt
     let files_section = if !changed_files.is_empty() {
@@ -551,29 +585,33 @@ pub fn generate_branch_tasks(
     // Truncate diff if too large
     let max_diff_size = 150_000;
     let truncated_diff = if diff.len() > max_diff_size {
-        format!("{}\n\n... (diff truncated, showing first {} characters)", &diff[..max_diff_size], max_diff_size)
+        format!(
+            "{}\n\n... (diff truncated, showing first {} characters)",
+            &diff[..max_diff_size],
+            max_diff_size
+        )
     } else {
         diff.to_string()
     };
-    
-    let full_prompt = format!("{}{}\n\n{}", TASK_GENERATION_PROMPT, files_section, truncated_diff);
-    
+
+    let full_prompt = format!(
+        "{}{}\n\n{}",
+        TASK_GENERATION_PROMPT, files_section, truncated_diff
+    );
+
     // Try with free model first
     let (command, fallback_command) = match cli.as_str() {
         "opencode" => (
             "opencode run -m opencode/kimi-k2.5".to_string(),
             Some("opencode run -m opencode/glm-5-free".to_string()),
         ),
-        _ => (
-            "claude --print".to_string(),
-            None,
-        ),
+        _ => ("claude --print".to_string(), None),
     };
 
     eprintln!("[generate_branch_tasks] Running command: {}", command);
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-    
+
     // First attempt with free model - pass prompt via stdin to avoid arg length limits
     let output = std::process::Command::new(&shell)
         .args(&["-lc", &command])
@@ -592,12 +630,18 @@ pub fn generate_branch_tasks(
             child.wait_with_output()
         })
         .map_err(|e| format!("Failed to run LLM command: {}", e))?;
-    
-    eprintln!("[generate_branch_tasks] Command exit status: {}", output.status);
+
+    eprintln!(
+        "[generate_branch_tasks] Command exit status: {}",
+        output.status
+    );
 
     let response = if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        eprintln!("[generate_branch_tasks] Command succeeded, stdout length: {}", stdout.len());
+        eprintln!(
+            "[generate_branch_tasks] Command succeeded, stdout length: {}",
+            stdout.len()
+        );
         stdout
     } else if let Some(fallback) = fallback_command {
         eprintln!("[generate_branch_tasks] Primary command failed, trying fallback");
@@ -623,34 +667,50 @@ pub fn generate_branch_tasks(
             .map_err(|e| format!("Failed to run LLM command: {}", e))?;
 
         if fallback_output.status.success() {
-            let stdout = String::from_utf8_lossy(&fallback_output.stdout).trim().to_string();
-            eprintln!("[generate_branch_tasks] Fallback succeeded, stdout length: {}", stdout.len());
+            let stdout = String::from_utf8_lossy(&fallback_output.stdout)
+                .trim()
+                .to_string();
+            eprintln!(
+                "[generate_branch_tasks] Fallback succeeded, stdout length: {}",
+                stdout.len()
+            );
             stdout
         } else {
             let stdout = String::from_utf8_lossy(&fallback_output.stdout).to_string();
             let stderr = String::from_utf8_lossy(&fallback_output.stderr).to_string();
-            eprintln!("[generate_branch_tasks] Fallback failed. stdout: {}, stderr: {}", stdout, stderr);
+            eprintln!(
+                "[generate_branch_tasks] Fallback failed. stdout: {}, stderr: {}",
+                stdout, stderr
+            );
             let error_msg = if !stdout.is_empty() { stdout } else { stderr };
             return Err(format!("LLM command failed: {}", error_msg));
         }
     } else {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        eprintln!("[generate_branch_tasks] Primary failed and no fallback. stdout: {}, stderr: {}", stdout, stderr);
+        eprintln!(
+            "[generate_branch_tasks] Primary failed and no fallback. stdout: {}, stderr: {}",
+            stdout, stderr
+        );
         let error_msg = if !stdout.is_empty() { stdout } else { stderr };
         return Err(format!("LLM command failed: {}", error_msg));
     };
 
     // Parse JSON response
-    let tasks = parse_llm_task_response(&response, &changed_files)
-        .map_err(|e| format!("Failed to parse LLM response: {}. Raw response preview: {}", e, &response[..response.len().min(200)]))?;
+    let tasks = parse_llm_task_response(&response, &changed_files).map_err(|e| {
+        format!(
+            "Failed to parse LLM response: {}. Raw response preview: {}",
+            e,
+            &response[..response.len().min(200)]
+        )
+    })?;
 
     // Get the latest commit hash
     let hash_output = std::process::Command::new("git")
         .args(&["rev-parse", "HEAD"])
         .current_dir(&project_dir)
         .output();
-    
+
     let last_commit_hash = match hash_output {
         Ok(output) if output.status.success() => {
             String::from_utf8_lossy(&output.stdout).trim().to_string()
@@ -666,10 +726,19 @@ pub fn generate_branch_tasks(
     })
 }
 
-fn parse_llm_task_response(response: &str, changed_files: &[String]) -> Result<Vec<GeneratedTask>, String> {
+fn parse_llm_task_response(
+    response: &str,
+    changed_files: &[String],
+) -> Result<Vec<GeneratedTask>, String> {
     // Debug: log the raw response
-    eprintln!("[parse_llm_task_response] Raw response length: {}", response.len());
-    eprintln!("[parse_llm_task_response] First 500 chars: {}", &response[..response.len().min(500)]);
+    eprintln!(
+        "[parse_llm_task_response] Raw response length: {}",
+        response.len()
+    );
+    eprintln!(
+        "[parse_llm_task_response] First 500 chars: {}",
+        &response[..response.len().min(500)]
+    );
 
     // Try to extract JSON from the response (it might be wrapped in markdown code blocks)
     let json_str = if let Some(start) = response.find('[') {
@@ -685,18 +754,21 @@ fn parse_llm_task_response(response: &str, changed_files: &[String]) -> Result<V
     // Try to parse as JSON array
     match serde_json::from_str::<Vec<GeneratedTask>>(json_str) {
         Ok(tasks) => {
-            eprintln!("[parse_llm_task_response] Successfully parsed {} tasks from JSON", tasks.len());
+            eprintln!(
+                "[parse_llm_task_response] Successfully parsed {} tasks from JSON",
+                tasks.len()
+            );
             Ok(tasks)
         }
         Err(e) => {
             eprintln!("[parse_llm_task_response] JSON parsing failed: {}", e);
-            
+
             // If JSON parsing fails, try to parse as a simple list
             let tasks: Vec<GeneratedTask> = response
                 .lines()
                 .filter(|line| {
                     let trimmed = line.trim();
-                    !trimmed.is_empty() 
+                    !trimmed.is_empty()
                         && !trimmed.starts_with("```")
                         && !trimmed.starts_with("[")
                         && !trimmed.starts_with("]")
@@ -705,22 +777,30 @@ fn parse_llm_task_response(response: &str, changed_files: &[String]) -> Result<V
                 })
                 .enumerate()
                 .map(|(i, line)| {
-                    let clean_line = line.trim()
+                    let clean_line = line
+                        .trim()
                         .trim_start_matches('-')
                         .trim_start_matches('*')
                         .trim_start_matches("•")
                         .trim();
                     GeneratedTask {
                         title: clean_line.to_string(),
-                        files: if i == 0 { changed_files.to_vec() } else { vec![] },
+                        files: if i == 0 {
+                            changed_files.to_vec()
+                        } else {
+                            vec![]
+                        },
                     }
                 })
                 .filter(|task| !task.title.is_empty() && task.title.len() > 5)
                 .take(5)
                 .collect();
 
-            eprintln!("[parse_llm_task_response] Fallback parsing found {} tasks", tasks.len());
-            
+            eprintln!(
+                "[parse_llm_task_response] Fallback parsing found {} tasks",
+                tasks.len()
+            );
+
             if tasks.is_empty() {
                 // Last resort: return the raw response as a single task
                 let clean_response = response
@@ -728,7 +808,7 @@ fn parse_llm_task_response(response: &str, changed_files: &[String]) -> Result<V
                     .filter(|l| !l.trim().is_empty() && !l.starts_with("```"))
                     .collect::<Vec<_>>()
                     .join(" ");
-                
+
                 if !clean_response.is_empty() {
                     eprintln!("[parse_llm_task_response] Using raw response as fallback");
                     Ok(vec![GeneratedTask {

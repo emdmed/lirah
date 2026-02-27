@@ -1,8 +1,29 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { buildTreeFromFlatList, incrementallyUpdateTree } from "../utils/treeOperations";
 import { lastSepIndex } from "../utils/pathUtils";
 import { useToast } from "../contexts/ToastContext";
+
+/**
+ * Custom hook to debounce a value
+ * @template T
+ * @param {T} value - The value to debounce
+ * @param {number} delay - Delay in milliseconds
+ * @returns {T} The debounced value
+ */
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults }) {
   const [treeData, setTreeData] = useState([]);
@@ -11,6 +32,9 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
   const [allFiles, setAllFiles] = useState([]);
   const { error } = useToast();
+
+  // Debounce search results to prevent expensive tree filtering on every keystroke
+  const debouncedSearchResults = useDebounce(searchResults, 150);
 
   const loadTreeData = useCallback(async () => {
     try {
@@ -160,12 +184,13 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
 
   const displayedTreeData = useMemo(() => {
     let filtered = treeData;
-    if (searchResults) {
-      const matchingPaths = searchResults.map(r => r.path);
+    // Use debounced search results to prevent excessive filtering during typing
+    if (debouncedSearchResults) {
+      const matchingPaths = debouncedSearchResults.map(r => r.path);
       filtered = filterTreeBySearch(filtered, matchingPaths);
     }
     return filtered;
-  }, [treeData, searchResults, filterTreeBySearch]);
+  }, [treeData, debouncedSearchResults, filterTreeBySearch]);
 
   return useMemo(() => ({
     treeData, setTreeData,
