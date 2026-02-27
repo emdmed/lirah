@@ -836,6 +836,7 @@ function App() {
         onLoadContext={handleLoadInstanceContext}
         onSendToTerminal={handleSendImplementationPrompt}
         onDebugPaths={instanceSync.debugClaudeDataPaths}
+        onDebugOpencodePaths={instanceSync.debugOpencodeDataPaths}
         isLoading={false}
         error={instanceSync.error}
       />

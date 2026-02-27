@@ -8,6 +8,8 @@ pub struct InstanceState {
     pub current_focus: String,
     pub active_files: Vec<String>,
     pub claude_session_id: Option<String>,
+    pub opencode_session_id: Option<String>,
+    pub source: String,
     pub last_updated: u64,
     pub status: InstanceStatus,
 }
@@ -26,6 +28,7 @@ pub struct InstanceUpdate {
     pub current_focus: Option<String>,
     pub active_files: Option<Vec<String>>,
     pub claude_session_id: Option<Option<String>>,
+    pub opencode_session_id: Option<Option<String>>,
     pub status: Option<InstanceStatus>,
 }
 
@@ -44,6 +47,8 @@ impl InstanceState {
             current_focus: String::new(),
             active_files: Vec::new(),
             claude_session_id: None,
+            opencode_session_id: None,
+            source: "lirah".to_string(),
             last_updated: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()

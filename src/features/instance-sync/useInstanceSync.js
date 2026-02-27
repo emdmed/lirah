@@ -62,6 +62,16 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     // Get home directory for comparison
     const homeDir = process.env.HOME || '/home/enrique';
     
+    // Debug logging
+    console.log('[InstanceSync] Registration check:', {
+      instanceId,
+      currentPath,
+      isRegistered,
+      homeDir,
+      pathLength: currentPath?.length,
+      homeDirLength: homeDir.length
+    });
+    
     // Only register when we have a valid project path
     // - Not empty
     // - Not "Waiting for terminal..."
@@ -74,19 +84,30 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
                         currentPath !== '/' &&
                         currentPath.length > homeDir.length; // Must be longer than home dir (i.e., a subdirectory)
     
-    if (!instanceId || !isValidPath || isRegistered) return;
+    console.log('[InstanceSync] Path validation:', { isValidPath });
+    
+    if (!instanceId || !isValidPath || isRegistered) {
+      console.log('[InstanceSync] Skipping registration:', { 
+        hasInstanceId: !!instanceId, 
+        isValidPath, 
+        isRegistered 
+      });
+      return;
+    }
     
     const register = async () => {
       try {
+        console.log('[InstanceSync] Registering instance with path:', currentPath);
         const state = await invoke('register_instance', {
           projectPath: currentPath,
         });
         setOwnState(state);
         setIsRegistered(true);
         setError(null);
+        console.log('[InstanceSync] Registration successful:', state);
       } catch (err) {
         setError(err.message || 'Failed to register instance');
-        console.error('Failed to register instance:', err);
+        console.error('[InstanceSync] Failed to register instance:', err);
       }
     };
     
@@ -151,11 +172,19 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
 
   // Poll for other instances
   useEffect(() => {
-    if (!isRegistered) return;
+    console.log('[InstanceSync] Polling check - isRegistered:', isRegistered);
+    
+    if (!isRegistered) {
+      console.log('[InstanceSync] Skipping polling - not registered');
+      return;
+    }
     
     const pollInstances = async () => {
       try {
+        console.log('[InstanceSync] Polling for instances...');
         const instances = await invoke('get_all_instances');
+        console.log('[InstanceSync] Found instances:', instances.length);
+        
         // Only update state if data actually changed to prevent re-render loops
         setOtherInstances(prev => {
           if (prev.length !== instances.length) return instances;
@@ -171,7 +200,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
           return changed ? instances : prev;
         });
       } catch (err) {
-        console.error('Failed to get other instances:', err);
+        console.error('[InstanceSync] Failed to get other instances:', err);
       }
     };
     
@@ -193,7 +222,12 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     setSessionsTotal(0);
     
     try {
-      const page = await invoke('get_claude_sessions', {
+      // Route to correct backend command based on source
+      const command = instance.source === 'opencode' 
+        ? 'get_opencode_sessions' 
+        : 'get_claude_sessions';
+      
+      const page = await invoke(command, {
         projectPath: instance.project_path,
         limit: SESSIONS_PAGE_SIZE,
         offset: 0,
@@ -217,7 +251,12 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     setIsLoadingSessions(true);
     
     try {
-      const page = await invoke('get_claude_sessions', {
+      // Route to correct backend command based on source
+      const command = selectedInstance.source === 'opencode' 
+        ? 'get_opencode_sessions' 
+        : 'get_claude_sessions';
+      
+      const page = await invoke(command, {
         projectPath: selectedInstance.project_path,
         limit: SESSIONS_PAGE_SIZE,
         offset: sessionsOffset,
@@ -244,7 +283,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
   }, []);
 
   // New: Fetch specific session content
-  const fetchSessionContent = useCallback(async (sessionId, projectPath) => {
+  const fetchSessionContent = useCallback(async (sessionId, projectPath, source = 'claude') => {
     // If null is passed, clear the selected session (go back to sessions list)
     if (!sessionId || !projectPath) {
       setSelectedSession(null);
@@ -252,7 +291,12 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     }
     
     try {
-      const session = await invoke('get_claude_session', {
+      // Route to correct backend command based on source
+      const command = source === 'opencode' 
+        ? 'get_opencode_session' 
+        : 'get_claude_session';
+      
+      const session = await invoke(command, {
         sessionId,
         projectPath,
       });
@@ -306,6 +350,18 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
       return paths;
     } catch (err) {
       console.error('Failed to get Claude data paths:', err);
+      return [];
+    }
+  }, []);
+
+  // New: Debug function to check OpenCode data paths
+  const debugOpencodeDataPaths = useCallback(async () => {
+    try {
+      const paths = await invoke('get_opencode_data_paths');
+      console.log('[OpenCode Debug] Searched paths:', paths);
+      return paths;
+    } catch (err) {
+      console.error('Failed to get OpenCode data paths:', err);
       return [];
     }
   }, []);
@@ -367,6 +423,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     syncWithInstance,
     cleanupStaleInstances,
     debugClaudeDataPaths,
+    debugOpencodeDataPaths,
     buildImplementationPrompt,
   };
 }

@@ -670,6 +670,93 @@ pub fn get_active_claude_session(
     Ok(page.sessions.into_iter().filter(|s| !s.is_sidechain).next())
 }
 
+/// Get all Claude Code instances (projects with sessions)
+#[tauri::command]
+pub fn get_claude_instances() -> Result<Vec<crate::instance_sync::types::InstanceState>, String> {
+    use crate::instance_sync::types::{InstanceState, InstanceStatus};
+
+    let claude_dir = find_claude_data_dir();
+    if claude_dir.is_none() {
+        return Ok(Vec::new());
+    }
+    let claude_dir = claude_dir.unwrap();
+
+    let projects_dir = claude_dir.join("projects");
+    if !projects_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let mut instances = Vec::new();
+
+    // Scan all project directories
+    if let Ok(entries) = fs::read_dir(&projects_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                // Decode the project path from directory name
+                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                    let project_path = decode_project_path(dir_name);
+
+                    // Check if this project has sessions
+                    let sessions_index = path.join("sessions-index.json");
+                    if sessions_index.exists() {
+                        let project_name = PathBuf::from(&project_path)
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        // Check if sessions file has recent activity by reading modification time
+                        let last_updated = if let Ok(metadata) = fs::metadata(&sessions_index) {
+                            if let Ok(modified) = metadata.modified() {
+                                modified
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs()
+                            } else {
+                                now
+                            }
+                        } else {
+                            now
+                        };
+
+                        // Only include if has recent activity (< 1 hour)
+                        let age = now - last_updated;
+                        if age < 3600 {
+                            instances.push(InstanceState {
+                                instance_id: format!("claude-{}", dir_name),
+                                project_path: project_path.clone(),
+                                project_name,
+                                current_focus: String::new(),
+                                active_files: Vec::new(),
+                                claude_session_id: None,
+                                opencode_session_id: None,
+                                source: "claude".to_string(),
+                                last_updated,
+                                status: InstanceStatus::Active,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(instances)
+}
+
+/// Decode a project path from Claude directory name
+/// Claude replaces ALL / with - (including leading /)
+/// So -home-enrique-projects-nevo-terminal becomes /home/enrique/projects/nevo-terminal
+fn decode_project_path(encoded: &str) -> String {
+    encoded.replace('-', "/")
+}
+
 /// Encode a project path for the Claude directory structure
 /// Claude replaces ALL / with - (including leading /)
 /// So /home/enrique/projects/nevo-terminal becomes -home-enrique-projects-nevo-terminal

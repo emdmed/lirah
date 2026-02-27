@@ -34,6 +34,7 @@ export function InstanceSyncPanel({
   onLoadContext,
   onSendToTerminal,
   onDebugPaths,
+  onDebugOpencodePaths,
   isLoading,
   error
 }) {
@@ -41,6 +42,7 @@ export function InstanceSyncPanel({
   const [expandedMessages, setExpandedMessages] = useState(new Set());
   const [visibleMessageCount, setVisibleMessageCount] = useState(MESSAGES_CHUNK_SIZE);
   const [debugPaths, setDebugPaths] = useState(null);
+  const [debugOpencodePaths, setDebugOpencodePaths] = useState(null);
   const [generatingPromptType, setGeneratingPromptType] = useState(null);
   const [generatedPrompt, setGeneratedPrompt] = useState(null);
   const scrollRef = useRef(null);
@@ -59,7 +61,16 @@ export function InstanceSyncPanel({
   const handleDebugPaths = async () => {
     const paths = await onDebugPaths();
     setDebugPaths(paths);
+    setDebugOpencodePaths(null);
     console.log('[Instance Sync] Claude data paths checked:');
+    paths.forEach(p => console.log('  ' + p));
+  };
+
+  const handleDebugOpencodePaths = async () => {
+    const paths = await onDebugOpencodePaths();
+    setDebugOpencodePaths(paths);
+    setDebugPaths(null);
+    console.log('[Instance Sync] OpenCode data paths checked:');
     paths.forEach(p => console.log('  ' + p));
   };
 
@@ -442,7 +453,7 @@ export function InstanceSyncPanel({
     const SessionItem = ({ session, isActive }) => (
       <button
         key={session.session_id}
-        onClick={() => onFetchSessionContent(session.session_id, selectedInstance.project_path)}
+        onClick={() => onFetchSessionContent(session.session_id, selectedInstance.project_path, selectedInstance.source)}
         className={`group w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3 rounded-md ${
           isActive ? 'bg-primary/5 border border-primary/20' : ''
         }`}
@@ -608,11 +619,27 @@ export function InstanceSyncPanel({
           <div className="flex items-center gap-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" onClick={handleDebugPaths}>
-                  <span className="text-[10px] font-mono">DBG</span>
+                <Button 
+                  variant={debugPaths ? "secondary" : "ghost"} 
+                  size="icon-sm" 
+                  onClick={handleDebugPaths}
+                >
+                  <span className="text-[10px] font-mono">C</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Debug: Check Claude data paths</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={debugOpencodePaths ? "secondary" : "ghost"} 
+                  size="icon-sm" 
+                  onClick={handleDebugOpencodePaths}
+                >
+                  <span className="text-[10px] font-mono">O</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Debug: Check OpenCode data paths</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -633,12 +660,24 @@ export function InstanceSyncPanel({
           </div>
         </div>
 
-        {/* Debug paths */}
+        {/* Debug paths - Claude */}
         {debugPaths && (
           <div className="px-1 py-2 mb-2 bg-muted/30">
             <p className="text-[10px] font-mono text-muted-foreground mb-1">Claude data paths checked:</p>
             <div className="max-h-20 overflow-y-auto text-[10px] font-mono text-muted-foreground/60 space-y-0.5">
               {debugPaths.map((path, idx) => (
+                <div key={idx} className="truncate">{path}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Debug paths - OpenCode */}
+        {debugOpencodePaths && (
+          <div className="px-1 py-2 mb-2 bg-muted/30">
+            <p className="text-[10px] font-mono text-muted-foreground mb-1">OpenCode data paths checked:</p>
+            <div className="max-h-20 overflow-y-auto text-[10px] font-mono text-muted-foreground/60 space-y-0.5">
+              {debugOpencodePaths.map((path, idx) => (
                 <div key={idx} className="truncate">{path}</div>
               ))}
             </div>
@@ -662,14 +701,23 @@ export function InstanceSyncPanel({
                   className="group w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3"
                 >
                   <div className={`w-2 h-2 mt-1.5 flex-shrink-0 ${getStatusDotColor(instance.status)}`} />
-                  <div className="flex-1 min-w-0">
+                     <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-mono font-medium text-foreground truncate group-hover:text-primary transition-colors">
                         {instance.project_name || 'Unknown'}
                       </span>
-                      <span className="text-[10px] font-mono text-muted-foreground/60 flex-shrink-0 ml-2">
-                        {formatLastUpdated(instance.last_updated)}
-                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        {/* Source Badge */}
+                        <Badge 
+                          variant={instance.source === 'opencode' ? 'secondary' : instance.source === 'claude' ? 'outline' : 'default'}
+                          className="text-[9px] py-0 px-1.5"
+                        >
+                          {instance.source === 'opencode' ? 'OpenCode' : instance.source === 'claude' ? 'Claude' : 'Lirah'}
+                        </Badge>
+                        <span className="text-[10px] font-mono text-muted-foreground/60">
+                          {formatLastUpdated(instance.last_updated)}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground mb-1.5">
                       <Folder className="w-3 h-3 flex-shrink-0" />

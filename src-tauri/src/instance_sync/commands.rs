@@ -99,6 +99,9 @@ pub fn update_instance_state(
     if let Some(session_id) = update.claude_session_id {
         state.claude_session_id = session_id;
     }
+    if let Some(session_id) = update.opencode_session_id {
+        state.opencode_session_id = session_id;
+    }
     if let Some(status) = update.status {
         state.status = status;
     }
@@ -129,6 +132,7 @@ pub fn get_all_instances(
         .unwrap_or_default()
         .as_secs();
 
+    // Read Lirah instances
     if let Ok(entries) = fs::read_dir(&base_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -141,12 +145,16 @@ pub fn get_all_instances(
                 }
 
                 if let Ok(content) = fs::read_to_string(&path) {
-                    if let Ok(state) = serde_json::from_str::<InstanceState>(&content) {
+                    if let Ok(mut state) = serde_json::from_str::<InstanceState>(&content) {
+                        // Set source to lirah if not already set
+                        if state.source.is_empty() {
+                            state.source = "lirah".to_string();
+                        }
+
                         // Filter out stale instances
                         let age = now - state.last_updated;
 
                         // If instance has no project path, it's likely stuck initializing
-                        // Give it 5 minutes to initialize, otherwise filter it out
                         if state.project_path.is_empty() && age > 300 {
                             continue;
                         }
@@ -160,6 +168,23 @@ pub fn get_all_instances(
             }
         }
     }
+
+    // Read OpenCode instances
+    if let Ok(opencode_instances) = crate::opencode::commands::get_opencode_instances() {
+        instances.extend(opencode_instances);
+    }
+
+    // Read Claude Code instances (projects with sessions)
+    if let Ok(claude_instances) = crate::claude::commands::get_claude_instances() {
+        instances.extend(claude_instances);
+    }
+
+    // Discover running CLI processes (Claude Code and OpenCode)
+    let cli_instances = crate::instance_sync::process_discovery::get_all_cli_instances();
+    instances.extend(cli_instances);
+
+    // Sort by last_updated descending (most recent first)
+    instances.sort_by(|a, b| b.last_updated.cmp(&a.last_updated));
 
     Ok(instances)
 }
