@@ -11,7 +11,14 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState(null);
   
+  // New: Track selected instance and its sessions
+  const [selectedInstance, setSelectedInstance] = useState(null);
+  const [selectedInstanceSessions, setSelectedInstanceSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  
   const lastUpdateRef = useRef(0);
+  const pendingUpdateRef = useRef(false);
 
   // Initialize and get instance ID
   useEffect(() => {
@@ -27,15 +34,40 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     
     init();
     
-    // Cleanup on unmount
+    // Cleanup on unmount - synchronous cleanup to avoid race conditions
     return () => {
-      invoke('unregister_instance').catch(console.error);
+      // Use a synchronous flag to prevent new updates
+      pendingUpdateRef.current = false;
+      lastUpdateRef.current = 0;
+      
+      // Fire and forget cleanup
+      invoke('unregister_instance').catch((err) => {
+        // Only log if it's not a "not registered" error
+        if (!err.message?.includes('not registered')) {
+          console.error('Failed to unregister instance:', err);
+        }
+      });
     };
   }, []);
 
   // Register instance when project path is available
   useEffect(() => {
-    if (!instanceId || !currentPath || isRegistered) return;
+    // Get home directory for comparison
+    const homeDir = process.env.HOME || '/home/enrique';
+    
+    // Only register when we have a valid project path
+    // - Not empty
+    // - Not "Waiting for terminal..."
+    // - Not just the home directory (must be a project subdirectory)
+    const isValidPath = currentPath && 
+                        currentPath.trim() !== '' && 
+                        currentPath !== 'Waiting for terminal...' &&
+                        !currentPath.startsWith('Waiting') &&
+                        currentPath !== homeDir &&
+                        currentPath !== '/' &&
+                        currentPath.length > homeDir.length; // Must be longer than home dir (i.e., a subdirectory)
+    
+    if (!instanceId || !isValidPath || isRegistered) return;
     
     const register = async () => {
       try {
@@ -56,35 +88,57 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
 
   // Update instance state periodically
   useEffect(() => {
-    if (!isRegistered || !currentPath) return;
+    // Get home directory for comparison
+    const homeDir = process.env.HOME || '/home/enrique';
+    
+    // Skip updates if path is invalid or is just the home directory
+    const isValidPath = currentPath && 
+                        currentPath.trim() !== '' && 
+                        currentPath !== 'Waiting for terminal...' &&
+                        !currentPath.startsWith('Waiting') &&
+                        currentPath !== homeDir &&
+                        currentPath !== '/' &&
+                        currentPath.length > homeDir.length;
+    
+    if (!isRegistered || !isValidPath) return;
     
     const updateState = async () => {
       try {
         const now = Date.now();
-        // Throttle updates to avoid excessive writes
-        if (now - lastUpdateRef.current < INSTANCE_SYNC_INTERVAL) return;
+        
+        // Skip if we recently updated and no significant changes occurred
+        if (now - lastUpdateRef.current < INSTANCE_SYNC_INTERVAL && !pendingUpdateRef.current) {
+          return;
+        }
         
         const update = {
           project_path: currentPath,
           current_focus: '', // Could be set via UI
           active_files: selectedFiles || [],
           claude_session_id: claudeSessionId,
-          status: 'active',
+          status: { Active: null }, // Proper enum serialization for Rust
         };
         
         const state = await invoke('update_instance_state', { update });
         setOwnState(state);
         lastUpdateRef.current = now;
+        pendingUpdateRef.current = false;
       } catch (err) {
         console.error('Failed to update instance state:', err);
       }
     };
     
-    // Update immediately on changes
+    // Update immediately on initial registration or when data changes significantly
+    pendingUpdateRef.current = true;
     updateState();
     
-    // Set up interval for periodic updates
-    const interval = setInterval(updateState, INSTANCE_SYNC_INTERVAL);
+    // Set up interval for periodic heartbeats
+    const interval = setInterval(() => {
+      // Always update on interval to keep instance alive
+      pendingUpdateRef.current = true;
+      updateState();
+    }, INSTANCE_SYNC_INTERVAL);
+    
     return () => clearInterval(interval);
   }, [isRegistered, currentPath, selectedFiles, claudeSessionId]);
 
@@ -106,6 +160,56 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     return () => clearInterval(interval);
   }, [isRegistered]);
 
+  // New: Fetch sessions when an instance is selected
+  const selectInstance = useCallback(async (instance) => {
+    if (!instance?.project_path) return;
+    
+    setSelectedInstance(instance);
+    setIsLoadingSessions(true);
+    setSelectedInstanceSessions([]);
+    setSelectedSession(null);
+    
+    try {
+      const sessions = await invoke('get_claude_sessions', {
+        projectPath: instance.project_path,
+      });
+      setSelectedInstanceSessions(sessions);
+    } catch (err) {
+      console.error('Failed to fetch sessions:', err);
+      setSelectedInstanceSessions([]);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  }, []);
+
+  // New: Clear selected instance
+  const clearSelectedInstance = useCallback(() => {
+    setSelectedInstance(null);
+    setSelectedInstanceSessions([]);
+    setSelectedSession(null);
+  }, []);
+
+  // New: Fetch specific session content
+  const fetchSessionContent = useCallback(async (sessionId, projectPath) => {
+    // If null is passed, clear the selected session (go back to sessions list)
+    if (!sessionId || !projectPath) {
+      setSelectedSession(null);
+      return null;
+    }
+    
+    try {
+      const session = await invoke('get_claude_session', {
+        sessionId,
+        projectPath,
+      });
+      setSelectedSession(session);
+      return session;
+    } catch (err) {
+      console.error('Failed to fetch session content:', err);
+      return null;
+    }
+  }, []);
+
   // Manual refresh function
   const refreshInstances = useCallback(async () => {
     try {
@@ -117,6 +221,22 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
       return [];
     }
   }, []);
+
+  // Cleanup stale instances
+  const cleanupStaleInstances = useCallback(async () => {
+    try {
+      const removedCount = await invoke('cleanup_stale_instances');
+      if (removedCount > 0) {
+        console.log(`Cleaned up ${removedCount} stale instance(s)`);
+        // Refresh the list after cleanup
+        await refreshInstances();
+      }
+      return removedCount;
+    } catch (err) {
+      console.error('Failed to cleanup stale instances:', err);
+      return 0;
+    }
+  }, [refreshInstances]);
 
   // Sync with another instance (navigate to their project)
   const syncWithInstance = useCallback(async (instance) => {
@@ -130,7 +250,15 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     otherInstances,
     isRegistered,
     error,
+    selectedInstance,
+    selectedInstanceSessions,
+    selectedSession,
+    isLoadingSessions,
+    selectInstance,
+    clearSelectedInstance,
+    fetchSessionContent,
     refreshInstances,
     syncWithInstance,
+    cleanupStaleInstances,
   };
 }

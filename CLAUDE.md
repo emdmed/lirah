@@ -18,11 +18,37 @@ Lirah is a GUI for running Claude Code, built with Tauri 2, React 19, and xterm.
 ## Development Commands
 
 ```bash
-npm run dev         # Start development server (Tauri + Vite hot reload)
-npm run build       # Build frontend for production
-npm run tauri:build # Build full Tauri application
-npm run dev:vite    # Run Vite dev server only (frontend development)
-npm run preview     # Preview production build
+npm run dev              # Start development server (Tauri + Vite hot reload) on default port 1420
+npm run dev:instance 1   # Start instance 1 on port 1420
+npm run dev:instance 2   # Start instance 2 on port 1430 (auto-fallback if taken)
+npm run build            # Build frontend for production
+npm run tauri:build      # Build full Tauri application
+npm run dev:vite         # Run Vite dev server only (frontend development)
+npm run preview          # Preview production build
+```
+
+### Running Multiple Instances
+
+To run multiple Lirah instances simultaneously (useful for testing the Instance Sync feature):
+
+**Terminal 1 (Instance 1 - UI project):**
+```bash
+npm run dev:instance 1
+```
+
+**Terminal 2 (Instance 2 - Backend project):**
+```bash
+npm run dev:instance 2
+```
+
+Each instance automatically:
+- Finds an available port (starting from 1420, 1430, 1440, etc.)
+- Updates `tauri.conf.json` with the correct port
+- Restores default config on exit
+
+You can also set a custom port via environment variable:
+```bash
+LIRAH_DEV_PORT=3000 npm run dev
 ```
 
 ## Architecture

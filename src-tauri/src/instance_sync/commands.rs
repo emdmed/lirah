@@ -124,6 +124,10 @@ pub fn get_all_instances(
     let own_id = store.get_instance_id();
 
     let mut instances = Vec::new();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
 
     if let Ok(entries) = fs::read_dir(&base_dir) {
         for entry in entries.flatten() {
@@ -138,12 +142,17 @@ pub fn get_all_instances(
 
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(state) = serde_json::from_str::<InstanceState>(&content) {
+                        // Filter out stale instances
+                        let age = now - state.last_updated;
+
+                        // If instance has no project path, it's likely stuck initializing
+                        // Give it 5 minutes to initialize, otherwise filter it out
+                        if state.project_path.is_empty() && age > 300 {
+                            continue;
+                        }
+
                         // Filter out stale instances (older than 1 hour)
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs();
-                        if now - state.last_updated < 3600 {
+                        if age < 3600 {
                             instances.push(state);
                         }
                     }
@@ -185,11 +194,53 @@ pub fn unregister_instance(store: State<'_, Arc<Mutex<InstanceSyncStore>>>) -> R
 }
 
 #[tauri::command]
-pub fn watch_instances_dir(
+pub fn cleanup_stale_instances(
     store: State<'_, Arc<Mutex<InstanceSyncStore>>>,
-) -> Result<String, String> {
+) -> Result<usize, String> {
     let store = store.lock().map_err(|e| e.to_string())?;
     let base_dir = store.get_all_instances_path();
+    let own_id = store.get_instance_id();
 
-    Ok(base_dir.to_string_lossy().to_string())
+    let mut removed_count = 0;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    if let Ok(entries) = fs::read_dir(&base_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                // Skip own instance
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if stem == own_id {
+                        continue;
+                    }
+                }
+
+                let should_remove = if let Ok(content) = fs::read_to_string(&path) {
+                    if let Ok(state) = serde_json::from_str::<InstanceState>(&content) {
+                        let age = now - state.last_updated;
+                        // Remove if:
+                        // 1. No project path and older than 2 minutes (never properly initialized)
+                        // 2. Older than 30 minutes (likely crashed without cleanup)
+                        (state.project_path.is_empty() && age > 120) || age > 1800
+                    } else {
+                        // Invalid JSON, remove it
+                        true
+                    }
+                } else {
+                    // Can't read file, remove it
+                    true
+                };
+
+                if should_remove {
+                    let _ = fs::remove_file(&path);
+                    removed_count += 1;
+                }
+            }
+        }
+    }
+
+    Ok(removed_count)
 }

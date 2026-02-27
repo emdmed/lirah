@@ -156,7 +156,7 @@ function App() {
   const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
   const instanceSync = useInstanceSync(
     currentPath,
-    fileSelection.selectedFiles,
+    Array.from(fileSelection.selectedFiles), // Convert Set to Array for serialization
     terminalSessionId
   );
 
@@ -231,22 +231,55 @@ function App() {
     }
   }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark]);
 
-  // Sync with another instance (navigate to their project)
-  const handleSyncWithInstance = useCallback(async (instance) => {
-    if (!terminalSessionId || !instance?.project_path) return;
+  // Handle loading context from another instance's session
+  const handleLoadInstanceContext = useCallback(async (session) => {
+    if (!session?.messages?.length) return;
+    
     try {
-      const safePath = escapeShellPath(instance.project_path);
-      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-      if (viewMode === 'flat') await loadFolders();
-      else if (viewMode === 'tree') await treeView.loadTreeData();
+      // Build context from the session messages
+      const contextLines = [];
+      contextLines.push(`# Context from ${session.project_path}`);
+      contextLines.push(`## Session: ${session.summary || 'Previous Work'}`);
+      contextLines.push('');
+      contextLines.push('### Recent conversation:');
+      contextLines.push('');
+      
+      // Add last 10 messages as context
+      const recentMessages = session.messages.slice(-10);
+      recentMessages.forEach((msg) => {
+        const role = msg.role === 'user' ? '**User**' : '**Claude**';
+        contextLines.push(`${role}: ${msg.content.substring(0, 300)}${msg.content.length > 300 ? '...' : ''}`);
+        contextLines.push('');
+      });
+      
+      contextLines.push('---');
+      contextLines.push('Please continue based on the above context.');
+      
+      const contextText = contextLines.join('\n');
+      
+      // Append to textarea or set as new content
+      setTextareaContent(prev => {
+        if (prev.trim()) {
+          return prev + '\n\n' + contextText;
+        }
+        return contextText;
+      });
+      
+      // Make sure textarea is visible
+      setTextareaVisible(true);
+      
+      // Close the sync panel
       setInstanceSyncPanelOpen(false);
-      terminalRef.current?.focus?.();
+      
+      // Focus the textarea
+      setTimeout(() => {
+        textareaRef.current?.focus?.();
+      }, 100);
+      
     } catch (error) {
-      console.error('Failed to sync with instance:', error);
+      console.error('Failed to load instance context:', error);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData]);
+  }, [setTextareaContent, setTextareaVisible, setInstanceSyncPanelOpen]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProject = useCallback(async (bookmark) => {
@@ -721,13 +754,32 @@ function App() {
 
       {/* Instance Sync Panel - Floating overlay */}
       {instanceSyncPanelOpen && (
-        <div className="fixed top-16 right-4 w-80 max-h-[70vh] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 flex flex-col overflow-hidden">
+        <div 
+          className="fixed top-16 right-4 w-[480px] max-h-[80vh] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 flex flex-col overflow-hidden"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setInstanceSyncPanelOpen(false);
+            }
+          }}
+          tabIndex={0}
+          ref={(el) => el?.focus()}
+        >
           <InstanceSyncPanel
             ownState={instanceSync.ownState}
             otherInstances={instanceSync.otherInstances}
-            onSyncWithInstance={handleSyncWithInstance}
+            selectedInstance={instanceSync.selectedInstance}
+            selectedInstanceSessions={instanceSync.selectedInstanceSessions}
+            selectedSession={instanceSync.selectedSession}
+            isLoadingSessions={instanceSync.isLoadingSessions}
+            onSelectInstance={instanceSync.selectInstance}
+            onClearSelectedInstance={instanceSync.clearSelectedInstance}
+            onFetchSessionContent={instanceSync.fetchSessionContent}
             onRefresh={instanceSync.refreshInstances}
+            onCleanup={instanceSync.cleanupStaleInstances}
+            onLoadContext={handleLoadInstanceContext}
             isLoading={false}
+            error={instanceSync.error}
           />
         </div>
       )}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "dev:vite": "vite",
+    "dev:instance": "node scripts/dev.js",
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
