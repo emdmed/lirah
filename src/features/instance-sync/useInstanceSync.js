@@ -116,7 +116,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
           current_focus: '', // Could be set via UI
           active_files: selectedFiles || [],
           claude_session_id: claudeSessionId,
-          status: { Active: null }, // Proper enum serialization for Rust
+          status: 'active', // lowercase to match Rust enum
         };
         
         const state = await invoke('update_instance_state', { update });
