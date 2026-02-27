@@ -14,7 +14,7 @@ use fs::{read_directory, get_terminal_cwd, read_file_content, read_directory_rec
 use typecheck::check_file_types;
 use python_parser::parse_python_skeleton;
 use instance_sync::{create_instance_sync_store, get_instance_id, register_instance, update_instance_state, get_all_instances, get_own_instance_state, unregister_instance, cleanup_stale_instances};
-use claude::{get_claude_sessions, get_claude_session, get_active_claude_session};
+use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get_active_claude_session};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -65,6 +65,7 @@ pub fn run() {
             cleanup_stale_instances,
             get_claude_sessions,
             get_claude_session,
+            get_claude_data_paths,
             get_active_claude_session
         ])
         .run(tauri::generate_context!())

@@ -778,6 +778,7 @@ function App() {
             onRefresh={instanceSync.refreshInstances}
             onCleanup={instanceSync.cleanupStaleInstances}
             onLoadContext={handleLoadInstanceContext}
+            onDebugPaths={instanceSync.debugClaudeDataPaths}
             isLoading={false}
             error={instanceSync.error}
           />

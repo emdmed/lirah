@@ -20,11 +20,21 @@ export function InstanceSyncPanel({
   onRefresh,
   onCleanup,
   onLoadContext,
+  onDebugPaths,
   isLoading,
   error
 }) {
   const [selectedMessages, setSelectedMessages] = useState(new Set());
+  const [debugPaths, setDebugPaths] = useState(null);
   const scrollRef = useRef(null);
+
+  const handleDebugPaths = async () => {
+    const paths = await onDebugPaths();
+    setDebugPaths(paths);
+    // Also log to console for easier debugging
+    console.log('[Instance Sync] Claude data paths checked:');
+    paths.forEach(p => console.log('  ' + p));
+  };
 
   useEffect(() => {
     setSelectedMessages(new Set());
@@ -414,6 +424,13 @@ export function InstanceSyncPanel({
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={handleDebugPaths}
+            className="p-1.5 hover:bg-blue-500/10 text-muted-foreground hover:text-blue-500 border border-dashed border-transparent hover:border-blue-500/30 transition-all"
+            title="Debug: Check Claude data paths"
+          >
+            <span className="text-xs font-mono">[DBG]</span>
+          </button>
+          <button
             onClick={onCleanup}
             disabled={isLoading}
             className="p-1.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 border border-dashed border-transparent hover:border-red-500/30 transition-all disabled:opacity-50"
@@ -449,6 +466,16 @@ export function InstanceSyncPanel({
 
       {/* Instances List */}
       <div className="flex-1 overflow-y-auto min-h-0 bg-background">
+        {debugPaths && (
+          <div className="px-4 py-2 border-b border-dashed border-border bg-muted/5">
+            <p className="text-xs font-mono text-muted-foreground mb-1">[CLAUDE_DATA_PATHS_CHECKED]:</p>
+            <div className="max-h-24 overflow-y-auto text-[10px] font-mono text-muted-foreground/70 space-y-0.5">
+              {debugPaths.map((path, idx) => (
+                <div key={idx} className="truncate">{path}</div>
+              ))}
+            </div>
+          </div>
+        )}
         {otherInstances.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-12 text-center border-b border-dashed border-border">
             <div className="w-12 h-12 flex items-center justify-center border border-dashed border-border bg-muted/20 mb-3">

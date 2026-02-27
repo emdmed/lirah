@@ -244,6 +244,18 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     return instance.project_path;
   }, []);
 
+  // New: Debug function to check Claude data paths
+  const debugClaudeDataPaths = useCallback(async () => {
+    try {
+      const paths = await invoke('get_claude_data_paths');
+      console.log('[Claude Debug] Searched paths:', paths);
+      return paths;
+    } catch (err) {
+      console.error('Failed to get Claude data paths:', err);
+      return [];
+    }
+  }, []);
+
   return {
     instanceId,
     ownState,
@@ -260,5 +272,6 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     refreshInstances,
     syncWithInstance,
     cleanupStaleInstances,
+    debugClaudeDataPaths,
   };
 }
