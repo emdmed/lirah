@@ -154,6 +154,19 @@ function App() {
     terminalSessionId
   );
 
+  // Calculate deduplicated instance count (by project_path, keeping most recent)
+  const deduplicatedOtherInstancesCount = useMemo(() => {
+    const uniquePaths = new Set();
+    let count = 0;
+    for (const instance of instanceSync.otherInstances) {
+      if (!uniquePaths.has(instance.project_path)) {
+        uniquePaths.add(instance.project_path);
+        count++;
+      }
+    }
+    return count;
+  }, [instanceSync.otherInstances]);
+
   const sidebarSearch = useSidebarSearch();
 
   const treeView = useTreeView({
@@ -749,7 +762,7 @@ function App() {
             branchName={branchName}
             onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
             branchTasksOpen={dialogs.branchTasksOpen}
-            otherInstancesCount={instanceSync.otherInstances.length}
+            otherInstancesCount={deduplicatedOtherInstancesCount}
             onToggleInstanceSyncPanel={() => setInstanceSyncPanelOpen(prev => !prev)}
           />
         }

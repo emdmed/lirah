@@ -45,6 +45,17 @@ export function InstanceSyncPanel({
   const [generatedPrompt, setGeneratedPrompt] = useState(null);
   const scrollRef = useRef(null);
 
+  // Deduplicate instances by project_path, keeping the most recent one
+  const deduplicatedOtherInstances = otherInstances.reduce((acc, instance) => {
+    const existingIndex = acc.findIndex(i => i.project_path === instance.project_path);
+    if (existingIndex === -1) {
+      acc.push(instance);
+    } else if (instance.last_updated > acc[existingIndex].last_updated) {
+      acc[existingIndex] = instance;
+    }
+    return acc;
+  }, []);
+
   const handleDebugPaths = async () => {
     const paths = await onDebugPaths();
     setDebugPaths(paths);
@@ -590,8 +601,8 @@ export function InstanceSyncPanel({
           <div className="flex items-center gap-2">
             <Users className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs font-mono font-medium text-muted-foreground">Other instances</span>
-            {otherInstances.length > 0 && (
-              <Badge variant="outline" className="text-[10px] py-0">{otherInstances.length}</Badge>
+            {deduplicatedOtherInstances.length > 0 && (
+              <Badge variant="outline" className="text-[10px] py-0">{deduplicatedOtherInstances.length}</Badge>
             )}
           </div>
           <div className="flex items-center gap-0.5">
@@ -636,7 +647,7 @@ export function InstanceSyncPanel({
 
         {/* Instances list */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {otherInstances.length === 0 ? (
+          {deduplicatedOtherInstances.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Users className="w-8 h-8 text-muted-foreground/30 mb-3" />
               <p className="text-sm font-mono text-muted-foreground mb-1">No other instances</p>
@@ -644,7 +655,7 @@ export function InstanceSyncPanel({
             </div>
           ) : (
             <div className="space-y-0.5">
-              {otherInstances.map((instance) => (
+              {deduplicatedOtherInstances.map((instance) => (
                 <button
                   key={instance.instance_id}
                   onClick={() => onSelectInstance(instance)}
