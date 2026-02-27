@@ -1,4 +1,4 @@
-use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry};
+use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry, ClaudeSessionsPage};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -187,12 +187,19 @@ pub fn get_claude_data_paths() -> Result<Vec<String>, String> {
     Ok(paths)
 }
 
-/// Get the Claude Code sessions index for a project
+/// Get the Claude Code sessions index for a project (paginated)
 #[tauri::command]
-pub fn get_claude_sessions(project_path: String) -> Result<Vec<ClaudeSessionEntry>, String> {
+pub fn get_claude_sessions(
+    project_path: String,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> Result<ClaudeSessionsPage, String> {
+    let limit = limit.unwrap_or(20);
+    let offset = offset.unwrap_or(0);
+
     eprintln!(
-        "\n[Claude Sessions] Requesting sessions for: {}",
-        project_path
+        "\n[Claude Sessions] Requesting sessions for: {} (limit={}, offset={})",
+        project_path, limit, offset
     );
 
     // Encode the project path
@@ -223,7 +230,11 @@ pub fn get_claude_sessions(project_path: String) -> Result<Vec<ClaudeSessionEntr
             "[Claude Sessions] Sessions file not found at: {:?}",
             sessions_file
         );
-        return Ok(Vec::new());
+        return Ok(ClaudeSessionsPage {
+            sessions: Vec::new(),
+            total: 0,
+            has_more: false,
+        });
     }
 
     let content = fs::read_to_string(&sessions_file).map_err(|e| {
@@ -304,14 +315,198 @@ pub fn get_claude_sessions(project_path: String) -> Result<Vec<ClaudeSessionEntr
         eprintln!("[Claude Sessions] No entries found in sessions index");
     }
 
+    // Also scan for .jsonl files not in the index
+    let project_dir = claude_dir.join("projects").join(&encoded_path);
+    let indexed_ids: std::collections::HashSet<String> =
+        sessions.iter().map(|s| s.session_id.clone()).collect();
+
+    if let Ok(entries) = fs::read_dir(&project_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(ext) = path.extension() {
+                if ext == "jsonl" {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        let sid = stem.to_string();
+                        if !indexed_ids.contains(&sid) {
+                            // Build a minimal entry from the file
+                            if let Ok(entry) =
+                                build_session_entry_from_file(&path, &sid, &project_path)
+                            {
+                                sessions.push(entry);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Sort by modified date (most recent first)
     sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+    let total = sessions.len();
+
+    // Apply pagination
+    let paginated: Vec<ClaudeSessionEntry> =
+        sessions.into_iter().skip(offset).take(limit).collect();
+
+    let has_more = offset + paginated.len() < total;
+
     eprintln!(
-        "[Claude Sessions] Returning {} sessions (sorted newest first)",
-        sessions.len()
+        "[Claude Sessions] Returning {} of {} sessions (offset={}, limit={}, has_more={})",
+        paginated.len(),
+        total,
+        offset,
+        limit,
+        has_more
     );
 
-    Ok(sessions)
+    Ok(ClaudeSessionsPage {
+        sessions: paginated,
+        total,
+        has_more,
+    })
+}
+
+/// Format unix milliseconds as ISO 8601 string (simplified)
+fn format_unix_ms_as_iso(ms: u64) -> String {
+    let secs = ms / 1000;
+    let millis = ms % 1000;
+    // Calculate date/time from unix timestamp
+    let days = secs / 86400;
+    let time_secs = secs % 86400;
+    let hours = time_secs / 3600;
+    let minutes = (time_secs % 3600) / 60;
+    let seconds = time_secs % 60;
+
+    // Calculate year/month/day from days since epoch (1970-01-01)
+    let mut y = 1970i64;
+    let mut remaining = days as i64;
+    loop {
+        let days_in_year = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {
+            366
+        } else {
+            365
+        };
+        if remaining < days_in_year {
+            break;
+        }
+        remaining -= days_in_year;
+        y += 1;
+    }
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let month_days = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    let mut m = 0usize;
+    for md in &month_days {
+        if remaining < *md as i64 {
+            break;
+        }
+        remaining -= *md as i64;
+        m += 1;
+    }
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        y,
+        m + 1,
+        remaining + 1,
+        hours,
+        minutes,
+        seconds,
+        millis
+    )
+}
+
+/// Build a ClaudeSessionEntry by reading the first few lines of a .jsonl file
+fn build_session_entry_from_file(
+    path: &std::path::Path,
+    session_id: &str,
+    project_path: &str,
+) -> Result<ClaudeSessionEntry, String> {
+    let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| format_unix_ms_as_iso(d.as_millis() as u64))
+        .unwrap_or_default();
+    let created = metadata
+        .created()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| format_unix_ms_as_iso(d.as_millis() as u64))
+        .unwrap_or_else(|| modified.clone());
+
+    // Read file to extract first prompt, summary, and message count
+    use std::io::{BufRead, BufReader};
+    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    let mut first_prompt = String::new();
+    let mut message_count: i32 = 0;
+    let mut summary = String::new();
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+            if let Some(msg_type) = json.get("type").and_then(|v| v.as_str()) {
+                match msg_type {
+                    "user" | "assistant" => {
+                        message_count += 1;
+                        if first_prompt.is_empty() && msg_type == "user" {
+                            if let Some(msg) = json.get("message") {
+                                first_prompt = msg
+                                    .get("content")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .chars()
+                                    .take(200)
+                                    .collect();
+                            }
+                        }
+                    }
+                    "summary" => {
+                        summary = json
+                            .get("summary")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(ClaudeSessionEntry {
+        session_id: session_id.to_string(),
+        full_path: path.to_string_lossy().to_string(),
+        first_prompt,
+        summary,
+        message_count,
+        created,
+        modified,
+        git_branch: None,
+        project_path: project_path.to_string(),
+        is_sidechain: false,
+    })
 }
 
 /// Get a specific Claude Code session with its messages
@@ -344,23 +539,29 @@ pub fn get_claude_session(
         return Err(msg);
     }
 
-    let content = fs::read_to_string(&session_file).map_err(|e| {
-        let msg = format!("Failed to read session file: {}", e);
+    use std::io::{BufRead, BufReader};
+    let file = std::fs::File::open(&session_file).map_err(|e| {
+        let msg = format!("Failed to open session file: {}", e);
         eprintln!("[Claude Session] ERROR: {}", msg);
         msg
     })?;
+    let reader = BufReader::new(file);
 
     let mut messages = Vec::new();
     let mut summary = None;
     let mut line_count = 0;
 
-    for line in content.lines() {
+    for line_result in reader.lines() {
+        let line = match line_result {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
         line_count += 1;
         if line.trim().is_empty() {
             continue;
         }
 
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
             // Check the type field - Claude uses "user" and "assistant" types
             if let Some(msg_type) = json.get("type").and_then(|v| v.as_str()) {
                 match msg_type {
@@ -463,10 +664,10 @@ pub fn get_claude_session(
 pub fn get_active_claude_session(
     project_path: String,
 ) -> Result<Option<ClaudeSessionEntry>, String> {
-    let sessions = get_claude_sessions(project_path)?;
+    let page = get_claude_sessions(project_path, Some(1), Some(0))?;
 
     // Return the first (most recent) non-sidechain session
-    Ok(sessions.into_iter().filter(|s| !s.is_sidechain).next())
+    Ok(page.sessions.into_iter().filter(|s| !s.is_sidechain).next())
 }
 
 /// Encode a project path for the Claude directory structure

@@ -431,11 +431,15 @@ pub fn generate_commit_message(
     // Try with free model first
     let (command, fallback_command) = match cli.as_str() {
         "opencode" => (
-            format!("opencode run -m opencode/kimi-k2.5 '{}'", escaped_prompt),
+            format!("opencode run -m opencode/glm-5-free '{}'", escaped_prompt),
             Some(format!(
-                "opencode run -m opencode/glm-5-free '{}'",
+                "opencode run -m opencode/minimax '{}'",
                 escaped_prompt
             )),
+        ),
+        "claude" | "claude-code" => (
+            format!("claude --model sonnet --print '{}'", escaped_prompt),
+            None,
         ),
         _ => (
             format!("claude --model sonnet --print '{}'", escaped_prompt),
@@ -602,10 +606,11 @@ pub fn generate_branch_tasks(
     // Try with free model first
     let (command, fallback_command) = match cli.as_str() {
         "opencode" => (
-            "opencode run -m opencode/kimi-k2.5".to_string(),
-            Some("opencode run -m opencode/glm-5-free".to_string()),
+            "opencode run -m opencode/glm-5-free".to_string(),
+            Some("opencode run -m opencode/minimax".to_string()),
         ),
-        _ => ("claude --print".to_string(), None),
+        "claude" | "claude-code" => ("claude --model sonnet --print".to_string(), None),
+        _ => ("claude --model sonnet --print".to_string(), None),
     };
 
     eprintln!("[generate_branch_tasks] Running command: {}", command);
@@ -823,4 +828,122 @@ fn parse_llm_task_response(
             }
         }
     }
+}
+
+/// Message structure for conversation context
+#[derive(serde::Deserialize, Clone, Debug)]
+pub struct ConversationMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Generate an implementation prompt from conversation messages using hidden CLI
+#[tauri::command(async)]
+pub fn generate_instance_sync_prompt(
+    project_dir: String,
+    cli: String,
+    prompt_type: String,
+    messages: Vec<ConversationMessage>,
+) -> Result<String, String> {
+    if messages.is_empty() {
+        return Err("No conversation messages provided".to_string());
+    }
+
+    // Build the context block from selected messages
+    let context_block = messages
+        .iter()
+        .map(|msg| {
+            let role_label = if msg.role == "user" { "User" } else { "Claude" };
+            format!("**{}**: {}", role_label, msg.content)
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    // Build the full prompt
+    let label = match prompt_type.as_str() {
+        "ui" => "UI",
+        "backend" => "Backend",
+        "db" => "Database",
+        _ => prompt_type.as_str(),
+    };
+
+    let full_prompt = format!(
+        r#"# Implementation Prompt: {label}
+
+Based on the following conversation context, create an implementation for the {label} layer:
+
+## Context from conversation:
+{context}
+
+## Task
+Implement the {label} changes described above.
+
+Follow .orchestration/orchestration.md (read it only if not already read in this conversation)"#,
+        label = label,
+        context = context_block
+    );
+
+    // Escape single quotes for shell safety
+    let escaped_prompt = full_prompt.replace('\'', "'\\''");
+
+    // Build the CLI command
+    let (command, fallback_command) = match cli.as_str() {
+        "opencode" => (
+            format!("opencode run -m opencode/glm-5-free '{}'", escaped_prompt),
+            Some(format!(
+                "opencode run -m opencode/minimax '{}'",
+                escaped_prompt
+            )),
+        ),
+        "claude" | "claude-code" => (
+            format!("claude --model sonnet --print '{}'", escaped_prompt),
+            None,
+        ),
+        _ => (
+            format!("claude --model sonnet --print '{}'", escaped_prompt),
+            None,
+        ),
+    };
+
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+
+    // First attempt with free model
+    let output = std::process::Command::new(&shell)
+        .args(&["-lc", &command])
+        .current_dir(&project_dir)
+        .env("TERM", "xterm-256color")
+        .output()
+        .map_err(|e| format!("Failed to run LLM command: {}", e))?;
+
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    }
+
+    // If free model failed and we have a fallback (paid model), try it silently
+    if let Some(fallback) = fallback_command {
+        let fallback_output = std::process::Command::new(&shell)
+            .args(&["-lc", &fallback])
+            .current_dir(&project_dir)
+            .env("TERM", "xterm-256color")
+            .output()
+            .map_err(|e| format!("Failed to run LLM command: {}", e))?;
+
+        if fallback_output.status.success() {
+            return Ok(String::from_utf8_lossy(&fallback_output.stdout)
+                .trim()
+                .to_string());
+        }
+
+        // Both failed - return error from paid model attempt
+        let stdout = String::from_utf8_lossy(&fallback_output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&fallback_output.stderr).to_string();
+        let error_msg = if !stdout.is_empty() { stdout } else { stderr };
+        return Err(format!("LLM command failed: {}", error_msg));
+    }
+
+    // No fallback available, return original error
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let error_msg = if !stdout.is_empty() { stdout } else { stderr };
+    Err(format!("LLM command failed: {}", error_msg))
 }

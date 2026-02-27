@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Terminal } from "./components/Terminal";
 import { Layout } from "./components/Layout";
 import { StatusBar } from "./components/StatusBar";
@@ -147,9 +147,10 @@ function App() {
 
   // Instance sync state
   const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
+  const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
   const instanceSync = useInstanceSync(
     currentPath,
-    Array.from(fileSelection.selectedFiles), // Convert Set to Array for serialization
+    selectedFilesArray,
     terminalSessionId
   );
 
@@ -273,6 +274,60 @@ function App() {
       console.error('Failed to load instance context:', error);
     }
   }, [setTextareaContent, setTextareaVisible, setInstanceSyncPanelOpen]);
+
+  // Handle sending implementation prompt generation via hidden CLI
+  const handleSendImplementationPrompt = useCallback(async ({ selectedMessages, promptType, action, prompt }) => {
+    // Handle sending generated prompt to textarea
+    if (action === 'send-to-textarea' && prompt) {
+      setTextareaContent(prev => {
+        const separator = prev.trim() ? '\n\n' : '';
+        return prev + separator + prompt;
+      });
+      setTextareaVisible(true);
+      setInstanceSyncPanelOpen(false);
+      setTimeout(() => {
+        textareaRef.current?.focus?.();
+      }, 100);
+      return;
+    }
+    
+    // Handle generating the prompt
+    console.log('[App] handleSendImplementationPrompt called:', { selectedMessagesSize: selectedMessages?.size, promptType, currentPath: !!currentPath, selectedSession: !!instanceSync?.selectedSession });
+    if (!currentPath || !instanceSync.selectedSession) {
+      console.log('[App] Early return - missing currentPath or selectedSession');
+      return;
+    }
+
+    // Get the visible messages (same filter as in InstanceSyncPanel)
+    const allVisibleMessages = instanceSync.selectedSession.messages.filter(
+      msg => !msg.content.startsWith('[Thinking]:')
+    );
+
+    // Extract the selected message objects
+    const selectedMessageObjects = Array.from(selectedMessages)
+      .sort((a, b) => a - b)
+      .map(idx => allVisibleMessages[idx])
+      .filter(Boolean)
+      .map(msg => ({ role: msg.role, content: msg.content }));
+
+    if (selectedMessageObjects.length === 0) return;
+
+    try {
+      // Call the backend to generate the implementation via hidden CLI
+      const generatedPrompt = await invoke('generate_instance_sync_prompt', {
+        projectDir: currentPath,
+        cli: settings.selectedCli,
+        promptType,
+        messages: selectedMessageObjects,
+      });
+
+      // Return the generated prompt so the dialog can show it for review
+      return generatedPrompt;
+    } catch (error) {
+      console.error('Failed to generate implementation prompt:', error);
+      throw error;
+    }
+  }, [currentPath, instanceSync.selectedSession, settings.selectedCli, setTextareaContent, setTextareaVisible, setInstanceSyncPanelOpen, textareaRef, instanceSync]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProject = useCallback(async (bookmark) => {
@@ -745,38 +800,32 @@ function App() {
         />
       </Layout>
 
-      {/* Instance Sync Panel - Floating overlay */}
-      {instanceSyncPanelOpen && (
-        <div 
-          className="fixed top-16 right-4 w-[480px] max-h-[80vh] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 flex flex-col overflow-hidden"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              setInstanceSyncPanelOpen(false);
-            }
-          }}
-          tabIndex={0}
-          ref={(el) => el?.focus()}
-        >
-          <InstanceSyncPanel
-            ownState={instanceSync.ownState}
-            otherInstances={instanceSync.otherInstances}
-            selectedInstance={instanceSync.selectedInstance}
-            selectedInstanceSessions={instanceSync.selectedInstanceSessions}
-            selectedSession={instanceSync.selectedSession}
-            isLoadingSessions={instanceSync.isLoadingSessions}
-            onSelectInstance={instanceSync.selectInstance}
-            onClearSelectedInstance={instanceSync.clearSelectedInstance}
-            onFetchSessionContent={instanceSync.fetchSessionContent}
-            onRefresh={instanceSync.refreshInstances}
-            onCleanup={instanceSync.cleanupStaleInstances}
-            onLoadContext={handleLoadInstanceContext}
-            onDebugPaths={instanceSync.debugClaudeDataPaths}
-            isLoading={false}
-            error={instanceSync.error}
-          />
-        </div>
-      )}
+      {/* Instance Sync Dialog */}
+      <InstanceSyncPanel
+        open={instanceSyncPanelOpen}
+        onOpenChange={(open) => {
+          setInstanceSyncPanelOpen(open);
+          if (!open) instanceSync.clearSelectedInstance();
+        }}
+        ownState={instanceSync.ownState}
+        otherInstances={instanceSync.otherInstances}
+        selectedInstance={instanceSync.selectedInstance}
+        selectedInstanceSessions={instanceSync.selectedInstanceSessions}
+        selectedSession={instanceSync.selectedSession}
+        isLoadingSessions={instanceSync.isLoadingSessions}
+        sessionsHasMore={instanceSync.sessionsHasMore}
+        onSelectInstance={instanceSync.selectInstance}
+        onClearSelectedInstance={instanceSync.clearSelectedInstance}
+        onLoadMoreSessions={instanceSync.loadMoreSessions}
+        onFetchSessionContent={instanceSync.fetchSessionContent}
+        onRefresh={instanceSync.refreshInstances}
+        onCleanup={instanceSync.cleanupStaleInstances}
+        onLoadContext={handleLoadInstanceContext}
+        onSendToTerminal={handleSendImplementationPrompt}
+        onDebugPaths={instanceSync.debugClaudeDataPaths}
+        isLoading={false}
+        error={instanceSync.error}
+      />
 
       <AddBookmarkDialog
         open={dialogs.addBookmarkDialogOpen}

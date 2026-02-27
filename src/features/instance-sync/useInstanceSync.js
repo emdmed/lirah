@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { isEqual } from '@/lib/utils';
 
 export const INSTANCE_SYNC_INTERVAL = 5000; // Update every 5 seconds
 export const INSTANCE_WATCH_INTERVAL = 2000; // Check for other instances every 2 seconds
@@ -16,6 +17,12 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
   const [selectedInstanceSessions, setSelectedInstanceSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  
+  // Pagination state for sessions
+  const [sessionsOffset, setSessionsOffset] = useState(0);
+  const [sessionsHasMore, setSessionsHasMore] = useState(false);
+  const [sessionsTotal, setSessionsTotal] = useState(0);
+  const SESSIONS_PAGE_SIZE = 10;
   
   const lastUpdateRef = useRef(0);
   const pendingUpdateRef = useRef(false);
@@ -149,7 +156,20 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     const pollInstances = async () => {
       try {
         const instances = await invoke('get_all_instances');
-        setOtherInstances(instances);
+        // Only update state if data actually changed to prevent re-render loops
+        setOtherInstances(prev => {
+          if (prev.length !== instances.length) return instances;
+          if (instances.length === 0 && prev.length === 0) return prev;
+          // Check if any instance changed using instance_id as key
+          const changed = instances.some((inst, i) => {
+            const prevInst = prev[i];
+            return !prevInst || prevInst.instance_id !== inst.instance_id ||
+                   prevInst.last_updated !== inst.last_updated ||
+                   prevInst.status !== inst.status ||
+                   !isEqual(prevInst.active_files, inst.active_files);
+          });
+          return changed ? instances : prev;
+        });
       } catch (err) {
         console.error('Failed to get other instances:', err);
       }
@@ -160,7 +180,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     return () => clearInterval(interval);
   }, [isRegistered]);
 
-  // New: Fetch sessions when an instance is selected
+  // New: Fetch sessions when an instance is selected (paginated)
   const selectInstance = useCallback(async (instance) => {
     if (!instance?.project_path) return;
     
@@ -168,12 +188,20 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     setIsLoadingSessions(true);
     setSelectedInstanceSessions([]);
     setSelectedSession(null);
+    setSessionsOffset(0);
+    setSessionsHasMore(false);
+    setSessionsTotal(0);
     
     try {
-      const sessions = await invoke('get_claude_sessions', {
+      const page = await invoke('get_claude_sessions', {
         projectPath: instance.project_path,
+        limit: SESSIONS_PAGE_SIZE,
+        offset: 0,
       });
-      setSelectedInstanceSessions(sessions);
+      setSelectedInstanceSessions(page.sessions || []);
+      setSessionsHasMore(page.has_more || false);
+      setSessionsTotal(page.total || 0);
+      setSessionsOffset(page.sessions?.length || 0);
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
       setSelectedInstanceSessions([]);
@@ -181,12 +209,38 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
       setIsLoadingSessions(false);
     }
   }, []);
+  
+  // New: Load more sessions (pagination)
+  const loadMoreSessions = useCallback(async () => {
+    if (!selectedInstance?.project_path || !sessionsHasMore || isLoadingSessions) return;
+    
+    setIsLoadingSessions(true);
+    
+    try {
+      const page = await invoke('get_claude_sessions', {
+        projectPath: selectedInstance.project_path,
+        limit: SESSIONS_PAGE_SIZE,
+        offset: sessionsOffset,
+      });
+      
+      setSelectedInstanceSessions(prev => [...prev, ...(page.sessions || [])]);
+      setSessionsHasMore(page.has_more || false);
+      setSessionsOffset(prev => prev + (page.sessions?.length || 0));
+    } catch (err) {
+      console.error('Failed to load more sessions:', err);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  }, [selectedInstance, sessionsOffset, sessionsHasMore, isLoadingSessions]);
 
   // New: Clear selected instance
   const clearSelectedInstance = useCallback(() => {
     setSelectedInstance(null);
     setSelectedInstanceSessions([]);
     setSelectedSession(null);
+    setSessionsOffset(0);
+    setSessionsHasMore(false);
+    setSessionsTotal(0);
   }, []);
 
   // New: Fetch specific session content
@@ -256,6 +310,43 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     }
   }, []);
 
+  // Build implementation prompt from selected messages
+  const buildImplementationPrompt = useCallback((session, selectedMessageIndices, promptType) => {
+    if (!session || selectedMessageIndices.size === 0) return null;
+
+    const visibleMessages = session.messages.filter(
+      msg => !msg.content.startsWith('[Thinking]:')
+    );
+
+    const selectedMsgs = Array.from(selectedMessageIndices)
+      .sort((a, b) => a - b)
+      .map(idx => visibleMessages[idx])
+      .filter(Boolean);
+
+    if (selectedMsgs.length === 0) return null;
+
+    const labels = { ui: 'UI', backend: 'Backend', db: 'Database' };
+    const label = labels[promptType] || promptType;
+
+    const contextBlock = selectedMsgs
+      .map(msg => `**${msg.role === 'user' ? 'User' : 'Claude'}**: ${msg.content}`)
+      .join('\n\n');
+
+    return [
+      `# Implementation Prompt: ${label}`,
+      '',
+      `Based on the following conversation context, create an implementation for the ${label} layer:`,
+      '',
+      '## Context from conversation:',
+      contextBlock,
+      '',
+      '## Task',
+      `Implement the ${label} changes described above.`,
+      '',
+      'Follow .orchestration/orchestration.md (read it only if not already read in this conversation)',
+    ].join('\n');
+  }, []);
+
   return {
     instanceId,
     ownState,
@@ -266,12 +357,16 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     selectedInstanceSessions,
     selectedSession,
     isLoadingSessions,
+    sessionsHasMore,
+    sessionsTotal,
     selectInstance,
+    loadMoreSessions,
     clearSelectedInstance,
     fetchSessionContent,
     refreshInstances,
     syncWithInstance,
     cleanupStaleInstances,
     debugClaudeDataPaths,
+    buildImplementationPrompt,
   };
 }

@@ -21,6 +21,13 @@ pub struct ClaudeSessionsIndex {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeSessionsPage {
+    pub sessions: Vec<ClaudeSessionEntry>,
+    pub total: usize,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeMessage {
     pub role: String,
     pub content: String,
