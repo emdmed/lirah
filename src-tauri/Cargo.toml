@@ -27,6 +27,7 @@ uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 notify = "6.1"
 rustpython-parser = "0.4"
+dirs = "5.0"
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 sysinfo = "0.33"

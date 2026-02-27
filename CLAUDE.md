@@ -13,6 +13,7 @@ Lirah is a GUI for running Claude Code, built with Tauri 2, React 19, and xterm.
 - **Prompt Templates**: Save frequently used partial prompts for reuse across sessions
 - **Bidirectional Sync**: Sidebar updates when you `cd` in terminal; clicking folders navigates the terminal
 - **claude-orchestration Integration**: Includes workflow templates for common tasks (feature, bugfix, refactor, performance, review, pr, docs) with React-specific variants
+- **Instance Sync**: Share work context between multiple running Lirah instances - see what other instances are working on and sync to their projects
 
 ## Development Commands
 
@@ -46,8 +47,11 @@ npm run preview     # Preview production build
 **Key Modules**:
 - `pty/commands.rs`: Tauri commands (`spawn_terminal`, `write_to_terminal`, `resize_terminal`, `close_terminal`, `get_terminal_cwd`)
 - `fs.rs`: Filesystem operations (`read_directory`, `read_directory_recursive`, `read_file_content`, `get_git_stats`)
+- `instance_sync/`: Inter-instance communication (register, update state, watch other instances)
 
 **CWD Detection**: Linux-only via `/proc/[pid]/cwd` symlink resolution.
+
+**Instance Sync**: Each Lirah instance writes its state to `~/.lirah/instances/[instance-id].json`. Other instances poll this directory every 2 seconds to discover peers. Status includes project path, active files, Claude session ID, and last updated timestamp. Stale instances (>1 hour) are automatically filtered out.
 
 ### Frontend ↔ Backend Communication
 
@@ -83,6 +87,7 @@ await listen('terminal-output', ({ payload }) => terminal.write(payload.data));
 | Ctrl+F | Focus File Search |
 | Ctrl+G | Toggle Git Filter |
 | Ctrl+W | Toggle File Watchers |
+| Ctrl+Shift+I | Toggle Instance Sync Panel |
 | Ctrl+H | Open Keyboard Shortcuts Dialog |
 
 ## Debugging

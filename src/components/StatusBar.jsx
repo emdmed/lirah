@@ -4,7 +4,7 @@ import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
-  CheckCircle2, ListTodo
+  CheckCircle2, ListTodo, Monitor
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../contexts/WatcherContext';
@@ -220,6 +220,37 @@ function NetworkButton({ isolated, enabled, onToggle }) {
   );
 }
 
+function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
+  const hasInstances = otherInstancesCount > 0;
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="xs" 
+          onClick={onClick}
+          className={cn(
+            "gap-1 px-1.5 transition-colors",
+            hasInstances && "text-blue-400 hover:text-blue-300"
+          )}
+        >
+          <Monitor className="w-3 h-3" />
+          {hasInstances && (
+            <span className="text-xs font-medium">{otherInstancesCount}</span>
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {hasInstances 
+          ? `${otherInstancesCount} other instance${otherInstancesCount > 1 ? 's' : ''} active (Ctrl+Shift+I)`
+          : 'Instance Sync (Ctrl+Shift+I)'
+        }
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const StatusBar = ({
   viewMode, currentPath, sessionId, theme, onToggleHelp,
   onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar,
@@ -227,7 +258,7 @@ export const StatusBar = ({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
-  onToggleBranchTasks, branchTasksOpen
+  onToggleBranchTasks, branchTasksOpen, otherInstancesCount, onToggleInstanceSyncPanel
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
@@ -326,6 +357,12 @@ export const StatusBar = ({
           <div className="w-px h-3 bg-border/30 mx-0.5" />
           <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
         </div>
+
+        {/* Instance Sync Zone */}
+        <InstanceSyncIndicator 
+          otherInstancesCount={otherInstancesCount} 
+          onClick={onToggleInstanceSyncPanel} 
+        />
 
         <div className="w-px h-4 bg-border/50 mx-1" />
 

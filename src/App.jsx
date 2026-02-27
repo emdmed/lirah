@@ -59,6 +59,9 @@ import { useAutoCommit } from "./hooks/useAutoCommit";
 import { AutoCommitDialog } from "./components/AutoCommitDialog";
 import { AutoCommitConfigDialog } from "./components/AutoCommitConfigDialog";
 import { useBranchTasks } from "./hooks/useBranchTasks";
+import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
+import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
+import { InstanceSyncPanel } from "./features/instance-sync/InstanceSyncPanel";
 
 function App() {
   const { theme } = useTheme();
@@ -149,6 +152,14 @@ function App() {
 
   const branchTasks = useBranchTasks(settings.selectedCli);
 
+  // Instance sync state
+  const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
+  const instanceSync = useInstanceSync(
+    currentPath,
+    fileSelection.selectedFiles,
+    terminalSessionId
+  );
+
   const sidebarSearch = useSidebarSearch();
 
   const treeView = useTreeView({
@@ -219,6 +230,23 @@ function App() {
       console.error('Failed to navigate to bookmark:', error);
     }
   }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark]);
+
+  // Sync with another instance (navigate to their project)
+  const handleSyncWithInstance = useCallback(async (instance) => {
+    if (!terminalSessionId || !instance?.project_path) return;
+    try {
+      const safePath = escapeShellPath(instance.project_path);
+      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+      if (viewMode === 'flat') await loadFolders();
+      else if (viewMode === 'tree') await treeView.loadTreeData();
+      setInstanceSyncPanelOpen(false);
+      terminalRef.current?.focus?.();
+    } catch (error) {
+      console.error('Failed to sync with instance:', error);
+    }
+  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProject = useCallback(async (bookmark) => {
@@ -407,6 +435,11 @@ function App() {
   useBookmarksShortcut({
     bookmarksPaletteOpen: dialogs.bookmarksPaletteOpen,
     setBookmarksPaletteOpen: dialogs.setBookmarksPaletteOpen,
+    secondaryTerminalFocused: secondary.secondaryFocused,
+  });
+
+  useInstanceSyncShortcut({
+    onTogglePanel: () => setInstanceSyncPanelOpen(prev => !prev),
     secondaryTerminalFocused: secondary.secondaryFocused,
   });
 
@@ -635,6 +668,8 @@ function App() {
             branchName={branchName}
             onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
             branchTasksOpen={dialogs.branchTasksOpen}
+            otherInstancesCount={instanceSync.otherInstances.length}
+            onToggleInstanceSyncPanel={() => setInstanceSyncPanelOpen(prev => !prev)}
           />
         }
         secondaryTerminal={
@@ -683,6 +718,20 @@ function App() {
           currentBranch={branchName}
         />
       </Layout>
+
+      {/* Instance Sync Panel - Floating overlay */}
+      {instanceSyncPanelOpen && (
+        <div className="fixed top-16 right-4 w-80 max-h-[70vh] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 flex flex-col overflow-hidden">
+          <InstanceSyncPanel
+            ownState={instanceSync.ownState}
+            otherInstances={instanceSync.otherInstances}
+            onSyncWithInstance={handleSyncWithInstance}
+            onRefresh={instanceSync.refreshInstances}
+            isLoading={false}
+          />
+        </div>
+      )}
+
       <AddBookmarkDialog
         open={dialogs.addBookmarkDialogOpen}
         onOpenChange={dialogs.setAddBookmarkDialogOpen}

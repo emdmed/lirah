@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Keyboard, Search, Command, Zap, GitBranch } from 'lucide-react'
+import { Keyboard, Search, Command, Zap, GitBranch, Monitor } from 'lucide-react'
 
 const shortcuts = [
   {
@@ -46,6 +46,13 @@ const shortcuts = [
     icon: <GitBranch className='w-4 h-4' />,
     items: [
       { keys: ['Ctrl', 'Shift', 'T'], description: 'Toggle Branch Tasks' },
+    ],
+  },
+  {
+    category: 'Instance Sync',
+    icon: <Monitor className='w-4 h-4' />,
+    items: [
+      { keys: ['Ctrl', 'Shift', 'I'], description: 'Toggle Instance Sync Panel' },
     ],
   },
   {
