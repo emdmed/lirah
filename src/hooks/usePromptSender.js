@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { saveLastPrompt } from "./useTextareaShortcuts";
-import { LARGE_FILE_INSTRUCTION } from "../components/sidebar/SidebarFileSelection";
+import { LARGE_FILE_INSTRUCTION } from "../features/file-groups";
 import { escapeShellPath, getRelativePath } from "../utils/pathUtils";
 
 function buildFilesSections(selectedFiles, currentPath, fileStates, { getLineCount, formatFileAnalysis, getViewModeLabel }) {

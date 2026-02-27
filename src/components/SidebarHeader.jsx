@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Badge} from "./ui/badge"
 import { Input } from './ui/input';
-import { BookmarksDropdown } from './BookmarksDropdown';
+import { BookmarksDropdown } from '../features/bookmarks';
 import { Search, X, GitBranch, Star, Shield, Eye } from 'lucide-react';
 
 export function SidebarHeader({

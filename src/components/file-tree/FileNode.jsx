@@ -1,9 +1,9 @@
 import React from "react";
 import { GitBranch, Search } from "lucide-react";
-import { GitStatsBadge } from "./GitStatsBadge";
+import { GitStatsBadge } from "../../features/git";
 import { INDENT_PX } from "./constants";
-import { isBabelParseable } from "@/utils/babelSymbolParser";
-import { isPythonParseable } from "@/utils/pythonSymbolParser";
+import { isBabelParseable } from "@/features/file-analysis";
+import { isPythonParseable } from "@/features/file-analysis";
 
 /**
  * Renders a file node in the tree with action buttons

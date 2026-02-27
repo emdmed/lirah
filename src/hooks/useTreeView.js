@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { buildTreeFromFlatList, incrementallyUpdateTree } from "../utils/treeOperations";
 import { lastSepIndex } from "../utils/pathUtils";
-import { useToast } from "../contexts/ToastContext";
+import { useToast } from "../features/toast";
 
 /**
  * Custom hook to debounce a value

@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { useBookmarks } from '../contexts/BookmarksContext';
+import { useBookmarks } from '../features/bookmarks';
 import { FolderOpen } from 'lucide-react';
 
 export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {

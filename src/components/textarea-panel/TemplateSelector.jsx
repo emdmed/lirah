@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { usePromptTemplates } from "../../contexts/PromptTemplatesContext";
+import { usePromptTemplates } from "../../features/templates";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export function TemplateSelector({

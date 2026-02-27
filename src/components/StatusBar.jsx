@@ -7,9 +7,9 @@ import {
   CheckCircle2, ListTodo, Monitor
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
-import { useWatcher } from '../contexts/WatcherContext';
-import { useWatcherShortcut } from '../hooks/useWatcherShortcut';
-import { useTokenBudget } from '../contexts/TokenBudgetContext';
+import { useWatcher } from '../features/watcher';
+import { useWatcherShortcut } from '../features/watcher';
+import { useTokenBudget } from '../features/token-budget';
 import { Button } from './ui/button';
 import { Badge } from "./ui/badge.jsx"
 import {

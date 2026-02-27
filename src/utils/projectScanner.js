@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cache from './dataCache';
-import { computeCost } from './dashboardData';
+import { computeCost } from '../features/token-budget';
 
 export async function scanAllProjects(forceRefresh = false) {
   if (!forceRefresh) {

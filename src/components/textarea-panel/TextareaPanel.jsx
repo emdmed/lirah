@@ -5,16 +5,16 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { ActionButtons } from "./ActionButtons";
 import { Button } from "../ui/button";
 import { TemplateSelector } from "./TemplateSelector";
-import { FileGroupsDropdown } from "../sidebar/FileGroupsDropdown";
-import { CompactProjectButton } from "./CompactProjectButton";
-import { CompactSectionsDialog } from "./CompactSectionsDialog";
-import { FlowchartDialog } from "./FlowchartDialog";
-import { buildGraphData } from "../../utils/generateFlowchart";
-import { AtMentionModal } from "../AtMentionModal";
+import { FileGroupsDropdown } from "../../features/file-groups";
+import { CompactProjectButton } from "../../features/compact";
+import { CompactSectionsDialog } from "../../features/compact";
+import { FlowchartDialog } from "../../features/compact";
+import { buildGraphData } from "../../features/compact";
+import { AtMentionModal } from "../../features/at-mention";
 import { X, Map } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
-import { TokenCostEstimate } from "../TokenCostEstimate";
-import { useTokenBudget } from "../../contexts/TokenBudgetContext";
+import { TokenCostEstimate } from "../../features/token-budget";
+import { useTokenBudget } from "../../features/token-budget";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 

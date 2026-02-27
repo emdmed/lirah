@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { SidebarMenu } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
-import { useGitStats } from "./hooks/useGitStats";
+import { useGitStats } from "../../features/git";
 import { filterTreeByGitChanges } from "./utils/filterUtils";
 
 /**

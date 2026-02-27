@@ -1,8 +1,8 @@
 import { FileTree } from "./file-tree/file-tree";
 import { SidebarHeader } from "./SidebarHeader";
 import { FlatViewMenu } from "./FlatViewMenu";
-import { SidebarFileSelection } from "./sidebar/SidebarFileSelection";
-import { useFileSelection } from "../contexts/FileSelectionContext";
+import { SidebarFileSelection } from "../features/file-groups";
+import { useFileSelection } from "../features/file-groups";
 import { RetroSpinner } from "./ui/RetroSpinner";
 import {
   Sidebar,

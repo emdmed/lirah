@@ -2,12 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { WatcherProvider } from "./contexts/WatcherContext";
-import { BookmarksProvider } from "./contexts/BookmarksContext";
-import { PromptTemplatesProvider } from "./contexts/PromptTemplatesContext";
-import { FileGroupsProvider } from "./contexts/FileGroupsContext";
-import { FileSelectionProvider } from "./contexts/FileSelectionContext";
-import { ToastProvider } from "./contexts/ToastContext";
+import { WatcherProvider } from "./features/watcher";
+import { BookmarksProvider } from "./features/bookmarks";
+import { PromptTemplatesProvider } from "./features/templates";
+import { FileGroupsProvider } from "./features/file-groups";
+import { FileSelectionProvider } from "./features/file-groups";
+import { ToastProvider } from "./features/toast";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
