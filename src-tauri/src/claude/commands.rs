@@ -37,6 +37,37 @@ fn find_claude_data_dir() -> Option<PathBuf> {
     let home_dir = dirs::home_dir()?;
     eprintln!("[Claude Discovery] Home directory: {:?}", home_dir);
 
+    // 2.5 Check if ~/.claude exists specifically (debugging Ubuntu issue)
+    let standard_claude = home_dir.join(".claude");
+    eprintln!(
+        "[Claude Discovery] Checking ~/.claude specifically: {:?}",
+        standard_claude
+    );
+    if standard_claude.exists() {
+        eprintln!("[Claude Discovery] ✓ ~/.claude EXISTS");
+        let projects = standard_claude.join("projects");
+        if projects.exists() {
+            eprintln!("[Claude Discovery] ✓ ~/.claude/projects EXISTS");
+            // Try to read it
+            match fs::read_dir(&projects) {
+                Ok(entries) => {
+                    let count = entries.count();
+                    eprintln!(
+                        "[Claude Discovery] ✓ Can read ~/.claude/projects, found {} entries",
+                        count
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[Claude Discovery] ✗ Cannot read ~/.claude/projects: {}", e);
+                }
+            }
+        } else {
+            eprintln!("[Claude Discovery] ✗ ~/.claude/projects NOT FOUND");
+        }
+    } else {
+        eprintln!("[Claude Discovery] ✗ ~/.claude NOT FOUND");
+    }
+
     // 3. Try each location in priority order
     for location in CLAUDE_DATA_LOCATIONS {
         let path = home_dir.join(location);
