@@ -476,7 +476,7 @@ function App() {
       // Read the orchestration.md file and estimate tokens from its content
       // When orchestration is enabled, Claude will read this file, consuming those tokens
       const orchestrationContent = await invoke('read_file_content', { path: `${cwd}/.orchestration/orchestration.md` });
-      const commandText = 'Follow .orchestration/orchestration.md (read it only if not already read in this conversation)';
+      const commandText = 'Follow .orchestration/orchestration.md';
       // Total tokens = command text (~20) + file content that will be read
       const commandTokens = Math.round(commandText.length / 4);
       const contentTokens = Math.round(orchestrationContent.length / 4);

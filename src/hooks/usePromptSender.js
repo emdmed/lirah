@@ -115,17 +115,20 @@ export function usePromptSender({
     try {
       let fullCommand = '';
 
+      // Orchestration instruction goes first so Claude reads it before anything else
+      if (appendOrchestration) {
+        fullCommand = 'Follow .orchestration/orchestration.md';
+      }
+
       // Add compacted project at the beginning if it exists
       if (hasCompactedProject) {
-        fullCommand = compactedProject.output;
+        const separator = fullCommand.trim() ? '\n\n' : '';
+        fullCommand = fullCommand + separator + compactedProject.output;
       }
 
       if (hasTextContent) {
-        if (fullCommand) {
-          fullCommand += '\n\n' + textareaContent;
-        } else {
-          fullCommand = textareaContent;
-        }
+        const separator = fullCommand.trim() ? '\n\n' : '';
+        fullCommand = fullCommand + separator + textareaContent;
       }
 
       if (hasFiles) {
@@ -159,11 +162,6 @@ export function usePromptSender({
         }
       }
 
-      // Append orchestration prompt if checkbox is checked
-      if (appendOrchestration) {
-        const separator = fullCommand.trim() ? '\n\n' : '';
-        fullCommand = fullCommand + separator + 'Follow .orchestration/orchestration.md (read it only if not already read in this conversation)';
-      }
 
       // Send text content first
       await invoke('write_to_terminal', {

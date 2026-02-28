@@ -399,7 +399,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
       '## Task',
       `Implement the ${label} changes described above.`,
       '',
-      'Follow .orchestration/orchestration.md (read it only if not already read in this conversation)',
+      'Follow .orchestration/orchestration.md',
     ].join('\n');
   }, []);
 
