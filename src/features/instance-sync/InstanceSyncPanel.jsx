@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Monitor, Folder, FileText, RefreshCw, Users, AlertCircle, Trash2,
   MessageSquare, ChevronLeft, ChevronRight, Loader2,
@@ -48,30 +48,29 @@ export function InstanceSyncPanel({
   const scrollRef = useRef(null);
 
   // Deduplicate instances by project_path, keeping the most recent one
-  const deduplicatedOtherInstances = otherInstances.reduce((acc, instance) => {
-    const existingIndex = acc.findIndex(i => i.project_path === instance.project_path);
-    if (existingIndex === -1) {
-      acc.push(instance);
-    } else if (instance.last_updated > acc[existingIndex].last_updated) {
-      acc[existingIndex] = instance;
-    }
-    return acc;
-  }, []);
+  const deduplicatedOtherInstances = useMemo(() =>
+    otherInstances.reduce((acc, instance) => {
+      const existingIndex = acc.findIndex(i => i.project_path === instance.project_path);
+      if (existingIndex === -1) {
+        acc.push(instance);
+      } else if (instance.last_updated > acc[existingIndex].last_updated) {
+        acc[existingIndex] = instance;
+      }
+      return acc;
+    }, []),
+    [otherInstances]
+  );
 
   const handleDebugPaths = async () => {
     const paths = await onDebugPaths();
     setDebugPaths(paths);
     setDebugOpencodePaths(null);
-    console.log('[Instance Sync] Claude data paths checked:');
-    paths.forEach(p => console.log('  ' + p));
   };
 
   const handleDebugOpencodePaths = async () => {
     const paths = await onDebugOpencodePaths();
     setDebugOpencodePaths(paths);
     setDebugPaths(null);
-    console.log('[Instance Sync] OpenCode data paths checked:');
-    paths.forEach(p => console.log('  ' + p));
   };
 
   useEffect(() => {
@@ -146,12 +145,9 @@ export function InstanceSyncPanel({
   };
 
   const handleSendImplementation = async (promptType) => {
-    console.log('[InstanceSyncPanel] handleSendImplementation called:', { promptType, selectedSession: !!selectedSession, selectedMessagesSize: selectedMessages?.size, onSendToTerminal: !!onSendToTerminal });
     if (!selectedSession || selectedMessages.size === 0 || !onSendToTerminal) {
-      console.log('[InstanceSyncPanel] Early return - missing requirements');
       return;
     }
-    console.log('[InstanceSyncPanel] Calling onSendToTerminal with', { selectedMessagesSize: selectedMessages.size, promptType });
     
     setGeneratingPromptType(promptType);
     
@@ -438,6 +434,8 @@ export function InstanceSyncPanel({
   }
 
   function SessionsListView() {
+    const [sessionSearch, setSessionSearch] = useState('');
+
     // Deduplicate sessions by full_path, keeping the first (most recent) occurrence
     const deduplicatedSessions = selectedInstanceSessions.reduce((acc, session) => {
       if (!acc.find(s => s.full_path === session.full_path)) {
@@ -445,10 +443,20 @@ export function InstanceSyncPanel({
       }
       return acc;
     }, []);
-    
-    // Split deduplicated sessions into active (most recent) and inactive (older)
-    const activeSessions = deduplicatedSessions.slice(0, 1);
-    const inactiveSessions = deduplicatedSessions.slice(1);
+
+    // Filter by search query
+    const filteredSessions = sessionSearch.trim()
+      ? deduplicatedSessions.filter(s => {
+          const q = sessionSearch.toLowerCase();
+          return (s.summary && s.summary.toLowerCase().includes(q)) ||
+                 (s.first_prompt && s.first_prompt.toLowerCase().includes(q));
+        })
+      : deduplicatedSessions;
+
+    // Active = modified within last 5 minutes
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    const activeSessions = filteredSessions.filter(s => new Date(s.modified).getTime() > fiveMinutesAgo);
+    const inactiveSessions = filteredSessions.filter(s => new Date(s.modified).getTime() <= fiveMinutesAgo);
     
     const SessionItem = ({ session, isActive }) => (
       <button
@@ -520,6 +528,19 @@ export function InstanceSyncPanel({
 
         <Separator />
 
+        {/* Session search */}
+        {deduplicatedSessions.length > 3 && (
+          <div className="px-1 py-2">
+            <input
+              type="text"
+              placeholder="Search sessions..."
+              value={sessionSearch}
+              onChange={(e) => setSessionSearch(e.target.value)}
+              className="w-full px-2 py-1.5 text-xs font-mono bg-muted/30 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/40"
+            />
+          </div>
+        )}
+
         {/* Sessions */}
         <div className="flex-1 overflow-y-auto min-h-0 py-1">
           {isLoadingSessions && deduplicatedSessions.length === 0 ? (
@@ -528,7 +549,7 @@ export function InstanceSyncPanel({
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
-          ) : deduplicatedSessions.length === 0 ? (
+          ) : filteredSessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <MessageSquare className="w-8 h-8 text-muted-foreground/30 mb-3" />
               <p className="text-sm font-mono text-muted-foreground mb-1">No sessions found</p>
@@ -537,19 +558,21 @@ export function InstanceSyncPanel({
           ) : (
             <div className="space-y-4">
               {/* Currently Active Section */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 px-1">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs font-mono font-semibold text-green-600">
-                    Currently Active
-                  </span>
+              {activeSessions.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-1">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-xs font-mono font-semibold text-green-600">
+                      Currently Active
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {activeSessions.map(session => (
+                      <SessionItem key={session.session_id} session={session} isActive={true} />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-0.5">
-                  {activeSessions.map(session => (
-                    <SessionItem key={session.session_id} session={session} isActive={true} />
-                  ))}
-                </div>
-              </div>
+              )}
 
               {/* Previous Sessions Section */}
               {inactiveSessions.length > 0 && (
@@ -617,30 +640,34 @@ export function InstanceSyncPanel({
             )}
           </div>
           <div className="flex items-center gap-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant={debugPaths ? "secondary" : "ghost"} 
-                  size="icon-sm" 
-                  onClick={handleDebugPaths}
-                >
-                  <span className="text-[10px] font-mono">C</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Debug: Check Claude data paths</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant={debugOpencodePaths ? "secondary" : "ghost"} 
-                  size="icon-sm" 
-                  onClick={handleDebugOpencodePaths}
-                >
-                  <span className="text-[10px] font-mono">O</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Debug: Check OpenCode data paths</TooltipContent>
-            </Tooltip>
+            {import.meta.env.DEV && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={debugPaths ? "secondary" : "ghost"}
+                      size="icon-sm"
+                      onClick={handleDebugPaths}
+                    >
+                      <span className="text-[10px] font-mono">C</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Debug: Check Claude data paths</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={debugOpencodePaths ? "secondary" : "ghost"}
+                      size="icon-sm"
+                      onClick={handleDebugOpencodePaths}
+                    >
+                      <span className="text-[10px] font-mono">O</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Debug: Check OpenCode data paths</TooltipContent>
+                </Tooltip>
+              </>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon-sm" onClick={onCleanup} disabled={isLoading}>

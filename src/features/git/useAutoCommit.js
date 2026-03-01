@@ -33,9 +33,15 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       }
       setFiles(committableFiles);
 
-      // Stage the files
-      const filePaths = committableFiles.map(f => f.path);
-      await invoke('run_git_command', { repoPath: currentPath, args: ['add', ...filePaths] });
+      // Stage the files (use -- separator and handle deleted files)
+      const deleted = committableFiles.filter(f => f.status === 'deleted').map(f => f.path);
+      const other = committableFiles.filter(f => f.status !== 'deleted').map(f => f.path);
+      if (other.length > 0) {
+        await invoke('run_git_command', { repoPath: currentPath, args: ['add', '--', ...other] });
+      }
+      if (deleted.length > 0) {
+        await invoke('run_git_command', { repoPath: currentPath, args: ['rm', '--cached', '--', ...deleted] });
+      }
 
       // Generate commit message via backend (which gets diff via git command)
       setStage('generating-message');

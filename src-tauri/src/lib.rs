@@ -15,7 +15,7 @@ use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_te
 use fs::{read_directory, get_terminal_cwd, read_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_branch_completed_tasks};
 use typecheck::check_file_types;
 use python_parser::parse_python_skeleton;
-use instance_sync::{create_instance_sync_store, get_instance_id, register_instance, update_instance_state, get_all_instances, get_own_instance_state, unregister_instance, cleanup_stale_instances};
+use instance_sync::{create_instance_sync_store, get_instance_id, register_instance, update_instance_state, get_all_instances, get_own_instance_state, unregister_instance, cleanup_stale_instances, start_instance_watcher};
 use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get_active_claude_session};
 use opencode::{get_opencode_data_paths, get_opencode_sessions, get_opencode_session, get_active_opencode_session};
 
@@ -75,6 +75,10 @@ pub fn run() {
             get_opencode_data_paths,
             get_active_opencode_session
         ])
+        .setup(|app| {
+            start_instance_watcher(app.handle().clone());
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

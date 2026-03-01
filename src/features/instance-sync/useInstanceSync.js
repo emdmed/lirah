@@ -1,9 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { homeDir } from '@tauri-apps/api/path';
 import { isEqual } from '@/lib/utils';
 
 export const INSTANCE_SYNC_INTERVAL = 5000; // Update every 5 seconds
-export const INSTANCE_WATCH_INTERVAL = 2000; // Check for other instances every 2 seconds
+export const INSTANCE_WATCH_INTERVAL = 10000; // Fallback polling every 10 seconds (primary updates via Tauri event)
+
+/**
+ * Check if a path is a valid project path (not empty, not home dir, not waiting state)
+ */
+function isValidProjectPath(path, homeDirPath) {
+  return path &&
+    path.trim() !== '' &&
+    path !== 'Waiting for terminal...' &&
+    !path.startsWith('Waiting') &&
+    path !== homeDirPath &&
+    path !== '/' &&
+    path.length > (homeDirPath?.length || 0);
+}
 
 export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
   const [instanceId, setInstanceId] = useState(null);
@@ -26,19 +41,25 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
   
   const lastUpdateRef = useRef(0);
   const pendingUpdateRef = useRef(false);
+  const homeDirRef = useRef(null);
 
-  // Initialize and get instance ID
+  // Initialize and get instance ID + home dir
   useEffect(() => {
     const init = async () => {
       try {
-        const id = await invoke('get_instance_id');
+        const [id, home] = await Promise.all([
+          invoke('get_instance_id'),
+          homeDir(),
+        ]);
+        // homeDir() returns path with trailing slash on some platforms
+        homeDirRef.current = home.replace(/\/+$/, '');
         setInstanceId(id);
       } catch (err) {
         setError(err.message || 'Failed to get instance ID');
         console.error('Failed to get instance ID:', err);
       }
     };
-    
+
     init();
     
     // Cleanup on unmount - synchronous cleanup to avoid race conditions
@@ -59,76 +80,30 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
 
   // Register instance when project path is available
   useEffect(() => {
-    // Get home directory for comparison
-    const homeDir = process.env.HOME || '/home/enrique';
-    
-    // Debug logging
-    console.log('[InstanceSync] Registration check:', {
-      instanceId,
-      currentPath,
-      isRegistered,
-      homeDir,
-      pathLength: currentPath?.length,
-      homeDirLength: homeDir.length
-    });
-    
-    // Only register when we have a valid project path
-    // - Not empty
-    // - Not "Waiting for terminal..."
-    // - Not just the home directory (must be a project subdirectory)
-    const isValidPath = currentPath && 
-                        currentPath.trim() !== '' && 
-                        currentPath !== 'Waiting for terminal...' &&
-                        !currentPath.startsWith('Waiting') &&
-                        currentPath !== homeDir &&
-                        currentPath !== '/' &&
-                        currentPath.length > homeDir.length; // Must be longer than home dir (i.e., a subdirectory)
-    
-    console.log('[InstanceSync] Path validation:', { isValidPath });
-    
-    if (!instanceId || !isValidPath || isRegistered) {
-      console.log('[InstanceSync] Skipping registration:', { 
-        hasInstanceId: !!instanceId, 
-        isValidPath, 
-        isRegistered 
-      });
+    if (!instanceId || !isValidProjectPath(currentPath, homeDirRef.current) || isRegistered) {
       return;
     }
-    
+
     const register = async () => {
       try {
-        console.log('[InstanceSync] Registering instance with path:', currentPath);
         const state = await invoke('register_instance', {
           projectPath: currentPath,
         });
         setOwnState(state);
         setIsRegistered(true);
         setError(null);
-        console.log('[InstanceSync] Registration successful:', state);
       } catch (err) {
         setError(err.message || 'Failed to register instance');
         console.error('[InstanceSync] Failed to register instance:', err);
       }
     };
-    
+
     register();
   }, [instanceId, currentPath, isRegistered]);
 
   // Update instance state periodically
   useEffect(() => {
-    // Get home directory for comparison
-    const homeDir = process.env.HOME || '/home/enrique';
-    
-    // Skip updates if path is invalid or is just the home directory
-    const isValidPath = currentPath && 
-                        currentPath.trim() !== '' && 
-                        currentPath !== 'Waiting for terminal...' &&
-                        !currentPath.startsWith('Waiting') &&
-                        currentPath !== homeDir &&
-                        currentPath !== '/' &&
-                        currentPath.length > homeDir.length;
-    
-    if (!isRegistered || !isValidPath) return;
+    if (!isRegistered || !isValidProjectPath(currentPath, homeDirRef.current)) return;
     
     const updateState = async () => {
       try {
@@ -172,18 +147,11 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
 
   // Poll for other instances
   useEffect(() => {
-    console.log('[InstanceSync] Polling check - isRegistered:', isRegistered);
-    
-    if (!isRegistered) {
-      console.log('[InstanceSync] Skipping polling - not registered');
-      return;
-    }
-    
+    if (!isRegistered) return;
+
     const pollInstances = async () => {
       try {
-        console.log('[InstanceSync] Polling for instances...');
         const instances = await invoke('get_all_instances');
-        console.log('[InstanceSync] Found instances:', instances.length);
         
         // Only update state if data actually changed to prevent re-render loops
         setOtherInstances(prev => {
@@ -205,8 +173,17 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     };
     
     pollInstances();
+
+    // Listen for real-time updates from fs watcher
+    let unlisten;
+    listen('instance-sync-changed', pollInstances).then(fn => { unlisten = fn; });
+
+    // Fallback polling at longer interval
     const interval = setInterval(pollInstances, INSTANCE_WATCH_INTERVAL);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (unlisten) unlisten();
+    };
   }, [isRegistered]);
 
   // New: Fetch sessions when an instance is selected (paginated)

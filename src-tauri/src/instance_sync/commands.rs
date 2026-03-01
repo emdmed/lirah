@@ -122,9 +122,11 @@ pub fn update_instance_state(
 pub fn get_all_instances(
     store: State<'_, Arc<Mutex<InstanceSyncStore>>>,
 ) -> Result<Vec<InstanceState>, String> {
-    let store = store.lock().map_err(|e| e.to_string())?;
-    let base_dir = store.get_all_instances_path();
-    let own_id = store.get_instance_id();
+    // Extract what we need from the lock, then release it before doing I/O
+    let (base_dir, own_id) = {
+        let store = store.lock().map_err(|e| e.to_string())?;
+        (store.get_all_instances_path(), store.get_instance_id().to_string())
+    };
 
     let mut instances = Vec::new();
     let now = std::time::SystemTime::now()
@@ -146,20 +148,16 @@ pub fn get_all_instances(
 
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(mut state) = serde_json::from_str::<InstanceState>(&content) {
-                        // Set source to lirah if not already set
                         if state.source.is_empty() {
                             state.source = "lirah".to_string();
                         }
 
-                        // Filter out stale instances
                         let age = now - state.last_updated;
 
-                        // If instance has no project path, it's likely stuck initializing
                         if state.project_path.is_empty() && age > 300 {
                             continue;
                         }
 
-                        // Filter out stale instances (older than 1 hour)
                         if age < 3600 {
                             instances.push(state);
                         }
@@ -183,10 +181,33 @@ pub fn get_all_instances(
     let cli_instances = crate::instance_sync::process_discovery::get_all_cli_instances();
     instances.extend(cli_instances);
 
-    // Sort by last_updated descending (most recent first)
-    instances.sort_by(|a, b| b.last_updated.cmp(&a.last_updated));
+    // Centralized deduplication by project_path, preferring Lirah instances (richer state)
+    let mut seen_paths = std::collections::HashMap::new();
+    for (i, inst) in instances.iter().enumerate() {
+        if let Some(&existing_idx) = seen_paths.get(&inst.project_path) {
+            let existing: &InstanceState = &instances[existing_idx];
+            // Prefer lirah source, then most recently updated
+            let replace = (inst.source == "lirah" && existing.source != "lirah")
+                || (inst.source == existing.source && inst.last_updated > existing.last_updated);
+            if replace {
+                seen_paths.insert(inst.project_path.clone(), i);
+            }
+        } else {
+            seen_paths.insert(inst.project_path.clone(), i);
+        }
+    }
+    let keep_indices: std::collections::HashSet<usize> = seen_paths.values().copied().collect();
+    let mut deduped: Vec<InstanceState> = instances
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| keep_indices.contains(i))
+        .map(|(_, inst)| inst)
+        .collect();
 
-    Ok(instances)
+    // Sort by last_updated descending (most recent first)
+    deduped.sort_by(|a, b| b.last_updated.cmp(&a.last_updated));
+
+    Ok(deduped)
 }
 
 #[tauri::command]
