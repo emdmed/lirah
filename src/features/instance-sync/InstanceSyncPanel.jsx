@@ -45,6 +45,7 @@ export function InstanceSyncPanel({
   const [debugOpencodePaths, setDebugOpencodePaths] = useState(null);
   const [generatingPromptType, setGeneratingPromptType] = useState(null);
   const [generatedPrompt, setGeneratedPrompt] = useState(null);
+  const [sessionSearch, setSessionSearch] = useState('');
   const scrollRef = useRef(null);
 
   // Deduplicate instances by project_path, keeping the most recent one
@@ -434,7 +435,6 @@ export function InstanceSyncPanel({
   }
 
   function SessionsListView() {
-    const [sessionSearch, setSessionSearch] = useState('');
 
     // Deduplicate sessions by full_path, keeping the first (most recent) occurrence
     const deduplicatedSessions = selectedInstanceSessions.reduce((acc, session) => {
