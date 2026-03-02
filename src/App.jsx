@@ -32,6 +32,8 @@ import { useTypeChecker } from "./hooks/useTypeChecker";
 import { usePromptSender } from "./hooks/usePromptSender";
 import { escapeShellPath, getRelativePath } from "./utils/pathUtils";
 import { ElementPickerDialog } from "./features/file-analysis";
+import { OrchestrationPrompt } from "./components/OrchestrationPrompt";
+import { useOrchestrationCheck } from "./hooks/useOrchestrationCheck";
 import { TokenBudgetDialog } from "./features/token-budget";
 import { TokenAlertBanner } from "./features/token-budget";
 import { TokenDashboard } from "./features/token-budget";
@@ -147,6 +149,9 @@ function App() {
 
   // Instance sync state
   const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
+  const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
+  const [orchestrationStatus, setOrchestrationStatus] = useState(null);
+  const orchestrationCheckedForPath = useRef(null);
   const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
   const instanceSync = useInstanceSync(
     currentPath,
@@ -204,6 +209,8 @@ function App() {
 
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+
+  const orchestrationCheck = useOrchestrationCheck();
 
   const switchToClaudeMode = useCallback(() => {
     setViewMode('tree');
@@ -497,6 +504,27 @@ function App() {
     }
   }, [detectedCwd, calculateOrchestrationEstimate, appendOrchestration]);
 
+  const handleOrchestrationInstall = useCallback(async () => {
+    if (!currentPath) return;
+    
+    const result = await orchestrationCheck.installOrchestration(currentPath);
+    
+    if (result.success) {
+      // Re-run orchestration detection to update appendOrchestration state
+      invoke('read_file_content', { path: `${currentPath}/.orchestration/orchestration.md` })
+        .then(() => {
+          setAppendOrchestration(true);
+          calculateOrchestrationEstimate(currentPath);
+        })
+        .catch(() => {
+          setAppendOrchestration(false);
+          setOrchestrationTokenEstimate(null);
+        });
+      
+      setOrchestrationPromptOpen(false);
+    }
+  }, [currentPath, orchestrationCheck, calculateOrchestrationEstimate]);
+
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd);
 
@@ -510,6 +538,35 @@ function App() {
       })
       .catch(() => { setAppendOrchestration(false); setOrchestrationTokenEstimate(null); });
   }, [detectedCwd, calculateOrchestrationEstimate]);
+
+  // Check orchestration whenever view mode switches to tree (agent mode)
+  useEffect(() => {
+    if (viewMode !== 'tree' || !currentPath) return;
+    
+    // Don't check again if we already checked for this path
+    if (orchestrationCheckedForPath.current === currentPath) return;
+    
+    const check = async () => {
+      const result = await orchestrationCheck.checkOrchestration(currentPath);
+      
+      if (result.status === 'missing' || result.status === 'outdated') {
+        setOrchestrationStatus(result.status);
+        setOrchestrationPromptOpen(true);
+      }
+      
+      // Mark as checked for this path
+      orchestrationCheckedForPath.current = currentPath;
+    };
+    
+    check();
+  }, [viewMode, currentPath, orchestrationCheck]);
+
+  // Reset the checked flag when path changes
+  useEffect(() => {
+    if (currentPath !== orchestrationCheckedForPath.current) {
+      orchestrationCheckedForPath.current = null;
+    }
+  }, [currentPath]);
 
   // Keyboard shortcuts (must come after orchestration functions)
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
@@ -937,11 +994,12 @@ function App() {
           settings.setAutoCommitCustomPrompt(customPrompt);
         }}
       />
-      <SplashScreen
-        visible={splashVisible}
-        projectName={splashProjectName}
-        currentStep={splashStep}
-        onComplete={() => setSplashVisible(false)}
+      <OrchestrationPrompt
+        open={orchestrationPromptOpen}
+        onOpenChange={setOrchestrationPromptOpen}
+        status={orchestrationStatus}
+        onInstall={handleOrchestrationInstall}
+        installing={orchestrationCheck.installing}
       />
       <ToastContainer />
     </SidebarProvider>
