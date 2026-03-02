@@ -776,52 +776,6 @@ export function InstanceSyncPanel({
     );
   }
 
-  function ReviewPromptView() {
-    const labels = { ui: 'UI', backend: 'Backend', db: 'Database' };
-    const label = labels[generatedPrompt?.type] || generatedPrompt?.type;
-    
-    return (
-      <div className="flex flex-col h-full px-5 pb-5">
-        {/* Breadcrumb navigation */}
-        <div className="flex items-center gap-2 px-1 pb-3">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleCancelPrompt}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            Back to messages
-          </Button>
-          <span className="text-muted-foreground/40 font-mono text-xs">/</span>
-          <span className="text-xs font-mono text-foreground truncate">
-            Review {label} Prompt
-          </span>
-        </div>
-
-        <Separator />
-
-        {/* Prompt content */}
-        <div className="flex-1 overflow-y-auto min-h-0 py-4">
-          <div className="bg-muted/30 rounded-lg p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
-            {generatedPrompt?.prompt}
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Action buttons */}
-        <div className="flex items-center justify-end gap-2 px-1 py-3">
-          <Button variant="ghost" size="sm" onClick={handleCancelPrompt}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSendToTextarea}>
-            <ArrowUpRight className="w-4 h-4 mr-1.5" />
-            Send to Textarea
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -836,7 +790,9 @@ export function InstanceSyncPanel({
                 </DialogDescription>
               </DialogHeader>
               <div className="flex-1 overflow-hidden h-[calc(85vh-100px)]">
-                <GeneratingView />
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
               </div>
             </>
           ) : generatedPrompt ? (
@@ -848,7 +804,45 @@ export function InstanceSyncPanel({
                 </DialogDescription>
               </DialogHeader>
               <div className="flex-1 overflow-hidden h-[calc(85vh-100px)]">
-                <ReviewPromptView />
+                <div className="flex flex-col h-full px-5 pb-5">
+                  {/* Breadcrumb navigation */}
+                  <div className="flex items-center gap-2 px-1 pb-3">
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={handleCancelPrompt}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      Back to messages
+                    </Button>
+                    <span className="text-muted-foreground/40 font-mono text-xs">/</span>
+                    <span className="text-xs font-mono text-foreground truncate">
+                      Review {{ ui: 'UI', backend: 'Backend', db: 'Database' }[generatedPrompt?.type] || generatedPrompt?.type} Prompt
+                    </span>
+                  </div>
+
+                  <Separator />
+
+                  {/* Prompt content */}
+                  <div className="flex-1 overflow-y-auto min-h-0 py-4">
+                    <div className="bg-muted/30 rounded-lg p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                      {generatedPrompt?.prompt}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Action buttons */}
+                  <div className="flex items-center justify-end gap-2 px-1 py-3">
+                    <Button variant="ghost" size="sm" onClick={handleCancelPrompt}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSendToTextarea}>
+                      <ArrowUpRight className="w-4 h-4 mr-1.5" />
+                      Send to Textarea
+                    </Button>
+                  </div>
+                </div>
               </div>
             </>
           ) : (
