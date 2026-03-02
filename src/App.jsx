@@ -546,19 +546,19 @@ function App() {
     // Don't check again if we already checked for this path
     if (orchestrationCheckedForPath.current === currentPath) return;
     
-    const check = async () => {
+    // Defer so the tree view renders first and the UI doesn't freeze
+    const timeoutId = setTimeout(async () => {
       const result = await orchestrationCheck.checkOrchestration(currentPath);
-      
+
       if (result.status === 'missing' || result.status === 'outdated') {
         setOrchestrationStatus(result.status);
         setOrchestrationPromptOpen(true);
       }
-      
-      // Mark as checked for this path
+
       orchestrationCheckedForPath.current = currentPath;
-    };
-    
-    check();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [viewMode, currentPath, orchestrationCheck]);
 
   // Reset the checked flag when path changes
