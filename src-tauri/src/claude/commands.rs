@@ -225,94 +225,88 @@ pub fn get_claude_sessions(
         .join("sessions-index.json");
     eprintln!("[Claude Sessions] Looking for: {:?}", sessions_file);
 
-    if !sessions_file.exists() {
-        eprintln!(
-            "[Claude Sessions] Sessions file not found at: {:?}",
-            sessions_file
-        );
-        return Ok(ClaudeSessionsPage {
-            sessions: Vec::new(),
-            total: 0,
-            has_more: false,
-        });
-    }
-
-    let content = fs::read_to_string(&sessions_file).map_err(|e| {
-        let msg = format!(
-            "Failed to read sessions index from {:?}: {}",
-            sessions_file, e
-        );
-        eprintln!("[Claude Sessions] ERROR: {}", msg);
-        msg
-    })?;
-
-    let index: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
-        let msg = format!("Failed to parse sessions index: {}", e);
-        eprintln!("[Claude Sessions] ERROR: {}", msg);
-        msg
-    })?;
-
     let mut sessions = Vec::new();
 
-    if let Some(entries) = index.get("entries").and_then(|e| e.as_array()) {
-        eprintln!(
-            "[Claude Sessions] Found {} sessions in index",
-            entries.len()
-        );
-        for entry in entries {
-            let session = ClaudeSessionEntry {
-                session_id: entry
-                    .get("sessionId")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                full_path: entry
-                    .get("fullPath")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                first_prompt: entry
-                    .get("firstPrompt")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                summary: entry
-                    .get("summary")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                message_count: entry
-                    .get("messageCount")
-                    .and_then(|v| v.as_i64())
-                    .unwrap_or(0) as i32,
-                created: entry
-                    .get("created")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                modified: entry
-                    .get("modified")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                git_branch: entry
-                    .get("gitBranch")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                project_path: entry
-                    .get("projectPath")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                is_sidechain: entry
-                    .get("isSidechain")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
-            };
-            sessions.push(session);
+    if sessions_file.exists() {
+        let content = fs::read_to_string(&sessions_file).map_err(|e| {
+            let msg = format!(
+                "Failed to read sessions index from {:?}: {}",
+                sessions_file, e
+            );
+            eprintln!("[Claude Sessions] ERROR: {}", msg);
+            msg
+        })?;
+
+        let index: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
+            let msg = format!("Failed to parse sessions index: {}", e);
+            eprintln!("[Claude Sessions] ERROR: {}", msg);
+            msg
+        })?;
+
+        if let Some(entries) = index.get("entries").and_then(|e| e.as_array()) {
+            eprintln!(
+                "[Claude Sessions] Found {} sessions in index",
+                entries.len()
+            );
+            for entry in entries {
+                let session = ClaudeSessionEntry {
+                    session_id: entry
+                        .get("sessionId")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    full_path: entry
+                        .get("fullPath")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    first_prompt: entry
+                        .get("firstPrompt")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    summary: entry
+                        .get("summary")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    message_count: entry
+                        .get("messageCount")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0) as i32,
+                    created: entry
+                        .get("created")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    modified: entry
+                        .get("modified")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    git_branch: entry
+                        .get("gitBranch")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    project_path: entry
+                        .get("projectPath")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    is_sidechain: entry
+                        .get("isSidechain")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                };
+                sessions.push(session);
+            }
+        } else {
+            eprintln!("[Claude Sessions] No entries found in sessions index");
         }
     } else {
-        eprintln!("[Claude Sessions] No entries found in sessions index");
+        eprintln!(
+            "[Claude Sessions] No sessions-index.json found, will scan .jsonl files directly"
+        );
     }
 
     // Also scan for .jsonl files not in the index
