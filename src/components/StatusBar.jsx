@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ThemeSwitcher } from './ThemeSwitcher';
+import { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { Palette } from 'lucide-react';
 import {
-  Keyboard, Eye, EyeOff, Download, Bot, Terminal, MoreVertical,
+  Keyboard, Eye, EyeOff, Download, Bot, Terminal, Settings,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
   CheckCircle2, ListTodo, Monitor
@@ -9,12 +10,12 @@ import {
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../features/watcher';
 import { useWatcherShortcut } from '../features/watcher';
-import { useTokenBudget } from '../features/token-budget';
 import { Button } from './ui/button';
 import { Badge } from "./ui/badge.jsx"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
+  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from './ui/dropdown-menu';
 import {
   Dialog,
@@ -43,119 +44,6 @@ function CliIcon({ cli }) {
   return <Icon className="w-3 h-3" />;
 }
 
-function BudgetIndicator({ projectPath, onOpenBudgetSettings }) {
-  const { checkBudgetStatus, currentUsage, getBudget, formatCost } = useTokenBudget();
-  const [popupOpen, setPopupOpen] = useState(false);
-  const popupRef = useRef(null);
-
-  const budget = getBudget(projectPath);
-  const { status, percentage } = checkBudgetStatus(projectPath);
-
-  const closePopup = useCallback(() => setPopupOpen(false), []);
-
-  useEffect(() => {
-    if (!popupOpen) return;
-    const handleClickOutside = (e) => {
-      if (popupRef.current && !popupRef.current.contains(e.target)) closePopup();
-    };
-    const handleEsc = (e) => { if (e.key === 'Escape') closePopup(); };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEsc);
-    };
-  }, [popupOpen, closePopup]);
-
-  const barColor = STATUS_COLORS[status] || STATUS_COLORS.success;
-
-  if (!budget) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="xs" onClick={onOpenBudgetSettings} className="gap-1 px-1.5">
-            <Coins className="w-3 h-3" />
-            <span className="opacity-70 text-xs">Budget</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Set token budget</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <div className="relative">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={() => setPopupOpen(!popupOpen)}
-            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-white/10 transition-colors"
-          >
-            <Coins className="w-3 h-3" />
-            <div className="flex items-center gap-1">
-              <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, backgroundColor: barColor }} />
-              </div>
-              <span className="opacity-70">{Math.round(percentage)}%</span>
-            </div>
-            <span className="opacity-50">{formatCost(currentUsage.cost)}</span>
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>Token budget usage</TooltipContent>
-      </Tooltip>
-
-      {popupOpen && (
-        <div
-          ref={popupRef}
-          className="absolute bottom-full right-0 mb-2 w-64 rounded-md border border-border bg-popover p-3 shadow-md z-50"
-        >
-          <div className="text-xs font-medium mb-3">Token Budget</div>
-
-          {budget.dailyLimit && (
-            <div className="space-y-1 mb-3">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Today</span>
-                <span className="font-mono">{Math.round(percentage)}%</span>
-              </div>
-              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, backgroundColor: barColor }} />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground font-mono">
-                <span>{currentUsage.total.toLocaleString()} / {budget.dailyLimit.toLocaleString()}</span>
-                <span>{formatCost(currentUsage.cost)}</span>
-              </div>
-            </div>
-          )}
-
-          {budget.weeklyLimit && (
-            <div className="space-y-1 mb-3">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">This Week</span>
-                <span className="font-mono">{Math.round(Math.min((currentUsage.total / budget.weeklyLimit) * 100, 100))}%</span>
-              </div>
-              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.min((currentUsage.total / budget.weeklyLimit) * 100, 100)}%`,
-                    backgroundColor: (currentUsage.total / budget.weeklyLimit) >= 0.95 ? STATUS_COLORS.critical : (currentUsage.total / budget.weeklyLimit) >= 0.8 ? STATUS_COLORS.warning : STATUS_COLORS.success,
-                  }}
-                />
-              </div>
-              <div className="text-xs text-muted-foreground font-mono">
-                {currentUsage.total.toLocaleString()} / {budget.weeklyLimit.toLocaleString()}
-              </div>
-            </div>
-          )}
-
-          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { closePopup(); onOpenBudgetSettings(); }}>
-            Budget Settings
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function ChangelogStatus({ status }) {
   const config = useMemo(() => ({
@@ -251,6 +139,26 @@ function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
   );
 }
 
+function ThemeSwitcherMenuItem() {
+  const { currentTheme, themes, changeTheme } = useTheme();
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="cursor-pointer py-1 text-xs">
+        <Palette className="mr-2 w-3 h-3" />
+        Theme: {themes[currentTheme]?.name || 'Theme'}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="text-xs">
+        {Object.entries(themes).map(([key, t]) => (
+          <DropdownMenuItem key={key} onClick={() => changeTheme(key)} className="cursor-pointer py-1">
+            {t.name}
+            {currentTheme === key && <Check className="ml-auto w-3 h-3" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
 export const StatusBar = ({
   viewMode, currentPath, sessionId, theme, onToggleHelp,
   onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar,
@@ -343,21 +251,6 @@ export const StatusBar = ({
           </>
         )}
 
-        {/* Data & Analytics Zone */}
-        <div className="flex items-center gap-1 bg-secondary/30 rounded px-1.5 py-0.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="xs" onClick={onOpenDashboard} className="gap-1 px-1.5 h-5">
-                <BarChart3 className="w-3 h-3" />
-                <span className="opacity-70">Metrics</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Token Metrics (Ctrl+Shift+D)</TooltipContent>
-          </Tooltip>
-          <div className="w-px h-3 bg-border/30 mx-0.5" />
-          <BudgetIndicator projectPath={currentPath} onOpenBudgetSettings={onOpenBudgetSettings} />
-        </div>
-
         {/* Instance Sync Zone */}
         <InstanceSyncIndicator 
           otherInstancesCount={otherInstancesCount} 
@@ -388,19 +281,29 @@ export const StatusBar = ({
 
         {/* App Controls Zone */}
         <div className="flex items-center gap-0.5">
-          <ThemeSwitcher />
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
-                    <MoreVertical className="w-4 h-4" />
+                    <Settings className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent>Settings</TooltipContent>
             </Tooltip>
             <DropdownMenuContent align="end" className="w-100 text-xs">
+              <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
+                <BarChart3 className="mr-2 w-3 h-3" />
+                Token Metrics
+                <DropdownMenuShortcut>Ctrl+Shift+D</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenBudgetSettings} className="cursor-pointer py-1">
+                <Coins className="mr-2 w-3 h-3" />
+                Token Budget
+              </DropdownMenuItem>
+              <ThemeSwitcherMenuItem />
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1">
                 <Download className="mr-2 w-3 h-3" />
                 Add Orchestration
