@@ -117,7 +117,7 @@ export function usePromptSender({
 
       // Orchestration instruction goes first so Claude reads it before anything else
       if (appendOrchestration) {
-        fullCommand = 'Follow .orchestration/orchestration.md';
+        fullCommand = 'Read .orchestration/orchestration.md and strictly implement its protocol before proceeding.';
       }
 
       // Add compacted project at the beginning if it exists
