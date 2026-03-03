@@ -44,9 +44,16 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
 
         // On Linux, read /proc/[pid]/cwd symlink
         let cwd_link = format!("/proc/{}/cwd", target_pid);
-        fs::read_link(&cwd_link)
+        let real_path = fs::read_link(&cwd_link)
             .map(|p| p.to_string_lossy().to_string())
-            .map_err(|e| format!("Failed to read cwd from /proc: {}", e))
+            .map_err(|e| format!("Failed to read cwd from /proc: {}", e))?;
+
+        // If workspace is active, translate real path to workspace-relative symlink path
+        if let Some(ref ctx) = state_lock.workspace_context {
+            Ok(crate::workspace::manager::translate_path(&real_path, &ctx.path_map))
+        } else {
+            Ok(real_path)
+        }
     }
 
     #[cfg(target_os = "windows")]

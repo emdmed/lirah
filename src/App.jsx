@@ -57,6 +57,9 @@ import { useSidebar } from "./hooks/useSidebar";
 import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
 import { InstanceSyncPanel } from "./features/instance-sync/InstanceSyncPanel";
+import { useWorkspace } from "./hooks/useWorkspace";
+import { WorkspaceDialog } from "./components/WorkspaceDialog";
+import { WorkspaceProjectPicker } from "./components/WorkspaceProjectPicker";
 
 function App() {
   const { theme } = useTheme();
@@ -147,6 +150,12 @@ function App() {
 
   const branchTasks = useBranchTasks(settings.selectedCli);
 
+  // Workspace state
+  const workspaceHook = useWorkspace();
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectPickerAction, setProjectPickerAction] = useState(null); // 'lazygit' | 'autocommit'
+
   // Instance sync state
   const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
   const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
@@ -180,6 +189,33 @@ function App() {
     initializeSearch: sidebarSearch.initializeSearch,
     searchResults: sidebarSearch.searchResults,
   });
+
+  // Workspace navigation (after treeView is declared)
+  const navigateToWorkspace = useCallback(async (workspacePath) => {
+    if (!terminalSessionId) return;
+    try {
+      const safePath = escapeShellPath(workspacePath);
+      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+      if (viewMode === 'flat') await loadFolders();
+      else if (viewMode === 'tree') await treeView.loadTreeData();
+    } catch (error) {
+      console.error('Failed to navigate to workspace:', error);
+    }
+  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData]);
+
+  const handleCreateWorkspace = useCallback(async (name, projects) => {
+    const info = await workspaceHook.createWorkspace(name, projects);
+    if (info?.path) await navigateToWorkspace(info.path);
+    return info;
+  }, [workspaceHook.createWorkspace, navigateToWorkspace]);
+
+  const handleOpenWorkspace = useCallback(async (workspacePath) => {
+    const info = await workspaceHook.openWorkspace(workspacePath);
+    if (info?.path) await navigateToWorkspace(info.path);
+    return info;
+  }, [workspaceHook.openWorkspace, navigateToWorkspace]);
 
   // Auto-expand search results when they change
   useEffect(() => {
@@ -611,7 +647,7 @@ function App() {
 
   // Show initial project dialog
   useEffect(() => {
-    if (terminalSessionId && bookmarks.length > 0) dialogs.setInitialProjectDialogOpen(true);
+    if (terminalSessionId && (bookmarks.length > 0 || workspaceHook.workspaces.length > 0)) dialogs.setInitialProjectDialogOpen(true);
   }, [terminalSessionId]);
 
   // Reload sidebar when CWD changes
@@ -630,6 +666,7 @@ function App() {
   const viewModeRef = useRef(viewMode);
   const sidebarOpenRef = useRef(sidebar.sidebarOpen);
   const autoCommitStageRef = useRef(autoCommit.stage);
+  const workspaceRef = useRef(workspaceHook.workspace);
   
   useEffect(() => {
     viewModeRef.current = viewMode;
@@ -644,6 +681,10 @@ function App() {
   }, [autoCommit.stage]);
 
   useEffect(() => {
+    workspaceRef.current = workspaceHook.workspace;
+  }, [workspaceHook.workspace]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === '`') {
         e.preventDefault();
@@ -655,7 +696,12 @@ function App() {
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'l') {
         e.preventDefault();
         e.stopPropagation();
-        secondary.openWithCommand('lazygit');
+        if (workspaceRef.current?.projects?.length) {
+          setProjectPickerAction('lazygit');
+          setProjectPickerOpen(true);
+        } else {
+          secondary.openWithCommand('lazygit');
+        }
         return;
       }
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'n') {
@@ -684,7 +730,12 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === ' ') {
         e.preventDefault();
         if (autoCommitStageRef.current === 'idle') {
-          autoCommit.trigger(currentPathRef.current);
+          if (workspaceRef.current?.projects?.length) {
+            setProjectPickerAction('autocommit');
+            setProjectPickerOpen(true);
+          } else {
+            autoCommit.trigger(currentPathRef.current);
+          }
         } else {
           autoCommit.quickCommit();
         }
@@ -823,6 +874,9 @@ function App() {
             branchTasksOpen={dialogs.branchTasksOpen}
             otherInstancesCount={deduplicatedOtherInstancesCount}
             onToggleInstanceSyncPanel={() => setInstanceSyncPanelOpen(prev => !prev)}
+            workspace={workspaceHook.workspace}
+            onOpenWorkspaceDialog={() => setWorkspaceDialogOpen(true)}
+            onCloseWorkspace={workspaceHook.closeWorkspace}
           />
         }
         secondaryTerminal={
@@ -835,7 +889,7 @@ function App() {
               onClose={secondary.closeSecondaryTerminal}
               onFocusChange={secondary.setSecondaryFocused}
               onSessionReady={secondary.setSecondarySessionId}
-              projectDir={currentPath}
+              projectDir={secondary.projectDirOverride || currentPath}
               fullscreen={secondary.secondaryFullscreen}
               onToggleFullscreen={() => secondary.setSecondaryFullscreen(f => !f)}
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
@@ -934,6 +988,8 @@ function App() {
         open={dialogs.initialProjectDialogOpen}
         onOpenChange={dialogs.setInitialProjectDialogOpen}
         onSelectProject={handleSelectProject}
+        workspaces={workspaceHook.workspaces}
+        onOpenWorkspace={handleOpenWorkspace}
       />
       <CliSelectionModal
         open={dialogs.cliSelectionModalOpen}
@@ -986,6 +1042,33 @@ function App() {
         theme={theme}
       />
       <AutoCommitDialog autoCommit={autoCommit} />
+      <WorkspaceDialog
+        open={workspaceDialogOpen}
+        onOpenChange={setWorkspaceDialogOpen}
+        onCreateWorkspace={handleCreateWorkspace}
+        existingWorkspaces={workspaceHook.workspaces}
+        onOpenWorkspace={handleOpenWorkspace}
+        onDeleteWorkspace={workspaceHook.deleteWorkspace}
+      />
+      {projectPickerOpen && workspaceHook.workspace?.projects && (
+        <WorkspaceProjectPicker
+          projects={workspaceHook.workspace.projects}
+          onSelect={(project) => {
+            setProjectPickerOpen(false);
+            const path = project.real_path || project.path;
+            if (projectPickerAction === 'lazygit') {
+              secondary.openWithCommand('lazygit', path);
+            } else if (projectPickerAction === 'autocommit') {
+              autoCommit.trigger(path);
+            }
+            setProjectPickerAction(null);
+          }}
+          onCancel={() => {
+            setProjectPickerOpen(false);
+            setProjectPickerAction(null);
+          }}
+        />
+      )}
       <AutoCommitConfigDialog
         open={autoCommitConfigOpen}
         onOpenChange={setAutoCommitConfigOpen}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,9 +6,9 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { useBookmarks } from '../features/bookmarks';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Layers } from 'lucide-react';
 
-export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
+export function InitialProjectDialog({ open, onOpenChange, onSelectProject, workspaces, onOpenWorkspace }) {
   const { bookmarks } = useBookmarks();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selectedItemRef = useRef(null);
@@ -17,6 +17,25 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
   const sortedBookmarks = [...bookmarks].sort((a, b) =>
     (b.lastAccessedAt || 0) - (a.lastAccessedAt || 0)
   );
+
+  // Combined list: workspaces first, then bookmarks
+  const items = useMemo(() => {
+    const wsItems = (workspaces || []).map(ws => ({
+      type: 'workspace',
+      id: ws.id,
+      name: ws.name,
+      subtitle: ws.projects.map(p => p.name).join(', '),
+      data: ws,
+    }));
+    const bkItems = sortedBookmarks.map(b => ({
+      type: 'bookmark',
+      id: b.id,
+      name: b.name,
+      subtitle: b.path,
+      data: b,
+    }));
+    return [...wsItems, ...bkItems];
+  }, [workspaces, sortedBookmarks]);
 
   // Reset selection when dialog opens
   useEffect(() => {
@@ -42,14 +61,14 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex(prev => Math.min(prev + 1, sortedBookmarks.length - 1));
+        setSelectedIndex(prev => Math.min(prev + 1, items.length - 1));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex(prev => Math.max(prev - 1, 0));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (sortedBookmarks[selectedIndex]) {
-          handleSelectBookmark(sortedBookmarks[selectedIndex]);
+        if (items[selectedIndex]) {
+          handleSelectItem(items[selectedIndex]);
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -59,12 +78,14 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, selectedIndex, sortedBookmarks, onOpenChange]);
+  }, [open, selectedIndex, items, onOpenChange]);
 
-  const handleSelectBookmark = async (bookmark) => {
+  const handleSelectItem = async (item) => {
     onOpenChange(false);
-    if (onSelectProject) {
-      onSelectProject(bookmark);
+    if (item.type === 'workspace' && onOpenWorkspace) {
+      onOpenWorkspace(item.data.path);
+    } else if (item.type === 'bookmark' && onSelectProject) {
+      onSelectProject(item.data);
     }
   };
 
@@ -89,7 +110,7 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
         </DialogHeader>
 
         <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-md p-2 border-sketch">
-          {sortedBookmarks.length === 0 ? (
+          {items.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm opacity-50">
               <div className="text-center">
                 <p>No bookmarks yet.</p>
@@ -99,11 +120,11 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
               </div>
             </div>
           ) : (
-            sortedBookmarks.map((bookmark, index) => (
+            items.map((item, index) => (
               <button
-                key={bookmark.id}
+                key={item.id}
                 ref={index === selectedIndex ? selectedItemRef : null}
-                onClick={() => handleSelectBookmark(bookmark)}
+                onClick={() => handleSelectItem(item)}
                 className={`flex flex-col items-start gap-1 px-4 py-3 text-left font-mono border border-sketch shadow-xs transition-colors ${
                   index === selectedIndex
                     ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-0'
@@ -111,8 +132,11 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject }) {
                 }`}
                 style={{ backgroundColor: 'var(--color-input-background)' }}
               >
-                <span className="font-medium">{bookmark.name}</span>
-                <span className="text-xs opacity-50">{bookmark.path}</span>
+                <span className="font-medium flex items-center gap-2">
+                  {item.type === 'workspace' && <Layers className="w-3 h-3 opacity-50" />}
+                  {item.name}
+                </span>
+                <span className="text-xs opacity-50">{item.subtitle}</span>
               </button>
             ))
           )}

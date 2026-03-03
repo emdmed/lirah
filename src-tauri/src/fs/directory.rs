@@ -133,7 +133,7 @@ pub fn read_directory_recursive(
     // Walk directory tree
     for entry in WalkDir::new(&root_path)
         .max_depth(max_depth)
-        .follow_links(false) // Don't follow symlinks
+        .follow_links(true) // Follow symlinks (needed for workspace symlinked projects)
         .into_iter()
         .filter_entry(|e| {
             // Skip ignored directories
@@ -187,11 +187,6 @@ pub fn read_directory_recursive(
             Ok(e) => {
                 // Skip the root directory itself
                 if e.path() == root_path {
-                    continue;
-                }
-
-                // Skip symlinks
-                if e.path_is_symlink() {
                     continue;
                 }
 

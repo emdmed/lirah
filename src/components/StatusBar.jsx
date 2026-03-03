@@ -5,7 +5,7 @@ import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, Settings,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
-  CheckCircle2, ListTodo, Monitor
+  CheckCircle2, ListTodo, Monitor, Layers, X
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../features/watcher';
@@ -166,7 +166,8 @@ export const StatusBar = ({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
-  onToggleBranchTasks, branchTasksOpen, otherInstancesCount, onToggleInstanceSyncPanel
+  onToggleBranchTasks, branchTasksOpen, otherInstancesCount, onToggleInstanceSyncPanel,
+  workspace, onOpenWorkspaceDialog, onCloseWorkspace
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
@@ -216,6 +217,19 @@ export const StatusBar = ({
         <span className="overflow-hidden whitespace-nowrap text-ellipsis">
           {currentPath ? currentPath.split('/').pop() || '~' : '~'}
         </span>
+        {workspace && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="xs" onClick={onOpenWorkspaceDialog} className="gap-1 px-1.5 h-5">
+                <Layers className="w-3 h-3" />
+                <span className="opacity-70">{workspace.name}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Workspace: {workspace.projects.map(p => p.name).join(' + ')}
+            </TooltipContent>
+          </Tooltip>
+        )}
         {branchName && (
           <Badge variant="secondary">
             {branchName}
@@ -336,6 +350,17 @@ export const StatusBar = ({
                 {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
                 Title Bar: {showTitleBar ? 'ON' : 'OFF'}
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onOpenWorkspaceDialog} className="cursor-pointer py-1">
+                <Layers className="mr-2 w-3 h-3" />
+                {workspace ? `Workspace: ${workspace.name}` : 'Workspaces...'}
+              </DropdownMenuItem>
+              {workspace && (
+                <DropdownMenuItem onClick={onCloseWorkspace} className="cursor-pointer py-1">
+                  <X className="mr-2 w-3 h-3" />
+                  Close Workspace
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

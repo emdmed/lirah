@@ -15,11 +15,15 @@ export function useSecondaryTerminal(terminalRef) {
     setSecondaryFocused(false);
     setSecondaryFullscreen(false);
     setPendingCommand(null);
+    setProjectDirOverride(null);
     setSecondaryKey(k => k + 1);
   }, []);
 
-  const openWithCommand = useCallback((command) => {
+  const [projectDirOverride, setProjectDirOverride] = useState(null);
+
+  const openWithCommand = useCallback((command, projectDir) => {
     if (secondaryVisible) closeSecondaryTerminal();
+    setProjectDirOverride(projectDir || null);
     setPendingCommand(command);
     setSecondaryVisible(true);
     setSecondaryFullscreen(true);
@@ -44,6 +48,7 @@ export function useSecondaryTerminal(terminalRef) {
     secondaryTerminalRef,
     closeSecondaryTerminal,
     handlePickerVisibilityChange,
+    projectDirOverride,
     pendingCommand,
     setPendingCommand,
     openWithCommand,

@@ -12,10 +12,16 @@ pub struct PtySession {
     pub sandboxed: bool,
 }
 
+pub struct WorkspaceContext {
+    pub workspace_path: String,
+    pub path_map: HashMap<String, String>,
+}
+
 pub struct AppStateData {
     pub pty_sessions: HashMap<String, PtySession>,
     pub git_cache: crate::git_cache::GitStatsCache,
     pub directory_cache: crate::directory_cache::DirectoryCache,
+    pub workspace_context: Option<WorkspaceContext>,
 }
 
 pub type AppState = Arc<Mutex<AppStateData>>;
@@ -25,5 +31,6 @@ pub fn create_state() -> AppState {
         pty_sessions: HashMap::new(),
         git_cache: crate::git_cache::GitStatsCache::new(),
         directory_cache: crate::directory_cache::DirectoryCache::new(),
+        workspace_context: None,
     }))
 }
