@@ -90,6 +90,11 @@ pub fn read_file_content(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn write_file_content(path: String, content: String) -> Result<(), String> {
+    fs::write(&path, &content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
 pub fn read_directory_recursive(
     path: Option<String>,
     max_depth: Option<usize>,

@@ -100,9 +100,43 @@ export function useOrchestrationCheck() {
     }
   }, []);
 
+  const updateOrchestration = useCallback(async (projectPath) => {
+    if (!projectPath || installingRef.current) return;
+
+    setInstalling(true);
+    installingRef.current = true;
+
+    try {
+      const response = await fetch(ORCHESTRATION_CDN_URL, {
+        method: 'GET',
+        headers: { 'Accept': 'text/plain' }
+      });
+
+      if (!response.ok) {
+        return { success: false, error: 'Failed to fetch from CDN' };
+      }
+
+      const content = await response.text();
+
+      await invoke('write_file_content', {
+        path: `${projectPath}/.orchestration/orchestration.md`,
+        content
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to update orchestration:', error);
+      return { success: false, error: error.message };
+    } finally {
+      setInstalling(false);
+      installingRef.current = false;
+    }
+  }, []);
+
   return {
     checkOrchestration,
     installOrchestration,
+    updateOrchestration,
     installing
   };
 }
