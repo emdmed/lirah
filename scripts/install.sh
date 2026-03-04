@@ -1,6 +1,7 @@
 #!/bin/bash
 # Nevo Terminal Installation Script
 # Usage: curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
+# Note: This script requires bash (not sh/dash) due to bashisms like pipefail
 
 set -euo pipefail
 
@@ -119,9 +120,9 @@ get_checksum() {
     FILENAME="$1"
     CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.sha256"
 
-    CHECKSUM=$(fetch "$CHECKSUMS_URL" 2>/dev/null | grep -F "$FILENAME" | grep -v '\.sig' | cut -d' ' -f1)
+    CHECKSUM=$(fetch "$CHECKSUMS_URL" 2>/dev/null | grep -iF "$FILENAME" | grep -v '\.sig' | cut -d' ' -f1)
     if [ -z "$CHECKSUM" ]; then
-        warn "Could not fetch checksum for $FILENAME"
+        warn "Could not fetch checksum for $FILENAME" >&2
         echo ""
     else
         echo "$CHECKSUM"
