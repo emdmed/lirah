@@ -63,64 +63,91 @@ If you use CLI agents seriously, Lirah becomes the place you run them.
 
 ## Features
 
-### File Context Selection
+### Core
 
-CLI agents are only as good as the context you give them. Lirah makes that effortless.
+- **Terminal Emulator** — Full xterm.js terminal with PTY integration, session management, and automatic CWD monitoring. The terminal is the primary interface — everything else enhances it.
+- **Secondary Terminal** — A second terminal panel for running background processes (tests, servers, git log) without leaving your main session. Pick from preset commands or type your own.
+- **Tauri Desktop App** — Native Linux desktop app built with Tauri 2. Lightweight, fast startup, custom title bar with window controls.
 
-- Select files directly from your project tree
-- Tell your agent exactly how to use each file:
-  - **Modify** — Files the agent should change
-  - **Do not modify** — Reference only, keep unchanged
-  - **Use as example** — Patterns for the agent to follow
+### File Navigation & Management
 
-No more copy-pasting paths or guessing what the model "saw". Your intent is explicit. Your results are better.
+- **File Tree View** — Hierarchical project browser with expand/collapse folders, git status badges, and file selection for AI context.
+- **Flat View Navigation** — Alternative flat directory listing with parent navigation. Quick for jumping between directories.
+- **File Search** — Filter files in the sidebar by name. Keyboard-driven with `Ctrl+F`.
+- **Git-Only Filter** — Toggle (`Ctrl+G`) to show only files with uncommitted git changes. Useful for reviewing what you've touched.
+- **File Watcher** — Monitors the filesystem for changes and auto-refreshes the sidebar tree. Toggle with `Ctrl+W`.
 
-### Smart Token Optimization
+### AI / CLI Integration
 
-Large files shouldn't eat your context window. Lirah intelligently parses JavaScript and TypeScript files to send only what's needed.
+- **CLI Selection** — Switch between CLI agents (Claude Code, opencode, etc.) with automatic availability detection.
+- **Claude Launcher** — Launch Claude Code sessions directly from within Lirah with `Ctrl+K`.
+- **Prompt Textarea Panel** — Multi-line editor for composing prompts. Attach files, apply templates, toggle orchestration context, and send everything to your CLI agent with `Ctrl+Enter`.
+- **Orchestration Protocol** — Auto-detects and installs the [claude-orchestration](https://github.com/anthropics/claude-orchestration) workflow system. Appends workflow instructions to your prompts so the agent follows structured development processes (feature, bugfix, refactor, review, etc.).
+- **Token Cost Estimator** — Shows estimated cost (input tokens × model pricing) before you send a prompt, so you know what you're spending.
 
-- **Files under 300 lines** → Just the file path (Agent reads directly if needed)
-- **Files 300-799 lines** → Function signatures and structure 
-- **Files 800+ lines** → Skeleton overview with imports, exports, and component map
-- **Clickable UI** → Cycle through view modes (Full/Symbols/Signature/Skeleton)
+### File Context & Analysis
 
-Turn a 1000-line file read into a 50-line read. The AI agent gets a map and can request specific ranges when needed.
+- **File Selection** — Click files in the tree to attach them as context to your prompt. Selected files appear in the textarea panel with per-file controls.
+- **File State Management** — Set each selected file to a state that controls how much detail is sent:
+  - **Full** — Entire file contents
+  - **Signatures** — Function signatures and structure only
+  - **Skeleton** — Imports, exports, and component map
+  - Auto-selects based on file size (< 300 lines → full, 300-799 → signatures, 800+ → skeleton).
+- **Element Picker** — Opens a dialog to pick individual symbols (functions, components, types, constants) from a file using Babel (JS/TS) or Python AST parsing. Send only the specific code you need.
+- **Type Checker** — Run TypeScript type checking on selected files and surface errors directly in the UI, without leaving Lirah.
+- **@-Mention System** — Type `@` in the textarea to search and attach files inline, similar to chat apps.
 
-Supported: `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
+### Project Compaction
 
-### Prompt Editor
+- **Project Compact** — Compresses your entire project into a token-efficient summary: imports, exports, function signatures, component props, and hook usage. Achieves ~95% token reduction.
+- **Compact Sections Dialog** — View and toggle individual sections of the compacted output. Disable irrelevant files to save more tokens.
+- **Flowchart Visualization** — Interactive dependency graph rendered from compacted output. Shows how components connect through imports with expandable nodes.
 
-Stop typing prompts one line at a time in a terminal.
+### Templates & File Groups
 
-- Multi-line textarea for complex instructions
-- Send prompts straight into your CLI agent
-- Save and reuse prompt templates across sessions
+- **Prompt Templates** — Create, edit, and select reusable prompt templates. Ships with defaults. Toggle with `Alt+Alt` (double-tap).
+- **File Groups** — Save named sets of selected files per project. Load a group to instantly restore a file selection context you use often.
 
-Write once. Reuse forever.
+### Bookmarks & Workspaces
 
-### Bidirectional Sync
+- **Bookmarks** — Save project paths as bookmarks. Access via palette (`Ctrl+P`), dropdown, or sidebar section. Navigate between projects instantly.
+- **Multi-Project Workspaces** — Group multiple projects into a workspace. Uses symlinks to create a unified directory structure. Open a workspace to see all projects in one sidebar.
 
-Lirah keeps your UI and terminal aligned at all times.
+### Git Integration
 
-- `cd` in the terminal → sidebar updates instantly
-- Click a folder in the sidebar → terminal navigates there
+- **Git Stats Badges** — Real-time added/modified/deleted indicators on files in the tree, powered by `git status`.
+- **Git Diff Viewer** — Side-by-side diff dialog with word-level highlighting, a minimap, line selection, collapsed unchanged regions, and virtualized scrolling for large diffs.
+- **Auto Commit** — Automatically stage and commit changes via your CLI agent with a configurable commit prompt.
+- **Auto Changelog** — Generates changelog entries automatically on commit triggers using your CLI agent.
+- **Branch Name Display** — Shows the current git branch in the status bar.
+- **Branch Tasks** — Tracks completed tasks per branch. View history in a dialog to see what was done on each branch.
 
-Always know where you are, without thinking about it.
+### Token Budget & Analytics
 
-### Built-In Workflow Templates
+- **Token Usage Tracking** — Monitors input, output, and cache token usage per session by reading Claude's session files.
+- **Token Budget Limits** — Set daily and weekly token limits. An alert banner appears when you're approaching or over budget.
+- **Token Dashboard** — Full analytics view with:
+  - Line charts for usage over time (daily/weekly/monthly)
+  - Model breakdown pie chart
+  - Calendar heatmap of daily usage
+  - Session efficiency metrics
+  - Historical session browser with search and filters
+- **Project Comparison** — Compare token usage and costs across all your projects.
+- **Export Reports** — Export usage data as CSV or JSON with date range filtering.
 
-Ships with [claude-orchestration](https://github.com/anthropics/claude-orchestration) integrations out of the box. Start strong instead of from scratch.
+### Instance Sync
 
-| Workflow | Use Case |
-|----------|----------|
-| Feature | New feature development |
-| Bugfix | Debug and fix issues |
-| Refactor | Code restructuring |
-| Performance | Speed optimizations |
-| Review | Code review assistance |
-| Pull Request | PR preparation |
-| Documentation | Docs generation |
-| React | React-specific variants |
+- **Instance Sync** — Discovers other Claude Code or opencode instances running on the same machine by scanning their session directories.
+- **Instance Sync Panel** — Browse other instances' sessions, read their conversation history, and generate review or continuation prompts to load their context into your current session.
+
+### UI & Theming
+
+- **Theme System** — Multiple built-in themes with runtime switching. Persisted in localStorage.
+- **Keyboard Shortcuts** — Comprehensive shortcut system. Press `Ctrl+H` to open the shortcuts dialog.
+- **Splash Screen** — Animated project initialization screen with step indicators.
+- **Toast Notifications** — Stackable notification system for success, error, warning, and info messages.
+- **Sandbox Mode** — Toggle sandboxed terminal execution from the status bar.
+- **Network Isolation** — Toggle network access for terminal sessions from the status bar.
 
 ## Development
 

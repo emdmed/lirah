@@ -543,9 +543,7 @@ function App() {
   const handleOrchestrationInstall = useCallback(async () => {
     if (!currentPath) return;
 
-    const result = orchestrationStatus === 'outdated'
-      ? await orchestrationCheck.updateOrchestration(currentPath)
-      : await orchestrationCheck.installOrchestration(currentPath);
+    const result = await orchestrationCheck.syncOrchestration(currentPath);
     
     if (result.success) {
       // Re-run orchestration detection to update appendOrchestration state

@@ -91,6 +91,9 @@ pub fn read_file_content(path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn write_file_content(path: String, content: String) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directories: {}", e))?;
+    }
     fs::write(&path, &content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
