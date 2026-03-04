@@ -195,13 +195,8 @@ install_from_source() {
     info "Installing npm dependencies..."
     npm install || error "Failed to install npm dependencies"
 
-    info "Building frontend..."
-    npm run build || error "Frontend build failed"
-
-    info "Building Tauri binary (this may take a few minutes)..."
-    cd src-tauri
-    cargo build --release 2>&1 | tail -5 || error "Cargo build failed"
-    cd ..
+    info "Building Tauri application (this may take a few minutes)..."
+    npx tauri build --no-bundle 2>&1 | tail -5 || error "Build failed"
 
     # Find the built binary
     BINARY=$(find src-tauri/target/release -maxdepth 1 -name "nevo-terminal" -o -name "$APP_NAME" 2>/dev/null | head -1)
