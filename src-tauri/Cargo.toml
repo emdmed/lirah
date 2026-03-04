@@ -1,5 +1,5 @@
 [package]
-name = "nevo-terminal"
+name = "lirah"
 version = "0.1.0"
 description = "A terminal emulator built with Tauri"
 authors = ["you"]

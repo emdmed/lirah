@@ -142,6 +142,12 @@ install_deb() {
         verify_checksum "$TMPFILE" "$CHECKSUM"
     fi
 
+    # Remove old nevo-terminal package if present (project was renamed to lirah)
+    if has_pkg "nevo-terminal"; then
+        info "Removing old 'nevo-terminal' package (renamed to lirah)..."
+        sudo apt remove -y nevo-terminal
+    fi
+
     info "Installing DEB package..."
     if command -v apt >/dev/null 2>&1; then
         sudo apt install -y "$TMPFILE"
@@ -200,11 +206,7 @@ install_from_source() {
     npx tauri build --no-bundle 2>&1 | tail -5 || error "Build failed"
 
     # Find the built binary
-    BINARY=$(find src-tauri/target/release -maxdepth 1 -name "nevo-terminal" -o -name "$APP_NAME" 2>/dev/null | head -1)
-    if [ -z "$BINARY" ]; then
-        # Check bundle directory for the binary name
-        BINARY="src-tauri/target/release/nevo-terminal"
-    fi
+    BINARY="src-tauri/target/release/$APP_NAME"
 
     if [ ! -f "$BINARY" ]; then
         error "Build succeeded but binary not found at $BINARY"
