@@ -387,6 +387,9 @@ function App() {
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProject = useCallback(async (bookmark) => {
+    // Mark current path as "checked" to prevent orchestration check
+    // from firing against the pre-navigation path (e.g. home dir)
+    orchestrationCheckedForPath.current = currentPath;
     setSplashProjectName(bookmark.name);
     setSplashStep('navigate');
     setSplashVisible(true);
@@ -433,7 +436,7 @@ function App() {
     launchClaude();
 
     setSplashStep('done');
-  }, [navigateToBookmark, switchToClaudeMode, launchClaude]);
+  }, [navigateToBookmark, switchToClaudeMode, launchClaude, currentPath]);
 
   // Git changes handler (needs currentPath for incremental updates)
   const handleGitChanges = useCallback((changes) => {
@@ -577,14 +580,16 @@ function App() {
 
   // Check orchestration whenever view mode switches to tree (agent mode)
   useEffect(() => {
-    if (viewMode !== 'tree' || !currentPath) return;
-    
+    if (!currentPath || !currentPath.startsWith('/') || !terminalReady || dialogs.initialProjectDialogOpen) return;
+
     // Don't check again if we already checked for this path
     if (orchestrationCheckedForPath.current === currentPath) return;
-    
-    // Defer so the tree view renders first and the UI doesn't freeze
+
+    // Defer so the UI renders first and doesn't freeze
     const timeoutId = setTimeout(async () => {
+      console.log('[ORCH DEBUG] checking path:', currentPath);
       const result = await orchestrationCheck.checkOrchestration(currentPath);
+      console.log('[ORCH DEBUG] result:', result.status, 'for path:', currentPath);
 
       if (result.status === 'missing' || result.status === 'outdated') {
         setOrchestrationStatus(result.status);
@@ -595,14 +600,8 @@ function App() {
     }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [viewMode, currentPath, orchestrationCheck]);
+  }, [currentPath, terminalReady, dialogs.initialProjectDialogOpen, orchestrationCheck]);
 
-  // Reset the checked flag when path changes
-  useEffect(() => {
-    if (currentPath !== orchestrationCheckedForPath.current) {
-      orchestrationCheckedForPath.current = null;
-    }
-  }, [currentPath]);
 
   // Keyboard shortcuts (must come after orchestration functions)
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({

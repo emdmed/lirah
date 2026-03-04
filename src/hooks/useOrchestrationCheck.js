@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 const ORCHESTRATION_CDN_URL = 'https://agentic-orchestration-workflows.vercel.app/orchestration/orchestration.md';
@@ -73,12 +73,12 @@ export function useOrchestrationCheck() {
     }
   }, []);
 
-  return {
+  return useMemo(() => ({
     checkOrchestration,
     syncOrchestration,
     // Keep old names as aliases for backward compat in App.jsx
     installOrchestration: syncOrchestration,
     updateOrchestration: syncOrchestration,
     installing
-  };
+  }), [checkOrchestration, syncOrchestration, installing]);
 }
