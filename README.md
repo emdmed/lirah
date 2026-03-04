@@ -8,13 +8,21 @@ Built with **Tauri 2** | **React 19** | **xterm.js** | **TypeScript**
 
 ## Installation
 
-### Quick Install (Ubuntu/Debian)
+### Quick Install
+
+**Ubuntu/Debian:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
 ```
 
-**Note**: This installer works on Ubuntu, Debian, and most Debian-based distributions. It does not work on Arch Linux or Arch-based distros.
+**Arch Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
+```
+
+On Arch-based distros, the installer builds from source to avoid AppImage EGL compatibility issues. This requires Rust, Node.js, and Tauri build dependencies (the script will prompt to install any that are missing).
 
 ### Build from Source
 
