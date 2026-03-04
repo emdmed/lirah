@@ -182,6 +182,73 @@ install_rpm() {
     info "Installation complete!"
 }
 
+# Install by building from source (for Arch-based distros where AppImage has EGL issues)
+install_from_source() {
+    BUILD_DIR=$(mktemp -d)
+    info "Building from source in $BUILD_DIR..."
+
+    info "Cloning repository (tag: $VERSION)..."
+    git clone --depth 1 --branch "$VERSION" "https://github.com/$REPO.git" "$BUILD_DIR/lirah" || error "Failed to clone repository"
+
+    cd "$BUILD_DIR/lirah"
+
+    info "Installing npm dependencies..."
+    npm install || error "Failed to install npm dependencies"
+
+    info "Building Tauri application (this may take a few minutes)..."
+    npx tauri build 2>&1 | tail -5 || error "Build failed"
+
+    # Find the built binary
+    BINARY=$(find src-tauri/target/release -maxdepth 1 -name "nevo-terminal" -o -name "$APP_NAME" 2>/dev/null | head -1)
+    if [ -z "$BINARY" ]; then
+        # Check bundle directory for the binary name
+        BINARY="src-tauri/target/release/nevo-terminal"
+    fi
+
+    if [ ! -f "$BINARY" ]; then
+        error "Build succeeded but binary not found at $BINARY"
+    fi
+
+    INSTALL_DIR="$HOME/.local/bin"
+    mkdir -p "$INSTALL_DIR"
+
+    cp "$BINARY" "$INSTALL_DIR/$APP_NAME"
+    chmod +x "$INSTALL_DIR/$APP_NAME"
+
+    # Create desktop entry
+    DESKTOP_DIR="$HOME/.local/share/applications"
+    mkdir -p "$DESKTOP_DIR"
+
+    cat > "$DESKTOP_DIR/${APP_NAME}.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=$DISPLAY_NAME
+Comment=GUI for Claude Code with integrated terminal and file browser
+Exec=$INSTALL_DIR/$APP_NAME
+Icon=$APP_NAME
+Terminal=false
+Categories=Development;Utility;
+StartupWMClass=$APP_NAME
+EOF
+
+    info "Binary installed to: $INSTALL_DIR/$APP_NAME"
+    info "Desktop entry created at: $DESKTOP_DIR/${APP_NAME}.desktop"
+
+    # Check if ~/.local/bin is in PATH
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *)
+            warn "~/.local/bin is not in your PATH"
+            warn "Add this to your shell config: export PATH=\"\$HOME/.local/bin:\$PATH\""
+            ;;
+    esac
+
+    # Cleanup build directory
+    rm -rf "$BUILD_DIR"
+
+    info "Installation complete! Run '$APP_NAME' from terminal or launch from your application menu."
+}
+
 # Install using AppImage (fallback)
 install_appimage() {
     # Tauri generates AppImage with format: {ProductName}_{version}_{arch}.AppImage
@@ -296,7 +363,7 @@ check_tauri_deps() {
     MISSING=0
 
     # Common tools (check via command)
-    for CMD in curl wget file; do
+    for CMD in curl wget file git; do
         if ! has_cmd "$CMD"; then
             case "$DISTRO_ID" in
                 ubuntu|debian|linuxmint|pop|elementary|zorin|kali)
@@ -467,9 +534,9 @@ main() {
             install_rpm
             ;;
         arch|manjaro|endeavouros|garuda|artix)
-            # Arch-based distros: try AppImage since there's no native package
-            info "Arch-based distro detected, using AppImage..."
-            install_appimage
+            # Arch-based distros: build from source to avoid AppImage EGL incompatibility
+            info "Arch-based distro detected, building from source..."
+            install_from_source
             ;;
         *)
             # Check ID_LIKE for derivatives
