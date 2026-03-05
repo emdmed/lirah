@@ -136,11 +136,8 @@ export function usePromptSender({
           getLineCount, formatFileAnalysis, getViewModeLabel
         });
 
-        if (hasTextContent) {
-          fullCommand = `${filesString}\n\n${textareaContent}`;
-        } else {
-          fullCommand = filesString;
-        }
+        const separator = fullCommand.trim() ? '\n\n' : '';
+        fullCommand = fullCommand + separator + filesString;
       }
 
       // Add selected elements from element picker
