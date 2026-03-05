@@ -220,7 +220,7 @@ export const StatusBar = ({
   return (
     <>
     <div
-      className="flex items-center justify-between px-4 py-2 border-t border-t-sketch text-xs font-mono"
+      className="flex items-center justify-between p-2 border-t border-t-sketch text-xs font-mono"
       style={{
         backgroundColor: theme.background || '#1F1F28',
         color: theme.foreground || '#DCD7BA',

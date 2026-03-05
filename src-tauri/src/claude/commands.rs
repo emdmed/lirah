@@ -2,6 +2,10 @@ use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry, Cla
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// Cached result of Claude data directory discovery
+static CLAUDE_DATA_DIR_CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 /// Environment variable override for Claude data directory
 const CLAUDE_DATA_ENV: &str = "CLAUDE_CODE_DATA_DIR";
@@ -20,81 +24,40 @@ const CLAUDE_DATA_LOCATIONS: &[&str] = &[
     ".npm/_npx/<hash>/node_modules/@anthropic-ai/claude-code/.claude", // npx global
 ];
 
-/// Find the Claude Code data directory by trying multiple locations
+/// Find the Claude Code data directory by trying multiple locations (cached after first discovery)
 fn find_claude_data_dir() -> Option<PathBuf> {
+    CLAUDE_DATA_DIR_CACHE
+        .get_or_init(|| discover_claude_data_dir())
+        .clone()
+}
+
+/// Perform the actual filesystem discovery for Claude data directory
+fn discover_claude_data_dir() -> Option<PathBuf> {
     // 1. Check environment variable override first
     if let Ok(env_path) = env::var(CLAUDE_DATA_ENV) {
         let path = PathBuf::from(env_path);
-        eprintln!("[Claude Discovery] Trying env var: {:?}", path);
         if path.exists() {
-            eprintln!("[Claude Discovery] ✓ Found via CLAUDE_CODE_DATA_DIR");
             return Some(path);
         }
-        eprintln!("[Claude Discovery] ✗ Env var path doesn't exist");
     }
 
     // 2. Get home directory
     let home_dir = dirs::home_dir()?;
-    eprintln!("[Claude Discovery] Home directory: {:?}", home_dir);
-
-    // 2.5 Check if ~/.claude exists specifically (debugging Ubuntu issue)
-    let standard_claude = home_dir.join(".claude");
-    eprintln!(
-        "[Claude Discovery] Checking ~/.claude specifically: {:?}",
-        standard_claude
-    );
-    if standard_claude.exists() {
-        eprintln!("[Claude Discovery] ✓ ~/.claude EXISTS");
-        let projects = standard_claude.join("projects");
-        if projects.exists() {
-            eprintln!("[Claude Discovery] ✓ ~/.claude/projects EXISTS");
-            // Try to read it
-            match fs::read_dir(&projects) {
-                Ok(entries) => {
-                    let count = entries.count();
-                    eprintln!(
-                        "[Claude Discovery] ✓ Can read ~/.claude/projects, found {} entries",
-                        count
-                    );
-                }
-                Err(e) => {
-                    eprintln!("[Claude Discovery] ✗ Cannot read ~/.claude/projects: {}", e);
-                }
-            }
-        } else {
-            eprintln!("[Claude Discovery] ✗ ~/.claude/projects NOT FOUND");
-        }
-    } else {
-        eprintln!("[Claude Discovery] ✗ ~/.claude NOT FOUND");
-    }
 
     // 3. Try each location in priority order
     for location in CLAUDE_DATA_LOCATIONS {
         let path = home_dir.join(location);
-        eprintln!("[Claude Discovery] Trying: {:?}", path);
-
         if path.exists() && path.is_dir() {
-            // Verify it has a "projects" subdirectory (confirm it's a Claude data dir)
             let projects_dir = path.join("projects");
             if projects_dir.exists() && projects_dir.is_dir() {
-                eprintln!(
-                    "[Claude Discovery] ✓ Found valid Claude data directory: {:?}",
-                    path
-                );
                 return Some(path);
             }
-            eprintln!(
-                "[Claude Discovery] ~ Directory exists but no 'projects' subdir: {:?}",
-                path
-            );
         }
     }
 
     // 4. Check for npx-specific patterns (these have hash in path)
-    eprintln!("[Claude Discovery] Checking npx-specific locations...");
     let npm_dir = home_dir.join(".npm");
     if npm_dir.exists() {
-        // Look for _npx directories
         if let Ok(entries) = fs::read_dir(&npm_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -109,14 +72,9 @@ fn find_claude_data_dir() -> Option<PathBuf> {
                         .join("@anthropic-ai")
                         .join("claude-code")
                         .join(".claude");
-                    eprintln!("[Claude Discovery] Trying npx path: {:?}", claude_path);
                     if claude_path.exists() {
                         let projects_dir = claude_path.join("projects");
                         if projects_dir.exists() {
-                            eprintln!(
-                                "[Claude Discovery] ✓ Found npx Claude directory: {:?}",
-                                claude_path
-                            );
                             return Some(claude_path);
                         }
                     }
@@ -125,7 +83,6 @@ fn find_claude_data_dir() -> Option<PathBuf> {
         }
     }
 
-    eprintln!("[Claude Discovery] ✗ No Claude data directory found");
     None
 }
 
@@ -197,14 +154,8 @@ pub fn get_claude_sessions(
     let limit = limit.unwrap_or(20);
     let offset = offset.unwrap_or(0);
 
-    eprintln!(
-        "\n[Claude Sessions] Requesting sessions for: {} (limit={}, offset={})",
-        project_path, limit, offset
-    );
-
     // Encode the project path
     let encoded_path = encode_project_path(&project_path);
-    eprintln!("[Claude Sessions] Encoded path: {}", encoded_path);
 
     // Find Claude data directory
     let claude_dir = find_claude_data_dir().ok_or_else(|| {
@@ -215,7 +166,6 @@ pub fn get_claude_sessions(
             CLAUDE_DATA_LOCATIONS.join("\n"),
             CLAUDE_DATA_ENV
         );
-        eprintln!("[Claude Sessions] ERROR: {}", msg);
         msg
     })?;
 
@@ -223,7 +173,6 @@ pub fn get_claude_sessions(
         .join("projects")
         .join(&encoded_path)
         .join("sessions-index.json");
-    eprintln!("[Claude Sessions] Looking for: {:?}", sessions_file);
 
     let mut sessions = Vec::new();
 
@@ -233,21 +182,15 @@ pub fn get_claude_sessions(
                 "Failed to read sessions index from {:?}: {}",
                 sessions_file, e
             );
-            eprintln!("[Claude Sessions] ERROR: {}", msg);
             msg
         })?;
 
         let index: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
             let msg = format!("Failed to parse sessions index: {}", e);
-            eprintln!("[Claude Sessions] ERROR: {}", msg);
             msg
         })?;
 
         if let Some(entries) = index.get("entries").and_then(|e| e.as_array()) {
-            eprintln!(
-                "[Claude Sessions] Found {} sessions in index",
-                entries.len()
-            );
             for entry in entries {
                 let session = ClaudeSessionEntry {
                     session_id: entry
@@ -300,13 +243,7 @@ pub fn get_claude_sessions(
                 };
                 sessions.push(session);
             }
-        } else {
-            eprintln!("[Claude Sessions] No entries found in sessions index");
         }
-    } else {
-        eprintln!(
-            "[Claude Sessions] No sessions-index.json found, will scan .jsonl files directly"
-        );
     }
 
     // Also scan for .jsonl files not in the index
@@ -345,15 +282,6 @@ pub fn get_claude_sessions(
         sessions.into_iter().skip(offset).take(limit).collect();
 
     let has_more = offset + paginated.len() < total;
-
-    eprintln!(
-        "[Claude Sessions] Returning {} of {} sessions (offset={}, limit={}, has_more={})",
-        paginated.len(),
-        total,
-        offset,
-        limit,
-        has_more
-    );
 
     Ok(ClaudeSessionsPage {
         sessions: paginated,
@@ -509,11 +437,6 @@ pub fn get_claude_session(
     session_id: String,
     project_path: String,
 ) -> Result<ClaudeSession, String> {
-    eprintln!(
-        "\n[Claude Session] Requesting session: {} for project: {}",
-        session_id, project_path
-    );
-
     // Encode the project path
     let encoded_path = encode_project_path(&project_path);
 
@@ -525,32 +448,26 @@ pub fn get_claude_session(
         .join(&encoded_path)
         .join(format!("{}.jsonl", session_id));
 
-    eprintln!("[Claude Session] Looking for: {:?}", session_file);
-
     if !session_file.exists() {
-        let msg = format!("Session file not found: {:?}", session_file);
-        eprintln!("[Claude Session] ERROR: {}", msg);
-        return Err(msg);
+        return Err(format!("Session file not found: {:?}", session_file));
     }
 
     use std::io::{BufRead, BufReader};
     let file = std::fs::File::open(&session_file).map_err(|e| {
-        let msg = format!("Failed to open session file: {}", e);
-        eprintln!("[Claude Session] ERROR: {}", msg);
-        msg
+        format!("Failed to open session file: {}", e)
     })?;
     let reader = BufReader::new(file);
 
     let mut messages = Vec::new();
     let mut summary = None;
-    let mut line_count = 0;
+
 
     for line_result in reader.lines() {
         let line = match line_result {
             Ok(l) => l,
             Err(_) => continue,
         };
-        line_count += 1;
+
         if line.trim().is_empty() {
             continue;
         }
@@ -638,12 +555,6 @@ pub fn get_claude_session(
             }
         }
     }
-
-    eprintln!(
-        "[Claude Session] Parsed {} lines, extracted {} messages",
-        line_count,
-        messages.len()
-    );
 
     Ok(ClaudeSession {
         session_id,

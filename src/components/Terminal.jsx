@@ -53,7 +53,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
   return (
     <div
 
-      className={`p-2 mt-2 terminal-wrapper ${isFocused
+      className={`mt-2 terminal-wrapper ${isFocused
         ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-2'
         : ''
         }`}
