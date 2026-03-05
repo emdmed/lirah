@@ -34,6 +34,8 @@ export function LeftSidebar({
   onViewDiff,
   onGitChanges,
   onOpenElementPicker,
+  keepFilesAfterSend,
+  onToggleKeepFiles,
 }) {
   const {
     selectedFiles, toggleFileSelection, filesWithRelativePaths,
@@ -119,6 +121,8 @@ export function LeftSidebar({
               setFileViewMode={setFileViewMode}
               fileSymbols={symbols}
               VIEW_MODES={VIEW_MODES}
+              keepFilesAfterSend={keepFilesAfterSend}
+              onToggleKeepFiles={onToggleKeepFiles}
             />
           )}
         </SidebarContent>

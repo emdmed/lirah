@@ -120,10 +120,11 @@ export function usePromptSender({
         fullCommand = 'Read .orchestration/orchestration.md and strictly implement its protocol before proceeding.';
       }
 
-      // Add compacted project at the beginning if it exists
+      // Add compacted project file path with instructions to grep inside it
       if (hasCompactedProject) {
         const separator = fullCommand.trim() ? '\n\n' : '';
-        fullCommand = fullCommand + separator + compactedProject.output;
+        const relativePath = compactedProject.filePath.replace(currentPath + '/', '');
+        fullCommand = fullCommand + separator + `Grep inside ${relativePath} for relevant symbols/code before proceeding.`;
       }
 
       if (hasTextContent) {

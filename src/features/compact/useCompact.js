@@ -23,6 +23,31 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
       if (!result) return;
 
       const { output, originalSize } = result;
+      
+      // Save compacted output to .orchestration/tools/
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const projectName = currentPath.split('/').pop() || 'project';
+      const fileName = `compacted_${projectName}_${timestamp}.md`;
+      const filePath = `${currentPath}/.orchestration/tools/${fileName}`;
+      
+      // Ensure directory exists
+      try {
+        await invoke('read_directory', { path: `${currentPath}/.orchestration/tools` });
+      } catch {
+        // Directory might not exist, create it
+        try {
+          await invoke('write_file_content', { 
+            path: `${currentPath}/.orchestration/tools/.gitkeep`, 
+            content: '' 
+          });
+        } catch (dirErr) {
+          console.warn('Could not create .orchestration/tools directory:', dirErr);
+        }
+      }
+      
+      // Write the compacted content to file
+      await invoke('write_file_content', { path: filePath, content: output });
+      
       const compactedTokens = estimateTokens(output);
       const originalTokens = Math.ceil(originalSize / 4);
       const fileCount = (output.match(/^## /gm) || []).length;
@@ -31,7 +56,9 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
         : 0;
 
       const compacted = {
-        output,
+        filePath,
+        fileName,
+        output, // Keep for backward compatibility with CompactSectionsDialog
         fullOutput: output,
         fileCount,
         tokenEstimate: compactedTokens,
@@ -48,7 +75,7 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
       console.error('Failed to compact project:', error);
       return null;
     }
-  }, [isCompacting, currentPath, allFiles, compactProject]);
+  }, [isCompacting, currentPath, allFiles, compactProject, setTextareaVisible]);
 
   const handleCancelCompact = useCallback(() => {
     setCompactedProject(null);

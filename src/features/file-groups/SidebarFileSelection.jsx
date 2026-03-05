@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 import { Button } from "../../components/ui/button";
+import { Checkbox } from "../../components/ui/checkbox";
 import { SelectedFileItem } from "../../components/textarea-panel/SelectedFileItem";
 import { useFileListKeyboardNav } from "../../hooks/useFileListKeyboardNav";
 import { Badge } from "../../components/ui/badge";
@@ -36,7 +37,9 @@ export function SidebarFileSelection({
   getViewModeLabel,
   setFileViewMode,
   fileSymbols,
-  VIEW_MODES
+  VIEW_MODES,
+  keepFilesAfterSend = false,
+  onToggleKeepFiles,
 }) {
   const { theme } = useTheme();
 
@@ -111,15 +114,30 @@ export function SidebarFileSelection({
             {filesWithRelativePaths.length}
           </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClearAllFiles}
-          className="h-6 px-2 text-xs"
-        >
-          <X className="w-3 h-3 mr-1" />
-          Clear
-        </Button>
+        <div className="flex items-center gap-2">
+          {onToggleKeepFiles && (
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id="keep-files-sidebar"
+                checked={keepFilesAfterSend}
+                onCheckedChange={onToggleKeepFiles}
+                className="h-3.5 w-3.5"
+              />
+              <label htmlFor="keep-files-sidebar" className="text-muted-foreground cursor-pointer select-none text-[10px]">
+                keep
+              </label>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearAllFiles}
+            className="h-6 px-2 text-xs"
+          >
+            <X className="w-3 h-3 mr-1" />
+            Clear
+          </Button>
+        </div>
       </div>
 
       <div

@@ -39,7 +39,7 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
     return (
       <Badge
         variant="outline"
-        className="text-[10px] px-1.5 py-0.5 gap-1 font-semibold font-mono border border-sketch rounded-none whitespace-nowrap animate-pulse bg-primary/15 text-primary"
+        size="icon"
       >
         {config.Component ? (
           <config.Component {...config.props} />
@@ -56,10 +56,9 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           onClick={onClick}
           disabled={disabled}
-          className="text-muted-foreground hover:text-foreground transition-colors"
         >
           <Layers className="h-3 w-3" />
         </Button>

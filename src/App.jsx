@@ -774,6 +774,8 @@ function App() {
               onViewDiff={viewFileDiff}
               onGitChanges={handleGitChanges}
               onOpenElementPicker={elementPicker.handleOpenElementPicker}
+              keepFilesAfterSend={settings.keepFilesAfterSend}
+              onToggleKeepFiles={settings.setKeepFilesAfterSend}
             />
           )
         }
@@ -788,8 +790,6 @@ function App() {
               disabled={!terminalSessionId}
               selectedFiles={fileSelection.selectedFiles}
               currentPath={currentPath}
-              keepFilesAfterSend={settings.keepFilesAfterSend}
-              onToggleKeepFiles={settings.setKeepFilesAfterSend}
               selectedTemplateId={selectedTemplateId}
               onSelectTemplate={setSelectedTemplateId}
               onManageTemplates={() => dialogs.setManageTemplatesDialogOpen(true)}

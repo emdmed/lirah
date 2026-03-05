@@ -10,7 +10,7 @@ import { CompactSectionsDialog } from "../../features/compact";
 import { FlowchartDialog } from "../../features/compact";
 import { buildGraphData } from "../../features/compact";
 import { AtMentionModal } from "../../features/at-mention";
-import { X, Map, Send, Coins } from "lucide-react";
+import { X, Map, Send, Coins, Settings, Folder, MessageSquare } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
 import { TokenCostEstimate } from "../../features/token-budget";
 import { useTokenBudget } from "../../features/token-budget";
@@ -64,8 +64,6 @@ export function TextareaPanel({
   disabled = false,
   selectedFiles,
   currentPath,
-  keepFilesAfterSend = false,
-  onToggleKeepFiles,
   selectedTemplateId,
   onSelectTemplate,
   onManageTemplates,
@@ -135,11 +133,6 @@ export function TextareaPanel({
   }, [compactedProject]);
 
   const sortedAtMentionResults = atMentionResults || [];
-
-  const handleCompactAndFlowchart = useCallback(async () => {
-    const result = await onCompactProject();
-    if (result) setFlowchartOpen(true);
-  }, [onCompactProject]);
 
   const handleKeyDown = useCallback((e) => {
     if (atMentionActive && sortedAtMentionResults.length > 0) {
@@ -236,44 +229,11 @@ export function TextareaPanel({
           </Tooltip>
         </div>
       )}
-      {onToggleOrchestration && onToggleKeepFiles && !isWide && (
-        <div className="w-px h-3 bg-border/30" />
-      )}
-      {onToggleKeepFiles && (
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="keep-files"
-            checked={keepFilesAfterSend}
-            onCheckedChange={onToggleKeepFiles}
-            disabled={disabled}
-          />
-          <label htmlFor="keep-files" className="text-muted-foreground cursor-pointer select-none text-xs">
-            keep files
-          </label>
-        </div>
-      )}
     </div>
   );
 
   const projectZone = (
     <div className={`flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1 ${isWide ? 'flex-wrap' : ''}`}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCompactAndFlowchart}
-            disabled={disabled || isCompacting}
-            className="text-muted-foreground hover:text-foreground transition-colors px-1.5"
-          >
-            <Map className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={8}>
-          <span className="text-xs">Compact & open flowchart</span>
-        </TooltipContent>
-      </Tooltip>
-      <div className="w-px h-3 bg-border/30" />
       <CompactProjectButton
         onClick={onCompactProject}
         isCompacting={isCompacting}
@@ -340,51 +300,71 @@ export function TextareaPanel({
   );
 
   const compactedIndicator = compactedProject && (
-    <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 border border-primary/20 rounded w-fit text-xs">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-secondary/30 border border-sketch rounded-none w-fit text-xs font-mono">
       <Tooltip>
         <TooltipTrigger asChild>
           <div
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => setCompactDialogOpen(true)}
           >
-            <span className="text-primary font-medium">Project compacted</span>
-            <span className="text-muted-foreground">
-              {compactedProject.fileCount} files · ~{compactedProject.formattedTokens} tokens · {compactedProject.compressionPercent}% smaller
-            </span>
+            <span className="text-muted-foreground/70 uppercase text-[10px] tracking-wider border-r border-border/30 pr-2">Compacted</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-primary font-medium">{compactedProject.fileCount}</span>
+              <span className="text-muted-foreground">files</span>
+            </div>
+            <div className="w-px h-3 bg-border/50" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-primary font-medium">{compactedProject.formattedTokens}</span>
+              <span className="text-muted-foreground">tokens</span>
+            </div>
+            <div className="w-px h-3 bg-border/50" />
+            <div className="flex items-center gap-1 text-green-500/80">
+              <span className="font-medium">-{compactedProject.compressionPercent}%</span>
+              <span className="text-[10px]">saved</span>
+            </div>
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-md text-left p-3">
-          <div className="space-y-1">
-            <div>Click to toggle sections on/off</div>
-            <div className="text-muted-foreground text-xs">
-              {compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens
+          <div className="space-y-2">
+            <div className="font-medium">Click to toggle sections on/off</div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{compactedProject.formattedOriginalTokens}</span>
+              <span>→</span>
+              <span className="text-primary">{compactedProject.formattedTokens}</span>
             </div>
+            {compactedProject.fileName && (
+              <div className="text-muted-foreground text-xs truncate">
+                Saved to: {compactedProject.fileName}
+              </div>
+            )}
           </div>
         </TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setFlowchartOpen(true)}
-            className="p-0.5 h-auto text-primary hover:text-primary/80 hover:bg-white/10"
-            aria-label="View flowchart"
-          >
-            <Map className="w-3 h-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top">Flowchart</TooltipContent>
-      </Tooltip>
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={onClearCompactedProject}
-        className="p-0.5 h-auto hover:bg-white/10"
-        aria-label="Clear compacted project"
-      >
-        <X className="w-3 h-3" />
-      </Button>
+      <div className="flex items-center gap-0.5 border-l border-border/30 pl-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setFlowchartOpen(true)}
+              className="p-0.5 h-auto text-muted-foreground hover:text-primary hover:bg-white/10"
+              aria-label="View flowchart"
+            >
+              <Map className="w-3 h-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Flowchart</TooltipContent>
+        </Tooltip>
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={onClearCompactedProject}
+          className="p-0.5 h-auto text-muted-foreground hover:text-destructive hover:bg-white/10"
+          aria-label="Clear compacted project"
+        >
+          <X className="w-3 h-3" />
+        </Button>
+      </div>
     </div>
   );
 
@@ -410,6 +390,13 @@ export function TextareaPanel({
 
   const textareaArea = (
     <div className={`relative ${isWide ? 'flex-1 min-h-[200px]' : 'min-h-[120px] max-h-[300px]'}`}>
+      {/* Floating indicators overlay - doesn't affect layout */}
+      {(elementsIndicator || compactedIndicator) && (
+        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1.5 max-w-[calc(100%-80px)]">
+          {elementsIndicator}
+          {compactedIndicator}
+        </div>
+      )}
       <Textarea
         ref={textareaRef}
         value={value}
@@ -419,7 +406,7 @@ export function TextareaPanel({
         placeholder={disabled ? "Waiting for terminal session..." : "Type your command here... (Ctrl+Enter to send)"}
         aria-label="Multi-line command input"
         aria-describedby="textarea-instructions"
-        className="w-full h-full resize-none pb-10"
+        className={`w-full h-full resize-none pb-10 ${(elementsIndicator || compactedIndicator) ? 'pt-10' : ''}`}
       />
       {/* Send button inside textarea, bottom-right */}
       <div className="absolute bottom-2 right-2 flex items-center gap-2">
@@ -508,13 +495,52 @@ export function TextareaPanel({
             {textareaArea}
             {footerInfo}
           </div>
-          {/* Right: tools sidebar */}
+          {/* Right: tools sidebar - grouped by category */}
           <div className="flex flex-col gap-2 flex-1 min-w-[240px] max-w-[360px]">
-            {configZone}
-            {projectZone}
-            {promptZone}
-            {elementsIndicator}
-            {compactedIndicator}
+            {/* Orchestration Section */}
+            {onToggleOrchestration && (
+              <div className="bg-primary/10 border border-primary/30 p-2">
+                <h4 className="text-xs font-medium text-primary mb-1 flex items-center gap-1.5">
+                  <Checkbox
+                    id="orchestration-wide"
+                    checked={appendOrchestration}
+                    onCheckedChange={onToggleOrchestration}
+                    disabled={disabled}
+                    className="border-primary/50"
+                  />
+                  <label htmlFor="orchestration-wide" className="cursor-pointer select-none">
+                    Orchestration
+                    {appendOrchestration && orchestrationTokenEstimate != null && (
+                      <span className="text-primary/60 ml-1">(~{orchestrationTokenEstimate.toLocaleString()})</span>
+                    )}
+                  </label>
+                </h4>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Double-tap Ctrl to toggle</span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    {appendOrchestration && orchestrationTokenEstimate != null
+                      ? `+${orchestrationTokenEstimate.toLocaleString()} tokens`
+                      : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* Project Section */}
+            <div className="bg-secondary/30 border border-sketch p-2">
+              <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                <Folder className="w-3 h-3" /> Project
+              </h4>
+              {projectZone}
+            </div>
+            
+            {/* Prompt Section */}
+            <div className="bg-secondary/30 border border-sketch p-2">
+              <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                <MessageSquare className="w-3 h-3" /> Prompt
+              </h4>
+              {promptZone}
+            </div>
           </div>
         </div>
       </div>
@@ -534,8 +560,6 @@ export function TextareaPanel({
         </div>
       </div>
 
-      {elementsIndicator}
-      {compactedIndicator}
       {dialogs}
       {textareaArea}
 
