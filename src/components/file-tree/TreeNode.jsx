@@ -49,6 +49,7 @@ export const TreeNode = memo(function TreeNode({
   onSendToTerminal,
   onViewDiff,
   selectedFiles,
+  showGitChangesOnly,
   onToggleFileSelection,
   isTextareaPanelOpen,
   typeCheckResults,
@@ -90,6 +91,7 @@ export const TreeNode = memo(function TreeNode({
             isCurrentPath={isCurrentPath}
             stats={stats}
             isSelected={isSelected}
+            showGitChangesOnly={showGitChangesOnly}
             isTextareaPanelOpen={isTextareaPanelOpen}
             onSendToTerminal={onSendToTerminal}
             onToggleFileSelection={onToggleFileSelection}
@@ -116,6 +118,7 @@ export const TreeNode = memo(function TreeNode({
             onSendToTerminal={onSendToTerminal}
             onViewDiff={onViewDiff}
             selectedFiles={selectedFiles}
+            showGitChangesOnly={showGitChangesOnly}
             onToggleFileSelection={onToggleFileSelection}
             isTextareaPanelOpen={isTextareaPanelOpen}
             typeCheckResults={typeCheckResults}
@@ -133,6 +136,7 @@ export const TreeNode = memo(function TreeNode({
   if (prevProps.node !== nextProps.node) return false;
   if (prevProps.currentPath !== nextProps.currentPath) return false;
   if (prevProps.isTextareaPanelOpen !== nextProps.isTextareaPanelOpen) return false;
+  if (prevProps.showGitChangesOnly !== nextProps.showGitChangesOnly) return false;
   if (prevProps.onToggle !== nextProps.onToggle) return false;
   if (prevProps.onSendToTerminal !== nextProps.onSendToTerminal) return false;
   if (prevProps.onViewDiff !== nextProps.onViewDiff) return false;

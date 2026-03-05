@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { SidebarMenu } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
@@ -46,6 +46,16 @@ export function FileTree({
     return filtered;
   }, [nodes, showGitChangesOnly, gitStats]);
 
+  // When showing only git changes, clicking a file should show its diff
+  // instead of adding it to file selection
+  const handleToggleFileSelection = useCallback((filePath) => {
+    if (showGitChangesOnly && onViewDiff) {
+      onViewDiff(filePath);
+    } else {
+      onToggleFileSelection(filePath);
+    }
+  }, [showGitChangesOnly, onViewDiff, onToggleFileSelection]);
+
   if (!displayedNodes || displayedNodes.length === 0) {
     return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} />;
   }
@@ -63,7 +73,8 @@ export function FileTree({
           onSendToTerminal={onSendToTerminal}
           onViewDiff={onViewDiff}
           selectedFiles={selectedFiles}
-          onToggleFileSelection={onToggleFileSelection}
+          showGitChangesOnly={showGitChangesOnly}
+          onToggleFileSelection={handleToggleFileSelection}
           isTextareaPanelOpen={isTextareaPanelOpen}
           typeCheckResults={typeCheckResults}
           checkingFiles={checkingFiles}

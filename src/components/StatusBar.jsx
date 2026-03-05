@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Palette } from 'lucide-react';
 import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, Settings,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
-  CheckCircle2, ListTodo, Monitor, Layers, X
+  CheckCircle2, ListTodo, Monitor, Layers, X, RotateCcw
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../features/watcher';
@@ -167,13 +167,27 @@ export const StatusBar = ({
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
   onToggleBranchTasks, branchTasksOpen, otherInstancesCount, onToggleInstanceSyncPanel,
-  workspace, onOpenWorkspaceDialog, onCloseWorkspace
+  workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
   const [showNetworkConfirm, setShowNetworkConfirm] = useState(false);
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
+
+  // Ctrl+Shift+L: Clear CLI context
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (secondaryTerminalFocused) return;
+      if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onClearContext) onClearContext();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [secondaryTerminalFocused, onClearContext]);
 
   const cliName = CLI_DISPLAY[selectedCli]?.name || selectedCli;
 
@@ -286,6 +300,15 @@ export const StatusBar = ({
               <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
             </Tooltip>
           )}
+          <div className="w-px h-3 bg-border/30 mx-0.5" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="xs" onClick={onClearContext} disabled={!sessionId} className="gap-1 px-1.5 h-5">
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
+          </Tooltip>
           <div className="w-px h-3 bg-border/30 mx-0.5" />
           <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
           <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
