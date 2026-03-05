@@ -1,8 +1,7 @@
-import React, { useRef, useMemo, useState, useCallback } from "react";
+import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { Textarea } from "../ui/textarea";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
-import { ActionButtons } from "./ActionButtons";
 import { Button } from "../ui/button";
 import { TemplateSelector } from "./TemplateSelector";
 import { FileGroupsDropdown } from "../../features/file-groups";
@@ -11,7 +10,7 @@ import { CompactSectionsDialog } from "../../features/compact";
 import { FlowchartDialog } from "../../features/compact";
 import { buildGraphData } from "../../features/compact";
 import { AtMentionModal } from "../../features/at-mention";
-import { X, Map } from "lucide-react";
+import { X, Map, Send, Coins } from "lucide-react";
 import { getRelativePath } from "../../utils/pathUtils";
 import { TokenCostEstimate } from "../../features/token-budget";
 import { useTokenBudget } from "../../features/token-budget";
@@ -98,6 +97,21 @@ export function TextareaPanel({
   onSetFileState,
   onToggleFile,
 }) {
+  const containerRef = useRef(null);
+  const [isWide, setIsWide] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setIsWide(entry.contentRect.width >= 900);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const { checkBudgetStatus } = useTokenBudget();
   const budgetStatus = checkBudgetStatus(currentPath);
   const budgetExhausted = budgetStatus.status === 'critical' && budgetStatus.percentage >= 100;
@@ -182,207 +196,200 @@ export function TextareaPanel({
 
   const isSendDisabled = disabled || budgetExhausted || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0);
 
-  return (
-    <div className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        {/* Configuration Zone */}
-        <div className="flex items-center gap-3 bg-secondary/20 rounded px-2 py-1">
-          {onToggleOrchestration && (
-            <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="orchestration"
-                      checked={appendOrchestration}
-                      onCheckedChange={onToggleOrchestration}
-                      disabled={disabled}
-                    />
-                    <label htmlFor="orchestration" className="text-muted-foreground cursor-pointer select-none text-xs">
-                      orchestration
-                      {appendOrchestration && orchestrationTokenEstimate != null && (
-                        <span className="text-muted-foreground/60 ml-1">(~{orchestrationTokenEstimate.toLocaleString()})</span>
-                      )}
-                    </label>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <span className="text-xs">
-                    {appendOrchestration && orchestrationTokenEstimate != null
-                      ? `Adds ~${orchestrationTokenEstimate.toLocaleString()} tokens to prompt`
-                      : 'Enable to append orchestration context'}
-                  </span>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-muted-foreground/40 text-[10px] cursor-help">Ctrl+Ctrl</span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <span className="text-xs">Double-tap Ctrl to toggle</span>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          )}
-          {onToggleOrchestration && onToggleKeepFiles && (
-            <div className="w-px h-3 bg-border/30" />
-          )}
-          {onToggleKeepFiles && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="keep-files"
-                checked={keepFilesAfterSend}
-                onCheckedChange={onToggleKeepFiles}
-                disabled={disabled}
-              />
-              <label htmlFor="keep-files" className="text-muted-foreground cursor-pointer select-none text-xs">
-                keep files
-              </label>
-            </div>
-          )}
-        </div>
-
-        {/* Actions Zone */}
+  // Shared JSX fragments used in both layouts
+  const configZone = (
+    <div className={`flex ${isWide ? 'flex-col gap-2' : 'items-center gap-3'} bg-secondary/20 rounded px-2 py-1`}>
+      {onToggleOrchestration && (
         <div className="flex items-center gap-2">
-          {/* Project Operations */}
-          <div className="flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCompactAndFlowchart}
-                  disabled={disabled || isCompacting}
-                  className="text-muted-foreground hover:text-foreground transition-colors px-1.5"
-                >
-                  <Map className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8}>
-                <span className="text-xs">Compact & open flowchart</span>
-              </TooltipContent>
-            </Tooltip>
-            <div className="w-px h-3 bg-border/30" />
-            <CompactProjectButton
-              onClick={onCompactProject}
-              isCompacting={isCompacting}
-              progress={compactProgress}
-              disabled={disabled}
-            />
-            <div className="w-px h-3 bg-border/30" />
-            <FileGroupsDropdown
-              projectPath={projectPath}
-              onLoadGroup={onLoadGroup}
-              onSaveGroup={onSaveGroup}
-              hasSelectedFiles={fileArray.length > 0}
-            />
-          </div>
-
-          <div className="w-px h-4 bg-border/50" />
-
-          {/* Prompt Operations */}
-          <div className="flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1">
-            <TemplateSelector
-              selectedTemplateId={selectedTemplateId}
-              onSelectTemplate={onSelectTemplate}
-              onManageTemplates={onManageTemplates}
-              open={templateDropdownOpen}
-              onOpenChange={onTemplateDropdownOpenChange}
-            />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-muted-foreground/40 text-[10px] cursor-help px-1">Alt+Alt</span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <span className="text-xs">Double-tap Alt to {selectedTemplateId ? 'clear' : 'open'}</span>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-      </div>
-
-      {/* Selected elements indicator */}
-      {elementCount > 0 && (
-        <div className="flex items-center gap-2 px-2 py-1 bg-secondary border border-secondary rounded w-fit text-xs">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 cursor-default">
-                <span className="text-primary font-medium">
-                  {elementCount} element{elementCount !== 1 ? 's' : ''} selected
-                </span>
-                <span className="text-muted-foreground">
-                  from {selectedElements.size} file{selectedElements.size !== 1 ? 's' : ''}
-                </span>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="orchestration"
+                  checked={appendOrchestration}
+                  onCheckedChange={onToggleOrchestration}
+                  disabled={disabled}
+                />
+                <label htmlFor="orchestration" className="text-muted-foreground cursor-pointer select-none text-xs">
+                  orchestration
+                  {appendOrchestration && orchestrationTokenEstimate != null && (
+                    <span className="text-muted-foreground/60 ml-1">(~{orchestrationTokenEstimate.toLocaleString()})</span>
+                  )}
+                </label>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-md text-left p-3">
-              <ElementsTooltipContent selectedElements={selectedElements} currentPath={currentPath} />
-            </TooltipContent>
-          </Tooltip>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={onClearElements}
-            className="ml-auto p-0.5 h-auto hover:bg-white/10"
-            aria-label="Clear selected elements"
-          >
-            <X className="w-3 h-3" />
-          </Button>
-        </div>
-      )}
-
-      {/* Compacted project indicator */}
-      {compactedProject && (
-        <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 border border-primary/20 rounded w-fit text-xs">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setCompactDialogOpen(true)}
-              >
-                <span className="text-primary font-medium">Project compacted</span>
-                <span className="text-muted-foreground">
-                  {compactedProject.fileCount} files · ~{compactedProject.formattedTokens} tokens · {compactedProject.compressionPercent}% smaller
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-md text-left p-3">
-              <div className="space-y-1">
-                <div>Click to toggle sections on/off</div>
-                <div className="text-muted-foreground text-xs">
-                  {compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens
-                </div>
-              </div>
+            <TooltipContent side="bottom">
+              <span className="text-xs">
+                {appendOrchestration && orchestrationTokenEstimate != null
+                  ? `Adds ~${orchestrationTokenEstimate.toLocaleString()} tokens to prompt`
+                  : 'Enable to append orchestration context'}
+              </span>
             </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setFlowchartOpen(true)}
-                className="p-0.5 h-auto text-primary hover:text-primary/80 hover:bg-white/10"
-                aria-label="View flowchart"
-              >
-                <Map className="w-3 h-3" />
-              </Button>
+              <span className="text-muted-foreground/40 text-[10px] cursor-help">Ctrl+Ctrl</span>
             </TooltipTrigger>
-            <TooltipContent side="top">Flowchart</TooltipContent>
+            <TooltipContent side="bottom">
+              <span className="text-xs">Double-tap Ctrl to toggle</span>
+            </TooltipContent>
           </Tooltip>
+        </div>
+      )}
+      {onToggleOrchestration && onToggleKeepFiles && !isWide && (
+        <div className="w-px h-3 bg-border/30" />
+      )}
+      {onToggleKeepFiles && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="keep-files"
+            checked={keepFilesAfterSend}
+            onCheckedChange={onToggleKeepFiles}
+            disabled={disabled}
+          />
+          <label htmlFor="keep-files" className="text-muted-foreground cursor-pointer select-none text-xs">
+            keep files
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
+  const projectZone = (
+    <div className={`flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1 ${isWide ? 'flex-wrap' : ''}`}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCompactAndFlowchart}
+            disabled={disabled || isCompacting}
+            className="text-muted-foreground hover:text-foreground transition-colors px-1.5"
+          >
+            <Map className="h-3 w-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={8}>
+          <span className="text-xs">Compact & open flowchart</span>
+        </TooltipContent>
+      </Tooltip>
+      <div className="w-px h-3 bg-border/30" />
+      <CompactProjectButton
+        onClick={onCompactProject}
+        isCompacting={isCompacting}
+        progress={compactProgress}
+        disabled={disabled}
+      />
+      <div className="w-px h-3 bg-border/30" />
+      <FileGroupsDropdown
+        projectPath={projectPath}
+        onLoadGroup={onLoadGroup}
+        onSaveGroup={onSaveGroup}
+        hasSelectedFiles={fileArray.length > 0}
+      />
+    </div>
+  );
+
+  const promptZone = (
+    <div className="flex items-center gap-1 bg-secondary/20 rounded px-1.5 py-1">
+      <TemplateSelector
+        selectedTemplateId={selectedTemplateId}
+        onSelectTemplate={onSelectTemplate}
+        onManageTemplates={onManageTemplates}
+        open={templateDropdownOpen}
+        onOpenChange={onTemplateDropdownOpenChange}
+      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-muted-foreground/40 text-[10px] cursor-help px-1">Alt+Alt</span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <span className="text-xs">Double-tap Alt to {selectedTemplateId ? 'clear' : 'open'}</span>
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+
+  const elementsIndicator = elementCount > 0 && (
+    <div className="flex items-center gap-2 px-2 py-1 bg-secondary border border-secondary rounded w-fit text-xs">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-2 cursor-default">
+            <span className="text-primary font-medium">
+              {elementCount} element{elementCount !== 1 ? 's' : ''} selected
+            </span>
+            <span className="text-muted-foreground">
+              from {selectedElements.size} file{selectedElements.size !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-md text-left p-3">
+          <ElementsTooltipContent selectedElements={selectedElements} currentPath={currentPath} />
+        </TooltipContent>
+      </Tooltip>
+      <Button
+        variant="ghost"
+        size="xs"
+        onClick={onClearElements}
+        className="ml-auto p-0.5 h-auto hover:bg-white/10"
+        aria-label="Clear selected elements"
+      >
+        <X className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+
+  const compactedIndicator = compactedProject && (
+    <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 border border-primary/20 rounded w-fit text-xs">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setCompactDialogOpen(true)}
+          >
+            <span className="text-primary font-medium">Project compacted</span>
+            <span className="text-muted-foreground">
+              {compactedProject.fileCount} files · ~{compactedProject.formattedTokens} tokens · {compactedProject.compressionPercent}% smaller
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-md text-left p-3">
+          <div className="space-y-1">
+            <div>Click to toggle sections on/off</div>
+            <div className="text-muted-foreground text-xs">
+              {compactedProject.formattedOriginalTokens} → {compactedProject.formattedTokens} tokens
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
           <Button
             variant="ghost"
             size="xs"
-            onClick={onClearCompactedProject}
-            className="p-0.5 h-auto hover:bg-white/10"
-            aria-label="Clear compacted project"
+            onClick={() => setFlowchartOpen(true)}
+            className="p-0.5 h-auto text-primary hover:text-primary/80 hover:bg-white/10"
+            aria-label="View flowchart"
           >
-            <X className="w-3 h-3" />
+            <Map className="w-3 h-3" />
           </Button>
-        </div>
-      )}
+        </TooltipTrigger>
+        <TooltipContent side="top">Flowchart</TooltipContent>
+      </Tooltip>
+      <Button
+        variant="ghost"
+        size="xs"
+        onClick={onClearCompactedProject}
+        className="p-0.5 h-auto hover:bg-white/10"
+        aria-label="Clear compacted project"
+      >
+        <X className="w-3 h-3" />
+      </Button>
+    </div>
+  );
 
-      {/* Dialogs */}
+  const dialogs = (
+    <>
       {compactedProject && (
         <CompactSectionsDialog
           open={compactDialogOpen}
@@ -398,56 +405,142 @@ export function TextareaPanel({
           graphData={graphData}
         />
       )}
+    </>
+  );
 
-      {/* Main content area */}
-      <div className="min-h-[120px] max-h-[300px] relative">
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          placeholder={disabled ? "Waiting for terminal session..." : "Type your command here... (Ctrl+Enter to send)"}
-          aria-label="Multi-line command input"
-          aria-describedby="textarea-instructions"
-          className="w-full h-full resize-none"
-        />
-        {atMentionActive && sortedAtMentionResults.length > 0 && (
-          <AtMentionModal
-            results={atMentionResults}
-            selectedIndex={atMentionSelectedIndex}
-            onSelect={onAtMentionSelect}
-            currentPath={currentPath}
-            query={atMentionQuery}
-            selectedFiles={selectedFiles}
-            fileStates={fileStates}
-          />
-        )}
-      </div>
-
-      {/* Footer row: instructions + action buttons */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span id="textarea-instructions" className="text-muted-foreground font-mono text-xs">
-            {selectedTemplateId && !value?.trim() ? (
-              <span className="text-primary">Ctrl+Enter to send template</span>
-            ) : (
-              "Ctrl+Enter: send"
-            )}
-          </span>
-          <TokenCostEstimate
-            textareaContent={value}
-            selectedFiles={selectedFiles}
-            projectPath={currentPath}
-            orchestrationTokenEstimate={appendOrchestration ? orchestrationTokenEstimate : null}
-          />
-        </div>
-        <ActionButtons
-          onSend={handleSend}
+  const textareaArea = (
+    <div className={`relative ${isWide ? 'flex-1 min-h-[200px]' : 'min-h-[120px] max-h-[300px]'}`}>
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        placeholder={disabled ? "Waiting for terminal session..." : "Type your command here... (Ctrl+Enter to send)"}
+        aria-label="Multi-line command input"
+        aria-describedby="textarea-instructions"
+        className="w-full h-full resize-none pb-10"
+      />
+      {/* Send button inside textarea, bottom-right */}
+      <div className="absolute bottom-2 right-2 flex items-center gap-2">
+        <span id="textarea-instructions" className="text-muted-foreground font-mono text-xs">
+          {selectedTemplateId && !value?.trim() ? (
+            <span className="text-primary">Ctrl+Enter</span>
+          ) : (
+            "Ctrl+Enter"
+          )}
+        </span>
+        <Button
+          size="sm"
+          onClick={handleSend}
           disabled={isSendDisabled}
-          tokenUsage={tokenUsage}
-        />
+          className="h-7 px-2.5"
+        >
+          <Send className="h-3.5 w-3.5" />
+        </Button>
       </div>
+      {atMentionActive && sortedAtMentionResults.length > 0 && (
+        <AtMentionModal
+          results={atMentionResults}
+          selectedIndex={atMentionSelectedIndex}
+          onSelect={onAtMentionSelect}
+          currentPath={currentPath}
+          query={atMentionQuery}
+          selectedFiles={selectedFiles}
+          fileStates={fileStates}
+        />
+      )}
+    </div>
+  );
+
+  const hasTokens = tokenUsage && (tokenUsage.billable_input_tokens > 0 || tokenUsage.billable_output_tokens > 0);
+  const billableTotal = hasTokens ? tokenUsage.billable_input_tokens + tokenUsage.billable_output_tokens : 0;
+  const formatTokenCount = (count) => count >= 1000000 ? `${(count / 1000000).toFixed(1)}M` : count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count.toString();
+
+  const footerInfo = (
+    <div className="flex items-center gap-3">
+      <TokenCostEstimate
+        textareaContent={value}
+        selectedFiles={selectedFiles}
+        projectPath={currentPath}
+        orchestrationTokenEstimate={appendOrchestration ? orchestrationTokenEstimate : null}
+      />
+      {hasTokens && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono hover:text-foreground transition-colors cursor-default">
+              <Coins className="w-3 h-3" />
+              <span>{formatTokenCount(billableTotal)}</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={8}>
+            <div className="text-xs space-y-1 font-mono">
+              <div className="flex justify-between gap-4 font-semibold border-b border-border pb-1 mb-1">
+                <span>Billable</span>
+                <span>{billableTotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Input</span>
+                <span>{tokenUsage.billable_input_tokens.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Output</span>
+                <span>{tokenUsage.billable_output_tokens.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-4 pt-1 border-t border-border mt-1 text-muted-foreground">
+                <span>Cache read (free)</span>
+                <span>{tokenUsage.cache_read_input_tokens.toLocaleString()}</span>
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+
+  if (isWide) {
+    return (
+      <div ref={containerRef} className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
+        {dialogs}
+        <div className="flex gap-3" style={{ minHeight: '200px' }}>
+          {/* Left: textarea */}
+          <div className="flex flex-col gap-2 flex-[2] min-w-0">
+            {textareaArea}
+            {footerInfo}
+          </div>
+          {/* Right: tools sidebar */}
+          <div className="flex flex-col gap-2 flex-1 min-w-[240px] max-w-[360px]">
+            {configZone}
+            {projectZone}
+            {promptZone}
+            {elementsIndicator}
+            {compactedIndicator}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        {configZone}
+        {/* Actions Zone */}
+        <div className="flex items-center gap-2">
+          {projectZone}
+          <div className="w-px h-4 bg-border/50" />
+          {promptZone}
+        </div>
+      </div>
+
+      {elementsIndicator}
+      {compactedIndicator}
+      {dialogs}
+      {textareaArea}
+
+      {/* Footer row: token info */}
+      {footerInfo}
     </div>
   );
 }
