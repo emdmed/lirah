@@ -580,6 +580,7 @@ function App() {
 
   // Check orchestration whenever view mode switches to tree (agent mode)
   useEffect(() => {
+    if (viewMode !== 'tree') return;
     if (!currentPath || !currentPath.startsWith('/') || !terminalReady || dialogs.initialProjectDialogOpen) return;
 
     // Don't check again if we already checked for this path
@@ -587,9 +588,7 @@ function App() {
 
     // Defer so the UI renders first and doesn't freeze
     const timeoutId = setTimeout(async () => {
-      console.log('[ORCH DEBUG] checking path:', currentPath);
       const result = await orchestrationCheck.checkOrchestration(currentPath);
-      console.log('[ORCH DEBUG] result:', result.status, 'for path:', currentPath);
 
       if (result.status === 'missing' || result.status === 'outdated') {
         setOrchestrationStatus(result.status);
@@ -600,7 +599,7 @@ function App() {
     }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [currentPath, terminalReady, dialogs.initialProjectDialogOpen, orchestrationCheck]);
+  }, [viewMode, currentPath, terminalReady, dialogs.initialProjectDialogOpen, orchestrationCheck]);
 
 
   // Keyboard shortcuts (must come after orchestration functions)
