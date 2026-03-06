@@ -73,8 +73,8 @@ export function TemplateSelector({
       <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="ghost"
-            size="sm"
+            variant="outline"
+            size="icon-sm"
             aria-label="Select prompt template"
             title={selectedTemplate ? `Template: ${selectedTemplate.title}` : "Select prompt template"}
           >

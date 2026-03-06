@@ -5,7 +5,7 @@ import {
   Keyboard, Eye, EyeOff, Download, Bot, Terminal, Settings,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
-  CheckCircle2, ListTodo, Monitor, Layers, X, RotateCcw
+  CheckCircle2, ListTodo, Monitor, Layers, X
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../features/watcher';
@@ -116,12 +116,8 @@ function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
       <TooltipTrigger asChild>
         <Button 
           variant="ghost" 
-          size="xs" 
+          size="sm" 
           onClick={onClick}
-          className={cn(
-            "gap-1 px-1.5 transition-colors",
-            hasInstances && "text-blue-400 hover:text-blue-300"
-          )}
         >
           <Monitor className="w-3 h-3" />
           {hasInstances && (
@@ -300,15 +296,6 @@ export const StatusBar = ({
               <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
             </Tooltip>
           )}
-          <div className="w-px h-3 bg-border/30 mx-0.5" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="xs" onClick={onClearContext} disabled={!sessionId} className="gap-1 px-1.5 h-5">
-                <RotateCcw className="w-3 h-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
-          </Tooltip>
           <div className="w-px h-3 bg-border/30 mx-0.5" />
           <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
           <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />

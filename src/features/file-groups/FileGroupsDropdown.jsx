@@ -23,8 +23,8 @@ export function FileGroupsDropdown({ projectPath, onLoadGroup, onSaveGroup, hasS
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
-          size="icon"
+          variant="outline"
+          size="icon-sm"
           aria-label="File groups"
           title="File groups"
         >

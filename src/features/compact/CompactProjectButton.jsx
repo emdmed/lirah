@@ -55,8 +55,8 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="ghost"
-          size="icon"
+          variant="outline"
+          size="icon-sm"
           onClick={onClick}
           disabled={disabled}
         >

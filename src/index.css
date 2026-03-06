@@ -186,7 +186,6 @@ body {
 /* Engineering sketch dashed borders */
 .border-sketch {
   border-style: dashed !important;
-  border-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
 }
 
 .border-t-sketch {

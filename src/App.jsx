@@ -745,6 +745,24 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit, dialogs.setBranchTasksOpen]);
 
+  const handleClearContext = useCallback(async () => {
+    if (!terminalSessionId) return;
+    const command = settings.selectedCli === 'opencode' ? '/new' : '/clear';
+    try {
+      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: command });
+      setTimeout(async () => {
+        try {
+          await invoke('write_to_terminal', { sessionId: terminalSessionId, data: '\r' });
+        } catch (error) {
+          console.error('Failed to send Enter for clear context:', error);
+        }
+      }, 100);
+      terminalRef.current?.focus?.();
+    } catch (error) {
+      console.error('Failed to clear CLI context:', error);
+    }
+  }, [terminalSessionId, settings.selectedCli]);
+
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={sidebar.isResizing ? 'select-none' : ''} style={{ height: '100%' }}>
@@ -820,6 +838,8 @@ function App() {
               fileStates={fileSelection.fileStates}
               onSetFileState={fileSelection.setFileState}
               onToggleFile={fileSelection.toggleFileSelection}
+              sessionId={terminalSessionId}
+              onClearContext={handleClearContext}
             />
           )
         }
@@ -873,24 +893,7 @@ function App() {
             workspace={workspaceHook.workspace}
             onOpenWorkspaceDialog={() => setWorkspaceDialogOpen(true)}
             onCloseWorkspace={workspaceHook.closeWorkspace}
-            onClearContext={useCallback(async () => {
-              if (!terminalSessionId) return;
-              const command = settings.selectedCli === 'opencode' ? '/new' : '/clear';
-              try {
-                await invoke('write_to_terminal', { sessionId: terminalSessionId, data: command });
-                // Send Enter separately after a short delay to ensure the CLI processes the command first
-                setTimeout(async () => {
-                  try {
-                    await invoke('write_to_terminal', { sessionId: terminalSessionId, data: '\r' });
-                  } catch (error) {
-                    console.error('Failed to send Enter for clear context:', error);
-                  }
-                }, 100);
-                terminalRef.current?.focus?.();
-              } catch (error) {
-                console.error('Failed to clear CLI context:', error);
-              }
-            }, [terminalSessionId, settings.selectedCli])}
+            onClearContext={handleClearContext}
           />
         }
         secondaryTerminal={
