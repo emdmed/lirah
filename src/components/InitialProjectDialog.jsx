@@ -125,27 +125,26 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
                 key={item.id}
                 ref={index === selectedIndex ? selectedItemRef : null}
                 onClick={() => handleSelectItem(item)}
-                className={`flex flex-col items-start gap-1 px-4 py-3 text-left font-mono border border-sketch shadow-xs transition-colors ${
+                className={`flex flex-col items-start gap-1 px-4 py-2.5 text-left font-mono transition-colors rounded-sm ${
                   index === selectedIndex
-                    ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-0'
-                    : 'hover:bg-white/5'
+                    ? 'bg-foreground/8 border-l-2 border-primary'
+                    : 'hover:bg-foreground/5 border-l-2 border-transparent'
                 }`}
-                style={{ backgroundColor: 'var(--color-input-background)' }}
               >
                 <span className="font-medium flex items-center gap-2">
                   {item.type === 'workspace' && <Layers className="w-3 h-3 opacity-50" />}
                   {item.name}
                 </span>
-                <span className="text-xs opacity-50">{item.subtitle}</span>
+                <span className="text-xs opacity-50 truncate max-w-full">{item.subtitle}</span>
               </button>
             ))
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-xs opacity-50 border-t pt-2">
-          <span>↑↓ Navigate</span>
-          <span>Enter Select</span>
-          <span>ESC Close</span>
+        <div className="flex items-center gap-4 text-xs opacity-50 border-t border-foreground/10 pt-2">
+          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
+          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
+          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">ESC</span> Close</span>
         </div>
       </DialogContent>
     </Dialog>

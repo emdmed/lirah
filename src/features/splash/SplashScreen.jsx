@@ -13,10 +13,10 @@ function StepIndicator({ step, status, index }) {
     <div className={`flex items-center gap-3 transition-all duration-300 ${
       status === 'pending' ? 'opacity-25' : 'opacity-100'
     }`}>
-      <div className={`w-6 h-6 flex items-center justify-center border border-sketch ${
-        status === 'active' ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-0' : ''
+      <div className={`w-5 h-5 flex items-center justify-center border border-foreground/15 ${
+        status === 'active' ? 'bg-foreground/5' : ''
       }`}
-        style={{ backgroundColor: status === 'done' ? 'var(--color-input-background)' : 'transparent' }}
+        style={{ backgroundColor: status === 'done' ? 'var(--color-input-background)' : undefined }}
       >
         {status === 'active' ? (
           <RetroSpinner size={14} lineWidth={2} />
@@ -36,8 +36,18 @@ function StepIndicator({ step, status, index }) {
 
 export function SplashScreen({ visible, projectName, currentStep, onComplete }) {
   const [fadeOut, setFadeOut] = useState(false);
+  const [fadeIn, setFadeIn] = useState(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+
+  // Fade-in on mount
+  useEffect(() => {
+    if (visible) {
+      requestAnimationFrame(() => setFadeIn(true));
+    } else {
+      setFadeIn(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (currentStep === 'done') {
@@ -61,13 +71,13 @@ export function SplashScreen({ visible, projectName, currentStep, onComplete }) 
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-400 ${
-        fadeOut ? 'opacity-0' : 'opacity-100'
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-all duration-400 ${
+        fadeOut ? 'opacity-0' : fadeIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
       }`}
       style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
     >
       {/* Branding */}
-      <div className="mb-8" style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
+      <div className="mb-8 opacity-80" style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
         Lirah
       </div>
 
@@ -80,11 +90,11 @@ export function SplashScreen({ visible, projectName, currentStep, onComplete }) 
         </div>
 
         {/* Connecting dashed line */}
-        <div className="w-px h-4 border-l border-sketch" />
+        <div className="w-px h-5 border-l border-dashed border-foreground/15" />
 
         {/* Steps container */}
         <div className="border border-sketch p-3 flex flex-col gap-3 min-w-[240px]">
-          <div className="text-[10px] font-mono uppercase tracking-widest opacity-30">Initialization</div>
+          <div className="text-[10px] font-mono uppercase tracking-wider opacity-40">Initialization</div>
           {steps.map((step, index) => (
             <StepIndicator key={step.id} step={step} status={getStatus(step.id)} index={index} />
           ))}
