@@ -75,7 +75,7 @@ function KeyCombo({ keys, note, highlight = false }) {
         <span key={index} className='flex items-center gap-1'>
           {index > 0 && !isDoubleTap && <span className='text-muted-foreground text-xs'>+</span>}
           {isDoubleTap && index > 0 && <span className='text-muted-foreground text-xs mx-0.5'>⇢</span>}
-          <kbd className={`px-2 py-1 text-xs font-mono border border-sketch rounded-none transition-all ${
+          <kbd className={`px-2 py-1 text-xs font-mono border border-foreground/15 rounded-sm transition-all ${
             highlight || isDoubleTap
               ? 'bg-primary/10 border-primary/30 text-primary'
               : 'bg-muted/50 border-muted/30 hover:bg-muted'
@@ -97,8 +97,8 @@ function KeyCombo({ keys, note, highlight = false }) {
 export function KeyboardShortcutsDialog({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-2xl max-h-[80vh] border border-sketch rounded-none'>
-        <DialogHeader className='pb-4 border-b border-sketch'>
+      <DialogContent className='max-w-2xl max-h-[80vh]'>
+        <DialogHeader className='pb-4 border-b border-foreground/10'>
           <DialogTitle className='flex items-center gap-3 text-lg'>
             <div className='p-2 bg-primary/10'>
               <Keyboard className='w-5 h-5 text-primary' />
@@ -115,7 +115,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
         <div className='flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-2'>
           {shortcuts.map((section) => (
             <div key={section.category} className='space-y-2'>
-              <div className='flex items-center gap-2 pb-2 border-b border-sketch'>
+              <div className='flex items-center gap-2 pb-2 border-b border-foreground/10'>
                 <div className='p-1.5 bg-muted/30 text-muted-foreground'>
                   {section.icon}
                 </div>
@@ -147,10 +147,10 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
           ))}
         </div>
 
-        <div className='flex items-center justify-between pt-4 border-t border-sketch text-xs text-muted-foreground'>
+        <div className='flex items-center justify-between pt-4 border-t border-foreground/10 text-xs text-muted-foreground'>
           <div className='flex items-center gap-2'>
             <div className='w-2 h-2 bg-green-500/60 animate-pulse' />
-            <span>Press <kbd className='px-1.5 py-0.5 bg-muted border border-sketch rounded-none text-xs font-mono'>Ctrl+H</kbd> to close</span>
+            <span>Press <kbd className='px-1.5 py-0.5 bg-muted border border-foreground/15 rounded-sm text-xs font-mono'>Ctrl+H</kbd> to close</span>
           </div>
           <div className='flex items-center gap-1'>
             <Search className='w-3 h-3' />

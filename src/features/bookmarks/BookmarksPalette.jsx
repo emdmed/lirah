@@ -128,14 +128,14 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
                     key={bookmark.id}
                     ref={index === selectedIndex ? selectedItemRef : null}
                     onClick={() => handleSelectBookmark(bookmark)}
-                    className={`flex flex-col items-start gap-1 px-4 py-3 rounded-md text-left transition-colors ${
+                    className={`flex flex-col items-start gap-1 px-4 py-2.5 rounded-sm text-left transition-colors ${
                       index === selectedIndex
                         ? 'bg-white/10'
                         : 'hover:bg-white/5'
                     }`}
                   >
                     <span className="font-medium">{bookmark.name}</span>
-                    <span className="text-xs opacity-50">{bookmark.path}</span>
+                    <span className="text-xs opacity-50 truncate max-w-full">{bookmark.path}</span>
                   </button>
                 ))}
               </div>
@@ -143,10 +143,10 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
           </div>
 
           {/* Keyboard hints */}
-          <div className="flex items-center gap-4 text-xs opacity-50 border-t pt-2">
-            <span>↑↓ Navigate</span>
-            <span>Enter Select</span>
-            <span>ESC Close</span>
+          <div className="flex items-center gap-4 text-xs opacity-50 border-t border-foreground/10 pt-2">
+            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
+            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
+            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">ESC</span> Close</span>
           </div>
         </div>
       </SheetContent>

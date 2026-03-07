@@ -58,7 +58,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
   return (
     <div
       className={`px-2 terminal-wrapper ${isFocused
-        ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-2'
+        ? ''
         : ''
         }`}
       style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}

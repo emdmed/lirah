@@ -68,8 +68,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                 existingWorkspaces?.map(ws => (
                   <div
                     key={ws.id}
-                    className="flex items-center justify-between px-4 py-3 font-mono border border-sketch shadow-xs hover:bg-white/5 transition-colors"
-                    style={{ backgroundColor: 'var(--color-input-background)' }}
+                    className="flex items-center justify-between px-4 py-2.5 font-mono rounded-sm hover:bg-foreground/5 transition-colors"
                   >
                     <button
                       onClick={() => handleOpen(ws)}
@@ -85,7 +84,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteWorkspace(ws.path); }}
-                      className="p-1 opacity-30 hover:opacity-100 transition-opacity"
+                      className="p-1 opacity-40 hover:opacity-100 transition-opacity"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -130,12 +129,11 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                         <button
                           key={bookmark.id}
                           onClick={() => toggleProject(bookmark)}
-                          className={`flex items-center gap-2 px-3 py-2 text-left text-sm font-mono border border-sketch transition-colors ${
+                          className={`flex items-center gap-2 px-3 py-2 text-left text-sm font-mono rounded-sm transition-colors ${
                             isSelected
-                              ? 'outline outline-1 outline-dashed outline-ring/70 outline-offset-0 bg-white/5'
-                              : 'hover:bg-white/5'
+                              ? 'bg-foreground/8 border-l-2 border-primary'
+                              : 'hover:bg-foreground/5 border-l-2 border-transparent'
                           }`}
-                          style={{ backgroundColor: 'var(--color-input-background)' }}
                         >
                           <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[10px] ${isSelected ? 'bg-foreground text-background' : 'border-sketch'}`}>
                             {isSelected ? '✓' : ''}

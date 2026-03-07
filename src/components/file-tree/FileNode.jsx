@@ -40,7 +40,7 @@ export function FileNode({
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'outline-1 outline-dashed outline-ring/70 bg-primary/10' : ''
+      className={`flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'bg-foreground/8 border-l-2 border-primary' : ''
         } ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Element picker button - hidden in git changes mode */}
