@@ -215,7 +215,15 @@ install_from_source() {
     INSTALL_DIR="$HOME/.local/bin"
     mkdir -p "$INSTALL_DIR"
 
-    cp "$BINARY" "$INSTALL_DIR/$APP_NAME"
+    cp "$BINARY" "$INSTALL_DIR/${APP_NAME}-bin"
+    chmod +x "$INSTALL_DIR/${APP_NAME}-bin"
+
+    # Create wrapper script so 'lirah' launches detached and terminal closes
+    cat > "$INSTALL_DIR/$APP_NAME" << WRAPPER
+#!/bin/bash
+nohup "$INSTALL_DIR/${APP_NAME}-bin" "\$@" >/dev/null 2>&1 &
+disown
+WRAPPER
     chmod +x "$INSTALL_DIR/$APP_NAME"
 
     # Create desktop entry
@@ -288,8 +296,13 @@ Categories=Development;Utility;
 StartupWMClass=$APP_NAME
 EOF
 
-    # Create symlink so 'lirah' works as a command
-    ln -sf "$APPIMAGE_PATH" "$INSTALL_DIR/$APP_NAME"
+    # Create wrapper script so 'lirah' launches detached and terminal closes
+    cat > "$INSTALL_DIR/$APP_NAME" << WRAPPER
+#!/bin/bash
+nohup "$APPIMAGE_PATH" "\$@" >/dev/null 2>&1 &
+disown
+WRAPPER
+    chmod +x "$INSTALL_DIR/$APP_NAME"
 
     info "AppImage installed to: $APPIMAGE_PATH"
     info "Symlinked as: $INSTALL_DIR/$APP_NAME"
