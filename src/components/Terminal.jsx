@@ -29,10 +29,10 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
   // Debounced resize — wait for layout to settle before fitting terminal
   const resizeTimerRef = useRef(null);
   const debouncedResize = useCallback(() => {
-    if (resizeTimerRef.current) cancelAnimationFrame(resizeTimerRef.current);
-    resizeTimerRef.current = requestAnimationFrame(() => {
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(() => {
       handleResize();
-    });
+    }, 150);
   }, [handleResize]);
 
   // Setup resize observer
@@ -46,7 +46,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
-      if (resizeTimerRef.current) cancelAnimationFrame(resizeTimerRef.current);
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
   }, [debouncedResize]);
 
@@ -62,6 +62,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
         width: '100%',
         flex: 1,
         minHeight: 0,
+        minWidth: 0,
         position: 'relative',
       }}
     >
