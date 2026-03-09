@@ -64,13 +64,23 @@ export function TextareaPanel({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    let timeoutId = null;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setIsWide(entry.contentRect.width >= 900);
+        const width = entry.contentRect.width;
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setIsWide((prev) => {
+            // Hysteresis: widen at 920, narrow at 880 to prevent flickering
+            if (prev && width < 880) return false;
+            if (!prev && width >= 920) return true;
+            return prev;
+          });
+        }, 100);
       }
     });
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); clearTimeout(timeoutId); };
   }, []);
 
   const { checkBudgetStatus } = useTokenBudget();
@@ -292,7 +302,7 @@ export function TextareaPanel({
 
   return (
     <div ref={containerRef} className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-nowrap overflow-hidden min-h-[32px] max-h-[32px]">
         <OrchestrationToggle
           appendOrchestration={appendOrchestration}
           onToggleOrchestration={onToggleOrchestration}

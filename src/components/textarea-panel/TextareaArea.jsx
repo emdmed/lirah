@@ -47,7 +47,7 @@ export function TextareaArea({
         placeholder={disabled ? "Waiting for terminal session..." : "Type your command here... (Ctrl+Enter to send)"}
         aria-label="Multi-line command input"
         aria-describedby="textarea-instructions"
-        className={`w-full h-full resize-none pb-10 ${hasIndicators ? 'pt-10' : ''}`}
+        className="w-full h-full resize-none pb-10 pt-10"
       />
       <div className="absolute bottom-2 right-2 flex items-center gap-2">
         <span id="textarea-instructions" className="text-muted-foreground font-mono text-xs">
