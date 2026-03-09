@@ -9,6 +9,7 @@ import { ElementsIndicator } from "./ElementsIndicator";
 import { CompactedIndicator } from "./CompactedIndicator";
 import { TokenUsageDisplay } from "./TokenUsageDisplay";
 import { TextareaArea } from "./TextareaArea";
+import { PatternsSelector } from "../../features/patterns";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 
@@ -53,6 +54,9 @@ export function TextareaPanel({
   onToggleFile,
   onClearContext,
   sessionId,
+  patternFiles = [],
+  selectedPatterns = new Set(),
+  onTogglePattern,
 }) {
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
@@ -179,13 +183,20 @@ export function TextareaPanel({
   );
 
   const promptZone = (
-    <PromptToolbar
-      selectedTemplateId={selectedTemplateId}
-      onSelectTemplate={onSelectTemplate}
-      onManageTemplates={onManageTemplates}
-      templateDropdownOpen={templateDropdownOpen}
-      onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
-    />
+    <div className="flex items-center gap-1">
+      <PromptToolbar
+        selectedTemplateId={selectedTemplateId}
+        onSelectTemplate={onSelectTemplate}
+        onManageTemplates={onManageTemplates}
+        templateDropdownOpen={templateDropdownOpen}
+        onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
+      />
+      <PatternsSelector
+        patternFiles={patternFiles}
+        selectedPatterns={selectedPatterns}
+        onTogglePattern={onTogglePattern}
+      />
+    </div>
   );
 
   const footerInfo = (

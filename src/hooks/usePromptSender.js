@@ -98,6 +98,9 @@ export function usePromptSender({
   setCompactedProject,
   clearFileSelection,
   clearSelectedElements,
+  selectedPatterns,
+  getPatternInstructions,
+  clearPatterns,
 }) {
   const sendPrompt = useCallback(async () => {
     if (!terminalSessionId) return;
@@ -160,6 +163,14 @@ export function usePromptSender({
         }
       }
 
+      // Append pattern instructions (read & follow directives)
+      if (selectedPatterns && selectedPatterns.size > 0) {
+        const instructions = getPatternInstructions();
+        if (instructions) {
+          const separator = fullCommand.trim() ? '\n\n' : '';
+          fullCommand = fullCommand + separator + instructions;
+        }
+      }
 
       // Send text content first
       await invoke('write_to_terminal', {
@@ -200,10 +211,13 @@ export function usePromptSender({
 
       // Clear compacted project after sending
       setCompactedProject(null);
+
+      // Clear patterns after sending
+      if (clearPatterns) clearPatterns();
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns]);
 
   return sendPrompt;
 }

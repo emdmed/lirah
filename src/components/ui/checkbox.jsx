@@ -51,7 +51,7 @@ const Checkbox = React.forwardRef(({
           "peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2",
           "peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
           "peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary",
-          "transition-colors",
+          "transition-colors rounded-xs",
           disabled ? "cursor-not-allowed" : "cursor-pointer",
           className
         )}

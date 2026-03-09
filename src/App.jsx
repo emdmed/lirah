@@ -57,6 +57,7 @@ import { useSidebar } from "./hooks/useSidebar";
 import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
 import { InstanceSyncPanel } from "./features/instance-sync/InstanceSyncPanel";
+import { usePatterns } from "./features/patterns";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { WorkspaceDialog } from "./components/WorkspaceDialog";
 import { WorkspaceProjectPicker } from "./components/WorkspaceProjectPicker";
@@ -99,7 +100,9 @@ function App() {
   const dialogs = useDialogs();
 
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
-  
+
+  const patterns = usePatterns(currentPath);
+
   // Refs for splash screen to access current values in async callbacks
   const foldersRef = useRef(folders);
   const currentPathRef = useRef(currentPath);
@@ -494,6 +497,9 @@ function App() {
     setCompactedProject: compact.setCompactedProject,
     clearFileSelection: fileSelection.clearFileSelection,
     clearSelectedElements: elementPicker.clearSelectedElements,
+    selectedPatterns: patterns.selectedPatterns,
+    getPatternInstructions: patterns.getPatternInstructions,
+    clearPatterns: patterns.clearPatterns,
   });
 
   // Keyboard shortcut hooks
@@ -840,6 +846,9 @@ function App() {
               onToggleFile={fileSelection.toggleFileSelection}
               sessionId={terminalSessionId}
               onClearContext={handleClearContext}
+              patternFiles={patterns.patternFiles}
+              selectedPatterns={patterns.selectedPatterns}
+              onTogglePattern={patterns.togglePattern}
             />
           )
         }
