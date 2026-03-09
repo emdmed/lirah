@@ -92,6 +92,7 @@ If you use CLI agents seriously, Lirah becomes the place you run them.
 - **Prompt Textarea Panel** — Multi-line editor for composing prompts. Attach files, apply templates, toggle orchestration context, and send everything to your CLI agent with `Ctrl+Enter`.
 - **Orchestration Protocol** — Auto-detects and installs the [Agentic Orchestration Workflows](https://agentic-orchestration-workflows.vercel.app/) system, served via CDN for always-up-to-date workflow definitions. Appends workflow instructions to your prompts so the agent follows structured development processes (feature, bugfix, refactor, review, etc.). The orchestration system includes compaction scripts, dependency graph analysis, and symbol indexing tools.
 - **Token Cost Estimator** — Shows estimated cost (input tokens × model pricing) before you send a prompt, so you know what you're spending.
+- **Patterns Enforcement** — Define coding conventions in `.patterns/` files. A UI selector lets you toggle which patterns are active — selected patterns are automatically appended to prompts so your CLI agent follows project-specific rules.
 
 ### File Context & Analysis
 
