@@ -26,13 +26,13 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     }
   }, [sandboxFailed, onSandboxFailed]);
 
-  // Debounced resize — wait for layout to settle before fitting terminal
+  // Debounced resize — short delay lets flex layout settle before fitting
   const resizeTimerRef = useRef(null);
   const debouncedResize = useCallback(() => {
     if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     resizeTimerRef.current = setTimeout(() => {
       handleResize();
-    }, 150);
+    }, 50);
   }, [handleResize]);
 
   // Setup resize observer
