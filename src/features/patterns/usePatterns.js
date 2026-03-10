@@ -14,10 +14,11 @@ export function usePatterns(currentPath) {
 
     const loadPatterns = async () => {
       try {
-        const entries = await invoke('read_directory', { path: `${currentPath}/.patterns` });
+        const patternsDir = `${currentPath}/.patterns`;
+        const entries = await invoke('read_directory_recursive', { path: patternsDir, maxDepth: 10 });
         const files = entries
-          .filter(e => e.name !== 'patterns.md' && e.name.endsWith('.md'))
-          .map(e => e.name)
+          .filter(e => !e.is_dir && e.name.endsWith('.md') && e.name !== 'patterns.md')
+          .map(e => e.path.slice(patternsDir.length + 1))
           .sort();
         setPatternFiles(files);
         setSelectedPatterns(prev => {
