@@ -652,18 +652,6 @@ function App() {
     if (terminalSessionId && (bookmarks.length > 0 || workspaceHook.workspaces.length > 0)) dialogs.setInitialProjectDialogOpen(true);
   }, [terminalSessionId]);
 
-  // Reload sidebar when CWD changes
-  useEffect(() => {
-    if (detectedCwd && sidebar.sidebarOpen) {
-      if (viewMode === 'flat') loadFolders();
-      else if (viewMode === 'tree') {
-        treeView.loadTreeData();
-        sidebarSearch.setSearchQuery('');
-        sidebarSearch.setSearchResults(null);
-      }
-    }
-  }, [detectedCwd, viewMode]);
-
   // Global keyboard shortcuts - use refs to avoid unstable dependencies
   const viewModeRef = useRef(viewMode);
   const sidebarOpenRef = useRef(sidebar.sidebarOpen);

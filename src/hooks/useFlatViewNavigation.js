@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 const IS_WINDOWS = navigator.platform.startsWith('Win');
@@ -26,6 +26,7 @@ function parentPath(p) {
 export function useFlatViewNavigation(terminalSessionId) {
   const [folders, setFolders] = useState([]);
   const [currentPath, setCurrentPath] = useState('');
+  const projectRootRef = useRef(null);
 
   // Merge deleted files from git stats into directory listing
   const mergeDeletedFiles = useCallback(async (directories, dirPath) => {
@@ -106,9 +107,10 @@ export function useFlatViewNavigation(terminalSessionId) {
 
         // Get the terminal's actual CWD after navigation
         targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+        projectRootRef.current = targetPath;
         console.log('Terminal navigated to:', targetPath);
       } else {
-        // No explicit path - sync to terminal's current CWD
+        // No explicit path - use project root if already set
         if (!terminalSessionId) {
           console.log('No terminal session yet');
           setFolders([]);
@@ -116,9 +118,14 @@ export function useFlatViewNavigation(terminalSessionId) {
           return;
         }
 
-        // Get terminal's actual CWD
-        targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-        console.log('Terminal CWD:', targetPath);
+        if (projectRootRef.current) {
+          targetPath = projectRootRef.current;
+        } else {
+          // First load: capture terminal cwd as project root
+          targetPath = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+          projectRootRef.current = targetPath;
+        }
+        console.log('Using project root:', targetPath);
       }
 
       // Now load files from the confirmed directory

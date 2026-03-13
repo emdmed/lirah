@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { buildTreeFromFlatList, incrementallyUpdateTree } from "../utils/treeOperations";
 import { lastSepIndex } from "../utils/pathUtils";
@@ -31,6 +31,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
   const [allFiles, setAllFiles] = useState([]);
+  const projectRootRef = useRef(null);
   const { error } = useToast();
 
   // Debounce search results to prevent expensive tree filtering on every keystroke
@@ -44,7 +45,13 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
         return;
       }
       setTreeLoading(true);
-      const cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+      let cwd;
+      if (projectRootRef.current) {
+        cwd = projectRootRef.current;
+      } else {
+        cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+        projectRootRef.current = cwd;
+      }
       const allEntries = await invoke('read_directory_recursive', {
         path: cwd, maxDepth: 10, maxFiles: 10000
       });
