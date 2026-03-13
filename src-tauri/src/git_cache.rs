@@ -16,6 +16,7 @@ struct CacheEntry {
 // Cache configuration
 const CACHE_TTL_SECONDS: u64 = 1;
 const CLEANUP_INTERVAL_SECONDS: u64 = 60;
+const MAX_WATCHERS: usize = 5;
 
 // Main cache structure - uses RwLock for better read performance
 #[derive(Default)]
@@ -78,9 +79,24 @@ impl GitStatsCache {
                 *last = Some(Instant::now());
             }
 
+            let removed_paths: Vec<PathBuf>;
             if let Ok(mut entries) = self.entries.write() {
                 let ttl = Duration::from_secs(CACHE_TTL_SECONDS);
+                let before: Vec<PathBuf> = entries.keys().cloned().collect();
                 entries.retain(|_, entry| entry.cached_at.elapsed() <= ttl);
+                let after: std::collections::HashSet<&PathBuf> = entries.keys().collect();
+                removed_paths = before.into_iter().filter(|p| !after.contains(p)).collect();
+            } else {
+                removed_paths = Vec::new();
+            }
+
+            // Stop watchers for paths that no longer have cache entries
+            if !removed_paths.is_empty() {
+                if let Ok(mut stops) = self.watcher_stops.write() {
+                    for path in &removed_paths {
+                        stops.remove(path);
+                    }
+                }
             }
         }
     }
@@ -112,6 +128,22 @@ impl GitStatsCache {
 
         if stops.contains_key(&repo_path) {
             return Ok(());
+        }
+
+        // Evict watchers if at capacity
+        if stops.len() >= MAX_WATCHERS {
+            let entries = self.entries.read().map_err(|_| "Failed to acquire lock")?;
+            // Prefer evicting watchers with no cache entry, then oldest cache entry
+            let evict_path = stops.keys()
+                .filter(|p| *p != &repo_path)
+                .min_by_key(|p| {
+                    entries.get(*p).map(|e| e.cached_at).unwrap_or(Instant::now() - Duration::from_secs(86400))
+                })
+                .cloned();
+            drop(entries);
+            if let Some(path) = evict_path {
+                stops.remove(&path);
+            }
         }
 
         // Create channel for stop signal
