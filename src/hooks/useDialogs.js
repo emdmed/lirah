@@ -11,6 +11,16 @@ export function useDialogs() {
   const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [branchTasksOpen, setBranchTasksOpen] = useState(false);
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [autoChangelogDialogOpen, setAutoChangelogDialogOpen] = useState(false);
+  const [autoCommitConfigOpen, setAutoCommitConfigOpen] = useState(false);
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectPickerAction, setProjectPickerAction] = useState(null);
+  const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
+  const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
+  const [orchestrationStatus, setOrchestrationStatus] = useState(null);
 
   return {
     addBookmarkDialogOpen, setAddBookmarkDialogOpen,
@@ -23,5 +33,15 @@ export function useDialogs() {
     cliSelectionModalOpen, setCliSelectionModalOpen,
     showHelp, setShowHelp,
     branchTasksOpen, setBranchTasksOpen,
+    budgetDialogOpen, setBudgetDialogOpen,
+    dashboardOpen, setDashboardOpen,
+    autoChangelogDialogOpen, setAutoChangelogDialogOpen,
+    autoCommitConfigOpen, setAutoCommitConfigOpen,
+    workspaceDialogOpen, setWorkspaceDialogOpen,
+    projectPickerOpen, setProjectPickerOpen,
+    projectPickerAction, setProjectPickerAction,
+    instanceSyncPanelOpen, setInstanceSyncPanelOpen,
+    orchestrationPromptOpen, setOrchestrationPromptOpen,
+    orchestrationStatus, setOrchestrationStatus,
   };
 }

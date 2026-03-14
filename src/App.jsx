@@ -4,22 +4,13 @@ import { Layout } from "./components/Layout";
 import { StatusBar } from "./components/StatusBar";
 import { TitleBar } from "./components/TitleBar";
 import { LeftSidebar } from "./components/LeftSidebar";
-import { AddBookmarkDialog } from "./features/bookmarks";
-import { BookmarksPalette } from "./features/bookmarks";
-import { InitialProjectDialog } from "./components/InitialProjectDialog";
-import { SplashScreen } from "./features/splash";
-import { ManageTemplatesDialog } from "./features/templates";
-import { GitDiffDialog, BranchCompletedTasksDialog } from "./features/git";
-import { SaveFileGroupDialog } from "./features/file-groups";
-import { CliSelectionModal } from "./features/cli-selection";
-import { KeyboardShortcutsDialog } from "./components/KeyboardShortcutsDialog";
 import { usePromptTemplates } from "./features/templates";
 import { useTheme } from "./contexts/ThemeContext";
 import { useWatcher } from "./features/watcher";
 import { useBookmarks } from "./features/bookmarks";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
-import { useBranchName, useAutoChangelog, useAutoCommit, useBranchTasks, AutoChangelogDialog, AutoCommitDialog, AutoCommitConfigDialog } from "./features/git";
+import { useBranchName, useAutoChangelog, useAutoCommit, useBranchTasks, GitDiffDialog, BranchCompletedTasksDialog } from "./features/git";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
@@ -31,17 +22,12 @@ import { useTokenUsage } from "./features/token-budget";
 import { useTypeChecker } from "./hooks/useTypeChecker";
 import { usePromptSender } from "./hooks/usePromptSender";
 import { escapeShellPath, getRelativePath } from "./utils/pathUtils";
-import { ElementPickerDialog } from "./features/file-analysis";
-import { OrchestrationPrompt } from "./components/OrchestrationPrompt";
 import { useOrchestrationCheck } from "./hooks/useOrchestrationCheck";
-import { TokenBudgetDialog } from "./features/token-budget";
-import { TokenAlertBanner } from "./features/token-budget";
-import { TokenDashboard } from "./features/token-budget";
 import { TokenBudgetProvider } from "./features/token-budget";
-import { ToastContainer } from "./features/toast";
 import { SecondaryTerminal } from "./components/SecondaryTerminal";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { DialogHost } from "./components/DialogHost";
 
 // Domain hooks
 import { useSecondaryTerminal } from "./hooks/useSecondaryTerminal";
@@ -56,11 +42,8 @@ import { useTreeView } from "./hooks/useTreeView";
 import { useSidebar } from "./hooks/useSidebar";
 import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
-import { InstanceSyncPanel } from "./features/instance-sync/InstanceSyncPanel";
 import { usePatterns } from "./features/patterns";
 import { useWorkspace } from "./hooks/useWorkspace";
-import { WorkspaceDialog } from "./components/WorkspaceDialog";
-import { WorkspaceProjectPicker } from "./components/WorkspaceProjectPicker";
 
 function App() {
   const { theme } = useTheme();
@@ -81,10 +64,6 @@ function App() {
   const [viewMode, setViewMode] = useState('flat');
 
   // Template/orchestration state
-  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
-  const [dashboardOpen, setDashboardOpen] = useState(false);
-  const [autoChangelogDialogOpen, setAutoChangelogDialogOpen] = useState(false);
-  const [autoCommitConfigOpen, setAutoCommitConfigOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [appendOrchestration, setAppendOrchestration] = useState(true);
   const [orchestrationTokenEstimate, setOrchestrationTokenEstimate] = useState(null);
@@ -107,16 +86,16 @@ function App() {
   const foldersRef = useRef(folders);
   const currentPathRef = useRef(currentPath);
   const terminalReadyRef = useRef(terminalReady);
-  
+
   // Keep refs in sync with state
   useEffect(() => {
     foldersRef.current = folders;
   }, [folders]);
-  
+
   useEffect(() => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
-  
+
   useEffect(() => {
     terminalReadyRef.current = terminalReady;
   }, [terminalReady]);
@@ -155,16 +134,10 @@ function App() {
 
   // Workspace state
   const workspaceHook = useWorkspace();
-  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
-  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
-  const [projectPickerAction, setProjectPickerAction] = useState(null); // 'lazygit' | 'autocommit'
 
-  // Instance sync state
-  const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
-  const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
-  const [orchestrationStatus, setOrchestrationStatus] = useState(null);
-  const orchestrationCheckedForPath = useRef(null);
+  // Instance sync
   const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
+  const orchestrationCheckedForPath = useRef(null);
   const instanceSync = useInstanceSync(
     currentPath,
     selectedFilesArray,
@@ -287,82 +260,67 @@ function App() {
   // Handle loading context from another instance's session
   const handleLoadInstanceContext = useCallback(async (session) => {
     if (!session?.messages?.length) return;
-    
+
     try {
-      // Build context from the session messages
       const contextLines = [];
       contextLines.push(`# Context from ${session.project_path}`);
       contextLines.push(`## Session: ${session.summary || 'Previous Work'}`);
       contextLines.push('');
       contextLines.push('### Recent conversation:');
       contextLines.push('');
-      
-      // Add last 10 messages as context
+
       const recentMessages = session.messages.slice(-10);
       recentMessages.forEach((msg) => {
         const role = msg.role === 'user' ? '**User**' : '**Claude**';
         contextLines.push(`${role}: ${msg.content.substring(0, 300)}${msg.content.length > 300 ? '...' : ''}`);
         contextLines.push('');
       });
-      
+
       contextLines.push('---');
       contextLines.push('Please continue based on the above context.');
-      
+
       const contextText = contextLines.join('\n');
-      
-      // Append to textarea or set as new content
+
       setTextareaContent(prev => {
         if (prev.trim()) {
           return prev + '\n\n' + contextText;
         }
         return contextText;
       });
-      
-      // Make sure textarea is visible
+
       setTextareaVisible(true);
-      
-      // Close the sync panel
-      setInstanceSyncPanelOpen(false);
-      
-      // Focus the textarea
+      dialogs.setInstanceSyncPanelOpen(false);
+
       setTimeout(() => {
         textareaRef.current?.focus?.();
       }, 100);
-      
+
     } catch (error) {
       console.error('Failed to load instance context:', error);
     }
-  }, [setTextareaContent, setTextareaVisible, setInstanceSyncPanelOpen]);
+  }, [setTextareaContent, setTextareaVisible, dialogs]);
 
   // Handle sending implementation prompt generation via hidden CLI
   const handleSendImplementationPrompt = useCallback(async ({ selectedMessages, promptType, action, prompt }) => {
-    // Handle sending generated prompt to textarea
     if (action === 'send-to-textarea' && prompt) {
       setTextareaContent(prev => {
         const separator = prev.trim() ? '\n\n' : '';
         return prev + separator + prompt;
       });
       setTextareaVisible(true);
-      setInstanceSyncPanelOpen(false);
+      dialogs.setInstanceSyncPanelOpen(false);
       setTimeout(() => {
         textareaRef.current?.focus?.();
       }, 100);
       return;
     }
-    
-    // Handle generating the prompt
-    console.log('[App] handleSendImplementationPrompt called:', { selectedMessagesSize: selectedMessages?.size, promptType, currentPath: !!currentPath, selectedSession: !!instanceSync?.selectedSession });
-    if (!currentPath || !instanceSync.selectedSession) {
-      console.log('[App] Early return - missing currentPath or selectedSession');
-      return;
-    }
 
-    // Get the visible messages (same filter as in InstanceSyncPanel)
+    if (!currentPath || !instanceSync.selectedSession) return;
+
     const allVisibleMessages = instanceSync.selectedSession.messages.filter(
       msg => !msg.content.startsWith('[Thinking]:')
     );
 
-    // Extract the selected message objects
     const selectedMessageObjects = Array.from(selectedMessages)
       .sort((a, b) => a - b)
       .map(idx => allVisibleMessages[idx])
@@ -372,7 +330,6 @@ function App() {
     if (selectedMessageObjects.length === 0) return;
 
     try {
-      // Call the backend to generate the implementation via hidden CLI
       const generatedPrompt = await invoke('generate_instance_sync_prompt', {
         projectDir: currentPath,
         cli: settings.selectedCli,
@@ -380,29 +337,23 @@ function App() {
         messages: selectedMessageObjects,
       });
 
-      // Return the generated prompt so the dialog can show it for review
       return generatedPrompt;
     } catch (error) {
       console.error('Failed to generate implementation prompt:', error);
       throw error;
     }
-  }, [currentPath, instanceSync.selectedSession, settings.selectedCli, setTextareaContent, setTextareaVisible, setInstanceSyncPanelOpen, textareaRef, instanceSync]);
+  }, [currentPath, instanceSync.selectedSession, settings.selectedCli, setTextareaContent, setTextareaVisible, dialogs, textareaRef, instanceSync]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProject = useCallback(async (bookmark) => {
-    // Mark current path as "checked" to prevent orchestration check
-    // from firing against the pre-navigation path (e.g. home dir)
     orchestrationCheckedForPath.current = currentPath;
     setSplashProjectName(bookmark.name);
     setSplashStep('navigate');
     setSplashVisible(true);
     setTerminalReady(false);
 
-    // Step 1: Navigate and wait for filetree to fully load
     await navigateToBookmark(bookmark);
-    
-    // Wait for navigation to actually complete (folders loaded)
-    // Use a polling approach with refs to access current values
+
     await new Promise(resolve => {
       const checkNavigation = setInterval(() => {
         if (foldersRef.current.length > 0 && currentPathRef.current) {
@@ -410,18 +361,15 @@ function App() {
           resolve();
         }
       }, 50);
-      // Timeout after 5 seconds to prevent infinite wait
       setTimeout(() => {
         clearInterval(checkNavigation);
         resolve();
       }, 5000);
     });
 
-    // Step 2: Start Claude (wait for terminal to be ready first)
     setSplashStep('claude');
     switchToClaudeMode();
-    
-    // Wait for terminal to be ready before launching Claude
+
     await new Promise(resolve => {
       const checkReady = setInterval(() => {
         if (terminalReadyRef.current) {
@@ -429,15 +377,13 @@ function App() {
           resolve();
         }
       }, 50);
-      // Timeout after 3 seconds
       setTimeout(() => {
         clearInterval(checkReady);
         resolve();
       }, 3000);
     });
-    
-    launchClaude();
 
+    launchClaude();
     setSplashStep('done');
   }, [navigateToBookmark, switchToClaudeMode, launchClaude, currentPath]);
 
@@ -525,11 +471,8 @@ function App() {
   const calculateOrchestrationEstimate = useCallback(async (cwd) => {
     if (!cwd) return;
     try {
-      // Read the orchestration.md file and estimate tokens from its content
-      // When orchestration is enabled, Claude will read this file, consuming those tokens
       const orchestrationContent = await invoke('read_file_content', { path: `${cwd}/.orchestration/orchestration.md` });
       const commandText = 'Follow .orchestration/orchestration.md';
-      // Total tokens = command text (~20) + file content that will be read
       const commandTokens = Math.round(commandText.length / 4);
       const contentTokens = Math.round(orchestrationContent.length / 4);
       setOrchestrationTokenEstimate(commandTokens + contentTokens);
@@ -553,9 +496,8 @@ function App() {
     if (!currentPath) return;
 
     const result = await orchestrationCheck.syncOrchestration(currentPath);
-    
+
     if (result.success) {
-      // Re-run orchestration detection to update appendOrchestration state
       invoke('read_file_content', { path: `${currentPath}/.orchestration/orchestration.md` })
         .then(() => {
           setAppendOrchestration(true);
@@ -565,10 +507,10 @@ function App() {
           setAppendOrchestration(false);
           setOrchestrationTokenEstimate(null);
         });
-      
-      setOrchestrationPromptOpen(false);
+
+      dialogs.setOrchestrationPromptOpen(false);
     }
-  }, [currentPath, orchestrationCheck, calculateOrchestrationEstimate]);
+  }, [currentPath, orchestrationCheck, calculateOrchestrationEstimate, dialogs]);
 
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd);
@@ -589,16 +531,14 @@ function App() {
     if (viewMode !== 'tree') return;
     if (!currentPath || !currentPath.startsWith('/') || !terminalReady || dialogs.initialProjectDialogOpen) return;
 
-    // Don't check again if we already checked for this path
     if (orchestrationCheckedForPath.current === currentPath) return;
 
-    // Defer so the UI renders first and doesn't freeze
     const timeoutId = setTimeout(async () => {
       const result = await orchestrationCheck.checkOrchestration(currentPath);
 
       if (result.status === 'missing' || result.status === 'outdated') {
-        setOrchestrationStatus(result.status);
-        setOrchestrationPromptOpen(true);
+        dialogs.setOrchestrationStatus(result.status);
+        dialogs.setOrchestrationPromptOpen(true);
       }
 
       orchestrationCheckedForPath.current = currentPath;
@@ -630,7 +570,7 @@ function App() {
   });
 
   useInstanceSyncShortcut({
-    onTogglePanel: () => setInstanceSyncPanelOpen(prev => !prev),
+    onTogglePanel: () => dialogs.setInstanceSyncPanelOpen(prev => !prev),
     secondaryTerminalFocused: secondary.secondaryFocused,
   });
 
@@ -657,15 +597,15 @@ function App() {
   const sidebarOpenRef = useRef(sidebar.sidebarOpen);
   const autoCommitStageRef = useRef(autoCommit.stage);
   const workspaceRef = useRef(workspaceHook.workspace);
-  
+
   useEffect(() => {
     viewModeRef.current = viewMode;
   }, [viewMode]);
-  
+
   useEffect(() => {
     sidebarOpenRef.current = sidebar.sidebarOpen;
   }, [sidebar.sidebarOpen]);
-  
+
   useEffect(() => {
     autoCommitStageRef.current = autoCommit.stage;
   }, [autoCommit.stage]);
@@ -687,8 +627,8 @@ function App() {
         e.preventDefault();
         e.stopPropagation();
         if (workspaceRef.current?.projects?.length) {
-          setProjectPickerAction('lazygit');
-          setProjectPickerOpen(true);
+          dialogs.setProjectPickerAction('lazygit');
+          dialogs.setProjectPickerOpen(true);
         } else {
           secondary.openWithCommand('lazygit');
         }
@@ -711,18 +651,18 @@ function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
         e.preventDefault();
-        setBudgetDialogOpen(true);
+        dialogs.setBudgetDialogOpen(true);
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
         e.preventDefault();
-        setDashboardOpen(true);
+        dialogs.setDashboardOpen(true);
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === ' ') {
         e.preventDefault();
         if (autoCommitStageRef.current === 'idle') {
           if (workspaceRef.current?.projects?.length) {
-            setProjectPickerAction('autocommit');
-            setProjectPickerOpen(true);
+            dialogs.setProjectPickerAction('autocommit');
+            dialogs.setProjectPickerOpen(true);
           } else {
             autoCommit.trigger(currentPathRef.current);
           }
@@ -737,7 +677,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit, dialogs.setBranchTasksOpen]);
+  }, [compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit, dialogs]);
 
   const handleClearContext = useCallback(async () => {
     if (!terminalSessionId) return;
@@ -866,13 +806,13 @@ function App() {
               }
             }, [settings.setNetworkIsolation, settings.sandboxEnabled, terminalSessionId, settings.setSandboxFailed])}
             secondaryTerminalFocused={secondary.secondaryFocused}
-            onOpenDashboard={() => setDashboardOpen(true)}
-            onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
+            onOpenDashboard={() => dialogs.setDashboardOpen(true)}
+            onOpenBudgetSettings={() => dialogs.setBudgetDialogOpen(true)}
             autoChangelogEnabled={settings.autoChangelogEnabled}
             changelogStatus={changelogStatus}
-            onOpenAutoChangelogDialog={() => setAutoChangelogDialogOpen(true)}
+            onOpenAutoChangelogDialog={() => dialogs.setAutoChangelogDialogOpen(true)}
             autoCommitCli={settings.autoCommitCli}
-            onOpenAutoCommitConfig={() => setAutoCommitConfigOpen(true)}
+            onOpenAutoCommitConfig={() => dialogs.setAutoCommitConfigOpen(true)}
             onToggleSandbox={useCallback(() => {
               settings.setSandboxEnabled(prev => !prev);
               settings.setSandboxFailed(false);
@@ -886,9 +826,9 @@ function App() {
             onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
             branchTasksOpen={dialogs.branchTasksOpen}
             otherInstancesCount={deduplicatedOtherInstancesCount}
-            onToggleInstanceSyncPanel={() => setInstanceSyncPanelOpen(prev => !prev)}
+            onToggleInstanceSyncPanel={() => dialogs.setInstanceSyncPanelOpen(prev => !prev)}
             workspace={workspaceHook.workspace}
-            onOpenWorkspaceDialog={() => setWorkspaceDialogOpen(true)}
+            onOpenWorkspaceDialog={() => dialogs.setWorkspaceDialogOpen(true)}
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
           />
@@ -940,167 +880,33 @@ function App() {
         />
       </Layout>
 
-      {/* Instance Sync Dialog */}
-      <InstanceSyncPanel
-        open={instanceSyncPanelOpen}
-        onOpenChange={(open) => {
-          setInstanceSyncPanelOpen(open);
-          if (!open) instanceSync.clearSelectedInstance();
-        }}
-        ownState={instanceSync.ownState}
-        otherInstances={instanceSync.otherInstances}
-        selectedInstance={instanceSync.selectedInstance}
-        selectedInstanceSessions={instanceSync.selectedInstanceSessions}
-        selectedSession={instanceSync.selectedSession}
-        isLoadingSessions={instanceSync.isLoadingSessions}
-        sessionsHasMore={instanceSync.sessionsHasMore}
-        onSelectInstance={instanceSync.selectInstance}
-        onClearSelectedInstance={instanceSync.clearSelectedInstance}
-        onLoadMoreSessions={instanceSync.loadMoreSessions}
-        onFetchSessionContent={instanceSync.fetchSessionContent}
-        onRefresh={instanceSync.refreshInstances}
-        onCleanup={instanceSync.cleanupStaleInstances}
-        onLoadContext={handleLoadInstanceContext}
-        onSendToTerminal={handleSendImplementationPrompt}
-        onDebugPaths={instanceSync.debugClaudeDataPaths}
-        onDebugOpencodePaths={instanceSync.debugOpencodeDataPaths}
-        isLoading={false}
-        error={instanceSync.error}
-      />
-
-      <AddBookmarkDialog
-        open={dialogs.addBookmarkDialogOpen}
-        onOpenChange={dialogs.setAddBookmarkDialogOpen}
+      <DialogHost
+        dialogs={dialogs}
         currentPath={currentPath}
-      />
-      <BookmarksPalette
-        open={dialogs.bookmarksPaletteOpen}
-        onOpenChange={dialogs.setBookmarksPaletteOpen}
-        onNavigate={navigateToBookmark}
-      />
-      <ManageTemplatesDialog
-        open={dialogs.manageTemplatesDialogOpen}
-        onOpenChange={dialogs.setManageTemplatesDialogOpen}
-      />
-      <SaveFileGroupDialog
-        open={dialogs.saveFileGroupDialogOpen}
-        onOpenChange={dialogs.setSaveFileGroupDialogOpen}
-        projectPath={currentPath}
-        files={fileSelection.filesForGroup}
-      />
-      {dialogs.initialProjectDialogOpen && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center"
-          style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
-        >
-          <div style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
-            Lirah
-          </div>
-        </div>
-      )}
-      <InitialProjectDialog
-        open={dialogs.initialProjectDialogOpen}
-        onOpenChange={dialogs.setInitialProjectDialogOpen}
-        onSelectProject={handleSelectProject}
-        workspaces={workspaceHook.workspaces}
-        onOpenWorkspace={handleOpenWorkspace}
-      />
-      <CliSelectionModal
-        open={dialogs.cliSelectionModalOpen}
-        onOpenChange={dialogs.setCliSelectionModalOpen}
-        selectedCli={settings.selectedCli}
-        onCliChange={settings.setSelectedCli}
+        settings={settings}
         cliAvailability={cliAvailability}
-      />
-      <KeyboardShortcutsDialog
-        open={dialogs.showHelp}
-        onOpenChange={dialogs.setShowHelp}
-      />
-      <ElementPickerDialog
-        open={elementPicker.elementPickerOpen}
-        onOpenChange={elementPicker.setElementPickerOpen}
-        filePath={elementPicker.elementPickerFilePath}
-        currentPath={currentPath}
-        onAddElements={elementPicker.handleAddElements}
-      />
-      <TokenAlertBanner
-        projectPath={currentPath}
-        onOpenBudgetSettings={() => setBudgetDialogOpen(true)}
-      />
-      <TokenBudgetDialog
-        open={budgetDialogOpen}
-        onOpenChange={setBudgetDialogOpen}
-        projectPath={currentPath}
-      />
-      <AutoChangelogDialog
-        open={autoChangelogDialogOpen}
-        onOpenChange={setAutoChangelogDialogOpen}
-        enabled={settings.autoChangelogEnabled}
-        trigger={settings.autoChangelogTrigger}
-        targetFile={settings.autoChangelogTarget}
-        cli={settings.autoChangelogCli}
-        onSave={({ enabled, trigger, targetFile, cli }) => {
-          settings.setAutoChangelogEnabled(enabled);
-          settings.setAutoChangelogTrigger(trigger);
-          settings.setAutoChangelogTarget(targetFile);
-          settings.setAutoChangelogCli(cli);
-        }}
-      />
-      <TokenDashboard
-        open={dashboardOpen}
-        onOpenChange={setDashboardOpen}
+        elementPicker={elementPicker}
+        fileSelection={fileSelection}
+        instanceSync={instanceSync}
+        branchName={branchName}
+        branchTasks={branchTasks}
+        autoCommit={autoCommit}
+        changelogStatus={changelogStatus}
         tokenUsage={tokenUsage}
         projectStats={projectStats}
-        refreshStats={refreshProjectStats}
-        projectPath={currentPath}
+        refreshProjectStats={refreshProjectStats}
         theme={theme}
+        workspaceHook={workspaceHook}
+        secondary={secondary}
+        orchestrationCheck={orchestrationCheck}
+        navigateToBookmark={navigateToBookmark}
+        handleSelectProject={handleSelectProject}
+        handleCreateWorkspace={handleCreateWorkspace}
+        handleOpenWorkspace={handleOpenWorkspace}
+        handleLoadInstanceContext={handleLoadInstanceContext}
+        handleSendImplementationPrompt={handleSendImplementationPrompt}
+        handleOrchestrationInstall={handleOrchestrationInstall}
       />
-      <AutoCommitDialog autoCommit={autoCommit} />
-      <WorkspaceDialog
-        open={workspaceDialogOpen}
-        onOpenChange={setWorkspaceDialogOpen}
-        onCreateWorkspace={handleCreateWorkspace}
-        existingWorkspaces={workspaceHook.workspaces}
-        onOpenWorkspace={handleOpenWorkspace}
-        onDeleteWorkspace={workspaceHook.deleteWorkspace}
-      />
-      {projectPickerOpen && workspaceHook.workspace?.projects && (
-        <WorkspaceProjectPicker
-          projects={workspaceHook.workspace.projects}
-          onSelect={(project) => {
-            setProjectPickerOpen(false);
-            const path = project.real_path || project.path;
-            if (projectPickerAction === 'lazygit') {
-              secondary.openWithCommand('lazygit', path);
-            } else if (projectPickerAction === 'autocommit') {
-              autoCommit.trigger(path);
-            }
-            setProjectPickerAction(null);
-          }}
-          onCancel={() => {
-            setProjectPickerOpen(false);
-            setProjectPickerAction(null);
-          }}
-        />
-      )}
-      <AutoCommitConfigDialog
-        open={autoCommitConfigOpen}
-        onOpenChange={setAutoCommitConfigOpen}
-        cli={settings.autoCommitCli}
-        customPrompt={settings.autoCommitCustomPrompt}
-        onSave={({ cli, customPrompt }) => {
-          settings.setAutoCommitCli(cli);
-          settings.setAutoCommitCustomPrompt(customPrompt);
-        }}
-      />
-      <OrchestrationPrompt
-        open={orchestrationPromptOpen}
-        onOpenChange={setOrchestrationPromptOpen}
-        status={orchestrationStatus}
-        onInstall={handleOrchestrationInstall}
-        installing={orchestrationCheck.installing}
-      />
-      <ToastContainer />
     </SidebarProvider>
     </TokenBudgetProvider>
   );

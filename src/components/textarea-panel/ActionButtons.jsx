@@ -2,16 +2,7 @@ import React from "react";
 import { Button } from "../ui/button";
 import { Send, Coins } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-
-const formatTokenCount = (count) => {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
-};
+import { formatTokenCount } from "../../features/token-budget/tokenCalculations";
 
 /**
  * Action buttons at the bottom of the textarea panel

@@ -2,13 +2,7 @@
  * Pure tree utility functions for building and updating file tree structures.
  */
 
-/**
- * Build a hierarchical tree from a flat list of file entries.
- */
-// Normalize path separators for consistent comparison
-function normalizePath(p) {
-  return p ? p.replace(/\\/g, '/').replace(/\/+$/, '') : p;
-}
+import { normalizePath } from './pathUtils';
 
 export function buildTreeFromFlatList(flatList, rootPath) {
   const normalizedRoot = normalizePath(rootPath);

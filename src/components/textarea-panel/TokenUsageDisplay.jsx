@@ -1,12 +1,7 @@
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Coins } from "lucide-react";
 import { TokenCostEstimate } from "../../features/token-budget";
-
-function formatTokenCount(count) {
-  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-  return count.toString();
-}
+import { formatTokenCount } from "../../features/token-budget/tokenCalculations";
 
 export function TokenUsageDisplay({ tokenUsage, textareaContent, selectedFiles, projectPath, orchestrationTokenEstimate }) {
   const hasTokens = tokenUsage && (tokenUsage.billable_input_tokens > 0 || tokenUsage.billable_output_tokens > 0);

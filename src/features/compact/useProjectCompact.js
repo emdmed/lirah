@@ -16,20 +16,7 @@ export const estimateTokens = (text) => {
   return Math.ceil(text.length / 4);
 };
 
-/**
- * Format token count for display
- * @param {number} count - Token count
- * @returns {string} - Formatted string (e.g., "12.5K")
- */
-export const formatTokenCount = (count) => {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
-};
+export { formatTokenCount } from '../token-budget/tokenCalculations';
 
 // Directories to skip during compacting
 const SKIP_DIRECTORIES = new Set([
