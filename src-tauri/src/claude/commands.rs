@@ -655,16 +655,42 @@ pub fn get_claude_instances() -> Result<Vec<crate::instance_sync::types::Instanc
     Ok(instances)
 }
 
-/// Decode a project path from Claude directory name
-/// Claude replaces ALL / with - (including leading /)
-/// So -home-enrique-projects-nevo-terminal becomes /home/enrique/projects/nevo-terminal
+/// Decode a project path from Claude directory name.
+/// Claude replaces path separators and special chars with `-`.
+/// On Unix: `-home-enrique-projects-foo` → `/home/enrique/projects/foo`
+/// On Windows: `-C-Users-name-projects-foo` → `C:\Users\name\projects\foo`
 fn decode_project_path(encoded: &str) -> String {
-    encoded.replace('-', "/")
+    #[cfg(unix)]
+    {
+        encoded.replace('-', "/")
+    }
+    #[cfg(windows)]
+    {
+        // On Windows the encoded form looks like: -C-Users-name-projects-foo
+        // We need to reconstruct: C:\Users\name\projects\foo
+        let with_sep = encoded.replace('-', "\\");
+        // The leading `\` is spurious; strip it. Then restore the drive colon.
+        // e.g. `\C\Users\...` → `C\Users\...` → `C:\Users\...`
+        let trimmed = with_sep.trim_start_matches('\\');
+        // If the path starts with a single letter followed by `\`, insert `:` for the drive
+        if trimmed.len() >= 2
+            && trimmed.as_bytes()[0].is_ascii_alphabetic()
+            && trimmed.as_bytes()[1] == b'\\'
+        {
+            format!("{}:{}", &trimmed[..1], &trimmed[1..])
+        } else {
+            trimmed.to_string()
+        }
+    }
 }
 
-/// Encode a project path for the Claude directory structure
-/// Claude replaces ALL / with - (including leading /)
-/// So /home/enrique/projects/nevo-terminal becomes -home-enrique-projects-nevo-terminal
+/// Encode a project path for the Claude directory structure.
+/// Claude replaces ALL path separators (and `:`, spaces) with `-`.
+/// Unix: `/home/enrique/projects/foo` → `-home-enrique-projects-foo`
+/// Windows: `C:\Users\name\projects\foo` → `-C-Users-name-projects-foo`
 fn encode_project_path(path: &str) -> String {
-    path.replace('/', "-").replace(' ', "-")
+    path.replace('/', "-")
+        .replace('\\', "-")
+        .replace(':', "-")
+        .replace(' ', "-")
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
@@ -68,7 +68,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     try {
       await invoke('run_git_command', { repoPath, args: ['commit', '-m', editedMessage] });
       setStage('done');
-      setTimeout(reset, 2000);
+      doneTimerRef.current = setTimeout(reset, 2000);
     } catch (err) {
       setError(err.toString());
       setStage('error');
@@ -87,6 +87,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
 
   // Quick commit: if ready, commit immediately; if generating, mark for auto-commit when ready
   const autoConfirmRef = useRef(false);
+  const doneTimerRef = useRef(null);
 
   const quickCommit = useCallback(() => {
     if (stage === 'ready' && commitMessage.trim()) {
@@ -97,12 +98,19 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   }, [stage, commitMessage, confirm]);
 
   // Auto-confirm when message becomes ready if flagged
-  const prevStageRef = useRef(stage);
-  if (stage === 'ready' && prevStageRef.current !== 'ready' && autoConfirmRef.current) {
-    autoConfirmRef.current = false;
-    setTimeout(() => confirm(commitMessage), 0);
-  }
-  prevStageRef.current = stage;
+  useEffect(() => {
+    if (stage === 'ready' && autoConfirmRef.current) {
+      autoConfirmRef.current = false;
+      confirm(commitMessage);
+    }
+  }, [stage, commitMessage, confirm]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (doneTimerRef.current) clearTimeout(doneTimerRef.current);
+    };
+  }, []);
 
   return { stage, files, diff, commitMessage, setCommitMessage, error, trigger, confirm, cancel, quickCommit };
 }

@@ -8,6 +8,42 @@ use std::thread;
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
+/// Build a `Command` that runs a string through the platform shell.
+/// Unix: `$SHELL -lc <command>` (falls back to `/bin/bash`)
+/// Windows: `cmd.exe /C <command>`
+fn shell_command(command: &str) -> std::process::Command {
+    #[cfg(unix)]
+    {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+        let mut cmd = std::process::Command::new(shell);
+        cmd.args(["-lc", command]);
+        cmd
+    }
+    #[cfg(windows)]
+    {
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.args(["/C", command]);
+        cmd
+    }
+}
+
+/// Build a `portable_pty::CommandBuilder` that runs a string through the platform shell.
+fn shell_pty_command(command: &str) -> portable_pty::CommandBuilder {
+    #[cfg(unix)]
+    {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+        let mut cmd = portable_pty::CommandBuilder::new(&shell);
+        cmd.args(["-lc", command]);
+        cmd
+    }
+    #[cfg(windows)]
+    {
+        let mut cmd = portable_pty::CommandBuilder::new("cmd");
+        cmd.args(["/C", command]);
+        cmd
+    }
+}
+
 #[tauri::command]
 pub fn spawn_terminal(
     rows: u16,
@@ -171,7 +207,7 @@ pub fn spawn_hidden_terminal(
     app: AppHandle,
     state: tauri::State<AppState>,
 ) -> Result<String, String> {
-    use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
+    use portable_pty::{NativePtySystem, PtySize, PtySystem};
     use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
 
@@ -188,10 +224,8 @@ pub fn spawn_hidden_terminal(
         })
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    // Parse the command: run via shell -c
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-    let mut cmd = CommandBuilder::new(&shell);
-    cmd.args(&["-lc", &command]);
+    // Parse the command: run via platform shell
+    let mut cmd = shell_pty_command(&command);
     cmd.env("TERM", "xterm-256color");
     cmd.cwd(&project_dir);
 
@@ -447,11 +481,8 @@ pub fn generate_commit_message(
         ),
     };
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-
     // First attempt with free model
-    let output = std::process::Command::new(&shell)
-        .args(&["-lc", &command])
+    let output = shell_command(&command)
         .current_dir(&project_dir)
         .env("TERM", "xterm-256color")
         .output()
@@ -463,8 +494,7 @@ pub fn generate_commit_message(
 
     // If free model failed and we have a fallback (paid model), try it silently
     if let Some(fallback) = fallback_command {
-        let fallback_output = std::process::Command::new(&shell)
-            .args(&["-lc", &fallback])
+        let fallback_output = shell_command(&fallback)
             .current_dir(&project_dir)
             .env("TERM", "xterm-256color")
             .output()
@@ -615,11 +645,8 @@ pub fn generate_branch_tasks(
 
     eprintln!("[generate_branch_tasks] Running command: {}", command);
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-
     // First attempt with free model - pass prompt via stdin to avoid arg length limits
-    let output = std::process::Command::new(&shell)
-        .args(&["-lc", &command])
+    let output = shell_command(&command)
         .current_dir(&project_dir)
         .env("TERM", "xterm-256color")
         .stdin(std::process::Stdio::piped())
@@ -653,8 +680,7 @@ pub fn generate_branch_tasks(
         let stderr = String::from_utf8_lossy(&output.stderr);
         eprintln!("[generate_branch_tasks] Primary stderr: {}", stderr);
         // Try fallback - also pass prompt via stdin
-        let fallback_output = std::process::Command::new(&shell)
-            .args(&["-lc", &fallback])
+        let fallback_output = shell_command(&fallback)
             .current_dir(&project_dir)
             .env("TERM", "xterm-256color")
             .stdin(std::process::Stdio::piped())
@@ -905,11 +931,8 @@ Follow .orchestration/orchestration.md"#,
         ),
     };
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-
     // First attempt with free model
-    let output = std::process::Command::new(&shell)
-        .args(&["-lc", &command])
+    let output = shell_command(&command)
         .current_dir(&project_dir)
         .env("TERM", "xterm-256color")
         .output()
@@ -921,8 +944,7 @@ Follow .orchestration/orchestration.md"#,
 
     // If free model failed and we have a fallback (paid model), try it silently
     if let Some(fallback) = fallback_command {
-        let fallback_output = std::process::Command::new(&shell)
-            .args(&["-lc", &fallback])
+        let fallback_output = shell_command(&fallback)
             .current_dir(&project_dir)
             .env("TERM", "xterm-256color")
             .output()
