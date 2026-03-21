@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Palette } from 'lucide-react';
 import {
-  Keyboard, Eye, EyeOff, Download, Bot, Terminal, Settings,
+  Keyboard, Eye, EyeOff, Bot, Terminal, Settings,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
   CheckCircle2, ListTodo, Monitor, Layers, X
@@ -157,7 +157,7 @@ function ThemeSwitcherMenuItem() {
 
 export const StatusBar = ({
   viewMode, currentPath, sessionId, theme, onToggleHelp,
-  onLaunchOrchestration, selectedCli, onOpenCliSettings, showTitleBar,
+  selectedCli, onOpenCliSettings, showTitleBar,
   onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
@@ -327,11 +327,6 @@ export const StatusBar = ({
                 Token Budget
               </DropdownMenuItem>
               <ThemeSwitcherMenuItem />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onLaunchOrchestration} disabled={!sessionId} className="cursor-pointer py-1">
-                <Download className="mr-2 w-3 h-3" />
-                Add Orchestration
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
                 <Keyboard className="mr-2 w-3 h-3" />

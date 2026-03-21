@@ -21,6 +21,7 @@ export function useDialogs() {
   const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
   const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
   const [orchestrationStatus, setOrchestrationStatus] = useState(null);
+  const [orchestrationDashboardOpen, setOrchestrationDashboardOpen] = useState(false);
 
   return {
     addBookmarkDialogOpen, setAddBookmarkDialogOpen,
@@ -43,5 +44,6 @@ export function useDialogs() {
     instanceSyncPanelOpen, setInstanceSyncPanelOpen,
     orchestrationPromptOpen, setOrchestrationPromptOpen,
     orchestrationStatus, setOrchestrationStatus,
+    orchestrationDashboardOpen, setOrchestrationDashboardOpen,
   };
 }

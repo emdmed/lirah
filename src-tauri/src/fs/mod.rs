@@ -8,7 +8,7 @@ pub use directory::{read_directory, read_file_content, write_file_content, read_
 pub use cwd::get_terminal_cwd;
 pub use git::{GitStats, get_git_stats, get_git_diff, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, get_branch_completed_tasks};
 pub use tokens::{get_session_token_usage, get_project_stats, get_all_projects_stats};
-pub use commands::check_command_exists;
+pub use commands::{check_command_exists, get_home_dir, set_file_executable, path_exists};
 
 fn home_dir() -> Option<String> {
     #[cfg(unix)]

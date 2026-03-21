@@ -57,6 +57,8 @@ export function TextareaPanel({
   patternFiles = [],
   selectedPatterns = new Set(),
   onTogglePattern,
+  onDeleteOrchestration,
+  onOpenOrchestrationDashboard,
 }) {
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
@@ -281,6 +283,8 @@ export function TextareaPanel({
               orchestrationTokenEstimate={orchestrationTokenEstimate}
               disabled={disabled}
               isWide
+              onDeleteOrchestration={onDeleteOrchestration}
+              onOpenDashboard={onOpenOrchestrationDashboard}
             />
             <div className="p-1">
               <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
@@ -309,6 +313,7 @@ export function TextareaPanel({
           orchestrationTokenEstimate={orchestrationTokenEstimate}
           disabled={disabled}
           isWide={false}
+          onDeleteOrchestration={onDeleteOrchestration}
         />
         <div className="flex items-center gap-2">
           {projectZone}

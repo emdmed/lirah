@@ -12,8 +12,8 @@ mod opencode;
 mod workspace;
 
 use state::create_state;
-use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, generate_instance_sync_prompt};
-use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_branch_completed_tasks};
+use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, generate_instance_sync_prompt, check_pty_child_process};
+use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_branch_completed_tasks, get_home_dir, set_file_executable, path_exists};
 use typecheck::check_file_types;
 use python_parser::parse_python_skeleton;
 use instance_sync::{create_instance_sync_store, get_instance_id, register_instance, update_instance_state, get_all_instances, get_own_instance_state, unregister_instance, cleanup_stale_instances, start_instance_watcher};
@@ -81,7 +81,11 @@ pub fn run() {
             delete_workspace,
             list_workspaces,
             open_workspace,
-            close_workspace
+            close_workspace,
+            get_home_dir,
+            set_file_executable,
+            path_exists,
+            check_pty_child_process
         ])
         .setup(|app| {
             start_instance_watcher(app.handle().clone());

@@ -28,6 +28,7 @@ import { SecondaryTerminal } from "./components/SecondaryTerminal";
 import { TextareaPanel } from "./components/textarea-panel/textarea-panel";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DialogHost } from "./components/DialogHost";
+import { SplashScreen } from "./features/splash";
 
 // Domain hooks
 import { useSecondaryTerminal } from "./hooks/useSecondaryTerminal";
@@ -44,6 +45,7 @@ import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
 import { usePatterns } from "./features/patterns";
 import { useWorkspace } from "./hooks/useWorkspace";
+import { useToast } from "./features/toast";
 
 function App() {
   const { theme } = useTheme();
@@ -222,6 +224,7 @@ function App() {
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
 
+  const toast = useToast();
   const orchestrationCheck = useOrchestrationCheck();
 
   const switchToClaudeMode = useCallback(() => {
@@ -229,16 +232,37 @@ function App() {
     sidebar.setSidebarOpen(true);
   }, [sidebar]);
 
-  // Launch orchestration
-  const launchOrchestration = useCallback(async () => {
-    if (!terminalSessionId) return;
+  // Open orchestration dashboard
+  const openOrchestrationDashboard = useCallback(() => {
+    dialogs.setOrchestrationDashboardOpen(true);
+  }, [dialogs]);
+
+  // Delete orchestration folder
+  const handleDeleteOrchestration = useCallback(async () => {
+    if (!currentPath) return;
     try {
-      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: 'npx agentic-orchestration\r' });
-      terminalRef.current?.focus?.();
+      // Remove .orchestration directory by deleting known files and subdirs
+      const orchDir = `${currentPath}/.orchestration`;
+      const exists = await invoke('path_exists', { path: orchDir });
+      if (!exists) return;
+
+      // Use shell to remove directory recursively
+      await invoke('write_to_terminal', {
+        sessionId: terminalSessionId,
+        data: `rm -rf "${orchDir}"\r`
+      });
+
+      // Wait briefly for fs operation
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Reset orchestration state
+      setAppendOrchestration(false);
+      setOrchestrationTokenEstimate(null);
+      orchestrationCheckedForPath.current = null;
     } catch (error) {
-      console.error('Failed to launch orchestration:', error);
+      console.error('Failed to delete orchestration:', error);
     }
-  }, [terminalSessionId]);
+  }, [currentPath, terminalSessionId]);
 
   // Navigate to bookmark
   const navigateToBookmark = useCallback(async (bookmark) => {
@@ -383,9 +407,31 @@ function App() {
       }, 3000);
     });
 
-    launchClaude();
+    await launchClaude();
+
+    // Poll until the CLI process is detected (or timeout after 15s)
+    await new Promise(resolve => {
+      const cliName = settings.selectedCli === 'opencode' ? 'opencode' : 'claude';
+      const checkCli = setInterval(async () => {
+        try {
+          const running = await invoke('check_pty_child_process', {
+            sessionId: terminalSessionId,
+            processName: cliName,
+          });
+          if (running) {
+            clearInterval(checkCli);
+            resolve();
+          }
+        } catch { /* ignore polling errors */ }
+      }, 300);
+      setTimeout(() => { clearInterval(checkCli); resolve(); }, 15000);
+    });
+
+    // Allow the CLI TUI to render after process detection
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
     setSplashStep('done');
-  }, [navigateToBookmark, switchToClaudeMode, launchClaude, currentPath]);
+  }, [navigateToBookmark, switchToClaudeMode, launchClaude, currentPath, settings]);
 
   // Git changes handler (needs currentPath for incremental updates)
   const handleGitChanges = useCallback((changes) => {
@@ -525,6 +571,28 @@ function App() {
       })
       .catch(() => { setAppendOrchestration(false); setOrchestrationTokenEstimate(null); });
   }, [detectedCwd, calculateOrchestrationEstimate]);
+
+  // Auto-sync orchestration on project open (background, with toast)
+  const autoSyncedForPath = useRef(null);
+  useEffect(() => {
+    if (!detectedCwd || autoSyncedForPath.current === detectedCwd) return;
+    // Only auto-sync if project has .orchestration/
+    invoke('path_exists', { path: `${detectedCwd}/.orchestration/orchestration.md` })
+      .then(exists => {
+        if (!exists) return;
+        autoSyncedForPath.current = detectedCwd;
+        orchestrationCheck.fullSync(detectedCwd).then(result => {
+          if (!result) return;
+          const updates = [];
+          if (result.orchestration === 'updated') updates.push('protocol');
+          if (result.scripts.length > 0) updates.push(`${result.scripts.length} script(s)`);
+          if (result.workflows.length > 0) updates.push(`${result.workflows.length} workflow(s)`);
+          if (updates.length > 0) {
+            toast.success(`Orchestration synced: ${updates.join(', ')}`);
+          }
+        });
+      });
+  }, [detectedCwd, orchestrationCheck, toast]);
 
   // Check orchestration whenever view mode switches to tree (agent mode)
   useEffect(() => {
@@ -777,6 +845,8 @@ function App() {
               patternFiles={patterns.patternFiles}
               selectedPatterns={patterns.selectedPatterns}
               onTogglePattern={patterns.togglePattern}
+              onDeleteOrchestration={terminalSessionId ? handleDeleteOrchestration : undefined}
+              onOpenOrchestrationDashboard={openOrchestrationDashboard}
             />
           )
         }
@@ -788,7 +858,6 @@ function App() {
             sessionId={terminalSessionId}
             theme={theme.terminal}
             onToggleHelp={useCallback(() => dialogs.setShowHelp(prev => !prev), [dialogs.setShowHelp])}
-            onLaunchOrchestration={launchOrchestration}
             selectedCli={settings.selectedCli}
             onOpenCliSettings={() => dialogs.setCliSelectionModalOpen(true)}
             showTitleBar={settings.showTitleBar}
@@ -906,6 +975,13 @@ function App() {
         handleLoadInstanceContext={handleLoadInstanceContext}
         handleSendImplementationPrompt={handleSendImplementationPrompt}
         handleOrchestrationInstall={handleOrchestrationInstall}
+      />
+
+      <SplashScreen
+        visible={splashVisible}
+        projectName={splashProjectName}
+        currentStep={splashStep}
+        onComplete={() => setSplashVisible(false)}
       />
     </SidebarProvider>
     </TokenBudgetProvider>

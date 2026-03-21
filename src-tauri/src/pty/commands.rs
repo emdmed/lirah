@@ -5,6 +5,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::thread;
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
@@ -835,6 +836,59 @@ fn parse_llm_task_response(
 pub struct ConversationMessage {
     pub role: String,
     pub content: String,
+}
+
+#[tauri::command]
+pub fn check_pty_child_process(
+    session_id: String,
+    process_name: String,
+    state: tauri::State<AppState>,
+) -> Result<bool, String> {
+    let state_lock = state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?;
+    let session = state_lock
+        .pty_sessions
+        .get(&session_id)
+        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+
+    let shell_pid = session
+        .child
+        .process_id()
+        .ok_or_else(|| "Process has no PID".to_string())?;
+
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+
+    let target = process_name.to_lowercase();
+    for (pid, process) in sys.processes() {
+        let name: String = process.name().to_string_lossy().to_lowercase();
+        if name.contains(&target) {
+            if is_descendant(&sys, *pid, Pid::from_u32(shell_pid)) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn is_descendant(sys: &System, pid: Pid, ancestor: Pid) -> bool {
+    let mut current = pid;
+    for _ in 0..10 {
+        if let Some(proc_info) = sys.process(current) {
+            if let Some(parent) = proc_info.parent() {
+                if parent == ancestor {
+                    return true;
+                }
+                current = parent;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    false
 }
 
 /// Generate an implementation prompt from conversation messages using hidden CLI
