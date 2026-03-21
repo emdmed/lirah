@@ -26,13 +26,20 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     }
   }, [sandboxFailed, onSandboxFailed]);
 
-  // Debounced resize — short delay lets flex layout settle before fitting
+  // Debounced resize — delay lets flex layout settle before fitting.
+  // A secondary rAF pass catches late layout shifts that occur after the timeout.
   const resizeTimerRef = useRef(null);
+  const rafRef = useRef(null);
   const debouncedResize = useCallback(() => {
     if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     resizeTimerRef.current = setTimeout(() => {
       handleResize();
-    }, 50);
+      // Second pass: catch any layout shift that settled after the first fit
+      rafRef.current = requestAnimationFrame(() => {
+        handleResize();
+      });
+    }, 150);
   }, [handleResize]);
 
   // Setup resize observer
@@ -47,6 +54,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [debouncedResize]);
 

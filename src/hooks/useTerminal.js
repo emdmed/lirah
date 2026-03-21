@@ -16,6 +16,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [sandboxFailed, setSandboxFailed] = useState(false);
   const isFocusedRef = useRef(false);
   const sessionIdRef = useRef(null);
+  const lastDimsRef = useRef({ rows: 0, cols: 0 });
   const { error, warning } = useToast();
 
   // Initialize terminal
@@ -197,7 +198,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     };
   }, [terminal, fitAddon]);
 
-  // Handle resize
+  // Handle resize — fits the terminal to its container and syncs PTY dimensions.
+  // Skips if dimensions haven't changed to avoid spurious SIGWINCH to child processes.
   const handleResize = useCallback(() => {
     if (fitAddon && terminal && sessionId) {
       try {
@@ -208,6 +210,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         fitAddon.fit();
         const rows = terminal.rows;
         const cols = terminal.cols;
+        // Only notify the backend when dimensions actually changed
+        if (rows === lastDimsRef.current.rows && cols === lastDimsRef.current.cols) {
+          return;
+        }
+        lastDimsRef.current = { rows, cols };
         invoke('resize_terminal', { sessionId, rows, cols }).catch((error) => {
           console.error('Failed to resize terminal:', error);
         });
