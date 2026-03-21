@@ -26,6 +26,7 @@ export function TextareaArea({
   atMentionQuery,
   selectedFiles,
   fileStates,
+  footerInfo,
 }) {
   const hasIndicators = !!elementsIndicator || !!compactedIndicator;
   const sortedAtMentionResults = atMentionResults || [];
@@ -49,7 +50,11 @@ export function TextareaArea({
         aria-describedby="textarea-instructions"
         className="w-full h-full resize-none pb-10 pt-10"
       />
-      <div className="absolute bottom-2 right-2 flex items-center gap-2">
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          {footerInfo}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
         <span id="textarea-instructions" className="text-muted-foreground font-mono text-xs">
           {selectedTemplateId && !value?.trim() ? (
             <span className="text-primary">Ctrl+Enter</span>
@@ -77,6 +82,7 @@ export function TextareaArea({
         >
           <Send className="h-3.5 w-3.5" />
         </Button>
+        </div>
       </div>
       {atMentionActive && sortedAtMentionResults.length > 0 && (
         <AtMentionModal

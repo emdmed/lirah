@@ -236,6 +236,7 @@ export function TextareaPanel({
       sessionId={sessionId}
       handleSend={handleSend}
       isSendDisabled={isSendDisabled}
+      footerInfo={footerInfo}
       atMentionActive={atMentionActive}
       atMentionResults={atMentionResults}
       atMentionSelectedIndex={atMentionSelectedIndex}
@@ -274,7 +275,6 @@ export function TextareaPanel({
         <div className="flex gap-3" style={{ minHeight: '200px' }}>
           <div className="flex flex-col gap-2 flex-[2] min-w-0">
             {textareaArea}
-            {footerInfo}
           </div>
           <div className="flex flex-col gap-2 flex-1 min-w-[240px] max-w-[360px]">
             <OrchestrationToggle
@@ -323,7 +323,6 @@ export function TextareaPanel({
       </div>
       {dialogs}
       {textareaArea}
-      {footerInfo}
     </div>
   );
 }
