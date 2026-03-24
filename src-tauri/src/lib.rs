@@ -10,6 +10,7 @@ mod instance_sync;
 mod claude;
 mod opencode;
 mod workspace;
+mod fs_watcher;
 
 use state::create_state;
 use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, generate_instance_sync_prompt, check_pty_child_process};
@@ -20,6 +21,7 @@ use instance_sync::{create_instance_sync_store, get_instance_id, register_instan
 use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get_active_claude_session};
 use opencode::{get_opencode_data_paths, get_opencode_sessions, get_opencode_session, get_active_opencode_session};
 use workspace::{create_workspace, delete_workspace, list_workspaces, open_workspace, close_workspace};
+use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -32,6 +34,7 @@ pub fn run() {
         .manage(create_state())
         .manage(commit_watcher::create_commit_watcher_store())
         .manage(create_instance_sync_store())
+        .manage(std::sync::Arc::new(FsWatcherStore::new()))
         .invoke_handler(tauri::generate_handler![
             spawn_terminal,
             write_to_terminal,
@@ -85,7 +88,9 @@ pub fn run() {
             get_home_dir,
             set_file_executable,
             path_exists,
-            check_pty_child_process
+            check_pty_child_process,
+            start_fs_watcher,
+            stop_fs_watcher
         ])
         .setup(|app| {
             start_instance_watcher(app.handle().clone());

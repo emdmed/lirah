@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { buildTreeFromFlatList, incrementallyUpdateTree } from "../utils/treeOperations";
 import { lastSepIndex } from "../utils/pathUtils";
 import { useToast } from "../features/toast";
+import { useWatcher } from "../features/watcher/WatcherContext";
 
 /**
  * Custom hook to debounce a value
@@ -33,6 +35,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   const [allFiles, setAllFiles] = useState([]);
   const projectRootRef = useRef(null);
   const { error } = useToast();
+  const { fileWatchingEnabled } = useWatcher();
 
   // Debounce search results to prevent expensive tree filtering on every keystroke
   const debouncedSearchResults = useDebounce(searchResults, 150);
@@ -60,6 +63,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
       setCurrentPath(cwd);
       setAllFiles(allEntries);
       setTreeLoading(false);
+      setWatchPath(cwd);
       initializeSearch(allEntries);
     } catch (err) {
       console.error('Failed to load tree data:', err);
@@ -78,6 +82,38 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
       });
     }
   }, [terminalSessionId, setCurrentPath, initializeSearch]);
+
+  // Track project root for fs watcher (set after first loadTreeData)
+  const [watchPath, setWatchPath] = useState(null);
+
+  // Start native FS watcher and listen for create/delete events
+  useEffect(() => {
+    if (!watchPath || !fileWatchingEnabled) return;
+
+    let unlisten;
+    let stopped = false;
+
+    const setup = async () => {
+      try {
+        await invoke('start_fs_watcher', { path: watchPath });
+        unlisten = await listen('fs-changes', () => {
+          if (!stopped) {
+            loadTreeData();
+          }
+        });
+      } catch (err) {
+        console.warn('[useTreeView] Failed to start fs watcher:', err);
+      }
+    };
+
+    setup();
+
+    return () => {
+      stopped = true;
+      if (unlisten) unlisten();
+      invoke('stop_fs_watcher').catch(() => {});
+    };
+  }, [watchPath, fileWatchingEnabled, loadTreeData]);
 
   const handleIncrementalUpdate = useCallback((changes, rootPath) => {
     setTreeData(prev => incrementallyUpdateTree(prev, changes, rootPath));
