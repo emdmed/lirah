@@ -85,3 +85,32 @@ export function filterTreeByGitChanges(nodes, gitStatsMap) {
 
   return [...filtered, ...deletedAtRoot];
 }
+
+/**
+ * Recursively filters tree nodes to show only markdown (.md) files
+ * @param {Array} nodes - Array of tree nodes to filter
+ * @returns {Array} Filtered array of nodes containing only .md files and their parent dirs
+ */
+export function filterTreeByMarkdown(nodes) {
+  const filterNodes = (nodeList) => {
+    return nodeList
+      .map(node => {
+        if (node.is_dir && node.children && Array.isArray(node.children)) {
+          const filteredChildren = filterNodes(node.children);
+          if (filteredChildren.length > 0) {
+            return { ...node, children: filteredChildren };
+          }
+          return null;
+        }
+
+        if (!node.is_dir && node.name.endsWith('.md')) {
+          return node;
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  return filterNodes(nodes);
+}

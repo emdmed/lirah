@@ -2,7 +2,7 @@ import { Button } from './ui/button';
 import { Badge} from "./ui/badge"
 import { Input } from './ui/input';
 import { BookmarksDropdown } from '../features/bookmarks';
-import { Search, X, GitBranch, Star, Shield, Eye } from 'lucide-react';
+import { Search, X, GitBranch, Star, Shield, Eye, FileText } from 'lucide-react';
 
 export function SidebarHeader({
   viewMode,
@@ -14,6 +14,8 @@ export function SidebarHeader({
   searchInputRef,
   showGitChangesOnly,
   onToggleGitFilter,
+  showMarkdownOnly,
+  onToggleMarkdownFilter,
   fileWatchingEnabled,
   onAddBookmark,
   onNavigateBookmark,
@@ -56,17 +58,30 @@ export function SidebarHeader({
             </Button>
           )}
           {showSearch && (
-            <Button
-              onClick={onToggleGitFilter}
-              size="icon-xs"
-              variant={showGitChangesOnly ? 'default' : 'ghost'}
-              className={`h-6 w-6 ${!fileWatchingEnabled ? 'opacity-40' : ''} ${showGitChangesOnly ? '' : 'hover:bg-accent/60'}`}
-              title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only git changes (Ctrl+G)"}
-              aria-label={showGitChangesOnly ? "Show all files" : "Show only git changes"}
-              aria-pressed={showGitChangesOnly}
-            >
-              <GitBranch className="w-3 h-3" />
-            </Button>
+            <>
+              <Button
+                onClick={onToggleMarkdownFilter}
+                size="icon-xs"
+                variant={showMarkdownOnly ? 'default' : 'ghost'}
+                className={`h-6 w-6 ${showMarkdownOnly ? '' : 'hover:bg-accent/60'}`}
+                title={showMarkdownOnly ? "Show all files (Ctrl+M)" : "Show only markdown files (Ctrl+M)"}
+                aria-label={showMarkdownOnly ? "Show all files" : "Show only markdown files"}
+                aria-pressed={showMarkdownOnly}
+              >
+                <FileText className="w-3 h-3" />
+              </Button>
+              <Button
+                onClick={onToggleGitFilter}
+                size="icon-xs"
+                variant={showGitChangesOnly ? 'default' : 'ghost'}
+                className={`h-6 w-6 ${!fileWatchingEnabled ? 'opacity-40' : ''} ${showGitChangesOnly ? '' : 'hover:bg-accent/60'}`}
+                title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only git changes (Ctrl+G)"}
+                aria-label={showGitChangesOnly ? "Show all files" : "Show only git changes"}
+                aria-pressed={showGitChangesOnly}
+              >
+                <GitBranch className="w-3 h-3" />
+              </Button>
+            </>
           )}
 
         </div>

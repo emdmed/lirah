@@ -11,6 +11,7 @@ import { useBookmarks } from "./features/bookmarks";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "./hooks/useCwdMonitor";
 import { useBranchName, useAutoChangelog, useAutoCommit, useBranchTasks, GitDiffDialog, BranchCompletedTasksDialog } from "./features/git";
+import { MarkdownViewerDialog } from "./features/markdown";
 import { useFlatViewNavigation } from "./hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "./hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "./hooks/useTextareaShortcuts";
@@ -448,6 +449,26 @@ function App() {
     dialogs.setDiffDialogOpen(true);
   }, [dialogs]);
 
+  // View markdown file
+  const viewMarkdownFile = useCallback((filePath) => {
+    dialogs.setMarkdownFilePath(filePath);
+    dialogs.setMarkdownViewerOpen(true);
+  }, [dialogs]);
+
+  // Collect markdown file paths from tree for navigation (only when viewer is open)
+  const markdownFiles = useMemo(() => {
+    if (!dialogs.markdownViewerOpen) return [];
+    const paths = [];
+    const collect = (nodes) => {
+      for (const node of nodes) {
+        if (node.is_dir && node.children) collect(node.children);
+        else if (!node.is_dir && node.name.endsWith('.md')) paths.push(node.path);
+      }
+    };
+    collect(treeView.treeData);
+    return paths;
+  }, [treeView.treeData, dialogs.markdownViewerOpen]);
+
   // Send file path to terminal
   const sendFileToTerminal = useCallback(async (absolutePath) => {
     if (!terminalSessionId) return;
@@ -501,6 +522,7 @@ function App() {
     onLoadFlatView: loadFolders, onLoadTreeView: treeView.loadTreeData,
     onLaunchClaude: launchClaude, terminalSessionId,
     secondaryTerminalFocused: secondary.secondaryFocused,
+    onToggleMarkdownFilter: treeView.handleToggleMarkdownFilter,
   });
 
   // Clear folder expansion when sidebar closes
@@ -792,6 +814,7 @@ function App() {
               sandboxEnabled={settings.sandboxEnabled}
               onSendToTerminal={sendFileToTerminal}
               onViewDiff={viewFileDiff}
+              onViewMarkdown={viewMarkdownFile}
               onGitChanges={handleGitChanges}
               onOpenElementPicker={elementPicker.handleOpenElementPicker}
               keepFilesAfterSend={settings.keepFilesAfterSend}
@@ -939,6 +962,14 @@ function App() {
           onOpenChange={dialogs.setDiffDialogOpen}
           filePath={dialogs.diffFilePath}
           repoPath={currentPath}
+        />
+        <MarkdownViewerDialog
+          open={dialogs.markdownViewerOpen}
+          onOpenChange={dialogs.setMarkdownViewerOpen}
+          filePath={dialogs.markdownFilePath}
+          repoPath={currentPath}
+          markdownFiles={markdownFiles}
+          onFileChange={viewMarkdownFile}
         />
         <BranchCompletedTasksDialog
           open={dialogs.branchTasksOpen}

@@ -22,6 +22,8 @@ export function useDialogs() {
   const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
   const [orchestrationStatus, setOrchestrationStatus] = useState(null);
   const [orchestrationDashboardOpen, setOrchestrationDashboardOpen] = useState(false);
+  const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
+  const [markdownFilePath, setMarkdownFilePath] = useState(null);
 
   return {
     addBookmarkDialogOpen, setAddBookmarkDialogOpen,
@@ -45,5 +47,7 @@ export function useDialogs() {
     orchestrationPromptOpen, setOrchestrationPromptOpen,
     orchestrationStatus, setOrchestrationStatus,
     orchestrationDashboardOpen, setOrchestrationDashboardOpen,
+    markdownViewerOpen, setMarkdownViewerOpen,
+    markdownFilePath, setMarkdownFilePath,
   };
 }

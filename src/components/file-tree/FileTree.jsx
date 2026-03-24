@@ -3,7 +3,7 @@ import { SidebarMenu } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
 import { useGitStats } from "../../features/git";
-import { filterTreeByGitChanges } from "./utils/filterUtils";
+import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtils";
 
 /**
  * Main FileTree component - renders a tree view of files and folders
@@ -15,9 +15,11 @@ export function FileTree({
   expandedFolders,
   currentPath,
   showGitChangesOnly,
+  showMarkdownOnly,
   onToggle,
   onSendToTerminal,
   onViewDiff,
+  onViewMarkdown,
   selectedFiles,
   onToggleFileSelection,
   isTextareaPanelOpen,
@@ -38,26 +40,31 @@ export function FileTree({
 
     // Apply git changes filter if enabled
     if (showGitChangesOnly) {
-      console.log('[FileTree] Filtering by git changes. nodes:', nodes.length, 'gitStats:', gitStats.size);
       filtered = filterTreeByGitChanges(filtered, gitStats);
-      console.log('[FileTree] After filter:', filtered.length, 'nodes');
+    }
+
+    // Apply markdown filter if enabled
+    if (showMarkdownOnly) {
+      filtered = filterTreeByMarkdown(filtered);
     }
 
     return filtered;
-  }, [nodes, showGitChangesOnly, gitStats]);
+  }, [nodes, showGitChangesOnly, showMarkdownOnly, gitStats]);
 
   // When showing only git changes, clicking a file should show its diff
   // instead of adding it to file selection
   const handleToggleFileSelection = useCallback((filePath) => {
     if (showGitChangesOnly && onViewDiff) {
       onViewDiff(filePath);
+    } else if (showMarkdownOnly && onViewMarkdown) {
+      onViewMarkdown(filePath);
     } else {
       onToggleFileSelection(filePath);
     }
-  }, [showGitChangesOnly, onViewDiff, onToggleFileSelection]);
+  }, [showGitChangesOnly, showMarkdownOnly, onViewDiff, onViewMarkdown, onToggleFileSelection]);
 
   if (!displayedNodes || displayedNodes.length === 0) {
-    return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} />;
+    return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} />;
   }
 
   return (

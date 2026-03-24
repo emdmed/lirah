@@ -32,6 +32,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   const [treeLoading, setTreeLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
+  const [showMarkdownOnly, setShowMarkdownOnly] = useState(false);
   const [allFiles, setAllFiles] = useState([]);
   const projectRootRef = useRef(null);
   const { error } = useToast();
@@ -205,25 +206,43 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     setExpandedFolders(pathsToExpand);
   }, []);
 
+  const expandAllFolders = useCallback(() => {
+    if (treeData.length > 0) {
+      const allFolderPaths = new Set();
+      const collectFolders = (nodes) => {
+        nodes.forEach(node => {
+          if (node.is_dir) {
+            allFolderPaths.add(node.path);
+            if (node.children) collectFolders(node.children);
+          }
+        });
+      };
+      collectFolders(treeData);
+      setExpandedFolders(allFolderPaths);
+    }
+  }, [treeData]);
+
   const handleToggleGitFilter = useCallback(() => {
     setShowGitChangesOnly(prev => {
       const newValue = !prev;
-      if (newValue && treeData.length > 0) {
-        const allFolderPaths = new Set();
-        const collectFolders = (nodes) => {
-          nodes.forEach(node => {
-            if (node.is_dir) {
-              allFolderPaths.add(node.path);
-              if (node.children) collectFolders(node.children);
-            }
-          });
-        };
-        collectFolders(treeData);
-        setExpandedFolders(allFolderPaths);
+      if (newValue) {
+        setShowMarkdownOnly(false);
+        expandAllFolders();
       }
       return newValue;
     });
-  }, [treeData]);
+  }, [expandAllFolders]);
+
+  const handleToggleMarkdownFilter = useCallback(() => {
+    setShowMarkdownOnly(prev => {
+      const newValue = !prev;
+      if (newValue) {
+        setShowGitChangesOnly(false);
+        expandAllFolders();
+      }
+      return newValue;
+    });
+  }, [expandAllFolders]);
 
   const displayedTreeData = useMemo(() => {
     let filtered = treeData;
@@ -240,6 +259,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     treeLoading,
     expandedFolders, setExpandedFolders,
     showGitChangesOnly,
+    showMarkdownOnly,
     allFiles,
     loadTreeData,
     handleIncrementalUpdate,
@@ -248,10 +268,11 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     filterTreeBySearch,
     expandSearchResults,
     handleToggleGitFilter,
+    handleToggleMarkdownFilter,
     displayedTreeData,
   }), [
-    treeData, treeLoading, expandedFolders, showGitChangesOnly, allFiles,
+    treeData, treeLoading, expandedFolders, showGitChangesOnly, showMarkdownOnly, allFiles,
     loadTreeData, handleIncrementalUpdate, handleGitChanges, toggleFolder,
-    filterTreeBySearch, expandSearchResults, handleToggleGitFilter, displayedTreeData,
+    filterTreeBySearch, expandSearchResults, handleToggleGitFilter, handleToggleMarkdownFilter, displayedTreeData,
   ]);
 }
