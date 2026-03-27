@@ -891,6 +891,43 @@ fn is_descendant(sys: &System, pid: Pid, ancestor: Pid) -> bool {
     false
 }
 
+/// Kill a named child process running under the PTY session (e.g. claude, opencode).
+/// Sends SIGKILL to terminate the process immediately.
+#[tauri::command]
+pub fn kill_pty_child_process(
+    session_id: String,
+    process_name: String,
+    state: tauri::State<AppState>,
+) -> Result<bool, String> {
+    let state_lock = state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?;
+    let session = state_lock
+        .pty_sessions
+        .get(&session_id)
+        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+
+    let shell_pid = session
+        .child
+        .process_id()
+        .ok_or_else(|| "Process has no PID".to_string())?;
+
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+
+    let target = process_name.to_lowercase();
+    for (pid, process) in sys.processes() {
+        let name: String = process.name().to_string_lossy().to_lowercase();
+        if name.contains(&target) {
+            if is_descendant(&sys, *pid, Pid::from_u32(shell_pid)) {
+                process.kill();
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
 /// Generate an implementation prompt from conversation messages using hidden CLI
 #[tauri::command(async)]
 pub fn generate_instance_sync_prompt(

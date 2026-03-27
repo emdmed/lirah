@@ -101,6 +101,7 @@ export function usePromptSender({
   selectedPatterns,
   getPatternInstructions,
   clearPatterns,
+  clearSelectedTemplate,
 }) {
   const sendPrompt = useCallback(async () => {
     if (!terminalSessionId) return;
@@ -212,12 +213,15 @@ export function usePromptSender({
       // Clear compacted project after sending
       setCompactedProject(null);
 
+      // Clear selected template after sending
+      if (clearSelectedTemplate) clearSelectedTemplate();
+
       // Clear patterns after sending
       if (clearPatterns) clearPatterns();
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate]);
 
   return sendPrompt;
 }

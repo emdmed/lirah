@@ -54,6 +54,9 @@ function App() {
   const { getTemplateById } = usePromptTemplates();
   const { bookmarks, updateBookmark } = useBookmarks();
 
+  // CLI initial path (e.g. `lirah /path/to/project`)
+  const [initialProjectDir, setInitialProjectDir] = useState(undefined); // undefined = not yet checked
+
   // Core terminal state
   const [terminalSessionId, setTerminalSessionId] = useState(null);
   const [terminalKey, setTerminalKey] = useState(0);
@@ -82,6 +85,18 @@ function App() {
   const dialogs = useDialogs();
 
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
+
+  // Fetch CLI initial path on mount
+  useEffect(() => {
+    invoke('get_initial_path').then((path) => {
+      if (path) {
+        setCurrentPath(path);
+      }
+      setInitialProjectDir(path || null);
+    }).catch(() => {
+      setInitialProjectDir(null);
+    });
+  }, []);
 
   const patterns = usePatterns(currentPath);
 
@@ -169,10 +184,30 @@ function App() {
     searchResults: sidebarSearch.searchResults,
   });
 
+  // Terminate any running CLI process in the terminal before navigation
+  const terminateCliProcess = useCallback(async () => {
+    if (!terminalSessionId) return;
+    const cliNames = ['claude', 'opencode'];
+    for (const cliName of cliNames) {
+      try {
+        const killed = await invoke('kill_pty_child_process', {
+          sessionId: terminalSessionId,
+          processName: cliName,
+        });
+        if (killed) {
+          // Wait for shell to reclaim the prompt after child is killed
+          await new Promise(resolve => setTimeout(resolve, 300));
+          return;
+        }
+      } catch { /* ignore errors */ }
+    }
+  }, [terminalSessionId]);
+
   // Workspace navigation (after treeView is declared)
   const navigateToWorkspace = useCallback(async (workspacePath) => {
     if (!terminalSessionId) return;
     try {
+      await terminateCliProcess();
       const safePath = escapeShellPath(workspacePath);
       await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -182,7 +217,7 @@ function App() {
     } catch (error) {
       console.error('Failed to navigate to workspace:', error);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData]);
+  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData, terminateCliProcess]);
 
   const handleCreateWorkspace = useCallback(async (name, projects) => {
     const info = await workspaceHook.createWorkspace(name, projects);
@@ -269,6 +304,7 @@ function App() {
   const navigateToBookmark = useCallback(async (bookmark) => {
     if (!terminalSessionId) return;
     try {
+      await terminateCliProcess();
       const safePath = escapeShellPath(bookmark.path);
       await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -280,7 +316,7 @@ function App() {
     } catch (error) {
       console.error('Failed to navigate to bookmark:', error);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark]);
+  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess]);
 
   // Handle loading context from another instance's session
   const handleLoadInstanceContext = useCallback(async (session) => {
@@ -513,6 +549,7 @@ function App() {
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
     clearPatterns: patterns.clearPatterns,
+    clearSelectedTemplate: () => setSelectedTemplateId(null),
   });
 
   // Keyboard shortcut hooks
@@ -677,8 +714,9 @@ function App() {
     if (terminalSessionId && sidebar.sidebarOpen && folders.length === 0) loadFolders();
   }, [terminalSessionId]);
 
-  // Show initial project dialog
+  // Show initial project dialog (skip when opened via CLI with a path)
   useEffect(() => {
+    if (initialProjectDir) return;
     if (terminalSessionId && (bookmarks.length > 0 || workspaceHook.workspaces.length > 0)) dialogs.setInitialProjectDialogOpen(true);
   }, [terminalSessionId]);
 
@@ -944,19 +982,21 @@ function App() {
           )
         }
       >
-        <Terminal
-          key={terminalKey}
-          ref={terminalRef}
-          theme={theme.terminal}
-          onSessionReady={(id) => setTerminalSessionId(id)}
-          onReady={() => setTerminalReady(true)}
-          onSearchFocus={handleSearchFocus}
-          onToggleGitFilter={treeView.handleToggleGitFilter}
-          sandboxEnabled={settings.sandboxEnabled}
-          networkIsolation={settings.networkIsolation}
-          projectDir={currentPath}
-          onSandboxFailed={() => settings.setSandboxFailed(true)}
-        />
+        {initialProjectDir !== undefined && (
+          <Terminal
+            key={terminalKey}
+            ref={terminalRef}
+            theme={theme.terminal}
+            onSessionReady={(id) => setTerminalSessionId(id)}
+            onReady={() => setTerminalReady(true)}
+            onSearchFocus={handleSearchFocus}
+            onToggleGitFilter={treeView.handleToggleGitFilter}
+            sandboxEnabled={settings.sandboxEnabled}
+            networkIsolation={settings.networkIsolation}
+            projectDir={currentPath}
+            onSandboxFailed={() => settings.setSandboxFailed(true)}
+          />
+        )}
         <GitDiffDialog
           open={dialogs.diffDialogOpen}
           onOpenChange={dialogs.setDiffDialogOpen}
