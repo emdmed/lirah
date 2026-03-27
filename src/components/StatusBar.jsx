@@ -5,7 +5,7 @@ import {
   Keyboard, Eye, EyeOff, Bot, Terminal, Settings,
   PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
   Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
-  CheckCircle2, ListTodo, Monitor, Layers, X
+  CheckCircle2, ListTodo, Monitor, Layers, X, ArrowUpCircle
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../features/watcher';
@@ -163,7 +163,8 @@ export const StatusBar = ({
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
   onToggleBranchTasks, branchTasksOpen, otherInstancesCount, onToggleInstanceSyncPanel,
-  workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext
+  workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
+  availableUpdate
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
@@ -262,6 +263,26 @@ export const StatusBar = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Branch Tasks (Ctrl+Shift+T)</TooltipContent>
+          </Tooltip>
+        )}
+        {availableUpdate && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
+                    openUrl(availableUpdate.url);
+                  });
+                }}
+                className="gap-1 px-1.5 h-5"
+              >
+                <ArrowUpCircle className="w-3 h-3" style={{ color: STATUS_COLORS.success }} />
+                <span className="opacity-70">{availableUpdate.version}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Update available — click to view release</TooltipContent>
           </Tooltip>
         )}
       </div>

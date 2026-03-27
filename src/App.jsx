@@ -46,6 +46,7 @@ import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
 import { usePatterns } from "./features/patterns";
 import { useWorkspace } from "./hooks/useWorkspace";
+import { useUpdateChecker } from "./hooks/useUpdateChecker";
 import { useToast } from "./features/toast";
 
 function App() {
@@ -261,6 +262,7 @@ function App() {
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
 
   const toast = useToast();
+  const availableUpdate = useUpdateChecker();
   const orchestrationCheck = useOrchestrationCheck();
 
   const switchToClaudeMode = useCallback(() => {
@@ -653,6 +655,22 @@ function App() {
       });
   }, [detectedCwd, orchestrationCheck, toast]);
 
+  // Show toast when a new release is available
+  useEffect(() => {
+    if (!availableUpdate) return;
+    toast.info(`Update available: ${availableUpdate.version}`, {
+      duration: 15000,
+      action: {
+        label: 'View Release',
+        onClick: () => {
+          import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
+            openUrl(availableUpdate.url);
+          });
+        },
+      },
+    });
+  }, [availableUpdate]);
+
   // Check orchestration whenever view mode switches to tree (agent mode)
   useEffect(() => {
     if (viewMode !== 'tree') return;
@@ -961,6 +979,7 @@ function App() {
             onOpenWorkspaceDialog={() => dialogs.setWorkspaceDialogOpen(true)}
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
+            availableUpdate={availableUpdate}
           />
         }
         secondaryTerminal={
