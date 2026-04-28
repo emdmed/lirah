@@ -181,7 +181,7 @@ pub fn get_git_stats(
     // Cache miss - run git diff
     let stats = get_git_diff_stats(&repo_path)?;
 
-    // Store in cache and setup watcher
+    // Store in cache (watcher is handled by the unified fs_watcher)
     {
         let state_lock = state
             .lock()
@@ -189,10 +189,7 @@ pub fn get_git_stats(
 
         state_lock
             .git_cache
-            .set(canonical_path.clone(), stats.clone());
-
-        // Try to setup watcher (best-effort, ignore errors)
-        let _ = state_lock.git_cache.setup_watcher(canonical_path);
+            .set(canonical_path, stats.clone());
     }
 
     Ok(stats)

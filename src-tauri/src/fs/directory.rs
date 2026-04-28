@@ -1,3 +1,4 @@
+use crate::ignore_dirs::IGNORE_DIRS;
 use crate::state::AppState;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -12,7 +13,7 @@ pub struct DirectoryEntry {
     is_dir: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct RecursiveDirectoryEntry {
     name: String,
     path: String,
@@ -102,6 +103,7 @@ pub fn read_directory_recursive(
     path: Option<String>,
     max_depth: Option<usize>,
     max_files: Option<usize>,
+    state: tauri::State<AppState>,
 ) -> Result<Vec<RecursiveDirectoryEntry>, String> {
     let root_path = if let Some(ref p) = path {
         PathBuf::from(p)
@@ -109,26 +111,20 @@ pub fn read_directory_recursive(
         std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?
     };
 
+    // Try cache first
+    {
+        let state_lock = state
+            .lock()
+            .map_err(|e| format!("Failed to lock state: {}", e))?;
+        if let Some(cached) = state_lock.directory_cache.get_recursive(&root_path) {
+            return Ok((*cached).clone());
+        }
+    }
+
     let max_depth = max_depth.unwrap_or(10);
     let max_files = max_files.unwrap_or(10000);
 
-    // Directories to ignore
-    let ignore_dirs: HashSet<&str> = [
-        ".git",
-        "node_modules",
-        "target",
-        "dist",
-        "build",
-        ".cache",
-        ".next",
-        ".nuxt",
-        "__pycache__",
-        ".venv",
-        "venv",
-    ]
-    .iter()
-    .copied()
-    .collect();
+    let ignore_dirs: HashSet<&str> = IGNORE_DIRS.iter().copied().collect();
 
     let mut entries: Vec<RecursiveDirectoryEntry> = Vec::new();
     let root_path_str = root_path.to_string_lossy().to_string();
@@ -232,6 +228,14 @@ pub fn read_directory_recursive(
         (false, true) => std::cmp::Ordering::Greater,
         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
+
+    // Store in cache
+    {
+        let state_lock = state
+            .lock()
+            .map_err(|e| format!("Failed to lock state: {}", e))?;
+        state_lock.directory_cache.set_recursive(root_path, entries.clone());
+    }
 
     Ok(entries)
 }

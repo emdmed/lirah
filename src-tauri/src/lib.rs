@@ -3,6 +3,7 @@ mod pty;
 mod fs;
 mod git_cache;
 mod directory_cache;
+mod ignore_dirs;
 mod typecheck;
 mod python_parser;
 mod commit_watcher;
@@ -12,7 +13,6 @@ mod opencode;
 mod workspace;
 mod fs_watcher;
 
-use tauri::Manager;
 use state::create_state;
 use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, generate_instance_sync_prompt, check_pty_child_process, kill_pty_child_process};
 use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_branch_completed_tasks, get_home_dir, set_file_executable, path_exists};
@@ -29,14 +29,6 @@ pub struct InitialPath(pub Option<String>);
 #[tauri::command]
 fn get_initial_path(state: tauri::State<InitialPath>) -> Option<String> {
     state.0.clone()
-}
-
-fn init_git_cache_handle(handle: &tauri::AppHandle) {
-    let app_state = std::sync::Arc::clone(handle.state::<state::AppState>().inner());
-    let state_lock = app_state.lock();
-    if let Ok(guard) = state_lock {
-        guard.git_cache.set_app_handle(handle.clone());
-    };
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -112,8 +104,6 @@ pub fn run(initial_path: Option<String>) {
             get_initial_path
         ])
         .setup(|app| {
-            // Give git_cache access to AppHandle so it can emit events
-            init_git_cache_handle(app.handle());
             start_instance_watcher(app.handle().clone());
             Ok(())
         })

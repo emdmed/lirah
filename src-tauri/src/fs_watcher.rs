@@ -8,6 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
+use crate::ignore_dirs::IGNORE_DIRS;
 use crate::state::AppState;
 
 /// Payload emitted with "fs-changes" events so the frontend can do incremental updates.
@@ -16,14 +17,6 @@ pub struct FsChangesPayload {
     pub created: Vec<String>,
     pub deleted: Vec<String>,
 }
-
-/// Directories to ignore when watching for filesystem changes
-const IGNORE_DIRS: &[&str] = &[
-    ".git", "node_modules", "target", "dist", "build",
-    ".next", ".nuxt", "__pycache__", ".pytest_cache",
-    ".venv", "venv", ".tox", ".mypy_cache",
-    ".orchestration",
-];
 
 /// File extensions/patterns to ignore (editor temp files, OS files)
 const IGNORE_EXTENSIONS: &[&str] = &[
@@ -152,6 +145,7 @@ pub fn start_fs_watcher(
     enum FsEvent {
         Created(String),
         Deleted(String),
+        GitChanged,
     }
 
     let (event_tx, event_rx) = mpsc::channel::<FsEvent>();
@@ -161,9 +155,33 @@ pub fn start_fs_watcher(
     let watch_path_clone = watch_path.clone();
     let app_state = state.inner().clone();
 
+    /// Git state files that indicate index/HEAD changes worth notifying about.
+    const GIT_STATE_FILES: &[&str] = &[
+        "index", "HEAD", "ORIG_HEAD", "MERGE_HEAD",
+        "CHERRY_PICK_HEAD", "REBASE_HEAD", "COMMIT_EDITMSG",
+    ];
+
+    let git_dir = watch_path.join(".git");
+    let has_git = git_dir.is_dir();
+
     // Create the notify watcher — filter events in the callback and tag them
     let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
         if let Ok(event) = res {
+            // Check if this is a .git state file change
+            let is_git_event = event.paths.iter().any(|p| {
+                p.components().any(|c| {
+                    matches!(c, std::path::Component::Normal(n) if n == ".git")
+                }) && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|name| GIT_STATE_FILES.contains(&name))
+                    .unwrap_or(false)
+            });
+
+            if is_git_event {
+                let _ = event_tx.send(FsEvent::GitChanged);
+                return;
+            }
+
             let is_create = matches!(event.kind, EventKind::Create(_));
             let is_remove = matches!(event.kind, EventKind::Remove(_));
 
@@ -201,6 +219,11 @@ pub fn start_fs_watcher(
     // Watch directories selectively — skip ignored dirs at inotify level
     watch_directory_selective(&mut watcher, &watch_path, &ignore_set)?;
 
+    // Also watch .git directory for index/HEAD changes (unified watcher)
+    if has_git {
+        let _ = watcher.watch(&git_dir, RecursiveMode::NonRecursive);
+    }
+
     // Debounce thread: collect events, aggregate paths, emit after quiet period
     thread::spawn(move || {
         // Keep watcher alive in this thread
@@ -218,9 +241,11 @@ pub fn start_fs_watcher(
                 Ok(first_event) => {
                     // Start collecting — seed with the first event
                     let mut payload = FsChangesPayload::default();
+                    let mut git_changed = false;
                     match first_event {
                         FsEvent::Created(p) => payload.created.push(p),
                         FsEvent::Deleted(p) => payload.deleted.push(p),
+                        FsEvent::GitChanged => git_changed = true,
                     }
 
                     // Drain further events within debounce window
@@ -228,6 +253,7 @@ pub fn start_fs_watcher(
                         match ev {
                             FsEvent::Created(p) => payload.created.push(p),
                             FsEvent::Deleted(p) => payload.deleted.push(p),
+                            FsEvent::GitChanged => git_changed = true,
                         }
                     }
 
@@ -237,11 +263,23 @@ pub fn start_fs_watcher(
                     payload.deleted.sort();
                     payload.deleted.dedup();
 
-                    // Invalidate directory cache so next read_directory_recursive is fresh
-                    if let Ok(state_lock) = app_state.lock() {
-                        state_lock.directory_cache.invalidate(&watch_path_clone);
+                    let has_fs_changes = !payload.created.is_empty() || !payload.deleted.is_empty();
+
+                    // Invalidate directory cache and emit fs-changes if there were file changes
+                    if has_fs_changes {
+                        if let Ok(state_lock) = app_state.lock() {
+                            state_lock.directory_cache.invalidate(&watch_path_clone);
+                        }
+                        let _ = app_handle.emit("fs-changes", &payload);
                     }
-                    let _ = app_handle.emit("fs-changes", &payload);
+
+                    // Invalidate git cache and emit git-stats-changed if .git changed
+                    if git_changed {
+                        if let Ok(state_lock) = app_state.lock() {
+                            state_lock.git_cache.invalidate(&watch_path_clone);
+                        }
+                        let _ = app_handle.emit("git-stats-changed", watch_path_clone.to_string_lossy().to_string());
+                    }
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
