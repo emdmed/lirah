@@ -1,6 +1,25 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SubagentStatus {
+    Running,
+    Completed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubagentInfo {
+    pub agent_id: String,
+    pub slug: String,
+    pub status: SubagentStatus,
+    pub description: String,
+    pub last_tool: Option<String>,
+    pub message_count: u32,
+    pub started_at: String,
+    pub last_activity: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeSessionEntry {
     pub session_id: String,
     pub full_path: String,

@@ -44,6 +44,7 @@ import { useTreeView } from "./hooks/useTreeView";
 import { useSidebar } from "./hooks/useSidebar";
 import { useInstanceSync } from "./features/instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "./features/instance-sync/useInstanceSyncShortcut";
+import { useAgentOverlay, AgentOverlay } from "./features/agent-overlay";
 import { usePatterns } from "./features/patterns";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useUpdateChecker } from "./hooks/useUpdateChecker";
@@ -159,6 +160,9 @@ function App() {
     selectedFilesArray,
     terminalSessionId
   );
+
+  // Agent overlay
+  const agentOverlay = useAgentOverlay({ currentPath });
 
   // Calculate deduplicated instance count (by project_path, keeping most recent)
   const deduplicatedOtherInstancesCount = useMemo(() => {
@@ -919,6 +923,12 @@ function App() {
           currentBranch={branchName}
         />
       </Layout>
+
+      <AgentOverlay
+        subagents={agentOverlay.subagents}
+        visible={agentOverlay.visible}
+        activeSubagentCount={agentOverlay.activeSubagentCount}
+      />
 
       <DialogHost
         dialogs={dialogs}

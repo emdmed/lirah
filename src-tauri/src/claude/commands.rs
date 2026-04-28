@@ -1,4 +1,4 @@
-use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry, ClaudeSessionsPage};
+use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry, ClaudeSessionsPage, SubagentInfo, SubagentStatus};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -667,4 +667,313 @@ fn decode_project_path(encoded: &str) -> String {
 /// So /home/enrique/projects/nevo-terminal becomes -home-enrique-projects-nevo-terminal
 fn encode_project_path(path: &str) -> String {
     path.replace('/', "-").replace(' ', "-")
+}
+
+/// Store for the subagent filesystem watcher
+pub struct SubagentWatcherStore {
+    active: std::sync::Arc<std::sync::Mutex<Option<SubagentWatcherHandle>>>,
+}
+
+struct SubagentWatcherHandle {
+    _stop_tx: std::sync::mpsc::Sender<()>,
+}
+
+impl SubagentWatcherStore {
+    pub fn new() -> Self {
+        Self {
+            active: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        }
+    }
+}
+
+/// Get subagents for a given session
+#[tauri::command]
+pub fn get_session_subagents(
+    session_id: String,
+    project_path: String,
+) -> Result<Vec<SubagentInfo>, String> {
+    use std::io::{BufRead, BufReader};
+
+    let encoded_path = encode_project_path(&project_path);
+    let claude_dir = find_claude_data_dir().ok_or("Could not find Claude Code data directory")?;
+
+    let subagents_dir = claude_dir
+        .join("projects")
+        .join(&encoded_path)
+        .join(&session_id)
+        .join("subagents");
+
+    if !subagents_dir.exists() || !subagents_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let now = std::time::SystemTime::now();
+    let mut subagents = Vec::new();
+
+    let entries = fs::read_dir(&subagents_dir).map_err(|e| e.to_string())?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+
+        if !name.starts_with("agent-") || !name.ends_with(".jsonl") {
+            continue;
+        }
+
+        let file = match std::fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+
+        let metadata = match file.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        // Determine status based on mtime
+        let mtime_age = now
+            .duration_since(metadata.modified().unwrap_or(now))
+            .unwrap_or_default();
+        let status = if mtime_age.as_secs() < 30 {
+            SubagentStatus::Running
+        } else {
+            SubagentStatus::Completed
+        };
+
+        let mut reader = BufReader::new(&file);
+
+        // Parse first line for agent_id, slug, description, started_at
+        let mut first_line = String::new();
+        if reader.read_line(&mut first_line).unwrap_or(0) == 0 {
+            continue;
+        }
+
+        let first_json: serde_json::Value = match serde_json::from_str(first_line.trim()) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let agent_id = first_json
+            .get("agentId")
+            .or_else(|| first_json.get("agent_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let slug = first_json
+            .get("slug")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let started_at = first_json
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Extract description from first user message content
+        let description = first_json
+            .get("message")
+            .and_then(|m| m.get("content"))
+            .and_then(|c| {
+                if let Some(s) = c.as_str() {
+                    Some(s.chars().take(500).collect::<String>())
+                } else if let Some(arr) = c.as_array() {
+                    arr.iter()
+                        .find_map(|block| block.get("text").and_then(|t| t.as_str()))
+                        .map(|s| s.chars().take(500).collect::<String>())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        // Scan file for message_count, last_tool, last_activity
+        let mut message_count: u32 = 1; // count first line
+        let mut last_tool: Option<String> = None;
+        let mut last_activity = started_at.clone();
+
+        // Read remaining lines
+        for line_result in reader.lines() {
+            let line = match line_result {
+                Ok(l) => l,
+                Err(_) => continue,
+            };
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            message_count += 1;
+
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                if let Some(ts) = json.get("timestamp").and_then(|v| v.as_str()) {
+                    last_activity = ts.to_string();
+                }
+
+                // Check for tool_use in assistant message content blocks
+                if let Some(message) = json.get("message") {
+                    if let Some(blocks) = message.get("content").and_then(|c| c.as_array()) {
+                        for block in blocks {
+                            if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                                if let Some(tool_name) =
+                                    block.get("name").and_then(|n| n.as_str())
+                                {
+                                    last_tool = Some(tool_name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        subagents.push(SubagentInfo {
+            agent_id,
+            slug,
+            status,
+            description,
+            last_tool,
+            message_count,
+            started_at: started_at.clone(),
+            last_activity,
+        });
+    }
+
+    // Sort by started_at descending (most recent first)
+    subagents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+
+    Ok(subagents)
+}
+
+/// Get all subagents across all sessions for a project (scans all session dirs)
+#[tauri::command]
+pub fn get_project_subagents(
+    project_path: String,
+) -> Result<Vec<SubagentInfo>, String> {
+    let encoded_path = encode_project_path(&project_path);
+    let claude_dir = find_claude_data_dir().ok_or("Could not find Claude Code data directory")?;
+
+    let project_dir = claude_dir.join("projects").join(&encoded_path);
+    if !project_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut all_subagents = Vec::new();
+
+    // Scan all session directories for subagents
+    let entries = fs::read_dir(&project_dir).map_err(|e| e.to_string())?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let subagents_dir = path.join("subagents");
+        if !subagents_dir.is_dir() {
+            continue;
+        }
+
+        // Get session_id from directory name
+        let session_id = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        match get_session_subagents(session_id, project_path.clone()) {
+            Ok(mut subs) => all_subagents.append(&mut subs),
+            Err(_) => continue,
+        }
+    }
+
+    // Sort by started_at descending
+    all_subagents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+
+    Ok(all_subagents)
+}
+
+/// Start watching a project's subagent directories for changes
+#[tauri::command]
+pub fn watch_project_subagents(
+    project_path: String,
+    app_handle: tauri::AppHandle,
+    store: tauri::State<std::sync::Arc<SubagentWatcherStore>>,
+) -> Result<(), String> {
+    use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+    use tauri::Emitter;
+
+    let encoded_path = encode_project_path(&project_path);
+    let claude_dir = find_claude_data_dir().ok_or("Could not find Claude Code data directory")?;
+
+    let project_dir = claude_dir.join("projects").join(&encoded_path);
+    if !project_dir.exists() {
+        return Err("Project directory not found".to_string());
+    }
+
+    let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
+
+    // Stop existing watcher
+    active.take();
+
+    let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
+    let (event_tx, event_rx) = std::sync::mpsc::channel::<()>();
+
+    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+        if let Ok(event) = res {
+            // Only emit for subagent file changes
+            let is_subagent = event.paths.iter().any(|p| {
+                p.to_string_lossy().contains("/subagents/")
+            });
+            if is_subagent {
+                let _ = event_tx.send(());
+            }
+        }
+    })
+    .map_err(|e| format!("Failed to create watcher: {}", e))?;
+
+    // Watch the entire project dir recursively to catch new session dirs + subagent files
+    watcher
+        .watch(&project_dir, RecursiveMode::Recursive)
+        .map_err(|e| format!("Failed to watch project dir: {}", e))?;
+
+    // Debounce thread
+    std::thread::spawn(move || {
+        let _watcher = watcher; // keep alive
+        let debounce = std::time::Duration::from_millis(500);
+
+        loop {
+            match stop_rx.try_recv() {
+                Ok(()) | Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            }
+
+            match event_rx.recv_timeout(std::time::Duration::from_millis(200)) {
+                Ok(()) => {
+                    // Drain further events within debounce window
+                    while event_rx.recv_timeout(debounce).is_ok() {}
+                    let _ = app_handle.emit("subagents-changed", ());
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+    });
+
+    *active = Some(SubagentWatcherHandle {
+        _stop_tx: stop_tx,
+    });
+
+    Ok(())
+}
+
+/// Stop the subagent filesystem watcher
+#[tauri::command]
+pub fn stop_session_subagents_watcher(
+    store: tauri::State<std::sync::Arc<SubagentWatcherStore>>,
+) -> Result<(), String> {
+    let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
+    active.take();
+    Ok(())
 }
