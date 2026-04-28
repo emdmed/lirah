@@ -152,7 +152,7 @@ export function CalendarHeatmap({ sessions, onDayClick, colors }) {
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="fixed z-50 bg-popover text-popover-foreground border border-sketch rounded px-2 py-1 font-mono pointer-events-none shadow-lg"
+          className="fixed z-50 bg-popover text-popover-foreground border border-sketch rounded-none px-2 py-1 font-mono pointer-events-none shadow-lg"
           style={{ left: tooltip.x + 10, top: tooltip.y - 40, fontSize: 'var(--font-xs)' }}
         >
           <div className="font-medium">{tooltip.date}</div>

@@ -7,7 +7,7 @@ export function ElementsIndicator({ selectedElements, currentPath, elementCount,
   if (elementCount <= 0) return null;
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1 bg-secondary border border-secondary rounded w-fit text-xs">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-secondary/30 border border-sketch rounded-none w-fit text-xs font-mono">
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex items-center gap-2 cursor-default">
@@ -27,7 +27,7 @@ export function ElementsIndicator({ selectedElements, currentPath, elementCount,
         variant="ghost"
         size="xs"
         onClick={onClearElements}
-        className="ml-auto p-0.5 h-auto hover:bg-white/10"
+        className="ml-auto p-0.5 h-auto hover:bg-foreground/10"
         aria-label="Clear selected elements"
       >
         <X className="w-3 h-3" />

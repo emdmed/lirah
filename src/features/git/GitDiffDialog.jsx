@@ -129,19 +129,19 @@ export function GitDiffDialog({
           <div className="font-mono text-sm flex items-center gap-2">
             <span className="truncate">{fileName}</span>
             {diffResult?.is_new_file && (
-              <span className="text-xs text-green-500 font-normal">(new file)</span>
+              <span className="text-xs text-git-added font-normal">(new file)</span>
             )}
             {diffResult?.is_deleted_file && (
-              <span className="text-xs text-red-500 font-normal">(deleted)</span>
+              <span className="text-xs text-git-deleted font-normal">(deleted)</span>
             )}
           </div>
           <div className="font-mono text-xs text-muted-foreground truncate">
             {relativePath}
             {diffResult && (
               <span className="ml-2">
-                <span className="text-green-500">+{diffResult.added_lines}</span>
+                <span className="text-git-added">+{diffResult.added_lines}</span>
                 {' '}
-                <span className="text-red-500">-{diffResult.deleted_lines}</span>
+                <span className="text-git-deleted">-{diffResult.deleted_lines}</span>
               </span>
             )}
           </div>
@@ -205,7 +205,7 @@ export function GitDiffDialog({
             <RetroSpinner size={24} lineWidth={2} />
           </div>
         ) : error ? (
-          <div className="p-4 text-center text-red-400">
+          <div className="p-4 text-center text-destructive">
             <p className="font-medium">Failed to load diff</p>
             <p className="text-xs mt-1 text-muted-foreground">{error}</p>
           </div>

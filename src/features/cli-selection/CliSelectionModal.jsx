@@ -29,8 +29,8 @@ export function CliSelectionModal({ open, onOpenChange, selectedCli, onCliChange
                 key={option.id}
                 disabled={!isAvailable}
                 onClick={() => handleCliSelect(option.id)}
-                className={`flex items-center justify-between px-3 py-2 rounded text-sm text-left transition-colors ${
-                  isSelected ? 'bg-primary/10' : 'hover:bg-muted'
+                className={`flex items-center justify-between px-3 py-2 rounded-none text-sm text-left transition-colors ${
+                  isSelected ? 'bg-foreground/8 border-l-2 border-primary' : 'border-l-2 border-transparent hover:bg-foreground/5'
                 } ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
                 <span>{option.name}</span>

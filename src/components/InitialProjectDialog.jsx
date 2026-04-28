@@ -109,7 +109,7 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-md p-2 border-sketch">
+        <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-none p-2 border-sketch">
           {items.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm opacity-50">
               <div className="text-center">
@@ -141,7 +141,7 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-xs opacity-50 border-t border-foreground/10 pt-2">
+        <div className="flex items-center gap-4 text-xs opacity-50 border-t border-t-sketch pt-2">
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">ESC</span> Close</span>

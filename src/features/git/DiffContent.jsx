@@ -629,19 +629,19 @@ const DiffLine = memo(function DiffLine({
   if (type === 'added') {
     bgColor = 'rgba(152, 187, 108, 0.15)';
     gutterSymbol = '+';
-    gutterColor = 'text-green-500';
+    gutterColor = 'text-git-added';
   } else if (type === 'removed') {
     bgColor = 'rgba(195, 64, 67, 0.15)';
     gutterSymbol = '-';
-    gutterColor = 'text-red-500';
+    gutterColor = 'text-git-deleted';
   } else if (type === 'modified-old') {
     bgColor = 'rgba(195, 64, 67, 0.15)';
     gutterSymbol = '~';
-    gutterColor = 'text-yellow-500';
+    gutterColor = 'text-git-deleted';
   } else if (type === 'modified-new') {
     bgColor = 'rgba(152, 187, 108, 0.15)';
     gutterSymbol = '~';
-    gutterColor = 'text-yellow-500';
+    gutterColor = 'text-git-added';
   } else if (type === 'empty') {
     bgColor = 'rgba(128, 128, 128, 0.05)';
   }
@@ -663,11 +663,12 @@ const DiffLine = memo(function DiffLine({
           {wordDiff.map((part, i) => (
             <span
               key={i}
-              className={part.highlight ? (
-                type === 'modified-old'
-                  ? 'bg-red-500/30 rounded-sm'
-                  : 'bg-green-500/30 rounded-sm'
-              ) : ''}
+              className={part.highlight ? 'rounded-sm' : ''}
+              style={part.highlight ? {
+                backgroundColor: type === 'modified-old'
+                  ? 'rgba(195, 64, 67, 0.3)'
+                  : 'rgba(152, 187, 108, 0.3)'
+              } : undefined}
             >
               {part.text}
             </span>
@@ -711,7 +712,7 @@ const DiffLine = memo(function DiffLine({
           }}
         >
           {isCopied ? (
-            <Check className="w-3 h-3 text-green-500" />
+            <Check className="w-3 h-3" style={{ color: 'var(--color-status-success)' }} />
           ) : (
             <Copy className="w-3 h-3" />
           )}

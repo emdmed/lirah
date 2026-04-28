@@ -176,7 +176,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
               </div>
 
               {error && (
-                <p className="text-xs text-red-400">{error}</p>
+                <p className="text-xs text-destructive">{error}</p>
               )}
 
               <div className="flex justify-end gap-2">

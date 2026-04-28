@@ -69,7 +69,7 @@ export function DateRangePicker({ value, onChange, className = '' }) {
             type="date"
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="h-6 font-mono px-2 border border-sketch rounded"
+            className="h-6 font-mono px-2 border border-sketch rounded-none"
             style={{ fontSize: 'var(--font-xs)', backgroundColor: 'var(--color-input-background)' }}
           />
           <span className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>to</span>
@@ -77,7 +77,7 @@ export function DateRangePicker({ value, onChange, className = '' }) {
             type="date"
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="h-6 font-mono px-2 border border-sketch rounded"
+            className="h-6 font-mono px-2 border border-sketch rounded-none"
             style={{ fontSize: 'var(--font-xs)', backgroundColor: 'var(--color-input-background)' }}
           />
           <Button size="sm" className="h-6 px-2" style={{ fontSize: 'var(--font-xs)' }} onClick={handleCustomApply}>

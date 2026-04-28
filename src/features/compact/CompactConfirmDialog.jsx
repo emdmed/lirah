@@ -60,23 +60,26 @@ export function CompactConfirmDialog({
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Compacted size:</span>
-                <span className={`font-mono font-medium ${isLarge ? 'text-yellow-500' : 'text-green-500'}`}>
+                <span className="font-mono font-medium" style={{ color: isLarge ? 'var(--color-status-warning)' : 'var(--color-status-success)' }}>
                   ~{formattedTokens} tokens
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm border-t border-border pt-2">
                 <span className="text-muted-foreground">Compression:</span>
-                <span className="font-mono font-medium text-green-500">
+                <span className="font-mono font-medium" style={{ color: 'var(--color-status-success)' }}>
                   {compressionPercent}% smaller
                 </span>
               </div>
               {isLarge && (
-                <div className="flex items-start gap-2 text-xs text-yellow-500 bg-yellow-500/10 p-2 rounded">
+                <div
+                  className="flex items-start gap-2 text-xs p-2 rounded-none"
+                  style={{ color: 'var(--color-status-warning)', backgroundColor: 'color-mix(in srgb, var(--color-status-warning) 10%, transparent)' }}
+                >
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>Large output may consume significant context window</span>
                 </div>
               )}
-              <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded-none">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>Supports JavaScript, TypeScript, and Python files.</span>
               </div>

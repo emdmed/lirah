@@ -83,7 +83,7 @@ export function FileStateSelector({ value, onValueChange, className, showKeyboar
       value={value}
       onValueChange={onValueChange}
       variant="outline"
-      className={cn("inline-flex border border-dashed border-foreground/20 rounded p-px gap-px", className)}
+      className={cn("inline-flex border border-dashed border-foreground/20 rounded-none p-px gap-px", className)}
     >
       {states.map((state) => {
         const Icon = state.icon;
@@ -110,7 +110,7 @@ export function FileStateSelector({ value, onValueChange, className, showKeyboar
               </span>
             )}
             {showKeyboardHints && (
-              <span className="absolute -top-1.5 -right-1 text-[0.45rem] font-mono opacity-40 bg-background rounded px-0.5">
+              <span className="absolute -top-1.5 -right-1 text-[0.45rem] font-mono opacity-40 bg-background rounded-sm px-0.5">
                 {state.keyHint}
               </span>
             )}

@@ -15,7 +15,7 @@ function CustomTooltip({ active, payload, label, colors }) {
   if (!active || !payload || !payload.length) return null;
 
   return (
-    <div className="bg-background border border-sketch rounded shadow-lg p-2 text-xs font-mono">
+    <div className="bg-background border border-sketch rounded-none shadow-lg p-2 text-xs font-mono">
       <p className="font-medium mb-1">{label}</p>
       <div className="space-y-0.5">
         {payload.map((entry, index) => (

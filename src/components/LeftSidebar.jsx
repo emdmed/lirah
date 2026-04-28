@@ -52,8 +52,8 @@ export function LeftSidebar({
 
   return (
     <>
-      <Sidebar collapsible="none" className="border-e border-e-sketch m-0 p-1 shrink-0 overflow-hidden" style={{ height: '100%', display: 'flex', flexDirection: 'column', width: sidebarWidth }}>
-        <SidebarContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <Sidebar collapsible="none" className="border-e border-e-sketch m-0 p-1 shrink-0 overflow-hidden h-full flex flex-col" style={{ width: sidebarWidth }}>
+        <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
             viewMode={viewMode}
             currentPath={currentPath}
@@ -73,8 +73,8 @@ export function LeftSidebar({
             hasTerminalSession={hasTerminalSession}
             sandboxEnabled={sandboxEnabled}
           />
-          <SidebarGroup style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            <SidebarGroupContent className="p-1" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <SidebarGroup className="flex flex-col flex-1 min-h-0">
+            <SidebarGroupContent className="p-1 overflow-y-auto flex-1 min-h-0">
               {viewMode === 'flat' ? (
                 <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={onFolderClick} />
               ) : (
@@ -107,6 +107,9 @@ export function LeftSidebar({
                     fileWatchingEnabled={fileWatchingEnabled}
                     onGitChanges={onGitChanges}
                     onOpenElementPicker={onOpenElementPicker}
+                    onClearSearch={handleSearchClear}
+                    onToggleGitFilter={handleToggleGitFilter}
+                    onToggleMarkdownFilter={handleToggleMarkdownFilter}
                   />
                 )
               )}

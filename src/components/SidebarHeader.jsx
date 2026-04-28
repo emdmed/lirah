@@ -103,7 +103,7 @@ export function SidebarHeader({
           {searchQuery && (
             <button
               onClick={onSearchClear}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 hover:bg-muted/50 transition-all p-0.5 rounded focus-ring"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 hover:bg-muted/50 transition-all p-0.5 rounded-xs focus-ring"
               title="Clear search"
               aria-label="Clear search"
             >

@@ -111,7 +111,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
         </div>
         <button
           onClick={() => onOpenChange(false)}
-          className="p-1 rounded hover:bg-muted/30 transition-colors flex-shrink-0"
+          className="p-1 rounded-xs hover:bg-muted/30 transition-colors flex-shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
@@ -121,10 +121,13 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
       <div className="flex-1 overflow-y-auto p-1 space-y-3">
         {/* On base branch warning */}
         {currentBranch === baseBranch && (
-          <div className="flex items-start gap-2 p-3 border border-dashed border-yellow-500/40 bg-yellow-500/5">
-            <GitBranch className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+          <div
+            className="flex items-start gap-2 p-3 border border-dashed"
+            style={{ borderColor: 'color-mix(in srgb, var(--color-status-warning) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-warning) 5%, transparent)' }}
+          >
+            <GitBranch className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--color-status-warning)' }} />
             <div>
-              <p className="text-xs font-medium text-yellow-500 font-mono">[INFO] Base Branch</p>
+              <p className="text-xs font-medium font-mono" style={{ color: 'var(--color-status-warning)' }}>[INFO] Base Branch</p>
               <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                 You're on {baseBranch}. Switch to a feature branch to see tasks.
               </p>
@@ -151,13 +154,16 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
         
         {/* Error State */}
         {error && (
-          <div className="flex items-start gap-2 p-3 border border-dashed border-red-500/40 bg-red-500/5">
-            <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div
+            className="flex items-start gap-2 p-3 border border-dashed"
+            style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-critical) 5%, transparent)' }}
+          >
+            <svg className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--color-status-critical)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
             <div>
-              <p className="text-xs font-medium text-red-500 font-mono">[ERROR] Failed to generate tasks</p>
-              <p className="text-xs text-red-400/80 mt-0.5 break-words font-mono">{error}</p>
+              <p className="text-xs font-medium font-mono" style={{ color: 'var(--color-status-critical)' }}>[ERROR] Failed to generate tasks</p>
+              <p className="text-xs mt-0.5 break-words font-mono" style={{ color: 'color-mix(in srgb, var(--color-status-critical) 80%, transparent)' }}>{error}</p>
             </div>
           </div>
         )}

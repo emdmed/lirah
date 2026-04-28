@@ -1,6 +1,6 @@
 export function Layout({ sidebar, children, statusBar, textarea, titleBar, secondaryTerminal }) {
   return (
-    <div className="p-0 flex flex-col" style={{ width: '100%', height: '100%' }}>
+    <div className="p-0 flex flex-col w-full h-full">
       {titleBar}
       <div className="flex flex-1 min-h-0">
         {sidebar}
@@ -16,7 +16,7 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar, secon
           {secondaryTerminal}
         </div>
       </div>
-      <div className="flex-shrink-0" style={{ height: '32px' }}>
+      <div className="flex-shrink-0 h-8">
         {statusBar}
       </div>
     </div>

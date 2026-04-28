@@ -122,7 +122,7 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="h-7 text-xs px-2 border border-sketch rounded flex-1"
+                className="h-7 text-xs px-2 border border-sketch rounded-none flex-1"
                 style={{ backgroundColor: 'var(--color-input-background)' }}
               />
               <span className="text-xs text-muted-foreground">to</span>
@@ -130,7 +130,7 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="h-7 text-xs px-2 border border-sketch rounded flex-1"
+                className="h-7 text-xs px-2 border border-sketch rounded-none flex-1"
                 style={{ backgroundColor: 'var(--color-input-background)' }}
               />
             </div>

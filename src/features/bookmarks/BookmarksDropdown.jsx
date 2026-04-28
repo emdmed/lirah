@@ -66,7 +66,7 @@ export function BookmarksDropdown({ onNavigate }) {
                 {hoveredId === bookmark.id && (
                   <button
                     onClick={(e) => handleDelete(e, bookmark.id)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 flex items-center justify-center rounded opacity-60 hover:opacity-100 hover:bg-red-500/20"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 flex items-center justify-center rounded-xs opacity-60 hover:opacity-100 hover:bg-destructive/20"
                     title="Remove bookmark"
                   >
                     <X className="w-2.5 h-2.5" />

@@ -53,7 +53,7 @@ export function WorkspaceProjectPicker({ projects, onSelect, onCancel }) {
             </div>
           </button>
         ))}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t border-foreground/10">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t border-t-sketch">
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">ESC</span> Cancel</span>

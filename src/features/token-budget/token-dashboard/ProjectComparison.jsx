@@ -69,7 +69,7 @@ export function ProjectComparison({ projects, totals, colors }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter projects..."
-            className="w-full h-7 text-xs font-mono pl-7 pr-2 border border-sketch rounded"
+            className="w-full h-7 text-xs font-mono pl-7 pr-2 border border-sketch rounded-none"
             style={{ backgroundColor: 'var(--color-input-background)' }}
           />
         </div>
@@ -79,7 +79,7 @@ export function ProjectComparison({ projects, totals, colors }) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto border border-sketch rounded">
+      <div className="flex-1 overflow-auto border border-sketch rounded-none">
         {/* Header */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-sketch bg-muted/30 sticky top-0">
           {columns.map(col => (

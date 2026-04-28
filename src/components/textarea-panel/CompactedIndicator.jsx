@@ -24,7 +24,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
               <span className="text-muted-foreground">tokens</span>
             </div>
             <div className="w-px h-3 bg-border/50" />
-            <div className="flex items-center gap-1 text-green-500/80">
+            <div className="flex items-center gap-1" style={{ color: 'color-mix(in srgb, var(--color-status-success) 80%, transparent)' }}>
               <span className="font-medium">-{compactedProject.compressionPercent}%</span>
               <span className="text-[10px]">saved</span>
             </div>
@@ -53,7 +53,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
               variant="ghost"
               size="xs"
               onClick={onOpenFlowchart}
-              className="p-0.5 h-auto text-muted-foreground hover:text-primary hover:bg-white/10"
+              className="p-0.5 h-auto text-muted-foreground hover:text-primary hover:bg-foreground/10"
               aria-label="View flowchart"
             >
               <Map className="w-3 h-3" />
@@ -65,7 +65,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
           variant="ghost"
           size="xs"
           onClick={onClearCompactedProject}
-          className="p-0.5 h-auto text-muted-foreground hover:text-destructive hover:bg-white/10"
+          className="p-0.5 h-auto text-muted-foreground hover:text-destructive hover:bg-foreground/10"
           aria-label="Clear compacted project"
         >
           <X className="w-3 h-3" />

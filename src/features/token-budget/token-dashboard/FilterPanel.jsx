@@ -35,7 +35,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
     filters.dateFrom || filters.dateTo || filters.minTokens || filters.maxTokens;
 
   return (
-    <div className="bg-background rounded border border-sketch p-2">
+    <div className="bg-background rounded-none border border-sketch p-2">
       <div className="flex items-center justify-between">
         <button
           className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground"
@@ -44,7 +44,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
           <Filter size={12} />
           Filters
           {hasActiveFilters && (
-            <span className="bg-primary/20 text-primary rounded px-1" style={{ fontSize: 'var(--font-xs)' }}>Active</span>
+            <span className="bg-primary/20 text-primary rounded-xs px-1" style={{ fontSize: 'var(--font-xs)' }}>Active</span>
           )}
         </button>
         {hasActiveFilters && (

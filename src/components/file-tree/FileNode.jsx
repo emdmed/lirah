@@ -46,8 +46,8 @@ export function FileNode({
       {/* Element picker button - hidden in git changes mode */}
       {!showGitChangesOnly && (
         <button
-          className={`p-0 transition-all duration-200 rounded flex-shrink-0 ${isTextareaPanelOpen && isParseable && !isDeleted
-              ? 'opacity-60 hover:opacity-100 hover:bg-white/10 cursor-pointer'
+          className={`p-0 transition-all duration-200 rounded-xs flex-shrink-0 ${isTextareaPanelOpen && isParseable && !isDeleted
+              ? 'opacity-60 hover:opacity-100 hover:bg-foreground/10 cursor-pointer'
               : 'opacity-20 cursor-not-allowed grayscale'
             }`}
           onClick={(e) => {
@@ -65,14 +65,14 @@ export function FileNode({
 
       {/* Main file display */}
       <div
-        className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
+        className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-foreground/5'}`}
         onClick={handleFileClick}
       >
         {/* Git diff button - hidden in git changes mode */}
         {!showGitChangesOnly && (
           <button
-            className={`p-0 transition-all duration-200 rounded flex-shrink-0 ${hasGitChanges && !isDeleted
-                ? 'opacity-60 hover:opacity-100 hover:bg-white/10 cursor-pointer'
+            className={`p-0 transition-all duration-200 rounded-xs flex-shrink-0 ${hasGitChanges && !isDeleted
+                ? 'opacity-60 hover:opacity-100 hover:bg-foreground/10 cursor-pointer'
                 : 'opacity-20 cursor-not-allowed grayscale'
               }`}
             onClick={(e) => {

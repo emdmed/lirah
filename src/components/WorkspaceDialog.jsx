@@ -59,7 +59,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
 
         {mode === 'list' ? (
           <>
-            <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-md p-2 border-sketch">
+            <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-none p-2 border-sketch">
               {existingWorkspaces?.length === 0 ? (
                 <div className="flex items-center justify-center py-8 text-sm opacity-50">
                   No workspaces yet.
@@ -108,7 +108,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="my-fullstack-app"
-                  className="w-full px-3 py-2 text-sm font-mono border border-sketch rounded-md bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full px-3 py-2 text-sm font-mono border border-sketch rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
                   autoFocus
                 />
               </div>
@@ -117,7 +117,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                 <label className="text-xs font-mono opacity-70 mb-1 block">
                   Select Projects ({selectedProjects.length} selected, min 2)
                 </label>
-                <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto border rounded-md p-2 border-sketch">
+                <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto border rounded-none p-2 border-sketch">
                   {bookmarks.length === 0 ? (
                     <div className="text-xs opacity-50 text-center py-4">
                       No bookmarks. Add projects as bookmarks first.
@@ -158,7 +158,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                         value={p.description}
                         onChange={e => updateDescription(p.path, e.target.value)}
                         placeholder="e.g. React frontend"
-                        className="flex-1 px-2 py-1 text-xs font-mono border border-sketch rounded bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="flex-1 px-2 py-1 text-xs font-mono border border-sketch rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </div>
                   ))}

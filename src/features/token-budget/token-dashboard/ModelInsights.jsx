@@ -92,7 +92,7 @@ export function ModelInsights({ sessions, projects, colors }) {
       {/* Top row: Donut + Cost breakdown */}
       <div className="grid grid-cols-2 gap-3 shrink-0">
         {/* Donut */}
-        <div className="bg-background rounded border border-sketch p-3">
+        <div className="bg-background rounded-none border border-sketch p-3">
           <div className="text-xs font-medium mb-2">Model Distribution</div>
           {pieData.length > 0 ? (
             <div className="h-40">
@@ -141,7 +141,7 @@ export function ModelInsights({ sessions, projects, colors }) {
         </div>
 
         {/* Cost analysis */}
-        <div className="bg-background rounded border border-sketch p-3">
+        <div className="bg-background rounded-none border border-sketch p-3">
           <div className="text-xs font-medium mb-2">Cost Analysis</div>
           <div className="space-y-2">
             {modelData.map((m, i) => (
@@ -172,7 +172,7 @@ export function ModelInsights({ sessions, projects, colors }) {
       </div>
 
       {/* Recommendations */}
-      <div className="flex-1 bg-background rounded border border-sketch p-3 overflow-auto">
+      <div className="flex-1 bg-background rounded-none border border-sketch p-3 overflow-auto">
         <div className="text-xs font-medium mb-2">Optimization Recommendations</div>
         <div className="space-y-2">
           {recommendations.map((r, i) => (

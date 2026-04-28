@@ -61,7 +61,7 @@ export function OrchestrationToggle({ appendOrchestration, onToggleOrchestration
             Delete Orchestration?
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            This will permanently delete the <code className="text-xs bg-secondary/50 px-1 rounded">.orchestration/</code> directory from this project. The orchestration protocol will no longer run for this project.
+            This will permanently delete the <code className="text-xs bg-secondary/50 px-1 rounded-sm">.orchestration/</code> directory from this project. The orchestration protocol will no longer run for this project.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
@@ -118,7 +118,7 @@ export function OrchestrationToggle({ appendOrchestration, onToggleOrchestration
   return (
     <>
       {confirmDialog}
-      <div className="flex items-center gap-3 bg-secondary/20 rounded px-2 py-1">
+      <div className="flex items-center gap-3 bg-secondary/20 rounded-none px-2 py-1">
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>

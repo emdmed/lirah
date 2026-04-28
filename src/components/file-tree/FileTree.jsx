@@ -30,6 +30,9 @@ export function FileTree({
   fileWatchingEnabled,
   onGitChanges,
   onOpenElementPicker,
+  onClearSearch,
+  onToggleGitFilter,
+  onToggleMarkdownFilter,
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
@@ -64,7 +67,7 @@ export function FileTree({
   }, [showGitChangesOnly, showMarkdownOnly, onViewDiff, onViewMarkdown, onToggleFileSelection]);
 
   if (!displayedNodes || displayedNodes.length === 0) {
-    return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} />;
+    return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} onClearSearch={onClearSearch} onToggleGitFilter={onToggleGitFilter} onToggleMarkdownFilter={onToggleMarkdownFilter} />;
   }
 
   return (

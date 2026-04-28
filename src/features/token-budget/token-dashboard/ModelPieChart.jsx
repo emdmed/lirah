@@ -17,7 +17,7 @@ function CustomTooltip({ active, payload, colors }) {
   const percentage = ((data.tokens / totalTokens) * 100).toFixed(1);
   
   return (
-    <div className="bg-[hsl(var(--color-card))] border border-[hsl(var(--color-border))] rounded-lg shadow-lg p-3">
+    <div className="bg-[hsl(var(--color-card))] border border-[hsl(var(--color-border))] rounded-none shadow-lg p-3">
       <p className="font-medium text-[hsl(var(--color-foreground))]">{data.model}</p>
       <div className="mt-2 space-y-1 text-sm">
         <div className="flex justify-between gap-4">

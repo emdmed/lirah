@@ -70,7 +70,7 @@ export const AtMentionModal = memo(function AtMentionModal({
 
   return (
     <div
-      className="absolute left-0 right-0 bg-background border border-sketch rounded-md shadow-lg z-50 overflow-hidden"
+      className="absolute left-0 right-0 bg-background border border-sketch rounded-none shadow-lg z-50 overflow-hidden"
       style={{ bottom: '100%', marginBottom: '4px' }}
     >
       {/* Header */}
@@ -83,19 +83,19 @@ export const AtMentionModal = memo(function AtMentionModal({
         </span>
         <div className="flex items-center gap-3 text-muted-foreground">
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded bg-muted/50 border border-sketch text-[9px] font-mono">↑↓</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">↑↓</kbd>
             navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded bg-muted/50 border border-sketch text-[9px] font-mono">←→</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">←→</kbd>
             mode
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded bg-muted/50 border border-sketch text-[9px] font-mono">↵</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">↵</kbd>
             select
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded bg-muted/50 border border-sketch text-[9px] font-mono">esc</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">esc</kbd>
             close
           </span>
         </div>
@@ -152,7 +152,7 @@ export const AtMentionModal = memo(function AtMentionModal({
                 const state = (fileStates && fileStates.get(result.path)) || 'modify';
                 const mode = MODES.find(m => m.value === state) || MODES[0];
                 return (
-                  <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border font-medium ${mode.cls}`} style={{ fontSize: 'var(--font-xs)' }}>
+                  <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-none border font-medium ${mode.cls}`} style={{ fontSize: 'var(--font-xs)' }}>
                     {isSelected && <ChevronLeft className="w-2.5 h-2.5 opacity-40" />}
                     {mode.label}
                     {isSelected && <ChevronRight className="w-2.5 h-2.5 opacity-40" />}

@@ -2,6 +2,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../../components/ui/button';
 import { RetroSpinner } from '../../components/ui/RetroSpinner';
 
+const STATUS_COLORS = {
+  modified: 'var(--color-status-warning)',
+  added: 'var(--color-status-success)',
+  deleted: 'var(--color-status-critical)',
+  renamed: 'var(--color-status-info)',
+  untracked: 'var(--color-muted-foreground)',
+};
+
 const statusConfig = {
   modified: {
     icon: (
@@ -10,8 +18,7 @@ const statusConfig = {
         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
       </svg>
     ),
-    color: 'text-yellow-500',
-    bg: 'bg-yellow-500/10',
+    color: STATUS_COLORS.modified,
     label: 'modified',
   },
   added: {
@@ -20,8 +27,7 @@ const statusConfig = {
         <path d="M12 5v14M5 12h14" />
       </svg>
     ),
-    color: 'text-green-500',
-    bg: 'bg-green-500/10',
+    color: STATUS_COLORS.added,
     label: 'added',
   },
   deleted: {
@@ -30,8 +36,7 @@ const statusConfig = {
         <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       </svg>
     ),
-    color: 'text-red-500',
-    bg: 'bg-red-500/10',
+    color: STATUS_COLORS.deleted,
     label: 'deleted',
   },
   renamed: {
@@ -41,8 +46,7 @@ const statusConfig = {
         <path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8" />
       </svg>
     ),
-    color: 'text-blue-500',
-    bg: 'bg-blue-500/10',
+    color: STATUS_COLORS.renamed,
     label: 'renamed',
   },
   untracked: {
@@ -51,8 +55,7 @@ const statusConfig = {
         <path d="M12 2v20M2 12h20" />
       </svg>
     ),
-    color: 'text-gray-500',
-    bg: 'bg-gray-500/10',
+    color: STATUS_COLORS.untracked,
     label: 'untracked',
   },
 };
@@ -60,7 +63,10 @@ const statusConfig = {
 function FileStatusBadge({ status }) {
   const config = statusConfig[status] || statusConfig.untracked;
   return (
-    <div className={`flex items-center gap-1.5 px-2 py-0.5 border border-dashed ${config.color} border-current/30 bg-transparent`}>
+    <div
+      className="flex items-center gap-1.5 px-2 py-0.5 border border-dashed border-current/30 bg-transparent"
+      style={{ color: config.color }}
+    >
       {config.icon}
       <span className="text-[10px] uppercase tracking-wider font-semibold">{config.label}</span>
     </div>
@@ -118,14 +124,20 @@ export function AutoCommitDialog({ autoCommit }) {
         <div className="px-6 py-4 space-y-4">
           {/* Success State */}
           {showSuccess && (
-            <div className="flex items-center gap-3 p-4 border border-dashed border-green-500/40 bg-green-500/5">
-              <div className="flex items-center justify-center w-8 h-8 border border-dashed border-green-500/40">
-                <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <div
+              className="flex items-center gap-3 p-4 border border-dashed"
+              style={{ borderColor: 'color-mix(in srgb, var(--color-status-success) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-success) 5%, transparent)' }}
+            >
+              <div
+                className="flex items-center justify-center w-8 h-8 border border-dashed"
+                style={{ borderColor: 'color-mix(in srgb, var(--color-status-success) 40%, transparent)' }}
+              >
+                <svg className="w-4 h-4" style={{ color: 'var(--color-status-success)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-medium text-green-500 font-mono">[SUCCESS] Commit complete</p>
+                <p className="text-sm font-medium font-mono" style={{ color: 'var(--color-status-success)' }}>[SUCCESS] Commit complete</p>
                 <p className="text-xs text-muted-foreground mt-0.5 font-mono">{files.length} file{files.length !== 1 ? 's' : ''} committed</p>
               </div>
             </div>
@@ -133,15 +145,21 @@ export function AutoCommitDialog({ autoCommit }) {
 
           {/* Error State */}
           {stage === 'error' && (
-            <div className="flex items-start gap-3 p-4 border border-dashed border-red-500/40 bg-red-500/5">
-              <div className="flex items-center justify-center w-8 h-8 border border-dashed border-red-500/40 shrink-0">
-                <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div
+              className="flex items-start gap-3 p-4 border border-dashed"
+              style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-critical) 5%, transparent)' }}
+            >
+              <div
+                className="flex items-center justify-center w-8 h-8 border border-dashed shrink-0"
+                style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)' }}
+              >
+                <svg className="w-4 h-4" style={{ color: 'var(--color-status-critical)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-red-500 font-mono">[ERROR] Commit failed</p>
-                <p className="text-xs text-red-400/80 mt-1 break-words font-mono">{error}</p>
+                <p className="text-sm font-medium font-mono" style={{ color: 'var(--color-status-critical)' }}>[ERROR] Commit failed</p>
+                <p className="text-xs mt-1 break-words font-mono" style={{ color: 'color-mix(in srgb, var(--color-status-critical) 80%, transparent)' }}>{error}</p>
               </div>
             </div>
           )}

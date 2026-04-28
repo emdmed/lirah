@@ -16,6 +16,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
+  DropdownMenuLabel, DropdownMenuGroup,
 } from './ui/dropdown-menu';
 import {
   Dialog,
@@ -110,14 +111,15 @@ function NetworkButton({ isolated, enabled, onToggle }) {
 
 function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
   const hasInstances = otherInstancesCount > 0;
-  
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={onClick}
+          className="gap-1 px-1.5"
         >
           <Monitor className="w-3 h-3" />
           {hasInstances && (
@@ -126,12 +128,42 @@ function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {hasInstances 
+        {hasInstances
           ? `${otherInstancesCount} other instance${otherInstancesCount > 1 ? 's' : ''} active (Ctrl+Shift+I)`
           : 'Instance Sync (Ctrl+Shift+I)'
         }
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function ConfirmToggleDialog({ open, onOpenChange, title, description, onConfirm }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[440px] border-destructive/30 border-sketch bg-destructive/5">
+        <DialogHeader className="gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            </div>
+            <DialogTitle className="text-base font-semibold">
+              {title}
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="border-sketch">
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onConfirm}>
+            Continue
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -217,127 +249,133 @@ export const StatusBar = ({
   return (
     <>
     <div
-      className="flex items-center justify-between p-2 border-t border-t-sketch text-xs font-mono"
+      className="flex items-center justify-between px-2 h-8 border-t border-t-sketch text-xs font-mono"
       style={{
-        backgroundColor: theme.background || '#1F1F28',
-        color: theme.foreground || '#DCD7BA',
-        height: '32px',
+        backgroundColor: theme.background || 'var(--color-background)',
+        color: theme.foreground || 'var(--color-foreground)',
       }}
     >
-      <div className="flex items-center gap-2 overflow-hidden">
-        <span className="overflow-hidden whitespace-nowrap text-ellipsis">
-          {currentPath ? currentPath.split('/').pop() || '~' : '~'}
-        </span>
-        {workspace && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="xs" onClick={onOpenWorkspaceDialog} className="gap-1 px-1.5 h-5">
-                <Layers className="w-3 h-3" />
-                <span className="opacity-70">{workspace.name}</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Workspace: {workspace.projects.map(p => p.name).join(' + ')}
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {branchName && (
-          <Badge variant="secondary">
-            {branchName}
-          </Badge>
-        )}
-        {branchName && branchName !== 'main' && branchName !== 'master' && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="xs" 
-                onClick={onToggleBranchTasks}
-                className={cn(
-                  "gap-1 px-1.5 h-5 transition-colors",
-                  branchTasksOpen && "bg-white/10"
-                )}
-              >
-                <ListTodo className="w-3 h-3" />
-                <span className="opacity-70">Tasks</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Branch Tasks (Ctrl+Shift+T)</TooltipContent>
-          </Tooltip>
-        )}
-        {availableUpdate && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
-                    openUrl(availableUpdate.url);
-                  });
-                }}
-                className="gap-1 px-1.5 h-5"
-              >
-                <ArrowUpCircle className="w-3 h-3" style={{ color: STATUS_COLORS.success }} />
-                <span className="opacity-70">{availableUpdate.version}</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Update available — click to view release</TooltipContent>
-          </Tooltip>
+      {/* LEFT: Location + Context */}
+      <div className="flex items-center gap-1 overflow-hidden min-w-0">
+        {/* Location group: path + workspace + branch */}
+        <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
+          <span className="overflow-hidden whitespace-nowrap text-ellipsis opacity-70">
+            {currentPath ? currentPath.split('/').pop() || '~' : '~'}
+          </span>
+          {workspace && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="xs" onClick={onOpenWorkspaceDialog} className="gap-1 px-1.5 h-5">
+                  <Layers className="w-3 h-3" />
+                  <span className="opacity-70">{workspace.name}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Workspace: {workspace.projects.map(p => p.name).join(' + ')}
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {branchName && (
+            <Badge variant="secondary">
+              {branchName}
+            </Badge>
+          )}
+        </div>
+
+        {/* Context actions: tasks + update (shown when relevant) */}
+        {(branchName && branchName !== 'main' && branchName !== 'master' || availableUpdate) && (
+          <>
+            <div className="w-px h-3 bg-border/30 mx-0.5 shrink-0" />
+            <div className="flex items-center gap-0.5">
+              {branchName && branchName !== 'main' && branchName !== 'master' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={onToggleBranchTasks}
+                      className={cn(
+                        "gap-1 px-1.5 h-5 transition-colors",
+                        branchTasksOpen && "bg-foreground/10"
+                      )}
+                    >
+                      <ListTodo className="w-3 h-3" />
+                      <span className="opacity-70">Tasks</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Branch Tasks (Ctrl+Shift+T)</TooltipContent>
+                </Tooltip>
+              )}
+              {availableUpdate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => {
+                        import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
+                          openUrl(availableUpdate.url);
+                        });
+                      }}
+                      className="gap-1 px-1.5 h-5"
+                    >
+                      <ArrowUpCircle className="w-3 h-3" style={{ color: STATUS_COLORS.success }} />
+                      <span className="opacity-70">{availableUpdate.version}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Update available — click to view release</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      <div className="flex items-center gap-1">
-        {/* Status Zone */}
+      {/* RIGHT: Runtime status + Settings */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Transient status (changelog) — only visible when active */}
         {changelogStatus && (
-          <>
-            <ChangelogStatus status={changelogStatus} />
-            <div className="w-px h-4 bg-border/50 mx-1" />
-          </>
+          <ChangelogStatus status={changelogStatus} />
         )}
 
-        {/* Instance Sync Zone */}
-        <InstanceSyncIndicator 
-          otherInstancesCount={otherInstancesCount} 
-          onClick={onToggleInstanceSyncPanel} 
-        />
-
-        <div className="w-px h-4 bg-border/50 mx-1" />
-
-        {/* Environment Zone */}
-        <div className="flex items-center gap-0.5 bg-secondary/30 rounded px-1.5 py-0.5">
+        {/* Runtime zone: instances + CLI + sandbox + network — unified background */}
+        <div className="flex items-center gap-0.5 bg-secondary/20 px-1 py-0.5">
+          <InstanceSyncIndicator
+            otherInstancesCount={otherInstancesCount}
+            onClick={onToggleInstanceSyncPanel}
+          />
+          <div className="w-px h-3 bg-border/20 mx-0.5" />
           {selectedCli && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1.5 px-1.5 h-5">
+                <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1 px-1.5 h-5">
                   <CliIcon cli={selectedCli} />
-                  <span className="opacity-70">{cliName}</span>
+                  <span className="opacity-60">{cliName}</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
             </Tooltip>
           )}
-          <div className="w-px h-3 bg-border/30 mx-0.5" />
+          <div className="w-px h-3 bg-border/20 mx-0.5" />
           <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
           <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
         </div>
 
-        <div className="w-px h-4 bg-border/50 mx-1" />
-
-        {/* App Controls Zone */}
-        <div className="flex items-center gap-0.5">
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Settings</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end" className="w-100 text-xs">
+        {/* Settings — visually separated as the final anchor */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
+                  <Settings className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" className="w-56 text-xs">
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Analytics</DropdownMenuLabel>
+            <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
                 <BarChart3 className="mr-2 w-3 h-3" />
                 Token Metrics
@@ -347,18 +385,10 @@ export const StatusBar = ({
                 <Coins className="mr-2 w-3 h-3" />
                 Token Budget
               </DropdownMenuItem>
-              <ThemeSwitcherMenuItem />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
-                <Keyboard className="mr-2 w-3 h-3" />
-                Keyboard Shortcuts
-                <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1">
-                {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-                File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
-                <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
-              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Automation</DropdownMenuLabel>
+            <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1">
                 {autoChangelogEnabled ? (
                   <FileText className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.success }} />
@@ -372,11 +402,29 @@ export const StatusBar = ({
                 <span className="ml-2">Auto Commit...</span>
                 <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
               </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Preferences</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <ThemeSwitcherMenuItem />
+              <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
+                <Keyboard className="mr-2 w-3 h-3" />
+                Keyboard Shortcuts
+                <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1">
+                {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
+                File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
+                <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
                 {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
                 Title Bar: {showTitleBar ? 'ON' : 'OFF'}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Workspaces</DropdownMenuLabel>
+            <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenWorkspaceDialog} className="cursor-pointer py-1">
                 <Layers className="mr-2 w-3 h-3" />
                 {workspace ? `Workspace: ${workspace.name}` : 'Workspaces...'}
@@ -387,65 +435,27 @@ export const StatusBar = ({
                   Close Workspace
                 </DropdownMenuItem>
               )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
 
-    {/* Sandbox Toggle Confirmation Dialog */}
-    <Dialog open={showSandboxConfirm} onOpenChange={setShowSandboxConfirm}>
-      <DialogContent className="sm:max-w-[440px] border-destructive/30 border-sketch bg-destructive/5">
-        <DialogHeader className="gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-            </div>
-            <DialogTitle className="text-base font-semibold">
-              Toggle Sandbox Mode?
-            </DialogTitle>
-          </div>
-          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated. You'll need to restart your CLI agent after toggling.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
-          <Button variant="outline" size="sm" onClick={() => setShowSandboxConfirm(false)} className="border-sketch">
-            Cancel
-          </Button>
-          <Button variant="destructive" size="sm" onClick={confirmSandboxToggle}>
-            Continue
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmToggleDialog
+      open={showSandboxConfirm}
+      onOpenChange={setShowSandboxConfirm}
+      title="Toggle Sandbox Mode?"
+      description={<>This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated and file system isolation will be {sandboxEnabled ? 'disabled' : 'enabled'}.</>}
+      onConfirm={confirmSandboxToggle}
+    />
 
-    {/* Network Isolation Toggle Confirmation Dialog */}
-    <Dialog open={showNetworkConfirm} onOpenChange={setShowNetworkConfirm}>
-      <DialogContent className="sm:max-w-[440px] border-destructive/30 border-sketch bg-destructive/5">
-        <DialogHeader className="gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-            </div>
-            <DialogTitle className="text-base font-semibold">
-              Toggle Network Isolation?
-            </DialogTitle>
-          </div>
-          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated. You'll need to restart your CLI agent after toggling.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
-          <Button variant="outline" size="sm" onClick={() => setShowNetworkConfirm(false)} className="border-sketch">
-            Cancel
-          </Button>
-          <Button variant="destructive" size="sm" onClick={confirmNetworkToggle}>
-            Continue
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmToggleDialog
+      open={showNetworkConfirm}
+      onOpenChange={setShowNetworkConfirm}
+      title="Toggle Network Isolation?"
+      description={<>This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated and external network access will be {networkIsolation ? 'restored' : 'blocked'}.</>}
+      onConfirm={confirmNetworkToggle}
+    />
   </>
   );
 };

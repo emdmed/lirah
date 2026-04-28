@@ -102,12 +102,12 @@ export function InstanceSyncPanel({
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  const getStatusDotColor = (status) => {
+  const getStatusDotStyle = (status) => {
     switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'busy': return 'bg-yellow-500';
-      case 'idle': return 'bg-muted-foreground';
-      default: return 'bg-muted-foreground';
+      case 'active': return { backgroundColor: 'var(--color-status-success)' };
+      case 'busy': return { backgroundColor: 'var(--color-status-warning)' };
+      case 'idle': return {};
+      default: return {};
     }
   };
 
@@ -355,7 +355,7 @@ export function InstanceSyncPanel({
                       <div className="flex-shrink-0 pt-0.5">
                         {isUser ? (
                           <div className="w-6 h-6 flex items-center justify-center">
-                            <User className="w-3.5 h-3.5 text-blue-500" />
+                            <User className="w-3.5 h-3.5" style={{ color: 'var(--color-status-info)' }} />
                           </div>
                         ) : (
                           <Checkbox
@@ -368,9 +368,10 @@ export function InstanceSyncPanel({
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-mono font-semibold ${
-                            isUser ? 'text-blue-500' : 'text-emerald-500'
-                          }`}>
+                          <span
+                            className="text-[10px] font-mono font-semibold"
+                            style={{ color: isUser ? 'var(--color-status-info)' : 'var(--color-status-success)' }}
+                          >
                             {isUser ? 'USER' : 'ASSISTANT'}
                           </span>
                           {msg.timestamp && (
@@ -462,14 +463,14 @@ export function InstanceSyncPanel({
       <button
         key={session.session_id}
         onClick={() => onFetchSessionContent(session.session_id, selectedInstance.project_path, selectedInstance.source)}
-        className={`group w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3 rounded-md ${
+        className={`group w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3 rounded-none ${
           isActive ? 'bg-primary/5 border border-primary/20' : ''
         }`}
       >
         <div className="flex flex-col items-center gap-1">
           <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
           {isActive && (
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--color-status-success)' }} />
           )}
         </div>
         <div className="flex-1 min-w-0">
@@ -514,7 +515,7 @@ export function InstanceSyncPanel({
           </Button>
           <span className="text-muted-foreground/40 font-mono text-xs">/</span>
           <div className="flex items-center gap-1.5 min-w-0">
-            <div className={`w-2 h-2 flex-shrink-0 ${getStatusDotColor(selectedInstance.status)}`} />
+            <div className="w-2 h-2 flex-shrink-0 bg-muted-foreground" style={getStatusDotStyle(selectedInstance.status)} />
             <span className="text-xs font-mono text-foreground truncate">
               {selectedInstance.project_name}
             </span>
@@ -536,7 +537,7 @@ export function InstanceSyncPanel({
               placeholder="Search sessions..."
               value={sessionSearch}
               onChange={(e) => setSessionSearch(e.target.value)}
-              className="w-full px-2 py-1.5 text-xs font-mono bg-muted/30 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/40"
+              className="w-full px-2 py-1.5 text-xs font-mono bg-muted/30 border border-sketch rounded-none focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/40"
             />
           </div>
         )}
@@ -561,8 +562,8 @@ export function InstanceSyncPanel({
               {activeSessions.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-1">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-xs font-mono font-semibold text-green-600">
+                    <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--color-status-success)' }} />
+                    <span className="text-xs font-mono font-semibold" style={{ color: 'var(--color-status-success)' }}>
                       Currently Active
                     </span>
                   </div>
@@ -617,7 +618,7 @@ export function InstanceSyncPanel({
       <div className="flex flex-col h-full px-5 pb-5">
         {/* Own instance info */}
         <div className="flex items-center gap-3 px-1 pb-3">
-          <div className={`w-2 h-2 flex-shrink-0 ${getStatusDotColor(ownState.status)}`} />
+          <div className="w-2 h-2 flex-shrink-0 bg-muted-foreground" style={getStatusDotStyle(ownState.status)} />
           <div className="flex-1 min-w-0">
             <span className="text-sm font-mono font-medium text-foreground block truncate">
               {ownState.project_name || 'Unknown'}
@@ -727,7 +728,7 @@ export function InstanceSyncPanel({
                   onClick={() => onSelectInstance(instance)}
                   className="group w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3"
                 >
-                  <div className={`w-2 h-2 mt-1.5 flex-shrink-0 ${getStatusDotColor(instance.status)}`} />
+                  <div className="w-2 h-2 mt-1.5 flex-shrink-0 bg-muted-foreground" style={getStatusDotStyle(instance.status)} />
                      <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-mono font-medium text-foreground truncate group-hover:text-primary transition-colors">
@@ -825,7 +826,7 @@ export function InstanceSyncPanel({
 
                   {/* Prompt content */}
                   <div className="flex-1 overflow-y-auto min-h-0 py-4">
-                    <div className="bg-muted/30 rounded-lg p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                    <div className="bg-muted/30 rounded-none p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
                       {generatedPrompt?.prompt}
                     </div>
                   </div>

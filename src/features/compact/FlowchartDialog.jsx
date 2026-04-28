@@ -153,7 +153,7 @@ export function FlowchartDialog({ open, onOpenChange, graphData }) {
 
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden border border-border rounded-md bg-background/50"
+          className="flex-1 overflow-hidden border border-sketch rounded-none bg-background/50"
           style={{ cursor: panState.current.active ? 'grabbing' : 'default' }}
           onMouseDown={onPanStart}
           onMouseMove={onPanMove}

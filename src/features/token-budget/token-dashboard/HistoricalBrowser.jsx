@@ -75,7 +75,7 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
       />
 
       {/* Calendar Heatmap */}
-      <div className="bg-background rounded border border-sketch p-3 shrink-0 overflow-x-auto">
+      <div className="bg-background rounded-none border border-sketch p-3 shrink-0 overflow-x-auto">
         <div className="text-xs font-medium mb-2">Activity (Last 12 Months)</div>
         <CalendarHeatmap sessions={sessions} onDayClick={handleDayClick} colors={colors} />
       </div>
@@ -104,7 +104,7 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto border border-sketch rounded">
+        <div className="flex-1 overflow-auto border border-sketch rounded-none">
           {paged.map((s) => (
             <div key={s.sessionId + s.timestamp} className="border-b border-sketch/50">
               <button

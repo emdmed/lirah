@@ -11,36 +11,16 @@ const ICONS = {
 };
 
 const STYLES = {
-  error: {
-    border: 'border-red-500/50',
-    bg: 'bg-red-500/10',
-    icon: 'text-red-500',
-    progress: 'bg-red-500',
-  },
-  success: {
-    border: 'border-green-500/50',
-    bg: 'bg-green-500/10',
-    icon: 'text-green-500',
-    progress: 'bg-green-500',
-  },
-  warning: {
-    border: 'border-yellow-500/50',
-    bg: 'bg-yellow-500/10',
-    icon: 'text-yellow-500',
-    progress: 'bg-yellow-500',
-  },
-  info: {
-    border: 'border-blue-500/50',
-    bg: 'bg-blue-500/10',
-    icon: 'text-blue-500',
-    progress: 'bg-blue-500',
-  },
+  error: { color: 'var(--color-status-critical, #E82424)' },
+  success: { color: 'var(--color-status-success, #76946A)' },
+  warning: { color: 'var(--color-status-warning, #FF9E3B)' },
+  info: { color: 'var(--color-status-info, #6B8CCE)' },
 };
 
 function Toast({ toast, onDismiss }) {
   const [progress, setProgress] = useState(100);
   const Icon = ICONS[toast.type] || Info;
-  const style = STYLES[toast.type] || STYLES.info;
+  const { color } = STYLES[toast.type] || STYLES.info;
 
   useEffect(() => {
     if (!toast.duration || toast.duration <= 0) return;
@@ -64,10 +44,11 @@ function Toast({ toast, onDismiss }) {
 
   return (
     <div
-      className={`relative flex items-start gap-3 p-3 rounded-md border shadow-lg min-w-[320px] max-w-[480px] animate-in slide-in-from-right-4 fade-in duration-300 ${style.border} ${style.bg}`}
+      className="relative flex items-start gap-3 p-3 rounded-none border shadow-lg min-w-[320px] max-w-[480px] animate-in slide-in-from-right-4 fade-in duration-300"
+      style={{ borderColor: `color-mix(in srgb, ${color} 50%, transparent)`, backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)` }}
       role="alert"
     >
-      <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${style.icon}`} />
+      <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color }} />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-foreground leading-relaxed">{toast.message}</p>
         {toast.action && (
@@ -95,8 +76,8 @@ function Toast({ toast, onDismiss }) {
       </Button>
       {toast.duration > 0 && (
         <div
-          className={`absolute bottom-0 left-0 h-[2px] ${style.progress} transition-all duration-100`}
-          style={{ width: `${progress}%` }}
+          className="absolute bottom-0 left-0 h-[2px] transition-all duration-100"
+          style={{ width: `${progress}%`, backgroundColor: color }}
         />
       )}
     </div>

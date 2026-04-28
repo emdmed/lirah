@@ -7,14 +7,18 @@ import { EmptyState as EmptyStateBase } from "../EmptyState";
  * @param {string} searchQuery - Current search query if any
  * @param {boolean} showGitChangesOnly - Whether git changes filter is enabled
  * @param {boolean} showMarkdownOnly - Whether markdown filter is enabled
+ * @param {Function} onClearSearch - Callback to clear search query
+ * @param {Function} onToggleGitFilter - Callback to toggle git filter off
+ * @param {Function} onToggleMarkdownFilter - Callback to toggle markdown filter off
  */
-export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly }) {
+export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly, onClearSearch, onToggleGitFilter, onToggleMarkdownFilter }) {
   if (searchQuery) {
     return (
       <EmptyStateBase
         icon={FolderOpen}
         title={`No files match "${searchQuery}"`}
-        description="Try a different search term or clear the search to see all files"
+        description="Try a different search term or show all files"
+        action={onClearSearch ? { onClick: onClearSearch, label: 'Clear search' } : undefined}
       />
     );
   }
@@ -23,8 +27,9 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly }
     return (
       <EmptyStateBase
         icon={GitBranch}
-        title="No changes yet"
-        description="There are no modified files in this directory"
+        title="No uncommitted changes"
+        description="All files are clean in this directory"
+        action={onToggleGitFilter ? { onClick: onToggleGitFilter, label: 'Show all files' } : undefined}
       />
     );
   }
@@ -34,7 +39,8 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly }
       <EmptyStateBase
         icon={FileText}
         title="No markdown files"
-        description="There are no .md files in this directory"
+        description="This directory has no .md files"
+        action={onToggleMarkdownFilter ? { onClick: onToggleMarkdownFilter, label: 'Show all files' } : undefined}
       />
     );
   }
@@ -42,8 +48,8 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly }
   return (
     <EmptyStateBase
       icon={FolderOpen}
-      title="No files or folders found"
-      description="Navigate to a different directory or check your file permissions"
+      title="Empty directory"
+      description="No files or folders here"
     />
   );
 }

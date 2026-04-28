@@ -192,7 +192,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
               <div key={dirPath} className="mb-0.5">
                 {/* Directory row */}
                 <div
-                  className={`flex items-center gap-1.5 py-1 rounded px-1 select-none transition-opacity ${allDisabled ? 'opacity-35' : ''}`}
+                  className={`flex items-center gap-1.5 py-1 rounded-none px-1 select-none transition-opacity ${allDisabled ? 'opacity-35' : ''}`}
                 >
                   <div
                     className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
@@ -203,7 +203,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                       : <ChevronDown className="w-3 h-3 text-muted-foreground" />
                     }
                     <span
-                      className="shrink-0 px-1 py-0 rounded-full bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
+                      className="shrink-0 px-1 py-0 rounded-xs bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
                       style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
                       onClick={(e) => { e.stopPropagation(); toggleDir(dirPath, filePaths); }}
                     >
@@ -225,14 +225,14 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                       return (
                         <div
                           key={file.path}
-                          className={`flex items-center gap-1.5 py-0.5 rounded px-1 select-none transition-all ${
+                          className={`flex items-center gap-1.5 py-0.5 rounded-none px-1 select-none transition-all ${
                             isDisabled
                               ? 'opacity-30 hover:opacity-50'
                               : 'opacity-100'
                           }`}
                         >
                           <span
-                            className="shrink-0 px-1 py-0 rounded-full bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
+                            className="shrink-0 px-1 py-0 rounded-xs bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
                             style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
                             onClick={() => togglePath(file.path)}
                           >

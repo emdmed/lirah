@@ -80,7 +80,7 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
               autoFocus
             />
             {error && (
-              <p className="text-xs text-red-400">{error}</p>
+              <p className="text-xs text-destructive">{error}</p>
             )}
           </div>
 

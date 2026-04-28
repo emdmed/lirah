@@ -15,11 +15,11 @@ import {
 import { useToast } from '@/features/toast';
 
 const STATUS_ICON = {
-  installed: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />,
-  current: <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />,
-  outdated: <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />,
-  missing: <XCircle className="w-3.5 h-3.5 text-red-500" />,
-  updated: <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />,
+  installed: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
+  current: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
+  outdated: <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-warning)' }} />,
+  missing: <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-critical)' }} />,
+  updated: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-status-info)' }} />,
 };
 
 const STATUS_BADGE = {
@@ -49,7 +49,7 @@ function Section({ icon: Icon, title, children, action }) {
         </div>
         {action}
       </div>
-      <div className="rounded-md border border-border/50 bg-secondary/20 p-3 space-y-1.5 text-xs">
+      <div className="rounded-none border border-sketch bg-secondary/20 p-3 space-y-1.5 text-xs">
         {children}
       </div>
     </div>
@@ -318,7 +318,7 @@ export function OrchestrationDashboard({
               {hooksStatus ? (
                 <>
                   {hooksStatus.outdated && (
-                    <div className="flex items-center gap-1.5 text-yellow-500 text-[10px] pb-1">
+                    <div className="flex items-center gap-1.5 text-[10px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
                       <AlertTriangle className="w-3 h-3" />
                       Hook scripts have a newer version available
                     </div>

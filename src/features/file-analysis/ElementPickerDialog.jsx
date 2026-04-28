@@ -350,7 +350,7 @@ export function ElementPickerDialog({
                 const someSelected = selectedCount > 0 && !allSelected;
 
                 return (
-                  <div key={group.type} className="border border-border rounded-md">
+                  <div key={group.type} className="border border-sketch rounded-none">
                     <div
                       className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted"
                       onClick={() => toggleGroup(group.type)}
@@ -381,7 +381,7 @@ export function ElementPickerDialog({
                         {group.elements.map(el => (
                           <div
                             key={el.key}
-                            className="flex items-center gap-2 py-1 pl-6 hover:bg-muted/30 rounded cursor-pointer"
+                            className="flex items-center gap-2 py-1 pl-6 hover:bg-muted/30 rounded-none cursor-pointer"
                             onClick={() => toggleElement(el.key)}
                           >
                             <span className="w-4 h-4 flex items-center justify-center">
