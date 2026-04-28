@@ -3,7 +3,7 @@ import { Coins } from "lucide-react";
 import { TokenCostEstimate } from "../../features/token-budget";
 import { formatTokenCount } from "../../features/token-budget/tokenCalculations";
 
-export function TokenUsageDisplay({ tokenUsage, textareaContent, selectedFiles, projectPath, orchestrationTokenEstimate }) {
+export function TokenUsageDisplay({ tokenUsage, textareaContent, selectedFiles, projectPath }) {
   const hasTokens = tokenUsage && (tokenUsage.billable_input_tokens > 0 || tokenUsage.billable_output_tokens > 0);
   const billableTotal = hasTokens ? tokenUsage.billable_input_tokens + tokenUsage.billable_output_tokens : 0;
 
@@ -13,7 +13,6 @@ export function TokenUsageDisplay({ tokenUsage, textareaContent, selectedFiles, 
         textareaContent={textareaContent}
         selectedFiles={selectedFiles}
         projectPath={projectPath}
-        orchestrationTokenEstimate={orchestrationTokenEstimate}
       />
       {hasTokens && (
         <Tooltip>

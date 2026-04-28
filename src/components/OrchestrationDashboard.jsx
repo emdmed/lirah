@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RetroSpinner } from '@/components/ui/RetroSpinner';
 import {
-  CheckCircle2, AlertTriangle, XCircle, RefreshCw, Download,
+  CheckCircle2, AlertTriangle, XCircle, Download,
   FileText, Code, GitBranch, Shield, Puzzle
 } from 'lucide-react';
 import { useToast } from '@/features/toast';
@@ -123,9 +123,6 @@ export function OrchestrationDashboard({
   const [hooksStatus, setHooksStatus] = useState(null);
   const [availableWorkflows, setAvailableWorkflows] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [installingHooks, setInstallingHooks] = useState(false);
-  const [syncResult, setSyncResult] = useState(null);
   const toast = useToast();
 
   const refreshStatus = useCallback(async () => {
@@ -148,56 +145,8 @@ export function OrchestrationDashboard({
   }, [projectPath, orchestrationCheck]);
 
   useEffect(() => {
-    if (open) {
-      setSyncResult(null);
-      refreshStatus();
-    }
+    if (open) refreshStatus();
   }, [open, refreshStatus]);
-
-  const handleSyncAll = useCallback(async () => {
-    if (!projectPath) return;
-    setSyncing(true);
-    setSyncResult(null);
-    try {
-      const result = await orchestrationCheck.fullSync(projectPath);
-      setSyncResult(result);
-      await refreshStatus();
-      if (result) {
-        const updates = [];
-        if (result.orchestration === 'updated') updates.push('protocol');
-        if (result.scripts.length > 0) updates.push(`${result.scripts.length} script(s)`);
-        if (result.workflows.length > 0) updates.push(`${result.workflows.length} workflow(s)`);
-        if (updates.length > 0) {
-          toast.success(`Synced: ${updates.join(', ')}`);
-        } else {
-          toast.info('Everything up to date');
-        }
-      }
-    } catch (e) {
-      console.error('Sync failed:', e);
-      toast.error('Sync failed');
-    } finally {
-      setSyncing(false);
-    }
-  }, [projectPath, orchestrationCheck, refreshStatus]);
-
-  const handleInstallHooks = useCallback(async () => {
-    setInstallingHooks(true);
-    try {
-      const result = await orchestrationCheck.installHooks();
-      await refreshStatus();
-      if (result.success) {
-        toast.success('Hooks installed successfully');
-      } else {
-        toast.error(`Hook install failed: ${result.error}`);
-      }
-    } catch (e) {
-      console.error('Hook install failed:', e);
-      toast.error('Hook install failed');
-    } finally {
-      setInstallingHooks(false);
-    }
-  }, [orchestrationCheck, refreshStatus]);
 
   const isConfigured = orchStatus && orchStatus.protocol !== 'missing';
 
@@ -225,33 +174,9 @@ export function OrchestrationDashboard({
             <p className="text-xs opacity-40">
               No <code>.orchestration/</code> directory found at <code>{projectPath}</code>
             </p>
-            <Button size="sm" variant="outline" onClick={handleSyncAll} disabled={syncing}>
-              {syncing ? <RetroSpinner size={12} lineWidth={1.5} /> : <Download className="w-3 h-3 mr-1.5" />}
-              Initialize Orchestration
-            </Button>
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Sync All button */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {syncResult && (
-                  <span className="text-[10px] opacity-50">
-                    {syncResult.orchestration === 'updated' ? 'Protocol updated. ' : ''}
-                    {syncResult.scripts.length > 0 ? `${syncResult.scripts.length} script(s) updated. ` : ''}
-                    {syncResult.workflows.length > 0 ? `${syncResult.workflows.length} workflow(s) updated. ` : ''}
-                    {syncResult.orchestration === 'current' && syncResult.scripts.length === 0 && syncResult.workflows.length === 0
-                      ? 'Everything up to date.'
-                      : ''}
-                  </span>
-                )}
-              </div>
-              <Button size="sm" variant="outline" onClick={handleSyncAll} disabled={syncing} className="gap-1.5 h-7 text-xs">
-                {syncing ? <RetroSpinner size={12} lineWidth={1.5} /> : <RefreshCw className="w-3 h-3" />}
-                Sync All
-              </Button>
-            </div>
-
             {/* Protocol Status */}
             <Section icon={FileText} title="Protocol">
               <StatusRow label="orchestration.md" status={orchStatus.protocol} />
@@ -293,47 +218,26 @@ export function OrchestrationDashboard({
             </Section>
 
             {/* Hooks Status */}
-            <Section
-              icon={Shield}
-              title="Global Hooks"
-              action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleInstallHooks}
-                  disabled={installingHooks}
-                  className="gap-1.5 h-6 text-[10px] px-2"
-                >
-                  {installingHooks ? (
-                    <RetroSpinner size={10} lineWidth={1.5} />
-                  ) : hooksStatus?.installed ? (
-                    <RefreshCw className="w-3 h-3" />
-                  ) : (
-                    <Download className="w-3 h-3" />
-                  )}
-                  {hooksStatus?.outdated ? 'Update' : hooksStatus?.installed ? 'Reinstall' : 'Install Hooks'}
-                </Button>
-              }
-            >
+            <Section icon={Shield} title="Global Hooks">
               {hooksStatus ? (
                 <>
-                  {hooksStatus.outdated && (
+                  {!hooksStatus.installed && (
                     <div className="flex items-center gap-1.5 text-[10px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
                       <AlertTriangle className="w-3 h-3" />
-                      Hook scripts have a newer version available
+                      Hooks not installed. Install globally via the orchestration setup guide.
                     </div>
                   )}
                   <StatusRow
                     label="classify.sh (UserPromptSubmit)"
-                    status={hooksStatus.hooks.classify ? (hooksStatus.outdated ? 'outdated' : 'installed') : 'missing'}
+                    status={hooksStatus.hooks.classify ? 'installed' : 'missing'}
                   />
                   <StatusRow
                     label="maintain.sh (SessionStart)"
-                    status={hooksStatus.hooks.maintain ? (hooksStatus.outdated ? 'outdated' : 'installed') : 'missing'}
+                    status={hooksStatus.hooks.maintain ? 'installed' : 'missing'}
                   />
                   <StatusRow
                     label="guard-explore.sh (PreToolUse)"
-                    status={hooksStatus.hooks.guard ? (hooksStatus.outdated ? 'outdated' : 'installed') : 'missing'}
+                    status={hooksStatus.hooks.guard ? 'installed' : 'missing'}
                   />
                 </>
               ) : (

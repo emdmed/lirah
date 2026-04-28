@@ -87,6 +87,21 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   // Track project root for fs watcher (set after first loadTreeData)
   const [watchPath, setWatchPath] = useState(null);
 
+  // Remove a deleted file/directory from the tree
+  const removeDeletedFromTree = useCallback((nodes, deletedPaths) => {
+    const deletedSet = new Set(deletedPaths);
+    const filterNodes = (nodeList) =>
+      nodeList
+        .filter(node => !deletedSet.has(node.path))
+        .map(node => {
+          if (node.children) {
+            return { ...node, children: filterNodes(node.children) };
+          }
+          return node;
+        });
+    return filterNodes(nodes);
+  }, []);
+
   // Start native FS watcher and listen for create/delete events
   useEffect(() => {
     if (!watchPath || !fileWatchingEnabled) return;
@@ -97,9 +112,57 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     const setup = async () => {
       try {
         await invoke('start_fs_watcher', { path: watchPath });
-        unlisten = await listen('fs-changes', () => {
-          if (!stopped) {
+        unlisten = await listen('fs-changes', (event) => {
+          if (stopped) return;
+          const { created, deleted } = event.payload || {};
+          const hasCreated = created && created.length > 0;
+          const hasDeleted = deleted && deleted.length > 0;
+
+          // If the payload is empty or missing, fall back to full reload
+          if (!hasCreated && !hasDeleted) {
             loadTreeData();
+            return;
+          }
+
+          // Handle deletions — filter them out of the tree
+          if (hasDeleted) {
+            setTreeData(prev => removeDeletedFromTree(prev, deleted));
+            // Also remove from allFiles and update search index
+            setAllFiles(prev => {
+              const deletedSet = new Set(deleted);
+              const updated = prev.filter(f => !deletedSet.has(f.path));
+              initializeSearch(updated);
+              return updated;
+            });
+          }
+
+          // Handle creations — add new nodes incrementally
+          if (hasCreated) {
+            const changes = {
+              newUntracked: created.map(p => ({ path: p })),
+            };
+            setTreeData(prev => incrementallyUpdateTree(prev, changes, watchPath));
+            // Also add to allFiles and update search index
+            setAllFiles(prev => {
+              const existingPaths = new Set(prev.map(f => f.path));
+              const newEntries = created
+                .filter(p => !existingPaths.has(p))
+                .map(p => {
+                  const lastSep = p.lastIndexOf('/');
+                  return {
+                    name: p.substring(lastSep + 1),
+                    path: p,
+                    is_dir: false,
+                    parent_path: p.substring(0, lastSep),
+                  };
+                });
+              if (newEntries.length > 0) {
+                const updated = [...prev, ...newEntries];
+                initializeSearch(updated);
+                return updated;
+              }
+              return prev;
+            });
           }
         });
       } catch (err) {
@@ -114,7 +177,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
       if (unlisten) unlisten();
       invoke('stop_fs_watcher').catch(() => {});
     };
-  }, [watchPath, fileWatchingEnabled, loadTreeData]);
+  }, [watchPath, fileWatchingEnabled, loadTreeData, removeDeletedFromTree, initializeSearch]);
 
   const handleIncrementalUpdate = useCallback((changes, rootPath) => {
     setTreeData(prev => incrementallyUpdateTree(prev, changes, rootPath));

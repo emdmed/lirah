@@ -70,10 +70,8 @@ function App() {
   const textareaRef = useRef(null);
   const [viewMode, setViewMode] = useState('flat');
 
-  // Template/orchestration state
+  // Template state
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
-  const [appendOrchestration, setAppendOrchestration] = useState(true);
-  const [orchestrationTokenEstimate, setOrchestrationTokenEstimate] = useState(null);
 
   // Splash screen state
   const [splashVisible, setSplashVisible] = useState(false);
@@ -156,7 +154,6 @@ function App() {
 
   // Instance sync
   const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
-  const orchestrationCheckedForPath = useRef(null);
   const instanceSync = useInstanceSync(
     currentPath,
     selectedFilesArray,
@@ -270,33 +267,20 @@ function App() {
     sidebar.setSidebarOpen(true);
   }, [sidebar]);
 
-  // Open orchestration dashboard
-  const openOrchestrationDashboard = useCallback(() => {
-    dialogs.setOrchestrationDashboardOpen(true);
-  }, [dialogs]);
-
   // Delete orchestration folder
   const handleDeleteOrchestration = useCallback(async () => {
     if (!currentPath) return;
     try {
-      // Remove .orchestration directory by deleting known files and subdirs
       const orchDir = `${currentPath}/.orchestration`;
       const exists = await invoke('path_exists', { path: orchDir });
       if (!exists) return;
 
-      // Use shell to remove directory recursively
       await invoke('write_to_terminal', {
         sessionId: terminalSessionId,
         data: `rm -rf "${orchDir}"\r`
       });
 
-      // Wait briefly for fs operation
       await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Reset orchestration state
-      setAppendOrchestration(false);
-      setOrchestrationTokenEstimate(null);
-      orchestrationCheckedForPath.current = null;
     } catch (error) {
       console.error('Failed to delete orchestration:', error);
     }
@@ -409,7 +393,6 @@ function App() {
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProject = useCallback(async (bookmark) => {
-    orchestrationCheckedForPath.current = currentPath;
     setSplashProjectName(bookmark.name);
     setSplashStep('navigate');
     setSplashVisible(true);
@@ -540,7 +523,7 @@ function App() {
     selectedFiles: fileSelection.selectedFiles,
     currentPath, fileStates: fileSelection.fileStates,
     keepFilesAfterSend: settings.keepFilesAfterSend,
-    selectedTemplateId, getTemplateById, appendOrchestration,
+    selectedTemplateId, getTemplateById,
     formatFileAnalysis, getLineCount, getViewModeLabel,
     selectedElements: elementPicker.selectedElements,
     compactedProject: compact.compactedProject,
@@ -574,86 +557,8 @@ function App() {
   // Monitor terminal CWD
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled && !secondary.secondaryFullscreen);
 
-  // Calculate orchestration token estimate when enabled
-  const calculateOrchestrationEstimate = useCallback(async (cwd) => {
-    if (!cwd) return;
-    try {
-      const orchestrationContent = await invoke('read_file_content', { path: `${cwd}/.orchestration/orchestration.md` });
-      const commandText = 'Follow .orchestration/orchestration.md';
-      const commandTokens = Math.round(commandText.length / 4);
-      const contentTokens = Math.round(orchestrationContent.length / 4);
-      setOrchestrationTokenEstimate(commandTokens + contentTokens);
-    } catch {
-      setOrchestrationTokenEstimate(null);
-    }
-  }, []);
-
-  // Handle orchestration toggle
-  const handleToggleOrchestration = useCallback((value) => {
-    const nextValue = typeof value === 'function' ? value(appendOrchestration) : value;
-    setAppendOrchestration(nextValue);
-    if (nextValue && detectedCwd) {
-      calculateOrchestrationEstimate(detectedCwd);
-    } else if (!nextValue) {
-      setOrchestrationTokenEstimate(null);
-    }
-  }, [detectedCwd, calculateOrchestrationEstimate, appendOrchestration]);
-
-  const handleOrchestrationInstall = useCallback(async () => {
-    if (!currentPath) return;
-
-    const result = await orchestrationCheck.syncOrchestration(currentPath);
-
-    if (result.success) {
-      invoke('read_file_content', { path: `${currentPath}/.orchestration/orchestration.md` })
-        .then(() => {
-          setAppendOrchestration(true);
-          calculateOrchestrationEstimate(currentPath);
-        })
-        .catch(() => {
-          setAppendOrchestration(false);
-          setOrchestrationTokenEstimate(null);
-        });
-
-      dialogs.setOrchestrationPromptOpen(false);
-    }
-  }, [currentPath, orchestrationCheck, calculateOrchestrationEstimate, dialogs]);
-
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd);
-
-  // Auto-check orchestration
-  useEffect(() => {
-    if (!detectedCwd) return;
-    invoke('read_file_content', { path: `${detectedCwd}/.orchestration/orchestration.md` })
-      .then(() => {
-        setAppendOrchestration(true);
-        calculateOrchestrationEstimate(detectedCwd);
-      })
-      .catch(() => { setAppendOrchestration(false); setOrchestrationTokenEstimate(null); });
-  }, [detectedCwd, calculateOrchestrationEstimate]);
-
-  // Auto-sync orchestration on project open (background, with toast)
-  const autoSyncedForPath = useRef(null);
-  useEffect(() => {
-    if (!detectedCwd || autoSyncedForPath.current === detectedCwd) return;
-    // Only auto-sync if project has .orchestration/
-    invoke('path_exists', { path: `${detectedCwd}/.orchestration/orchestration.md` })
-      .then(exists => {
-        if (!exists) return;
-        autoSyncedForPath.current = detectedCwd;
-        orchestrationCheck.fullSync(detectedCwd).then(result => {
-          if (!result) return;
-          const updates = [];
-          if (result.orchestration === 'updated') updates.push('protocol');
-          if (result.scripts.length > 0) updates.push(`${result.scripts.length} script(s)`);
-          if (result.workflows.length > 0) updates.push(`${result.workflows.length} workflow(s)`);
-          if (updates.length > 0) {
-            toast.success(`Orchestration synced: ${updates.join(', ')}`);
-          }
-        });
-      });
-  }, [detectedCwd, orchestrationCheck, toast]);
 
   // Show toast when a new release is available
   useEffect(() => {
@@ -671,33 +576,11 @@ function App() {
     });
   }, [availableUpdate]);
 
-  // Check orchestration whenever view mode switches to tree (agent mode)
-  useEffect(() => {
-    if (viewMode !== 'tree') return;
-    if (!currentPath || !currentPath.startsWith('/') || !terminalReady || dialogs.initialProjectDialogOpen) return;
-
-    if (orchestrationCheckedForPath.current === currentPath) return;
-
-    const timeoutId = setTimeout(async () => {
-      const result = await orchestrationCheck.checkOrchestration(currentPath);
-
-      if (result.status === 'missing' || result.status === 'outdated') {
-        dialogs.setOrchestrationStatus(result.status);
-        dialogs.setOrchestrationPromptOpen(true);
-      }
-
-      orchestrationCheckedForPath.current = currentPath;
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [viewMode, currentPath, terminalReady, dialogs.initialProjectDialogOpen, orchestrationCheck]);
-
-
-  // Keyboard shortcuts (must come after orchestration functions)
+  // Keyboard shortcuts
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
     textareaVisible, setTextareaVisible, textareaRef,
     onSendContent: sendTextareaToTerminal,
-    onToggleOrchestration: handleToggleOrchestration,
+
     selectedTemplateId, onSelectTemplate: setSelectedTemplateId,
     onRestoreLastPrompt: setTextareaContent,
     secondaryTerminalFocused: secondary.secondaryFocused,
@@ -892,9 +775,7 @@ function App() {
               selectedTemplateId={selectedTemplateId}
               onSelectTemplate={setSelectedTemplateId}
               onManageTemplates={() => dialogs.setManageTemplatesDialogOpen(true)}
-              appendOrchestration={appendOrchestration}
-              onToggleOrchestration={handleToggleOrchestration}
-              orchestrationTokenEstimate={orchestrationTokenEstimate}
+
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
               tokenUsage={tokenUsage}
@@ -924,8 +805,8 @@ function App() {
               patternFiles={patterns.patternFiles}
               selectedPatterns={patterns.selectedPatterns}
               onTogglePattern={patterns.togglePattern}
-              onDeleteOrchestration={terminalSessionId ? handleDeleteOrchestration : undefined}
-              onOpenOrchestrationDashboard={openOrchestrationDashboard}
+
+
             />
           )
         }
@@ -1064,7 +945,7 @@ function App() {
         handleOpenWorkspace={handleOpenWorkspace}
         handleLoadInstanceContext={handleLoadInstanceContext}
         handleSendImplementationPrompt={handleSendImplementationPrompt}
-        handleOrchestrationInstall={handleOrchestrationInstall}
+
       />
 
       <SplashScreen

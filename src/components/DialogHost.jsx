@@ -11,7 +11,7 @@ import { TokenBudgetDialog } from "../features/token-budget";
 import { TokenAlertBanner } from "../features/token-budget";
 import { TokenDashboard } from "../features/token-budget";
 import { AutoChangelogDialog, AutoCommitDialog, AutoCommitConfigDialog } from "../features/git";
-import { OrchestrationPrompt } from "./OrchestrationPrompt";
+
 import { OrchestrationDashboard } from "./OrchestrationDashboard";
 import { ToastContainer } from "../features/toast";
 import { InstanceSyncPanel } from "../features/instance-sync/InstanceSyncPanel";
@@ -43,7 +43,6 @@ export function DialogHost({
   handleOpenWorkspace,
   handleLoadInstanceContext,
   handleSendImplementationPrompt,
-  handleOrchestrationInstall,
 }) {
   return (
     <>
@@ -198,13 +197,6 @@ export function DialogHost({
           settings.setAutoCommitCli(cli);
           settings.setAutoCommitCustomPrompt(customPrompt);
         }}
-      />
-      <OrchestrationPrompt
-        open={dialogs.orchestrationPromptOpen}
-        onOpenChange={dialogs.setOrchestrationPromptOpen}
-        status={dialogs.orchestrationStatus}
-        onInstall={handleOrchestrationInstall}
-        installing={orchestrationCheck.installing}
       />
       <OrchestrationDashboard
         open={dialogs.orchestrationDashboardOpen}

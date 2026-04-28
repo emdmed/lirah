@@ -33,14 +33,12 @@ export function useTextareaShortcuts({
   setTextareaVisible,
   textareaRef,
   onSendContent,
-  onToggleOrchestration,
+
   selectedTemplateId,
   onSelectTemplate,
   onRestoreLastPrompt,
   secondaryTerminalFocused,
 }) {
-  // Track last Ctrl keydown timestamp for double-tap detection
-  const lastCtrlDownRef = useRef(0);
   // Track last Alt keydown timestamp for double-tap detection
   const lastAltDownRef = useRef(0);
   const DOUBLE_TAP_THRESHOLD = 300; // ms
@@ -51,23 +49,6 @@ export function useTextareaShortcuts({
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (secondaryTerminalFocused) return;
-
-      // Double-tap Ctrl: Toggle orchestration mode
-      if (e.key === 'Control' && !e.repeat) {
-        const now = Date.now();
-        const timeSinceLastCtrl = now - lastCtrlDownRef.current;
-
-        if (timeSinceLastCtrl < DOUBLE_TAP_THRESHOLD && timeSinceLastCtrl > 50) {
-          // Double-tap detected (with minimum 50ms to filter out held keys)
-          e.preventDefault();
-          onToggleOrchestration?.((prev) => !prev);
-          lastCtrlDownRef.current = 0; // Reset to prevent triple-tap
-          return;
-        }
-
-        lastCtrlDownRef.current = now;
-        return;
-      }
 
       // Double-tap Alt: Clear selected template OR open dropdown
       if (e.key === 'Alt' && !e.repeat) {
@@ -134,7 +115,7 @@ export function useTextareaShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, onToggleOrchestration, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt, secondaryTerminalFocused]);
+  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt, secondaryTerminalFocused]);
 
   return { templateDropdownOpen, setTemplateDropdownOpen };
 }

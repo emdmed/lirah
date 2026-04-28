@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
 use notify::{Watcher, RecursiveMode, Event};
 use notify::event::{EventKind, ModifyKind, CreateKind, RemoveKind};
+use tauri::{AppHandle, Emitter};
 
 // Cache entry with TTL - now uses Arc to avoid cloning the entire HashMap
 #[derive(Clone, Debug)]
@@ -19,12 +20,12 @@ const CLEANUP_INTERVAL_SECONDS: u64 = 60;
 const MAX_WATCHERS: usize = 5;
 
 // Main cache structure - uses RwLock for better read performance
-#[derive(Default)]
 pub struct GitStatsCache {
     entries: Arc<RwLock<HashMap<PathBuf, CacheEntry>>>,
     watcher_stops: Arc<RwLock<HashMap<PathBuf, Sender<()>>>>,
     enabled: Arc<RwLock<bool>>,
     last_cleanup: Arc<RwLock<Option<Instant>>>,
+    app_handle: Arc<RwLock<Option<AppHandle>>>,
 }
 
 impl GitStatsCache {
@@ -34,6 +35,14 @@ impl GitStatsCache {
             watcher_stops: Arc::new(RwLock::new(HashMap::new())),
             enabled: Arc::new(RwLock::new(true)),
             last_cleanup: Arc::new(RwLock::new(None)),
+            app_handle: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Set the Tauri AppHandle so watchers can emit events to the frontend.
+    pub fn set_app_handle(&self, handle: AppHandle) {
+        if let Ok(mut h) = self.app_handle.write() {
+            *h = Some(handle);
         }
     }
 
@@ -156,6 +165,7 @@ impl GitStatsCache {
         // Clone Arc for watcher callback
         let entries = self.entries.clone();
         let watcher_stops = self.watcher_stops.clone();
+        let app_handle_arc = self.app_handle.clone();
         let repo_path_for_thread = repo_path.clone();
         let git_dir_clone = git_dir.clone();
 
@@ -164,6 +174,7 @@ impl GitStatsCache {
             // Clone for the inner closure (moved into watcher callback)
             let entries_for_callback = entries.clone();
             let repo_path_for_callback = repo_path_for_thread.clone();
+            let app_handle_for_callback = app_handle_arc.clone();
 
             // Create watcher
             let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
@@ -188,6 +199,12 @@ impl GitStatsCache {
                         if should_invalidate {
                             if let Ok(mut entries) = entries_for_callback.write() {
                                 entries.remove(&repo_path_for_callback);
+                            }
+                            // Emit event to frontend so it can fetch fresh stats
+                            if let Ok(handle_guard) = app_handle_for_callback.read() {
+                                if let Some(ref handle) = *handle_guard {
+                                    let _ = handle.emit("git-stats-changed", repo_path_for_callback.to_string_lossy().to_string());
+                                }
                             }
                         }
                     }

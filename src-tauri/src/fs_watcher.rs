@@ -1,4 +1,5 @@
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Event, EventKind};
+use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -8,6 +9,13 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use crate::state::AppState;
+
+/// Payload emitted with "fs-changes" events so the frontend can do incremental updates.
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct FsChangesPayload {
+    pub created: Vec<String>,
+    pub deleted: Vec<String>,
+}
 
 /// Directories to ignore when watching for filesystem changes
 const IGNORE_DIRS: &[&str] = &[
@@ -138,34 +146,54 @@ pub fn start_fs_watcher(
     }
 
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
-    let (event_tx, event_rx) = mpsc::channel::<()>();
+
+    /// Per-event info sent from the notify callback to the debounce thread.
+    #[derive(Debug)]
+    enum FsEvent {
+        Created(String),
+        Deleted(String),
+    }
+
+    let (event_tx, event_rx) = mpsc::channel::<FsEvent>();
 
     let ignore_set: HashSet<&'static str> = IGNORE_DIRS.iter().copied().collect();
     let ignore_set_for_callback = ignore_set.clone();
     let watch_path_clone = watch_path.clone();
     let app_state = state.inner().clone();
 
-    // Create the notify watcher — filter events in the callback
+    // Create the notify watcher — filter events in the callback and tag them
     let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
         if let Ok(event) = res {
-            match event.kind {
-                EventKind::Create(_) | EventKind::Remove(_) => {
-                    // Filter out events for temp/editor files
-                    let dominated_by_ignore = event.paths.iter().all(|p| {
-                        should_ignore_file(p) || p.components().any(|c| {
-                            if let std::path::Component::Normal(name) = c {
-                                if let Some(s) = name.to_str() {
-                                    return ignore_set_for_callback.contains(s);
-                                }
-                            }
-                            false
-                        })
-                    });
-                    if !dominated_by_ignore {
-                        let _ = event_tx.send(());
-                    }
+            let is_create = matches!(event.kind, EventKind::Create(_));
+            let is_remove = matches!(event.kind, EventKind::Remove(_));
+
+            if !is_create && !is_remove {
+                return;
+            }
+
+            for p in &event.paths {
+                // Filter out temp/editor files and ignored directories
+                if should_ignore_file(p) {
+                    continue;
                 }
-                _ => {}
+                let dominated_by_ignore = p.components().any(|c| {
+                    if let std::path::Component::Normal(name) = c {
+                        if let Some(s) = name.to_str() {
+                            return ignore_set_for_callback.contains(s);
+                        }
+                    }
+                    false
+                });
+                if dominated_by_ignore {
+                    continue;
+                }
+
+                let path_str = p.to_string_lossy().to_string();
+                if is_create {
+                    let _ = event_tx.send(FsEvent::Created(path_str));
+                } else {
+                    let _ = event_tx.send(FsEvent::Deleted(path_str));
+                }
             }
         }
     }).map_err(|e| format!("Failed to create watcher: {}", e))?;
@@ -173,7 +201,7 @@ pub fn start_fs_watcher(
     // Watch directories selectively — skip ignored dirs at inotify level
     watch_directory_selective(&mut watcher, &watch_path, &ignore_set)?;
 
-    // Debounce thread: collect events, emit after quiet period
+    // Debounce thread: collect events, aggregate paths, emit after quiet period
     thread::spawn(move || {
         // Keep watcher alive in this thread
         let _watcher = watcher;
@@ -187,14 +215,33 @@ pub fn start_fs_watcher(
             }
 
             match event_rx.recv_timeout(Duration::from_millis(200)) {
-                Ok(()) => {
-                    // Got an event — drain further events within debounce window
-                    while event_rx.recv_timeout(debounce).is_ok() {}
+                Ok(first_event) => {
+                    // Start collecting — seed with the first event
+                    let mut payload = FsChangesPayload::default();
+                    match first_event {
+                        FsEvent::Created(p) => payload.created.push(p),
+                        FsEvent::Deleted(p) => payload.deleted.push(p),
+                    }
+
+                    // Drain further events within debounce window
+                    while let Ok(ev) = event_rx.recv_timeout(debounce) {
+                        match ev {
+                            FsEvent::Created(p) => payload.created.push(p),
+                            FsEvent::Deleted(p) => payload.deleted.push(p),
+                        }
+                    }
+
+                    // Deduplicate
+                    payload.created.sort();
+                    payload.created.dedup();
+                    payload.deleted.sort();
+                    payload.deleted.dedup();
+
                     // Invalidate directory cache so next read_directory_recursive is fresh
                     if let Ok(state_lock) = app_state.lock() {
                         state_lock.directory_cache.invalidate(&watch_path_clone);
                     }
-                    let _ = app_handle.emit("fs-changes", &watch_path_clone.to_string_lossy().to_string());
+                    let _ = app_handle.emit("fs-changes", &payload);
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,

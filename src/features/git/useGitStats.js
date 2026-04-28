@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 /**
  * Custom hook to fetch and manage git statistics for files
@@ -11,6 +12,34 @@ import { invoke } from "@tauri-apps/api/core";
 export function useGitStats(currentPath, enabled = true, onGitChanges) {
   const [gitStats, setGitStats] = useState(new Map());
   const prevStatsRef = useRef(new Map());
+  const onGitChangesRef = useRef(onGitChanges);
+  onGitChangesRef.current = onGitChanges;
+
+  const fetchGitStats = useCallback(async () => {
+    if (!currentPath || !enabled) return;
+    try {
+      const statsData = await invoke('get_git_stats', { path: currentPath });
+      const newStats = new Map(Object.entries(statsData));
+
+      // Detect specific git changes for targeted updates
+      if (onGitChangesRef.current) {
+        const changes = detectGitChanges(prevStatsRef.current, newStats);
+        if (changes.hasChanges) {
+          onGitChangesRef.current(changes);
+        }
+      }
+
+      // Only update state if contents actually changed to avoid unnecessary re-renders
+      if (!mapsEqual(prevStatsRef.current, newStats)) {
+        setGitStats(newStats);
+      }
+      prevStatsRef.current = newStats;
+    } catch (error) {
+      console.warn('Failed to load git stats:', error);
+      setGitStats(new Map());
+      prevStatsRef.current = new Map();
+    }
+  }, [currentPath, enabled]);
 
   useEffect(() => {
     if (!currentPath || !enabled) {
@@ -19,41 +48,26 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
       return;
     }
 
-    const fetchGitStats = async () => {
-      try {
-        const statsData = await invoke('get_git_stats', { path: currentPath });
-        const newStats = new Map(Object.entries(statsData));
-
-        // Detect specific git changes for targeted updates
-        if (onGitChanges) {
-          const changes = detectGitChanges(prevStatsRef.current, newStats);
-          if (changes.hasChanges) {
-            console.log('Git changes detected:', changes);
-            onGitChanges(changes);
-          }
-        }
-
-        // Only update state if contents actually changed to avoid unnecessary re-renders
-        if (!mapsEqual(prevStatsRef.current, newStats)) {
-          setGitStats(newStats);
-        }
-        prevStatsRef.current = newStats;
-      } catch (error) {
-        console.warn('Failed to load git stats:', error);
-        setGitStats(new Map());
-        prevStatsRef.current = new Map();
-      }
-    };
-
     // Initial fetch
     fetchGitStats();
 
-    // Set up 3-second interval (was 1s - reduced to minimize git process spawning)
-    const interval = setInterval(fetchGitStats, 3000);
+    // Listen for backend event instead of polling
+    let unlisten;
+    const setup = async () => {
+      unlisten = await listen('git-stats-changed', () => {
+        fetchGitStats();
+      });
+    };
+    setup();
 
-    // Cleanup on unmount or path change
-    return () => clearInterval(interval);
-  }, [currentPath, enabled, onGitChanges]);
+    // Safety net: low-frequency poll (30s) to catch any missed events
+    const fallbackInterval = setInterval(fetchGitStats, 30000);
+
+    return () => {
+      if (unlisten) unlisten();
+      clearInterval(fallbackInterval);
+    };
+  }, [currentPath, enabled, fetchGitStats]);
 
   return { gitStats };
 }

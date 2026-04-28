@@ -19,8 +19,7 @@ export function useDialogs() {
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [projectPickerAction, setProjectPickerAction] = useState(null);
   const [instanceSyncPanelOpen, setInstanceSyncPanelOpen] = useState(false);
-  const [orchestrationPromptOpen, setOrchestrationPromptOpen] = useState(false);
-  const [orchestrationStatus, setOrchestrationStatus] = useState(null);
+
   const [orchestrationDashboardOpen, setOrchestrationDashboardOpen] = useState(false);
   const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
   const [markdownFilePath, setMarkdownFilePath] = useState(null);
@@ -44,8 +43,7 @@ export function useDialogs() {
     projectPickerOpen, setProjectPickerOpen,
     projectPickerAction, setProjectPickerAction,
     instanceSyncPanelOpen, setInstanceSyncPanelOpen,
-    orchestrationPromptOpen, setOrchestrationPromptOpen,
-    orchestrationStatus, setOrchestrationStatus,
+
     orchestrationDashboardOpen, setOrchestrationDashboardOpen,
     markdownViewerOpen, setMarkdownViewerOpen,
     markdownFilePath, setMarkdownFilePath,

@@ -87,7 +87,7 @@ export function usePromptSender({
   keepFilesAfterSend,
   selectedTemplateId,
   getTemplateById,
-  appendOrchestration,
+
   formatFileAnalysis,
   getLineCount,
   getViewModeLabel,
@@ -118,11 +118,6 @@ export function usePromptSender({
 
     try {
       let fullCommand = '';
-
-      // Orchestration instruction goes first so Claude reads it before anything else
-      if (appendOrchestration) {
-        fullCommand = 'Read .orchestration/orchestration.md and strictly implement its protocol before proceeding.';
-      }
 
       // Add compacted project file path with instructions to grep inside it
       if (hasCompactedProject) {
@@ -221,7 +216,7 @@ export function usePromptSender({
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, appendOrchestration, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate]);
+  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate]);
 
   return sendPrompt;
 }
