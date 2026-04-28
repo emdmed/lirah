@@ -2,10 +2,10 @@ use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry, Cla
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::Mutex;
 
-/// Cached result of Claude data directory discovery
-static CLAUDE_DATA_DIR_CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
+/// Cached result of Claude data directory discovery (retries on None)
+static CLAUDE_DATA_DIR_CACHE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 /// Environment variable override for Claude data directory
 const CLAUDE_DATA_ENV: &str = "CLAUDE_CODE_DATA_DIR";
@@ -24,11 +24,21 @@ const CLAUDE_DATA_LOCATIONS: &[&str] = &[
     ".npm/_npx/<hash>/node_modules/@anthropic-ai/claude-code/.claude", // npx global
 ];
 
-/// Find the Claude Code data directory by trying multiple locations (cached after first discovery)
+/// Find the Claude Code data directory by trying multiple locations
+/// Caches successful results; retries on failure (dir may appear later)
 fn find_claude_data_dir() -> Option<PathBuf> {
-    CLAUDE_DATA_DIR_CACHE
-        .get_or_init(|| discover_claude_data_dir())
-        .clone()
+    let cached = CLAUDE_DATA_DIR_CACHE.lock().ok()?.clone();
+    if let Some(path) = &cached {
+        if path.exists() {
+            return Some(path.clone());
+        }
+    }
+    // Not cached or cached path vanished — rediscover
+    let found = discover_claude_data_dir();
+    if let Ok(mut guard) = CLAUDE_DATA_DIR_CACHE.lock() {
+        *guard = found.clone();
+    }
+    found
 }
 
 /// Perform the actual filesystem discovery for Claude data directory
@@ -55,7 +65,25 @@ fn discover_claude_data_dir() -> Option<PathBuf> {
         }
     }
 
-    // 4. Check for npx-specific patterns (these have hash in path)
+    // 4. Check XDG env vars (user may have non-standard XDG base dirs)
+    if let Ok(xdg_config) = env::var("XDG_CONFIG_HOME") {
+        for name in &["claude-code", "claude"] {
+            let path = PathBuf::from(&xdg_config).join(name);
+            if path.is_dir() && path.join("projects").is_dir() {
+                return Some(path);
+            }
+        }
+    }
+    if let Ok(xdg_data) = env::var("XDG_DATA_HOME") {
+        for name in &["claude-code", "claude"] {
+            let path = PathBuf::from(&xdg_data).join(name);
+            if path.is_dir() && path.join("projects").is_dir() {
+                return Some(path);
+            }
+        }
+    }
+
+    // 5. Check for npx-specific patterns (these have hash in path)
     let npm_dir = home_dir.join(".npm");
     if npm_dir.exists() {
         if let Ok(entries) = fs::read_dir(&npm_dir) {
@@ -83,6 +111,64 @@ fn discover_claude_data_dir() -> Option<PathBuf> {
         }
     }
 
+    // 6. Broad fallback: scan $HOME top-level dotdirs (depth 2) for a valid claude data dir
+    //    Looks for any directory containing a "projects" subdir with UUID-named session folders
+    if let Ok(entries) = fs::read_dir(&home_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            // Only scan dotdirs that contain "claude" in the name
+            if !name.starts_with('.') || !name.to_lowercase().contains("claude") {
+                continue;
+            }
+            if let Some(found) = check_claude_data_dir(&path) {
+                return Some(found);
+            }
+        }
+    }
+
+    // 7. Scan ~/.config and ~/.local/share one level deep for claude-related dirs
+    for parent in &[home_dir.join(".config"), home_dir.join(".local").join("share")] {
+        if let Ok(entries) = fs::read_dir(parent) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                let name = match path.file_name().and_then(|n| n.to_str()) {
+                    Some(n) => n.to_lowercase(),
+                    None => continue,
+                };
+                if name.contains("claude") {
+                    if let Some(found) = check_claude_data_dir(&path) {
+                        return Some(found);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Check if a directory is a valid Claude data dir (contains projects/ with session-like subdirs)
+fn check_claude_data_dir(path: &PathBuf) -> Option<PathBuf> {
+    let projects = path.join("projects");
+    if !projects.is_dir() {
+        return None;
+    }
+    // Verify it has at least one subdirectory (encoded project path)
+    if let Ok(mut entries) = fs::read_dir(&projects) {
+        if entries.any(|e| e.map(|e| e.path().is_dir()).unwrap_or(false)) {
+            return Some(path.clone());
+        }
+    }
     None
 }
 
@@ -139,6 +225,12 @@ pub fn get_claude_data_paths() -> Result<Vec<String>, String> {
                 }
             }
         }
+    }
+
+    // Show what discover_claude_data_dir actually resolved to
+    match find_claude_data_dir() {
+        Some(p) => paths.push(format!("RESOLVED: {} [ACTIVE]", p.to_string_lossy())),
+        None => paths.push("RESOLVED: <none>".to_string()),
     }
 
     Ok(paths)
