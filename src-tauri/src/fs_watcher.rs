@@ -1,6 +1,6 @@
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, Event, EventKind};
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -16,6 +16,7 @@ use crate::state::AppState;
 pub struct FsChangesPayload {
     pub created: Vec<String>,
     pub deleted: Vec<String>,
+    pub root_path: String,
 }
 
 /// File extensions/patterns to ignore (editor temp files, OS files)
@@ -56,18 +57,17 @@ fn should_ignore_file(path: &Path) -> bool {
 struct WatcherHandle {
     // Kept alive — dropping signals the watcher thread to stop
     _stop_tx: mpsc::Sender<()>,
-    path: PathBuf,
 }
 
-/// Global store for active filesystem watchers (one per project path)
+/// Global store for active filesystem watchers (multiple per project path)
 pub struct FsWatcherStore {
-    active: Arc<Mutex<Option<WatcherHandle>>>,
+    active: Arc<Mutex<HashMap<PathBuf, WatcherHandle>>>,
 }
 
 impl FsWatcherStore {
     pub fn new() -> Self {
         Self {
-            active: Arc::new(Mutex::new(None)),
+            active: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -130,12 +130,8 @@ pub fn start_fs_watcher(
     let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
 
     // If already watching this path, no-op
-    if let Some(handle) = active.as_ref() {
-        if handle.path == watch_path {
-            return Ok(());
-        }
-        // Stop previous watcher (drop sender signals thread to stop)
-        active.take();
+    if active.contains_key(&watch_path) {
+        return Ok(());
     }
 
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
@@ -270,6 +266,7 @@ pub fn start_fs_watcher(
                         if let Ok(state_lock) = app_state.lock() {
                             state_lock.directory_cache.invalidate(&watch_path_clone);
                         }
+                        payload.root_path = watch_path_clone.to_string_lossy().to_string();
                         let _ = app_handle.emit("fs-changes", &payload);
                     }
 
@@ -287,20 +284,29 @@ pub fn start_fs_watcher(
         }
     });
 
-    *active = Some(WatcherHandle {
+    active.insert(watch_path, WatcherHandle {
         _stop_tx: stop_tx,
-        path: watch_path,
     });
 
     Ok(())
 }
 
-/// Stop the active filesystem watcher
+/// Stop the filesystem watcher for a specific path.
+/// If no path is given, stops all watchers (backwards compat).
 #[tauri::command]
 pub fn stop_fs_watcher(
+    path: Option<String>,
     store: tauri::State<Arc<FsWatcherStore>>,
 ) -> Result<(), String> {
     let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
-    active.take(); // Dropping the sender signals the thread to stop
+    match path {
+        Some(p) => {
+            let key = PathBuf::from(p);
+            active.remove(&key); // Dropping the sender signals the thread to stop
+        }
+        None => {
+            active.clear(); // Stop all watchers
+        }
+    }
     Ok(())
 }

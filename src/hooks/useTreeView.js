@@ -114,7 +114,9 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
         await invoke('start_fs_watcher', { path: watchPath });
         unlisten = await listen('fs-changes', (event) => {
           if (stopped) return;
-          const { created, deleted } = event.payload || {};
+          const { created, deleted, root_path } = event.payload || {};
+          // Only process events for our watched path
+          if (root_path && root_path !== watchPath) return;
           const hasCreated = created && created.length > 0;
           const hasDeleted = deleted && deleted.length > 0;
 
@@ -175,7 +177,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     return () => {
       stopped = true;
       if (unlisten) unlisten();
-      invoke('stop_fs_watcher').catch(() => {});
+      invoke('stop_fs_watcher', { path: watchPath }).catch(() => {});
     };
   }, [watchPath, fileWatchingEnabled, loadTreeData, removeDeletedFromTree, initializeSearch]);
 
