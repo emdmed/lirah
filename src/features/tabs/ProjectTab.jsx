@@ -8,6 +8,7 @@ import { usePromptTemplates } from "../templates";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useWatcher } from "../watcher";
 import { useBookmarks } from "../bookmarks";
+import { useTabManager } from "../tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "../../hooks/useCwdMonitor";
 import { useBranchName, useAutoChangelog, useAutoCommit, useBranchTasks, GitDiffDialog, BranchCompletedTasksDialog } from "../git";
@@ -65,6 +66,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const { bookmarks, updateBookmark } = useBookmarks();
+  const { updateTabPath } = useTabManager();
 
   // Core terminal state
   const [terminalSessionId, setTerminalSessionId] = useState(null);
@@ -500,6 +502,13 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
 
   // Monitor terminal CWD
   const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled && !secondary.secondaryFullscreen);
+
+  // Update tab label when terminal CWD changes
+  useEffect(() => {
+    if (detectedCwd && tabId) {
+      updateTabPath(tabId, detectedCwd);
+    }
+  }, [detectedCwd, tabId, updateTabPath]);
 
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd);
