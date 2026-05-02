@@ -45,7 +45,6 @@ import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
 import { useInstanceSync } from "../instance-sync/useInstanceSync";
 import { useInstanceSyncShortcut } from "../instance-sync/useInstanceSyncShortcut";
-import { useAgentOverlay, AgentOverlay } from "../agent-overlay";
 import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { useUpdateChecker } from "../../hooks/useUpdateChecker";
@@ -149,9 +148,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   // Instance sync
   const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
   const instanceSync = useInstanceSync(currentPath, selectedFilesArray, terminalSessionId);
-
-  // Agent overlay
-  const agentOverlay = useAgentOverlay({ currentPath });
 
   // Calculate deduplicated instance count
   const deduplicatedOtherInstancesCount = useMemo(() => {
@@ -877,12 +873,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
           currentBranch={branchName}
         />
       </Layout>
-
-      <AgentOverlay
-        subagents={agentOverlay.subagents}
-        visible={agentOverlay.visible}
-        activeSubagentCount={agentOverlay.activeSubagentCount}
-      />
 
       <DialogHost
         dialogs={dialogs}

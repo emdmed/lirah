@@ -761,9 +761,9 @@ fn encode_project_path(path: &str) -> String {
     path.replace('/', "-").replace(' ', "-")
 }
 
-/// Store for the subagent filesystem watcher
+/// Store for the subagent filesystem watchers (one per project path)
 pub struct SubagentWatcherStore {
-    active: std::sync::Arc<std::sync::Mutex<Option<SubagentWatcherHandle>>>,
+    active: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, SubagentWatcherHandle>>>,
 }
 
 struct SubagentWatcherHandle {
@@ -773,7 +773,7 @@ struct SubagentWatcherHandle {
 impl SubagentWatcherStore {
     pub fn new() -> Self {
         Self {
-            active: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            active: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         }
     }
 }
@@ -1006,8 +1006,10 @@ pub fn watch_project_subagents(
 
     let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
 
-    // Stop existing watcher
-    active.take();
+    // If already watching this path, no-op (idempotent)
+    if active.contains_key(&project_path) {
+        return Ok(());
+    }
 
     let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
     let (event_tx, event_rx) = std::sync::mpsc::channel::<()>();
@@ -1030,7 +1032,8 @@ pub fn watch_project_subagents(
         .watch(&project_dir, RecursiveMode::Recursive)
         .map_err(|e| format!("Failed to watch project dir: {}", e))?;
 
-    // Debounce thread
+    // Debounce thread — emits project_path so frontend knows which path changed
+    let emit_path = project_path.clone();
     std::thread::spawn(move || {
         let _watcher = watcher; // keep alive
         let debounce = std::time::Duration::from_millis(500);
@@ -1045,7 +1048,7 @@ pub fn watch_project_subagents(
                 Ok(()) => {
                     // Drain further events within debounce window
                     while event_rx.recv_timeout(debounce).is_ok() {}
-                    let _ = app_handle.emit("subagents-changed", ());
+                    let _ = app_handle.emit("subagents-changed", &emit_path);
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
@@ -1053,19 +1056,20 @@ pub fn watch_project_subagents(
         }
     });
 
-    *active = Some(SubagentWatcherHandle {
+    active.insert(project_path, SubagentWatcherHandle {
         _stop_tx: stop_tx,
     });
 
     Ok(())
 }
 
-/// Stop the subagent filesystem watcher
+/// Stop the subagent filesystem watcher for a specific project path
 #[tauri::command]
-pub fn stop_session_subagents_watcher(
+pub fn stop_project_subagents_watcher(
+    project_path: String,
     store: tauri::State<std::sync::Arc<SubagentWatcherStore>>,
 ) -> Result<(), String> {
     let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
-    active.take();
+    active.remove(&project_path);
     Ok(())
 }

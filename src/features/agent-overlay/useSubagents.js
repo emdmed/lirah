@@ -68,7 +68,7 @@ export function useSubagents(projectPath) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-      invoke('stop_session_subagents_watcher').catch(() => {});
+      invoke('stop_project_subagents_watcher', { projectPath }).catch(() => {});
     };
   }, [projectPath, fetchSubagents]);
 

@@ -4,6 +4,8 @@ import { useTabManager } from "./features/tabs";
 import { ProjectTab } from "./features/tabs/ProjectTab";
 import { TabBar } from "./features/tabs/TabBar";
 import { SplashScreen } from "./features/splash";
+import { SubagentProvider } from "./contexts/SubagentContext";
+import { AgentSidebar } from "./components/AgentSidebar";
 
 function App() {
   const { tabs, activeTabId, addTab, removeTab, switchTab, reorderTab } = useTabManager();
@@ -113,36 +115,41 @@ function App() {
   }, [addTab]);
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {tabs.length > 1 && (
-        <TabBar
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSwitch={switchTab}
-          onClose={removeTab}
-          onAdd={handleNewTab}
-          onReorder={reorderTab}
-        />
-      )}
-
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {tabs.map(tab => (
-          <ProjectTab
-            key={tab.id}
-            tabId={tab.id}
-            projectPath={tab.projectPath}
-            isActive={tab.id === activeTabId}
+    <SubagentProvider tabs={tabs}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {tabs.length > 1 && (
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onSwitch={switchTab}
+            onClose={removeTab}
+            onAdd={handleNewTab}
+            onReorder={reorderTab}
           />
-        ))}
-      </div>
+        )}
 
-      <SplashScreen
-        visible={splashVisible}
-        projectName={splashProjectName}
-        currentStep={splashStep}
-        onComplete={() => setSplashVisible(false)}
-      />
-    </div>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            {tabs.map(tab => (
+              <ProjectTab
+                key={tab.id}
+                tabId={tab.id}
+                projectPath={tab.projectPath}
+                isActive={tab.id === activeTabId}
+              />
+            ))}
+          </div>
+          <AgentSidebar />
+        </div>
+
+        <SplashScreen
+          visible={splashVisible}
+          projectName={splashProjectName}
+          currentStep={splashStep}
+          onComplete={() => setSplashVisible(false)}
+        />
+      </div>
+    </SubagentProvider>
   );
 }
 

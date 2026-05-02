@@ -19,7 +19,7 @@ use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content
 use typecheck::check_file_types;
 use python_parser::parse_python_skeleton;
 use instance_sync::{create_instance_sync_store, get_instance_id, register_instance, update_instance_state, get_all_instances, get_own_instance_state, unregister_instance, cleanup_stale_instances, start_instance_watcher};
-use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get_active_claude_session, get_session_subagents, get_project_subagents, watch_project_subagents, stop_session_subagents_watcher, SubagentWatcherStore};
+use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get_active_claude_session, get_session_subagents, get_project_subagents, watch_project_subagents, stop_project_subagents_watcher, SubagentWatcherStore};
 use opencode::{get_opencode_data_paths, get_opencode_sessions, get_opencode_session, get_active_opencode_session};
 use workspace::{create_workspace, delete_workspace, list_workspaces, open_workspace, close_workspace};
 use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
@@ -89,7 +89,7 @@ pub fn run(initial_path: Option<String>) {
             get_session_subagents,
             get_project_subagents,
             watch_project_subagents,
-            stop_session_subagents_watcher,
+            stop_project_subagents_watcher,
             get_opencode_sessions,
             get_opencode_session,
             get_opencode_data_paths,
