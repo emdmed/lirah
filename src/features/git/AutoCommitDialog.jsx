@@ -73,7 +73,7 @@ function FileStatusBadge({ status }) {
   );
 }
 
-function FileList({ files, maxHeight = 'max-h-[200px]' }) {
+function FileList({ files, maxHeight = 'max-h-[40vh]' }) {
   if (files.length === 0) return null;
 
   return (
@@ -102,7 +102,7 @@ export function AutoCommitDialog({ autoCommit }) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) cancel(); }}>
       <DialogContent
-        className="sm:max-w-[650px] max-w-[95vw] p-0 gap-0 overflow-hidden rounded-none"
+        className="sm:max-w-[650px] max-w-[95vw] max-h-[85vh] p-0 gap-0 overflow-hidden rounded-none"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && stage === 'ready' && commitMessage.trim()) {
             e.preventDefault();
@@ -121,7 +121,7 @@ export function AutoCommitDialog({ autoCommit }) {
         </DialogHeader>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto">
           {/* Success State */}
           {showSuccess && (
             <div
@@ -186,7 +186,7 @@ export function AutoCommitDialog({ autoCommit }) {
                     </span>
                   </div>
                   <div className="p-0">
-                    <FileList files={files} maxHeight="max-h-[120px]" />
+                    <FileList files={files} maxHeight="max-h-[25vh]" />
                   </div>
                 </div>
               )}
