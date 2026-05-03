@@ -35,17 +35,17 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     }
   }, [sessionId, initialCommand, ref]);
 
-  const resizeTimerRef = useRef(null);
   const rafRef = useRef(null);
+  const trailingRef = useRef(null);
   const debouncedResize = useCallback(() => {
-    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    resizeTimerRef.current = setTimeout(() => {
+    if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
+    rafRef.current = requestAnimationFrame(() => {
       handleResize();
-      rafRef.current = requestAnimationFrame(() => {
+      trailingRef.current = requestAnimationFrame(() => {
         handleResize();
       });
-    }, 150);
+    });
   }, [handleResize]);
 
   useEffect(() => {
@@ -56,8 +56,8 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
     };
   }, [debouncedResize]);
 

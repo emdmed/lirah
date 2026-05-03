@@ -26,20 +26,21 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     }
   }, [sandboxFailed, onSandboxFailed]);
 
-  // Debounced resize — delay lets flex layout settle before fitting.
-  // A secondary rAF pass catches late layout shifts that occur after the timeout.
-  const resizeTimerRef = useRef(null);
+  // Debounced resize — fit on next animation frame, coalescing rapid-fire
+  // ResizeObserver events. A short follow-up pass catches late layout shifts
+  // (e.g. CSS transitions finishing after the first fit).
   const rafRef = useRef(null);
+  const trailingRef = useRef(null);
   const debouncedResize = useCallback(() => {
-    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    resizeTimerRef.current = setTimeout(() => {
+    if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
+    rafRef.current = requestAnimationFrame(() => {
       handleResize();
-      // Second pass: catch any layout shift that settled after the first fit
-      rafRef.current = requestAnimationFrame(() => {
+      // Trailing pass: catch layout shifts that settle one frame later
+      trailingRef.current = requestAnimationFrame(() => {
         handleResize();
       });
-    }, 150);
+    });
   }, [handleResize]);
 
   // Setup resize observer
@@ -53,8 +54,8 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
     };
   }, [debouncedResize]);
 
