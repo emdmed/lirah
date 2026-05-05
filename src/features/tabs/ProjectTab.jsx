@@ -563,10 +563,14 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     if (terminalSessionId && sidebar.sidebarOpen && folders.length === 0) loadFolders();
   }, [terminalSessionId]);
 
-  // Auto-focus terminal when this tab becomes active
+  // Auto-focus and re-fit terminal when this tab becomes active
   useEffect(() => {
     if (isActive && terminalReady) {
-      setTimeout(() => terminalRef.current?.focus?.(), 50);
+      // Re-fit the terminal after the container regains dimensions from display:none → contents
+      requestAnimationFrame(() => {
+        terminalRef.current?.resize?.();
+        terminalRef.current?.focus?.();
+      });
     }
   }, [isActive, terminalReady]);
 

@@ -8,6 +8,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const [commitMessage, setCommitMessage] = useState('');
   const [error, setError] = useState(null);
   const currentPathRef = useRef(null);
+  const cancelledRef = useRef(false);
 
   const reset = useCallback(() => {
     setStage('idle');
@@ -20,12 +21,14 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const trigger = useCallback(async (currentPath) => {
     if (!currentPath) return;
     currentPathRef.current = currentPath;
+    cancelledRef.current = false;
     reset();
     setStage('loading-files');
 
     try {
       // Get committable files
       const committableFiles = await invoke('get_committable_files', { repoPath: currentPath });
+      if (cancelledRef.current) return;
       if (!committableFiles || committableFiles.length === 0) {
         setError('No committable files found');
         setStage('error');
@@ -38,9 +41,11 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       const other = committableFiles.filter(f => f.status !== 'deleted').map(f => f.path);
       if (other.length > 0) {
         await invoke('run_git_command', { repoPath: currentPath, args: ['add', '--', ...other] });
+        if (cancelledRef.current) return;
       }
       if (deleted.length > 0) {
         await invoke('run_git_command', { repoPath: currentPath, args: ['rm', '--cached', '--', ...deleted] });
+        if (cancelledRef.current) return;
       }
 
       // Generate commit message via backend (which gets diff via git command)
@@ -51,11 +56,13 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
         cli,
         customPrompt: customPrompt.trim() || null,
       });
+      if (cancelledRef.current) return;
 
       const lines = msg.split('\n').filter(l => l.trim().length > 0);
       setCommitMessage(lines.length > 0 ? lines.join('\n') : 'chore: update files');
       setStage('ready');
     } catch (err) {
+      if (cancelledRef.current) return;
       setError(err.toString());
       setStage('error');
     }
@@ -76,6 +83,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   }, [reset]);
 
   const cancel = useCallback(async () => {
+    cancelledRef.current = true;
     const repoPath = currentPathRef.current;
     if (repoPath && (stage === 'ready' || stage === 'generating-message')) {
       try {

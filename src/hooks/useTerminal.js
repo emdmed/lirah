@@ -261,7 +261,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     }
   }, [terminal, theme]);
 
-  // Expose focus and blur methods to parent via ref
+  // Expose focus, blur, and resize methods to parent via ref
   useImperativeHandle(imperativeRef, () => ({
     focus: () => {
       if (terminal && isReady) {
@@ -277,8 +277,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         return true;
       }
       return false;
+    },
+    resize: () => {
+      handleResize();
     }
-  }), [terminal, isReady]);
+  }), [terminal, isReady, handleResize]);
 
   return {
     terminal,
