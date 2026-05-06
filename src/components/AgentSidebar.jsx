@@ -1,63 +1,171 @@
-import { useState, useMemo } from 'react';
-import { Bot, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
 
-function AgentCard({ agent, onDismiss }) {
+function formatElapsed(isoString) {
+  if (!isoString) return null;
+  const start = new Date(isoString).getTime();
+  if (Number.isNaN(start)) return null;
+  const secs = Math.floor((Date.now() - start) / 1000);
+  if (secs < 5) return 'just now';
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h${mins % 60}m`;
+}
+
+function extractTaskLabel(desc) {
+  if (!desc) return null;
+
+  let text = desc;
+
+  // 1. Strip leading filler words
+  text = text.replace(/^(Thoroughly|Carefully|Please)\s+/i, '');
+
+  // 2. Cut at context/instruction boundaries
+  const cutPatterns = [
+    /\.\s*(This is RESEARCH|Context from|IMPORTANT:|Note:|DO NOT|CRITICAL:)/i,
+    /\.\s*(The following|Here is|Below is|Make sure)/i,
+  ];
+  for (const pattern of cutPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      text = text.slice(0, match.index + 1);
+      break;
+    }
+  }
+
+  // 3. Strip absolute paths
+  text = text.replace(/\s+(at|in|from)\s+\/\S+/g, '');
+
+  // 4. Strip "the X codebase" / "the X project" boilerplate
+  text = text.replace(/\s+the\s+\S+\s+(codebase|project|repo(sitory)?)\b/gi, '');
+
+  // 5. Extract purpose clause: "for X" or "to X"
+  const purposeMatch = text.match(/\b(?:for|to)\s+(.+?)\.?\s*$/i);
+  if (purposeMatch && purposeMatch[1].length > 10) {
+    text = purposeMatch[1];
+  }
+
+  // 6. Capitalize first letter, strip trailing period
+  text = text.replace(/\.\s*$/, '').trim();
+  if (text) text = text[0].toUpperCase() + text.slice(1);
+
+  return text || null;
+}
+
+function truncate(text, maxLen = 60) {
+  if (!text || text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 20 ? cut.slice(0, lastSpace) : cut) + '\u2026';
+}
+
+function AgentCard({ agent, onDismiss, now }) {
   const isRunning = agent.status === 'running';
   const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const elapsed = formatElapsed(agent.started_at);
+  const label = extractTaskLabel(agent.description);
+  const summary = truncate(label);
 
   return (
     <div
       className={cn(
-        'rounded-md p-2 text-xs cursor-pointer transition-colors border border-sketch',
-        isRunning && 'border-l-2 border-l-green-500',
+        'relative rounded-sm px-2 py-1.5 text-xs cursor-pointer transition-colors',
+        isRunning
+          ? 'bg-[color-mix(in_srgb,var(--color-status-success)_8%,transparent)]'
+          : 'hover:bg-sidebar-accent/50',
       )}
       onClick={() => setExpanded(e => !e)}
-      onDoubleClick={() => onDismiss(agent.agent_id)}
-      title="Click to expand, double-click to dismiss"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      <div className="flex items-center gap-1.5">
+      {/* Row 1: status dot + task summary + dismiss */}
+      <div className="flex items-start gap-1.5">
         <span
           className={cn(
-            'inline-block w-2 h-2 rounded-full shrink-0',
-            isRunning ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]' : 'bg-muted-foreground opacity-50',
+            'inline-block w-1.5 h-1.5 rounded-full shrink-0 mt-[3px]',
+            isRunning && 'animate-pulse',
           )}
+          style={{
+            backgroundColor: isRunning
+              ? 'var(--color-status-success)'
+              : 'var(--color-muted-foreground)',
+            opacity: isRunning ? 1 : 0.35,
+            boxShadow: isRunning
+              ? '0 0 6px color-mix(in srgb, var(--color-status-success) 50%, transparent)'
+              : undefined,
+          }}
         />
-        <span className="font-medium truncate text-sidebar-foreground">
-          {agent.slug || agent.agent_id.slice(0, 8)}
+        <span className="text-[11px] text-sidebar-foreground leading-tight line-clamp-2 break-words min-w-0">
+          {summary || agent.slug || agent.agent_id.slice(0, 8)}
         </span>
+        {hovered && (
+          <button
+            className="ml-auto shrink-0 p-0.5 rounded hover:bg-sidebar-accent cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss(agent.agent_id);
+            }}
+            title="Dismiss"
+          >
+            <X size={10} className="text-muted-foreground" />
+          </button>
+        )}
       </div>
-      {agent.last_tool && (
-        <div className="mt-1">
-          <span className="inline-block px-1 py-0.5 rounded text-[10px] font-mono bg-primary/15 text-primary">
+
+      {/* Row 2: metadata — tool, turns, elapsed */}
+      <div className="flex items-center gap-1.5 mt-1 ml-3 text-[10px] text-muted-foreground/60">
+        {agent.last_tool && (
+          <span className="inline-block px-1 py-px rounded font-mono bg-primary/10 text-primary/70">
             {agent.last_tool}
           </span>
-        </div>
-      )}
-      {expanded && agent.description && (
-        <div className="mt-1 text-[10px] text-muted-foreground line-clamp-3 break-words">
-          {agent.description}
+        )}
+        {agent.message_count > 0 && (
+          <span className="flex items-center gap-0.5" title={`${agent.message_count} messages`}>
+            <MessageSquare size={8} />
+            <span className="tabular-nums">{agent.message_count}</span>
+          </span>
+        )}
+        {elapsed && (
+          <span className="tabular-nums ml-auto">{elapsed}</span>
+        )}
+      </div>
+
+      {/* Expanded: full task label */}
+      {expanded && label && label !== summary && (
+        <div className="mt-1.5 ml-3 text-[10px] text-muted-foreground/60 break-words leading-relaxed">
+          {label}
         </div>
       )}
     </div>
   );
 }
 
-function TabGroup({ tabLabel, agents, onDismiss }) {
+function TabGroup({ tabLabel, agents, onDismiss, now }) {
   const runningCount = agents.filter(a => a.status === 'running').length;
 
   return (
-    <div className="mb-2">
-      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground">
+    <div className="mb-1">
+      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground/60">
         <span className="truncate">{tabLabel}</span>
-        <span className="shrink-0 ml-1">
-          {runningCount > 0 ? `${runningCount}/${agents.length}` : agents.length}
+        <span className="shrink-0 ml-1 tabular-nums">
+          {runningCount > 0 ? (
+            <>
+              <span style={{ color: 'var(--color-status-success)' }}>{runningCount}</span>
+              <span className="opacity-40">/{agents.length}</span>
+            </>
+          ) : (
+            <span className="opacity-40">{agents.length}</span>
+          )}
         </span>
       </div>
-      <div className="flex flex-col gap-1 px-1">
+      <div className="flex flex-col gap-px px-1">
         {agents.map(agent => (
-          <AgentCard key={agent.agent_id} agent={agent} onDismiss={onDismiss} />
+          <AgentCard key={agent.agent_id} agent={agent} onDismiss={onDismiss} now={now} />
         ))}
       </div>
     </div>
@@ -75,6 +183,13 @@ export function AgentSidebar() {
   } = useSubagentContext();
 
   const [collapsed, setCollapsed] = useState(false);
+  // Tick every 5s to keep elapsed times fresh
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (totalActiveCount === 0) return;
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [totalActiveCount]);
 
   const visibleSubagents = useMemo(
     () => allSubagents.filter(s => !dismissedIds.has(s.agent_id)),
@@ -101,10 +216,10 @@ export function AgentSidebar() {
     return map;
   }, [visibleSubagents]);
 
-  // Collapsed strip — just status dots
+  // Collapsed strip
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center gap-1 py-2 shrink-0 w-9 border-l border-l-sidebar-border bg-sidebar">
+      <div className="flex flex-col items-center gap-1.5 py-2 shrink-0 w-8 border-l border-l-sidebar-border bg-sidebar">
         <button
           onClick={() => setCollapsed(false)}
           className="p-1 rounded hover:bg-sidebar-accent cursor-pointer"
@@ -113,7 +228,10 @@ export function AgentSidebar() {
           <PanelRightOpen size={14} className="text-muted-foreground" />
         </button>
         {totalActiveCount > 0 && (
-          <span className="text-[10px] font-bold text-green-500">
+          <span
+            className="text-[10px] font-bold tabular-nums"
+            style={{ color: 'var(--color-status-success)' }}
+          >
             {totalActiveCount}
           </span>
         )}
@@ -121,11 +239,18 @@ export function AgentSidebar() {
           <span
             key={agent.agent_id}
             className={cn(
-              'w-2 h-2 rounded-full',
-              agent.status === 'running'
-                ? 'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]'
-                : 'bg-muted-foreground opacity-40',
+              'w-1.5 h-1.5 rounded-full',
+              agent.status === 'running' && 'animate-pulse',
             )}
+            style={{
+              backgroundColor: agent.status === 'running'
+                ? 'var(--color-status-success)'
+                : 'var(--color-muted-foreground)',
+              opacity: agent.status === 'running' ? 1 : 0.3,
+              boxShadow: agent.status === 'running'
+                ? '0 0 4px color-mix(in srgb, var(--color-status-success) 40%, transparent)'
+                : undefined,
+            }}
           />
         ))}
       </div>
@@ -138,11 +263,15 @@ export function AgentSidebar() {
       <div className="flex items-center justify-between px-2 py-1.5 shrink-0 border-b border-b-sidebar-border">
         <div className="flex items-center gap-1.5">
           <Bot size={12} className="text-muted-foreground" />
-          <span className="text-xs font-medium">
-            Agents
-          </span>
+          <span className="text-xs font-medium">Agents</span>
           {totalActiveCount > 0 && (
-            <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[18px] bg-green-500 text-white">
+            <span
+              className="inline-flex items-center justify-center px-1 py-px rounded text-[10px] font-bold min-w-[16px] tabular-nums"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--color-status-success) 20%, transparent)',
+                color: 'var(--color-status-success)',
+              }}
+            >
               {totalActiveCount}
             </span>
           )}
@@ -159,8 +288,14 @@ export function AgentSidebar() {
       {/* Scrollable agent list */}
       <div className="flex-1 overflow-y-auto min-h-0 py-1">
         {visibleSubagents.length === 0 ? (
-          <div className="px-3 py-4 text-center text-[11px] text-muted-foreground">
-            No active agents
+          <div className="px-3 py-6 text-center">
+            <Bot size={16} className="mx-auto mb-2 text-muted-foreground/30" />
+            <div className="text-[11px] text-muted-foreground/50">
+              No agents running
+            </div>
+            <div className="mt-1 text-[10px] text-muted-foreground/30">
+              Agents appear here when spawned during tool use
+            </div>
           </div>
         ) : (
           [...groups.entries()].map(([tabId, group]) => (
@@ -169,6 +304,7 @@ export function AgentSidebar() {
               tabLabel={group.tabLabel}
               agents={group.agents}
               onDismiss={dismiss}
+              now={now}
             />
           ))
         )}
