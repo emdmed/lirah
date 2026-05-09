@@ -1,5 +1,4 @@
 import { Button } from './ui/button';
-import { Badge} from "./ui/badge"
 import { Input } from './ui/input';
 import { BookmarksDropdown } from '../features/bookmarks';
 import { Search, X, GitBranch, Star, Shield, Eye, FileText } from 'lucide-react';
@@ -24,26 +23,18 @@ export function SidebarHeader({
 }) {
   return (
     <div className="p-2 border-b border-b-sketch flex flex-col gap-2 flex-shrink-0">
-      {/* Branding + Mode indicator + controls */}
+      {/* Mode indicator + controls */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="font-bold leading-tight text-2xl text-primary pb-1"
-            style={{ fontFamily: "'Grenze Gotisch', serif", display: 'flex', alignItems: 'center'}}
-          >
-            Lirah
-          </span>
-          <Badge
-            variant={viewMode === "tree" ? "outline" : "secondary"}
-            className="gap-1"
-          >
-            {sandboxEnabled ? <Shield className="w-3 h-3 inline mr-0.5" /> : <Eye className="w-3 h-3 inline mr-0.5" />}
-            {viewMode === 'tree' ? 'agent' : 'nav'}
-          </Badge>
+        <div
+          className="flex items-center justify-center h-6 w-6 text-muted-foreground"
+          title={`${viewMode === 'tree' ? 'Agent' : 'Navigation'} mode${sandboxEnabled ? ' — sandboxed' : ''}`}
+          aria-label={`${viewMode === 'tree' ? 'Agent' : 'Navigation'} mode`}
+        >
+          {sandboxEnabled ? <Shield className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
           <BookmarksDropdown onNavigate={onNavigateBookmark} />
           {hasTerminalSession && (
             <Button
@@ -83,7 +74,6 @@ export function SidebarHeader({
               </Button>
             </>
           )}
-
         </div>
       </div>
 

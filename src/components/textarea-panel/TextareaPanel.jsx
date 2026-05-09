@@ -1,5 +1,5 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { Folder, MessageSquare } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { CompactSectionsDialog, FlowchartDialog, buildGraphData } from "../../features/compact";
 import { useTokenBudget } from "../../features/token-budget";
 
@@ -186,7 +186,7 @@ export function TextareaPanel({
       onLoadGroup={onLoadGroup}
       onSaveGroup={onSaveGroup}
       fileCount={fileArray.length}
-      isWide={isWide}
+      isWide={false}
     />
   );
 
@@ -263,42 +263,25 @@ export function TextareaPanel({
     </>
   );
 
-  if (isWide) {
-    return (
-      <div ref={containerRef} className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
-        {dialogs}
-        <div className="flex gap-3" style={{ minHeight: '200px' }}>
-          <div className="flex flex-col gap-2 flex-[2] min-w-0">
-            {textareaArea}
-          </div>
-          <div className="flex flex-col gap-2 flex-1 min-w-[240px] max-w-[360px]">
-            <div className="p-1">
-              <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
-                <Folder className="w-3 h-3" /> Project
-              </h4>
-              {projectZone}
-            </div>
-            <div className="p-1">
-              <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
-                <MessageSquare className="w-3 h-3" /> Prompt
-              </h4>
-              {promptZone}
-            </div>
-          </div>
-        </div>
+  const toolbarRow = (
+    <div className="flex items-center justify-between flex-nowrap overflow-hidden min-h-[32px] max-h-[32px]">
+      <div
+        className="flex items-center justify-center h-6 w-6 text-muted-foreground"
+        title="Compose"
+        aria-label="Compose"
+      >
+        <Pencil className="w-4 h-4" />
       </div>
-    );
-  }
+      <div className="flex items-center gap-1">
+        {projectZone}
+        {promptZone}
+      </div>
+    </div>
+  );
 
   return (
     <div ref={containerRef} className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
-      <div className="flex items-center justify-end flex-nowrap overflow-hidden min-h-[32px] max-h-[32px]">
-        <div className="flex items-center gap-2">
-          {projectZone}
-          <div className="w-px h-4 bg-border/50" />
-          {promptZone}
-        </div>
-      </div>
+      {toolbarRow}
       {dialogs}
       {textareaArea}
     </div>

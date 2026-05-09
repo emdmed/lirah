@@ -10,7 +10,7 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
         progress={compactProgress}
         disabled={disabled}
       />
-      <div className="w-px h-3 bg-border/30" />
+      {isWide && <div className="w-px h-3 bg-border/30" />}
       <FileGroupsDropdown
         projectPath={projectPath}
         onLoadGroup={onLoadGroup}
