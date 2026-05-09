@@ -51,8 +51,30 @@ import { useUpdateChecker } from "../../hooks/useUpdateChecker";
 import { useToast } from "../toast";
 
 export function ProjectTab({ projectPath, isActive, tabId }) {
+  // Inactive tabs stay mounted so terminals don't lose state, but we can't
+  // use display:none — xterm's renderer pauses against a zero-size box and
+  // pixels go stale, so when the tab returns the canvas blits the old frame
+  // over Claude Code's new paint. We also can't use display:contents — the
+  // wrapper has no box, ResizeObserver readings drift, and layout sizing
+  // depends on the grandparent. Instead: keep the tab in the flow with full
+  // dimensions, but hide it behind aria-hidden + visibility:hidden + pointer
+  // events disabled. The terminal stays sized; ResizeObserver fires once on
+  // first activation when the tab actually has the user's current viewport.
+  // All tabs share the same absolute box inside a position:relative parent.
+  // Inactive tabs keep their layout (so xterm sees real dimensions and the
+  // ResizeObserver fires a single time on the actual viewport when the tab
+  // becomes active) but are hidden via visibility + pointer-events.
+  const style = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    visibility: isActive ? 'visible' : 'hidden',
+    pointerEvents: isActive ? 'auto' : 'none',
+    zIndex: isActive ? 1 : 0,
+  };
   return (
-    <div style={{ display: isActive ? 'contents' : 'none' }}>
+    <div style={style} aria-hidden={!isActive}>
       <FileSelectionProvider>
         <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} />
       </FileSelectionProvider>
@@ -563,15 +585,26 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     if (terminalSessionId && sidebar.sidebarOpen && folders.length === 0) loadFolders();
   }, [terminalSessionId]);
 
-  // Auto-focus and re-fit terminal when this tab becomes active
+  // Auto-focus and re-fit terminal when this tab becomes active.
+  // Double rAF: first frame lets the browser apply the display change and
+  // recompute layout; second frame guarantees the box has real dimensions
+  // before xterm measures and we force-flush a SIGWINCH. Without this, an
+  // Ink-style TUI (e.g. Claude Code) repaints against the pre-switch size
+  // and the visible canvas keeps stale pixels until the next full redraw.
   useEffect(() => {
-    if (isActive && terminalReady) {
-      // Re-fit the terminal after the container regains dimensions from display:none → contents
-      requestAnimationFrame(() => {
+    if (!isActive || !terminalReady) return;
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
         terminalRef.current?.resize?.();
         terminalRef.current?.focus?.();
       });
-    }
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
   }, [isActive, terminalReady]);
 
   // Global keyboard shortcuts - use refs to avoid unstable dependencies

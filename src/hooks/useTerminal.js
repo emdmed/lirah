@@ -17,6 +17,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const isFocusedRef = useRef(false);
   const sessionIdRef = useRef(null);
   const lastDimsRef = useRef({ rows: 0, cols: 0 });
+  const pendingDimsRef = useRef(null);
+  const sigwinchTimerRef = useRef(null);
   const { error, warning } = useToast();
 
   // Initialize terminal
@@ -198,32 +200,67 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     };
   }, [terminal, fitAddon]);
 
-  // Handle resize — fits the terminal to its container and syncs PTY dimensions.
-  // Skips if dimensions haven't changed to avoid spurious SIGWINCH to child processes.
-  const handleResize = useCallback(() => {
-    if (fitAddon && terminal && sessionId) {
-      try {
-        // Check if terminal is ready for resize
-        if (!terminal._core || !terminal._core._renderService) {
-          return; // Terminal not fully initialized yet
-        }
-        fitAddon.fit();
-        const rows = terminal.rows;
-        const cols = terminal.cols;
-        // Only notify the backend when dimensions actually changed
-        if (rows === lastDimsRef.current.rows && cols === lastDimsRef.current.cols) {
-          return;
-        }
-        lastDimsRef.current = { rows, cols };
-        invoke('resize_terminal', { sessionId, rows, cols }).catch((error) => {
-          console.error('Failed to resize terminal:', error);
-        });
-      } catch (error) {
-        // Silently ignore resize errors during initialization
-        console.debug('Resize skipped (terminal not ready):', error.message);
-      }
+  // Flush a pending PTY resize immediately. TUI apps like Claude Code (Ink)
+  // re-paint with absolute cursor positioning on SIGWINCH, so we must avoid
+  // SIGWINCH storms during a sidebar drag while still delivering the final
+  // size promptly when the user lets go.
+  const flushSigwinch = useCallback(() => {
+    if (sigwinchTimerRef.current) {
+      clearTimeout(sigwinchTimerRef.current);
+      sigwinchTimerRef.current = null;
     }
-  }, [fitAddon, terminal, sessionId]);
+    const pending = pendingDimsRef.current;
+    const id = sessionIdRef.current;
+    if (!pending || !id) return;
+    pendingDimsRef.current = null;
+    if (pending.rows === lastDimsRef.current.rows && pending.cols === lastDimsRef.current.cols) {
+      return;
+    }
+    lastDimsRef.current = pending;
+    invoke('resize_terminal', { sessionId: id, rows: pending.rows, cols: pending.cols }).catch((err) => {
+      console.error('Failed to resize terminal:', err);
+    });
+  }, []);
+
+  // Handle resize — refits the xterm canvas to its container synchronously
+  // (cheap, local) and queues a debounced SIGWINCH to the backend PTY. The
+  // refresh() call evicts stale pixels from the canvas/WebGL renderer that
+  // would otherwise overlay the next paint from a TUI app.
+  const handleResize = useCallback(({ immediate = false } = {}) => {
+    if (!fitAddon || !terminal || !sessionId) return;
+    try {
+      if (!terminal._core || !terminal._core._renderService) {
+        return;
+      }
+      fitAddon.fit();
+      const rows = terminal.rows;
+      const cols = terminal.cols;
+      try {
+        terminal.refresh(0, terminal.rows - 1);
+      } catch (e) {
+        // Renderer may not be ready; ignore.
+      }
+      pendingDimsRef.current = { rows, cols };
+      if (immediate) {
+        flushSigwinch();
+        return;
+      }
+      if (sigwinchTimerRef.current) clearTimeout(sigwinchTimerRef.current);
+      sigwinchTimerRef.current = setTimeout(flushSigwinch, 120);
+    } catch (error) {
+      console.debug('Resize skipped (terminal not ready):', error.message);
+    }
+  }, [fitAddon, terminal, sessionId, flushSigwinch]);
+
+  // Cleanup pending SIGWINCH timer on unmount
+  useEffect(() => {
+    return () => {
+      if (sigwinchTimerRef.current) {
+        clearTimeout(sigwinchTimerRef.current);
+        sigwinchTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Track focus state via the underlying textarea element
   useEffect(() => {
@@ -279,7 +316,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       return false;
     },
     resize: () => {
-      handleResize();
+      // Force-flush SIGWINCH on tab activation: the app may have missed
+      // resize events while hidden, and Ink-style renderers rely on the
+      // latest size to redraw cleanly.
+      handleResize({ immediate: true });
     }
   }), [terminal, isReady, handleResize]);
 

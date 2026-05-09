@@ -129,7 +129,7 @@ function App() {
         )}
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
             {tabs.map(tab => (
               <ProjectTab
                 key={tab.id}

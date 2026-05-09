@@ -9,6 +9,38 @@ use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
+/// Drain the longest valid UTF-8 prefix from `carry` and return it as a String,
+/// keeping any trailing incomplete byte sequence in `carry` for the next read.
+///
+/// PTY reads land on arbitrary byte boundaries; a multi-byte glyph or a long
+/// ANSI escape sequence can straddle a chunk. Using `from_utf8_lossy` on a
+/// raw chunk replaces those trailing bytes with `U+FFFD`, permanently
+/// corrupting the stream — visible as scrambled characters in xterm while a
+/// TUI app like Claude Code or vim is running. Buffering the tail bytes
+/// preserves the original byte stream.
+fn split_valid_utf8(carry: &mut Vec<u8>) -> String {
+    if carry.is_empty() {
+        return String::new();
+    }
+    let valid_up_to = match std::str::from_utf8(carry) {
+        Ok(_) => carry.len(),
+        Err(e) => e.valid_up_to(),
+    };
+    if valid_up_to == 0 {
+        // No valid prefix yet (rare: first byte mid-sequence). If the carry
+        // grows unreasonably large, drop it to avoid unbounded growth on a
+        // genuinely malformed stream.
+        if carry.len() > 8 {
+            carry.clear();
+        }
+        return String::new();
+    }
+    // Safe: from_utf8 guaranteed bytes 0..valid_up_to are a valid UTF-8 string.
+    let head = unsafe { std::str::from_utf8_unchecked(&carry[..valid_up_to]).to_string() };
+    carry.drain(..valid_up_to);
+    head
+}
+
 #[tauri::command]
 pub fn spawn_terminal(
     rows: u16,
@@ -40,6 +72,11 @@ pub fn spawn_terminal(
     let app_clone = app.clone();
     thread::spawn(move || {
         let mut buf = [0u8; 8192];
+        // Carryover for incomplete UTF-8 sequences that straddle a read boundary.
+        // Without this, from_utf8_lossy replaces the trailing bytes with U+FFFD
+        // and ANSI sequences / multibyte glyphs from TUI apps get corrupted —
+        // visible as "scrambled characters" while Claude Code or vim is running.
+        let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
         loop {
             // Check shutdown flag before reading
             if shutdown_flag.load(Ordering::SeqCst) {
@@ -53,8 +90,11 @@ pub fn spawn_terminal(
                         break;
                     }
 
-                    // Convert bytes to string (handling UTF-8)
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    carry.extend_from_slice(&buf[..n]);
+                    let data = split_valid_utf8(&mut carry);
+                    if data.is_empty() {
+                        continue;
+                    }
 
                     // Emit event to frontend
                     let _ = app_clone.emit(
@@ -219,6 +259,7 @@ pub fn spawn_hidden_terminal(
 
     thread::spawn(move || {
         let mut buf = [0u8; 8192];
+        let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
         loop {
             if shutdown_flag.load(Ordering::SeqCst) {
                 break;
@@ -228,7 +269,11 @@ pub fn spawn_hidden_terminal(
                     if shutdown_flag.load(Ordering::SeqCst) {
                         break;
                     }
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    carry.extend_from_slice(&buf[..n]);
+                    let data = split_valid_utf8(&mut carry);
+                    if data.is_empty() {
+                        continue;
+                    }
                     let _ = app_clone.emit(
                         "hidden-terminal-output",
                         serde_json::json!({

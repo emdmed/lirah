@@ -26,20 +26,15 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     }
   }, [sandboxFailed, onSandboxFailed]);
 
-  // Debounced resize — fit on next animation frame, coalescing rapid-fire
-  // ResizeObserver events. A short follow-up pass catches late layout shifts
-  // (e.g. CSS transitions finishing after the first fit).
+  // Coalesce rapid-fire ResizeObserver events to one fit per frame. The
+  // SIGWINCH itself is debounced inside handleResize, so we no longer need a
+  // trailing rAF here — that just doubled the local fit work without helping.
   const rafRef = useRef(null);
-  const trailingRef = useRef(null);
   const debouncedResize = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
     rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
       handleResize();
-      // Trailing pass: catch layout shifts that settle one frame later
-      trailingRef.current = requestAnimationFrame(() => {
-        handleResize();
-      });
     });
   }, [handleResize]);
 
@@ -55,7 +50,6 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
     };
   }, [debouncedResize]);
 
