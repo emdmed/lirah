@@ -3,6 +3,8 @@ import { SidebarHeader } from "./SidebarHeader";
 import { FlatViewMenu } from "./FlatViewMenu";
 import { SidebarFileSelection } from "../features/file-groups";
 import { useFileSelection } from "../features/file-groups";
+import { usePinnedFiles } from "../features/pinned-files";
+import { useMemo, useCallback } from "react";
 import { RetroSpinner } from "./ui/RetroSpinner";
 import {
   Sidebar,
@@ -42,6 +44,11 @@ export function LeftSidebar({
     selectedFiles, toggleFileSelection, filesWithRelativePaths,
     fileStates, setFileState, removeFileFromSelection, clearFileSelection,
   } = useFileSelection();
+
+  const { getPinnedPaths, togglePin } = usePinnedFiles();
+  const pinnedPaths = useMemo(() => getPinnedPaths(currentPath), [getPinnedPaths, currentPath]);
+  const pinnedFiles = useMemo(() => new Set(pinnedPaths), [pinnedPaths]);
+  const handleTogglePin = useCallback((path) => togglePin(path, currentPath), [togglePin, currentPath]);
 
   // Destructure only needed fields from grouped props (fix #2: explicit dependencies)
   const { sidebarWidth, isResizing, handleResizeStart } = sidebar;
@@ -99,6 +106,9 @@ export function LeftSidebar({
                     onViewMarkdown={onViewMarkdown}
                     selectedFiles={selectedFiles}
                     onToggleFileSelection={toggleFileSelection}
+                    pinnedFiles={pinnedFiles}
+                    pinnedPaths={pinnedPaths}
+                    onTogglePin={handleTogglePin}
                     isTextareaPanelOpen={isTextareaPanelOpen}
                     typeCheckResults={typeCheckResults}
                     checkingFiles={checkingFiles}
@@ -131,6 +141,8 @@ export function LeftSidebar({
               VIEW_MODES={VIEW_MODES}
               keepFilesAfterSend={keepFilesAfterSend}
               onToggleKeepFiles={onToggleKeepFiles}
+              pinnedFiles={pinnedFiles}
+              onTogglePin={handleTogglePin}
             />
           )}
         </SidebarContent>

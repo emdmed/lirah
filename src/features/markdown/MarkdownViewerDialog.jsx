@@ -4,9 +4,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Pin, PinOff } from 'lucide-react';
 import { RetroSpinner } from '../../components/ui/RetroSpinner';
 import { basename } from '../../utils/pathUtils';
+import { usePinnedFiles } from '../pinned-files';
 
 const REMARK_PLUGINS = [remarkGfm];
 const EMPTY_FILES = [];
@@ -31,6 +32,12 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const { isPinned, togglePin } = usePinnedFiles();
+  const pinned = filePath && repoPath ? isPinned(filePath, repoPath) : false;
+  const handleTogglePin = useCallback(() => {
+    if (filePath && repoPath) togglePin(filePath, repoPath);
+  }, [filePath, repoPath, togglePin]);
 
   const currentFileIndex = useMemo(() => {
     if (!markdownFiles.length || !filePath) return -1;
@@ -133,6 +140,23 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
               <TooltipContent>Next file (Ctrl+])</TooltipContent>
             </Tooltip>
           </div>
+        )}
+
+        {filePath && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleTogglePin}
+                aria-pressed={pinned}
+                className={`ml-2 ${pinned ? 'text-primary' : ''}`}
+              >
+                {pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>
+          </Tooltip>
         )}
 
         <Button variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)} className="ml-2">

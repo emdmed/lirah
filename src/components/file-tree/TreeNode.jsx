@@ -49,6 +49,8 @@ export const TreeNode = memo(function TreeNode({
   onSendToTerminal,
   onViewDiff,
   selectedFiles,
+  pinnedFiles,
+  onTogglePin,
   showGitChangesOnly,
   onToggleFileSelection,
   isTextareaPanelOpen,
@@ -62,6 +64,7 @@ export const TreeNode = memo(function TreeNode({
   const isCurrentPath = currentPath === node.path;
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
   const isSelected = selectedFiles && selectedFiles.has(node.path);
+  const isPinned = pinnedFiles && pinnedFiles.has(node.path);
   const depth = node.depth || 0;
   const isDotfile = node.name?.startsWith('.');
 
@@ -93,6 +96,8 @@ export const TreeNode = memo(function TreeNode({
             isSelected={isSelected}
             showGitChangesOnly={showGitChangesOnly}
             isTextareaPanelOpen={isTextareaPanelOpen}
+            isPinned={isPinned}
+            onTogglePin={onTogglePin}
             onSendToTerminal={onSendToTerminal}
             onToggleFileSelection={onToggleFileSelection}
             onViewDiff={onViewDiff}
@@ -118,6 +123,8 @@ export const TreeNode = memo(function TreeNode({
             onSendToTerminal={onSendToTerminal}
             onViewDiff={onViewDiff}
             selectedFiles={selectedFiles}
+            pinnedFiles={pinnedFiles}
+            onTogglePin={onTogglePin}
             showGitChangesOnly={showGitChangesOnly}
             onToggleFileSelection={onToggleFileSelection}
             isTextareaPanelOpen={isTextareaPanelOpen}
@@ -143,11 +150,13 @@ export const TreeNode = memo(function TreeNode({
   if (prevProps.onToggleFileSelection !== nextProps.onToggleFileSelection) return false;
   if (prevProps.onCheckFileTypes !== nextProps.onCheckFileTypes) return false;
   if (prevProps.onOpenElementPicker !== nextProps.onOpenElementPicker) return false;
+  if (prevProps.onTogglePin !== nextProps.onTogglePin) return false;
 
   // Compare Sets and Maps
   if (!setsEqual(prevProps.expandedFolders, nextProps.expandedFolders)) return false;
   if (!mapsEqual(prevProps.gitStats, nextProps.gitStats)) return false;
   if (!setsEqual(prevProps.selectedFiles, nextProps.selectedFiles)) return false;
+  if (!setsEqual(prevProps.pinnedFiles, nextProps.pinnedFiles)) return false;
   if (!mapsEqual(prevProps.typeCheckResults, nextProps.typeCheckResults)) return false;
   if (!setsEqual(prevProps.checkingFiles, nextProps.checkingFiles)) return false;
   if (!setsEqual(prevProps.successfulChecks, nextProps.successfulChecks)) return false;

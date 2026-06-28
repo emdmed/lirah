@@ -6,6 +6,7 @@ import { WatcherProvider } from "./features/watcher";
 import { BookmarksProvider } from "./features/bookmarks";
 import { PromptTemplatesProvider } from "./features/templates";
 import { FileGroupsProvider } from "./features/file-groups";
+import { PinnedFilesProvider } from "./features/pinned-files";
 import { TabProvider } from "./features/tabs";
 import { ToastProvider } from "./features/toast";
 import "./index.css";
@@ -18,9 +19,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <BookmarksProvider>
             <PromptTemplatesProvider>
               <FileGroupsProvider>
-                <TabProvider>
-                  <App />
-                </TabProvider>
+                <PinnedFilesProvider>
+                  <TabProvider>
+                    <App />
+                  </TabProvider>
+                </PinnedFilesProvider>
               </FileGroupsProvider>
             </PromptTemplatesProvider>
           </BookmarksProvider>

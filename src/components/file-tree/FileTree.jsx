@@ -1,9 +1,11 @@
 import React, { useMemo, useCallback } from "react";
+import { Pin } from "lucide-react";
 import { SidebarMenu } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
 import { useGitStats } from "../../features/git";
 import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtils";
+import { basename } from "../../utils/pathUtils";
 
 /**
  * Main FileTree component - renders a tree view of files and folders
@@ -22,6 +24,9 @@ export function FileTree({
   onViewMarkdown,
   selectedFiles,
   onToggleFileSelection,
+  pinnedFiles,
+  pinnedPaths,
+  onTogglePin,
   isTextareaPanelOpen,
   typeCheckResults,
   checkingFiles,
@@ -66,33 +71,69 @@ export function FileTree({
     }
   }, [showGitChangesOnly, showMarkdownOnly, onViewDiff, onViewMarkdown, onToggleFileSelection]);
 
-  if (!displayedNodes || displayedNodes.length === 0) {
-    return <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} onClearSearch={onClearSearch} onToggleGitFilter={onToggleGitFilter} onToggleMarkdownFilter={onToggleMarkdownFilter} />;
-  }
+  // Build flat node objects for pinned files so they can be rendered through
+  // the same TreeNode pipeline (selection highlight, git stats, type checks).
+  const pinnedNodes = useMemo(() => {
+    if (!pinnedPaths || pinnedPaths.length === 0) return [];
+    return pinnedPaths.map((path) => ({
+      path,
+      name: basename(path),
+      is_dir: false,
+      depth: 0,
+    }));
+  }, [pinnedPaths]);
+
+  const treeIsEmpty = !displayedNodes || displayedNodes.length === 0;
+
+  // Shared props for every TreeNode (pinned section + main tree)
+  const treeNodeProps = {
+    expandedFolders,
+    currentPath,
+    gitStats,
+    onToggle,
+    onSendToTerminal,
+    onViewDiff,
+    selectedFiles,
+    pinnedFiles,
+    onTogglePin,
+    showGitChangesOnly,
+    onToggleFileSelection: handleToggleFileSelection,
+    isTextareaPanelOpen,
+    typeCheckResults,
+    checkingFiles,
+    successfulChecks,
+    onCheckFileTypes,
+    onOpenElementPicker,
+  };
 
   return (
-    <SidebarMenu className="filetree-container">
-      {displayedNodes.map((node) => (
-        <TreeNode
-          key={node.path}
-          node={node}
-          expandedFolders={expandedFolders}
-          currentPath={currentPath}
-          gitStats={gitStats}
-          onToggle={onToggle}
-          onSendToTerminal={onSendToTerminal}
-          onViewDiff={onViewDiff}
-          selectedFiles={selectedFiles}
-          showGitChangesOnly={showGitChangesOnly}
-          onToggleFileSelection={handleToggleFileSelection}
-          isTextareaPanelOpen={isTextareaPanelOpen}
-          typeCheckResults={typeCheckResults}
-          checkingFiles={checkingFiles}
-          successfulChecks={successfulChecks}
-          onCheckFileTypes={onCheckFileTypes}
-          onOpenElementPicker={onOpenElementPicker}
-        />
-      ))}
-    </SidebarMenu>
+    <>
+      {pinnedNodes.length > 0 && (
+        <SidebarMenu className="filetree-container mb-0.5">
+          <div className="flex items-center gap-1 px-1 pt-0.5 select-none">
+            <Pin className="w-2.5 h-2.5 text-muted-foreground/60" fill="currentColor" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              Pinned
+            </span>
+          </div>
+          {pinnedNodes.map((node) => (
+            <TreeNode key={`pinned:${node.path}`} node={node} {...treeNodeProps} />
+          ))}
+          <div className="border-t border-dashed border-foreground/10 mx-1 mt-1" />
+        </SidebarMenu>
+      )}
+
+      {treeIsEmpty ? (
+        pinnedNodes.length === 0 && (
+          <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} onClearSearch={onClearSearch} onToggleGitFilter={onToggleGitFilter} onToggleMarkdownFilter={onToggleMarkdownFilter} />
+        )
+      ) : (
+        <SidebarMenu className="filetree-container">
+          {displayedNodes.map((node) => (
+            <TreeNode key={node.path} node={node} {...treeNodeProps} />
+          ))}
+        </SidebarMenu>
+      )}
+    </>
   );
 }

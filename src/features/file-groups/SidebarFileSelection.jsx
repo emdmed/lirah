@@ -39,6 +39,8 @@ export function SidebarFileSelection({
   VIEW_MODES,
   keepFilesAfterSend = false,
   onToggleKeepFiles,
+  pinnedFiles,
+  onTogglePin,
 }) {
   const { theme } = useTheme();
   const badgeStyle = THEME_BADGE_STYLES[theme.name?.toLowerCase()] || THEME_BADGE_STYLES.kanagawa;
@@ -150,6 +152,8 @@ export function SidebarFileSelection({
                 isSelected={selectedIndex === index}
                 itemRef={(el) => (fileRefs.current[index] = el)}
                 showKeyboardHints={true}
+                isPinned={pinnedFiles?.has(file.absolute)}
+                onTogglePin={onTogglePin}
               />
             </React.Fragment>
           );

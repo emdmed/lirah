@@ -1,4 +1,5 @@
 import React from "react";
+import { Pin, PinOff } from "lucide-react";
 import { GitStatsBadge } from "../../features/git";
 import { INDENT_PX } from "./constants";
 
@@ -11,6 +12,8 @@ export function FileNode({
   isCurrentPath,
   stats,
   isSelected,
+  isPinned,
+  onTogglePin,
   isTextareaPanelOpen,
   onSendToTerminal,
   showGitChangesOnly,
@@ -31,10 +34,15 @@ export function FileNode({
     }
   };
 
+  const handleTogglePin = (e) => {
+    e.stopPropagation();
+    if (onTogglePin) onTogglePin(node.path);
+  };
+
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'bg-foreground/8 border-l-2 border-primary' : ''
+      className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'bg-foreground/8 border-l-2 border-primary' : ''
         } ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
@@ -47,6 +55,24 @@ export function FileNode({
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}
       </div>
+
+      {/* Pin toggle */}
+      {!isDeleted && onTogglePin && (
+        <button
+          type="button"
+          onClick={handleTogglePin}
+          title={isPinned ? 'Unpin file' : 'Pin file to top'}
+          aria-label={isPinned ? 'Unpin file' : 'Pin file to top'}
+          aria-pressed={!!isPinned}
+          className={`shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 rounded-sm hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-opacity ${
+            isPinned ? 'opacity-80' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+          }`}
+        >
+          {isPinned
+            ? <PinOff className="w-2.5 h-2.5" />
+            : <Pin className="w-2.5 h-2.5" />}
+        </button>
+      )}
     </div>
   );
 }

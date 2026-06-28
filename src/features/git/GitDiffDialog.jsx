@@ -3,9 +3,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Pin, PinOff } from 'lucide-react';
 import { RetroSpinner } from '../../components/ui/RetroSpinner';
 import { basename } from '../../utils/pathUtils';
+import { usePinnedFiles } from '../pinned-files';
 
 /**
  * Overlay that shows side-by-side git diff, rendered over the terminal area
@@ -29,6 +30,12 @@ export function GitDiffDialog({
   const [error, setError] = useState(null);
 
   const scrollContainerRef = useRef(null);
+
+  const { isPinned, togglePin } = usePinnedFiles();
+  const pinned = filePath && repoPath ? isPinned(filePath, repoPath) : false;
+  const handleTogglePin = useCallback(() => {
+    if (filePath && repoPath) togglePin(filePath, repoPath);
+  }, [filePath, repoPath, togglePin]);
 
   // Find current file index in changed files list
   const currentFileIndex = useMemo(() => {
@@ -182,6 +189,24 @@ export function GitDiffDialog({
               <TooltipContent>Next file (Ctrl+])</TooltipContent>
             </Tooltip>
           </div>
+        )}
+
+        {/* Pin toggle */}
+        {filePath && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleTogglePin}
+                aria-pressed={pinned}
+                className={`ml-2 ${pinned ? 'text-primary' : ''}`}
+              >
+                {pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Close button */}
