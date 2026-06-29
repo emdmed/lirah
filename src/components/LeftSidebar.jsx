@@ -46,9 +46,9 @@ export function LeftSidebar({
   } = useFileSelection();
 
   const { getPinnedPaths, togglePin } = usePinnedFiles();
-  const pinnedPaths = useMemo(() => getPinnedPaths(currentPath), [getPinnedPaths, currentPath]);
+  const pinnedPaths = useMemo(() => getPinnedPaths(), [getPinnedPaths]);
   const pinnedFiles = useMemo(() => new Set(pinnedPaths), [pinnedPaths]);
-  const handleTogglePin = useCallback((path) => togglePin(path, currentPath), [togglePin, currentPath]);
+  const handleTogglePin = useCallback((path) => togglePin(path), [togglePin]);
 
   // Destructure only needed fields from grouped props (fix #2: explicit dependencies)
   const { sidebarWidth, isResizing, handleResizeStart } = sidebar;

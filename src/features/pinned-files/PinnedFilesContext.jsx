@@ -3,17 +3,27 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 const PinnedFilesContext = createContext(undefined);
 
 const STORAGE_KEY = 'nevo-terminal:pinned-files';
-const MAX_PINS_PER_PROJECT = 50;
+const MAX_PINS = 50;
 
+// Pins are global: they store the absolute file path and are shared across all
+// project tabs. Older entries carried a `projectPath` field that scoped them to
+// a single project — those are migrated here by keeping only the absolute path
+// and de-duplicating, so previously pinned files survive the upgrade.
 function validatePins(pins) {
   if (!Array.isArray(pins)) return [];
 
-  return pins.filter(p =>
-    p &&
-    typeof p.path === 'string' &&
-    p.path.trim() !== '' &&
-    typeof p.projectPath === 'string'
-  );
+  const seen = new Set();
+  return pins
+    .filter(p => p && typeof p.path === 'string' && p.path.trim() !== '')
+    .filter(p => {
+      if (seen.has(p.path)) return false;
+      seen.add(p.path);
+      return true;
+    })
+    .map(p => ({
+      path: p.path,
+      pinnedAt: typeof p.pinnedAt === 'number' ? p.pinnedAt : Date.now(),
+    }));
 }
 
 function loadPins() {
@@ -42,30 +52,28 @@ export function PinnedFilesProvider({ children }) {
     savePins(pins);
   }, [pins]);
 
-  // Ordered list of pinned absolute paths for a given project (pin order preserved)
-  const getPinnedPaths = useCallback((projectPath) => {
-    return pins
-      .filter(p => p.projectPath === projectPath)
-      .map(p => p.path);
+  // Ordered list of all pinned absolute paths (pin order preserved). Pins are
+  // global and shared across every project tab.
+  const getPinnedPaths = useCallback(() => {
+    return pins.map(p => p.path);
   }, [pins]);
 
-  const isPinned = useCallback((path, projectPath) => {
-    return pins.some(p => p.path === path && p.projectPath === projectPath);
+  const isPinned = useCallback((path) => {
+    return pins.some(p => p.path === path);
   }, [pins]);
 
-  const togglePin = useCallback((path, projectPath) => {
-    if (!path || !projectPath) return;
+  const togglePin = useCallback((path) => {
+    if (!path) return;
     setPins(prev => {
-      const exists = prev.some(p => p.path === path && p.projectPath === projectPath);
+      const exists = prev.some(p => p.path === path);
       if (exists) {
-        return prev.filter(p => !(p.path === path && p.projectPath === projectPath));
+        return prev.filter(p => p.path !== path);
       }
-      const projectCount = prev.filter(p => p.projectPath === projectPath).length;
-      if (projectCount >= MAX_PINS_PER_PROJECT) {
-        console.warn(`Maximum ${MAX_PINS_PER_PROJECT} pinned files reached for this project`);
+      if (prev.length >= MAX_PINS) {
+        console.warn(`Maximum ${MAX_PINS} pinned files reached`);
         return prev;
       }
-      return [...prev, { path, projectPath, pinnedAt: Date.now() }];
+      return [...prev, { path, pinnedAt: Date.now() }];
     });
   }, []);
 

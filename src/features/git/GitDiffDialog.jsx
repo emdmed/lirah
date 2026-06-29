@@ -32,10 +32,10 @@ export function GitDiffDialog({
   const scrollContainerRef = useRef(null);
 
   const { isPinned, togglePin } = usePinnedFiles();
-  const pinned = filePath && repoPath ? isPinned(filePath, repoPath) : false;
+  const pinned = filePath ? isPinned(filePath) : false;
   const handleTogglePin = useCallback(() => {
-    if (filePath && repoPath) togglePin(filePath, repoPath);
-  }, [filePath, repoPath, togglePin]);
+    if (filePath) togglePin(filePath);
+  }, [filePath, togglePin]);
 
   // Find current file index in changed files list
   const currentFileIndex = useMemo(() => {

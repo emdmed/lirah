@@ -34,10 +34,10 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
   const [error, setError] = useState(null);
 
   const { isPinned, togglePin } = usePinnedFiles();
-  const pinned = filePath && repoPath ? isPinned(filePath, repoPath) : false;
+  const pinned = filePath ? isPinned(filePath) : false;
   const handleTogglePin = useCallback(() => {
-    if (filePath && repoPath) togglePin(filePath, repoPath);
-  }, [filePath, repoPath, togglePin]);
+    if (filePath) togglePin(filePath);
+  }, [filePath, togglePin]);
 
   const currentFileIndex = useMemo(() => {
     if (!markdownFiles.length || !filePath) return -1;
