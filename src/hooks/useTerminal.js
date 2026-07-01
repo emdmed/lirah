@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useImperativeHandle, useRef } from 'r
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useToast } from '../features/toast';
@@ -45,6 +46,26 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // Open terminal in DOM
     term.open(terminalRef.current);
 
+    // GPU-accelerated rendering. The default DOM renderer builds a node per
+    // styled cell and thrashes layout/paint on heavy TUI output (Claude Code
+    // redraws, build logs, `cat` of large files). WebGL offloads glyph
+    // rendering to the GPU — an order-of-magnitude win under bursty output.
+    // Must be loaded after open(). If the context can't be created (headless,
+    // driver issues) or is lost, dispose and fall back to the DOM renderer.
+    let webgl = null;
+    try {
+      webgl = new WebglAddon();
+      webgl.onContextLoss(() => {
+        webgl?.dispose();
+        webgl = null;
+      });
+      term.loadAddon(webgl);
+    } catch (e) {
+      webgl?.dispose();
+      webgl = null;
+      console.debug('WebGL renderer unavailable, using DOM renderer:', e?.message);
+    }
+
     // Initial fit
     try {
       fit.fit();
@@ -56,6 +77,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     setFitAddon(fit);
 
     return () => {
+      webgl?.dispose();
       term.dispose();
     };
   }, [terminalRef]);

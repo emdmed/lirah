@@ -4,7 +4,9 @@ use crate::state::AppState;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread;
+use std::time::Duration;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
@@ -39,6 +41,63 @@ fn split_valid_utf8(carry: &mut Vec<u8>) -> String {
     let head = unsafe { std::str::from_utf8_unchecked(&carry[..valid_up_to]).to_string() };
     carry.drain(..valid_up_to);
     head
+}
+
+/// Flush the accumulated buffer at most this often — bounds added latency so
+/// interactive echo (typing a char, prompt redraw) still feels instant.
+const PTY_FLUSH_INTERVAL: Duration = Duration::from_millis(8);
+/// Flush early once this many bytes accumulate — bounds memory and keeps big
+/// bursts moving without waiting out the interval.
+const PTY_FLUSH_SIZE: usize = 32 * 1024;
+
+/// Coalesce PTY output before it crosses the Rust→JS IPC boundary.
+///
+/// A naive reader emits one Tauri event per read (~8 KB). Under heavy output
+/// (build logs, TUI redraws, `cat` of a large file) that is thousands of IPC
+/// round-trips per second — each allocating a payload and waking the webview
+/// event loop, the classic cause of terminal jank and pinned CPU.
+///
+/// This runs on its own thread, draining decoded UTF-8 chunks from `rx` and
+/// emitting one `event_name` event per flush. It flushes when the buffer
+/// reaches `PTY_FLUSH_SIZE` (throughput) or `PTY_FLUSH_INTERVAL` elapses with
+/// data pending (latency). When the reader drops its sender the channel
+/// disconnects; we flush whatever remains and return — so a caller that joins
+/// this thread is guaranteed all output has been delivered before it emits any
+/// subsequent lifecycle event (e.g. "[Process exited]").
+fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, event_name: &'static str) {
+    let mut pending = String::new();
+    loop {
+        match rx.recv_timeout(PTY_FLUSH_INTERVAL) {
+            Ok(chunk) => {
+                pending.push_str(&chunk);
+                if pending.len() >= PTY_FLUSH_SIZE {
+                    let data = std::mem::take(&mut pending);
+                    let _ = app.emit(
+                        event_name,
+                        serde_json::json!({ "session_id": &session_id, "data": data }),
+                    );
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                if !pending.is_empty() {
+                    let data = std::mem::take(&mut pending);
+                    let _ = app.emit(
+                        event_name,
+                        serde_json::json!({ "session_id": &session_id, "data": data }),
+                    );
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                if !pending.is_empty() {
+                    let _ = app.emit(
+                        event_name,
+                        serde_json::json!({ "session_id": &session_id, "data": pending }),
+                    );
+                }
+                break;
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -77,6 +136,16 @@ pub fn spawn_terminal(
         // and ANSI sequences / multibyte glyphs from TUI apps get corrupted —
         // visible as "scrambled characters" while Claude Code or vim is running.
         let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
+
+        // Batch output on a dedicated emitter thread: the reader stays tight on
+        // the PTY while emits are coalesced by time/size (see batch_emit_loop).
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let emitter = {
+            let app = app_clone.clone();
+            let sid = session_id_clone.clone();
+            thread::spawn(move || batch_emit_loop(rx, app, sid, "terminal-output"))
+        };
+
         loop {
             // Check shutdown flag before reading
             if shutdown_flag.load(Ordering::SeqCst) {
@@ -96,17 +165,16 @@ pub fn spawn_terminal(
                         continue;
                     }
 
-                    // Emit event to frontend
-                    let _ = app_clone.emit(
-                        "terminal-output",
-                        serde_json::json!({
-                            "session_id": session_id_clone,
-                            "data": data,
-                        }),
-                    );
+                    // Hand off to the emitter; if it's gone, stop reading.
+                    if tx.send(data).is_err() {
+                        break;
+                    }
                 }
                 Ok(_) => {
-                    // EOF reached, process exited
+                    // EOF reached, process exited. Drain the emitter first so
+                    // the "[Process exited]" notice lands after all output.
+                    drop(tx);
+                    let _ = emitter.join();
                     if !shutdown_flag.load(Ordering::SeqCst) {
                         let _ = app_clone.emit(
                             "terminal-output",
@@ -116,16 +184,22 @@ pub fn spawn_terminal(
                             }),
                         );
                     }
-                    break;
+                    return;
                 }
                 Err(e) => {
+                    drop(tx);
+                    let _ = emitter.join();
                     if !shutdown_flag.load(Ordering::SeqCst) {
                         eprintln!("Error reading from PTY: {}", e);
                     }
-                    break;
+                    return;
                 }
             }
         }
+
+        // Shutdown path: drop the sender and let the emitter flush and exit.
+        drop(tx);
+        let _ = emitter.join();
     });
 
     // Store the session
@@ -260,6 +334,15 @@ pub fn spawn_hidden_terminal(
     thread::spawn(move || {
         let mut buf = [0u8; 8192];
         let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
+
+        // Coalesce output on a dedicated emitter thread (see batch_emit_loop).
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let emitter = {
+            let app = app_clone.clone();
+            let sid = session_id_clone.clone();
+            thread::spawn(move || batch_emit_loop(rx, app, sid, "hidden-terminal-output"))
+        };
+
         loop {
             if shutdown_flag.load(Ordering::SeqCst) {
                 break;
@@ -274,16 +357,14 @@ pub fn spawn_hidden_terminal(
                     if data.is_empty() {
                         continue;
                     }
-                    let _ = app_clone.emit(
-                        "hidden-terminal-output",
-                        serde_json::json!({
-                            "session_id": session_id_clone,
-                            "data": data,
-                        }),
-                    );
+                    if tx.send(data).is_err() {
+                        break;
+                    }
                 }
                 Ok(_) => {
-                    // Process exited - auto-cleanup
+                    // Process exited - drain output first, then notify + cleanup.
+                    drop(tx);
+                    let _ = emitter.join();
                     let _ = app_clone.emit(
                         "hidden-terminal-closed",
                         serde_json::json!({"session_id": session_id_clone}),
@@ -292,9 +373,11 @@ pub fn spawn_hidden_terminal(
                     if let Ok(mut st) = state_inner.lock() {
                         st.pty_sessions.remove(&session_id_clone);
                     }
-                    break;
+                    return;
                 }
                 Err(_) => {
+                    drop(tx);
+                    let _ = emitter.join();
                     let _ = app_clone.emit(
                         "hidden-terminal-closed",
                         serde_json::json!({"session_id": session_id_clone, "error": true}),
@@ -302,10 +385,14 @@ pub fn spawn_hidden_terminal(
                     if let Ok(mut st) = state_inner.lock() {
                         st.pty_sessions.remove(&session_id_clone);
                     }
-                    break;
+                    return;
                 }
             }
         }
+
+        // Shutdown path: drop the sender and let the emitter flush and exit.
+        drop(tx);
+        let _ = emitter.join();
     });
 
     let session = crate::state::PtySession {

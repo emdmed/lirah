@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-export function useBranchName(repoPath) {
+export function useBranchName(repoPath, enabled = true) {
   const [branchName, setBranchName] = useState(null);
   const lastBranchRef = useRef(null);
   const intervalRef = useRef(null);
@@ -27,9 +27,13 @@ export function useBranchName(repoPath) {
   }, [repoPath]);
 
   useEffect(() => {
-    if (!repoPath) {
-      setBranchName(null);
-      lastBranchRef.current = null;
+    if (!repoPath || !enabled) {
+      // Don't clobber the last known branch when merely paused (inactive tab);
+      // only reset when there's no repo at all.
+      if (!repoPath) {
+        setBranchName(null);
+        lastBranchRef.current = null;
+      }
       return;
     }
 
@@ -44,7 +48,7 @@ export function useBranchName(repoPath) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [repoPath, fetchBranch]);
+  }, [repoPath, enabled, fetchBranch]);
 
   return branchName;
 }

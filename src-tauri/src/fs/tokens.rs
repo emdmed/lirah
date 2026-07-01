@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::PathBuf;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::collections::HashMap;
+use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Default, Clone)]
@@ -45,7 +46,7 @@ struct MessageContent {
     usage: Option<UsageData>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 struct UsageData {
     input_tokens: Option<u64>,
     output_tokens: Option<u64>,
@@ -434,72 +435,135 @@ fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
     })
 }
 
-fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
-    let file = fs::File::open(path)
-        .map_err(|e| format!("Failed to open session file: {}", e))?;
-    let reader = BufReader::new(file);
+/// Accumulated parse state for one session file, retained between calls so a
+/// growing (append-only) JSONL is never re-read from the top.
+#[derive(Clone, Default)]
+struct CachedSession {
+    /// Byte offset up to which complete lines have been merged into `usage_by_msg`.
+    len: u64,
+    /// Usage keyed by message id (dedup: a resent id overwrites, never double-counts).
+    usage_by_msg: HashMap<String, UsageData>,
+    session_id: String,
+    model: Option<String>,
+    timestamp: Option<String>,
+}
 
-    let mut usage_by_msg: HashMap<String, UsageData> = HashMap::new();
-    let mut session_id = String::new();
-    let mut model: Option<String> = None;
-    let mut timestamp: Option<String> = None;
+/// Per-file incremental parse cache. Claude session files are append-only and
+/// the active one is polled every 5s; without this each poll re-parsed the
+/// entire (tens-of-MB) file, and get_project_stats re-parsed every session
+/// file in the project on every call. Keyed by path; grows with distinct
+/// session files viewed (bounded in practice by the user's projects/sessions).
+static SESSION_USAGE_CACHE: Mutex<Option<HashMap<PathBuf, CachedSession>>> = Mutex::new(None);
 
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => continue,
-        };
-
-        if let Ok(msg) = serde_json::from_str::<ClaudeMessage>(&line) {
-            if session_id.is_empty() {
-                session_id = msg.session_id.unwrap_or_default();
-            }
-            if timestamp.is_none() {
-                timestamp = msg.timestamp;
-            }
-            if let Some(message) = msg.message {
-                if model.is_none() {
-                    if let Some(ref m) = message.model {
-                        if !m.starts_with('<') {
-                            model = Some(m.clone());
-                        }
-                    }
-                }
-                if let (Some(id), Some(u)) = (message.id, message.usage) {
-                    usage_by_msg.insert(id, u);
-                }
-            }
-        }
-    }
-
+/// Sum the cached per-message usage into a `SessionInfo` — cheap, no file I/O.
+fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
     let mut input_tokens = 0u64;
     let mut output_tokens = 0u64;
     let mut cache_read = 0u64;
     let mut cache_creation = 0u64;
-
-    for u in usage_by_msg.values() {
+    for u in c.usage_by_msg.values() {
         input_tokens += u.input_tokens.unwrap_or(0);
         output_tokens += u.output_tokens.unwrap_or(0);
         cache_read += u.cache_read_input_tokens.unwrap_or(0);
         cache_creation += u.cache_creation_input_tokens.unwrap_or(0);
     }
-
-    let billable_input_tokens = input_tokens + cache_creation;
-    let billable_output_tokens = output_tokens;
-
-    let message_count = usage_by_msg.len() as u64;
-
-    Ok(SessionInfo {
-        session_id,
+    SessionInfo {
+        session_id: c.session_id.clone(),
         session_file: path.to_string_lossy().to_string(),
-        model,
+        model: c.model.clone(),
         input_tokens,
         output_tokens,
         cache_read_input_tokens: cache_read,
         cache_creation_input_tokens: cache_creation,
-        billable_input_tokens,
-        billable_output_tokens,
-        message_count,
-        timestamp: timestamp.unwrap_or_default(),
-    })
+        billable_input_tokens: input_tokens + cache_creation,
+        billable_output_tokens: output_tokens,
+        message_count: c.usage_by_msg.len() as u64,
+        timestamp: c.timestamp.clone().unwrap_or_default(),
+    }
+}
+
+/// Read complete (newline-terminated) lines from `reader` and merge them into
+/// `state`. A trailing partial line (still being written) is left uncommitted
+/// for the next poll. Returns the number of bytes consumed.
+fn merge_session_lines<R: BufRead>(reader: &mut R, state: &mut CachedSession) -> u64 {
+    let mut consumed = 0u64;
+    let mut line: Vec<u8> = Vec::new();
+    loop {
+        line.clear();
+        let n = match reader.read_until(b'\n', &mut line) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(_) => break,
+        };
+        // Stop at a partial final line (no newline yet) — don't consume it.
+        if line.last() != Some(&b'\n') {
+            break;
+        }
+        consumed += n as u64;
+        let content = &line[..line.len() - 1];
+        if content.is_empty() {
+            continue;
+        }
+        if let Ok(msg) = serde_json::from_slice::<ClaudeMessage>(content) {
+            if state.session_id.is_empty() {
+                state.session_id = msg.session_id.unwrap_or_default();
+            }
+            if state.timestamp.is_none() {
+                state.timestamp = msg.timestamp;
+            }
+            if let Some(message) = msg.message {
+                if state.model.is_none() {
+                    if let Some(ref m) = message.model {
+                        if !m.starts_with('<') {
+                            state.model = Some(m.clone());
+                        }
+                    }
+                }
+                if let (Some(id), Some(u)) = (message.id, message.usage) {
+                    state.usage_by_msg.insert(id, u);
+                }
+            }
+        }
+    }
+    consumed
+}
+
+fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
+    let current_len = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+
+    // Consult the cache for a resume point. Lock is held only briefly here.
+    let (mut state, start_offset) = {
+        let mut guard = SESSION_USAGE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        let cache = guard.get_or_insert_with(HashMap::new);
+        match cache.get(path) {
+            // Unchanged since last parse — recompute totals from cached usage
+            // with no file read. Hot path for the 5s poll between new messages
+            // and for every unchanged file in get_project_stats.
+            Some(c) if c.len == current_len => return Ok(build_session_info(path, c)),
+            // Grew (append-only) — resume from the last consumed offset.
+            Some(c) if current_len > c.len => (c.clone(), c.len),
+            // New file, or truncated/rotated — parse from the start.
+            _ => (CachedSession::default(), 0),
+        }
+    };
+
+    let file = fs::File::open(path)
+        .map_err(|e| format!("Failed to open session file: {}", e))?;
+    let mut reader = BufReader::new(file);
+    if start_offset > 0 {
+        reader
+            .seek(SeekFrom::Start(start_offset))
+            .map_err(|e| format!("Failed to seek session file: {}", e))?;
+    }
+    let consumed = merge_session_lines(&mut reader, &mut state);
+    state.len = start_offset + consumed;
+
+    let info = build_session_info(path, &state);
+    {
+        let mut guard = SESSION_USAGE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(cache) = guard.as_mut() {
+            cache.insert(path.clone(), state);
+        }
+    }
+    Ok(info)
 }

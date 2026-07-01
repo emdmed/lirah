@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Palette } from 'lucide-react';
 import {
@@ -187,7 +187,10 @@ function ThemeSwitcherMenuItem() {
   );
 }
 
-export const StatusBar = ({
+// Memoized: StatusBar's props are all primitives/callbacks, so with stable
+// callbacks (see ProjectTab call site) it skips re-render on every keystroke
+// in the prompt textarea and on the 5s token/branch polls.
+export const StatusBar = memo(({
   viewMode, currentPath, sessionId, theme, onToggleHelp,
   selectedCli, onOpenCliSettings, showTitleBar,
   onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
@@ -458,4 +461,4 @@ export const StatusBar = ({
     />
   </>
   );
-};
+});

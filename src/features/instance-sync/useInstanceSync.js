@@ -20,7 +20,7 @@ function isValidProjectPath(path, homeDirPath) {
     path.length > (homeDirPath?.length || 0);
 }
 
-export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
+export function useInstanceSync(currentPath, selectedFiles, claudeSessionId, enabled = true) {
   const [instanceId, setInstanceId] = useState(null);
   const [ownState, setOwnState] = useState(null);
   const [otherInstances, setOtherInstances] = useState([]);
@@ -145,9 +145,12 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
     return () => clearInterval(interval);
   }, [isRegistered, currentPath, selectedFiles, claudeSessionId]);
 
-  // Poll for other instances
+  // Poll for other instances. Gated on `enabled` (active tab) because the
+  // backend `get_all_instances` command walks all of /proc + several dirs —
+  // expensive to run per hidden tab. Registration and the heartbeat above stay
+  // running while inactive so this instance never appears stale to others.
   useEffect(() => {
-    if (!isRegistered) return;
+    if (!isRegistered || !enabled) return;
 
     const pollInstances = async () => {
       try {
@@ -184,7 +187,7 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId) {
       clearInterval(interval);
       if (unlisten) unlisten();
     };
-  }, [isRegistered]);
+  }, [isRegistered, enabled]);
 
   // New: Fetch sessions when an instance is selected (paginated)
   const selectInstance = useCallback(async (instance) => {

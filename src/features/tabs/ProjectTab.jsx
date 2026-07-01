@@ -169,7 +169,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
 
   // Instance sync
   const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
-  const instanceSync = useInstanceSync(currentPath, selectedFilesArray, terminalSessionId);
+  const instanceSync = useInstanceSync(currentPath, selectedFilesArray, terminalSessionId, isActive);
 
   // Calculate deduplicated instance count
   const deduplicatedOtherInstancesCount = useMemo(() => {
@@ -246,7 +246,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     }
   }, [sidebarSearch.searchResults]);
 
-  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, !!currentPath && !secondary.secondaryFullscreen);
+  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
   const compact = useCompact({
     currentPath,
@@ -519,7 +519,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   }, [sidebar.sidebarOpen]);
 
   // Monitor terminal CWD
-  const detectedCwd = useCwdMonitor(terminalSessionId, sidebar.sidebarOpen && fileWatchingEnabled && !secondary.secondaryFullscreen);
+  const detectedCwd = useCwdMonitor(terminalSessionId, isActive && sidebar.sidebarOpen && fileWatchingEnabled && !secondary.secondaryFullscreen);
 
   // Update tab label when terminal CWD changes
   useEffect(() => {
@@ -529,7 +529,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   }, [detectedCwd, tabId, updateTabPath]);
 
   // Get current git branch
-  const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd);
+  const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd, isActive);
 
   // Show toast when a new release is available
   useEffect(() => {
@@ -812,9 +812,9 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             theme={theme.terminal}
             onToggleHelp={useCallback(() => dialogs.setShowHelp(prev => !prev), [dialogs.setShowHelp])}
             selectedCli={settings.selectedCli}
-            onOpenCliSettings={() => dialogs.setCliSelectionModalOpen(true)}
+            onOpenCliSettings={useCallback(() => dialogs.setCliSelectionModalOpen(true), [dialogs.setCliSelectionModalOpen])}
             showTitleBar={settings.showTitleBar}
-            onToggleTitleBar={() => settings.setShowTitleBar(prev => !prev)}
+            onToggleTitleBar={useCallback(() => settings.setShowTitleBar(prev => !prev), [settings.setShowTitleBar])}
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
             networkIsolation={settings.networkIsolation}
@@ -828,13 +828,13 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               }
             }, [settings.setNetworkIsolation, settings.sandboxEnabled, terminalSessionId, settings.setSandboxFailed])}
             secondaryTerminalFocused={secondary.secondaryFocused}
-            onOpenDashboard={() => dialogs.setDashboardOpen(true)}
-            onOpenBudgetSettings={() => dialogs.setBudgetDialogOpen(true)}
+            onOpenDashboard={useCallback(() => dialogs.setDashboardOpen(true), [dialogs.setDashboardOpen])}
+            onOpenBudgetSettings={useCallback(() => dialogs.setBudgetDialogOpen(true), [dialogs.setBudgetDialogOpen])}
             autoChangelogEnabled={settings.autoChangelogEnabled}
             changelogStatus={changelogStatus}
-            onOpenAutoChangelogDialog={() => dialogs.setAutoChangelogDialogOpen(true)}
+            onOpenAutoChangelogDialog={useCallback(() => dialogs.setAutoChangelogDialogOpen(true), [dialogs.setAutoChangelogDialogOpen])}
             autoCommitCli={settings.autoCommitCli}
-            onOpenAutoCommitConfig={() => dialogs.setAutoCommitConfigOpen(true)}
+            onOpenAutoCommitConfig={useCallback(() => dialogs.setAutoCommitConfigOpen(true), [dialogs.setAutoCommitConfigOpen])}
             onToggleSandbox={useCallback(() => {
               settings.setSandboxEnabled(prev => !prev);
               settings.setSandboxFailed(false);
@@ -848,9 +848,9 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
             branchTasksOpen={dialogs.branchTasksOpen}
             otherInstancesCount={deduplicatedOtherInstancesCount}
-            onToggleInstanceSyncPanel={() => dialogs.setInstanceSyncPanelOpen(prev => !prev)}
+            onToggleInstanceSyncPanel={useCallback(() => dialogs.setInstanceSyncPanelOpen(prev => !prev), [dialogs.setInstanceSyncPanelOpen])}
             workspace={workspaceHook.workspace}
-            onOpenWorkspaceDialog={() => dialogs.setWorkspaceDialogOpen(true)}
+            onOpenWorkspaceDialog={useCallback(() => dialogs.setWorkspaceDialogOpen(true), [dialogs.setWorkspaceDialogOpen])}
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
             availableUpdate={availableUpdate}
