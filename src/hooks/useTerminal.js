@@ -153,11 +153,12 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
           });
         }
 
-        // Listen for terminal output
-        unlisten = await listen('terminal-output', (event) => {
-          if (event.payload.session_id === id) {
-            terminal.write(event.payload.data);
-          }
+        // Listen for terminal output on this session's own event channel. The
+        // backend scopes the event name per session (terminal-output-<id>), so
+        // this listener only ever receives its own stream — no cross-terminal
+        // fan-out or filtering needed even with many tabs mounted at once.
+        unlisten = await listen(`terminal-output-${id}`, (event) => {
+          terminal.write(event.payload.data);
         });
 
         // Handle terminal input

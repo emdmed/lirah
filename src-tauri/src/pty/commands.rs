@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
@@ -59,21 +59,43 @@ const PTY_FLUSH_SIZE: usize = 32 * 1024;
 ///
 /// This runs on its own thread, draining decoded UTF-8 chunks from `rx` and
 /// emitting one `event_name` event per flush. It flushes when the buffer
-/// reaches `PTY_FLUSH_SIZE` (throughput) or `PTY_FLUSH_INTERVAL` elapses with
-/// data pending (latency). When the reader drops its sender the channel
-/// disconnects; we flush whatever remains and return — so a caller that joins
-/// this thread is guaranteed all output has been delivered before it emits any
-/// subsequent lifecycle event (e.g. "[Process exited]").
-fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, event_name: &'static str) {
+/// reaches `PTY_FLUSH_SIZE` (throughput) or `PTY_FLUSH_INTERVAL` elapses since
+/// the *first* buffered byte (latency). When the reader drops its sender the
+/// channel disconnects; we flush whatever remains and return — so a caller that
+/// joins this thread is guaranteed all output has been delivered before it
+/// emits any subsequent lifecycle event (e.g. "[Process exited]").
+///
+/// When nothing is buffered we block on `recv()` (no timeout) rather than
+/// polling every interval — an idle terminal must cost zero wakeups, which
+/// matters when many tabs each hold a quiet nvim/lazygit. The flush deadline is
+/// anchored to the first byte, so a steady sub-interval trickle still flushes
+/// within one `PTY_FLUSH_INTERVAL` instead of being deferred indefinitely by a
+/// per-recv timeout reset.
+fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, event_name: String) {
     let mut pending = String::new();
+    // Some(_) once data is buffered: the instant by which we must flush.
+    let mut deadline: Option<Instant> = None;
     loop {
-        match rx.recv_timeout(PTY_FLUSH_INTERVAL) {
+        // Idle: block until the first chunk arrives. Buffered: wait only until
+        // the flush deadline. Past the deadline: force a flush this iteration.
+        let next = match deadline {
+            None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            Some(dl) => match dl.checked_duration_since(Instant::now()) {
+                Some(remaining) => rx.recv_timeout(remaining),
+                None => Err(RecvTimeoutError::Timeout),
+            },
+        };
+        match next {
             Ok(chunk) => {
+                if pending.is_empty() {
+                    deadline = Some(Instant::now() + PTY_FLUSH_INTERVAL);
+                }
                 pending.push_str(&chunk);
                 if pending.len() >= PTY_FLUSH_SIZE {
                     let data = std::mem::take(&mut pending);
+                    deadline = None;
                     let _ = app.emit(
-                        event_name,
+                        &event_name,
                         serde_json::json!({ "session_id": &session_id, "data": data }),
                     );
                 }
@@ -81,8 +103,9 @@ fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, eve
             Err(RecvTimeoutError::Timeout) => {
                 if !pending.is_empty() {
                     let data = std::mem::take(&mut pending);
+                    deadline = None;
                     let _ = app.emit(
-                        event_name,
+                        &event_name,
                         serde_json::json!({ "session_id": &session_id, "data": data }),
                     );
                 }
@@ -90,7 +113,7 @@ fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, eve
             Err(RecvTimeoutError::Disconnected) => {
                 if !pending.is_empty() {
                     let _ = app.emit(
-                        event_name,
+                        &event_name,
                         serde_json::json!({ "session_id": &session_id, "data": pending }),
                     );
                 }
@@ -137,13 +160,21 @@ pub fn spawn_terminal(
         // visible as "scrambled characters" while Claude Code or vim is running.
         let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
 
+        // Per-session event name so each terminal's output reaches only its own
+        // listener. A single shared "terminal-output" event forces every mounted
+        // terminal (all tabs stay mounted) to wake and filter every other
+        // terminal's output — O(M²) across M live terminals. Scoping the event
+        // to the session makes each listener see only its own stream.
+        let event_name = format!("terminal-output-{}", session_id_clone);
+
         // Batch output on a dedicated emitter thread: the reader stays tight on
         // the PTY while emits are coalesced by time/size (see batch_emit_loop).
         let (tx, rx) = std::sync::mpsc::channel::<String>();
         let emitter = {
             let app = app_clone.clone();
             let sid = session_id_clone.clone();
-            thread::spawn(move || batch_emit_loop(rx, app, sid, "terminal-output"))
+            let ev = event_name.clone();
+            thread::spawn(move || batch_emit_loop(rx, app, sid, ev))
         };
 
         loop {
@@ -177,7 +208,7 @@ pub fn spawn_terminal(
                     let _ = emitter.join();
                     if !shutdown_flag.load(Ordering::SeqCst) {
                         let _ = app_clone.emit(
-                            "terminal-output",
+                            &event_name,
                             serde_json::json!({
                                 "session_id": session_id_clone,
                                 "data": "\r\n[Process exited]\r\n",
@@ -340,7 +371,7 @@ pub fn spawn_hidden_terminal(
         let emitter = {
             let app = app_clone.clone();
             let sid = session_id_clone.clone();
-            thread::spawn(move || batch_emit_loop(rx, app, sid, "hidden-terminal-output"))
+            thread::spawn(move || batch_emit_loop(rx, app, sid, "hidden-terminal-output".to_string()))
         };
 
         loop {
