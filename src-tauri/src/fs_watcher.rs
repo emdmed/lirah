@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-use crate::ignore_dirs::IGNORE_DIRS;
+use crate::ignore_dirs::{should_ignore_file, IGNORE_DIRS};
 use crate::state::AppState;
 
 /// Payload emitted with "fs-changes" events so the frontend can do incremental updates.
@@ -17,41 +17,6 @@ pub struct FsChangesPayload {
     pub created: Vec<String>,
     pub deleted: Vec<String>,
     pub root_path: String,
-}
-
-/// File extensions/patterns to ignore (editor temp files, OS files)
-const IGNORE_EXTENSIONS: &[&str] = &[
-    ".swp", ".swo", ".swn", ".swx",  // vim/nvim swap files
-    ".tmp", ".bak", ".orig",
-    "~",                               // editor backup files
-];
-
-/// File prefixes to ignore
-const IGNORE_PREFIXES: &[&str] = &[
-    ".#",   // emacs lock files
-    "#",    // emacs auto-save
-];
-
-fn should_ignore_file(path: &Path) -> bool {
-    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        // Check extensions
-        for ext in IGNORE_EXTENSIONS {
-            if name.ends_with(ext) {
-                return true;
-            }
-        }
-        // Check prefixes
-        for prefix in IGNORE_PREFIXES {
-            if name.starts_with(prefix) {
-                return true;
-            }
-        }
-        // 4913 is nvim's writability test file
-        if name == "4913" {
-            return true;
-        }
-    }
-    false
 }
 
 struct WatcherHandle {

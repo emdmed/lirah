@@ -6,6 +6,9 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
   const [status, setStatus] = useState(null); // null | 'updating' | 'done' | 'error'
   const watcherStarted = useRef(null);
   const dismissTimer = useRef(null);
+  // Track per-commit "hidden-terminal-closed" listeners so they can't leak if
+  // the close event never arrives or the component unmounts while pending.
+  const closeListenersRef = useRef(new Set());
 
   // Start/stop commit watcher when path or enabled changes
   useEffect(() => {
@@ -74,8 +77,10 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
             setStatus(closeEvent.payload.error ? "error" : "done");
             dismissTimer.current = setTimeout(() => setStatus(null), 4000);
             unlistenClose();
+            closeListenersRef.current.delete(unlistenClose);
           }
         });
+        closeListenersRef.current.add(unlistenClose);
       } catch (err) {
         console.error("Failed to spawn hidden terminal for changelog:", err);
         setStatus("error");
@@ -88,10 +93,13 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
     };
   }, [enabled, currentPath, targetFile, trigger, cli]);
 
-  // Cleanup timer on unmount
+  // Cleanup timer and any pending close-listeners on unmount
   useEffect(() => {
+    const closeListeners = closeListenersRef.current;
     return () => {
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
+      for (const unlistenClose of closeListeners) unlistenClose();
+      closeListeners.clear();
     };
   }, []);
 

@@ -178,12 +178,18 @@ export function useInstanceSync(currentPath, selectedFiles, claudeSessionId, ena
     pollInstances();
 
     // Listen for real-time updates from fs watcher
+    let cancelled = false;
     let unlisten;
-    listen('instance-sync-changed', pollInstances).then(fn => { unlisten = fn; });
+    listen('instance-sync-changed', pollInstances).then(fn => {
+      // If we already unmounted before listen() resolved, tear down immediately
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
 
     // Fallback polling at longer interval
     const interval = setInterval(pollInstances, INSTANCE_WATCH_INTERVAL);
     return () => {
+      cancelled = true;
       clearInterval(interval);
       if (unlisten) unlisten();
     };

@@ -1,4 +1,4 @@
-use crate::ignore_dirs::IGNORE_DIRS;
+use crate::ignore_dirs::{should_ignore_file, IGNORE_DIRS};
 use crate::state::AppState;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -54,6 +54,12 @@ pub fn read_directory(
             .metadata()
             .map_err(|e| format!("Failed to read metadata: {}", e))?;
         let path = entry.path();
+
+        // Skip editor temp/backup files and atomic-write temp files
+        if !metadata.is_dir() && should_ignore_file(&path) {
+            continue;
+        }
+
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -190,6 +196,12 @@ pub fn read_directory_recursive(
                 }
 
                 let path = e.path();
+
+                // Skip editor temp/backup files and atomic-write temp files
+                if !e.file_type().is_dir() && should_ignore_file(path) {
+                    continue;
+                }
+
                 let name = path
                     .file_name()
                     .and_then(|n| n.to_str())

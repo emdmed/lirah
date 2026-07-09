@@ -112,7 +112,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     const setup = async () => {
       try {
         await invoke('start_fs_watcher', { path: watchPath });
-        unlisten = await listen('fs-changes', (event) => {
+        const fn = await listen('fs-changes', (event) => {
           if (stopped) return;
           const { created, deleted, root_path } = event.payload || {};
           // Only process events for our watched path
@@ -167,6 +167,9 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
             });
           }
         });
+        // Unmounted while listen() was resolving — tear down immediately
+        if (stopped) fn();
+        else unlisten = fn;
       } catch (err) {
         console.warn('[useTreeView] Failed to start fs watcher:', err);
       }

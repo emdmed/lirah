@@ -119,10 +119,12 @@ export function useBranchTasks(cli = 'claude-code') {
 
   // Listen for commit events to regenerate tasks when dialog is open
   useEffect(() => {
+    let cancelled = false;
     let unlisten;
-    
+
     const setupListener = async () => {
-      unlisten = await listen('commit-detected', async (event) => {
+      const fn = await listen('commit-detected', async (event) => {
+        if (cancelled) return;
         // Only regenerate if the dialog is currently open
         if (isDialogOpenRef.current && currentPathRef.current && baseBranchRef.current && currentBranchRef.current) {
           const branchName = currentBranchRef.current;
@@ -149,11 +151,15 @@ export function useBranchTasks(cli = 'claude-code') {
           generateTasks(currentPathRef.current, baseBranchRef.current, currentBranchRef.current);
         }
       });
+      // Unmounted while listen() was resolving — tear down immediately
+      if (cancelled) fn();
+      else unlisten = fn;
     };
-    
+
     setupListener();
-    
+
     return () => {
+      cancelled = true;
       if (unlisten) unlisten();
     };
   }, [generateTasks]);

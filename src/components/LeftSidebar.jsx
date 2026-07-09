@@ -53,7 +53,7 @@ export function LeftSidebar({
   // Destructure only needed fields from grouped props (fix #2: explicit dependencies)
   const { sidebarWidth, isResizing, handleResizeStart } = sidebar;
   const { searchQuery, handleSearchClear } = search;
-  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, displayedTreeData, expandedFolders, toggleFolder } = treeView;
+  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, displayedTreeData, expandedFolders, toggleFolder, loadTreeData } = treeView;
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, setFileViewMode, VIEW_MODES } = fileSymbols;
 
@@ -70,6 +70,8 @@ export function LeftSidebar({
             onSearchClear={handleSearchClear}
             showSearch={viewMode === 'tree'}
             searchInputRef={searchInputRef}
+            onSyncTree={loadTreeData}
+            treeLoading={treeLoading}
             showGitChangesOnly={showGitChangesOnly}
             onToggleGitFilter={handleToggleGitFilter}
             showMarkdownOnly={showMarkdownOnly}

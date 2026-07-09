@@ -125,6 +125,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     if (!terminal || !fitAddon) return;
 
     let unlisten;
+    let cancelled = false;
 
     const initTerminal = async () => {
       try {
@@ -157,9 +158,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // backend scopes the event name per session (terminal-output-<id>), so
         // this listener only ever receives its own stream — no cross-terminal
         // fan-out or filtering needed even with many tabs mounted at once.
-        unlisten = await listen(`terminal-output-${id}`, (event) => {
+        const fn = await listen(`terminal-output-${id}`, (event) => {
           terminal.write(event.payload.data);
         });
+        // Unmounted while listen() was resolving — tear down immediately
+        if (cancelled) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
 
         // Handle terminal input
         terminal.onData((data) => {
@@ -210,6 +217,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     initTerminal();
 
     return () => {
+      cancelled = true;
       if (unlisten) {
         unlisten();
       }

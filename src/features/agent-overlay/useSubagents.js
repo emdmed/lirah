@@ -48,6 +48,11 @@ export function useSubagents(projectPath) {
       const unlisten = await listen('subagents-changed', () => {
         if (!cancelled) fetchSubagents();
       });
+      // Unmounted while listen() was resolving — tear down immediately
+      if (cancelled) {
+        unlisten();
+        return;
+      }
       unlistenRef.current = unlisten;
 
       // Fallback polling every 10s (needed for mtime-based status transitions)

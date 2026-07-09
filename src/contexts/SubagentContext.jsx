@@ -91,7 +91,9 @@ export function SubagentProvider({ tabs, children }) {
           fetchForPath(changedPath);
         }
       });
-      unlistenRef.current = unlisten;
+      // Unmounted while listen() was resolving — tear down immediately
+      if (cancelled) unlisten();
+      else unlistenRef.current = unlisten;
     };
     setup();
 

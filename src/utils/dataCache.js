@@ -19,11 +19,18 @@ const cache = {
     if (entry && this.isValid(entry.timestamp, 10 * 60 * 1000)) {
       return entry.data;
     }
+    // Evict expired entry so the Map doesn't grow unbounded
+    if (entry) this.sessions.delete(sessionId);
     return null;
   },
 
   setSession(sessionId, data) {
-    this.sessions.set(sessionId, { data, timestamp: Date.now() });
+    // Sweep expired entries so write-only sessions can't grow the Map forever
+    const now = Date.now();
+    for (const [id, entry] of this.sessions) {
+      if (now - entry.timestamp >= 10 * 60 * 1000) this.sessions.delete(id);
+    }
+    this.sessions.set(sessionId, { data, timestamp: now });
   },
 
   isValid(timestamp, ttl) {

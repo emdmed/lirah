@@ -52,11 +52,16 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
     fetchGitStats();
 
     // Listen for backend event instead of polling
+    let cancelled = false;
     let unlisten;
     const setup = async () => {
-      unlisten = await listen('git-stats-changed', () => {
+      const fn = await listen('git-stats-changed', () => {
+        if (cancelled) return;
         fetchGitStats();
       });
+      // Unmounted while listen() was resolving — tear down immediately
+      if (cancelled) fn();
+      else unlisten = fn;
     };
     setup();
 
@@ -64,6 +69,7 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
     const fallbackInterval = setInterval(fetchGitStats, 30000);
 
     return () => {
+      cancelled = true;
       if (unlisten) unlisten();
       clearInterval(fallbackInterval);
     };

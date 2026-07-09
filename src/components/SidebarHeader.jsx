@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { BookmarksDropdown } from '../features/bookmarks';
-import { Search, X, GitBranch, Star, Shield, Eye, FileText } from 'lucide-react';
+import { Search, X, GitBranch, Star, Shield, Eye, FileText, RefreshCw } from 'lucide-react';
 
 export function SidebarHeader({
   viewMode,
@@ -19,7 +19,9 @@ export function SidebarHeader({
   onAddBookmark,
   onNavigateBookmark,
   hasTerminalSession,
-  sandboxEnabled
+  sandboxEnabled,
+  onSyncTree,
+  treeLoading
 }) {
   return (
     <div className="p-2 border-b border-b-sketch flex flex-col gap-2 flex-shrink-0">
@@ -50,6 +52,17 @@ export function SidebarHeader({
           )}
           {showSearch && (
             <>
+              <Button
+                onClick={onSyncTree}
+                disabled={treeLoading}
+                size="icon-xs"
+                variant="ghost"
+                className="h-6 w-6 hover:bg-accent/60"
+                title="Sync file tree"
+                aria-label="Sync file tree"
+              >
+                <RefreshCw className={`w-3 h-3 ${treeLoading ? 'animate-spin' : ''}`} />
+              </Button>
               <Button
                 onClick={onToggleMarkdownFilter}
                 size="icon-xs"
