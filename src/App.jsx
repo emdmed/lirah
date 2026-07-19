@@ -5,10 +5,11 @@ import { ProjectTab } from "./features/tabs/ProjectTab";
 import { TabBar } from "./features/tabs/TabBar";
 import { SplashScreen } from "./features/splash";
 import { SubagentProvider } from "./contexts/SubagentContext";
-import { AgentSidebar } from "./components/AgentSidebar";
+import { RightSidebar } from "./features/agent-jobs/agent-jobs";
 
 function App() {
   const { tabs, activeTabId, addTab, removeTab, switchTab, reorderTab } = useTabManager();
+  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   // CLI initial path (e.g. `nevo /path/to/project`)
   const [initialProjectDir, setInitialProjectDir] = useState(undefined); // undefined = not yet checked
@@ -139,7 +140,7 @@ function App() {
               />
             ))}
           </div>
-          <AgentSidebar />
+          <RightSidebar projectPath={activeTab?.projectPath} />
         </div>
 
         <SplashScreen

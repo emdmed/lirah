@@ -12,6 +12,7 @@ mod claude;
 mod opencode;
 mod workspace;
 mod fs_watcher;
+mod agent_runner;
 
 use state::create_state;
 use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, generate_instance_sync_prompt, check_pty_child_process, kill_pty_child_process};
@@ -23,6 +24,8 @@ use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get
 use opencode::{get_opencode_data_paths, get_opencode_sessions, get_opencode_session, get_active_opencode_session};
 use workspace::{create_workspace, delete_workspace, list_workspaces, open_workspace, close_workspace};
 use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
+use agent_runner::{create_agent_job_store};
+use agent_runner::commands::{run_agent_job, cancel_agent_job};
 
 pub struct InitialPath(pub Option<String>);
 
@@ -44,6 +47,7 @@ pub fn run(initial_path: Option<String>) {
         .manage(create_instance_sync_store())
         .manage(std::sync::Arc::new(FsWatcherStore::new()))
         .manage(std::sync::Arc::new(SubagentWatcherStore::new()))
+        .manage(create_agent_job_store())
         .manage(InitialPath(initial_path))
         .invoke_handler(tauri::generate_handler![
             spawn_terminal,
@@ -106,6 +110,8 @@ pub fn run(initial_path: Option<String>) {
             kill_pty_child_process,
             start_fs_watcher,
             stop_fs_watcher,
+            run_agent_job,
+            cancel_agent_job,
             get_initial_path
         ])
         .setup(|app| {

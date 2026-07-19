@@ -49,6 +49,7 @@ import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { useUpdateChecker } from "../../hooks/useUpdateChecker";
 import { useToast } from "../toast";
+import { useAgentJobs } from "../agent-jobs/agent-jobs";
 
 export function ProjectTab({ projectPath, isActive, tabId }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
@@ -141,6 +142,14 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   const { extractFileSymbols, clearFileSymbols, clearAllSymbols, isBabelParseable, formatFileAnalysis, getLineCount, getViewModeLabel } = fileSymbolsHook;
 
   const fileSelection = useFileSelection();
+
+  // Bridge this tab's file-tree selection up to the global agent-jobs context
+  // (only while active) so the Run Job dialog can use it as context.
+  const { registerContextFiles } = useAgentJobs();
+  useEffect(() => {
+    if (!isActive) return;
+    registerContextFiles(fileSelection.filesForGroup);
+  }, [isActive, fileSelection.filesForGroup, registerContextFiles]);
 
   // Register symbol callbacks and currentPath with file selection context
   useEffect(() => {

@@ -172,6 +172,67 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
   );
 }
 
+// Body-only subagent list (no shell/header) — reused by the tabbed right sidebar.
+export function SubagentList() {
+  const { allSubagents, totalActiveCount, dismissedIds, dismiss } = useSubagentContext();
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (totalActiveCount === 0) return;
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [totalActiveCount]);
+
+  const visibleSubagents = useMemo(
+    () => allSubagents.filter(s => !dismissedIds.has(s.agent_id)),
+    [allSubagents, dismissedIds]
+  );
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const agent of visibleSubagents) {
+      if (!map.has(agent.tabId)) {
+        map.set(agent.tabId, { tabLabel: agent.tabLabel, agents: [] });
+      }
+      map.get(agent.tabId).agents.push(agent);
+    }
+    for (const group of map.values()) {
+      group.agents.sort((a, b) => {
+        if (a.status === 'running' && b.status !== 'running') return -1;
+        if (a.status !== 'running' && b.status === 'running') return 1;
+        return (a.started_at || '').localeCompare(b.started_at || '');
+      });
+    }
+    return map;
+  }, [visibleSubagents]);
+
+  if (visibleSubagents.length === 0) {
+    return (
+      <div className="px-3 py-6 text-center">
+        <Bot size={16} className="mx-auto mb-2 text-muted-foreground/30" />
+        <div className="text-[11px] text-muted-foreground/50">No agents running</div>
+        <div className="mt-1 text-[10px] text-muted-foreground/30">
+          Agents appear here when spawned during tool use
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {[...groups.entries()].map(([tabId, group]) => (
+        <TabGroup
+          key={tabId}
+          tabLabel={group.tabLabel}
+          agents={group.agents}
+          onDismiss={dismiss}
+          now={now}
+        />
+      ))}
+    </>
+  );
+}
+
 export function AgentSidebar() {
   const {
     allSubagents,

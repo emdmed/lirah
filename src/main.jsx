@@ -7,6 +7,7 @@ import { BookmarksProvider } from "./features/bookmarks";
 import { PromptTemplatesProvider } from "./features/templates";
 import { FileGroupsProvider } from "./features/file-groups";
 import { PinnedFilesProvider } from "./features/pinned-files";
+import { AgentJobsProvider } from "./features/agent-jobs/agent-jobs";
 import { TabProvider } from "./features/tabs";
 import { ToastProvider } from "./features/toast";
 import "./index.css";
@@ -20,9 +21,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <PromptTemplatesProvider>
               <FileGroupsProvider>
                 <PinnedFilesProvider>
-                  <TabProvider>
-                    <App />
-                  </TabProvider>
+                  <AgentJobsProvider>
+                    <TabProvider>
+                      <App />
+                    </TabProvider>
+                  </AgentJobsProvider>
                 </PinnedFilesProvider>
               </FileGroupsProvider>
             </PromptTemplatesProvider>
