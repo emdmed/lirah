@@ -1,6 +1,7 @@
 use super::AgentJobStore;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -102,8 +103,8 @@ pub fn run_agent_job(
         prompt
     };
 
-    let mut child = Command::new(&shell)
-        .args(["-lc", &command])
+    let mut cmd = Command::new(&shell);
+    cmd.args(["-lc", &command])
         .current_dir(&cwd)
         .env("TERM", "xterm-256color")
         // No human is attached to this job, so make sure nothing the agent runs
@@ -119,9 +120,13 @@ pub fn run_agent_job(
         .env("DEBIAN_FRONTEND", "noninteractive")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        // Own process group so cancel_agent_job can kill the whole tree.
-        .process_group(0)
+        .stderr(Stdio::piped());
+    // Own process group so cancel_agent_job can kill the whole tree. Unix only:
+    // `process_group` comes from the unix CommandExt, and the group-kill in
+    // cancel_agent_job is likewise POSIX. On Windows this is a no-op.
+    #[cfg(unix)]
+    cmd.process_group(0);
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn agent job: {}", e))?;
 
