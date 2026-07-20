@@ -48,11 +48,20 @@ function App() {
     });
   }, []);
 
+  // New tab handler — opens at home dir
+  const handleNewTab = useCallback(async () => {
+    try {
+      const home = await invoke('get_home_dir');
+      if (home) addTab(home);
+    } catch { /* ignore */ }
+  }, [addTab]);
+
   // Global keyboard shortcuts for tab management
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl+Tab: next tab
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab' && !e.shiftKey) {
+        if (tabs.length === 0) return;
         e.preventDefault();
         const idx = tabs.findIndex(t => t.id === activeTabId);
         const nextIdx = (idx + 1) % tabs.length;
@@ -61,6 +70,7 @@ function App() {
       }
       // Ctrl+Shift+Tab: previous tab
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab' && e.shiftKey) {
+        if (tabs.length === 0) return;
         e.preventDefault();
         const idx = tabs.findIndex(t => t.id === activeTabId);
         const prevIdx = (idx - 1 + tabs.length) % tabs.length;
@@ -93,15 +103,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, activeTabId, switchTab, removeTab]);
-
-  // New tab handler — opens at home dir
-  const handleNewTab = useCallback(async () => {
-    try {
-      const home = await invoke('get_home_dir');
-      if (home) addTab(home);
-    } catch { /* ignore */ }
-  }, [addTab]);
+  }, [tabs, activeTabId, switchTab, removeTab, handleNewTab]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProjectForNewTab = useCallback((bookmark) => {
