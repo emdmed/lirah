@@ -75,6 +75,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     }));
   }, [projectPath, getPinnedPaths]);
 
+  const [name, setName] = useState('');
   const [templateId, setTemplateId] = useState(null);
   const [cli, setCli] = useState('claude-code');
   const [useWorktree, setUseWorktree] = useState(true);
@@ -123,6 +124,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   // On open: pre-check the tree selection, reset transient state.
   useEffect(() => {
     if (open) {
+      setName('');
       setInstructions('');
       setGroupFiles([]);
       setChecked(new Set(selectedContextFiles.map((f) => f.relativePath)));
@@ -158,7 +160,10 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   const handleRun = async () => {
     const prompt = assemblePrompt({ template, files: checkedFiles, instructions });
     if (!prompt.trim()) return;
-    const label = template?.title || `Agent job (${checkedFiles.length} file${checkedFiles.length === 1 ? '' : 's'})`;
+    const label =
+      name.trim() ||
+      template?.title ||
+      `Agent job (${checkedFiles.length} file${checkedFiles.length === 1 ? '' : 's'})`;
     await launchJob({
       cli: cli === 'opencode' ? 'opencode' : 'claude',
       prompt,
@@ -184,6 +189,16 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
         </DialogHeader>
 
         <div className="flex flex-col gap-3 py-1 flex-1 min-h-0 overflow-y-auto">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Optional — defaults to template / file count"
+              className="h-7 min-w-[150px] flex-1 rounded border border-sketch bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
           <Picker
             label="Template"
             value={template?.title || 'None'}
@@ -286,7 +301,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                 !isGitRepo
                   ? 'Not a git repository — jobs run in-place with no diff review'
                   : useWorktree
-                  ? 'Runs in an isolated git worktree — changes quarantined until approved'
+                  ? 'Runs in an isolated git worktree — changes quarantined until you apply them to your working tree'
                   : 'Runs in-place — edits your working tree directly'
               }
             >

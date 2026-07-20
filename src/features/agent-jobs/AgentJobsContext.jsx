@@ -43,7 +43,17 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
     const filesList = changedFiles.length
       ? changedFiles.map((f) => `  - ${rel(f.path)}`).join('\n')
       : '  - (none)';
-    const outputText = job.output.map((o) => o.chunk).join('\n');
+    // Prefer the full on-disk log — the in-memory buffer is capped at
+    // MAX_OUTPUT_LINES, so long jobs would otherwise lose their earliest output.
+    let outputText = job.output.map((o) => o.chunk).join('\n');
+    if (job.logPath) {
+      try {
+        const full = await invoke('read_file_content', { path: job.logPath });
+        if (full.trim()) outputText = full.replace(/\n$/, '');
+      } catch {
+        // Log file missing — fall back to the in-memory buffer above.
+      }
+    }
 
     const md = [
       `# ${job.label}`,
@@ -71,6 +81,30 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
 
     await invoke('write_file_content', { path, content: md });
     return path;
+  } catch {
+    return null;
+  }
+}
+
+// Sum added/removed lines across a worktree's changes. `git add -N` records
+// intent-to-add for untracked files so they show up in `git diff --numstat` as
+// additions (without staging their content), giving a full +/- count in one go.
+// Only safe to call on an isolated worktree — never the user's real working tree.
+async function computeDiffStat(cwd) {
+  try {
+    await invoke('run_git_command', { repoPath: cwd, args: ['add', '-N', '.'] });
+    const out = await invoke('run_git_command', { repoPath: cwd, args: ['diff', '--numstat'] });
+    let added = 0;
+    let removed = 0;
+    for (const line of out.split('\n')) {
+      const [a, d] = line.trim().split(/\s+/);
+      if (a === '-' || d === '-') continue; // binary file — no line counts
+      const na = parseInt(a, 10);
+      const nd = parseInt(d, 10);
+      if (!Number.isNaN(na)) added += na;
+      if (!Number.isNaN(nd)) removed += nd;
+    }
+    return { added, removed };
   } catch {
     return null;
   }
@@ -108,6 +142,90 @@ export function AgentJobsProvider({ children }) {
     );
   }, []);
 
+  // Persistence: the job list lives only in React state, but the backend keeps
+  // running detached jobs (and its PID map) across a webview reload. Persist the
+  // list to disk and rehydrate on mount so the panel survives reloads/restarts.
+  const hydratedRef = useRef(false);
+  const stateFileRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const home = await invoke('get_home_dir');
+        stateFileRef.current = `${home}/.lirah/jobs-state.json`;
+        let saved = [];
+        try {
+          const raw = await invoke('read_file_content', { path: stateFileRef.current });
+          saved = JSON.parse(raw) || [];
+        } catch {
+          saved = []; // First run or unreadable state — start empty.
+        }
+        // Jobs whose backend threads are still alive (webview reload, not a full
+        // restart) — those keep streaming, so leave them 'running' and let the
+        // listeners below finalize them.
+        let liveIds = [];
+        try {
+          liveIds = await invoke('list_running_agent_jobs');
+        } catch {
+          liveIds = [];
+        }
+        const liveSet = new Set(liveIds);
+
+        const recovered = await Promise.all(
+          saved.map(async (job) => {
+            if (job.status !== 'running' || liveSet.has(job.id)) return job;
+            // Process is gone (app was restarted, or it finished while detached).
+            // Recover any changes from the worktree so review/discard still work.
+            let changedFiles = [];
+            try {
+              const status = await invoke('run_git_command', {
+                repoPath: job.cwd,
+                args: ['status', '--porcelain'],
+              });
+              changedFiles = parsePorcelain(status, job.cwd);
+            } catch {
+              // Non-git cwd or the worktree is gone.
+            }
+            const worktreeGone = job.worktreePath
+              ? !(await invoke('path_exists', { path: job.worktreePath }).catch(() => false))
+              : true;
+            const hasChanges = changedFiles.length > 0;
+            const diffStat = !worktreeGone && hasChanges ? await computeDiffStat(job.cwd) : null;
+            return {
+              ...job,
+              status: hasChanges ? 'done' : 'interrupted',
+              changedFiles,
+              diffStat,
+              endedAt: job.endedAt || Date.now(),
+              worktreePath: worktreeGone ? null : job.worktreePath,
+              error: hasChanges ? job.error : 'Interrupted — recovered after the app was closed.',
+            };
+          })
+        );
+
+        if (!cancelled) setJobs(recovered);
+      } catch {
+        // Persistence unavailable — run in-memory only.
+      } finally {
+        hydratedRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Debounced write-back of the job list whenever it changes (post-hydration).
+  useEffect(() => {
+    if (!hydratedRef.current || !stateFileRef.current) return;
+    const file = stateFileRef.current;
+    const timer = setTimeout(() => {
+      invoke('write_file_content', { path: file, content: JSON.stringify(jobs) }).catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [jobs]);
+
   // Stream output + completion events from the backend.
   useEffect(() => {
     let unlistenOutput = null;
@@ -115,6 +233,11 @@ export function AgentJobsProvider({ children }) {
     let cancelled = false;
 
     const finalizeJob = async (job, exitCode, success) => {
+      // A cancelled (or otherwise no-longer-running) job can still emit a backend
+      // 'done' event when its process finally exits. Don't let that resurrect it
+      // to 'done' or fire a spurious report + notification.
+      const snapshot = jobsRef.current.find((j) => j.id === job.id);
+      if (snapshot && snapshot.status !== 'running') return;
       let changedFiles = [];
       try {
         const status = await invoke('run_git_command', {
@@ -126,6 +249,9 @@ export function AgentJobsProvider({ children }) {
         // Non-git cwd or command failed — leave changedFiles empty.
       }
       const endedAt = Date.now();
+      // Line-level diff stat, but only for isolated worktrees (never touch the
+      // user's real index/working tree).
+      const diffStat = job.worktreePath && changedFiles.length ? await computeDiffStat(job.cwd) : null;
       // Use the freshest job snapshot so the report captures the full output.
       const fresh = jobsRef.current.find((j) => j.id === job.id) || job;
       const reportPath = await writeJobReport(fresh, { changedFiles, success, exitCode, endedAt });
@@ -133,6 +259,7 @@ export function AgentJobsProvider({ children }) {
         status: success ? 'done' : 'failed',
         exitCode,
         changedFiles,
+        diffStat,
         endedAt,
         reportPath,
       });
@@ -174,6 +301,9 @@ export function AgentJobsProvider({ children }) {
   // so file changes stay quarantined until approved.
   const launchJob = useCallback(async ({ cli, prompt, label, repoPath, useWorktree = true }) => {
     const id = makeId();
+    const home = await invoke('get_home_dir').catch(() => null);
+    // Full output is mirrored here so it survives the in-memory cap and reloads.
+    const logPath = home ? `${home}/.lirah/jobs-logs/${id}.log` : null;
 
     // Resolve the git repo root (works even when repoPath is a subdirectory).
     // Null means repoPath is not inside a git repo.
@@ -198,7 +328,7 @@ export function AgentJobsProvider({ children }) {
       error = 'Not a git repository — running in-place (no isolation or diff review).';
     } else if (useWorktree) {
       try {
-        const home = await invoke('get_home_dir');
+        if (!home) throw new Error('home directory unavailable');
         worktreePath = `${home}/.lirah/worktrees/${basename(repoRoot)}-${id}`;
         await invoke('run_git_command', {
           repoPath: repoRoot,
@@ -227,13 +357,14 @@ export function AgentJobsProvider({ children }) {
       changedFiles: [],
       exitCode: null,
       error,
+      logPath,
       startedAt: Date.now(),
       endedAt: null,
     };
     setJobs((prev) => [job, ...prev]);
 
     try {
-      await invoke('run_agent_job', { jobId: id, cli, prompt, cwd });
+      await invoke('run_agent_job', { jobId: id, cli, prompt, cwd, logPath });
     } catch (e) {
       patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
     }
@@ -249,35 +380,92 @@ export function AgentJobsProvider({ children }) {
     patchJob(id, { status: 'cancelled', endedAt: Date.now() });
   }, [patchJob]);
 
-  // Apply a job's worktree changes back onto the main repo working tree.
+  // Apply a job's isolated worktree changes onto the current branch's working
+  // tree. With `threeWay`, overlapping edits are merged and left with conflict
+  // markers instead of hard-failing — the reconcile path relies on this so that
+  // several jobs touching the same files can be combined. Throws on failure so
+  // the caller can decide whether to keep the worktree around for inspection.
+  const applyJobPatch = useCallback(async (job, { threeWay = false } = {}) => {
+    // Stage everything (incl. new files) and produce a full binary patch.
+    await invoke('run_git_command', { repoPath: job.cwd, args: ['add', '-A'] });
+    const patch = await invoke('run_git_command', {
+      repoPath: job.cwd,
+      args: ['diff', '--cached', '--binary'],
+    });
+    if (!patch.trim()) return;
+    const home = await invoke('get_home_dir');
+    const patchFile = `${home}/.lirah/patches/job-${job.id}.patch`;
+    await invoke('write_file_content', { path: patchFile, content: patch });
+    const applyArgs = ['apply', '--whitespace=nowarn'];
+    if (threeWay) applyArgs.push('--3way');
+    applyArgs.push(patchFile);
+    await invoke('run_git_command', { repoPath: job.repoPath, args: applyArgs });
+  }, []);
+
+  // Apply a single job's worktree changes back onto the main repo working tree.
   const approveJob = useCallback(async (id) => {
     const job = jobsRef.current.find((j) => j.id === id);
-    if (!job || !job.worktreePath) return;
+    if (!job || !job.worktreePath) return { ok: false, error: 'No isolated changes to apply.' };
     try {
-      // Stage everything (incl. new files) and produce a full patch.
-      await invoke('run_git_command', { repoPath: job.cwd, args: ['add', '-A'] });
-      const patch = await invoke('run_git_command', {
-        repoPath: job.cwd,
-        args: ['diff', '--cached', '--binary'],
-      });
-      if (patch.trim()) {
-        const home = await invoke('get_home_dir');
-        const patchFile = `${home}/.lirah/patches/job-${id}.patch`;
-        await invoke('write_file_content', { path: patchFile, content: patch });
-        await invoke('run_git_command', {
-          repoPath: job.repoPath,
-          args: ['apply', '--whitespace=nowarn', patchFile],
-        });
-      }
+      await applyJobPatch(job);
       await invoke('run_git_command', {
         repoPath: job.repoPath,
         args: ['worktree', 'remove', '--force', job.worktreePath],
       });
       patchJob(id, { status: 'applied', worktreePath: null });
+      return { ok: true, label: job.label };
     } catch (e) {
       patchJob(id, { error: `Approve failed: ${e}` });
+      return { ok: false, error: String(e), label: job.label };
     }
-  }, [patchJob]);
+  }, [applyJobPatch, patchJob]);
+
+  // Launch a fresh copy of a finished/failed job with the exact same prompt,
+  // CLI and isolation — the common "tweak nothing, just run it again" path.
+  const rerunJob = useCallback(async (id) => {
+    const job = jobsRef.current.find((j) => j.id === id);
+    if (!job) return null;
+    return launchJob({
+      cli: job.cli,
+      prompt: job.prompt,
+      label: job.label,
+      repoPath: job.repoPath,
+      useWorktree: job.useWorktree,
+    });
+  }, [launchJob]);
+
+  // Reconcile several finished jobs into the current branch in one pass. Each
+  // job lives on its own worktree, so we 3-way merge them sequentially onto the
+  // working tree; overlapping edits land as conflict markers for the user to
+  // resolve. Cleanly-applied jobs get their worktree removed and are marked
+  // 'applied'; jobs that couldn't be applied are marked 'conflict' and keep
+  // their worktree so the isolated result stays reviewable. Returns a summary.
+  const reconcileJobs = useCallback(async (ids) => {
+    const idSet = new Set(ids);
+    const targets = jobsRef.current.filter(
+      (j) => idSet.has(j.id) && j.worktreePath && j.changedFiles.length > 0
+    );
+    const summary = { applied: 0, conflict: 0, jobs: [] };
+    for (const job of targets) {
+      try {
+        await applyJobPatch(job, { threeWay: true });
+        await invoke('run_git_command', {
+          repoPath: job.repoPath,
+          args: ['worktree', 'remove', '--force', job.worktreePath],
+        });
+        patchJob(job.id, { status: 'applied', worktreePath: null, error: null });
+        summary.applied += 1;
+        summary.jobs.push({ id: job.id, label: job.label, ok: true });
+      } catch (e) {
+        // 3-way apply writes conflict markers into the working tree even when it
+        // exits non-zero, so the changes are already present — flag for review.
+        patchJob(job.id, { status: 'conflict', error: `Reconcile conflict: ${e}` });
+        summary.conflict += 1;
+        summary.jobs.push({ id: job.id, label: job.label, ok: false, error: String(e) });
+      }
+    }
+    return summary;
+  }, [applyJobPatch, patchJob]);
 
   const discardJob = useCallback(async (id) => {
     const job = jobsRef.current.find((j) => j.id === id);
@@ -299,6 +487,8 @@ export function AgentJobsProvider({ children }) {
     launchJob,
     cancelJob,
     approveJob,
+    rerunJob,
+    reconcileJobs,
     discardJob,
     selectedContextFiles,
     registerContextFiles,

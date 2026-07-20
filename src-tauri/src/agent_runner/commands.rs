@@ -1,8 +1,10 @@
 use super::AgentJobStore;
+use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 #[derive(serde::Serialize, Clone)]
@@ -38,13 +40,27 @@ fn build_command(cli: &str) -> String {
         // opencode has no system-prompt flag — its autonomy rules are prepended
         // to the prompt in run_agent_job instead.
         "opencode" => "opencode run".to_string(),
-        // -p / --print = headless; `--permission-mode auto` lets Claude decide
-        // permissions itself so the job runs unattended (needs claude >= 2.1).
+        // -p / --print = headless; `--permission-mode auto` is the Shift+Tab
+        // "auto mode" — its classifier auto-approves safe actions. Note: auto
+        // still defers actions it deems risky to a human, so a job may stall on
+        // those in headless; the AUTONOMY_PROMPT (never ask, make assumptions,
+        // apply changes directly) pushes Claude to power through. Requires a
+        // claude version that lists `auto` under --permission-mode.
         // --append-system-prompt injects the autonomy rules as a system prompt.
         _ => format!(
             "claude -p --permission-mode auto --append-system-prompt '{}'",
             AUTONOMY_PROMPT
         ),
+    }
+}
+
+/// Append a single output line to a job's on-disk log, if logging is enabled.
+/// Best-effort — a failed write never interrupts the live stream.
+fn append_log(log: &Option<Arc<Mutex<File>>>, line: &str) {
+    if let Some(handle) = log {
+        if let Ok(mut file) = handle.lock() {
+            let _ = writeln!(file, "{}", line);
+        }
     }
 }
 
@@ -59,8 +75,23 @@ pub fn run_agent_job(
     cli: String,
     prompt: String,
     cwd: String,
+    log_path: Option<String>,
 ) -> Result<(), String> {
     let command = build_command(&cli);
+
+    // Persist the full output stream to disk so it survives the in-memory ring
+    // buffer cap and a webview reload — the run report and reattach both read it.
+    let log_file = log_path.as_deref().and_then(|p| {
+        if let Some(parent) = Path::new(p).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(p)
+            .ok()
+            .map(|f| Arc::new(Mutex::new(f)))
+    });
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
 
     // opencode can't take a system prompt via flag, so fold the autonomy rules
@@ -75,6 +106,17 @@ pub fn run_agent_job(
         .args(["-lc", &command])
         .current_dir(&cwd)
         .env("TERM", "xterm-256color")
+        // No human is attached to this job, so make sure nothing the agent runs
+        // can block waiting for interactive input. These stop the most common
+        // culprits: git credential/host prompts, interactive pagers, and tools
+        // that only go non-interactive when they detect a CI environment.
+        .env("GIT_TERMINAL_PROMPT", "0") // git never prompts for username/password
+        .env("GIT_ASKPASS", "true")      // no credential-helper GUI/tty popup
+        .env("SSH_ASKPASS", "true")      // ssh won't pop a passphrase prompt
+        .env("GIT_PAGER", "cat")         // git output isn't piped into a pager
+        .env("PAGER", "cat")             // ditto for anything else that pages
+        .env("CI", "1")                  // many CLIs suppress prompts when CI is set
+        .env("DEBIAN_FRONTEND", "noninteractive")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -103,9 +145,11 @@ pub fn run_agent_job(
     if let Some(stdout) = child.stdout.take() {
         let app = app_handle.clone();
         let id = job_id.clone();
+        let log = log_file.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
+                append_log(&log, &line);
                 let _ = app.emit(
                     "agent-job://output",
                     JobOutput {
@@ -122,9 +166,11 @@ pub fn run_agent_job(
     if let Some(stderr) = child.stderr.take() {
         let app = app_handle.clone();
         let id = job_id.clone();
+        let log = log_file.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().map_while(Result::ok) {
+                append_log(&log, &line);
                 let _ = app.emit(
                     "agent-job://output",
                     JobOutput {
@@ -187,9 +233,32 @@ pub fn cancel_agent_job(
         .map(|s| s.success())
         .unwrap_or(false);
 
+    // Escalate to SIGKILL for an agent that ignores SIGTERM, so a job can never
+    // get stuck in a half-cancelled state. Harmless if the group already exited.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        let _ = Command::new("kill")
+            .args(["-KILL", &format!("-{}", pid)])
+            .status();
+    });
+
     if let Ok(mut jobs) = store.jobs.lock() {
         jobs.remove(&job_id);
     }
 
     Ok(killed)
+}
+
+/// Return the ids of jobs still tracked as running in this process. The frontend
+/// uses this on startup to tell a live job (backend still streaming after a
+/// webview reload) apart from one orphaned by a full app restart.
+#[tauri::command]
+pub fn list_running_agent_jobs(
+    store: tauri::State<Arc<AgentJobStore>>,
+) -> Result<Vec<String>, String> {
+    let jobs = store
+        .jobs
+        .lock()
+        .map_err(|e| format!("Failed to lock job store: {}", e))?;
+    Ok(jobs.keys().cloned().collect())
 }

@@ -25,7 +25,7 @@ use opencode::{get_opencode_data_paths, get_opencode_sessions, get_opencode_sess
 use workspace::{create_workspace, delete_workspace, list_workspaces, open_workspace, close_workspace};
 use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
 use agent_runner::{create_agent_job_store};
-use agent_runner::commands::{run_agent_job, cancel_agent_job};
+use agent_runner::commands::{run_agent_job, cancel_agent_job, list_running_agent_jobs};
 
 pub struct InitialPath(pub Option<String>);
 
@@ -112,6 +112,7 @@ pub fn run(initial_path: Option<String>) {
             stop_fs_watcher,
             run_agent_job,
             cancel_agent_job,
+            list_running_agent_jobs,
             get_initial_path
         ])
         .setup(|app| {
