@@ -3,11 +3,11 @@ import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-r
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
 
-function formatElapsed(isoString) {
+function formatElapsed(isoString, now = Date.now()) {
   if (!isoString) return null;
   const start = new Date(isoString).getTime();
   if (Number.isNaN(start)) return null;
-  const secs = Math.floor((Date.now() - start) / 1000);
+  const secs = Math.floor((now - start) / 1000);
   if (secs < 5) return 'just now';
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
@@ -67,7 +67,7 @@ function AgentCard({ agent, onDismiss, now }) {
   const isRunning = agent.status === 'running';
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const elapsed = formatElapsed(agent.started_at);
+  const elapsed = formatElapsed(agent.started_at, now);
   const label = extractTaskLabel(agent.description);
   const summary = truncate(label);
 
