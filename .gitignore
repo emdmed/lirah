@@ -29,3 +29,8 @@ win-macOs-support.md
 /demos
 /demo
 .patterns
+
+# impeccable design-skill context (local only)
+.impeccable.md
+PRODUCT.md
+DESIGN.md
