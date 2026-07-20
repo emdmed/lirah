@@ -141,16 +141,16 @@ export function RightSidebar({ projectPath }) {
   const handleReconcile = async () => {
     if (selected.size === 0 || reconciling) return;
     setReconciling(true);
+    const count = selected.size;
     try {
-      const summary = await reconcileJobs([...selected]);
-      const applied = summary?.applied ?? 0;
-      const conflict = summary?.conflict ?? 0;
-      const parts = [`${applied} applied`];
-      if (conflict) parts.push(`${conflict} with conflicts`);
-      const where = `${branchName ? `${branchName} ` : ''}working tree (uncommitted)`;
-      const msg = `Reconciled ${parts.join(', ')} into ${where}`;
-      if (conflict) toast.warning(msg);
-      else if (applied) toast.success(msg);
+      const res = await reconcileJobs([...selected]);
+      if (res?.started) {
+        toast.info(
+          `Reconciling ${count} job${count === 1 ? '' : 's'} — an agent is merging and verifying; review it when it finishes`
+        );
+      } else if (res?.error) {
+        toast.error(`Reconcile failed: ${res.error}`);
+      }
     } finally {
       setReconciling(false);
       setSelected(new Set());
@@ -258,23 +258,28 @@ export function RightSidebar({ projectPath }) {
       )}
 
       {tab === 'jobs' && selected.size > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 shrink-0 border-b border-b-sidebar-border bg-sidebar-accent/40">
-          <button
-            onClick={handleReconcile}
-            disabled={reconciling}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60 cursor-pointer"
-          >
-            {reconciling ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitMerge className="h-3 w-3" />}
-            Reconcile {selected.size}
-            {branchName ? <span className="opacity-80 truncate">→ {branchName}</span> : null}
-          </button>
-          <button
-            onClick={() => setSelected(new Set())}
-            disabled={reconciling}
-            className="text-[10px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer disabled:opacity-60"
-          >
-            Clear
-          </button>
+        <div className="flex flex-col gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border bg-sidebar-accent/40">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60 cursor-pointer"
+              title="Merge the selected jobs with an agent that resolves conflicts and verifies the combined result"
+            >
+              {reconciling ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitMerge className="h-3 w-3" />}
+              Reconcile {selected.size}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              disabled={reconciling}
+              className="text-[10px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer disabled:opacity-60"
+            >
+              Clear
+            </button>
+          </div>
+          <span className="text-[10px] leading-snug text-muted-foreground/70">
+            An agent merges them in an isolated worktree and verifies the build. Review before applying.
+          </span>
         </div>
       )}
 
@@ -431,6 +436,15 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       {/* Meta line: cli, isolation, diff stat, status */}
       <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pl-[2.6rem] pr-2.5 text-[10px]">
         <span className="uppercase tracking-wide text-muted-foreground/80">{job.cli}</span>
+        {job.kind === 'reconcile' && (
+          <span className="inline-flex items-center gap-1.5">
+            <Dot />
+            <span className="inline-flex items-center gap-0.5 font-medium text-primary/80">
+              <GitMerge className="h-2.5 w-2.5" />
+              merge
+            </span>
+          </span>
+        )}
         {job.useWorktree && (
           <span className="inline-flex items-center gap-1.5">
             <Dot />

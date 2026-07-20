@@ -110,6 +110,41 @@ async function computeDiffStat(cwd) {
   }
 }
 
+// Build the instruction prompt for the semantic-reconcile agent. It receives
+// each source job's intent + touched files so it can integrate them coherently,
+// not just resolve textual conflicts.
+function buildReconcilePrompt(jobs, conflictJobs) {
+  const rel = (job, p) => (job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p);
+  const goals = jobs
+    .map((j, i) => {
+      const files = j.changedFiles.map((f) => rel(j, f.path)).join(', ') || '(no files)';
+      return `${i + 1}. ${j.label}\n   Files touched: ${files}\n   Goal: ${(j.prompt || '').trim()}`;
+    })
+    .join('\n\n');
+
+  const conflictNote = conflictJobs.length
+    ? `Some changes overlapped: the working tree contains git conflict markers (<<<<<<<, =======, >>>>>>>) from these jobs — ${conflictJobs
+        .map((j) => j.label)
+        .join(', ')}. Resolve every one of them.`
+    : 'The changes applied without textual conflicts, but they may still interact in ways that break the code.';
+
+  return [
+    `The current working tree already contains the combined changes of ${jobs.length} background agent job(s), merged together for integration.`,
+    conflictNote,
+    '',
+    'What each job was trying to accomplish:',
+    '',
+    goals,
+    '',
+    'Your task: reconcile everything into one coherent, correct result.',
+    '- Resolve all git conflict markers if any are present.',
+    '- Ensure the combined changes are logically consistent: no references to renamed or removed symbols, no duplicated or contradictory logic, no half-applied refactors across the merged edits.',
+    "- Run the project's typecheck/build (and fast tests if available) and fix anything the merge broke.",
+    '- Preserve every job\'s intent — integrate them all, do not drop or revert one to satisfy another.',
+    'End with a short summary of how you combined them and anything you had to change to make them fit.',
+  ].join('\n');
+}
+
 async function fireNotification(title, body) {
   try {
     if (typeof Notification === 'undefined') return;
@@ -385,7 +420,8 @@ export function AgentJobsProvider({ children }) {
   // markers instead of hard-failing — the reconcile path relies on this so that
   // several jobs touching the same files can be combined. Throws on failure so
   // the caller can decide whether to keep the worktree around for inspection.
-  const applyJobPatch = useCallback(async (job, { threeWay = false } = {}) => {
+  const applyJobPatch = useCallback(async (job, { threeWay = false, targetRepo } = {}) => {
+    const dest = targetRepo || job.repoPath;
     // Stage everything (incl. new files) and produce a full binary patch.
     await invoke('run_git_command', { repoPath: job.cwd, args: ['add', '-A'] });
     const patch = await invoke('run_git_command', {
@@ -399,7 +435,7 @@ export function AgentJobsProvider({ children }) {
     const applyArgs = ['apply', '--whitespace=nowarn'];
     if (threeWay) applyArgs.push('--3way');
     applyArgs.push(patchFile);
-    await invoke('run_git_command', { repoPath: job.repoPath, args: applyArgs });
+    await invoke('run_git_command', { repoPath: dest, args: applyArgs });
   }, []);
 
   // Apply a single job's worktree changes back onto the main repo working tree.
@@ -413,6 +449,24 @@ export function AgentJobsProvider({ children }) {
         args: ['worktree', 'remove', '--force', job.worktreePath],
       });
       patchJob(id, { status: 'applied', worktreePath: null });
+      // A reconcile job supersedes its sources — tear their worktrees down and
+      // drop them so their (now-integrated) changes can't be applied a second time.
+      if (job.sourceJobIds?.length) {
+        for (const srcId of job.sourceJobIds) {
+          const src = jobsRef.current.find((j) => j.id === srcId);
+          if (src?.worktreePath) {
+            try {
+              await invoke('run_git_command', {
+                repoPath: src.repoPath,
+                args: ['worktree', 'remove', '--force', src.worktreePath],
+              });
+            } catch {
+              // Worktree already gone.
+            }
+          }
+        }
+        setJobs((prev) => prev.filter((j) => !job.sourceJobIds.includes(j.id)));
+      }
       return { ok: true, label: job.label };
     } catch (e) {
       patchJob(id, { error: `Approve failed: ${e}` });
@@ -434,37 +488,81 @@ export function AgentJobsProvider({ children }) {
     });
   }, [launchJob]);
 
-  // Reconcile several finished jobs into the current branch in one pass. Each
-  // job lives on its own worktree, so we 3-way merge them sequentially onto the
-  // working tree; overlapping edits land as conflict markers for the user to
-  // resolve. Cleanly-applied jobs get their worktree removed and are marked
-  // 'applied'; jobs that couldn't be applied are marked 'conflict' and keep
-  // their worktree so the isolated result stays reviewable. Returns a summary.
+  // Semantically reconcile several finished jobs. Rather than blindly 3-way
+  // merging into the working tree (which resolves text but not logic), we:
+  //   1. spin up a dedicated integration worktree off the current branch,
+  //   2. seed it by 3-way applying every selected job's patch (overlaps become
+  //      conflict markers),
+  //   3. launch a headless agent in that worktree to resolve conflicts, make the
+  //      combined change coherent, and get the project building.
+  // The result surfaces as an ordinary reviewable job the user can Review/Apply.
+  // Returns { started, jobId } on success or { started:false, error }.
   const reconcileJobs = useCallback(async (ids) => {
     const idSet = new Set(ids);
     const targets = jobsRef.current.filter(
       (j) => idSet.has(j.id) && j.worktreePath && j.changedFiles.length > 0
     );
-    const summary = { applied: 0, conflict: 0, jobs: [] };
+    if (targets.length === 0) return { started: false, error: 'No reconcilable jobs selected.' };
+
+    // All jobs must share a repo to be integrated together.
+    const repoRoot = targets[0].repoPath;
+    if (targets.some((j) => j.repoPath !== repoRoot)) {
+      return { started: false, error: 'Selected jobs belong to different repositories.' };
+    }
+
+    const home = await invoke('get_home_dir').catch(() => null);
+    if (!home) return { started: false, error: 'Home directory unavailable.' };
+
+    const id = makeId();
+    const intPath = `${home}/.lirah/worktrees/reconcile-${basename(repoRoot)}-${id}`;
+    try {
+      await invoke('run_git_command', { repoPath: repoRoot, args: ['worktree', 'add', '--detach', intPath] });
+    } catch (e) {
+      return { started: false, error: `Could not create integration worktree: ${e}` };
+    }
+
+    // Seed the integration worktree with every job's changes. 3-way so overlaps
+    // land as conflict markers for the agent to resolve instead of hard-failing.
+    const conflicts = [];
     for (const job of targets) {
       try {
-        await applyJobPatch(job, { threeWay: true });
-        await invoke('run_git_command', {
-          repoPath: job.repoPath,
-          args: ['worktree', 'remove', '--force', job.worktreePath],
-        });
-        patchJob(job.id, { status: 'applied', worktreePath: null, error: null });
-        summary.applied += 1;
-        summary.jobs.push({ id: job.id, label: job.label, ok: true });
-      } catch (e) {
-        // 3-way apply writes conflict markers into the working tree even when it
-        // exits non-zero, so the changes are already present — flag for review.
-        patchJob(job.id, { status: 'conflict', error: `Reconcile conflict: ${e}` });
-        summary.conflict += 1;
-        summary.jobs.push({ id: job.id, label: job.label, ok: false, error: String(e) });
+        await applyJobPatch(job, { threeWay: true, targetRepo: intPath });
+      } catch {
+        conflicts.push(job);
       }
     }
-    return summary;
+
+    const logPath = `${home}/.lirah/jobs-logs/${id}.log`;
+    const prompt = buildReconcilePrompt(targets, conflicts);
+    const job = {
+      id,
+      kind: 'reconcile',
+      cli: 'claude',
+      label: `Reconcile ${targets.length} job${targets.length === 1 ? '' : 's'}`,
+      prompt,
+      status: 'running',
+      repoPath: repoRoot,
+      cwd: intPath,
+      worktreePath: intPath,
+      useWorktree: true,
+      output: [],
+      changedFiles: [],
+      exitCode: null,
+      error: null,
+      logPath,
+      sourceJobIds: targets.map((t) => t.id),
+      startedAt: Date.now(),
+      endedAt: null,
+    };
+    setJobs((prev) => [job, ...prev]);
+
+    try {
+      await invoke('run_agent_job', { jobId: id, cli: 'claude', prompt, cwd: intPath, logPath });
+    } catch (e) {
+      patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
+      return { started: false, error: String(e) };
+    }
+    return { started: true, jobId: id, seededConflicts: conflicts.length };
   }, [applyJobPatch, patchJob]);
 
   const discardJob = useCallback(async (id) => {
