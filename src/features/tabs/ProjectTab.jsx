@@ -540,9 +540,16 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd, isActive);
 
-  // Show toast when a new release is available
+  // Show toast when a new release is available — but only once per version.
+  // useUpdateChecker runs in every ProjectTab and polls every 4h, so without
+  // this guard the toast re-fires on each tab, remount, and interval forever.
   useEffect(() => {
     if (!availableUpdate) return;
+    const NOTIFIED_KEY = 'nevo-terminal:update-notified-version';
+    try {
+      if (localStorage.getItem(NOTIFIED_KEY) === availableUpdate.version) return;
+      localStorage.setItem(NOTIFIED_KEY, availableUpdate.version);
+    } catch { /* ignore */ }
     toast.info(`Update available: ${availableUpdate.version}`, {
       duration: 15000,
       action: {

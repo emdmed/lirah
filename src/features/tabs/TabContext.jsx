@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 const TabContext = createContext(null);
 
@@ -35,15 +35,15 @@ export function TabProvider({ children }) {
     return tabs[0]?.id || null;
   });
 
-  // Persist tabs to localStorage (debounced)
-  const persistTimer = useRef(null);
+  // Persist tabs to localStorage synchronously on every change.
+  // A debounce here loses state: the custom TitleBar close button calls
+  // appWindow.close() immediately, destroying the webview before a deferred
+  // write can flush — so tab edits made right before quitting never persist.
   useEffect(() => {
-    clearTimeout(persistTimer.current);
-    persistTimer.current = setTimeout(() => {
+    try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
       localStorage.setItem(STORAGE_KEY + ':active', activeTabId || '');
-    }, 500);
-    return () => clearTimeout(persistTimer.current);
+    } catch { /* ignore */ }
   }, [tabs, activeTabId]);
 
   const addTab = useCallback((projectPath) => {
