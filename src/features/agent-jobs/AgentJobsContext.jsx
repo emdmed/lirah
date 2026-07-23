@@ -110,6 +110,49 @@ async function computeDiffStat(cwd) {
   }
 }
 
+// Files worth type-checking as a post-merge gate. tsc follows imports, so
+// checking a changed file also catches references to symbols another job
+// renamed or removed elsewhere.
+const TYPECHECK_EXT = /\.(ts|tsx|js|jsx)$/i;
+const TYPECHECK_MAX_FILES = 25;
+
+// Path of a job's change relative to the repo root, given its cwd (worktree).
+function relToRepo(job, p) {
+  return job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p;
+}
+
+// Run tsc over a set of changed files and aggregate. `files` is an array of
+// { path } with ABSOLUTE paths (in whatever tree you want checked). Missing
+// files (deletions), non-JS/TS files, and a missing tsc are skipped rather than
+// treated as failures — this gate only fails on real type errors. Capped so a
+// huge job can't spawn hundreds of tsc runs; the cap is reported, never silent.
+async function typecheckChangedFiles(changedFiles) {
+  const candidates = (changedFiles || [])
+    .map((f) => f.path)
+    .filter((p) => TYPECHECK_EXT.test(p));
+  const checked = candidates.slice(0, TYPECHECK_MAX_FILES);
+  let errorCount = 0;
+  const failed = [];
+  for (const path of checked) {
+    try {
+      const res = await invoke('check_file_types', { filePath: path });
+      if (res && res.error_count > 0) {
+        errorCount += res.error_count;
+        failed.push({ path, errorCount: res.error_count });
+      }
+    } catch {
+      // File gone, unsupported type, or tsc not installed — skip, don't fail.
+    }
+  }
+  return {
+    status: 'done',
+    checked: checked.length,
+    skipped: candidates.length - checked.length,
+    errorCount,
+    failed,
+  };
+}
+
 // Build the instruction prompt for the semantic-reconcile agent. It receives
 // each source job's intent + touched files so it can integrate them coherently,
 // not just resolve textual conflicts.
@@ -334,7 +377,7 @@ export function AgentJobsProvider({ children }) {
 
   // Launch a background job. If useWorktree, run it in an isolated git worktree
   // so file changes stay quarantined until approved.
-  const launchJob = useCallback(async ({ cli, prompt, label, repoPath, useWorktree = true }) => {
+  const launchJob = useCallback(async ({ cli, prompt, label, repoPath, useWorktree = true, intendedFiles = [] }) => {
     const id = makeId();
     const home = await invoke('get_home_dir').catch(() => null);
     // Full output is mirrored here so it survives the in-memory cap and reloads.
@@ -388,6 +431,9 @@ export function AgentJobsProvider({ children }) {
       cwd,
       worktreePath,
       useWorktree: !!worktreePath,
+      // Files the user flagged as modifiable — used to warn when a later job's
+      // scope overlaps this one's before it's even launched.
+      intendedFiles: Array.isArray(intendedFiles) ? intendedFiles : [],
       output: [],
       changedFiles: [],
       exitCode: null,
@@ -439,10 +485,24 @@ export function AgentJobsProvider({ children }) {
   }, []);
 
   // Apply a single job's worktree changes back onto the main repo working tree.
-  const approveJob = useCallback(async (id) => {
+  // Gated on a typecheck of the isolated result: a job (or a reconcile result)
+  // that doesn't type-check is blocked before it can touch the working tree,
+  // unless the caller forces it through. This is the "don't trust per-worktree
+  // green — verify the merged result" gate; for a reconcile job the worktree IS
+  // the merged tree, so this checks exactly what will land.
+  const approveJob = useCallback(async (id, { force = false } = {}) => {
     const job = jobsRef.current.find((j) => j.id === id);
     if (!job || !job.worktreePath) return { ok: false, error: 'No isolated changes to apply.' };
+    let typecheck = null;
     try {
+      if (!force) {
+        patchJob(id, { typecheck: { status: 'checking' } });
+        typecheck = await typecheckChangedFiles(job.changedFiles);
+        patchJob(id, { typecheck });
+        if (typecheck.errorCount > 0) {
+          return { ok: false, blocked: true, typecheck, label: job.label };
+        }
+      }
       await applyJobPatch(job);
       await invoke('run_git_command', {
         repoPath: job.repoPath,
@@ -467,7 +527,7 @@ export function AgentJobsProvider({ children }) {
         }
         setJobs((prev) => prev.filter((j) => !job.sourceJobIds.includes(j.id)));
       }
-      return { ok: true, label: job.label };
+      return { ok: true, label: job.label, typecheck, forced: force };
     } catch (e) {
       patchJob(id, { error: `Approve failed: ${e}` });
       return { ok: false, error: String(e), label: job.label };
@@ -485,6 +545,7 @@ export function AgentJobsProvider({ children }) {
       label: job.label,
       repoPath: job.repoPath,
       useWorktree: job.useWorktree,
+      intendedFiles: job.intendedFiles,
     });
   }, [launchJob]);
 
@@ -521,6 +582,22 @@ export function AgentJobsProvider({ children }) {
       return { started: false, error: `Could not create integration worktree: ${e}` };
     }
 
+    // Detect files two or more jobs both touched BEFORE merging — a 3-way apply
+    // can silently auto-merge overlapping hunks, so textual-conflict detection
+    // alone under-reports collisions. This is the ground truth for "which jobs
+    // stepped on each other", surfaced loudly rather than smoothed over.
+    const touchedBy = new Map(); // repo-relative path -> [job labels]
+    for (const job of targets) {
+      for (const f of job.changedFiles) {
+        const rel = relToRepo(job, f.path);
+        if (!touchedBy.has(rel)) touchedBy.set(rel, []);
+        touchedBy.get(rel).push(job.label);
+      }
+    }
+    const overlaps = [...touchedBy.entries()]
+      .filter(([, labels]) => labels.length > 1)
+      .map(([path, labels]) => ({ path, labels }));
+
     // Seed the integration worktree with every job's changes. 3-way so overlaps
     // land as conflict markers for the agent to resolve instead of hard-failing.
     const conflicts = [];
@@ -530,6 +607,13 @@ export function AgentJobsProvider({ children }) {
       } catch {
         conflicts.push(job);
       }
+    }
+
+    // Mark the source jobs that couldn't apply cleanly so the user can see which
+    // upstream jobs collided (the 'conflict' status is otherwise never set).
+    if (conflicts.length) {
+      const conflictIds = new Set(conflicts.map((j) => j.id));
+      setJobs((prev) => prev.map((j) => (conflictIds.has(j.id) ? { ...j, status: 'conflict' } : j)));
     }
 
     const logPath = `${home}/.lirah/jobs-logs/${id}.log`;
@@ -551,6 +635,10 @@ export function AgentJobsProvider({ children }) {
       error: null,
       logPath,
       sourceJobIds: targets.map((t) => t.id),
+      // Loud conflict record: files two+ jobs both edited, and jobs whose patch
+      // wouldn't apply cleanly. Rendered on the card so nothing is smoothed over.
+      overlaps,
+      conflictLabels: conflicts.map((j) => j.label),
       startedAt: Date.now(),
       endedAt: null,
     };
@@ -562,8 +650,26 @@ export function AgentJobsProvider({ children }) {
       patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
       return { started: false, error: String(e) };
     }
-    return { started: true, jobId: id, seededConflicts: conflicts.length };
+    return {
+      started: true,
+      jobId: id,
+      seededConflicts: conflicts.length,
+      overlapCount: overlaps.length,
+    };
   }, [applyJobPatch, patchJob]);
+
+  // Archive: tuck a finished job out of the main list without losing anything —
+  // worktree, report and log are untouched, so an archived job can still be
+  // reviewed, applied or re-run later from the archived section.
+  const archiveJob = useCallback((id) => {
+    const job = jobsRef.current.find((j) => j.id === id);
+    if (!job || job.status === 'running') return;
+    patchJob(id, { archived: true, archivedAt: Date.now() });
+  }, [patchJob]);
+
+  const unarchiveJob = useCallback((id) => {
+    patchJob(id, { archived: false, archivedAt: null });
+  }, [patchJob]);
 
   const discardJob = useCallback(async (id) => {
     const job = jobsRef.current.find((j) => j.id === id);
@@ -580,14 +686,38 @@ export function AgentJobsProvider({ children }) {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, []);
 
+  // Find existing jobs in the same repo whose scope (files they intend to touch,
+  // or already changed) overlaps a prospective set of repo-relative paths. Used
+  // to warn before launching a job that would collide with a pending one, so
+  // overlap is partitioned away up front instead of reconciled after the fact.
+  const findOverlappingJobs = useCallback((repoPath, relativePaths) => {
+    if (!repoPath || !relativePaths?.length) return [];
+    const want = new Set(relativePaths);
+    const active = new Set(['running', 'done', 'interrupted', 'conflict']);
+    const out = [];
+    for (const job of jobs) {
+      if (job.repoPath !== repoPath || !active.has(job.status)) continue;
+      const scope = new Set([
+        ...(job.intendedFiles || []),
+        ...(job.changedFiles || []).map((f) => relToRepo(job, f.path)),
+      ]);
+      const files = [...want].filter((p) => scope.has(p));
+      if (files.length) out.push({ id: job.id, label: job.label, status: job.status, files });
+    }
+    return out;
+  }, [jobs]);
+
   const value = {
     jobs,
     launchJob,
+    findOverlappingJobs,
     cancelJob,
     approveJob,
     rerunJob,
     reconcileJobs,
     discardJob,
+    archiveJob,
+    unarchiveJob,
     selectedContextFiles,
     registerContextFiles,
   };

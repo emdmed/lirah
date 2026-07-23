@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
+import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -59,7 +59,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   const { getGroupsForProject } = useFileGroups();
   const { templates } = usePromptTemplates();
   const { getPinnedPaths } = usePinnedFiles();
-  const { launchJob, selectedContextFiles } = useAgentJobs();
+  const { launchJob, selectedContextFiles, findOverlappingJobs } = useAgentJobs();
 
   const groups = useMemo(
     () => (projectPath ? getGroupsForProject(projectPath) : []),
@@ -136,6 +136,22 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   const canRun =
     !!projectPath && (!!template || checkedFiles.length > 0 || instructions.trim().length > 0);
 
+  // Files this job is allowed to change (reference/example files excluded).
+  const modifiablePaths = useMemo(
+    () =>
+      checkedFiles
+        .filter((f) => f.state !== 'do-not-modify' && f.state !== 'use-as-example')
+        .map((f) => f.relativePath),
+    [checkedFiles]
+  );
+
+  // Warn when another pending/running job in this repo already owns some of the
+  // same files — the collision the reconciler would otherwise have to untangle.
+  const overlaps = useMemo(
+    () => (open ? findOverlappingJobs(projectPath, modifiablePaths) : []),
+    [open, findOverlappingJobs, projectPath, modifiablePaths]
+  );
+
   const toggleFile = (relativePath) => {
     setChecked((prev) => {
       const next = new Set(prev);
@@ -170,6 +186,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
       label,
       repoPath: projectPath,
       useWorktree,
+      intendedFiles: modifiablePaths,
     });
     onOpenChange(false);
   };
@@ -310,6 +327,26 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             </button>
           </div>
         </div>
+
+        {overlaps.length > 0 && (
+          <div className="shrink-0 rounded border border-[var(--color-status-warning)]/40 bg-[var(--color-status-warning)]/10 px-2.5 py-2 text-[10px] leading-snug">
+            <div className="flex items-center gap-1.5 font-medium text-[var(--color-status-warning)]">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              Overlaps {overlaps.length} pending job{overlaps.length === 1 ? '' : 's'}
+            </div>
+            <div className="mt-1 flex flex-col gap-1 text-muted-foreground">
+              {overlaps.map((o) => (
+                <div key={o.id} className="truncate">
+                  <span className="text-foreground/80">{o.label}</span>{' '}
+                  <span className="opacity-70">({o.status})</span> — {o.files.join(', ')}
+                </div>
+              ))}
+            </div>
+            <div className="mt-1 text-muted-foreground/70">
+              Both jobs will edit these files; you'll have to reconcile them. Consider splitting the work by file instead.
+            </div>
+          </div>
+        )}
 
         <DialogFooter className="shrink-0">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>

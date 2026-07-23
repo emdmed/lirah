@@ -15,7 +15,12 @@ import {
   RotateCcw,
   ChevronRight,
   ChevronDown,
+  AlertTriangle,
+  Copy,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
 import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
@@ -67,7 +72,7 @@ function isReconcilable(job) {
 }
 
 export function RightSidebar({ projectPath }) {
-  const { jobs, cancelJob, approveJob, rerunJob, reconcileJobs, discardJob } = useAgentJobs();
+  const { jobs, cancelJob, approveJob, rerunJob, reconcileJobs, discardJob, archiveJob, unarchiveJob } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const toast = useToast();
   const branchName = useBranchName(projectPath);
@@ -79,6 +84,11 @@ export function RightSidebar({ projectPath }) {
   const [reportPath, setReportPath] = useState(null); // markdown report being viewed
   const [selected, setSelected] = useState(() => new Set()); // job ids picked for reconcile
   const [reconciling, setReconciling] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Archived jobs are stored alongside the rest but kept out of immediate sight.
+  const visibleJobs = jobs.filter((j) => !j.archived);
+  const archivedJobs = jobs.filter((j) => j.archived);
 
   // User-resizable panel width — persisted so it survives reloads. A narrow
   // fixed panel is what made the cards feel squashed.
@@ -125,7 +135,7 @@ export function RightSidebar({ projectPath }) {
   useEffect(() => {
     setSelected((prev) => {
       if (prev.size === 0) return prev;
-      const valid = new Set(jobs.filter(isReconcilable).map((j) => j.id));
+      const valid = new Set(jobs.filter((j) => isReconcilable(j) && !j.archived).map((j) => j.id));
       const next = new Set([...prev].filter((id) => valid.has(id)));
       return next.size === prev.size ? prev : next;
     });
@@ -145,9 +155,19 @@ export function RightSidebar({ projectPath }) {
     try {
       const res = await reconcileJobs([...selected]);
       if (res?.started) {
-        toast.info(
-          `Reconciling ${count} job${count === 1 ? '' : 's'} — an agent is merging and verifying; review it when it finishes`
-        );
+        const collisions = (res.overlapCount || 0) + (res.seededConflicts || 0);
+        if (collisions > 0) {
+          const bits = [];
+          if (res.overlapCount) bits.push(`${res.overlapCount} file${res.overlapCount === 1 ? '' : 's'} edited by 2+ jobs`);
+          if (res.seededConflicts) bits.push(`${res.seededConflicts} job${res.seededConflicts === 1 ? '' : 's'} conflicted on apply`);
+          toast.warning(
+            `Reconciling ${count} jobs — ${bits.join(', ')}. An agent is resolving them; review carefully before applying.`
+          );
+        } else {
+          toast.info(
+            `Reconciling ${count} job${count === 1 ? '' : 's'} — no file overlaps; an agent is verifying the combined result`
+          );
+        }
       } else if (res?.error) {
         toast.error(`Reconcile failed: ${res.error}`);
       }
@@ -157,12 +177,20 @@ export function RightSidebar({ projectPath }) {
     }
   };
 
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, force = false) => {
     const count = jobs.find((j) => j.id === id)?.changedFiles.length ?? 0;
-    const result = await approveJob(id);
-    if (result?.ok) {
+    const result = await approveJob(id, { force });
+    if (result?.blocked) {
+      const n = result.typecheck?.errorCount ?? 0;
+      toast.error(
+        `Not applied — ${n} type error${n === 1 ? '' : 's'} in the changes. Fix them in the worktree, or use "Apply anyway".`
+      );
+    } else if (result?.ok) {
       const files = `${count} file${count === 1 ? '' : 's'}`;
-      toast.success(`Applied ${files} into your ${branchName ? `${branchName} ` : ''}working tree — uncommitted`);
+      const suffix = result.forced ? ' (typecheck skipped)' : '';
+      toast.success(
+        `Applied ${files} into your ${branchName ? `${branchName} ` : ''}working tree — uncommitted${suffix}`
+      );
     } else if (result?.error) {
       toast.error(`Apply failed: ${result.error}`);
     }
@@ -171,6 +199,31 @@ export function RightSidebar({ projectPath }) {
   const handleRerun = async (id) => {
     await rerunJob(id);
     toast.info('Re-running job');
+  };
+
+  // Copy just the LLM output — no prompt, no metadata — so it can be pasted as a
+  // prompt elsewhere. Prefer the full on-disk log; fall back to the in-memory
+  // buffer (capped, so long jobs may be truncated).
+  const handleCopyOutput = async (job) => {
+    try {
+      let output = job.output.map((o) => o.chunk).join('\n');
+      if (job.logPath) {
+        try {
+          const full = await invoke('read_file_content', { path: job.logPath });
+          if (full.trim()) output = full.replace(/\n$/, '');
+        } catch {
+          // Log file missing — fall back to the in-memory buffer above.
+        }
+      }
+      if (!output.trim()) {
+        toast.info('No output to copy');
+        return;
+      }
+      await navigator.clipboard.writeText(output);
+      toast.success('Copied output to clipboard');
+    } catch (err) {
+      toast.error(`Copy failed: ${err}`);
+    }
   };
 
   // Auto-expand + jump to Jobs when a new job is launched.
@@ -286,33 +339,78 @@ export function RightSidebar({ projectPath }) {
       <div className="flex-1 overflow-y-auto min-h-0 py-1.5">
         {tab === 'agents' ? (
           <SubagentList />
-        ) : jobs.length === 0 ? (
-          <div className="px-4 py-8 text-center">
-            <Bot size={18} className="mx-auto mb-2 text-muted-foreground/30" />
-            <div className="text-[11px] text-muted-foreground/60">No background jobs</div>
-            <div className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground/40">
-              Dispatch a headless agent run with “New background job”.
-            </div>
-          </div>
         ) : (
-          <div className="flex flex-col gap-1.5 px-2">
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                now={now}
-                selectable={isReconcilable(job)}
-                selected={selected.has(job.id)}
-                onToggleSelect={() => toggleSelect(job.id)}
-                onCancel={() => cancelJob(job.id)}
-                onApprove={() => handleApprove(job.id)}
-                onRerun={() => handleRerun(job.id)}
-                onDiscard={() => discardJob(job.id)}
-                onReview={() => setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null })}
-                onReport={() => setReportPath(job.reportPath)}
-              />
-            ))}
-          </div>
+          <>
+            {visibleJobs.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <Bot size={18} className="mx-auto mb-2 text-muted-foreground/30" />
+                <div className="text-[11px] text-muted-foreground/60">
+                  {archivedJobs.length > 0 ? 'No active jobs' : 'No background jobs'}
+                </div>
+                <div className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground/40">
+                  Dispatch a headless agent run with “New background job”.
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5 px-2">
+                {visibleJobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    now={now}
+                    selectable={isReconcilable(job)}
+                    selected={selected.has(job.id)}
+                    onToggleSelect={() => toggleSelect(job.id)}
+                    onCancel={() => cancelJob(job.id)}
+                    onApprove={(force) => handleApprove(job.id, force)}
+                    onRerun={() => handleRerun(job.id)}
+                    onDiscard={() => discardJob(job.id)}
+                    onArchive={() => archiveJob(job.id)}
+                    onReview={() => setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null })}
+                    onReport={() => setReportPath(job.reportPath)}
+                    onCopyOutput={() => handleCopyOutput(job)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Archived jobs: stored but out of immediate sight, browsable on demand. */}
+            {archivedJobs.length > 0 && (
+              <div className="mt-2 border-t border-t-sidebar-border/60 pt-1">
+                <button
+                  onClick={() => setShowArchived((v) => !v)}
+                  className="flex w-full items-center gap-1 px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/70 hover:text-sidebar-foreground cursor-pointer transition-colors"
+                >
+                  {showArchived ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  <Archive className="h-3 w-3" />
+                  Archived
+                  <span className="tabular-nums">{archivedJobs.length}</span>
+                </button>
+                {showArchived && (
+                  <div className="flex flex-col gap-1.5 px-2 pt-0.5 opacity-80">
+                    {archivedJobs.map((job) => (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        now={now}
+                        selectable={false}
+                        selected={false}
+                        onToggleSelect={() => {}}
+                        onCancel={() => cancelJob(job.id)}
+                        onApprove={(force) => handleApprove(job.id, force)}
+                        onRerun={() => handleRerun(job.id)}
+                        onDiscard={() => discardJob(job.id)}
+                        onUnarchive={() => unarchiveJob(job.id)}
+                        onReview={() => setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null })}
+                        onReport={() => setReportPath(job.reportPath)}
+                        onCopyOutput={() => handleCopyOutput(job)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -370,7 +468,7 @@ function Dot() {
   return <span className="text-muted-foreground/30">·</span>;
 }
 
-function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onApprove, onRerun, onDiscard, onReview, onReport }) {
+function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onApprove, onRerun, onDiscard, onArchive, onUnarchive, onReview, onReport, onCopyOutput }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
@@ -388,6 +486,10 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
   // A dedicated status chip for anything that isn't a clean running/done state.
   const showStatusChip = !isRunning && job.status !== 'done';
   const canApprove = isDone && !!job.worktreePath && changedCount > 0;
+  const tc = job.typecheck;
+  const tcChecking = tc?.status === 'checking';
+  const tcErrors = tc?.status === 'done' && tc.errorCount > 0;
+  const tcClean = tc?.status === 'done' && tc.errorCount === 0;
 
   // Keep the expanded log pinned to the newest output while a job streams.
   useEffect(() => {
@@ -474,7 +576,67 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
             </span>
           </span>
         )}
+        {tcChecking && (
+          <span className="inline-flex items-center gap-1.5">
+            <Dot />
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              typecheck
+            </span>
+          </span>
+        )}
+        {tcErrors && (
+          <span className="inline-flex items-center gap-1.5">
+            <Dot />
+            <span
+              className="inline-flex items-center gap-0.5 font-medium"
+              style={{ color: 'var(--color-destructive)' }}
+              title={tc.failed.map((f) => `${f.path.split('/').pop()}: ${f.errorCount}`).join('\n')}
+            >
+              <AlertTriangle className="h-2.5 w-2.5" />
+              {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}
+            </span>
+          </span>
+        )}
+        {tcClean && (
+          <span className="inline-flex items-center gap-1.5">
+            <Dot />
+            <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-status-success)' }}>
+              <Check className="h-2.5 w-2.5" />
+              types ok
+            </span>
+          </span>
+        )}
       </div>
+
+      {/* Loud conflict record for a reconcile job: which files 2+ jobs edited. */}
+      {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
+        <div className="mt-1.5 mx-2.5 rounded-sm border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[10px] leading-snug">
+          <div className="flex items-center gap-1 font-medium text-[var(--color-status-warning)]">
+            <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+            {job.overlaps?.length > 0
+              ? `${job.overlaps.length} file${job.overlaps.length === 1 ? '' : 's'} edited by multiple jobs`
+              : 'Merge conflicts on apply'}
+          </div>
+          {job.overlaps?.length > 0 && (
+            <div className="mt-1 flex flex-col gap-0.5 font-mono text-muted-foreground/80">
+              {job.overlaps.slice(0, 6).map((o) => (
+                <div key={o.path} className="truncate" title={`${o.path} — ${o.labels.join(', ')}`}>
+                  {o.path}
+                </div>
+              ))}
+              {job.overlaps.length > 6 && (
+                <div className="text-muted-foreground/60">+{job.overlaps.length - 6} more</div>
+              )}
+            </div>
+          )}
+          {job.conflictLabels?.length > 0 && (
+            <div className="mt-1 text-muted-foreground/70">
+              Textual conflict from: {job.conflictLabels.join(', ')}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Collapsed preview: last couple of output lines */}
       {lastLines.length > 0 && (
@@ -527,17 +689,31 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         )}
         {canApprove && (
           <PrimaryAction
-            icon={Check}
-            label="Apply"
-            onClick={onApprove}
-            variant="primary"
-            title="Apply these changes into your working tree — uncommitted, so you review and commit them yourself"
+            icon={tcErrors ? AlertTriangle : Check}
+            label={tcChecking ? 'Checking…' : tcErrors ? 'Apply anyway' : 'Apply'}
+            onClick={() => onApprove(tcErrors)}
+            disabled={tcChecking}
+            variant={tcErrors ? 'danger' : 'primary'}
+            title={
+              tcErrors
+                ? 'These changes have type errors — applying anyway skips the check. Review before committing.'
+                : 'Apply these changes into your working tree — uncommitted, so you review and commit them yourself'
+            }
           />
         )}
 
         <div className="ml-auto flex items-center gap-0.5">
           {isDone && <IconAction icon={RotateCcw} title="Re-run job" onClick={onRerun} />}
           {job.reportPath && <IconAction icon={FileText} title="View run report" onClick={onReport} />}
+          {isDone && (job.logPath || job.output.length > 0) && (
+            <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={onCopyOutput} />
+          )}
+          {!isRunning && onArchive && (
+            <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={onArchive} />
+          )}
+          {onUnarchive && (
+            <IconAction icon={ArchiveRestore} title="Restore to the jobs list" onClick={onUnarchive} />
+          )}
           {!isRunning && (
             <IconAction
               icon={Trash2}
@@ -552,13 +728,14 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
   );
 }
 
-function PrimaryAction({ icon: Icon, label, onClick, variant = 'outline', title }) {
+function PrimaryAction({ icon: Icon, label, onClick, variant = 'outline', title, disabled = false }) {
   return (
     <button
       onClick={onClick}
       title={title}
+      disabled={disabled}
       className={cn(
-        'flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-2 py-1 text-[11px] font-medium cursor-pointer transition-colors',
+        'flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-2 py-1 text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
         variant === 'primary' && 'bg-primary text-primary-foreground hover:opacity-90',
         variant === 'outline' && 'border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent',
         variant === 'danger' && 'border border-destructive/40 text-destructive hover:bg-destructive/10'
