@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, X, Pin, PinOff } from 'lucide-react';
 import { RetroSpinner } from '../../components/ui/RetroSpinner';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
+import './markdown.css';
 
 const REMARK_PLUGINS = [remarkGfm];
 const EMPTY_FILES = [];
@@ -165,7 +166,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-auto px-6 py-4">
+      <div className="flex-1 min-h-0 overflow-auto px-8 py-6">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <RetroSpinner size={24} lineWidth={2} />
@@ -176,20 +177,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
             <p className="text-xs mt-1 text-muted-foreground">{error}</p>
           </div>
         ) : (
-          <div className="prose prose-invert prose-sm max-w-none
-            prose-headings:text-foreground prose-headings:font-semibold prose-headings:border-b prose-headings:border-sketch prose-headings:pb-1
-            prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-            prose-p:text-muted-foreground prose-p:leading-relaxed
-            prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-            prose-strong:text-foreground
-            prose-code:text-primary prose-code:bg-muted/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none
-            prose-pre:bg-muted/30 prose-pre:border prose-pre:border-sketch prose-pre:rounded
-            prose-blockquote:border-primary/50 prose-blockquote:text-muted-foreground
-            prose-li:text-muted-foreground
-            prose-table:text-sm prose-th:text-foreground prose-td:text-muted-foreground prose-th:border-sketch prose-td:border-sketch
-            prose-hr:border-sketch
-            [&_input[type=checkbox]]:mr-2 [&_input[type=checkbox]]:accent-primary
-          ">
+          <div className="markdown-body">
             <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{content}</ReactMarkdown>
           </div>
         )}

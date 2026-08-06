@@ -51,6 +51,15 @@ import { useUpdateChecker } from "../../hooks/useUpdateChecker";
 import { useToast } from "../toast";
 import { useAgentJobs } from "../agent-jobs/agent-jobs";
 
+// currentPath doubles as sidebar status text ('Waiting for terminal...',
+// 'Error loading directory') before the terminal session exists. Terminals
+// spawned with that text as projectDir fall back to the home dir, and the
+// cwd monitor then persists home over the tab's restored path — so anything
+// that treats currentPath as a filesystem path must go through this guard.
+function isRealPath(p) {
+  return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
+}
+
 export function ProjectTab({ projectPath, isActive, tabId }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
@@ -123,6 +132,10 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
       setCurrentPath(projectPath);
     }
   }, [projectPath]);
+
+  // Directory terminals spawn in: currentPath once it holds a real path,
+  // otherwise the tab's persisted project path.
+  const resolvedProjectDir = isRealPath(currentPath) ? currentPath : projectPath;
 
   const patterns = usePatterns(currentPath);
 
@@ -882,7 +895,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               onClose={secondary.closeSecondaryTerminal}
               onFocusChange={secondary.setSecondaryFocused}
               onSessionReady={secondary.setSecondarySessionId}
-              projectDir={secondary.projectDirOverride || currentPath}
+              projectDir={secondary.projectDirOverride || resolvedProjectDir}
               fullscreen={secondary.secondaryFullscreen}
               onToggleFullscreen={() => secondary.setSecondaryFullscreen(f => !f)}
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
@@ -901,7 +914,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
           onToggleGitFilter={treeView.handleToggleGitFilter}
           sandboxEnabled={settings.sandboxEnabled}
           networkIsolation={settings.networkIsolation}
-          projectDir={currentPath}
+          projectDir={resolvedProjectDir}
           onSandboxFailed={() => settings.setSandboxFailed(true)}
         />
         <GitDiffDialog
