@@ -1,6 +1,7 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import { CompactSectionsDialog, FlowchartDialog, buildGraphData } from "../../features/compact";
+import { DesignDialog, useDesignExtraction } from "../../features/design";
 import { useTokenBudget } from "../../features/token-budget";
 
 import { ProjectToolbar } from "./ProjectToolbar";
@@ -96,6 +97,21 @@ export function TextareaPanel({
 
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
   const [flowchartOpen, setFlowchartOpen] = useState(false);
+  const [designOpen, setDesignOpen] = useState(false);
+
+  // Lives above the dialog on purpose: closing the dialog must not cancel a
+  // running extraction, and reopening should show the finished diagram.
+  const designExtraction = useDesignExtraction();
+
+  // Clicking a file in the design panel pulls it into the prompt context —
+  // the diagram doubles as a way to select what you want to work on next.
+  const handleOpenDesignFile = useCallback(
+    (relPath) => {
+      if (!projectPath || !onToggleFile) return;
+      onToggleFile(relPath.startsWith('/') ? relPath : `${projectPath}/${relPath}`);
+    },
+    [projectPath, onToggleFile]
+  );
 
   const graphData = useMemo(() => {
     if (!compactedProject) return null;
@@ -187,6 +203,9 @@ export function TextareaPanel({
       onSaveGroup={onSaveGroup}
       fileCount={fileArray.length}
       isWide={false}
+      onOpenDesign={() => setDesignOpen(true)}
+      designRunning={designExtraction.isRunning}
+      designHasSpec={!!designExtraction.spec}
     />
   );
 
@@ -260,6 +279,13 @@ export function TextareaPanel({
           graphData={graphData}
         />
       )}
+      <DesignDialog
+        open={designOpen}
+        onOpenChange={setDesignOpen}
+        extraction={designExtraction}
+        projectPath={projectPath || currentPath}
+        onOpenFile={handleOpenDesignFile}
+      />
     </>
   );
 

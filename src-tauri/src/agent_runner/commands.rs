@@ -77,8 +77,17 @@ pub fn run_agent_job(
     prompt: String,
     cwd: String,
     log_path: Option<String>,
+    stream_json: Option<bool>,
 ) -> Result<(), String> {
-    let command = build_command(&cli);
+    let mut command = build_command(&cli);
+    // Plain `claude -p` prints nothing until the run finishes, which leaves a
+    // caller with no idea whether a four-minute job is working or wedged.
+    // stream-json emits one NDJSON event per message, tool call and hook, so the
+    // frontend can show live activity. `--verbose` is required alongside it in
+    // headless mode. opencode has no equivalent, so it keeps plain output.
+    if stream_json.unwrap_or(false) && cli != "opencode" {
+        command.push_str(" --output-format stream-json --verbose");
+    }
 
     // Persist the full output stream to disk so it survives the in-memory ring
     // buffer cap and a webview reload — the run report and reattach both read it.

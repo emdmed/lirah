@@ -656,15 +656,25 @@ pub fn get_claude_session(
     })
 }
 
-/// Get the most recent active session for a project
+/// Get the most recent active session for a project.
+///
+/// `async` because this is not cheap: it scans every session file for the
+/// project, which measured 1.14s on a project with 272 of them. Tauri runs sync
+/// commands on the main thread, so as a sync command it froze the UI for that
+/// whole second.
 #[tauri::command]
-pub fn get_active_claude_session(
+pub async fn get_active_claude_session(
     project_path: String,
 ) -> Result<Option<ClaudeSessionEntry>, String> {
-    let page = get_claude_sessions(project_path, Some(1), Some(0))?;
-
-    // Return the first (most recent) non-sidechain session
-    Ok(page.sessions.into_iter().filter(|s| !s.is_sidechain).next())
+    // The scan is blocking and slow, so it goes to the blocking pool rather than
+    // occupying an async worker for a second.
+    tauri::async_runtime::spawn_blocking(move || {
+        let page = get_claude_sessions(project_path, Some(1), Some(0))?;
+        // Return the first (most recent) non-sidechain session
+        Ok(page.sessions.into_iter().find(|s| !s.is_sidechain))
+    })
+    .await
+    .map_err(|e| format!("Session scan failed: {}", e))?
 }
 
 /// Get all Claude Code instances (projects with sessions)

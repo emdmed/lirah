@@ -445,7 +445,9 @@ export function AgentJobsProvider({ children }) {
     setJobs((prev) => [job, ...prev]);
 
     try {
-      await invoke('run_agent_job', { jobId: id, cli, prompt, cwd, logPath });
+      // streamJson stays off: this UI shows the raw output and folds it into the
+      // run report, so it wants plain text, not NDJSON events.
+      await invoke('run_agent_job', { jobId: id, cli, prompt, cwd, logPath, streamJson: false });
     } catch (e) {
       patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
     }
@@ -645,7 +647,7 @@ export function AgentJobsProvider({ children }) {
     setJobs((prev) => [job, ...prev]);
 
     try {
-      await invoke('run_agent_job', { jobId: id, cli: 'claude', prompt, cwd: intPath, logPath });
+      await invoke('run_agent_job', { jobId: id, cli: 'claude', prompt, cwd: intPath, logPath, streamJson: false });
     } catch (e) {
       patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
       return { started: false, error: String(e) };
