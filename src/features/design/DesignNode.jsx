@@ -8,6 +8,7 @@ import {
   NODE_FOOTER_H,
   BODY_CHAR_W,
 } from './designLayout';
+import { iconFor, tagFor, typeLabel } from './designIcons';
 
 const FALLBACK_COLORS = {
   component: '#7dd3fc',
@@ -45,17 +46,6 @@ const KIND_PALETTE_KEY = {
   module: 'constant',
 };
 
-const KIND_TAG = {
-  ui: 'UI',
-  service: 'SVC',
-  store: 'STORE',
-  db: 'DB',
-  queue: 'QUEUE',
-  external: 'EXT',
-  job: 'JOB',
-  module: 'MOD',
-};
-
 export function kindColor(kind, colors = getDesignColors()) {
   return colors[KIND_PALETTE_KEY[kind] || 'constant'] || colors.constant;
 }
@@ -80,6 +70,7 @@ export const DesignNode = React.memo(function DesignNode({
   lines,
   hasFooter,
   selected,
+  primary,
   connected,
   dimmed,
   faded,
@@ -111,7 +102,11 @@ export const DesignNode = React.memo(function DesignNode({
         ? 'rgba(255,255,255,0.06)'
         : 'rgba(255,255,255,0.03)';
 
-  const tag = KIND_TAG[node.kind] || 'MOD';
+  // What sort of thing this is, said twice over: a glyph you recognise without
+  // reading, and the word for it ("VIEW", "PROC") for when the glyph is not
+  // enough. Both come from the sub-kind when the spec gives one.
+  const Icon = iconFor(node);
+  const tag = tagFor(node);
   const tagW = tag.length * 5.4 + 8;
 
   const footerParts = [];
@@ -120,11 +115,13 @@ export const DesignNode = React.memo(function DesignNode({
   if (node.files?.length) footerParts.push(`${node.files.length} file${node.files.length > 1 ? 's' : ''}`);
   if (proposed) footerParts.push('proposed');
 
-  // Label shares the header row with the kind tag, and with the change glyph
-  // when there is one.
+  // Label shares the header row with the type icon and kind tag, and with the
+  // change glyph when there is one.
+  const ICON_SIZE = 11;
+  const iconW = ICON_SIZE + 4;
   const glyphW = touched ? 11 : 0;
-  const labelX = rect.x + NODE_PAD_X + glyphW;
-  const labelBudget = Math.floor((rect.w - NODE_PAD_X * 2 - tagW - 6 - glyphW) / 6.7);
+  const labelX = rect.x + NODE_PAD_X + iconW + glyphW;
+  const labelBudget = Math.floor((rect.w - NODE_PAD_X * 2 - tagW - 6 - glyphW - iconW) / 6.7);
   const label =
     node.label.length > labelBudget ? `${node.label.slice(0, Math.max(1, labelBudget - 1))}…` : node.label;
 
@@ -132,7 +129,9 @@ export const DesignNode = React.memo(function DesignNode({
     <g
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(node.id);
+        // The event travels with the id: ctrl/⌘/shift-click builds up a
+        // multi-part selection to ask one question about.
+        onSelect(node.id, e);
       }}
       style={{ cursor: 'pointer', opacity: dimmed ? 0.22 : faded ? 0.3 : 1 }}
     >
@@ -140,7 +139,7 @@ export const DesignNode = React.memo(function DesignNode({
           reason for any warning) lives in the hover tooltip. */}
       <title>
         {[
-          node.label,
+          `${node.label} — ${typeLabel(node)}`,
           node.responsibility,
           `This work: ${changeStyle.label}${
             node.changeSource === 'git' ? ' (from git)' : ' (as described)'
@@ -159,7 +158,7 @@ export const DesignNode = React.memo(function DesignNode({
         rx={4}
         fill={fill}
         stroke={stroke}
-        strokeWidth={selected ? 1.6 : 1}
+        strokeWidth={primary ? 2 : selected ? 1.6 : 1}
         strokeDasharray={proposed ? '5 3' : undefined}
       />
       {/* Kind stripe — a quick read of what sort of thing this is. */}
@@ -176,9 +175,20 @@ export const DesignNode = React.memo(function DesignNode({
           fill={changeStyle.color}
         />
       )}
+      {/* Type icon — what this box *is*, readable before any of its text. */}
+      <Icon
+        x={rect.x + NODE_PAD_X}
+        y={rect.y + 6}
+        width={ICON_SIZE}
+        height={ICON_SIZE}
+        stroke={accent}
+        strokeWidth={2}
+        opacity={proposed ? 0.7 : 0.95}
+      />
+
       {touched && (
         <text
-          x={rect.x + NODE_PAD_X}
+          x={rect.x + NODE_PAD_X + iconW}
           y={rect.y + 16}
           fill={changeStyle.color}
           fontSize={12}

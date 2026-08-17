@@ -119,6 +119,12 @@ export function validateSpec(spec) {
       if (node.kind !== undefined && !isNonEmptyString(node.kind)) {
         err(`${at}.kind`, 'must be a non-empty string when present');
       }
+      // Free-form on purpose: the renderer has icons and tags for the sub-kinds
+      // it knows (see designIcons.jsx) and falls back to showing anything else
+      // verbatim, so an unmodelled one is information rather than an error.
+      if (node.subkind !== undefined && !isNonEmptyString(node.subkind)) {
+        err(`${at}.subkind`, 'must be a non-empty string when present');
+      }
     });
     if (spec.nodes.length > NODE_CAP) {
       warnings.push(
@@ -204,6 +210,7 @@ export function normalizeSpec(spec) {
     nodes.set(node.id, {
       ...node,
       kind: NODE_KINDS.includes(node.kind) ? node.kind : 'module',
+      subkind: typeof node.subkind === 'string' ? node.subkind.trim().toLowerCase() : '',
       status,
       // Nothing said either way: a part that does not exist yet is by
       // definition something this work adds; anything else is assumed to be

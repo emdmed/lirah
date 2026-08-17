@@ -2,6 +2,9 @@
 export { DesignButton } from './DesignButton';
 export { DesignDialog } from './DesignDialog';
 
+// Selection → prompt
+export { ASK_ACTIONS, buildAskPrompt, filesOfSelection } from './designAsk';
+
 // Hooks
 export { useDesignExtraction } from './useDesignExtraction';
 

@@ -113,6 +113,26 @@ export function TextareaPanel({
     [projectPath, onToggleFile]
   );
 
+  // Asking about a selection in the diagram continues the conversation here:
+  // the composed question lands in the prompt box (appended, never replacing
+  // what was already typed) and the parts' files come with it as context.
+  const handleDesignAsk = useCallback(
+    (prompt, { files = [] } = {}) => {
+      if (projectPath && onToggleFile) {
+        for (const file of files) {
+          const abs = file.startsWith('/') ? file : `${projectPath}/${file}`;
+          // onToggleFile toggles — re-adding an already selected file would
+          // silently drop it from the context.
+          if (!(selectedFiles instanceof Set) || !selectedFiles.has(abs)) onToggleFile(abs);
+        }
+      }
+      const existing = value?.trim() ? `${value.trimEnd()}\n\n` : '';
+      onChange(`${existing}${prompt}\n`);
+      requestAnimationFrame(() => textareaRef?.current?.focus());
+    },
+    [projectPath, onToggleFile, selectedFiles, value, onChange, textareaRef]
+  );
+
   const graphData = useMemo(() => {
     if (!compactedProject) return null;
     const fullOutput = compactedProject.fullOutput || compactedProject.output;
@@ -285,6 +305,7 @@ export function TextareaPanel({
         extraction={designExtraction}
         projectPath={projectPath || currentPath}
         onOpenFile={handleOpenDesignFile}
+        onAsk={handleDesignAsk}
       />
     </>
   );

@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { ArrowDownLeft, ArrowUpRight, FileWarning, X } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { CHANGE_STYLE, changeOf, kindColor, getDesignColors } from './DesignNode';
+import { iconFor, typeLabel } from './designIcons';
 import '../markdown/markdown.css';
 
 /**
@@ -30,6 +31,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
   if (!node) return null;
 
   const accent = kindColor(node.kind, colors);
+  const NodeIcon = iconFor(node);
   const proposed = node.status === 'proposed';
   const missing = node.filesMissing || [];
   const change = changeOf(node);
@@ -74,11 +76,17 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
     <div className="w-[320px] flex-shrink-0 border-l border-sketch flex flex-col min-h-0 bg-background">
       <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-sketch flex-shrink-0">
         <div className="min-w-0">
-          <div className="font-mono text-sm truncate" style={{ color: accent }}>
-            {node.label}
+          <div
+            className="font-mono text-sm truncate flex items-center gap-1.5"
+            style={{ color: accent }}
+          >
+            <NodeIcon className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{node.label}</span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-mono text-[10px] uppercase text-muted-foreground">{node.kind}</span>
+            <span className="font-mono text-[10px] uppercase text-muted-foreground">
+              {typeLabel(node)}
+            </span>
             <span
               className="font-mono text-[10px] px-1 rounded"
               style={{

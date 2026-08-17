@@ -7,18 +7,34 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, History, Maximize2, Minus, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  History,
+  Maximize2,
+  Minus,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useDesignViewport } from './useDesignViewport';
 import { layoutDesign, BODY_CHAR_W } from './designLayout';
 import { CHANGE_STYLE, DesignNode, changeOf, getDesignColors, kindColor } from './DesignNode';
 import { DesignPanel } from './DesignPanel';
 import { DesignActivity } from './DesignActivity';
+import { DesignAskBar } from './DesignAskBar';
+import { DesignSourcePicker } from './DesignSourcePicker';
+import { iconForLayer } from './designIcons';
+import { buildAskPrompt, filesOfSelection } from './designAsk';
 
 /** Above this many edges, contract labels are only drawn for the selected node. */
 const LABEL_ALL_EDGES_BELOW = 9;
 
 const EMPTY_ARRAY = [];
 const EMPTY_MAP = new Map();
+const EMPTY_SELECTION = { ids: EMPTY_ARRAY, primary: null };
 
 /** Clip a contract label to something that fits above an arrow. */
 function clipLabel(text, max = 46) {
@@ -31,6 +47,7 @@ export function DesignDialog({
   extraction,
   projectPath,
   onOpenFile,
+  onAsk,
 }) {
   const { status, statusLabel, isRunning, error, spec, warnings, source } = extraction;
 
@@ -40,12 +57,33 @@ export function DesignDialog({
     zoomIn, zoomOut, resetZoom, fitTo, consumeDrag,
   } = useDesignViewport();
 
-  const [selectedNode, setSelectedNode] = useState(null);
+  /**
+   * `ids` is every clicked part in click order — one question can be about
+   * several — and `primary` is the last one clicked, whose detail the side
+   * panel shows. They move together, so they are one piece of state.
+   */
+  const [selection, setSelection] = useState(EMPTY_SELECTION);
+  const selectedIds = selection.ids;
+  const primaryId = selection.primary;
   const [hiddenLayers, setHiddenLayers] = useState(() => new Set());
   /** null = show every change class; otherwise only these are kept in focus. */
   const [changeFocus, setChangeFocus] = useState(null);
   const [showWarnings, setShowWarnings] = useState(false);
+  /**
+   * The summary is a paragraph, and a paragraph at the top of a diagram costs
+   * the diagram a fifth of the screen. It stays folded until asked for.
+   */
+  const [showSummary, setShowSummary] = useState(false);
+  /** The ask drawer is opened deliberately, not by merely clicking a box. */
+  const [askOpen, setAskOpen] = useState(false);
   const [storedRun, setStoredRun] = useState(false);
+  /**
+   * What the last Generate was asked to cover. Held here so "Try again" and
+   * "Regenerate" repeat that choice instead of silently falling back to the
+   * conversation — a branch diagram that regenerates as a conversation diagram
+   * reads as the feature being broken.
+   */
+  const [lastSource, setLastSource] = useState({ sourceKind: 'conversation', baseRef: null });
 
   // Offer a previous run only when one is actually on disk.
   // Depend on the stable callback, NOT on `extraction`: the hook returns a fresh
@@ -64,10 +102,12 @@ export function DesignDialog({
   // A fresh spec invalidates any selection and viewport from the previous one.
   useEffect(() => {
     if (spec) {
-      setSelectedNode(null);
+      setSelection(EMPTY_SELECTION);
       setHiddenLayers(new Set());
       setChangeFocus(null);
       setShowWarnings(true);
+      setShowSummary(false);
+      setAskOpen(false);
     }
   }, [spec]);
 
@@ -95,24 +135,62 @@ export function DesignDialog({
 
   const fitView = useCallback(() => fitTo(totalW, totalH), [fitTo, totalW, totalH]);
 
+  // One icon per layer, keyed by layer id so the band header and the footer's
+  // show/hide button can never disagree about what a layer looks like. Built
+  // from every declared layer, not just the visible bands — hiding a layer must
+  // not change its button.
+  const layerIcons = useMemo(() => {
+    const byLayer = new Map();
+    for (const node of nodes.values()) {
+      if (!byLayer.has(node.layer)) byLayer.set(node.layer, []);
+      byLayer.get(node.layer).push(node);
+    }
+    return new Map(
+      layers.map((layer) => [layer.id, iconForLayer(layer.label, byLayer.get(layer.id) || [])])
+    );
+  }, [layers, nodes]);
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
   const connectedIds = useMemo(() => {
-    if (!selectedNode) return null;
-    const set = new Set([selectedNode]);
+    if (selectedIds.length === 0) return null;
+    const set = new Set(selectedIds);
     for (const edge of edges) {
-      if (edge.from === selectedNode) set.add(edge.to);
-      if (edge.to === selectedNode) set.add(edge.from);
+      if (selectedSet.has(edge.from)) set.add(edge.to);
+      if (selectedSet.has(edge.to)) set.add(edge.from);
     }
     return set;
-  }, [selectedNode, edges]);
+  }, [selectedIds, selectedSet, edges]);
 
   // A click that ended a pan gesture must not also toggle a node.
   const selectNode = useCallback(
-    (id) => {
+    (id, event) => {
       if (consumeDrag()) return;
-      setSelectedNode((prev) => (prev === id ? null : id));
+      const additive = !!event && (event.ctrlKey || event.metaKey || event.shiftKey);
+      setSelection(({ ids }) => {
+        const next = additive
+          ? ids.includes(id)
+            ? ids.filter((x) => x !== id)
+            : [...ids, id]
+          : // Plain click on the only selected part clears it; anything else
+            // collapses the selection down to what was just clicked.
+            ids.length === 1 && ids[0] === id
+            ? []
+            : [id];
+        return { ids: next, primary: next.includes(id) ? id : (next[next.length - 1] ?? null) };
+      });
     },
     [consumeDrag]
   );
+
+  const deselectNode = useCallback((id) => {
+    setSelection(({ ids, primary }) => {
+      const next = ids.filter((x) => x !== id);
+      return { ids: next, primary: primary === id ? (next[next.length - 1] ?? null) : primary };
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelection(EMPTY_SELECTION), []);
 
   // What this work did to the system, counted per class — the legend doubles as
   // the filter, so these numbers and the focus state come from the same place.
@@ -153,21 +231,50 @@ export function DesignDialog({
     });
   }, []);
 
+  /** Start a run for an explicitly chosen source, and remember the choice. */
   const handleGenerate = useCallback(
-    () => extraction.generate({ projectPath }),
+    ({ sourceKind, baseRef }) => {
+      setLastSource({ sourceKind, baseRef });
+      return extraction.generate({ projectPath, sourceKind, baseRef });
+    },
     [extraction, projectPath]
+  );
+
+  /** Re-run whatever the last choice was. */
+  const handleRegenerate = useCallback(
+    () => extraction.generate({ projectPath, ...lastSource }),
+    [extraction, projectPath, lastSource]
   );
 
   // Highlighted edges are drawn last so they sit above the dimmed ones —
   // SVG has no z-index, only document order.
   const orderedRoutes = useMemo(() => {
-    if (!selectedNode) return routes;
-    const hot = (r) => r.edge.from === selectedNode || r.edge.to === selectedNode;
+    if (selectedIds.length === 0) return routes;
+    const hot = (r) => selectedSet.has(r.edge.from) || selectedSet.has(r.edge.to);
     return [...routes].sort((a, b) => Number(hot(a)) - Number(hot(b)));
-  }, [routes, selectedNode]);
+  }, [routes, selectedIds, selectedSet]);
 
   const labelAllEdges = edges.length < LABEL_ALL_EDGES_BELOW;
-  const selected = selectedNode ? nodes.get(selectedNode) : null;
+  const selected = primaryId ? nodes.get(primaryId) : null;
+
+  // Click order is what the reader built up, so the ask bar and the composed
+  // prompt list the parts in that order rather than in layout order.
+  const selectedNodes = useMemo(
+    () => selectedIds.map((id) => nodes.get(id)).filter(Boolean),
+    [selectedIds, nodes]
+  );
+
+  const attachableFiles = useMemo(() => filesOfSelection(selectedNodes), [selectedNodes]);
+
+  const handleAsk = useCallback(
+    (question, { attachFiles }) => {
+      if (!spec || selectedNodes.length === 0) return;
+      const prompt = buildAskPrompt({ selected: selectedNodes, question, spec });
+      onAsk?.(prompt, { files: attachFiles ? attachableFiles : [] });
+      onOpenChange(false);
+    },
+    [spec, selectedNodes, attachableFiles, onAsk, onOpenChange]
+  );
 
   // ---- overlay states -------------------------------------------------------
 
@@ -214,8 +321,14 @@ export function DesignDialog({
             />
           )}
           <div className="flex items-center justify-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleGenerate}>
+            <Button variant="outline" size="sm" onClick={handleRegenerate}>
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Try again
+            </Button>
+            {/* The failure is often the source itself — an empty session, a
+                branch with no base — so the way back to the picker matters more
+                here than a bare retry. */}
+            <Button variant="outline" size="sm" onClick={extraction.reset}>
+              <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Choose another source
             </Button>
             {storedRun && (
               <Button
@@ -233,30 +346,15 @@ export function DesignDialog({
 
     if (!spec) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
-          <Sparkles className="w-6 h-6 text-muted-foreground" />
-          <div className="font-mono text-sm">Turn this conversation into a design diagram</div>
-          <div className="text-xs text-muted-foreground max-w-[62ch] leading-relaxed">
-            Reads the current Claude Code session for this project, works out the parts involved,
-            what each is responsible for and what data moves between them, then checks it all
-            against the repo so you can see what exists and what is still just proposed.
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleGenerate}>
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate diagram
-            </Button>
-            {storedRun && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => extraction.loadLastRun({ projectPath })}
-                title="Show the diagram from the last run without spending another extraction"
-              >
-                <History className="w-3.5 h-3.5 mr-1.5" /> Load last run
-              </Button>
-            )}
-          </div>
-        </div>
+        <DesignSourcePicker
+          projectPath={projectPath}
+          probeConversationSource={extraction.probeConversationSource}
+          probeBranchSource={extraction.probeBranchSource}
+          listBaseChoices={extraction.listBaseChoices}
+          onGenerate={handleGenerate}
+          storedRun={storedRun}
+          onLoadLastRun={() => extraction.loadLastRun({ projectPath })}
+        />
       );
     }
     return null;
@@ -271,7 +369,7 @@ export function DesignDialog({
         className="flex-1 overflow-hidden border border-sketch rounded-none bg-background/50 select-none"
         style={{ cursor: panning ? 'grabbing' : 'grab' }}
         onClick={() => {
-          if (!consumeDrag()) setSelectedNode(null);
+          if (!consumeDrag()) clearSelection();
         }}
         onDoubleClick={fitView}
         onAuxClick={(e) => e.preventDefault()}
@@ -296,36 +394,56 @@ export function DesignDialog({
 
           <g ref={graphGRef} transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
             {/* Layer bands */}
-            {bandRects.map((band) => (
-              <g key={band.id}>
-                <rect
-                  x={band.x}
-                  y={band.y}
-                  width={band.w}
-                  height={band.h}
-                  rx={6}
-                  fill="rgba(255,255,255,0.02)"
-                  stroke="rgba(255,255,255,0.06)"
-                />
-                <text x={band.x + 14} y={band.y + 15} fill={colors.mutedText} fontSize={10} fontFamily="monospace">
-                  {band.label}
-                </text>
-              </g>
-            ))}
+            {bandRects.map((band) => {
+              // A band is a row of the diagram, and rows are scanned, not read —
+              // it gets the same icon treatment as the boxes inside it.
+              const BandIcon = layerIcons.get(band.id);
+              return (
+                <g key={band.id}>
+                  <rect
+                    x={band.x}
+                    y={band.y}
+                    width={band.w}
+                    height={band.h}
+                    rx={6}
+                    fill="rgba(255,255,255,0.02)"
+                    stroke="rgba(255,255,255,0.06)"
+                  />
+                  {BandIcon && (
+                    <BandIcon
+                      x={band.x + 14}
+                      y={band.y + 4}
+                      width={11}
+                      height={11}
+                      stroke={colors.mutedText}
+                      strokeWidth={2}
+                    />
+                  )}
+                  <text
+                    x={band.x + (BandIcon ? 29 : 14)}
+                    y={band.y + 14}
+                    fill={colors.mutedText}
+                    fontSize={10}
+                    fontFamily="monospace"
+                  >
+                    {band.label}
+                  </text>
+                </g>
+              );
+            })}
 
             {/* Edges — the union of every flow's steps, routed through the
                 channels between bands so nothing crosses a box */}
             {orderedRoutes.map(({ key, edge, path, labelX, labelY }) => {
-              const isHot = selectedNode
-                ? edge.from === selectedNode || edge.to === selectedNode
-                : false;
+              const isHot = selectedSet.has(edge.from) || selectedSet.has(edge.to);
               // An arrow is only interesting while filtering if it still has an
               // end the reader is looking at.
               const filteredOut =
                 fadedIds && fadedIds.has(edge.from) && fadedIds.has(edge.to);
-              const dimmed = (selectedNode && !isHot) || filteredOut;
+              const dimmed = (selectedIds.length > 0 && !isHot) || filteredOut;
               const label = edge.contracts[0];
-              const showLabel = !!label && (isHot || (labelAllEdges && !selectedNode));
+              const showLabel =
+                !!label && (isHot || (labelAllEdges && selectedIds.length === 0));
               const text = showLabel ? clipLabel(label) : null;
 
               return (
@@ -375,8 +493,9 @@ export function DesignDialog({
                   rect={rect}
                   lines={m?.lines || []}
                   hasFooter={m?.hasFooter}
-                  selected={selectedNode === node.id}
-                  connected={!!connectedIds && connectedIds.has(node.id) && selectedNode !== node.id}
+                  selected={selectedSet.has(node.id)}
+                  primary={primaryId === node.id}
+                  connected={!!connectedIds && connectedIds.has(node.id) && !selectedSet.has(node.id)}
                   dimmed={!!connectedIds && !connectedIds.has(node.id)}
                   faded={!!fadedIds && fadedIds.has(node.id)}
                   onSelect={selectNode}
@@ -393,12 +512,26 @@ export function DesignDialog({
           edges={edges}
           nodes={nodes}
           concerns={concerns}
-          onSelectNode={(id) => setSelectedNode(id)}
-          onClose={() => setSelectedNode(null)}
+          onSelectNode={(id) => selectNode(id)}
+          onClose={() => deselectNode(primaryId)}
           onOpenFile={onOpenFile}
         />
       )}
     </div>
+  );
+
+  // The diagram is only useful if you can keep talking about what you clicked —
+  // this is the way back into the conversation.
+  const askBar = onAsk && !overlay && (
+    <DesignAskBar
+      selected={selectedNodes}
+      onDeselect={deselectNode}
+      onClear={clearSelection}
+      onAsk={handleAsk}
+      attachFileCount={attachableFiles.length}
+      open={askOpen}
+      onOpenChange={setAskOpen}
+    />
   );
 
   // ---- chrome ---------------------------------------------------------------
@@ -412,21 +545,50 @@ export function DesignDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-none !w-screen !h-screen !max-h-screen flex flex-col !rounded-none gap-2">
-        <DialogHeader className="pr-8">
-          <DialogTitle className="font-mono text-base">
-            {spec ? spec.title : 'Design View'}
+        <DialogHeader className="pr-8 gap-1">
+          <DialogTitle className="font-mono text-base flex items-center gap-2">
+            <span>{spec ? spec.title : 'Design View'}</span>
+            {spec?.summary && (
+              <button
+                type="button"
+                onClick={() => setShowSummary((v) => !v)}
+                title={showSummary ? 'Hide the summary' : 'Show the summary'}
+                className="flex items-center gap-0.5 font-mono text-[10px] font-normal text-muted-foreground border border-border/60 px-1 py-0.5 hover:text-foreground hover:border-border"
+              >
+                {showSummary ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronRight className="w-3 h-3" />
+                )}
+                summary
+              </button>
+            )}
           </DialogTitle>
-          <DialogDescription className="text-xs">
+          {/* Always rendered for the dialog's accessible description, but only
+              laid out when the reader asks for it. */}
+          <DialogDescription className={spec && !showSummary ? 'sr-only' : 'text-xs'}>
             {spec ? (
               <span className="block max-w-[110ch]">{spec.summary}</span>
             ) : (
               'Turn a conversation into a system-design diagram.'
             )}
           </DialogDescription>
+          {/* Which source produced this diagram is not a detail: it decides what
+              the diagram can and cannot know, so it stays on screen. */}
           {spec && source && (
             <div className="font-mono text-[10px] text-muted-foreground truncate">
-              from session {source.sessionId.slice(0, 8)} · {source.messageCount} messages ·{' '}
-              {source.firstPrompt.slice(0, 80)}
+              {source.kind === 'branch' ? (
+                <>
+                  from branch {source.branch} vs {source.base} ({source.baseSha}) ·{' '}
+                  {source.commitCount} commits · {source.fileCount} files
+                  {source.dirtyCount ? ` · ${source.dirtyCount} uncommitted` : ''}
+                </>
+              ) : (
+                <>
+                  from session {source.sessionId.slice(0, 8)} · {source.messageCount} messages ·{' '}
+                  {source.firstPrompt.slice(0, 80)}
+                </>
+              )}
             </div>
           )}
         </DialogHeader>
@@ -448,7 +610,12 @@ export function DesignDialog({
           </div>
         )}
 
-        {overlay || diagram}
+        {/* The drawer floats over the canvas, so it shares this box with it
+            instead of taking a row of its own. */}
+        <div className="relative flex-1 flex min-h-0">
+          {overlay || diagram}
+          {askBar}
+        </div>
 
         <div className="flex items-center gap-2 border-t border-border pt-2 flex-wrap">
           {spec && (
@@ -509,18 +676,20 @@ export function DesignDialog({
               <div className="flex items-center gap-1 flex-wrap">
                 {layers.map((layer) => {
                   const hidden = hiddenLayers.has(layer.id);
+                  const LayerIcon = layerIcons.get(layer.id);
                   return (
                     <button
                       key={layer.id}
                       type="button"
                       onClick={() => toggleLayer(layer.id)}
                       title={hidden ? 'Show layer' : 'Hide layer'}
-                      className={`font-mono text-[10px] px-1.5 py-0.5 border rounded-none ${
+                      className={`flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 border rounded-none ${
                         hidden
                           ? 'border-border/40 text-muted-foreground/50 line-through'
                           : 'border-border text-muted-foreground'
                       }`}
                     >
+                      {LayerIcon && <LayerIcon className="w-3 h-3 flex-shrink-0" />}
                       {layer.label}
                     </button>
                   );
@@ -549,8 +718,25 @@ export function DesignDialog({
                 )}
               </div>
 
-              <Button variant="outline" size="sm" onClick={handleGenerate} disabled={isRunning}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={isRunning}
+                title={`Re-run from ${
+                  lastSource.sourceKind === 'branch' ? 'this branch’s changes' : 'this conversation'
+                }`}
+              >
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regenerate
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={extraction.reset}
+                disabled={isRunning}
+                title="Back to the source picker"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> New source
               </Button>
             </>
           )}

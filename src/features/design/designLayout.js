@@ -542,6 +542,9 @@ export function layoutDesign(layers, nodes, edges, hiddenLayers = new Set()) {
       w: totalW,
       h: bandH,
       nodeCount: band.nodeIds.length,
+      // Carried out of the layout so the band header can pick an icon from what
+      // the band actually holds.
+      nodeIds: band.nodeIds,
     });
     cursorY += bandH;
   });

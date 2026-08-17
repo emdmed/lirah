@@ -54,7 +54,7 @@ pub async fn paths_exist(paths: Vec<String>, root: Option<String>) -> Vec<bool> 
 // branch's diff against its merge-base with the default branch, plus whatever
 // is still uncommitted in the working tree.
 
-fn run_git(dir: &Path, args: &[&str]) -> Option<String> {
+pub(crate) fn run_git(dir: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git").current_dir(dir).args(args).output().ok()?;
     if !out.status.success() {
         return None;
@@ -62,7 +62,7 @@ fn run_git(dir: &Path, args: &[&str]) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).to_string())
 }
 
-fn git_top_level(dir: &Path) -> Option<PathBuf> {
+pub(crate) fn git_top_level(dir: &Path) -> Option<PathBuf> {
     let top = run_git(dir, &["rev-parse", "--show-toplevel"])?;
     let top = PathBuf::from(top.trim());
     std::fs::canonicalize(&top).ok().or(Some(top))
@@ -96,7 +96,11 @@ fn status_class(x: char, y: char) -> Option<&'static str> {
 }
 
 /// Every path this branch touched, mapped to "added" or "modified".
-fn repo_changes(top: &Path) -> HashMap<String, String> {
+///
+/// `prefer` is the base the caller chose. It has to be honoured here and not
+/// only when building the digest: classified against a different base, the
+/// diagram's added/modified colouring would contradict the diff it came from.
+fn repo_changes(top: &Path, prefer: Option<&str>) -> HashMap<String, String> {
     let mut map = HashMap::new();
 
     // Uncommitted work first — NUL-separated so paths with spaces survive.
@@ -116,8 +120,8 @@ fn repo_changes(top: &Path) -> HashMap<String, String> {
         }
     }
 
-    // Then everything committed on this branch since it left the default one.
-    if let Some(base) = merge_base(top) {
+    // Then everything committed on this branch since it left its base.
+    if let Some((_, base)) = resolve_base(top, prefer) {
         if let Some(out) = run_git(top, &["diff", "--name-status", "-z", &base, "HEAD"]) {
             let mut fields = out.split('\0').filter(|f| !f.is_empty());
             while let Some(code) = fields.next() {
@@ -143,12 +147,24 @@ fn repo_changes(top: &Path) -> HashMap<String, String> {
 }
 
 /// Where this branch diverged from the default branch, if that can be worked out.
-fn merge_base(top: &Path) -> Option<String> {
+/// Resolve the ref this branch forked from, and the merge-base commit with it.
+///
+/// Returns `(ref name, merge-base sha)` — the name matters to anything that has
+/// to *tell the user* what it compared against, which the branch digest does.
+/// `prefer` is an explicit base the user chose; it is tried first and, if it
+/// resolves, wins outright, so an override is never silently ignored.
+pub(crate) fn resolve_base(top: &Path, prefer: Option<&str>) -> Option<(String, String)> {
     let origin_head = run_git(top, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
-    let mut candidates: Vec<String> = origin_head.into_iter().collect();
+    let mut candidates: Vec<String> = prefer
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .into_iter()
+        .collect();
+    candidates.extend(origin_head);
     for name in ["origin/main", "origin/master", "main", "master", "develop"] {
         candidates.push(name.to_string());
     }
@@ -163,20 +179,27 @@ fn merge_base(top: &Path) -> Option<String> {
         if let Some(base) = run_git(top, &["merge-base", &candidate, "HEAD"]) {
             let base = base.trim().to_string();
             if !base.is_empty() {
-                return Some(base);
+                return Some((candidate, base));
             }
         }
     }
     None
 }
 
+
 /// Per-path change class, in input order: `added`, `modified`, `untouched`,
 /// `missing` (not on disk) or `unknown` (not inside a git repository).
+///
+/// `base_ref` is the base to classify against; omitted, it is auto-detected.
 ///
 /// Batched for the same reason as [`paths_exist`] — and because the git work is
 /// done once per repository no matter how many paths point into it.
 #[tauri::command]
-pub async fn paths_change_status(paths: Vec<String>, root: Option<String>) -> Vec<String> {
+pub async fn paths_change_status(
+    paths: Vec<String>,
+    root: Option<String>,
+    base_ref: Option<String>,
+) -> Vec<String> {
     let root = root.map(PathBuf::from);
     let parent = root
         .as_deref()
@@ -216,7 +239,7 @@ pub async fn paths_change_status(paths: Vec<String>, root: Option<String>) -> Ve
 
         let map = changes
             .entry(top.clone())
-            .or_insert_with(|| repo_changes(&top));
+            .or_insert_with(|| repo_changes(&top, base_ref.as_deref()));
         let rel = abs
             .strip_prefix(&top)
             .ok()
@@ -362,11 +385,21 @@ mod tests {
                 "src/ghost.rs".to_string(),
             ],
             Some(dir.to_string_lossy().to_string()),
+            None,
         ));
         assert_eq!(
             result,
             vec!["added", "modified", "added", "modified", "untouched", "missing"]
         );
+
+        // An explicit base is honoured: classified against `feature` itself, the
+        // committed work is behind the base and only the working tree is new.
+        let result = tauri::async_runtime::block_on(paths_change_status(
+            vec!["src/born.rs".to_string(), "src/dirty.rs".to_string()],
+            Some(dir.to_string_lossy().to_string()),
+            Some("feature".to_string()),
+        ));
+        assert_eq!(result, vec!["untouched", "added"]);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

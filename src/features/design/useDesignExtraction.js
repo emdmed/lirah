@@ -1,19 +1,30 @@
 import { useCallback, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { buildExtractionPrompt, buildRepairPrompt } from './designPrompt';
+import {
+  buildBranchExtractionPrompt,
+  buildExtractionPrompt,
+  buildRepairPrompt,
+} from './designPrompt';
 import { parseSpecJson, validateSpec, normalizeSpec } from './spec';
 import { createEventLog } from './designEvents';
 
 /**
- * Drives conversation → design spec.
+ * Drives source → design spec.
  *
- *   1. resolve the source session
- *   2. digest it in Rust (`build_session_digest`)
+ *   1. resolve the source the caller picked — the current conversation, or this
+ *      branch's diff against its base
+ *   2. digest it in Rust (`build_session_digest` / `build_branch_digest`)
  *   3. run the extractor headless (`run_agent_job`) — it reads the digest, checks
  *      the repo, and writes spec JSON to a file
  *   4. validate; on failure run exactly one repair pass
  *   5. verify every `files` entry against disk and mark what is missing
+ *
+ * Only step 1 differs between the two sources: each produces digest text, a
+ * description of itself for the UI, and the prompt that explains that flavour of
+ * digest to the extractor. Everything downstream — the run directory, the job,
+ * validation, the repair pass, git grounding — is shared, because the spec
+ * schema is the same design either way.
  *
  * The extractor writes to a file rather than stdout because the runner's stdout
  * carries progress chatter, and because the repair pass needs something concrete
@@ -207,15 +218,22 @@ export function useDesignExtraction() {
    * changed, and `untouched` when none did. Nodes with no files (or files git
    * knows nothing about) keep whatever the extractor claimed — which is why the
    * source is recorded on the node, so the UI can be honest about it.
+   *
+   * `baseRef` is the base the user chose. It must be the same one the digest was
+   * built from, or the colouring would contradict the diff that produced it.
    */
-  const classifyChanges = useCallback(async (parsed, projectPath) => {
+  const classifyChanges = useCallback(async (parsed, projectPath, baseRef = null) => {
     const nodes = parsed.nodes || [];
     const unique = [...new Set(nodes.flatMap((n) => n.files || []))];
     if (unique.length === 0) return parsed;
 
     let classes;
     try {
-      classes = await invoke('paths_change_status', { paths: unique, root: projectPath });
+      classes = await invoke('paths_change_status', {
+        paths: unique,
+        root: projectPath,
+        baseRef,
+      });
     } catch {
       return parsed; // Grounding is an enhancement — never a gate on the diagram.
     }
@@ -252,14 +270,19 @@ export function useDesignExtraction() {
    * verify the spec's file references, normalize, and publish to state.
    */
   const publish = useCallback(
-    async (parsed, projectPath, baseWarnings = [], { truncated = false } = {}) => {
+    async (
+      parsed,
+      projectPath,
+      baseWarnings = [],
+      { truncated = false, truncationWarning, baseRef = null } = {}
+    ) => {
       const fileCount = (parsed.nodes || []).reduce((a, n) => a + (n.files || []).length, 0);
       const verified = await verifyFiles(parsed, projectPath);
       const missingCount = (verified.nodes || []).reduce((a, n) => a + (n.filesMissing?.length || 0), 0);
       await stage('Files verified', `${fileCount} referenced · ${missingCount} not found`);
       if (cancelledRef.current) return false;
 
-      await classifyChanges(verified, projectPath);
+      await classifyChanges(verified, projectPath, baseRef);
       const changed = (verified.nodes || []).filter(
         (n) => n.change === 'added' || n.change === 'modified'
       );
@@ -280,8 +303,8 @@ export function useDesignExtraction() {
           `${unverified.length} node(s) marked existing reference files that are not on disk — see the amber markers.`
         );
       }
-      if (truncated) {
-        allWarnings.push('The conversation was long; older messages were omitted from the digest.');
+      if (truncated && truncationWarning) {
+        allWarnings.push(truncationWarning);
       }
 
       setWarnings(allWarnings);
@@ -352,8 +375,170 @@ export function useDesignExtraction() {
     [publish, designsDirFor]
   );
 
+  /**
+   * Resolve + digest the active Claude session. Returns the digest text, a
+   * description of the source for the UI, and the prompt that reads it.
+   */
+  const prepareConversation = useCallback(
+    async ({ projectPath }) => {
+      const entry = await invoke('get_active_claude_session', { projectPath });
+      if (!entry) {
+        throw new Error(
+          'No Claude Code session found for this project yet. Have a conversation first, then try again.'
+        );
+      }
+      await stage(
+        'Session resolved',
+        `${entry.session_id.slice(0, 8)} · ${entry.message_count} messages`
+      );
+
+      // projectPath lets the digest speak in repo-relative paths — the same
+      // terms the spec asks for, and what the verification pass resolves.
+      const digest = await invoke('build_session_digest', {
+        sessionPath: entry.full_path,
+        projectPath,
+      });
+      if (!digest.digest?.trim() || digest.message_count === 0) {
+        throw new Error('That session has no conversation content to diagram.');
+      }
+      await stage(
+        'Digest built',
+        `${digest.message_count} messages · ${Math.round(digest.chars / 1024)} KB${
+          digest.truncated ? ' · truncated' : ''
+        }`
+      );
+
+      const sourceLabel = `session ${entry.session_id} (${digest.message_count} messages${
+        digest.truncated ? ', older ones omitted' : ''
+      })`;
+
+      return {
+        digest: digest.digest,
+        truncated: digest.truncated,
+        truncationWarning:
+          'The conversation was long; older messages were omitted from the digest.',
+        // No base was chosen, so git grounding auto-detects one as it always has.
+        classifyBase: null,
+        source: {
+          kind: 'conversation',
+          sessionId: entry.session_id,
+          firstPrompt: entry.first_prompt || '(no prompt recorded)',
+          modified: entry.modified,
+          messageCount: entry.message_count,
+          path: entry.full_path,
+        },
+        buildPrompt: ({ digestPath, outPath }) =>
+          buildExtractionPrompt({ digestPath, outPath, repoPath: projectPath, sourceLabel }),
+      };
+    },
+    [stage]
+  );
+
+  /** As `prepareConversation`, but for what this branch changed. */
+  const prepareBranch = useCallback(
+    async ({ projectPath, baseRef }) => {
+      // Rust raises a readable error for "not a repo", "no base found" and
+      // "nothing changed" — those are the three ways this source is unusable and
+      // each one tells the user what to do instead, so they pass straight through.
+      const digest = await invoke('build_branch_digest', {
+        projectPath,
+        baseRef: baseRef || null,
+      });
+      await stage('Branch resolved', `${digest.branch} vs ${digest.base} (${digest.base_sha})`);
+      await stage(
+        'Digest built',
+        `${digest.commit_count} commits · ${digest.file_count} files · ${Math.round(
+          digest.chars / 1024
+        )} KB${digest.truncated ? ' · patches clipped' : ''}`
+      );
+
+      return {
+        digest: digest.digest,
+        truncated: digest.truncated,
+        truncationWarning:
+          'The branch diff was large; some patches were clipped or omitted from the digest.',
+        // The base git *resolved*, not the one asked for: an override that did not
+        // resolve fell back to detection, and the colouring must follow the digest.
+        classifyBase: digest.base,
+        source: {
+          kind: 'branch',
+          branch: digest.branch,
+          base: digest.base,
+          baseSha: digest.base_sha,
+          commitCount: digest.commit_count,
+          fileCount: digest.file_count,
+          dirtyCount: digest.dirty_count,
+        },
+        buildPrompt: ({ digestPath, outPath }) =>
+          buildBranchExtractionPrompt({
+            digestPath,
+            outPath,
+            repoPath: projectPath,
+            branch: digest.branch,
+            base: digest.base,
+          }),
+      };
+    },
+    [stage]
+  );
+
+  /**
+   * What the conversation source would cover. Same contract as
+   * `probeBranchSource`: cheap, never throws, and an unusable source explains
+   * itself so the picker can grey it out with a reason instead of failing a run.
+   */
+  const probeConversationSource = useCallback(async ({ projectPath } = {}) => {
+    if (!projectPath) return { available: false, reason: 'No project folder open.' };
+    try {
+      const entry = await invoke('get_active_claude_session', { projectPath });
+      if (!entry) {
+        return {
+          available: false,
+          reason: 'No Claude Code session recorded for this project yet.',
+        };
+      }
+      return {
+        available: entry.message_count > 0,
+        reason: entry.message_count > 0 ? null : 'That session has no messages yet.',
+        sessionId: entry.session_id,
+        messageCount: entry.message_count,
+        firstPrompt: entry.first_prompt || '',
+        modified: entry.modified,
+      };
+    } catch (e) {
+      return { available: false, reason: e.message || String(e) };
+    }
+  }, []);
+
+  /**
+   * The branches this repo could be compared against, newest tip first, with the
+   * auto-detected one marked. Never throws — no repo comes back as an empty list.
+   */
+  const listBaseChoices = useCallback(async ({ projectPath } = {}) => {
+    if (!projectPath) return { detected: null, current: null, refs: [] };
+    try {
+      return await invoke('list_base_choices', { projectPath });
+    } catch {
+      return { detected: null, current: null, refs: [] };
+    }
+  }, []);
+
+  /**
+   * What the branch source would cover, for the picker to show before the user
+   * commits to a run. Never throws — an unusable source comes back as
+   * `available: false` with a reason.
+   */
+  const probeBranchSource = useCallback(async ({ projectPath, baseRef } = {}) => {
+    if (!projectPath) return { available: false, reason: 'No project folder open.' };
+    try {
+      return await invoke('branch_diff_summary', { projectPath, baseRef: baseRef || null });
+    } catch (e) {
+      return { available: false, reason: e.message || String(e) };
+    }
+  }, []);
+
   const generate = useCallback(
-    async ({ projectPath, cli = 'claude' }) => {
+    async ({ projectPath, cli = 'claude', sourceKind = 'conversation', baseRef = null }) => {
       if (!projectPath) {
         setError('No project path — open a folder first.');
         setStatus('error');
@@ -370,38 +555,12 @@ export function useDesignExtraction() {
       setStatus('digesting');
 
       try {
-        // --- 1. source session ---
-        const entry = await invoke('get_active_claude_session', { projectPath });
-        if (!entry) {
-          throw new Error(
-            'No Claude Code session found for this project yet. Have a conversation first, then try again.'
-          );
-        }
-        const sourceInfo = {
-          sessionId: entry.session_id,
-          firstPrompt: entry.first_prompt || '(no prompt recorded)',
-          modified: entry.modified,
-          messageCount: entry.message_count,
-          path: entry.full_path,
-        };
-        setSource(sourceInfo);
-        await stage('Session resolved', `${entry.session_id.slice(0, 8)} · ${entry.message_count} messages`);
-
-        // --- 2. digest ---
-        // projectPath lets the digest speak in repo-relative paths — the same
-        // terms the spec asks for, and what the verification pass resolves.
-        const digest = await invoke('build_session_digest', {
-          sessionPath: entry.full_path,
-          projectPath,
-        });
-        if (!digest.digest?.trim() || digest.message_count === 0) {
-          throw new Error('That session has no conversation content to diagram.');
-        }
-
-        await stage(
-          'Digest built',
-          `${digest.message_count} messages · ${Math.round(digest.chars / 1024)} KB${digest.truncated ? ' · truncated' : ''}`
-        );
+        // --- 1 + 2. resolve and digest whichever source the user picked ---
+        const prepared =
+          sourceKind === 'branch'
+            ? await prepareBranch({ projectPath, baseRef })
+            : await prepareConversation({ projectPath });
+        setSource(prepared.source);
 
         const home = await invoke('get_home_dir');
         const dir = `${home}/.lirah/designs/${basename(projectPath)}/${stamp()}`;
@@ -411,21 +570,18 @@ export function useDesignExtraction() {
         setRunDir(dir);
         setLogPath(logPath);
         pipelineLogRef.current = `${dir}/pipeline.log`;
-        await invoke('write_file_content', { path: digestPath, content: digest.digest });
+        await invoke('write_file_content', { path: digestPath, content: prepared.digest });
         await stage('Run directory', dir);
 
         if (cancelledRef.current) return;
 
         // --- 3. extract ---
         setStatus('extracting');
-        const sourceLabel = `session ${entry.session_id} (${digest.message_count} messages${
-          digest.truncated ? ', older ones omitted' : ''
-        })`;
-        await stage('Extractor starting', `cli=${cli}`);
+        await stage('Extractor starting', `cli=${cli} · source=${prepared.source.kind}`);
         const extractResult = await runJob({
           jobId: `design-${Date.now()}`,
           cli,
-          prompt: buildExtractionPrompt({ digestPath, outPath: specPath, repoPath: projectPath, sourceLabel }),
+          prompt: prepared.buildPrompt({ digestPath, outPath: specPath }),
           cwd: projectPath,
           logPath,
         });
@@ -503,7 +659,9 @@ export function useDesignExtraction() {
         // ready" unconditionally, so a publish that bailed still looked like a
         // success in the log — which is precisely the trail needed to diagnose it.
         const published = await publish(parsed, projectPath, result.warnings, {
-          truncated: digest.truncated,
+          truncated: prepared.truncated,
+          truncationWarning: prepared.truncationWarning,
+          baseRef: prepared.classifyBase,
         });
         await stage(
           published ? 'Diagram ready' : 'Cancelled before publishing',
@@ -518,7 +676,7 @@ export function useDesignExtraction() {
         setStatus('error');
       }
     },
-    [runJob, publish, stage]
+    [runJob, publish, stage, prepareConversation, prepareBranch]
   );
 
   const cancel = useCallback(async () => {
@@ -558,6 +716,9 @@ export function useDesignExtraction() {
     generate,
     loadLastRun,
     probeStoredRun,
+    probeConversationSource,
+    probeBranchSource,
+    listBaseChoices,
     cancel,
     reset,
   };
