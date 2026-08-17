@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DIGEST_DEPTHS } from './useDesignExtraction';
 
 /**
  * "Which feature are we diagramming?" — asked before anything is spent.
@@ -142,6 +143,50 @@ function BasePicker({ choices, value, onChange }) {
   );
 }
 
+/**
+ * How much of the source goes into the digest.
+ *
+ * The default budget fits an ordinary feature whole, and a wide branch or a very
+ * long conversation still overruns it — the digest then says so, but by that
+ * point the diagram has already been drawn from a partial picture. This is the
+ * knob for the second attempt, offered up front so a run known to be large does
+ * not have to be paid for twice.
+ */
+function DepthPicker({ value, onChange, sourceKind }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Digest depth
+      </span>
+      <div className="flex items-center border border-border">
+        {Object.entries(DIGEST_DEPTHS).map(([id, { label, hint }]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            aria-pressed={value === id}
+            title={hint}
+            className={`font-mono text-[10px] px-2 py-1 transition-colors ${
+              value === id
+                ? 'bg-foreground/10 text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <span className="font-mono text-[10px] text-muted-foreground">
+        {value === 'full'
+          ? sourceKind === 'branch'
+            ? 'every patch, uncut — slower and costs more'
+            : 'the whole conversation — slower and costs more'
+          : DIGEST_DEPTHS.standard.hint}
+      </span>
+    </div>
+  );
+}
+
 export function DesignSourcePicker({
   projectPath,
   probeConversationSource,
@@ -152,6 +197,7 @@ export function DesignSourcePicker({
   onLoadLastRun,
 }) {
   const [sourceKind, setSourceKind] = useState('conversation');
+  const [depth, setDepth] = useState('standard');
   /** The chosen base. Starts as whatever detection found, then the user's choice. */
   const [baseRef, setBaseRef] = useState(null);
   const [choices, setChoices] = useState({ detected: null, current: null, refs: [] });
@@ -265,10 +311,12 @@ export function DesignSourcePicker({
         </div>
       )}
 
+      <DepthPicker value={depth} onChange={setDepth} sourceKind={sourceKind} />
+
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          onClick={() => onGenerate({ sourceKind, baseRef: baseRef || null })}
+          onClick={() => onGenerate({ sourceKind, baseRef: baseRef || null, depth })}
           disabled={!canGenerate}
           title={canGenerate ? undefined : chosen?.reason || 'This source has nothing to diagram'}
         >

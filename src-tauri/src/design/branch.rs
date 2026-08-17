@@ -28,11 +28,28 @@ use std::path::Path;
 
 /// Total digest budget, matched to the session digest so both sources leave the
 /// extractor the same room to explore the repo.
-const DEFAULT_MAX_CHARS: usize = 240_000;
+///
+/// Roughly 175k tokens. The earlier 240k-char budget was sized for a 200k-token
+/// context and clipped almost every real feature branch — a diagram drawn from a
+/// clipped diff is a diagram of half the feature, and the reader cannot tell
+/// which half. The extractor still reads the repo itself, so this is the budget
+/// for what it gets *for free*, not a ceiling on what it can know.
+const DEFAULT_MAX_CHARS: usize = 700_000;
 
-/// Cap on one file's patch, so a single generated or vendored file cannot eat
-/// the whole budget before the interesting files are reached.
-const MAX_FILE_PATCH_CHARS: usize = 8_000;
+/// Floor for one file's patch, so a single generated or vendored file cannot eat
+/// the whole budget before the interesting files are reached. The real cap
+/// scales with the budget — see `file_patch_cap`.
+const MAX_FILE_PATCH_CHARS: usize = 25_000;
+
+/// The per-file patch cap for a given budget.
+///
+/// A fixed cap makes a raised budget a lie: asking for the full diff and still
+/// getting every large file cut at the same line is the failure this exists to
+/// prevent. The ratio is set so the default budget derives exactly
+/// `MAX_FILE_PATCH_CHARS`, which then acts as the floor for small budgets.
+fn file_patch_cap(budget: usize) -> usize {
+    (budget / 28).max(MAX_FILE_PATCH_CHARS)
+}
 
 /// Cap on how many changed paths are listed. Beyond this the list is noise, and
 /// a branch this wide is not one feature.
@@ -390,7 +407,7 @@ pub async fn build_branch_digest(
                 skipped_noise += 1;
                 continue;
             }
-            let clipped = clip(&body, MAX_FILE_PATCH_CHARS);
+            let clipped = clip(&body, file_patch_cap(budget));
             if patch.len() + clipped.len() > patch_budget {
                 skipped_budget += 1;
                 continue;
@@ -684,6 +701,46 @@ mod tests {
         assert!(d.digest.contains("chars of this patch omitted"));
         // The clip is per-file, so the small files still get their patch.
         assert!(d.digest.contains("fn brand_new()"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A raised budget has to raise the per-file cut with it, or "full diff"
+    /// returns the same clipped files and the option means nothing.
+    #[test]
+    fn the_per_file_cap_follows_the_budget() {
+        assert_eq!(file_patch_cap(DEFAULT_MAX_CHARS), MAX_FILE_PATCH_CHARS);
+        assert_eq!(file_patch_cap(4_000), MAX_FILE_PATCH_CHARS);
+        assert!(file_patch_cap(2_000_000) > MAX_FILE_PATCH_CHARS);
+    }
+
+    /// The same branch, asked for in full, keeps a patch that the default budget
+    /// clips.
+    #[test]
+    fn a_bigger_budget_keeps_a_patch_the_default_clips() {
+        let dir = scratch_repo("full");
+        let git = |args: &[&str]| {
+            Command::new("git").current_dir(&dir).args(args).output().unwrap();
+        };
+        std::fs::write(dir.join("src/huge.rs"), "fn f() {}\n".repeat(5_000)).unwrap();
+        git(&["add", "-A"]);
+        git(&["commit", "-qm", "huge"]);
+
+        let default = tauri::async_runtime::block_on(build_branch_digest(
+            dir.to_string_lossy().to_string(),
+            Some("main".to_string()),
+            None,
+        ))
+        .unwrap();
+        let full = tauri::async_runtime::block_on(build_branch_digest(
+            dir.to_string_lossy().to_string(),
+            Some("main".to_string()),
+            Some(2_000_000),
+        ))
+        .unwrap();
+
+        assert!(default.truncated, "the default budget should clip this file");
+        assert!(!full.truncated, "the full budget should not");
+        assert!(full.chars > default.chars);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

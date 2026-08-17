@@ -56,7 +56,32 @@ const SCHEMA_DOC = `{
   ],
   "concerns": [
     { "node": "<node id, optional>", "kind": "risk | open-question | tradeoff", "text": "..." }
-  ]
+  ],
+  "concepts": {
+    "summary": "3-5 sentences in plain language: what this does and why, no file paths",
+    "data": [
+      {
+        "id": "kebab-id",
+        "label": "Human name for this piece of data",
+        "shape": "its concrete shape, e.g. 'JobSpec { prompt, cwd, useWorktree }' or 'markdown text, ~45 KB'",
+        "what": "ONE sentence: what this data is and what it is for",
+        "livesIn": "optional: where it sits — a path, a table, a React state, in-memory",
+        "example": "optional: a short real example, 1-3 lines",
+        "nodes": ["optional: ids of nodes that handle this data"]
+      }
+    ],
+    "stages": [
+      {
+        "id": "kebab-id",
+        "label": "Short name for this step",
+        "actor": "optional: who does it, e.g. 'Frontend', 'Rust core', 'The agent'",
+        "does": "ONE plain sentence: what happens at this step",
+        "consumes": ["<concepts.data id>"],
+        "produces": ["<concepts.data id>"],
+        "nodes": ["optional: ids of the nodes that implement this stage"]
+      }
+    ]
+  }
 }`;
 
 /**
@@ -130,14 +155,37 @@ ${howToRead}
     \`index\`, \`trigger\` or \`migration\` rather than leaving a row of identical boxes.
     Prefer one node per database object over one node called "the database". Leave
     \`subkind\` out when you would be guessing.
+13. **\`concepts\` is the second diagram, and it is written for someone who has never seen
+    this code.** Everything above is a map of the parts; \`concepts\` explains the *data* —
+    what each piece of it is, what is inside it, and which step hands it to which. It is
+    what a new engineer reads first, so:
+    - **Plain language, no file paths and no module names** in \`summary\`, \`does\` and
+      \`what\`. A sentence that only makes sense to someone who already read the code has
+      failed. Write "the conversation, reduced to text plus the list of files it touched",
+      not "the output of build_session_digest".
+    - **\`data\` is the point of the view.** Every entry needs a \`shape\` the reader can
+      hold in their head: a type with its fields, a file format with a rough size, an
+      event name with its payload. "The data" or "a JSON object" is a failure;
+      \`SessionDigest { digest, message_count, chars, truncated }\` is right.
+    - **\`stages\` are 4-8 steps in the order they actually happen**, and they are stages
+      of the *flow*, not layers of the architecture — one stage often spans several nodes,
+      which is correct and expected. Wire every stage with \`consumes\`/\`produces\`: that
+      wiring is what draws the flow, so a stage with neither is invisible.
+    - **Set \`nodes\` wherever you can**, on both stages and data. It is the link between
+      the two diagrams — it lets the reader jump from a step to the parts implementing it.
+    - A \`concepts\` block that merely renames the layers and repeats the node labels is
+      worse than none: it must carry the explanation the system diagram cannot.
 
 ## Output rules
 
 - \`${outPath}\` must contain **only** the JSON object — no prose, no markdown fence.
 - Every \`node.layer\` must match a declared \`layers[].id\`; every step's \`from\`/\`to\` must
   match a declared \`nodes[].id\`. Ids are kebab-case and unique.
+- Every id in a stage's \`consumes\`/\`produces\` must match a declared \`concepts.data[].id\`,
+  and every id in a stage's or datum's \`nodes\` must match a declared \`nodes[].id\`.
 - When you are done, reply with one short paragraph: how many nodes, layers and flows you
-  wrote, and anything you deliberately abstracted or could not determine.`;
+  wrote, how many concept stages and data kinds, and anything you deliberately abstracted
+  or could not determine.`;
 }
 
 /**

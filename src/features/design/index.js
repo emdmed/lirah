@@ -10,3 +10,7 @@ export { useDesignExtraction } from './useDesignExtraction';
 
 // Spec model
 export { validateSpec, normalizeSpec, parseSpecJson, NODE_KINDS, NODE_STATUSES, NODE_CAP } from './spec';
+
+// Concepts diagram
+export { ConceptView } from './ConceptView';
+export { buildConceptModel, formOf, DATA_FORMS } from './conceptModel';

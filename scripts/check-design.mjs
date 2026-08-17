@@ -10,6 +10,7 @@
  * `cargo test --lib design::` in src-tauri.
  */
 import { validateSpec, normalizeSpec, parseSpecJson } from '../src/features/design/spec.js';
+import { buildConceptModel, formOf } from '../src/features/design/conceptModel.js';
 import { layoutDesign, wrapText } from '../src/features/design/designLayout.js';
 import { parseStreamLine, createEventLog, MAX_EVENTS } from '../src/features/design/designEvents.js';
 
@@ -52,6 +53,25 @@ const good = {
     ]},
   ],
   concerns: [{ node: 'runner', kind: 'risk', text: 'auto permission mode can still stall on risky actions' }],
+  concepts: {
+    summary: 'You ask for a job, it runs on its own, and you watch the output arrive.',
+    data: [
+      { id: 'job-spec', label: 'Job request', shape: 'JobSpec { prompt, cwd, useWorktree }',
+        what: 'What you want run and where to run it.', nodes: ['jobs-ctx'] },
+      { id: 'output-chunk', label: 'Output chunk', shape: 'agent-job://output { jobId, chunk }',
+        what: 'A slice of the running job’s output, as it appears.', nodes: ['runner'] },
+      { id: 'run-log', label: 'Run log', shape: 'text file on disk', livesIn: '~/.lirah/jobs/<id>.log',
+        what: 'The whole output, kept so it survives a reload.', nodes: ['log'] },
+    ],
+    stages: [
+      { id: 'ask', label: 'You ask for a job', actor: 'Frontend', does: 'You write a prompt and pick a folder.',
+        produces: ['job-spec'], nodes: ['jobs-ctx'] },
+      { id: 'run', label: 'It runs headless', actor: 'Tauri core', does: 'The CLI is spawned and its output is streamed back.',
+        consumes: ['job-spec'], produces: ['output-chunk', 'run-log'], nodes: ['runner'] },
+      { id: 'watch', label: 'You watch it', actor: 'Frontend', does: 'Each chunk lands in the sidebar as it arrives.',
+        consumes: ['output-chunk'], nodes: ['jobs-ctx'] },
+    ],
+  },
 };
 
 console.log('validateSpec — valid spec');
@@ -288,6 +308,90 @@ console.log('createEventLog');
   check('cap keeps the newest events', events[events.length - 1].label === `line ${MAX_EVENTS + 49}`);
 }
 
+
+console.log('concepts — validation');
+{
+  const noConcepts = structuredClone(good);
+  delete noConcepts.concepts;
+  const r = validateSpec(noConcepts);
+  check('a spec without concepts is still valid', r.ok, JSON.stringify(r.errors));
+  check('missing concepts warns instead', r.warnings.some(w => w.includes('concepts view will be derived')),
+    JSON.stringify(r.warnings));
+
+  const badC = structuredClone(good);
+  badC.concepts.data[0].shape = '';
+  badC.concepts.data[1].what = '   ';
+  badC.concepts.data[2].id = 'job-spec';                 // duplicate
+  badC.concepts.stages[1].consumes = ['ghost-data'];     // unknown datum
+  badC.concepts.stages[2].nodes = ['ghost-node'];        // unknown node
+  badC.concepts.stages[0].does = '';
+  const cp = validateSpec(badC).errors.map(e => e.path);
+  check('flags empty data shape', cp.includes('concepts.data[0].shape'), JSON.stringify(cp));
+  check('flags empty data definition', cp.includes('concepts.data[1].what'), JSON.stringify(cp));
+  check('flags duplicate data id', cp.includes('concepts.data[2].id'), JSON.stringify(cp));
+  check('flags unknown consumed datum', cp.includes('concepts.stages[1].consumes'), JSON.stringify(cp));
+  check('flags unknown linked node', cp.includes('concepts.stages[2].nodes'), JSON.stringify(cp));
+  check('flags missing stage description', cp.includes('concepts.stages[0].does'), JSON.stringify(cp));
+
+  const orphan = structuredClone(good);
+  orphan.concepts.data.push({ id: 'stray', label: 'Stray', shape: 'string', what: 'Nothing reads this.' });
+  const orphanResult = validateSpec(orphan);
+  check('unwired datum is a warning, not an error', orphanResult.ok, JSON.stringify(orphanResult.errors));
+  check('unwired datum is reported', orphanResult.warnings.some(w => w.includes('"stray"')),
+    JSON.stringify(orphanResult.warnings));
+}
+
+console.log('concepts — authored model');
+{
+  const model = buildConceptModel(normalizeSpec(good));
+  check('model is usable', model.ok);
+  check('model is not derived', model.derived === false);
+  check('stages keep source order', model.stages.map(s => s.id).join(',') === 'ask,run,watch');
+  check('data resolved on stages', model.stages[1].consumesData[0]?.label === 'Job request');
+  check('reverse links built', model.dataById.get('job-spec').consumedBy.map(s => s.id).join(',') === 'run');
+  check('producers recorded', model.dataById.get('output-chunk').producedBy.map(s => s.id).join(',') === 'run');
+  // job-spec is produced by `ask` and consumed by the *next* stage → a handoff.
+  check('handoff is what the next stage reads', model.stages[0].handoff.map(d => d.id).join(',') === 'job-spec');
+  // run-log is produced by `run` and read by nobody → terminal, not a handoff.
+  check('unread output is terminal', model.stages[1].terminal.map(d => d.id).join(',') === 'run-log');
+  check('handoff excludes terminal data', !model.stages[1].handoff.some(d => d.id === 'run-log'));
+  check('system links filtered to real nodes', model.stages[1].systemNodes.join(',') === 'runner');
+}
+
+console.log('concepts — derived fallback');
+{
+  const bare = structuredClone(good);
+  delete bare.concepts;
+  const model = buildConceptModel(normalizeSpec(bare));
+  check('derives a usable model', model.ok);
+  check('says it is derived', model.derived === true);
+  check('stages come from layers', model.stages.map(s => s.id).join(',') === 'ui,core,fs');
+  check('layer members become system links', model.stages[0].systemNodes.join(',') === 'jobs-ctx');
+  // Two flows carry `JobSpec { prompt, cwd, useWorktree }` and `JobSpec { prompt, cwd }` —
+  // different strings, so different data. The same string twice must collapse to one.
+  const labels = model.data.map(d => d.label);
+  check('one datum per distinct contract', new Set(labels).size === labels.length, JSON.stringify(labels));
+  check('no invented prose', model.stages.every(s => s.does === '') && model.data.every(d => d.what === ''));
+  // Every derived datum came off an arrow, so both its ends must have landed on a
+  // stage — an unwired one would mean a layer went missing on the way.
+  check('every derived datum is wired both ways',
+    model.data.every(d => d.producedBy.length > 0 && d.consumedBy.length > 0),
+    JSON.stringify(model.data.map(d => [d.label, d.producedBy.length, d.consumedBy.length])));
+  // The bottom layer only receives, so it must be a pure consumer.
+  check('a receiving-only layer produces nothing',
+    model.stages[2].produces.length === 0 && model.stages[2].consumes.length === 1);
+
+  const empty = buildConceptModel(normalizeSpec({ ...bare, flows: [] }));
+  check('no contracts to derive from is not ok', empty.ok === false);
+  check('null spec is handled', buildConceptModel(null).ok === false);
+}
+
+console.log('concepts — data form inference');
+check('a path is a file', formOf('~/.lirah/designs/spec.json', 'Spec') === 'file');
+check('a typed shape is an object', formOf('JobSpec { prompt, cwd }', 'Job') === 'object');
+check('an emitted name is an event', formOf('agent-job://output, emitted per chunk', 'Chunk') === 'event');
+check('markdown is text', formOf('markdown text, ~45 KB', 'Digest') === 'text');
+check('unknown falls back to value', formOf('a count', 'Count') === 'value');
 
 console.log('pipeline stage events');
 check('stage event is parsed', (() => {

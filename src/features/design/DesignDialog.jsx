@@ -14,9 +14,11 @@ import {
   History,
   Maximize2,
   Minus,
+  Network,
   Plus,
   RefreshCw,
   Sparkles,
+  Waypoints,
   X,
 } from 'lucide-react';
 import { useDesignViewport } from './useDesignViewport';
@@ -26,6 +28,8 @@ import { DesignPanel } from './DesignPanel';
 import { DesignActivity } from './DesignActivity';
 import { DesignAskBar } from './DesignAskBar';
 import { DesignSourcePicker } from './DesignSourcePicker';
+import { ConceptView } from './ConceptView';
+import { buildConceptModel } from './conceptModel';
 import { iconForLayer } from './designIcons';
 import { buildAskPrompt, filesOfSelection } from './designAsk';
 
@@ -49,7 +53,7 @@ export function DesignDialog({
   onOpenFile,
   onAsk,
 }) {
-  const { status, statusLabel, isRunning, error, spec, warnings, source } = extraction;
+  const { status, statusLabel, isRunning, error, spec, warnings, truncated, source } = extraction;
 
   const {
     svgRef, graphGRef, containerRef,
@@ -78,12 +82,22 @@ export function DesignDialog({
   const [askOpen, setAskOpen] = useState(false);
   const [storedRun, setStoredRun] = useState(false);
   /**
+   * Which of the two diagrams is on screen. `concepts` explains the data flow in
+   * plain language; `system` is the file-grounded map. They are separate views of
+   * one spec rather than two modes of one renderer — see `ConceptView`.
+   */
+  const [view, setView] = useState('concepts');
+  /**
    * What the last Generate was asked to cover. Held here so "Try again" and
    * "Regenerate" repeat that choice instead of silently falling back to the
    * conversation — a branch diagram that regenerates as a conversation diagram
    * reads as the feature being broken.
    */
-  const [lastSource, setLastSource] = useState({ sourceKind: 'conversation', baseRef: null });
+  const [lastSource, setLastSource] = useState({
+    sourceKind: 'conversation',
+    baseRef: null,
+    depth: 'standard',
+  });
 
   // Offer a previous run only when one is actually on disk.
   // Depend on the stable callback, NOT on `extraction`: the hook returns a fresh
@@ -122,6 +136,36 @@ export function DesignDialog({
   const { positioned, bandRects, measured, routes, totalW, totalH } = useMemo(
     () => layoutDesign(layers, nodes, edges, hiddenLayers),
     [layers, nodes, edges, hiddenLayers]
+  );
+
+  const conceptModel = useMemo(() => buildConceptModel(spec), [spec]);
+
+  /**
+   * Open on whichever view actually helps.
+   *
+   * A written concepts block is the fastest way into an unfamiliar system, so it
+   * leads. A derived one is a skeleton with no sentences in it — leading with that
+   * would sell the feature short — so the system diagram leads instead, with the
+   * concepts tab still one click away.
+   */
+  useEffect(() => {
+    if (!spec) return;
+    setView(conceptModel.ok && !conceptModel.derived ? 'concepts' : 'system');
+  }, [spec, conceptModel]);
+
+  /**
+   * Jump from the concepts view into the system diagram with the relevant parts
+   * already selected — the bridge between the two diagrams, and the reason the
+   * concept model bothers to carry node ids.
+   */
+  const showNodesInSystem = useCallback(
+    (ids) => {
+      const known = (ids || []).filter((id) => nodes.has(id));
+      if (known.length === 0) return;
+      setSelection({ ids: known, primary: known[known.length - 1] });
+      setView('system');
+    },
+    [nodes]
   );
 
   // Frame the whole diagram whenever its extent changes — a new spec, a hidden
@@ -233,9 +277,9 @@ export function DesignDialog({
 
   /** Start a run for an explicitly chosen source, and remember the choice. */
   const handleGenerate = useCallback(
-    ({ sourceKind, baseRef }) => {
-      setLastSource({ sourceKind, baseRef });
-      return extraction.generate({ projectPath, sourceKind, baseRef });
+    ({ sourceKind, baseRef, depth = 'standard' }) => {
+      setLastSource({ sourceKind, baseRef, depth });
+      return extraction.generate({ projectPath, sourceKind, baseRef, depth });
     },
     [extraction, projectPath]
   );
@@ -245,6 +289,18 @@ export function DesignDialog({
     () => extraction.generate({ projectPath, ...lastSource }),
     [extraction, projectPath, lastSource]
   );
+
+  /**
+   * Same source, nothing left out. Offered next to the truncation warning rather
+   * than only in the picker: the moment the reader learns the digest was clipped
+   * is the moment they want the un-clipped one, and sending them back through
+   * "New source" to re-pick the branch and base is three clicks to say "again".
+   */
+  const handleRegenerateFull = useCallback(() => {
+    const next = { ...lastSource, depth: 'full' };
+    setLastSource(next);
+    return extraction.generate({ projectPath, ...next });
+  }, [extraction, projectPath, lastSource]);
 
   // Highlighted edges are drawn last so they sit above the dimmed ones —
   // SVG has no z-index, only document order.
@@ -521,8 +577,10 @@ export function DesignDialog({
   );
 
   // The diagram is only useful if you can keep talking about what you clicked —
-  // this is the way back into the conversation.
-  const askBar = onAsk && !overlay && (
+  // this is the way back into the conversation. Scoped to the system view: the
+  // selection it acts on is a set of *nodes*, which is only what a click means
+  // over there.
+  const askBar = onAsk && !overlay && view === 'system' && (
     <DesignAskBar
       selected={selectedNodes}
       onDeselect={deselectNode}
@@ -537,8 +595,62 @@ export function DesignDialog({
   // ---- chrome ---------------------------------------------------------------
 
   const statusCounts = spec
-    ? `${nodes.size} nodes · ${layers.length} layers · ${edges.length} arrows · ${spec.flows.length} flows`
+    ? view === 'concepts'
+      ? `${conceptModel.stages.length} stages · ${conceptModel.data.length} kinds of data`
+      : `${nodes.size} nodes · ${layers.length} layers · ${edges.length} arrows · ${spec.flows.length} flows`
     : '';
+
+  /**
+   * The two diagrams, as a switch rather than two dialogs: they describe the same
+   * work at different altitudes, and the whole value is being able to move between
+   * them without losing your place.
+   */
+  const viewToggle = spec && (
+    <div className="flex items-center border border-border">
+      {[
+        {
+          id: 'concepts',
+          label: 'Concepts',
+          icon: Waypoints,
+          title: conceptModel.ok
+            ? 'What the data is and how it flows — start here'
+            : 'No concepts data in this spec',
+          disabled: !conceptModel.ok,
+        },
+        {
+          id: 'system',
+          label: 'System',
+          icon: Network,
+          title: 'The parts, their layers and the files they live in',
+          disabled: false,
+        },
+      ].map(({ id, label, icon: Icon, title, disabled }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => setView(id)}
+          disabled={disabled}
+          title={title}
+          aria-pressed={view === id}
+          className={`flex items-center gap-1.5 font-mono text-[10px] px-2 py-1 transition-colors ${
+            view === id
+              ? 'bg-foreground/10 text-foreground'
+              : disabled
+                ? 'text-muted-foreground/40 cursor-not-allowed'
+                : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Icon className="w-3 h-3" />
+          {label}
+          {id === 'concepts' && conceptModel.derived && conceptModel.ok && (
+            <span className="text-amber-500/80" title="Derived — regenerate for the written version">
+              ·
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
 
   const proposedCount = spec ? [...nodes.values()].filter((n) => n.status === 'proposed').length : 0;
 
@@ -548,6 +660,7 @@ export function DesignDialog({
         <DialogHeader className="pr-8 gap-1">
           <DialogTitle className="font-mono text-base flex items-center gap-2">
             <span>{spec ? spec.title : 'Design View'}</span>
+            {viewToggle}
             {spec?.summary && (
               <button
                 type="button"
@@ -570,7 +683,7 @@ export function DesignDialog({
             {spec ? (
               <span className="block max-w-[110ch]">{spec.summary}</span>
             ) : (
-              'Turn a conversation into a system-design diagram.'
+              'Turn a conversation or a branch into a concepts diagram and a system-design diagram.'
             )}
           </DialogDescription>
           {/* Which source produced this diagram is not a detail: it decides what
@@ -603,9 +716,22 @@ export function DesignDialog({
                   </div>
                 ))}
               </div>
-              <Button variant="ghost" size="icon-sm" onClick={() => setShowWarnings(false)}>
-                <X className="w-3 h-3" />
-              </Button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {truncated && lastSource.depth !== 'full' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRegenerateFull}
+                    disabled={isRunning}
+                    title="Re-run the same source with nothing left out of the digest — slower, costs more"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regenerate in full
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon-sm" onClick={() => setShowWarnings(false)}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -613,13 +739,23 @@ export function DesignDialog({
         {/* The drawer floats over the canvas, so it shares this box with it
             instead of taking a row of its own. */}
         <div className="relative flex-1 flex min-h-0">
-          {overlay || diagram}
+          {overlay ||
+            (view === 'concepts' ? (
+              <ConceptView model={conceptModel} onShowNodes={showNodesInSystem} />
+            ) : (
+              diagram
+            ))}
           {askBar}
         </div>
 
         <div className="flex items-center gap-2 border-t border-border pt-2 flex-wrap">
           {spec && (
             <>
+              {/* Canvas controls, the change legend and the layer toggles all act
+                  on the SVG diagram, so they belong to that view only — showing
+                  them over a scrolling document would be controls that do nothing. */}
+              {view === 'system' && (
+              <>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="sm" onClick={zoomOut} title="Zoom out">
                   <Minus className="w-3.5 h-3.5" />
@@ -695,10 +831,18 @@ export function DesignDialog({
                   );
                 })}
               </div>
+              </>
+              )}
 
               <div className="font-mono text-[10px] text-muted-foreground ml-auto flex items-center gap-3">
-                <span className="hidden lg:inline opacity-70">drag to pan · wheel to zoom</span>
-                {proposedCount > 0 && (
+                {view === 'system' ? (
+                  <span className="hidden lg:inline opacity-70">drag to pan · wheel to zoom</span>
+                ) : (
+                  <span className="hidden lg:inline opacity-70">
+                    click a piece of data to trace it
+                  </span>
+                )}
+                {view === 'system' && proposedCount > 0 && (
                   <span className="flex items-center gap-1">
                     <svg width="16" height="8">
                       <line x1="0" y1="4" x2="16" y2="4" stroke="#fbbf24" strokeWidth="1.2" strokeDasharray="4 3" />
@@ -725,7 +869,7 @@ export function DesignDialog({
                 disabled={isRunning}
                 title={`Re-run from ${
                   lastSource.sourceKind === 'branch' ? 'this branch’s changes' : 'this conversation'
-                }`}
+                }${lastSource.depth === 'full' ? ' at full digest depth' : ''}`}
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regenerate
               </Button>

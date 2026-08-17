@@ -54,6 +54,30 @@ const WATCHDOG_INTERVAL_MS = 2_000;
  */
 const JOB_TIMEOUT_MS = 15 * 60_000;
 
+/**
+ * How much source the digest may carry.
+ *
+ * `standard` leaves the budget to Rust — sized so a normal feature fits whole
+ * while the extractor keeps most of its context free to go and read the repo.
+ * `full` is for the branch the standard budget clips: a wide refactor, a
+ * multi-week feature, a conversation of several hundred turns. It costs tokens
+ * and minutes, which is why it is a deliberate choice rather than the default.
+ *
+ * `null` means "no override", so the Rust default stays the single source of
+ * truth for what standard means.
+ */
+export const DIGEST_DEPTHS = {
+  standard: { label: 'Standard', chars: null, hint: 'about 175k tokens of source' },
+  full: { label: 'Full', chars: 2_000_000, hint: 'up to ~500k tokens — slower, costs more' },
+};
+
+const digestBudget = (depth) => DIGEST_DEPTHS[depth]?.chars ?? null;
+
+/** Told only when there is somewhere left to go — at full depth there is not. */
+const retryHint = (depth) =>
+  depth === 'full' ? ' This was already the full digest, so the rest is genuinely too large.'
+    : ' Regenerate with digest depth “Full” to include more of it.';
+
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 const basename = (p) => p.replace(/\/+$/, '').split('/').pop() || 'repo';
 
@@ -64,6 +88,8 @@ export function useDesignExtraction() {
   const [logPath, setLogPath] = useState(null);
   const [spec, setSpec] = useState(null);
   const [warnings, setWarnings] = useState([]);
+  /** Did the digest this spec was drawn from leave source out? */
+  const [truncated, setTruncated] = useState(false);
   const [source, setSource] = useState(null);
   const [runDir, setRunDir] = useState(null);
 
@@ -306,6 +332,10 @@ export function useDesignExtraction() {
       if (truncated && truncationWarning) {
         allWarnings.push(truncationWarning);
       }
+      // Kept as a flag as well as a sentence: the chrome offers a one-click
+      // re-run at full depth, and matching on warning text to decide that would
+      // break the first time the wording changed.
+      setTruncated(!!truncated);
 
       setWarnings(allWarnings);
       setSpec(normalizeSpec(verified));
@@ -380,7 +410,7 @@ export function useDesignExtraction() {
    * description of the source for the UI, and the prompt that reads it.
    */
   const prepareConversation = useCallback(
-    async ({ projectPath }) => {
+    async ({ projectPath, depth = 'standard' }) => {
       const entry = await invoke('get_active_claude_session', { projectPath });
       if (!entry) {
         throw new Error(
@@ -397,13 +427,14 @@ export function useDesignExtraction() {
       const digest = await invoke('build_session_digest', {
         sessionPath: entry.full_path,
         projectPath,
+        maxChars: digestBudget(depth),
       });
       if (!digest.digest?.trim() || digest.message_count === 0) {
         throw new Error('That session has no conversation content to diagram.');
       }
       await stage(
         'Digest built',
-        `${digest.message_count} messages · ${Math.round(digest.chars / 1024)} KB${
+        `${digest.message_count} messages · ${Math.round(digest.chars / 1024)} KB · ${depth} depth${
           digest.truncated ? ' · truncated' : ''
         }`
       );
@@ -415,8 +446,7 @@ export function useDesignExtraction() {
       return {
         digest: digest.digest,
         truncated: digest.truncated,
-        truncationWarning:
-          'The conversation was long; older messages were omitted from the digest.',
+        truncationWarning: `The conversation was long; older messages were omitted from the digest.${retryHint(depth)}`,
         // No base was chosen, so git grounding auto-detects one as it always has.
         classifyBase: null,
         source: {
@@ -436,27 +466,27 @@ export function useDesignExtraction() {
 
   /** As `prepareConversation`, but for what this branch changed. */
   const prepareBranch = useCallback(
-    async ({ projectPath, baseRef }) => {
+    async ({ projectPath, baseRef, depth = 'standard' }) => {
       // Rust raises a readable error for "not a repo", "no base found" and
       // "nothing changed" — those are the three ways this source is unusable and
       // each one tells the user what to do instead, so they pass straight through.
       const digest = await invoke('build_branch_digest', {
         projectPath,
         baseRef: baseRef || null,
+        maxChars: digestBudget(depth),
       });
       await stage('Branch resolved', `${digest.branch} vs ${digest.base} (${digest.base_sha})`);
       await stage(
         'Digest built',
         `${digest.commit_count} commits · ${digest.file_count} files · ${Math.round(
           digest.chars / 1024
-        )} KB${digest.truncated ? ' · patches clipped' : ''}`
+        )} KB · ${depth} depth${digest.truncated ? ' · patches clipped' : ''}`
       );
 
       return {
         digest: digest.digest,
         truncated: digest.truncated,
-        truncationWarning:
-          'The branch diff was large; some patches were clipped or omitted from the digest.',
+        truncationWarning: `The branch diff was large; some patches were clipped or omitted from the digest.${retryHint(depth)}`,
         // The base git *resolved*, not the one asked for: an override that did not
         // resolve fell back to detection, and the colouring must follow the digest.
         classifyBase: digest.base,
@@ -538,7 +568,13 @@ export function useDesignExtraction() {
   }, []);
 
   const generate = useCallback(
-    async ({ projectPath, cli = 'claude', sourceKind = 'conversation', baseRef = null }) => {
+    async ({
+      projectPath,
+      cli = 'claude',
+      sourceKind = 'conversation',
+      baseRef = null,
+      depth = 'standard',
+    }) => {
       if (!projectPath) {
         setError('No project path — open a folder first.');
         setStatus('error');
@@ -547,6 +583,7 @@ export function useDesignExtraction() {
       cancelledRef.current = false;
       setError(null);
       setWarnings([]);
+      setTruncated(false);
       setSpec(null);
       eventLogRef.current.reset();
       stagesRef.current = [];
@@ -558,8 +595,8 @@ export function useDesignExtraction() {
         // --- 1 + 2. resolve and digest whichever source the user picked ---
         const prepared =
           sourceKind === 'branch'
-            ? await prepareBranch({ projectPath, baseRef })
-            : await prepareConversation({ projectPath });
+            ? await prepareBranch({ projectPath, baseRef, depth })
+            : await prepareConversation({ projectPath, depth });
         setSource(prepared.source);
 
         const home = await invoke('get_home_dir');
@@ -696,6 +733,7 @@ export function useDesignExtraction() {
     setSpec(null);
     setError(null);
     setWarnings([]);
+    setTruncated(false);
     setStatus('idle');
   }, []);
 
@@ -711,6 +749,7 @@ export function useDesignExtraction() {
     error,
     spec,
     warnings,
+    truncated,
     source,
     runDir,
     generate,

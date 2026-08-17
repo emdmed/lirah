@@ -18,13 +18,22 @@
 use serde::Serialize;
 use std::io::{BufRead, BufReader};
 
-/// Per-message text cap, so one pasted stack trace or file dump cannot crowd
-/// out the rest of the conversation.
+/// Floor for the per-message text cap, so one pasted stack trace or file dump
+/// cannot crowd out the rest of the conversation. The real cap scales with the
+/// budget — see `msg_cap`.
 const MAX_MSG_CHARS: usize = 6_000;
 
-/// Default digest budget. Roughly 60k tokens — large enough for a long design
-/// conversation, small enough to leave the extractor room to explore the repo.
-const DEFAULT_MAX_CHARS: usize = 240_000;
+/// Default digest budget. Roughly 175k tokens — large enough that a long design
+/// conversation survives whole, and still a fraction of the extractor's context
+/// so it has room to go and read the repo.
+const DEFAULT_MAX_CHARS: usize = 700_000;
+
+/// The per-message cap for a given budget. A raised budget has to lift the
+/// per-message cut too, or asking for the full conversation still returns every
+/// long turn chopped at the same place.
+fn msg_cap(budget: usize) -> usize {
+    (budget / 40).max(MAX_MSG_CHARS)
+}
 
 /// Cap on how many distinct file paths we report; beyond this the list stops
 /// being useful grounding and starts being noise.
@@ -211,7 +220,7 @@ pub async fn build_session_digest(
                     // Pure tool_result turn, or nothing but harness plumbing.
                     continue;
                 }
-                blocks.push(format!("## user\n{}", clip(text.trim(), MAX_MSG_CHARS)));
+                blocks.push(format!("## user\n{}", clip(text.trim(), msg_cap(budget))));
             }
             "assistant" => {
                 let content = message.get("content").and_then(|v| v.as_array());
@@ -266,7 +275,7 @@ pub async fn build_session_digest(
                 }
                 let mut rendered = String::from("## assistant\n");
                 if !texts.is_empty() {
-                    rendered.push_str(&clip(texts.join("\n\n").trim(), MAX_MSG_CHARS));
+                    rendered.push_str(&clip(texts.join("\n\n").trim(), msg_cap(budget)));
                     rendered.push('\n');
                 }
                 if !tools.is_empty() {
@@ -567,13 +576,26 @@ mod tests {
 
     #[test]
     fn per_message_cap_limits_one_giant_paste() {
-        let huge = "y".repeat(50_000);
+        let huge = "y".repeat(500_000);
         let line = format!(
             r#"{{"type":"user","message":{{"role":"user","content":"{}"}}}}"#,
             huge
         );
         let d = digest_of("per-msg-cap", &[&line], None);
-        assert!(d.chars < 8_000, "one message expanded to {} chars", d.chars);
+        assert!(
+            d.chars < msg_cap(DEFAULT_MAX_CHARS) + 2_000,
+            "one message expanded to {} chars",
+            d.chars
+        );
         assert!(d.digest.contains("chars omitted"));
+    }
+
+    /// The cap scales with the budget, but never below the floor — a caller who
+    /// asks for a small digest still gets whole short messages in it.
+    #[test]
+    fn the_per_message_cap_follows_the_budget() {
+        assert_eq!(msg_cap(DEFAULT_MAX_CHARS), DEFAULT_MAX_CHARS / 40);
+        assert_eq!(msg_cap(4_000), MAX_MSG_CHARS);
+        assert!(msg_cap(2_000_000) > msg_cap(DEFAULT_MAX_CHARS));
     }
 }

@@ -11,6 +11,19 @@
  *
  * `flows` is also the only source of edges: the rendered graph is the union of
  * every flow's steps, which keeps structure and data flow from drifting apart.
+ *
+ * One spec feeds two diagrams:
+ *
+ *   - the **system** diagram — `layers`/`nodes`/`flows`, grounded in real files;
+ *   - the **concepts** diagram — the optional `concepts` block, which names the
+ *     data itself and the stages it moves through, in plain language and with no
+ *     file paths, for a reader who has never seen the code.
+ *
+ * They are separate collections rather than two renderings of one, because they
+ * answer different questions and abstract at different levels: a concepts stage
+ * routinely covers several system nodes, and a piece of data routinely has no
+ * single node that owns it. `concepts` is optional so that a spec written before
+ * it existed still renders — see `conceptModel.js` for the derived fallback.
  */
 
 /** Node kinds the renderer has a colour for. Unknown kinds fall back to `module`. */
@@ -171,6 +184,118 @@ export function validateSpec(spec) {
     }
   }
 
+  // --- concepts ---
+  //
+  // The second diagram. Optional, because a spec produced before this existed is
+  // still a perfectly good system diagram — the concepts view falls back to
+  // deriving what it can (see `conceptModel.js`) rather than refusing to draw.
+  if (spec.concepts !== undefined) {
+    if (!spec.concepts || typeof spec.concepts !== 'object' || Array.isArray(spec.concepts)) {
+      err('concepts', 'must be an object when present');
+    } else {
+      const { summary, data, stages } = spec.concepts;
+      if (summary !== undefined && typeof summary !== 'string') {
+        err('concepts.summary', 'must be a string when present');
+      }
+
+      const dataIds = new Set();
+      if (!Array.isArray(data) || data.length === 0) {
+        err('concepts.data', 'must be a non-empty array — the concepts view is about the data');
+      } else {
+        data.forEach((item, i) => {
+          const at = `concepts.data[${i}]`;
+          if (!item || typeof item !== 'object') {
+            err(at, 'must be an object');
+            return;
+          }
+          if (!isNonEmptyString(item.id)) err(`${at}.id`, 'must be a non-empty string');
+          else if (dataIds.has(item.id)) err(`${at}.id`, `duplicate data id "${item.id}"`);
+          else dataIds.add(item.id);
+          if (!isNonEmptyString(item.label)) err(`${at}.label`, 'must be a non-empty string');
+          // `shape` and `what` are the two halves of "what this data is". A data
+          // item missing either is a name with nothing behind it, which is
+          // exactly what this view exists to avoid.
+          if (!isNonEmptyString(item.shape)) {
+            err(`${at}.shape`, 'must be a non-empty string — the concrete shape of this data');
+          }
+          if (!isNonEmptyString(item.what)) {
+            err(`${at}.what`, 'must be a non-empty string — one sentence on what this data is');
+          }
+          if (item.nodes !== undefined && !isStringArray(item.nodes)) {
+            err(`${at}.nodes`, 'must be an array of strings when present');
+          }
+        });
+      }
+
+      const stageIds = new Set();
+      if (!Array.isArray(stages) || stages.length === 0) {
+        err('concepts.stages', 'must be a non-empty array');
+      } else {
+        stages.forEach((stage, i) => {
+          const at = `concepts.stages[${i}]`;
+          if (!stage || typeof stage !== 'object') {
+            err(at, 'must be an object');
+            return;
+          }
+          if (!isNonEmptyString(stage.id)) err(`${at}.id`, 'must be a non-empty string');
+          else if (stageIds.has(stage.id)) err(`${at}.id`, `duplicate stage id "${stage.id}"`);
+          else stageIds.add(stage.id);
+          if (!isNonEmptyString(stage.label)) err(`${at}.label`, 'must be a non-empty string');
+          if (!isNonEmptyString(stage.does)) {
+            err(`${at}.does`, 'must be a non-empty string — one plain sentence on what happens here');
+          }
+          if (stage.actor !== undefined && !isNonEmptyString(stage.actor)) {
+            err(`${at}.actor`, 'must be a non-empty string when present');
+          }
+          for (const end of ['consumes', 'produces']) {
+            if (stage[end] === undefined) continue;
+            if (!isStringArray(stage[end])) {
+              err(`${at}.${end}`, 'must be an array of strings when present');
+              continue;
+            }
+            for (const id of stage[end]) {
+              if (dataIds.size > 0 && !dataIds.has(id)) {
+                err(`${at}.${end}`, `"${id}" is not a declared concepts.data id`);
+              }
+            }
+          }
+          // The link back to the system diagram. Wrong ids here would break the
+          // "show these parts" jump, so they are checked like any other edge.
+          if (stage.nodes !== undefined) {
+            if (!isStringArray(stage.nodes)) {
+              err(`${at}.nodes`, 'must be an array of strings when present');
+            } else {
+              for (const id of stage.nodes) {
+                if (nodeIds.size > 0 && !nodeIds.has(id)) {
+                  err(`${at}.nodes`, `"${id}" is not a declared node id`);
+                }
+              }
+            }
+          }
+        });
+
+        // Data nobody reads or writes is either a missing wire or a leftover;
+        // either way the reader is owed the diagram's own admission of it.
+        const wired = new Set();
+        for (const stage of stages) {
+          for (const id of [...(stage?.consumes || []), ...(stage?.produces || [])]) wired.add(id);
+        }
+        const orphans = [...dataIds].filter((id) => !wired.has(id));
+        if (orphans.length) {
+          warnings.push(
+            `concepts.data ${orphans.map((id) => `"${id}"`).join(', ')} ${
+              orphans.length === 1 ? 'is' : 'are'
+            } never consumed or produced by a stage — it will not appear on the flow.`
+          );
+        }
+      }
+    }
+  } else {
+    warnings.push(
+      'No concepts block — the concepts view will be derived from the system diagram. Regenerate for the plain-language version.'
+    );
+  }
+
   // --- concerns ---
   if (spec.concerns !== undefined && !Array.isArray(spec.concerns)) {
     err('concerns', 'must be an array when present');
@@ -258,6 +383,10 @@ export function normalizeSpec(spec) {
     edges: [...edges.values()],
     flows,
     concerns,
+    // Passed through raw on purpose: turning it into the concepts render model
+    // needs the *normalized* nodes and edges (to derive a fallback when the block
+    // is absent), so that job belongs to `buildConceptModel`, not here.
+    concepts: spec.concepts || null,
   };
 }
 
