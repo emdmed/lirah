@@ -74,11 +74,21 @@ export function ProjectTab({ projectPath, isActive, tabId }) {
   // Inactive tabs keep their layout (so xterm sees real dimensions and the
   // ResizeObserver fires a single time on the actual viewport when the tab
   // becomes active) but are hidden via visibility + pointer-events.
+  //
+  // The translate is what stops background tabs burning CPU. xterm pauses its
+  // renderer through an IntersectionObserver on the screen element, but
+  // visibility:hidden leaves the geometry untouched, so a hidden terminal keeps
+  // intersecting and keeps painting — three tabs with agents running means three
+  // renderers going flat out for one visible terminal. Moving the box out of the
+  // viewport makes it genuinely non-intersecting, so xterm's own pause path
+  // engages and resumes with a full refresh on return. Unlike display:none the
+  // element keeps its size, so ResizeObserver readings and fit() stay correct.
   const style = {
     position: 'absolute',
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
+    transform: isActive ? 'none' : 'translateX(-200vw)',
     visibility: isActive ? 'visible' : 'hidden',
     pointerEvents: isActive ? 'auto' : 'none',
     zIndex: isActive ? 1 : 0,
@@ -936,6 +946,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
           key={terminalKey}
           ref={terminalRef}
           theme={theme.terminal}
+          isActive={isActive}
           onSessionReady={handleSessionReady}
           onReady={() => setTerminalReady(true)}
           onSearchFocus={handleSearchFocus}

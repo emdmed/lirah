@@ -162,7 +162,10 @@ export function useDesignExtraction() {
 
     unOut = await listen('agent-job://output', (event) => {
       if (event.payload?.jobId !== jobId) return;
-      eventLogRef.current.push(event.payload.chunk || '');
+      // One event carries a coalesced batch of lines.
+      for (const line of event.payload.lines || []) {
+        eventLogRef.current.push(line.chunk || '');
+      }
     });
     unDone = await listen('agent-job://done', (event) => {
       if (event.payload?.jobId !== jobId) return;

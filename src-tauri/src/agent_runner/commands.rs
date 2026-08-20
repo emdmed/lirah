@@ -5,15 +5,87 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+
+#[derive(serde::Serialize, Clone)]
+struct JobLine {
+    stream: String,
+    chunk: String,
+}
 
 #[derive(serde::Serialize, Clone)]
 struct JobOutput {
     #[serde(rename = "jobId")]
     job_id: String,
-    stream: String,
-    chunk: String,
+    lines: Vec<JobLine>,
+}
+
+/// Flush buffered job output at most this often. Slower than the PTY's 8ms —
+/// nobody types into a headless job, so the only cost of waiting is how fresh
+/// the log panel looks.
+const JOB_FLUSH_INTERVAL: Duration = Duration::from_millis(60);
+/// Flush early once this many lines accumulate, so a burst keeps moving.
+const JOB_FLUSH_LINES: usize = 200;
+
+/// Coalesce a job's output before it crosses the Rust→JS IPC boundary.
+///
+/// Emitting one event per line meant a chatty agent (or `--output-format
+/// stream-json`, which prints an event per message, tool call and hook) drove
+/// hundreds of React state updates a second, each re-rendering the whole jobs
+/// sidebar. This batches on the same principle as the PTY reader: block while
+/// idle so a quiet job costs no wakeups, flush on line count or elapsed time.
+///
+/// stdout and stderr feed one channel so their interleaving is preserved; each
+/// line keeps its own stream tag inside the batch.
+fn batch_job_output(rx: Receiver<JobLine>, app: AppHandle, job_id: String) {
+    let mut pending: Vec<JobLine> = Vec::new();
+    // Some(_) once lines are buffered: the instant by which we must flush.
+    let mut deadline: Option<Instant> = None;
+    let emit = |lines: Vec<JobLine>| {
+        let _ = app.emit(
+            "agent-job://output",
+            JobOutput {
+                job_id: job_id.clone(),
+                lines,
+            },
+        );
+    };
+    loop {
+        let next = match deadline {
+            None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            Some(dl) => match dl.checked_duration_since(Instant::now()) {
+                Some(remaining) => rx.recv_timeout(remaining),
+                None => Err(RecvTimeoutError::Timeout),
+            },
+        };
+        match next {
+            Ok(line) => {
+                if pending.is_empty() {
+                    deadline = Some(Instant::now() + JOB_FLUSH_INTERVAL);
+                }
+                pending.push(line);
+                if pending.len() >= JOB_FLUSH_LINES {
+                    deadline = None;
+                    emit(std::mem::take(&mut pending));
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                if !pending.is_empty() {
+                    deadline = None;
+                    emit(std::mem::take(&mut pending));
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                if !pending.is_empty() {
+                    emit(pending);
+                }
+                break;
+            }
+        }
+    }
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -202,49 +274,53 @@ pub fn run_agent_job(
         .map_err(|e| format!("Failed to lock job store: {}", e))?
         .insert(job_id.clone(), pid);
 
-    // Stream stdout line-by-line.
-    if let Some(stdout) = child.stdout.take() {
+    // Both readers feed one channel; a batcher thread turns it into coalesced
+    // events. Every sender must be dropped for the batcher to finish, so the
+    // original `tx` is moved into the last reader (or dropped outright below).
+    let (tx, rx) = std::sync::mpsc::channel::<JobLine>();
+    let batcher = {
         let app = app_handle.clone();
         let id = job_id.clone();
+        std::thread::spawn(move || batch_job_output(rx, app, id))
+    };
+
+    // Stream stdout line-by-line into the batcher.
+    let stdout_reader = child.stdout.take().map(|stdout| {
         let log = log_file.clone();
+        let tx = tx.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
                 append_log(&log, &line);
-                let _ = app.emit(
-                    "agent-job://output",
-                    JobOutput {
-                        job_id: id.clone(),
-                        stream: "stdout".to_string(),
-                        chunk: line,
-                    },
-                );
+                let _ = tx.send(JobLine {
+                    stream: "stdout".to_string(),
+                    chunk: line,
+                });
             }
-        });
-    }
+        })
+    });
 
-    // Stream stderr line-by-line.
-    if let Some(stderr) = child.stderr.take() {
-        let app = app_handle.clone();
-        let id = job_id.clone();
+    // Stream stderr line-by-line into the same batcher.
+    let stderr_reader = child.stderr.take().map(|stderr| {
         let log = log_file.clone();
+        let tx = tx.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().map_while(Result::ok) {
                 append_log(&log, &line);
-                let _ = app.emit(
-                    "agent-job://output",
-                    JobOutput {
-                        job_id: id.clone(),
-                        stream: "stderr".to_string(),
-                        chunk: line,
-                    },
-                );
+                let _ = tx.send(JobLine {
+                    stream: "stderr".to_string(),
+                    chunk: line,
+                });
             }
-        });
-    }
+        })
+    });
+    drop(tx);
 
     // Wait for completion in a background thread, then emit done + clean up.
+    // The readers and the batcher are joined first: a process can exit while its
+    // pipes still hold buffered output, and batching widens that window, so
+    // without this the frontend could finalize a job before its last lines land.
     let app = app_handle.clone();
     let store_inner = store.inner().clone();
     let id = job_id.clone();
@@ -253,6 +329,13 @@ pub fn run_agent_job(
             Ok(status) => status.code().unwrap_or(-1),
             Err(_) => -1,
         };
+        if let Some(handle) = stdout_reader {
+            let _ = handle.join();
+        }
+        if let Some(handle) = stderr_reader {
+            let _ = handle.join();
+        }
+        let _ = batcher.join();
         if let Ok(mut jobs) = store_inner.jobs.lock() {
             jobs.remove(&id);
         }

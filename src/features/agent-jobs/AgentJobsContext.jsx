@@ -6,6 +6,11 @@ const AgentJobsContext = createContext(undefined);
 
 const MAX_OUTPUT_LINES = 500;
 
+// Job-list persistence: coalesce bursts, but never go longer than this without
+// writing, so a long-running job's state survives a crash.
+const PERSIST_DEBOUNCE = 400;
+const PERSIST_MAX_STALENESS = 3000;
+
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -335,7 +340,9 @@ export function AgentJobsProvider({ children }) {
         const liveSet = new Set(liveIds);
 
         const recovered = await Promise.all(
-          saved.map(async (job) => {
+          saved.map(async (entry) => {
+            // Snapshots carry no output (it lives in the job's log file).
+            const job = { ...entry, output: entry.output || [] };
             if (job.status !== 'running' || liveSet.has(job.id)) return job;
             // Process is gone (app was restarted, or it finished while detached).
             // Recover any changes from the worktree so review/discard still work.
@@ -382,12 +389,29 @@ export function AgentJobsProvider({ children }) {
   }, []);
 
   // Debounced write-back of the job list whenever it changes (post-hydration).
+  //
+  // `output` is deliberately excluded: the full stream is already mirrored to
+  // logPath on disk, so persisting up to MAX_OUTPUT_LINES per job meant
+  // stringifying and rewriting megabytes of text that a reload can read back
+  // from the log anyway.
+  //
+  // A running job changes state faster than the debounce, which used to reset
+  // the timer forever and leave nothing persisted for the whole run — so a write
+  // is forced once the snapshot is older than PERSIST_MAX_STALENESS.
+  const lastPersistRef = useRef(0);
   useEffect(() => {
     if (!hydratedRef.current || !stateFileRef.current) return;
     const file = stateFileRef.current;
-    const timer = setTimeout(() => {
-      invoke('write_file_content', { path: file, content: JSON.stringify(jobs) }).catch(() => {});
-    }, 400);
+    const write = () => {
+      lastPersistRef.current = Date.now();
+      const snapshot = jobs.map(({ output, ...rest }) => rest);
+      invoke('write_file_content', { path: file, content: JSON.stringify(snapshot) }).catch(() => {});
+    };
+    if (Date.now() - lastPersistRef.current >= PERSIST_MAX_STALENESS) {
+      write();
+      return;
+    }
+    const timer = setTimeout(write, PERSIST_DEBOUNCE);
     return () => clearTimeout(timer);
   }, [jobs]);
 
@@ -456,10 +480,14 @@ export function AgentJobsProvider({ children }) {
     };
 
     (async () => {
+      // The backend coalesces output, so one event carries many lines — appending
+      // the whole batch in a single state update instead of one per line is what
+      // keeps a chatty job from re-rendering the sidebar hundreds of times a second.
       const uo = await listen('agent-job://output', (event) => {
-        const { jobId, stream, chunk } = event.payload;
+        const { jobId, lines } = event.payload;
+        if (!lines?.length) return;
         patchJob(jobId, (j) => ({
-          output: [...j.output, { stream, chunk }].slice(-MAX_OUTPUT_LINES),
+          output: [...j.output, ...lines].slice(-MAX_OUTPUT_LINES),
         }));
       });
       const ud = await listen('agent-job://done', (event) => {

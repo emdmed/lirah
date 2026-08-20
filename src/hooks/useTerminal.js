@@ -11,7 +11,7 @@ import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import '@xterm/xterm/css/xterm.css';
 
-export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false) {
+export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -26,6 +26,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const pendingDimsRef = useRef(null);
   const sigwinchTimerRef = useRef(null);
   const onDataDisposableRef = useRef(null);
+  // WebGL renderer state. A lost context drops us to the DOM renderer, which is
+  // far slower under heavy output, so track it and rebuild when we can.
+  const webglRef = useRef(null);
+  const [rendererLost, setRendererLost] = useState(false);
+  const rendererRetriesRef = useRef(0);
   const { error, warning } = useToast();
 
   // Initialize terminal
@@ -72,17 +77,22 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // rendering to the GPU — an order-of-magnitude win under bursty output.
     // Must be loaded after open(). If the context can't be created (headless,
     // driver issues) or is lost, dispose and fall back to the DOM renderer.
-    let webgl = null;
+    // Browsers cap live WebGL contexts and evict the least recently used one
+    // first — with several tabs, each holding a primary and maybe a secondary
+    // terminal, a background tab's context is exactly what gets taken. Losing it
+    // used to be permanent: dispose, fall back to DOM, stay slow forever. Now the
+    // loss is recorded and the renderer is rebuilt when the tab is active again.
     try {
-      webgl = new WebglAddon();
+      const webgl = new WebglAddon();
       webgl.onContextLoss(() => {
-        webgl?.dispose();
-        webgl = null;
+        webgl.dispose();
+        if (webglRef.current === webgl) webglRef.current = null;
+        setRendererLost(true);
       });
       term.loadAddon(webgl);
+      webglRef.current = webgl;
     } catch (e) {
-      webgl?.dispose();
-      webgl = null;
+      webglRef.current = null;
       console.debug('WebGL renderer unavailable, using DOM renderer:', e?.message);
     }
 
@@ -98,7 +108,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     setSearchAddon(search);
 
     return () => {
-      webgl?.dispose();
+      webglRef.current?.dispose();
+      webglRef.current = null;
       term.dispose();
     };
   }, [terminalRef]);
@@ -356,6 +367,30 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       textarea.removeEventListener('blur', handleBlur);
     };
   }, [terminal, onFocusChange]);
+
+  // Rebuild the GPU renderer once the terminal is on screen again. Retrying
+  // while hidden would just lose the context to the next foreground terminal, and
+  // a few failures in a row means this machine can't hold another context — stay
+  // on the DOM renderer rather than thrashing.
+  useEffect(() => {
+    if (!terminal || !rendererLost || !isActive) return;
+    if (rendererRetriesRef.current >= 3) return;
+    rendererRetriesRef.current += 1;
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => {
+        webgl.dispose();
+        if (webglRef.current === webgl) webglRef.current = null;
+        setRendererLost(true);
+      });
+      terminal.loadAddon(webgl);
+      webglRef.current = webgl;
+      setRendererLost(false);
+      terminal.refresh(0, terminal.rows - 1);
+    } catch (e) {
+      console.debug('WebGL renderer could not be restored:', e?.message);
+    }
+  }, [terminal, rendererLost, isActive]);
 
   // Apply preference changes to this already-open terminal, including ones made
   // in another window of the app.
