@@ -25,7 +25,8 @@ export function useTerminalSettings() {
   const [networkIsolation, setNetworkIsolation] = useLocalStorageState('nevo-terminal:network-isolation', false);
   const [showTitleBar, setShowTitleBar] = useLocalStorageState('nevo-terminal:show-title-bar', true);
   const [keepFilesAfterSend, setKeepFilesAfterSend] = useLocalStorageState('nevo-terminal:keep-files-after-send', false);
-  // Run the Ctrl+K launch automatically the first time a tab becomes active.
+  // Launch the CLI automatically when a starred (bookmarked) repo is opened.
+  // Never applies to tabs restored at startup — that isn't a deliberate act.
   const [autoLaunchCli, setAutoLaunchCli] = useLocalStorageState('nevo-terminal:auto-launch-cli', true);
   const [autoChangelogEnabled, setAutoChangelogEnabled] = useLocalStorageState('nevo-terminal:auto-changelog-enabled', false);
   const [autoChangelogTarget, setAutoChangelogTarget] = useLocalStorageState('nevo-terminal:auto-changelog-target', 'CHANGELOG.md');

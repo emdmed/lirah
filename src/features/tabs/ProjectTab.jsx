@@ -153,9 +153,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   const foldersRef = useRef(folders);
   const currentPathRef = useRef(currentPath);
   const terminalReadyRef = useRef(terminalReady);
-  // Guards the one-shot CLI auto-launch (see the effect further down).
-  const autoLaunchedRef = useRef(false);
-  const autoLaunchTimerRef = useRef(null);
 
   useEffect(() => { foldersRef.current = folders; }, [folders]);
   useEffect(() => { currentPathRef.current = currentPath; }, [currentPath]);
@@ -329,8 +326,15 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     }
   }, [currentPath, terminalSessionId]);
 
-  // Navigate to bookmark
-  const navigateToBookmark = useCallback(async (bookmark) => {
+  // Navigate to bookmark. Jumping to a saved repo kills the CLI that was running
+  // in the old directory, so it's relaunched in the new one — otherwise opening a
+  // starred repo drops you at a bare shell and you have to press Ctrl+K yourself.
+  //
+  // This is the ONLY automatic launch: opening a starred repo is a deliberate
+  // act, whereas restoring persisted tabs at startup is not, so a restored tab
+  // stays at its shell until you press Ctrl+K.
+  // `autoLaunch: false` is for callers that run their own launch sequence.
+  const navigateToBookmark = useCallback(async (bookmark, { autoLaunch = true } = {}) => {
     if (!terminalSessionId) return;
     try {
       await terminateCliProcess();
@@ -342,10 +346,15 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
       if (viewMode === 'flat') await loadFolders();
       else if (viewMode === 'tree') await treeView.loadTreeData();
       terminalRef.current?.focus?.();
+      if (autoLaunch && settings.autoLaunchCli) {
+        // Let the cd settle so the CLI starts in the new directory.
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await launchClaude();
+      }
     } catch (error) {
       console.error('Failed to navigate to bookmark:', error);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess]);
+  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess, settings.autoLaunchCli, launchClaude]);
 
   // Handle loading context from another instance's session
   const handleLoadInstanceContext = useCallback(async (session) => {
@@ -416,9 +425,8 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
 
   // Handle project selection from initial dialog (with splash screen) — kept for bookmark navigation
   const handleSelectProject = useCallback(async (bookmark) => {
-    // This path launches the CLI itself; claim the auto-launch so it can't fire too.
-    autoLaunchedRef.current = true;
-    await navigateToBookmark(bookmark);
+    // This path runs its own launch-and-wait sequence below.
+    await navigateToBookmark(bookmark, { autoLaunch: false });
     await new Promise(resolve => {
       const checkNavigation = setInterval(() => {
         if (foldersRef.current.length > 0 && currentPathRef.current) {
@@ -547,27 +555,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     onToggleMarkdownFilter: treeView.handleToggleMarkdownFilter,
     isActive,
   });
-
-  // Starting the app used to drop you at a bare shell in nav mode: every session
-  // began with a manual Ctrl+K. Do that first Ctrl+K for you — switch to context
-  // mode and launch the selected CLI — once per tab, the first time the tab is
-  // active with a live terminal. Restored background tabs wait until you
-  // actually switch to them, so reopening four tabs doesn't spawn four agents.
-  useEffect(() => {
-    if (!settings.autoLaunchCli || autoLaunchedRef.current) return;
-    if (!isActive || !terminalReady || !terminalSessionId) return;
-    autoLaunchedRef.current = true;
-    setViewMode('tree');
-    sidebar.setSidebarOpen(true);
-    treeView.loadTreeData();
-    // Give the shell a moment to finish sourcing its rc before typing at it.
-    autoLaunchTimerRef.current = setTimeout(() => {
-      autoLaunchTimerRef.current = null;
-      launchClaude();
-    }, 400);
-  }, [settings.autoLaunchCli, isActive, terminalReady, terminalSessionId, launchClaude, sidebar, treeView]);
-
-  useEffect(() => () => clearTimeout(autoLaunchTimerRef.current), []);
 
   // Clear folder expansion when sidebar closes
   useEffect(() => {

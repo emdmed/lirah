@@ -426,7 +426,7 @@ export const StatusBar = memo(({
                 {autoLaunchCli
                   ? <Bot className="mr-2 w-3 h-3" />
                   : <Bot className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-                Auto-launch CLI: {autoLaunchCli ? 'ON' : 'OFF'}
+                Auto-launch on starred: {autoLaunchCli ? 'ON' : 'OFF'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
                 {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
