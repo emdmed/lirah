@@ -40,6 +40,7 @@ const shortcuts = [
     items: [
       { keys: ['Ctrl', 'Shift', 'D'], description: 'Open Token Dashboard' },
       { keys: ['Ctrl', 'Shift', 'B'], description: 'Open Budget Settings' },
+      { keys: ['Ctrl', 'Shift', 'F'], description: 'Search terminal output' },
     ],
   },
   {

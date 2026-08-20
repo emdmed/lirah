@@ -25,6 +25,8 @@ export function useTerminalSettings() {
   const [networkIsolation, setNetworkIsolation] = useLocalStorageState('nevo-terminal:network-isolation', false);
   const [showTitleBar, setShowTitleBar] = useLocalStorageState('nevo-terminal:show-title-bar', true);
   const [keepFilesAfterSend, setKeepFilesAfterSend] = useLocalStorageState('nevo-terminal:keep-files-after-send', false);
+  // Run the Ctrl+K launch automatically the first time a tab becomes active.
+  const [autoLaunchCli, setAutoLaunchCli] = useLocalStorageState('nevo-terminal:auto-launch-cli', true);
   const [autoChangelogEnabled, setAutoChangelogEnabled] = useLocalStorageState('nevo-terminal:auto-changelog-enabled', false);
   const [autoChangelogTarget, setAutoChangelogTarget] = useLocalStorageState('nevo-terminal:auto-changelog-target', 'CHANGELOG.md');
   const [autoChangelogTrigger, setAutoChangelogTrigger] = useLocalStorageState('nevo-terminal:auto-changelog-trigger', 'commit');
@@ -52,6 +54,7 @@ export function useTerminalSettings() {
     networkIsolation, setNetworkIsolation,
     showTitleBar, setShowTitleBar,
     keepFilesAfterSend, setKeepFilesAfterSend,
+    autoLaunchCli, setAutoLaunchCli,
     selectedCli, setSelectedCli,
     autoChangelogEnabled, setAutoChangelogEnabled,
     autoChangelogTarget, setAutoChangelogTarget,

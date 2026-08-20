@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback, useImperativeHandle, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useImperativeHandle, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { SearchAddon } from '@xterm/addon-search';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useToast } from '../features/toast';
+import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import '@xterm/xterm/css/xterm.css';
 
 export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false) {
@@ -15,11 +18,14 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [isReady, setIsReady] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [sandboxFailed, setSandboxFailed] = useState(false);
+  const [searchAddon, setSearchAddon] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const isFocusedRef = useRef(false);
   const sessionIdRef = useRef(null);
   const lastDimsRef = useRef({ rows: 0, cols: 0 });
   const pendingDimsRef = useRef(null);
   const sigwinchTimerRef = useRef(null);
+  const onDataDisposableRef = useRef(null);
   const { error, warning } = useToast();
 
   // Initialize terminal
@@ -33,15 +39,29 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       fontFamily: '"Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace',
       theme: theme,
       allowProposedApi: true,
+      // User-configurable; xterm's 1000-line default loses most of an agent turn.
+      scrollback: getScrollback(),
     });
 
     // Create addons
     const fit = new FitAddon();
     const webLinks = new WebLinksAddon();
+    const search = new SearchAddon();
 
     // Load addons
     term.loadAddon(fit);
     term.loadAddon(webLinks);
+    term.loadAddon(search);
+
+    // Unicode 11 widths. Without it xterm uses the v6 table, which is one column
+    // short on most emoji — enough to smear the redraws of TUI agents (Ink) that
+    // position the cursor absolutely.
+    try {
+      term.loadAddon(new Unicode11Addon());
+      term.unicode.activeVersion = '11';
+    } catch (e) {
+      console.debug('Unicode 11 addon unavailable:', e?.message);
+    }
 
     // Open terminal in DOM
     term.open(terminalRef.current);
@@ -75,6 +95,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
 
     setTerminal(term);
     setFitAddon(fit);
+    setSearchAddon(search);
 
     return () => {
       webgl?.dispose();
@@ -87,6 +108,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     if (!terminal) return;
 
     const disposable = terminal.attachCustomKeyEventHandler((event) => {
+      // Scrollback search. Ctrl+F is already the file-tree search, so this takes
+      // Ctrl+Shift+F — and it comes before the secondary-mode passthrough so the
+      // secondary terminal gets search too.
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f' && event.type === 'keydown') {
+        event.preventDefault();
+        setSearchOpen(true);
+        return false;
+      }
+
       // In secondary mode, pass all keys through to the terminal (nvim/lazygit need them)
       if (secondaryMode) {
         return true;
@@ -168,12 +198,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
           unlisten = fn;
         }
 
-        // Handle terminal input
-        terminal.onData((data) => {
+        // Handle terminal input. Held so the cleanup below can dispose it — an
+        // undisposed handler would double every keystroke if this effect re-ran.
+        const dataDisposable = terminal.onData((data) => {
           invoke('write_to_terminal', { sessionId: id, data }).catch((error) => {
             console.error('Failed to write to terminal:', error);
           });
         });
+        if (cancelled) dataDisposable.dispose();
+        else onDataDisposableRef.current = dataDisposable;
 
         setIsReady(true);
 
@@ -221,6 +254,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       if (unlisten) {
         unlisten();
       }
+      onDataDisposableRef.current?.dispose();
+      onDataDisposableRef.current = null;
       const id = sessionIdRef.current;
       if (id) {
         sessionIdRef.current = null;
@@ -322,6 +357,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     };
   }, [terminal, onFocusChange]);
 
+  // Apply preference changes to this already-open terminal, including ones made
+  // in another window of the app.
+  useEffect(() => {
+    if (!terminal) return;
+    return subscribeTerminalPrefs(() => {
+      terminal.options.scrollback = getScrollback();
+    });
+  }, [terminal]);
+
   // Update theme
   useEffect(() => {
     if (terminal && theme) {
@@ -354,6 +398,25 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     }
   }), [terminal, isReady, handleResize]);
 
+  // The search addon only reports match counts when decorations are enabled, and
+  // decoration colors aren't themed for us — derive them from the terminal theme
+  // so highlights stay legible on light and dark alike.
+  const searchDecorations = useMemo(
+    () => ({
+      matchBackground: theme?.selectionBackground || '#585b70',
+      matchOverviewRuler: theme?.yellow || '#f9e2af',
+      activeMatchBackground: theme?.yellow || '#f9e2af',
+      activeMatchColorOverviewRuler: theme?.red || '#f38ba8',
+    }),
+    [theme]
+  );
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    searchAddon?.clearDecorations?.();
+    terminal?.focus();
+  }, [searchAddon, terminal]);
+
   return {
     terminal,
     sessionId,
@@ -361,5 +424,9 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     isFocused,
     sandboxFailed,
     handleResize,
+    searchAddon,
+    searchOpen,
+    searchDecorations,
+    closeSearch,
   };
 }

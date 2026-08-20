@@ -28,6 +28,7 @@ import {
 } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'Claude Code', icon: Bot },
@@ -193,6 +194,7 @@ function ThemeSwitcherMenuItem() {
 export const StatusBar = memo(({
   viewMode, currentPath, sessionId, theme, onToggleHelp,
   selectedCli, onOpenCliSettings, showTitleBar,
+  autoLaunchCli, onToggleAutoLaunchCli,
   onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
@@ -420,10 +422,17 @@ export const StatusBar = memo(({
                 File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
                 <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleAutoLaunchCli} className="cursor-pointer py-1">
+                {autoLaunchCli
+                  ? <Bot className="mr-2 w-3 h-3" />
+                  : <Bot className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
+                Auto-launch CLI: {autoLaunchCli ? 'ON' : 'OFF'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
                 {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
                 Title Bar: {showTitleBar ? 'ON' : 'OFF'}
               </DropdownMenuItem>
+              <ScrollbackMenuItem />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Workspaces</DropdownMenuLabel>
@@ -462,3 +471,35 @@ export const StatusBar = memo(({
   </>
   );
 });
+
+
+// Terminal scrollback depth. Applies live to every open terminal (including
+// other windows) through the terminalPrefs subscription.
+function ScrollbackMenuItem() {
+  const [value, setValue] = useState(() => getScrollback());
+
+  useEffect(() => subscribeTerminalPrefs(() => setValue(getScrollback())), []);
+
+  const current = SCROLLBACK_OPTIONS.find((o) => o.value === value);
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="py-1">
+        <Terminal className="mr-2 w-3 h-3" />
+        Scrollback: {current ? current.label.replace(' lines', '') : value.toLocaleString()}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="text-xs">
+        {SCROLLBACK_OPTIONS.map((o) => (
+          <DropdownMenuItem
+            key={o.value}
+            onClick={() => setScrollback(o.value)}
+            className="cursor-pointer py-1"
+          >
+            {o.value === value && <Check className="mr-2 w-3 h-3" />}
+            <span className={o.value === value ? '' : 'ml-5'}>{o.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}

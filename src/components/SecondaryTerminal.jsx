@@ -1,12 +1,13 @@
 import { useRef, useEffect, useState, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
+import { TerminalSearchBar } from './TerminalSearchBar';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
 const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir }, ref) => {
   const terminalRef = useRef(null);
 
-  const { handleResize, sessionId, isFocused } = useTerminal(
+  const { handleResize, sessionId, isFocused, searchAddon, searchOpen, searchDecorations, closeSearch } = useTerminal(
     terminalRef,
     theme,
     ref,
@@ -73,6 +74,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
         ref={terminalRef}
         style={{ width: '100%', height: '100%', overflow: 'hidden' }}
       />
+      {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
     </div>
   );
 }));
