@@ -19,6 +19,8 @@ import {
   Copy,
   Archive,
   ArchiveRestore,
+  Swords,
+  Trophy,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -31,6 +33,7 @@ import { useBranchName } from '../git/useBranchName';
 import { MarkdownViewerDialog } from '../markdown';
 import { useAgentJobs } from './AgentJobsContext';
 import { RunJobDialog } from './RunJobDialog';
+import { RaceCompareDialog } from './RaceCompareDialog';
 
 const MIN_WIDTH = 224;
 const MAX_WIDTH = 560;
@@ -71,8 +74,36 @@ function isReconcilable(job) {
   );
 }
 
+// Fold race candidates into a single entry so they render as one comparison
+// group, in the position of the race's first (newest) candidate.
+function groupJobs(list) {
+  const out = [];
+  const seen = new Set();
+  for (const job of list) {
+    if (!job.raceId) {
+      out.push({ type: 'job', key: job.id, job });
+      continue;
+    }
+    if (seen.has(job.raceId)) continue;
+    seen.add(job.raceId);
+    out.push({ type: 'race', key: job.raceId, jobs: list.filter((j) => j.raceId === job.raceId) });
+  }
+  return out;
+}
+
 export function RightSidebar({ projectPath }) {
-  const { jobs, cancelJob, approveJob, rerunJob, reconcileJobs, discardJob, archiveJob, unarchiveJob } = useAgentJobs();
+  const {
+    jobs,
+    cancelJob,
+    approveJob,
+    rerunJob,
+    reconcileJobs,
+    discardJob,
+    archiveJob,
+    unarchiveJob,
+    pickRaceWinner,
+    reviseJob,
+  } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const toast = useToast();
   const branchName = useBranchName(projectPath);
@@ -81,7 +112,12 @@ export function RightSidebar({ projectPath }) {
   const [tab, setTab] = useState('jobs');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [review, setReview] = useState(null); // { jobId, filePath }
+  // Review notes pinned to lines of the job being reviewed, sent back to the
+  // agent as a revision instead of being retyped as a fresh prompt.
+  const [notes, setNotes] = useState([]);
+  const [sendingNotes, setSendingNotes] = useState(false);
   const [reportPath, setReportPath] = useState(null); // markdown report being viewed
+  const [compareRaceId, setCompareRaceId] = useState(null); // race being compared A-vs-B
   const [selected, setSelected] = useState(() => new Set()); // job ids picked for reconcile
   const [reconciling, setReconciling] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -196,6 +232,57 @@ export function RightSidebar({ projectPath }) {
     }
   };
 
+  // Settle a race: apply this candidate, throw the others away.
+  const handlePickWinner = async (id, force = false) => {
+    const job = jobs.find((j) => j.id === id);
+    const count = job?.changedFiles.length ?? 0;
+    const result = await pickRaceWinner(id, { force });
+    if (result?.blocked) {
+      const n = result.typecheck?.errorCount ?? 0;
+      toast.error(
+        `Not applied — ${n} type error${n === 1 ? '' : 's'} in this candidate. Pick another, or use "Keep anyway".`
+      );
+    } else if (result?.ok) {
+      const others = result.discarded || 0;
+      toast.success(
+        `Kept ${job?.cli || 'candidate'} — ${count} file${count === 1 ? '' : 's'} applied, ${others} other candidate${
+          others === 1 ? '' : 's'
+        } discarded`
+      );
+    } else if (result?.error) {
+      toast.error(`Apply failed: ${result.error}`);
+    }
+  };
+
+  const openReview = (job) => {
+    setNotes([]);
+    setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null });
+  };
+
+  const addNote = (note) =>
+    setNotes((prev) => [...prev, { ...note, id: `${Date.now()}-${prev.length}` }]);
+
+  const removeNote = (id) => setNotes((prev) => prev.filter((n) => n.id !== id));
+
+  // Ship the notes back to the agent that wrote the diff — it re-runs in the
+  // same worktree with the original task plus the feedback.
+  const handleSendNotes = async () => {
+    if (!review || notes.length === 0 || sendingNotes) return;
+    setSendingNotes(true);
+    try {
+      const result = await reviseJob(review.jobId, notes);
+      if (result?.ok) {
+        toast.info(`Sent ${notes.length} note${notes.length === 1 ? '' : 's'} back to the agent`);
+        setNotes([]);
+        setReview(null);
+      } else {
+        toast.error(`Could not send notes: ${result?.error || 'unknown error'}`);
+      }
+    } finally {
+      setSendingNotes(false);
+    }
+  };
+
   const handleRerun = async (id) => {
     await rerunJob(id);
     toast.info('Re-running job');
@@ -237,6 +324,31 @@ export function RightSidebar({ projectPath }) {
   }, [jobs.length]);
 
   const reviewJob = review ? jobs.find((j) => j.id === review.jobId) : null;
+  const compareJobs = compareRaceId ? jobs.filter((j) => j.raceId === compareRaceId) : [];
+
+  // One place that knows how a job card is wired, shared by the active list, the
+  // race groups and the archived section.
+  const renderCard = (job, { archived = false } = {}) => (
+    <JobCard
+      key={job.id}
+      job={job}
+      now={now}
+      selectable={!archived && isReconcilable(job)}
+      selected={selected.has(job.id)}
+      onToggleSelect={() => toggleSelect(job.id)}
+      onCancel={() => cancelJob(job.id)}
+      onApprove={(force) => handleApprove(job.id, force)}
+      // A race candidate is applied by winning, which also clears the others.
+      onPickWinner={job.raceId ? (force) => handlePickWinner(job.id, force) : null}
+      onRerun={() => handleRerun(job.id)}
+      onDiscard={() => discardJob(job.id)}
+      onArchive={archived ? undefined : () => archiveJob(job.id)}
+      onUnarchive={archived ? () => unarchiveJob(job.id) : undefined}
+      onReview={() => openReview(job)}
+      onReport={() => setReportPath(job.reportPath)}
+      onCopyOutput={() => handleCopyOutput(job)}
+    />
+  );
 
   if (collapsed) {
     return (
@@ -353,24 +465,18 @@ export function RightSidebar({ projectPath }) {
               </div>
             ) : (
               <div className="flex flex-col gap-1.5 px-2">
-                {visibleJobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    now={now}
-                    selectable={isReconcilable(job)}
-                    selected={selected.has(job.id)}
-                    onToggleSelect={() => toggleSelect(job.id)}
-                    onCancel={() => cancelJob(job.id)}
-                    onApprove={(force) => handleApprove(job.id, force)}
-                    onRerun={() => handleRerun(job.id)}
-                    onDiscard={() => discardJob(job.id)}
-                    onArchive={() => archiveJob(job.id)}
-                    onReview={() => setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null })}
-                    onReport={() => setReportPath(job.reportPath)}
-                    onCopyOutput={() => handleCopyOutput(job)}
-                  />
-                ))}
+                {groupJobs(visibleJobs).map((entry) =>
+                  entry.type === 'race' ? (
+                    <RaceGroup
+                      key={entry.key}
+                      jobs={entry.jobs}
+                      renderCard={renderCard}
+                      onCompare={() => setCompareRaceId(entry.key)}
+                    />
+                  ) : (
+                    renderCard(entry.job)
+                  )
+                )}
               </div>
             )}
 
@@ -388,24 +494,7 @@ export function RightSidebar({ projectPath }) {
                 </button>
                 {showArchived && (
                   <div className="flex flex-col gap-1.5 px-2 pt-0.5 opacity-80">
-                    {archivedJobs.map((job) => (
-                      <JobCard
-                        key={job.id}
-                        job={job}
-                        now={now}
-                        selectable={false}
-                        selected={false}
-                        onToggleSelect={() => {}}
-                        onCancel={() => cancelJob(job.id)}
-                        onApprove={(force) => handleApprove(job.id, force)}
-                        onRerun={() => handleRerun(job.id)}
-                        onDiscard={() => discardJob(job.id)}
-                        onUnarchive={() => unarchiveJob(job.id)}
-                        onReview={() => setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null })}
-                        onReport={() => setReportPath(job.reportPath)}
-                        onCopyOutput={() => handleCopyOutput(job)}
-                      />
-                    ))}
+                    {archivedJobs.map((job) => renderCard(job, { archived: true }))}
                   </div>
                 )}
               </div>
@@ -425,7 +514,18 @@ export function RightSidebar({ projectPath }) {
             repoPath={reviewJob.cwd}
             changedFiles={reviewJob.changedFiles}
             onFileChange={(filePath) => setReview((r) => ({ ...r, filePath }))}
+            annotations={notes}
+            onAddAnnotation={reviewJob.status === 'running' ? undefined : addNote}
+            onRemoveAnnotation={removeNote}
+            onSendAnnotations={handleSendNotes}
+            sendingAnnotations={sendingNotes}
           />
+        </div>
+      )}
+
+      {compareJobs.length > 1 && (
+        <div className="fixed inset-0 z-50">
+          <RaceCompareDialog jobs={compareJobs} onClose={() => setCompareRaceId(null)} />
         </div>
       )}
 
@@ -439,6 +539,47 @@ export function RightSidebar({ projectPath }) {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// Candidates of one race, boxed together so they read as alternatives to choose
+// between rather than as unrelated jobs that all want applying.
+function RaceGroup({ jobs, renderCard, onCompare }) {
+  const running = jobs.filter((j) => j.status === 'running').length;
+  const settled = jobs.some((j) => j.status === 'applied');
+  // Comparing needs two candidates that actually produced changes.
+  const comparable = jobs.filter((j) => j.status !== 'running' && j.changedFiles.length > 0).length;
+  return (
+    <div className="rounded-sm border border-primary/30 bg-primary/[0.03]">
+      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[10px] uppercase tracking-wide text-primary/80">
+        <Swords className="h-3 w-3" />
+        Race
+        <span className="tabular-nums text-muted-foreground/70">
+          {jobs.length} candidate{jobs.length === 1 ? '' : 's'}
+        </span>
+        {running > 0 && (
+          <span className="ml-auto normal-case tabular-nums text-muted-foreground/70">
+            {running} running
+          </span>
+        )}
+        {running === 0 && comparable > 1 && (
+          <button
+            onClick={onCompare}
+            title="Diff two candidates against each other"
+            className="ml-auto flex items-center gap-1 rounded-sm px-1 py-0.5 normal-case text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer transition-colors"
+          >
+            <GitCompare className="h-3 w-3" />
+            Compare
+          </button>
+        )}
+      </div>
+      {!settled && (
+        <div className="px-2 pb-1 text-[10px] leading-snug text-muted-foreground/70">
+          Same prompt, separate worktrees. Keeping one applies it and discards the rest.
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5 p-1.5 pt-0.5">{jobs.map((job) => renderCard(job))}</div>
     </div>
   );
 }
@@ -468,7 +609,7 @@ function Dot() {
   return <span className="text-muted-foreground/30">·</span>;
 }
 
-function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onApprove, onRerun, onDiscard, onArchive, onUnarchive, onReview, onReport, onCopyOutput }) {
+function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onApprove, onPickWinner, onRerun, onDiscard, onArchive, onUnarchive, onReview, onReport, onCopyOutput }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
@@ -689,14 +830,26 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         )}
         {canApprove && (
           <PrimaryAction
-            icon={tcErrors ? AlertTriangle : Check}
-            label={tcChecking ? 'Checking…' : tcErrors ? 'Apply anyway' : 'Apply'}
-            onClick={() => onApprove(tcErrors)}
+            icon={tcErrors ? AlertTriangle : onPickWinner ? Trophy : Check}
+            label={
+              tcChecking
+                ? 'Checking…'
+                : tcErrors
+                ? onPickWinner
+                  ? 'Keep anyway'
+                  : 'Apply anyway'
+                : onPickWinner
+                ? 'Keep this'
+                : 'Apply'
+            }
+            onClick={() => (onPickWinner ? onPickWinner(tcErrors) : onApprove(tcErrors))}
             disabled={tcChecking}
             variant={tcErrors ? 'danger' : 'primary'}
             title={
               tcErrors
                 ? 'These changes have type errors — applying anyway skips the check. Review before committing.'
+                : onPickWinner
+                ? 'Keep this candidate: applies it to your working tree and discards the other candidates'
                 : 'Apply these changes into your working tree — uncommitted, so you review and commit them yourself'
             }
           />

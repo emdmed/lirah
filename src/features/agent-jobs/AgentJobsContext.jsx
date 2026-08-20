@@ -188,6 +188,87 @@ function buildReconcilePrompt(jobs, conflictJobs) {
   ].join('\n');
 }
 
+// Build the follow-up prompt for a revision: the agent's own worktree is already
+// in the reviewed state, so it only needs the notes plus enough of the original
+// goal to keep the intent. Notes carry file:line so it can go straight there.
+function buildRevisionPrompt(job, notes) {
+  const lines = notes.map((n) => {
+    const where = n.fromLine === n.toLine ? `${n.relPath}:${n.fromLine}` : `${n.relPath}:${n.fromLine}-${n.toLine}`;
+    const snippet = n.snippet ? `\n   > ${n.snippet.split('\n').join('\n   > ')}` : '';
+    return `- ${where} — ${n.note}${snippet}`;
+  });
+  return [
+    'You already made changes in this working directory. They have been reviewed and need revision.',
+    '',
+    'Original task:',
+    '',
+    (job.prompt || '').trim(),
+    '',
+    `Review notes (${notes.length}):`,
+    '',
+    lines.join('\n'),
+    '',
+    'Address every note in place, here in this working directory. Keep the rest of the work intact — do not revert or redo changes the notes did not ask about. End with a short summary of what you changed for each note.',
+  ].join('\n');
+}
+
+// Remove worktrees under ~/.lirah/worktrees/ that no job in `liveJobs` claims —
+// jobs whose app was killed mid-run, or whose entry was dropped without a clean
+// discard, otherwise leak a full checkout each. Only ever touches paths inside
+// that directory. Best-effort; failures are silent by design.
+//
+// Runs once at startup against the just-hydrated job list, which is shared
+// across instances via jobs-state.json — so a second window's worktrees are
+// claimed too, apart from one it launched in the last few hundred ms (the
+// debounce window on that file).
+async function gcOrphanWorktrees(home, liveJobs) {
+  if (!home) return 0;
+  const root = `${home}/.lirah/worktrees`;
+  let entries = [];
+  try {
+    entries = await invoke('read_directory', { path: root });
+  } catch {
+    return 0; // No worktrees directory yet.
+  }
+  const claimed = new Set(liveJobs.map((j) => j.worktreePath).filter(Boolean));
+  let removed = 0;
+  for (const entry of entries) {
+    if (!entry.is_dir || claimed.has(entry.path)) continue;
+    if (!entry.path.startsWith(`${root}/`)) continue; // paranoia: never stray outside
+    try {
+      // Resolve the repo that owns this worktree so git can tear down its admin
+      // files too — a bare `rm -rf` would leave the parent repo with a stale
+      // worktree registration.
+      let repoRoot = null;
+      try {
+        const common = await invoke('run_git_command', {
+          repoPath: entry.path,
+          args: ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+        });
+        repoRoot = common.trim().replace(/\/\.git\/?$/, '') || null;
+      } catch {
+        // --path-format needs git 2.31+. The first entry of `worktree list` is
+        // always the main worktree, which is the repo we need.
+        const list = await invoke('run_git_command', {
+          repoPath: entry.path,
+          args: ['worktree', 'list', '--porcelain'],
+        });
+        repoRoot = list.split('\n')[0]?.replace(/^worktree\s+/, '').trim() || null;
+      }
+      if (!repoRoot) continue;
+      await invoke('run_git_command', {
+        repoPath: repoRoot,
+        args: ['worktree', 'remove', '--force', entry.path],
+      });
+      await invoke('run_git_command', { repoPath: repoRoot, args: ['worktree', 'prune'] });
+      removed += 1;
+    } catch {
+      // Not a worktree, repo gone, or removal refused — leave it alone.
+    }
+  }
+  return removed;
+}
+
 async function fireNotification(title, body) {
   try {
     if (typeof Notification === 'undefined') return;
@@ -209,6 +290,9 @@ export function AgentJobsProvider({ children }) {
   const [selectedContextFiles, setSelectedContextFiles] = useState([]);
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
+  // Ids already run through finalizeJob this session. Closes the gap between a
+  // job finishing and its status landing in state.
+  const finalizedRef = useRef(new Set());
 
   const registerContextFiles = useCallback((files) => {
     setSelectedContextFiles(Array.isArray(files) ? files : []);
@@ -283,6 +367,9 @@ export function AgentJobsProvider({ children }) {
         );
 
         if (!cancelled) setJobs(recovered);
+        // Sweep worktrees no surviving job claims. Runs after recovery so a job
+        // that was merely interrupted keeps its changes.
+        if (!cancelled) await gcOrphanWorktrees(home, recovered);
       } catch {
         // Persistence unavailable — run in-memory only.
       } finally {
@@ -316,6 +403,7 @@ export function AgentJobsProvider({ children }) {
       // to 'done' or fire a spurious report + notification.
       const snapshot = jobsRef.current.find((j) => j.id === job.id);
       if (snapshot && snapshot.status !== 'running') return;
+      finalizedRef.current.add(job.id);
       let changedFiles = [];
       try {
         const status = await invoke('run_git_command', {
@@ -341,10 +429,30 @@ export function AgentJobsProvider({ children }) {
         endedAt,
         reportPath,
       });
-      fireNotification(
-        success ? 'Agent job finished' : 'Agent job failed',
-        `${job.label} — ${changedFiles.length} file(s) changed`
-      );
+      // A race would otherwise pop one notification per candidate and none for
+      // the thing you actually wait on — all candidates being ready to compare.
+      if (job.raceId) {
+        const others = jobsRef.current.filter((j) => j.raceId === job.raceId && j.id !== job.id);
+        // jobsRef can lag a sibling that finished moments ago, so consult the
+        // finalized set too — otherwise two near-simultaneous finishes each see
+        // the other as running and nobody announces the race.
+        const pending = others.some(
+          (j) => j.status === 'running' && !finalizedRef.current.has(j.id)
+        );
+        if (!pending) {
+          const all = [...others.map((j) => j.changedFiles.length), changedFiles.length];
+          const withChanges = all.filter((n) => n > 0).length;
+          fireNotification(
+            'Race ready',
+            `${all.length} candidates finished — ${withChanges} with changes. Compare and keep one.`
+          );
+        }
+      } else {
+        fireNotification(
+          success ? 'Agent job finished' : 'Agent job failed',
+          `${job.label} — ${changedFiles.length} file(s) changed`
+        );
+      }
     };
 
     (async () => {
@@ -377,7 +485,18 @@ export function AgentJobsProvider({ children }) {
 
   // Launch a background job. If useWorktree, run it in an isolated git worktree
   // so file changes stay quarantined until approved.
-  const launchJob = useCallback(async ({ cli, prompt, label, repoPath, useWorktree = true, intendedFiles = [] }) => {
+  const launchJob = useCallback(async ({
+    cli,
+    prompt,
+    label,
+    repoPath,
+    useWorktree = true,
+    intendedFiles = [],
+    // Set when this job is one candidate of a race — several agents solving the
+    // same prompt in parallel, of which the user keeps one.
+    raceId = null,
+    raceSize = 0,
+  }) => {
     const id = makeId();
     const home = await invoke('get_home_dir').catch(() => null);
     // Full output is mirrored here so it survives the in-memory cap and reloads.
@@ -434,6 +553,8 @@ export function AgentJobsProvider({ children }) {
       // Files the user flagged as modifiable — used to warn when a later job's
       // scope overlaps this one's before it's even launched.
       intendedFiles: Array.isArray(intendedFiles) ? intendedFiles : [],
+      raceId,
+      raceSize,
       output: [],
       changedFiles: [],
       exitCode: null,
@@ -453,6 +574,33 @@ export function AgentJobsProvider({ children }) {
     }
     return id;
   }, [patchJob]);
+
+  // Fan one prompt out across several agents at once. Every candidate gets its
+  // own isolated worktree, so they can be compared side by side and exactly one
+  // kept — the rest are torn down with their changes. `clis` is the list of CLIs
+  // to run; `copies` runs each CLI that many times (same agent, different luck).
+  const launchRace = useCallback(async ({ clis, copies = 1, label, ...rest }) => {
+    const list = (clis || []).filter(Boolean);
+    if (list.length === 0) return { raceId: null, ids: [] };
+    const n = list.length * Math.max(1, copies);
+    // A single candidate isn't a race — launch it as an ordinary job so it isn't
+    // wrapped in compare UI it doesn't need.
+    if (n === 1) {
+      const id = await launchJob({ ...rest, cli: list[0], label });
+      return { raceId: null, ids: [id] };
+    }
+    const raceId = makeId();
+    const ids = [];
+    for (const cli of list) {
+      for (let i = 0; i < Math.max(1, copies); i += 1) {
+        const suffix = copies > 1 ? `${cli} #${i + 1}` : cli;
+        ids.push(
+          await launchJob({ ...rest, cli, label: `${label} · ${suffix}`, raceId, raceSize: n })
+        );
+      }
+    }
+    return { raceId, ids };
+  }, [launchJob]);
 
   const cancelJob = useCallback(async (id) => {
     try {
@@ -688,6 +836,71 @@ export function AgentJobsProvider({ children }) {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, []);
 
+  // Settle a race: apply one candidate and tear the rest down. Losing candidates
+  // are cancelled if still running, then discarded with their worktrees — the
+  // winner is the only thing that reaches the working tree. The apply goes
+  // through approveJob, so the typecheck gate still applies.
+  const pickRaceWinner = useCallback(async (id, { force = false } = {}) => {
+    const winner = jobsRef.current.find((j) => j.id === id);
+    if (!winner) return { ok: false, error: 'Job not found.' };
+    const result = await approveJob(id, { force });
+    if (!result.ok) return result;
+    const losers = winner.raceId
+      ? jobsRef.current.filter((j) => j.raceId === winner.raceId && j.id !== id)
+      : [];
+    for (const loser of losers) {
+      if (loser.status === 'running') await cancelJob(loser.id);
+      await discardJob(loser.id);
+    }
+    return { ...result, discarded: losers.length };
+  }, [approveJob, cancelJob, discardJob]);
+
+  // Re-run a finished job in its own worktree with review notes attached, so
+  // feedback on a diff goes straight back to the agent that wrote it instead of
+  // becoming a fresh job with none of the context. The job keeps its identity —
+  // same id, same worktree, same card — and simply goes back to running.
+  const reviseJob = useCallback(async (id, notes) => {
+    const job = jobsRef.current.find((j) => j.id === id);
+    if (!job) return { ok: false, error: 'Job not found.' };
+    if (job.status === 'running') return { ok: false, error: 'Job is still running.' };
+    if (!notes?.length) return { ok: false, error: 'No review notes to send.' };
+
+    const revision = (job.revisions || 0) + 1;
+    const prompt = buildRevisionPrompt(job, notes);
+    const notesBlock = notes
+      .map((n) => `- ${n.relPath}:${n.fromLine}${n.toLine !== n.fromLine ? `-${n.toLine}` : ''} — ${n.note}`)
+      .join('\n');
+
+    patchJob(id, (j) => ({
+      status: 'running',
+      exitCode: null,
+      error: null,
+      endedAt: null,
+      startedAt: Date.now(),
+      typecheck: null,
+      revisions: revision,
+      // Fold the notes into the stored prompt so the run report records what the
+      // agent was actually asked for across revisions.
+      prompt: `${j.prompt}\n\n## Review notes (revision ${revision})\n${notesBlock}`,
+      output: [...j.output, { stream: 'stdout', chunk: `— revision ${revision}: ${notes.length} review note(s) —` }],
+    }));
+
+    try {
+      await invoke('run_agent_job', {
+        jobId: id,
+        cli: job.cli,
+        prompt,
+        cwd: job.cwd,
+        logPath: job.logPath,
+        streamJson: false,
+      });
+    } catch (e) {
+      patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
+      return { ok: false, error: String(e) };
+    }
+    return { ok: true, revision };
+  }, [patchJob]);
+
   // Find existing jobs in the same repo whose scope (files they intend to touch,
   // or already changed) overlaps a prospective set of repo-relative paths. Used
   // to warn before launching a job that would collide with a pending one, so
@@ -712,6 +925,9 @@ export function AgentJobsProvider({ children }) {
   const value = {
     jobs,
     launchJob,
+    launchRace,
+    pickRaceWinner,
+    reviseJob,
     findOverlappingJobs,
     cancelJob,
     approveJob,

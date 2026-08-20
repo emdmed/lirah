@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, X, Pin, PinOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Pin, PinOff, MessageSquarePlus, Send, Trash2, Loader2 } from 'lucide-react';
 import { RetroSpinner } from '../../components/ui/RetroSpinner';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
@@ -16,6 +16,11 @@ import { usePinnedFiles } from '../pinned-files';
  * @param {string} repoPath - Path to the git repository root
  * @param {Array} changedFiles - Optional list of all changed files for navigation
  * @param {function} onFileChange - Optional callback when navigating to a different file
+ * @param {Array} annotations - Review notes already pinned to this diff (all files)
+ * @param {function} onAddAnnotation - Enables the review-notes bar when provided
+ * @param {function} onRemoveAnnotation - Drops one note by id
+ * @param {function} onSendAnnotations - Ships the collected notes back to the agent
+ * @param {boolean} sendingAnnotations - True while that send is in flight
  */
 export function GitDiffDialog({
   open,
@@ -23,13 +28,31 @@ export function GitDiffDialog({
   filePath,
   repoPath,
   changedFiles = [],
-  onFileChange
+  onFileChange,
+  annotations = [],
+  onAddAnnotation,
+  onRemoveAnnotation,
+  onSendAnnotations,
+  sendingAnnotations = false,
 }) {
   const [diffResult, setDiffResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const scrollContainerRef = useRef(null);
+
+  // Review notes: a line selection in the diff plus free text, collected here
+  // and sent back to the agent that produced the diff.
+  const [selection, setSelection] = useState(null);
+  const [noteText, setNoteText] = useState('');
+  const annotationsEnabled = typeof onAddAnnotation === 'function';
+  const handleSelectionChange = useCallback((next) => setSelection(next), []);
+
+  // A stale selection from the previous file would pin a note to the wrong lines.
+  useEffect(() => {
+    setSelection(null);
+    setNoteText('');
+  }, [filePath]);
 
   const { isPinned, togglePin } = usePinnedFiles();
   const pinned = filePath ? isPinned(filePath) : false;
@@ -125,6 +148,22 @@ export function GitDiffDialog({
   const relativePath = filePath && repoPath
     ? filePath.replace(repoPath + '/', '')
     : filePath;
+
+  // Notes are collected across the whole review; only this file's show inline.
+  const fileNotes = annotations.filter((n) => n.filePath === filePath);
+
+  const addNote = () => {
+    if (!selection || !noteText.trim()) return;
+    onAddAnnotation({
+      filePath,
+      relPath: relativePath,
+      fromLine: selection.fromLine,
+      toLine: selection.toLine,
+      snippet: selection.snippet,
+      note: noteText.trim(),
+    });
+    setNoteText('');
+  };
 
   if (!open) return null;
 
@@ -241,9 +280,85 @@ export function GitDiffDialog({
             isNewFile={diffResult.is_new_file}
             isDeletedFile={diffResult.is_deleted_file}
             scrollContainerRef={scrollContainerRef}
+            onSelectionChange={annotationsEnabled ? handleSelectionChange : undefined}
           />
         ) : null}
       </div>
+
+      {/* Review notes: pin feedback to lines, then send it all back to the agent */}
+      {annotationsEnabled && (
+        <div className="flex-shrink-0 border-t border-sketch bg-muted/20">
+          {fileNotes.length > 0 && (
+            <div className="max-h-28 overflow-y-auto px-3 pt-2">
+              {fileNotes.map((n) => (
+                <div key={n.id} className="flex items-start gap-2 py-0.5 text-xs">
+                  <span className="font-mono text-muted-foreground shrink-0">
+                    L{n.fromLine}
+                    {n.toLine !== n.fromLine ? `-${n.toLine}` : ''}
+                  </span>
+                  <span className="flex-1 min-w-0 break-words">{n.note}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => onRemoveAnnotation?.(n.id)}
+                    title="Remove note"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 px-3 py-2">
+            <span className="font-mono text-xs text-muted-foreground shrink-0">
+              {selection
+                ? `L${selection.fromLine}${selection.toLine !== selection.fromLine ? `-${selection.toLine}` : ''}`
+                : 'select lines'}
+            </span>
+            <input
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  addNote();
+                }
+              }}
+              disabled={!selection}
+              placeholder={
+                selection
+                  ? 'What should the agent change here? (Enter to pin)'
+                  : 'Click a diff line (shift-click for a range) to attach a note'
+              }
+              className="flex-1 min-w-0 h-7 rounded border border-sketch bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!selection || !noteText.trim()}
+              onClick={addNote}
+              title="Pin this note to the selected lines"
+            >
+              <MessageSquarePlus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
+            <Button
+              size="sm"
+              disabled={annotations.length === 0 || sendingAnnotations}
+              onClick={() => onSendAnnotations?.()}
+              title="Re-run the agent in this worktree with every note attached"
+            >
+              {sendingAnnotations ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <Send className="w-3 h-3 mr-1" />
+              )}
+              Send {annotations.length || ''}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

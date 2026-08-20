@@ -24,10 +24,18 @@ import { usePromptTemplates } from '../templates';
 import { usePinnedFiles } from '../pinned-files';
 import { useAgentJobs } from './AgentJobsContext';
 
+// Agents the job runner knows how to drive headlessly. `bin` is what gets probed
+// on PATH; `value` is the id the Rust registry matches on.
 const CLI_OPTIONS = [
-  { value: 'claude-code', label: 'Claude Code' },
-  { value: 'opencode', label: 'opencode' },
+  { value: 'claude', label: 'Claude Code', bin: 'claude' },
+  { value: 'opencode', label: 'opencode', bin: 'opencode' },
+  { value: 'codex', label: 'Codex', bin: 'codex' },
+  { value: 'gemini', label: 'Gemini', bin: 'gemini' },
+  { value: 'cursor-agent', label: 'Cursor', bin: 'cursor-agent' },
+  { value: 'amp', label: 'Amp', bin: 'amp' },
 ];
+
+const MAX_COPIES = 3;
 
 const SOURCE_META = {
   selected: { label: 'tree', icon: ListTree },
@@ -59,7 +67,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   const { getGroupsForProject } = useFileGroups();
   const { templates } = usePromptTemplates();
   const { getPinnedPaths } = usePinnedFiles();
-  const { launchJob, selectedContextFiles, findOverlappingJobs } = useAgentJobs();
+  const { launchRace, selectedContextFiles, findOverlappingJobs } = useAgentJobs();
 
   const groups = useMemo(
     () => (projectPath ? getGroupsForProject(projectPath) : []),
@@ -77,7 +85,11 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
 
   const [name, setName] = useState('');
   const [templateId, setTemplateId] = useState(null);
-  const [cli, setCli] = useState('claude-code');
+  // Agents to run this prompt through. More than one candidate makes it a race:
+  // each gets its own worktree and you keep exactly one result.
+  const [clis, setClis] = useState(() => new Set(['claude']));
+  const [copies, setCopies] = useState(1);
+  const [availableClis, setAvailableClis] = useState(null); // null = not probed yet
   const [useWorktree, setUseWorktree] = useState(true);
   const [isGitRepo, setIsGitRepo] = useState(true);
   const [instructions, setInstructions] = useState('');
@@ -101,6 +113,29 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
       cancelled = true;
     };
   }, [open, projectPath]);
+  // Probe which agent CLIs are actually installed, so a race can't be aimed at a
+  // binary that isn't there. A failed probe leaves the option enabled rather
+  // than hiding a working agent.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const found = await Promise.all(
+        CLI_OPTIONS.map(async (o) => {
+          try {
+            return (await invoke('check_command_exists', { command: o.bin })) ? o.value : null;
+          } catch {
+            return o.value;
+          }
+        })
+      );
+      if (!cancelled) setAvailableClis(new Set(found.filter(Boolean)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   const [groupFiles, setGroupFiles] = useState([]); // files pulled in from a group
   const [checked, setChecked] = useState(() => new Set());
 
@@ -173,6 +208,35 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     setChecked((prev) => new Set([...prev, ...group.files.map((f) => f.relativePath)]));
   };
 
+  // Racing only makes sense when every candidate gets its own worktree —
+  // in-place runs would all edit the same files at once.
+  const canRace = isGitRepo && useWorktree;
+  const candidateCount = canRace ? clis.size * copies : 1;
+
+  const toggleCli = (value) => {
+    if (!canRace) {
+      setClis(new Set([value])); // no isolation: picking swaps the single agent
+      return;
+    }
+    setClis((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) {
+        if (next.size === 1) return prev; // always leave one agent selected
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return next;
+    });
+  };
+
+  // Dropping isolation collapses a pending race back to a single candidate.
+  useEffect(() => {
+    if (canRace) return;
+    setCopies(1);
+    setClis((prev) => (prev.size > 1 ? new Set([[...prev][0]]) : prev));
+  }, [canRace]);
+
   const handleRun = async () => {
     const prompt = assemblePrompt({ template, files: checkedFiles, instructions });
     if (!prompt.trim()) return;
@@ -180,8 +244,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
       name.trim() ||
       template?.title ||
       `Agent job (${checkedFiles.length} file${checkedFiles.length === 1 ? '' : 's'})`;
-    await launchJob({
-      cli: cli === 'opencode' ? 'opencode' : 'claude',
+    await launchRace({
+      clis: [...clis],
+      copies: canRace ? copies : 1,
       prompt,
       label,
       repoPath: projectPath,
@@ -300,15 +365,73 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <Picker
-              label="CLI"
-              value={CLI_OPTIONS.find((o) => o.value === cli)?.label}
-              items={CLI_OPTIONS.map((o) => ({ id: o.value, name: o.label }))}
-              selectedId={cli}
-              onSelect={setCli}
-            />
+          {/* Agents: pick one, or several to race them against each other. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Agents ({clis.size})
+              </span>
+              {canRace && (
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span>runs each</span>
+                  {Array.from({ length: MAX_COPIES }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setCopies(n)}
+                      className={cn(
+                        'h-4 w-4 rounded-sm border text-[10px] leading-none tabular-nums',
+                        copies === n
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-sketch hover:bg-muted/50'
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  <span>×</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {CLI_OPTIONS.map((o) => {
+                const missing = availableClis && !availableClis.has(o.value);
+                const on = clis.has(o.value);
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    disabled={missing && !on}
+                    onClick={() => toggleCli(o.value)}
+                    title={
+                      missing
+                        ? `${o.bin} not found on PATH`
+                        : canRace
+                        ? 'Toggle — two or more agents race in separate worktrees'
+                        : 'Racing needs isolated worktrees; picking swaps the agent'
+                    }
+                    className={cn(
+                      'rounded-sm border px-1.5 py-0.5 text-[11px] transition-colors',
+                      on
+                        ? 'border-primary/70 bg-primary/10 text-foreground'
+                        : 'border-sketch text-muted-foreground hover:bg-muted/50',
+                      missing && !on && 'opacity-40 cursor-not-allowed line-through'
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+            {candidateCount > 1 && (
+              <span className="text-[10px] leading-snug text-muted-foreground/70">
+                Races {candidateCount} candidates on the same prompt, one worktree each. Compare the
+                diffs, keep one — the rest are discarded.
+              </span>
+            )}
+          </div>
 
+          <div className="flex items-center justify-end">
             <button
               type="button"
               onClick={() => isGitRepo && setUseWorktree((v) => !v)}
@@ -354,7 +477,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           </Button>
           <Button size="sm" onClick={handleRun} disabled={!canRun}>
             <Bot className="h-3 w-3 mr-1" />
-            Run
+            {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
           </Button>
         </DialogFooter>
       </DialogContent>

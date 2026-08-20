@@ -33,25 +33,68 @@ clarification, and never end your turn with a question. Make reasonable assumpti
 briefly, and complete the entire task. Apply all code changes directly to the files. When \
 finished, end with a short summary of what you changed and why.";
 
-/// Build the headless CLI invocation for a given agent. The prompt is passed via
-/// stdin (see run_agent_job) so it never hits arg-length limits. Flags put each
-/// CLI into non-interactive, auto-approving mode so jobs run unattended.
-fn build_command(cli: &str) -> String {
+/// How to drive one CLI agent headlessly. Every entry takes its prompt on stdin
+/// (see run_agent_job) so it never hits arg-length limits.
+struct AgentCli {
+    /// Shell invocation that puts the CLI into non-interactive, auto-approving
+    /// mode. The prompt is NOT part of it — it arrives on stdin.
+    command: &'static str,
+    /// Flag that injects the autonomy rules as a system prompt. `None` means the
+    /// CLI has no such flag, so the rules are prepended to the prompt instead.
+    system_prompt_flag: Option<&'static str>,
+    /// Supports Claude-style `--output-format stream-json --verbose`.
+    stream_json: bool,
+}
+
+/// Registry of supported agents. Adding a CLI is a row here plus an entry in the
+/// frontend's CLI list — nothing else in the job pipeline is agent-specific.
+///
+/// Anything unknown falls through to Claude Code, which is what the previous
+/// single-agent implementation did.
+fn agent_cli(cli: &str) -> AgentCli {
     match cli {
-        // opencode has no system-prompt flag — its autonomy rules are prepended
-        // to the prompt in run_agent_job instead.
-        "opencode" => "opencode run".to_string(),
+        // opencode has no system-prompt flag — autonomy rules go in the prompt.
+        "opencode" => AgentCli {
+            command: "opencode run",
+            system_prompt_flag: None,
+            stream_json: false,
+        },
+        // `codex exec` is the non-interactive mode; --full-auto lets it edit
+        // files and run commands without asking.
+        "codex" => AgentCli {
+            command: "codex exec --full-auto",
+            system_prompt_flag: None,
+            stream_json: false,
+        },
+        // --yolo is Gemini CLI's auto-approve; it reads the prompt from stdin.
+        "gemini" => AgentCli {
+            command: "gemini --yolo",
+            system_prompt_flag: None,
+            stream_json: false,
+        },
+        // -p = print/headless, --force skips per-action approval.
+        "cursor-agent" => AgentCli {
+            command: "cursor-agent -p --force",
+            system_prompt_flag: None,
+            stream_json: false,
+        },
+        // -x is Amp's execute-and-exit mode.
+        "amp" => AgentCli {
+            command: "amp -x",
+            system_prompt_flag: None,
+            stream_json: false,
+        },
         // -p / --print = headless; `--permission-mode auto` is the Shift+Tab
         // "auto mode" — its classifier auto-approves safe actions. Note: auto
         // still defers actions it deems risky to a human, so a job may stall on
         // those in headless; the AUTONOMY_PROMPT (never ask, make assumptions,
         // apply changes directly) pushes Claude to power through. Requires a
         // claude version that lists `auto` under --permission-mode.
-        // --append-system-prompt injects the autonomy rules as a system prompt.
-        _ => format!(
-            "claude -p --permission-mode auto --append-system-prompt '{}'",
-            AUTONOMY_PROMPT
-        ),
+        _ => AgentCli {
+            command: "claude -p --permission-mode auto",
+            system_prompt_flag: Some("--append-system-prompt"),
+            stream_json: true,
+        },
     }
 }
 
@@ -79,13 +122,17 @@ pub fn run_agent_job(
     log_path: Option<String>,
     stream_json: Option<bool>,
 ) -> Result<(), String> {
-    let mut command = build_command(&cli);
+    let agent = agent_cli(&cli);
+    let mut command = match agent.system_prompt_flag {
+        Some(flag) => format!("{} {} '{}'", agent.command, flag, AUTONOMY_PROMPT),
+        None => agent.command.to_string(),
+    };
     // Plain `claude -p` prints nothing until the run finishes, which leaves a
     // caller with no idea whether a four-minute job is working or wedged.
     // stream-json emits one NDJSON event per message, tool call and hook, so the
     // frontend can show live activity. `--verbose` is required alongside it in
-    // headless mode. opencode has no equivalent, so it keeps plain output.
-    if stream_json.unwrap_or(false) && cli != "opencode" {
+    // headless mode. CLIs without an equivalent keep plain output.
+    if stream_json.unwrap_or(false) && agent.stream_json {
         command.push_str(" --output-format stream-json --verbose");
     }
 
@@ -104,9 +151,9 @@ pub fn run_agent_job(
     });
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
 
-    // opencode can't take a system prompt via flag, so fold the autonomy rules
-    // into the prompt itself. Claude gets them via --append-system-prompt.
-    let prompt = if cli == "opencode" {
+    // CLIs without a system-prompt flag get the autonomy rules folded into the
+    // prompt itself; the rest already carry them on the command line above.
+    let prompt = if agent.system_prompt_flag.is_none() {
         format!("{}\n\n{}", AUTONOMY_PROMPT, prompt)
     } else {
         prompt

@@ -38,6 +38,14 @@ export function DiffContent({
   isNewFile,
   isDeletedFile,
   scrollContainerRef,
+  // Column headers. Default to the git working-tree comparison this view was
+  // built for; a race compare passes the two candidate names instead.
+  oldLabel,
+  newLabel,
+  // Called whenever the line selection changes, with the resolved line range and
+  // its text — the anchor a review note is pinned to. Null when nothing is
+  // selected. Must be stable (useCallback) to avoid a render loop.
+  onSelectionChange,
 }) {
   const [collapsedRegions, setCollapsedRegions] = useState(new Set());
   const [selectedLines, setSelectedLines] = useState(new Set());
@@ -351,6 +359,34 @@ export function DiffContent({
     };
   }, [container]);
 
+  // Report the current selection upward as a line range + snippet. The new side
+  // is authoritative (it's what the agent wrote); deleted lines fall back to the
+  // old side so a note can still be pinned to them.
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    const indexes = [...selectedLines].sort((a, b) => a - b);
+    if (indexes.length === 0) {
+      onSelectionChange(null);
+      return;
+    }
+    const pick = (i) => {
+      const next = newLines[i];
+      if (next && next.type !== 'empty') return next;
+      return oldLines[i];
+    };
+    const picked = indexes.map(pick).filter(Boolean);
+    const nums = picked.map((l) => l.lineNum).filter((n) => typeof n === 'number');
+    if (nums.length === 0) {
+      onSelectionChange(null);
+      return;
+    }
+    onSelectionChange({
+      fromLine: nums[0],
+      toLine: nums[nums.length - 1],
+      snippet: picked.map((l) => l.content ?? '').join('\n').slice(0, 600),
+    });
+  }, [selectedLines, oldLines, newLines, onSelectionChange]);
+
   // Handle line selection via event delegation
   const handleLineClick = useCallback((lineIndex, e) => {
     if (e.shiftKey && selectionAnchor !== null) {
@@ -456,7 +492,7 @@ export function DiffContent({
       {/* Old file (left side) */}
       <div className="flex-1 border-r border-sketch overflow-x-auto">
         <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-sketch z-10">
-          {isNewFile ? '(new file)' : 'HEAD'}
+          {oldLabel || (isNewFile ? '(new file)' : 'HEAD')}
         </div>
         <div
           className="min-w-max relative"
@@ -502,7 +538,7 @@ export function DiffContent({
       {/* New file (right side) */}
       <div className="flex-1 overflow-x-auto">
         <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground border-b border-sketch z-10">
-          {isDeletedFile ? '(deleted)' : 'Working Tree'}
+          {newLabel || (isDeletedFile ? '(deleted)' : 'Working Tree')}
         </div>
         <div
           className="min-w-max relative"
