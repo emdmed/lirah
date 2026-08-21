@@ -11,6 +11,21 @@ import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import '@xterm/xterm/css/xterm.css';
 
+// Smallest geometry we will ever apply. FitAddon floors its proposal at 2 cols /
+// 1 row whenever the container is collapsed — a window narrowed until the
+// terminal column has no room left, a mid-resize frame, a shut panel. Applying
+// that floor reflows the whole scrollback to 2 columns and SIGWINCHes the PTY
+// with it; reflowing back out to the real width afterwards does not restore what
+// the wrap destroyed, so the view stays garbled once the window is wide again.
+// Ignoring the degenerate proposal keeps the last good geometry instead.
+const MIN_USABLE_COLS = 20;
+const MIN_USABLE_ROWS = 4;
+
+// SIGWINCH pacing: quiet enough not to storm a TUI mid-drag, capped so a stream
+// of resize events can never starve the final delivery.
+const SIGWINCH_DEBOUNCE_MS = 120;
+const SIGWINCH_MAX_WAIT_MS = 400;
+
 export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
@@ -25,7 +40,9 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const lastDimsRef = useRef({ rows: 0, cols: 0 });
   const pendingDimsRef = useRef(null);
   const sigwinchTimerRef = useRef(null);
+  const pendingSinceRef = useRef(0);
   const onDataDisposableRef = useRef(null);
+  const terminalInstRef = useRef(null);
   // WebGL renderer state. A lost context drops us to the DOM renderer, which is
   // far slower under heavy output, so track it and rebuild when we can.
   const webglRef = useRef(null);
@@ -103,6 +120,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       // Container may not have dimensions yet, spawn effect will re-fit
     }
 
+    terminalInstRef.current = term;
     setTerminal(term);
     setFitAddon(fit);
     setSearchAddon(search);
@@ -110,6 +128,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     return () => {
       webglRef.current?.dispose();
       webglRef.current = null;
+      terminalInstRef.current = null;
       term.dispose();
     };
   }, [terminalRef]);
@@ -223,7 +242,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
 
         // Sync dimensions: fit may have changed cols/rows after initial spawn
         try {
-          fitAddon.fit();
+          const proposed = fitAddon.proposeDimensions();
+          if (proposed && proposed.cols >= MIN_USABLE_COLS && proposed.rows >= MIN_USABLE_ROWS) {
+            fitAddon.fit();
+          }
           const fittedRows = terminal.rows;
           const fittedCols = terminal.cols;
           if (fittedRows !== rows || fittedCols !== cols) {
@@ -277,6 +299,25 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     };
   }, [terminal, fitAddon]);
 
+  // Rebuild the GPU glyph atlas and repaint every cell. refresh() alone re-runs
+  // the renderer against the *existing* atlas, so glyphs smeared when the canvas
+  // was reallocated during a resize (WebKitGTK does this on window maximize) get
+  // painted right back. Clearing the atlas first forces them to be re-rasterized.
+  const repaintAll = useCallback(() => {
+    const term = terminalInstRef.current;
+    if (!term) return;
+    try {
+      webglRef.current?.clearTextureAtlas();
+    } catch (e) {
+      console.debug('Texture atlas clear skipped:', e?.message);
+    }
+    try {
+      term.refresh(0, term.rows - 1);
+    } catch (e) {
+      // Renderer may not be ready; ignore.
+    }
+  }, []);
+
   // Flush a pending PTY resize immediately. TUI apps like Claude Code (Ink)
   // re-paint with absolute cursor positioning on SIGWINCH, so we must avoid
   // SIGWINCH storms during a sidebar drag while still delivering the final
@@ -286,6 +327,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       clearTimeout(sigwinchTimerRef.current);
       sigwinchTimerRef.current = null;
     }
+    pendingSinceRef.current = 0;
+    // The resize gesture has settled — this is the point where a stale atlas is
+    // worth the cost of rebuilding, once, rather than on every intermediate fit.
+    repaintAll();
     const pending = pendingDimsRef.current;
     const id = sessionIdRef.current;
     if (!pending || !id) return;
@@ -297,7 +342,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     invoke('resize_terminal', { sessionId: id, rows: pending.rows, cols: pending.cols }).catch((err) => {
       console.error('Failed to resize terminal:', err);
     });
-  }, []);
+  }, [repaintAll]);
 
   // Handle resize — refits the xterm canvas to its container synchronously
   // (cheap, local) and queues a debounced SIGWINCH to the backend PTY. The
@@ -307,6 +352,16 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     if (!fitAddon || !terminal || !sessionId) return;
     try {
       if (!terminal._core || !terminal._core._renderService) {
+        return;
+      }
+      // Check what fit() *would* do before letting it touch the buffer: a
+      // collapsed container yields the 2x1 floor, which is destructive (see
+      // MIN_USABLE_COLS). Keep the current geometry until there is room again.
+      const proposed = fitAddon.proposeDimensions();
+      if (!proposed || !Number.isFinite(proposed.cols) || !Number.isFinite(proposed.rows)) {
+        return;
+      }
+      if (proposed.cols < MIN_USABLE_COLS || proposed.rows < MIN_USABLE_ROWS) {
         return;
       }
       fitAddon.fit();
@@ -322,8 +377,18 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         flushSigwinch();
         return;
       }
+      // Debounce, but with a ceiling: every event pushes the timer out, so a
+      // window manager that streams resize events (a maximize animation, a
+      // compositor doing continuous resize) could postpone the SIGWINCH
+      // indefinitely and leave the TUI painting at a size nobody has anymore.
+      const now = performance.now();
+      if (!pendingSinceRef.current) pendingSinceRef.current = now;
+      if (now - pendingSinceRef.current >= SIGWINCH_MAX_WAIT_MS) {
+        flushSigwinch();
+        return;
+      }
       if (sigwinchTimerRef.current) clearTimeout(sigwinchTimerRef.current);
-      sigwinchTimerRef.current = setTimeout(flushSigwinch, 120);
+      sigwinchTimerRef.current = setTimeout(flushSigwinch, SIGWINCH_DEBOUNCE_MS);
     } catch (error) {
       console.debug('Resize skipped (terminal not ready):', error.message);
     }
@@ -336,6 +401,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         clearTimeout(sigwinchTimerRef.current);
         sigwinchTimerRef.current = null;
       }
+      pendingSinceRef.current = 0;
     };
   }, []);
 

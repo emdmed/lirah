@@ -83,7 +83,18 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, proj
             "--unshare-ipc",
             "--unshare-pid",
             "--unshare-cgroup",
-            "--new-session",
+            // NOTE: deliberately no --new-session. It calls setsid() inside the
+            // sandbox, and bwrap never re-acquires a controlling terminal
+            // afterwards (no TIOCSCTTY), so the sandboxed shell ends up holding
+            // the pty slave as plain stdio with tty_nr=0 / tpgid=-1. The kernel
+            // then has no foreground process group to signal, so TIOCSWINSZ on
+            // the master — every resize_pty call — delivers SIGWINCH to nobody:
+            // a running TUI (Claude Code, vim) never learns the terminal got
+            // wider and keeps repainting at the old geometry.
+            // Its purpose is blocking TIOCSTI input injection, which buys
+            // nothing here: the pty is dedicated to this session and the
+            // sandboxed process already owns both ends of it, and TIOCSTI is
+            // disabled kernel-wide since Linux 6.2 (dev.tty.legacy_tiocsti=0).
             "--die-with-parent",
             // Mount /proc after --unshare-pid so it's scoped to sandbox PIDs
             "--proc", "/proc",
