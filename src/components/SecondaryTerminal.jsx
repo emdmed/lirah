@@ -4,7 +4,7 @@ import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
-const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir }, ref) => {
+const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir, isActive = true }, ref) => {
   const terminalRef = useRef(null);
 
   const { handleResize, sessionId, isFocused, searchAddon, searchOpen, searchDecorations, closeSearch } = useTerminal(
@@ -19,6 +19,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     projectDir,
     initialCommand,
     true,  // secondaryMode
+    isActive,
   );
 
   useEffect(() => {
@@ -81,7 +82,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
-export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange, initialCommand: initialCommandProp }, ref) => {
+export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange, initialCommand: initialCommandProp, isActive = true }, ref) => {
   const [selectedCommand, setSelectedCommand] = useState(initialCommandProp || null);
 
   // Notify parent when picker visibility changes
@@ -121,6 +122,7 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
         onSessionReady={onSessionReady}
         initialCommand={selectedCommand}
         projectDir={projectDir}
+        isActive={isActive}
       />
     </div>
   );

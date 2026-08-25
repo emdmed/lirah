@@ -48,6 +48,12 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const webglRef = useRef(null);
   const [rendererLost, setRendererLost] = useState(false);
   const rendererRetriesRef = useRef(0);
+  // Repaint scheduling. Several signals can ask for the same repaint in one
+  // frame (the tab becoming visible also focuses the window, which also fires
+  // visibilitychange), and clearing the atlas re-rasterizes every glyph — so
+  // coalesce to one per frame.
+  const repaintRafRef = useRef(0);
+  const isActiveRef = useRef(isActive);
   const { error, warning } = useToast();
 
   // Initialize terminal
@@ -318,6 +324,79 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     }
   }, []);
 
+  // Coalesced form of the above, for the recovery paths below. They can all
+  // fire for the same event, and each atlas clear costs a full re-rasterization.
+  const scheduleRepaint = useCallback(() => {
+    if (repaintRafRef.current) return;
+    repaintRafRef.current = requestAnimationFrame(() => {
+      repaintRafRef.current = 0;
+      repaintAll();
+    });
+  }, [repaintAll]);
+
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
+  useEffect(() => {
+    return () => {
+      if (repaintRafRef.current) cancelAnimationFrame(repaintRafRef.current);
+      repaintRafRef.current = 0;
+    };
+  }, []);
+
+  // Repaint when this terminal comes back on screen. Background tabs are moved
+  // out of the viewport (see ProjectTab), which is what engages xterm's own
+  // render pause — but while paused xterm turns refresh() into a deferred
+  // _needsFullRefresh flag and queues renderer resizes into a paused task, so a
+  // repaint driven off a rAF after the tab flips races the resume and lands on
+  // whichever side of it the browser feels like. Observing the same element
+  // xterm does removes the race: IntersectionObserver callbacks are delivered
+  // in registration order, and xterm registers its observer during open(), so
+  // by the time this runs the renderer has already un-paused and we are
+  // clearing an atlas that will actually be re-uploaded.
+  useEffect(() => {
+    if (!terminal || typeof IntersectionObserver === 'undefined') return;
+    const el = terminal.element?.querySelector('.xterm-screen') || terminal.element;
+    if (!el) return;
+    let wasVisible = null;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const visible = entry.isIntersecting === undefined
+          ? entry.intersectionRatio > 0
+          : entry.isIntersecting;
+        // Only on the hidden -> visible edge; the first callback just records
+        // the starting state, since a terminal that was never hidden has
+        // nothing stale to repaint.
+        if (wasVisible === false && visible) scheduleRepaint();
+        wasVisible = visible;
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [terminal, scheduleRepaint]);
+
+  // Repaint when the window itself comes back. Alt-tabbing away lets the
+  // compositor occlude us and the browser evict our GL context; nothing about
+  // that changes the tab's visibility or geometry, so no resize, no
+  // intersection change, and without this nothing would ever repaint the stale
+  // canvas. Only the visible tab needs it — the others repaint on their own
+  // intersection edge when the user switches to them.
+  useEffect(() => {
+    if (!terminal) return;
+    const onWake = () => {
+      if (!isActiveRef.current) return;
+      if (document.visibilityState === 'hidden') return;
+      scheduleRepaint();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, [terminal, scheduleRepaint]);
+
   // Flush a pending PTY resize immediately. TUI apps like Claude Code (Ink)
   // re-paint with absolute cursor positioning on SIGWINCH, so we must avoid
   // SIGWINCH storms during a sidebar drag while still delivering the final
@@ -452,11 +531,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       terminal.loadAddon(webgl);
       webglRef.current = webgl;
       setRendererLost(false);
-      terminal.refresh(0, terminal.rows - 1);
+      // The atlas is cached per terminal by the addon and survives the addon
+      // that built it, so a fresh renderer can come back pointing at pages that
+      // were uploaded to the context we just lost — which paints the right
+      // glyph shapes from the wrong slots. Force a re-rasterization.
+      repaintAll();
     } catch (e) {
       console.debug('WebGL renderer could not be restored:', e?.message);
     }
-  }, [terminal, rendererLost, isActive]);
+  }, [terminal, rendererLost, isActive, repaintAll]);
 
   // Apply preference changes to this already-open terminal, including ones made
   // in another window of the app.

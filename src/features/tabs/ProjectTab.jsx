@@ -925,6 +925,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               onToggleFullscreen={() => secondary.setSecondaryFullscreen(f => !f)}
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
               initialCommand={secondary.pendingCommand}
+              isActive={isActive}
             />
           )
         }
