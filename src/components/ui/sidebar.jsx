@@ -218,7 +218,7 @@ const Sidebar = React.forwardRef((
         {...props}>
         <div
           data-sidebar="sidebar"
-          className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:border group-data-[variant=floating]:border-sketch group-data-[variant=floating]:shadow">
+          className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:border group-data-[variant=floating]:edge-engraved group-data-[variant=floating]:shadow">
           {children}
         </div>
       </div>
@@ -329,7 +329,7 @@ const SidebarSeparator = React.forwardRef(({ className, ...props }, ref) => {
     <Separator
       ref={ref}
       data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border border-sketch", className)}
+      className={cn("mx-2 w-auto bg-sidebar-border edge-engraved", className)}
       {...props} />
   );
 })
@@ -430,7 +430,7 @@ const sidebarMenuButtonVariants = cva(
       variant: {
         default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         outline:
-          "bg-background border border-sketch hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "bg-background border edge-engraved hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       },
       size: {
         default: "h-8 text-sm",
@@ -567,7 +567,7 @@ const SidebarMenuSub = React.forwardRef(({ className, ...props }, ref) => (
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sketch px-2.5 py-0.5",
+      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l edge-engraved px-2.5 py-0.5",
       "group-data-[collapsible=icon]:hidden",
       className
     )}

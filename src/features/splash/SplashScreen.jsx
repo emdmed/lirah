@@ -83,17 +83,17 @@ export function SplashScreen({ visible, projectName, currentStep, onComplete }) 
 
       <div className="flex flex-col items-center">
         {/* Project name label */}
-        <div className="border border-sketch px-4 py-2 shadow-xs"
+        <div className="border edge-engraved px-4 py-2 shadow-xs"
           style={{ backgroundColor: 'var(--color-input-background)' }}
         >
           <span className="text-xs font-mono font-medium">{projectName}</span>
         </div>
 
-        {/* Connecting dashed line */}
-        <div className="w-px h-5 border-l border-dashed border-foreground/15" />
+        {/* Connecting rule */}
+        <div className="w-px h-5 border-l border-foreground/15" />
 
         {/* Steps container */}
-        <div className="border border-sketch p-3 flex flex-col gap-3 min-w-[240px]">
+        <div className="border edge-engraved p-3 flex flex-col gap-3 min-w-[240px]">
           <div className="text-[10px] font-mono uppercase tracking-wider opacity-40">Initialization</div>
           {steps.map((step, index) => (
             <StepIndicator key={step.id} step={step} status={getStatus(step.id)} index={index} />

@@ -34,7 +34,7 @@ export function SecondaryTerminalPicker({ onSelect }) {
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
       <div
-        className="flex flex-col gap-1 border border-sketch p-4 shadow-xs font-mono rounded-none"
+        className="flex flex-col gap-1 border edge-engraved p-4 shadow-xs font-mono rounded-none"
         style={{ backgroundColor: 'var(--color-input-background)' }}
       >
         <div className="text-sm font-semibold text-foreground mb-2">Secondary terminal</div>
@@ -51,7 +51,7 @@ export function SecondaryTerminalPicker({ onSelect }) {
             {opt.label}
           </button>
         ))}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t border-t-sketch">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t edge-t-engraved">
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
           <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
         </div>

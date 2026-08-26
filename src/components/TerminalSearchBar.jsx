@@ -87,7 +87,7 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
     : '';
 
   return (
-    <div className="absolute right-3 top-1 z-30 flex items-center gap-1 rounded-sm border border-sketch bg-background/95 px-1.5 py-1 shadow-sm backdrop-blur">
+    <div className="absolute right-3 top-1 z-30 flex items-center gap-1 rounded-sm border edge-engraved bg-background/95 px-1.5 py-1 shadow-sm backdrop-blur">
       <input
         ref={inputRef}
         value={query}

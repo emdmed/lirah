@@ -17,9 +17,15 @@ export function TokenUsageDisplay({ tokenUsage, textareaContent, selectedFiles, 
       {hasTokens && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono hover:text-foreground transition-colors cursor-default">
-              <Coins className="w-3 h-3" />
-              <span>{formatTokenCount(billableTotal)}</span>
+            <div className="flex items-baseline gap-1.5 font-mono cursor-default">
+              <Coins className="w-3 h-3 self-center text-muted-foreground/60" />
+              <span
+                className="tube-idle leading-none"
+                style={{ fontSize: 'var(--font-lg)' }}
+              >
+                {formatTokenCount(billableTotal)}
+              </span>
+              <span className="engraved-label">billable</span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={8}>

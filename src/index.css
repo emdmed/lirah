@@ -57,9 +57,32 @@
   --color-status-success: #76946A;
   --color-status-info: #6B8CCE;
 
-  --radius-lg: 0.5rem;
-  --radius-md: calc(0.5rem - 2px);
-  --radius-sm: calc(0.5rem - 4px);
+  /* Zero radius by conviction: a chassis is milled, not moulded. */
+  --radius-lg: 0px;
+  --radius-md: 0px;
+  --radius-sm: 0px;
+}
+
+/*
+  Chassis material. Both cut edges step toward the theme's own foreground at
+  two strengths, never toward black or white: at the poles (hackerman's pure
+  black ground, latte's near-white) a literal has nowhere left to go and the
+  engraving disappears. Stepping toward the foreground keeps a visible delta in
+  both polarities, and the bevel simply reverses on a light panel — which is
+  what a cut in light material actually does.
+*/
+:root {
+  --chassis-shadow: color-mix(in srgb, var(--color-background) 93%, var(--color-foreground));
+  --chassis-light: color-mix(in srgb, var(--color-background) 82%, var(--color-foreground));
+  /* The well IS the background. The terminal canvas already paints exactly
+     this colour, so the recess costs nothing and never fights the canvas. */
+  --chassis-recess: var(--color-background);
+  /* The panel is raised metal: the one ground that actually moves. */
+  --chassis-raise: color-mix(in srgb, var(--color-background) 88%, var(--color-foreground));
+  /* Plasma. The theme owns the hue; the world owns the scarcity. */
+  --glow: var(--color-primary);
+  --glow-dim: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  --glow-bloom: color-mix(in srgb, var(--color-primary) 28%, transparent);
 }
 
 html,
@@ -101,8 +124,10 @@ body {
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    border-style: dashed;
-    border-color: rgba(255, 255, 255, 0.12);
+    /* The drawn box is refused. Where a border still exists it is a hairline
+       of the theme's own border token, never a dashed sketch line. */
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
   }
 
   body {
@@ -149,12 +174,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-foreground) 20%, transparent);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: color-mix(in srgb, var(--color-foreground) 35%, transparent);
 }
 
 ::-webkit-scrollbar-button {
@@ -165,7 +190,7 @@ body {
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-foreground) 20%, transparent) transparent;
   }
 }
 
@@ -183,24 +208,153 @@ body {
   line-height: 1.4;
 }
 
-/* Engineering sketch dashed borders */
-.border-sketch {
-  border-style: dashed !important;
+/*
+  Engraved separation. A region is milled into the chassis: a shadow hairline
+  above the cut and a light hairline below it. No border is drawn — these
+  utilities remove the border entirely and cut the edge with inset shadow, so
+  separation is material rather than notation.
+*/
+.edge-engraved {
+  border-width: 0 !important;
+  box-shadow:
+    inset 0 1px 0 0 var(--chassis-shadow),
+    inset 1px 0 0 0 var(--chassis-shadow),
+    inset 0 -1px 0 0 var(--chassis-light),
+    inset -1px 0 0 0 var(--chassis-light);
 }
 
-.border-t-sketch {
-  border-top-style: dashed !important;
-  border-top-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
+.edge-t-engraved {
+  border-top-width: 0 !important;
+  box-shadow:
+    inset 0 1px 0 0 var(--chassis-shadow),
+    inset 0 2px 0 0 var(--chassis-light);
 }
 
-.border-b-sketch {
-  border-bottom-style: dashed !important;
-  border-bottom-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
+.edge-b-engraved {
+  border-bottom-width: 0 !important;
+  box-shadow:
+    inset 0 -2px 0 0 var(--chassis-shadow),
+    inset 0 -1px 0 0 var(--chassis-light);
 }
 
-.border-e-sketch {
-  border-inline-end-style: dashed !important;
-  border-inline-end-color: color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.12)) 40%, transparent);
+.edge-e-engraved {
+  border-inline-end-width: 0 !important;
+  box-shadow:
+    inset -2px 0 0 0 var(--chassis-shadow),
+    inset -1px 0 0 0 var(--chassis-light);
+}
+
+/*
+  The chassis has exactly two levels, and every region is one of them. This is
+  what makes the panel read as milled rather than as a flat void: a well is a
+  working surface sunk into the panel, a rail is the panel itself.
+
+  Region grounds derive from background/foreground rather than the `sidebar`
+  and `card` tokens on purpose — those are equal to `background` in all 17
+  themes (`card` too, in `retro`), so a ground built on them cannot separate.
+*/
+.chassis-well,
+.chassis-well.chassis-well {
+  background-color: var(--chassis-recess);
+  box-shadow:
+    inset 0 1px 0 0 var(--chassis-shadow),
+    inset 1px 0 0 0 var(--chassis-shadow),
+    inset 0 -1px 0 0 var(--chassis-light),
+    inset -1px 0 0 0 var(--chassis-light);
+}
+
+/*
+  The cut without the ground, for surfaces that already paint their own: the
+  terminal (an xterm canvas fills it edge to edge) and the prompt input (whose
+  component sets backgroundColor as an inline style, which no class can beat).
+*/
+.chassis-cut {
+  box-shadow:
+    inset 0 1px 0 0 var(--chassis-shadow),
+    inset 1px 0 0 0 var(--chassis-shadow),
+    inset 0 -1px 0 0 var(--chassis-light),
+    inset -1px 0 0 0 var(--chassis-light);
+}
+
+.chassis-rail,
+.chassis-rail.chassis-rail {
+  background-color: var(--chassis-raise);
+}
+
+/* A recessed working area, cut into the panel on all four sides. */
+.panel-recess {
+  background-color: var(--chassis-recess);
+  box-shadow:
+    inset 0 1px 0 0 var(--chassis-shadow),
+    inset 0 -1px 0 0 var(--chassis-light);
+}
+
+/*
+  Engraved caps. Labels are cut into the panel and catch light from below.
+  This is the world's labelling discipline: a control that needs a label gets
+  one on the chassis, not only in a tooltip.
+*/
+.engraved-label {
+  font-size: var(--font-xs);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--color-muted-foreground) 78%, transparent);
+  text-shadow: 0 1px 0 var(--chassis-light);
+}
+
+/*
+  Tube bank. Numerals are the instrument's readout: fixed-position, tabular,
+  and the only warm thing on the panel. Glow is scarce by law — if everything
+  glows, the instrument reads nothing.
+*/
+.tube {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: var(--glow);
+  /* Two-stop bloom. On emerald-mono and hackerman `primary` equals
+     `foreground`, so hue cannot say "lit" — the halo has to. */
+  text-shadow: 0 0 4px var(--glow-bloom), 0 0 10px var(--glow-bloom);
+}
+
+.tube-idle {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
+  text-shadow: none;
+}
+
+/* A value that just changed cross-fades rather than jumping. */
+.tube-change {
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+/*
+  Overflow is a visible mechanical event, not a silently disabled control.
+  Used when a budget is spent: the readout goes to the critical role and the
+  panel says so rather than dimming to 50% opacity with no explanation.
+*/
+.tube-overflow {
+  color: var(--color-status-critical);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--color-status-critical) 30%, transparent);
+}
+
+/* Lit state. The single affordance that says "this one is live". */
+.lit {
+  color: var(--glow);
+  text-shadow: 0 0 4px var(--glow-bloom), 0 0 10px var(--glow-bloom);
+}
+
+/*
+  The terminal is the chassis's working surface: unlit while idle, so the
+  scarcity of glow is what makes it the calm centre. Focus lights its cut edge
+  only — the field itself never glows, because that is the surface being read
+  for eight hours at a stretch.
+*/
+.terminal-live {
+  box-shadow:
+    inset 0 0 0 1px var(--glow-dim),
+    0 0 12px -4px var(--glow-bloom);
 }
 
 /* Terminal focus indicator */

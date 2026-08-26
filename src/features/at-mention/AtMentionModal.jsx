@@ -70,12 +70,12 @@ export const AtMentionModal = memo(function AtMentionModal({
 
   return (
     <div
-      className="absolute left-0 right-0 bg-background border border-sketch rounded-none shadow-lg z-50 overflow-hidden"
+      className="absolute left-0 right-0 bg-background border edge-engraved rounded-none shadow-lg z-50 overflow-hidden"
       style={{ bottom: '100%', marginBottom: '4px' }}
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3 py-1.5 border-b border-b-sketch bg-muted/20"
+        className="flex items-center justify-between px-3 py-1.5 border-b edge-b-engraved bg-muted/20"
         style={{ fontSize: 'var(--font-xs)' }}
       >
         <span className="text-muted-foreground">
@@ -83,19 +83,19 @@ export const AtMentionModal = memo(function AtMentionModal({
         </span>
         <div className="flex items-center gap-3 text-muted-foreground">
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">↑↓</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">↑↓</kbd>
             navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">←→</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">←→</kbd>
             mode
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">↵</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">↵</kbd>
             select
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border border-sketch text-[9px] font-mono">esc</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">esc</kbd>
             close
           </span>
         </div>
@@ -172,7 +172,7 @@ export const AtMentionModal = memo(function AtMentionModal({
       {/* Overflow indicator */}
       {results.length > 12 && (
         <div
-          className="px-3 py-1 text-muted-foreground border-t border-t-sketch text-center"
+          className="px-3 py-1 text-muted-foreground border-t edge-t-engraved text-center"
           style={{ fontSize: 'var(--font-xs)' }}
         >
           +{results.length - 12} more &mdash; keep typing to narrow

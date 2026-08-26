@@ -347,7 +347,7 @@ export function InstanceSyncPanel({
                   <div
                     key={idx}
                     className={`px-3 py-2.5 transition-colors ${
-                      isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : 'hover:bg-muted/30 border-l-2 border-l-transparent'
+                      isSelected ? 'bg-primary/15' : 'hover:bg-muted/30'
                     }`}
                   >
                     <div className="flex gap-3">
@@ -537,7 +537,7 @@ export function InstanceSyncPanel({
               placeholder="Search sessions..."
               value={sessionSearch}
               onChange={(e) => setSessionSearch(e.target.value)}
-              className="w-full px-2 py-1.5 text-xs font-mono bg-muted/30 border border-sketch rounded-none focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/40"
+              className="w-full px-2 py-1.5 text-xs font-mono bg-muted/30 border edge-engraved rounded-none focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/40"
             />
           </div>
         )}

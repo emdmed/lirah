@@ -17,7 +17,7 @@ function StatRow({ icon: Icon, label, value, color }) {
 export function SessionEfficiencyPanel({ metrics, colors = {} }) {
   if (!metrics) {
     return (
-      <Card className="bg-background border-sketch h-full font-mono">
+      <Card className="bg-background edge-engraved h-full font-mono">
         <CardHeader className="pb-2">
           <CardTitle className="text-xs font-medium">Efficiency</CardTitle>
         </CardHeader>
@@ -44,7 +44,7 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
   const c = colors;
 
   return (
-    <Card className="bg-background border-sketch h-full flex flex-col font-mono">
+    <Card className="bg-background edge-engraved h-full flex flex-col font-mono">
       <CardHeader className="pb-2 pt-3 px-3">
         <CardTitle className="text-xs font-medium">Efficiency</CardTitle>
       </CardHeader>
@@ -56,7 +56,7 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
           <StatRow icon={DollarSign} label="$/Msg" value={formatCost(costPerMessage)} color={c.input} />
         </div>
 
-        <div className="mt-auto pt-2 border-t border-sketch">
+        <div className="mt-auto pt-2 border-t edge-engraved">
           <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
             <span>Est. Monthly:</span>{' '}
             <span className="font-bold">

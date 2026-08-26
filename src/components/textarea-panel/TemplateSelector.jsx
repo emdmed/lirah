@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { usePromptTemplates } from "../../features/templates";
-import { useTheme } from "../../contexts/ThemeContext";
 
 export function TemplateSelector({
   selectedTemplateId,
@@ -20,7 +19,6 @@ export function TemplateSelector({
   onOpenChange,   // Callback to change open state
 }) {
   const { templates } = usePromptTemplates();
-  const { theme } = useTheme();
 
   // Handle number key presses when dropdown is open
   useEffect(() => {
@@ -44,27 +42,18 @@ export function TemplateSelector({
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  // Get theme-specific color for the selected template badge (engineering sketch style)
-  const getThemeBadgeStyle = () => {
-    const themeStyles = {
-      kanagawa: 'bg-[#76946A]/20 text-[#76946A] hover:bg-[#76946A]/30', // Spring Green
-      light: 'bg-[#5e81ac]/20 text-[#5e81ac] hover:bg-[#5e81ac]/30', // Nordic Blue
-      dracula: 'bg-[#bd93f9]/20 text-[#bd93f9] hover:bg-[#bd93f9]/30', // Dracula Purple
-      monokai: 'bg-[#a6e22e]/20 text-[#a6e22e] hover:bg-[#a6e22e]/30', // Monokai Green
-      'emerald-mono': 'bg-[#34d399]/20 text-[#34d399] hover:bg-[#34d399]/30', // Emerald
-      gruvbox: 'bg-[#fe8019]/20 text-[#fe8019] hover:bg-[#fe8019]/30', // Gruvbox Orange
-    };
-    return themeStyles[theme.name?.toLowerCase()] || themeStyles.kanagawa;
-  };
+  // The badge takes the theme's own accent token, so it is correct in every
+  // theme without a per-theme table to keep in sync.
+  const badgeStyle = 'bg-primary/20 text-primary hover:bg-primary/30';
 
   return (
     <div className="flex items-center gap-1">
       {selectedTemplate && (
         <Badge
           variant="outline"
-          className={`text-[10px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border border-sketch ${getThemeBadgeStyle()}`}
+          className={`text-[10px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border edge-engraved ${badgeStyle}`}
           onClick={() => onSelectTemplate(null)}
-          title="Click to clear template"
+          title="Click to clear template  ·  Alt+Alt"
         >
           {selectedTemplate.title}
           <X className="h-2.5 w-2.5 flex-shrink-0 hover:opacity-70" />
@@ -75,8 +64,8 @@ export function TemplateSelector({
           <Button
             variant="outline"
             size="icon-sm"
-            aria-label="Select prompt template"
-            title={selectedTemplate ? `Template: ${selectedTemplate.title}` : "Select prompt template"}
+            aria-label={selectedTemplate ? `Template: ${selectedTemplate.title} (Alt+Alt to clear)` : "Select prompt template (Alt+Alt)"}
+            title={selectedTemplate ? `Template: ${selectedTemplate.title}  ·  Alt+Alt to clear` : "Select prompt template  ·  Alt+Alt"}
           >
             <FileText className={`h-3 w-3 ${selectedTemplateId ? 'text-primary' : ''}`} />
           </Button>

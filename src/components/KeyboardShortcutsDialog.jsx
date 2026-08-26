@@ -19,6 +19,7 @@ const shortcuts = [
     items: [
       { keys: ['Ctrl', 'T'], description: 'Focus Textarea' },
       { keys: ['Ctrl', 'Enter'], description: 'Send Textarea Content' },
+      { keys: ['Ctrl', 'Shift', 'E'], description: 'Show / Hide What Will Be Sent' },
       { keys: ['Ctrl', 'Shift', 'Z'], description: 'Restore Last Prompt', note: 'when empty' },
       { keys: ['Ctrl', 'Shift', 'P'], description: 'Compact Whole Project' },
       { keys: ['Ctrl', 'Ctrl'], description: 'Toggle Orchestration Mode', note: 'double-tap' },
@@ -99,7 +100,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='max-w-2xl max-h-[80vh]'>
-        <DialogHeader className='pb-4 border-b border-b-sketch'>
+        <DialogHeader className='pb-4 border-b edge-b-engraved'>
           <DialogTitle className='flex items-center gap-3 text-lg'>
             <div className='p-2 bg-primary/10'>
               <Keyboard className='w-5 h-5 text-primary' />
@@ -116,7 +117,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
         <div className='flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-2'>
           {shortcuts.map((section) => (
             <div key={section.category} className='space-y-2'>
-              <div className='flex items-center gap-2 pb-2 border-b border-b-sketch'>
+              <div className='flex items-center gap-2 pb-2 border-b edge-b-engraved'>
                 <div className='p-1.5 bg-muted/30 text-muted-foreground'>
                   {section.icon}
                 </div>
@@ -148,7 +149,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
           ))}
         </div>
 
-        <div className='flex items-center justify-between pt-4 border-t border-t-sketch text-xs text-muted-foreground'>
+        <div className='flex items-center justify-between pt-4 border-t edge-t-engraved text-xs text-muted-foreground'>
           <div className='flex items-center gap-2'>
             <span>Press <kbd className='px-1.5 py-0.5 bg-muted border border-border rounded-sm text-xs font-mono'>Ctrl+H</kbd> to close</span>
           </div>

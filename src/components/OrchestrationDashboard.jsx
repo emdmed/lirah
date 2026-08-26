@@ -49,7 +49,7 @@ function Section({ icon: Icon, title, children, action }) {
         </div>
         {action}
       </div>
-      <div className="rounded-none border border-sketch bg-secondary/20 p-3 space-y-1.5 text-xs">
+      <div className="rounded-none border edge-engraved bg-secondary/20 p-3 space-y-1.5 text-xs">
         {children}
       </div>
     </div>

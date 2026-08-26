@@ -32,7 +32,7 @@ export function UsageSummaryPanel({ sessionData, tokenUsage, colors = {} }) {
   const c = colors;
 
   return (
-    <Card className="bg-background border-sketch h-full flex flex-col font-mono">
+    <Card className="bg-background edge-engraved h-full flex flex-col font-mono">
       <CardHeader className="pb-2 pt-3 px-3">
         <CardTitle className="text-xs font-medium">Session</CardTitle>
       </CardHeader>
@@ -46,7 +46,7 @@ export function UsageSummaryPanel({ sessionData, tokenUsage, colors = {} }) {
           <StatRow icon={Coins} label="Cost" value={formatCost(totalCost)} color={c.cacheRead} />
         </div>
 
-        <div className="mt-auto pt-2 border-t border-sketch">
+        <div className="mt-auto pt-2 border-t edge-engraved">
           <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
             <span>Model:</span>{' '}
             <span>{modelDisplay}</span>

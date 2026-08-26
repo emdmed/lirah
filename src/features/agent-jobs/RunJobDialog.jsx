@@ -277,7 +277,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Optional — defaults to template / file count"
-              className="h-7 min-w-[150px] flex-1 rounded border border-sketch bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-7 min-w-[150px] flex-1 rounded border edge-engraved bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
@@ -322,7 +322,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
               )}
             </div>
 
-            <div className="max-h-40 overflow-auto rounded border border-sketch">
+            <div className="max-h-40 overflow-auto rounded border edge-engraved">
               {candidates.length === 0 ? (
                 <div className="px-2 py-3 text-center text-[10px] text-muted-foreground">
                   No files selected. Pick files in the tree, pin files, or add a group.
@@ -361,7 +361,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
               onChange={(e) => setInstructions(e.target.value)}
               rows={3}
               placeholder="e.g. Write unit tests for these files following existing conventions."
-              className="w-full resize-none rounded border border-sketch bg-background px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full resize-none rounded border edge-engraved bg-background px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
@@ -383,7 +383,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                         'h-4 w-4 rounded-sm border text-[10px] leading-none tabular-nums',
                         copies === n
                           ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-sketch hover:bg-muted/50'
+                          : 'edge-engraved hover:bg-muted/50'
                       )}
                     >
                       {n}
@@ -414,7 +414,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                       'rounded-sm border px-1.5 py-0.5 text-[11px] transition-colors',
                       on
                         ? 'border-primary/70 bg-primary/10 text-foreground'
-                        : 'border-sketch text-muted-foreground hover:bg-muted/50',
+                        : 'edge-engraved text-muted-foreground hover:bg-muted/50',
                       missing && !on && 'opacity-40 cursor-not-allowed line-through'
                     )}
                   >

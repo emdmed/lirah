@@ -24,7 +24,7 @@ export function SidebarHeader({
   treeLoading
 }) {
   return (
-    <div className="p-2 border-b border-b-sketch flex flex-col gap-2 flex-shrink-0">
+    <div className="p-2 border-b edge-b-engraved flex flex-col gap-2 flex-shrink-0">
       {/* Mode indicator + controls */}
       <div className="flex items-center justify-between gap-3">
         <div
@@ -100,7 +100,7 @@ export function SidebarHeader({
             placeholder="Search files..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-7 pl-7 pr-7 py-0 leading-7 bg-muted/30 border border-sketch focus-visible:outline-1 focus-visible:outline-dashed focus-visible:outline-ring/70 focus-visible:outline-offset-0 focus-visible:ring-0 focus:bg-background"
+            className="h-7 pl-7 pr-7 py-0 leading-7 bg-muted/30 border edge-engraved focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-ring/70 focus-visible:outline-offset-0 focus-visible:ring-0 focus:bg-background"
             style={{ fontSize: 'var(--font-xs)' }}
           />
           {searchQuery && (

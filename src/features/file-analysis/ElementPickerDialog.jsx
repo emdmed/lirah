@@ -350,7 +350,7 @@ export function ElementPickerDialog({
                 const someSelected = selectedCount > 0 && !allSelected;
 
                 return (
-                  <div key={group.type} className="border border-sketch rounded-none">
+                  <div key={group.type} className="border edge-engraved rounded-none">
                     <div
                       className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted"
                       onClick={() => toggleGroup(group.type)}

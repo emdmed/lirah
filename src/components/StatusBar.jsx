@@ -141,7 +141,7 @@ function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
 function ConfirmToggleDialog({ open, onOpenChange, title, description, onConfirm }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px] border-destructive/30 border-sketch bg-destructive/5">
+      <DialogContent className="sm:max-w-[440px] border-destructive/30 edge-engraved bg-destructive/5">
         <DialogHeader className="gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
@@ -156,7 +156,7 @@ function ConfirmToggleDialog({ open, onOpenChange, title, description, onConfirm
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="border-sketch">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="edge-engraved">
             Cancel
           </Button>
           <Button variant="destructive" size="sm" onClick={onConfirm}>
@@ -254,9 +254,8 @@ export const StatusBar = memo(({
   return (
     <>
     <div
-      className="flex items-center justify-between px-2 h-8 border-t border-t-sketch text-xs font-mono"
+      className="chassis-rail flex items-center justify-between px-2 h-8 border-t edge-t-engraved text-xs font-mono"
       style={{
-        backgroundColor: theme.background || 'var(--color-background)',
         color: theme.foreground || 'var(--color-foreground)',
       }}
     >

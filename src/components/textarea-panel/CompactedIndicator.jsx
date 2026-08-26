@@ -6,7 +6,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
   if (!compactedProject) return null;
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 bg-secondary/30 border border-sketch rounded-none w-fit text-xs font-mono">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-secondary/30 border edge-engraved rounded-none w-fit text-xs font-mono">
       <Tooltip>
         <TooltipTrigger asChild>
           <div

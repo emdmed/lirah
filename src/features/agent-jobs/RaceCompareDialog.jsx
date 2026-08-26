@@ -118,7 +118,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-background">
       {/* Header: which two candidates, and which file */}
-      <div className="flex items-center justify-between gap-3 border-b border-sketch px-3 py-2 flex-shrink-0">
+      <div className="flex items-center justify-between gap-3 border-b edge-engraved px-3 py-2 flex-shrink-0">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Swords className="h-4 w-4 shrink-0 text-primary/80" />
           <CandidatePicker
@@ -161,7 +161,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
       </div>
 
       {/* File strip: who touched what, so single-candidate files are obvious */}
-      <div className="flex gap-1 overflow-x-auto border-b border-sketch px-3 py-1 flex-shrink-0">
+      <div className="flex gap-1 overflow-x-auto border-b edge-engraved px-3 py-1 flex-shrink-0">
         {files.map((f) => {
           const inA = a && f.ids.has(a.id);
           const inB = b && f.ids.has(b.id);
@@ -174,7 +174,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
                 'flex shrink-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
                 f.path === filePath
                   ? 'border-primary/70 bg-primary/10'
-                  : 'border-sketch text-muted-foreground hover:bg-muted/40'
+                  : 'edge-engraved text-muted-foreground hover:bg-muted/40'
               )}
             >
               {f.path.split('/').pop()}
@@ -230,7 +230,7 @@ function CandidatePicker({ candidates, value, onChange, exclude }) {
     <select
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      className="h-7 min-w-0 max-w-[40%] rounded border border-sketch bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+      className="h-7 min-w-0 max-w-[40%] rounded border edge-engraved bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
     >
       {candidates.map((j) => (
         <option key={j.id} value={j.id} disabled={j.id === exclude}>

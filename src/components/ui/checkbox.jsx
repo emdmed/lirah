@@ -47,7 +47,7 @@ const Checkbox = React.forwardRef(({
         onClick={handleVisualClick}
         role="presentation"
         className={cn(
-          "h-4 w-4 shrink-0 flex items-center justify-center border border-secondary border-dashed bg-background",
+          "h-4 w-4 shrink-0 flex items-center justify-center border border-secondary bg-background",
           "peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2",
           "peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
           "peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary",

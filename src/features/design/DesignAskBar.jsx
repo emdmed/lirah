@@ -57,7 +57,7 @@ export function DesignAskBar({
         type="button"
         onClick={() => onOpenChange(true)}
         title="Ask about the selection"
-        className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 font-mono text-[11px] px-3 py-1.5 border border-sketch bg-background/95 shadow-lg backdrop-blur-sm hover:border-foreground/40"
+        className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 font-mono text-[11px] px-3 py-1.5 border edge-engraved bg-background/95 shadow-lg backdrop-blur-sm hover:border-foreground/40"
       >
         <MessageSquare className="w-3.5 h-3.5" />
         Ask about {selected.length} selected
@@ -72,7 +72,7 @@ export function DesignAskBar({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-1.5 border-t border-sketch bg-background/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.35)] px-3 py-2"
+      className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-1.5 border-t edge-engraved bg-background/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.35)] px-3 py-2"
       onKeyDown={(e) => {
         // The dialog closes on Escape; in here Escape belongs to the drawer.
         if (e.key === 'Escape') {

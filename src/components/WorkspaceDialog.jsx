@@ -59,7 +59,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
 
         {mode === 'list' ? (
           <>
-            <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-none p-2 border-sketch">
+            <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-none p-2 edge-engraved">
               {existingWorkspaces?.length === 0 ? (
                 <div className="flex items-center justify-center py-8 text-sm opacity-50">
                   No workspaces yet.
@@ -108,7 +108,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="my-fullstack-app"
-                  className="w-full px-3 py-2 text-sm font-mono border border-sketch rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full px-3 py-2 text-sm font-mono border edge-engraved rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
                   autoFocus
                 />
               </div>
@@ -117,7 +117,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                 <label className="text-xs font-mono opacity-70 mb-1 block">
                   Select Projects ({selectedProjects.length} selected, min 2)
                 </label>
-                <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto border rounded-none p-2 border-sketch">
+                <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto border rounded-none p-2 edge-engraved">
                   {bookmarks.length === 0 ? (
                     <div className="text-xs opacity-50 text-center py-4">
                       No bookmarks. Add projects as bookmarks first.
@@ -131,11 +131,11 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                           onClick={() => toggleProject(bookmark)}
                           className={`flex items-center gap-2 px-3 py-2 text-left text-sm font-mono rounded-sm transition-colors ${
                             isSelected
-                              ? 'bg-foreground/8 border-l-2 border-primary'
+                              ? 'bg-primary/15'
                               : 'hover:bg-foreground/5 border-l-2 border-transparent'
                           }`}
                         >
-                          <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[10px] ${isSelected ? 'bg-foreground text-background' : 'border-sketch'}`}>
+                          <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[10px] ${isSelected ? 'bg-foreground text-background' : 'edge-engraved'}`}>
                             {isSelected ? '✓' : ''}
                           </span>
                           <span className="truncate">{bookmark.name}</span>
@@ -158,7 +158,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                         value={p.description}
                         onChange={e => updateDescription(p.path, e.target.value)}
                         placeholder="e.g. React frontend"
-                        className="flex-1 px-2 py-1 text-xs font-mono border border-sketch rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="flex-1 px-2 py-1 text-xs font-mono border edge-engraved rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </div>
                   ))}

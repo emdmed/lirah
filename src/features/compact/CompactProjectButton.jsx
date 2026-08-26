@@ -23,7 +23,7 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
       case 'scanning':
         return { Icon: Scan, iconClass: 'animate-pulse', text: 'Scanning...' };
       case 'parsing':
-        return { Icon: Zap, iconClass: 'animate-bounce', text: progressText };
+        return { Icon: Zap, iconClass: 'animate-pulse', text: progressText };
       case 'finishing':
         return { Component: RetroSpinner, props: { size: 12, lineWidth: 1.5 }, text: 'Finishing...' };
       case 'empty':
@@ -66,7 +66,7 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
       <TooltipContent side="bottom" sideOffset={8}>
         <span className="text-xs">
           Compact whole project
-          <kbd className="ml-2 px-1 py-0.5 bg-muted border border-sketch rounded-sm text-xs">
+          <kbd className="ml-2 px-1 py-0.5 bg-muted border edge-engraved rounded-sm text-xs">
             Ctrl+Shift+P
           </kbd>
         </span>

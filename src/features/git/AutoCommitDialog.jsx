@@ -64,7 +64,7 @@ function FileStatusBadge({ status }) {
   const config = statusConfig[status] || statusConfig.untracked;
   return (
     <div
-      className="flex items-center gap-1.5 px-2 py-0.5 border border-dashed border-current/30 bg-transparent"
+      className="flex items-center gap-1.5 px-2 py-0.5 border border-current/30 bg-transparent"
       style={{ color: config.color }}
     >
       {config.icon}
@@ -81,7 +81,7 @@ function FileList({ files, maxHeight = 'max-h-[40vh]' }) {
       {files.map((f, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 px-2 py-1.5 border-b border-dashed border-border/30 last:border-b-0 hover:bg-muted/30 transition-colors group"
+          className="flex items-center gap-3 px-2 py-1.5 border-b border-border/30 last:border-b-0 hover:bg-muted/30 transition-colors group"
         >
           <FileStatusBadge status={f.status} />
           <span className="text-xs font-mono text-muted-foreground break-all min-w-0">{f.path}</span>
@@ -114,7 +114,7 @@ export function AutoCommitDialog({ autoCommit }) {
         }}
       >
         {/* Header */}
-        <DialogHeader className="px-6 pt-5 pb-3 border-b border-dashed border-border">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border">
           <DialogTitle className="text-base font-semibold font-mono tracking-tight">
             {stage === 'error' ? '[ERROR] Auto Commit' : 'Auto Commit'}
           </DialogTitle>
@@ -125,11 +125,11 @@ export function AutoCommitDialog({ autoCommit }) {
           {/* Success State */}
           {showSuccess && (
             <div
-              className="flex items-center gap-3 p-4 border border-dashed"
+              className="flex items-center gap-3 p-4 border"
               style={{ borderColor: 'color-mix(in srgb, var(--color-status-success) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-success) 5%, transparent)' }}
             >
               <div
-                className="flex items-center justify-center w-8 h-8 border border-dashed"
+                className="flex items-center justify-center w-8 h-8 border"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-status-success) 40%, transparent)' }}
               >
                 <svg className="w-4 h-4" style={{ color: 'var(--color-status-success)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -146,11 +146,11 @@ export function AutoCommitDialog({ autoCommit }) {
           {/* Error State */}
           {stage === 'error' && (
             <div
-              className="flex items-start gap-3 p-4 border border-dashed"
+              className="flex items-start gap-3 p-4 border"
               style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-critical) 5%, transparent)' }}
             >
               <div
-                className="flex items-center justify-center w-8 h-8 border border-dashed shrink-0"
+                className="flex items-center justify-center w-8 h-8 border shrink-0"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)' }}
               >
                 <svg className="w-4 h-4" style={{ color: 'var(--color-status-critical)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -179,8 +179,8 @@ export function AutoCommitDialog({ autoCommit }) {
                 <span className="text-sm text-muted-foreground font-mono">Analyzing changes and generating message...</span>
               </div>
               {files.length > 0 && (
-                <div className="border border-dashed border-border overflow-hidden">
-                  <div className="px-3 py-2 bg-muted/30 border-b border-dashed border-border">
+                <div className="border border-border overflow-hidden">
+                  <div className="px-3 py-2 bg-muted/30 border-b border-border">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
                       {files.length} file{files.length !== 1 ? 's' : ''} changed
                     </span>
@@ -197,8 +197,8 @@ export function AutoCommitDialog({ autoCommit }) {
           {(stage === 'ready' || stage === 'committing') && (
             <div className="space-y-4">
               {/* File List */}
-              <div className="border border-dashed border-border overflow-hidden">
-                <div className="px-3 py-2 bg-muted/30 border-b border-dashed border-border flex items-center justify-between">
+              <div className="border border-border overflow-hidden">
+                <div className="px-3 py-2 bg-muted/30 border-b border-border flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
                     Changes
                   </span>
@@ -225,7 +225,7 @@ export function AutoCommitDialog({ autoCommit }) {
                   value={commitMessage}
                   onChange={(e) => setCommitMessage(e.target.value)}
                   placeholder="Describe the changes..."
-                  className="w-full h-24 text-sm font-mono bg-muted/30 border border-dashed border-border p-3 resize-none focus:outline-none focus:border-primary/50 transition-all"
+                  className="w-full h-24 text-sm font-mono bg-muted/30 border border-border p-3 resize-none focus:outline-none focus:border-primary/50 transition-all"
                   disabled={stage === 'committing'}
                   autoFocus
                 />
@@ -235,12 +235,12 @@ export function AutoCommitDialog({ autoCommit }) {
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t border-dashed border-border bg-muted/20">
+        <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20">
           <div className="flex items-center justify-between w-full">
             <span className="text-xs text-muted-foreground font-mono">
-              <kbd className="px-1.5 py-0.5 bg-muted border border-dashed border-border text-[10px]">Enter</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[10px]">Enter</kbd>
               {' '}to commit{' '}
-              <kbd className="px-1.5 py-0.5 bg-muted border border-dashed border-border text-[10px] ml-1">Esc</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[10px] ml-1">Esc</kbd>
               {' '}to cancel
             </span>
             <div className="flex gap-2">
@@ -249,7 +249,7 @@ export function AutoCommitDialog({ autoCommit }) {
                 size="sm"
                 onClick={cancel}
                 disabled={stage === 'committing'}
-                className="text-xs border border-dashed border-transparent hover:border-border"
+                className="text-xs border border-transparent hover:border-border"
               >
                 Cancel
               </Button>
@@ -258,7 +258,7 @@ export function AutoCommitDialog({ autoCommit }) {
                   size="sm"
                   onClick={() => confirm(commitMessage)}
                   disabled={stage === 'committing' || !commitMessage.trim()}
-                  className="text-xs min-w-[80px] border border-dashed border-primary/50"
+                  className="text-xs min-w-[80px] border border-primary/50"
                 >
                   {stage === 'committing' ? (
                     <span className="flex items-center gap-2">

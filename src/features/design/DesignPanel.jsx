@@ -73,8 +73,8 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
   );
 
   return (
-    <div className="w-[320px] flex-shrink-0 border-l border-sketch flex flex-col min-h-0 bg-background">
-      <div className="flex items-start justify-between gap-2 px-3 py-2 border-b border-sketch flex-shrink-0">
+    <div className="w-[320px] flex-shrink-0 border-l edge-engraved flex flex-col min-h-0 bg-background">
+      <div className="flex items-start justify-between gap-2 px-3 py-2 border-b edge-engraved flex-shrink-0">
         <div className="min-w-0">
           <div
             className="font-mono text-sm truncate flex items-center gap-1.5"
@@ -91,7 +91,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
               className="font-mono text-[10px] px-1 rounded"
               style={{
                 color: proposed ? '#fbbf24' : colors.mutedText,
-                border: `1px ${proposed ? 'dashed' : 'solid'} ${proposed ? '#fbbf2466' : 'rgba(255,255,255,0.15)'}`,
+                border: `1px solid ${proposed ? 'color-mix(in srgb, var(--color-status-warning) 40%, transparent)' : 'color-mix(in srgb, var(--color-border) 70%, transparent)'}`,
               }}
             >
               {node.status}

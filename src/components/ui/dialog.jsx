@@ -53,8 +53,8 @@ function DialogContent({
   ...props
 }) {
   const baseAnimation = instant
-    ? "relative grid w-full max-w-lg gap-4 border border-sketch p-6 shadow-xs font-mono rounded-none"
-    : "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative grid w-full max-w-lg gap-4 border border-sketch p-6 shadow-xs font-mono duration-200 rounded-none";
+    ? "relative grid w-full max-w-lg gap-4 border edge-engraved p-6 shadow-xs font-mono rounded-none"
+    : "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative grid w-full max-w-lg gap-4 border edge-engraved p-6 shadow-xs font-mono duration-200 rounded-none";
   return (
     <DialogPortal>
       <DialogOverlay className={instant ? "!animate-none !duration-0" : overlayClassName} />
@@ -69,7 +69,7 @@ function DialogContent({
           {...props}>
           {children}
           <DialogPrimitive.Close
-            className="ring-offset-background focus-visible:outline-1 focus-visible:outline-dashed focus-visible:outline-ring/70 focus-visible:outline-offset-0 data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none">
+            className="ring-offset-background focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-ring/70 focus-visible:outline-offset-0 data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none">
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>

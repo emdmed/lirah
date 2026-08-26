@@ -177,6 +177,7 @@ npm run preview     # Preview production build
 | `Ctrl+P` | Open Projects Palette |
 | `Ctrl+T` | Focus Textarea Panel |
 | `Ctrl+Enter` | Send Textarea Content |
+| `Ctrl+Shift+E` | Show/Hide What Will Be Sent |
 | `Ctrl+Ctrl` | Toggle Orchestration Mode (double-tap) |
 | `Alt+Alt` | Open Template Selector / Clear Template (double-tap) |
 | `Ctrl+F` | Focus File Search |

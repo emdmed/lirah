@@ -9,13 +9,15 @@ import { useState, useCallback, useRef, useEffect } from 'react';
  * @param {Function} options.onRemoveFile - Callback to remove file at index: (index) => void
  * @param {Function} options.onFocusTextarea - Callback to focus the textarea
  * @param {Function} options.onSetFileState - Callback to set file state: (index, state) => void
+ * @param {Function} [options.onCycleViewMode] - Callback to cycle detail level: (index) => void
  * @returns {Object} { selectedIndex, setSelectedIndex, handleKeyDown, fileRefs }
  */
 export function useFileListKeyboardNav({
   filesCount,
   onRemoveFile,
   onFocusTextarea,
-  onSetFileState
+  onSetFileState,
+  onCycleViewMode
 }) {
   // Currently selected file index (null = no selection)
   const [selectedIndex, setSelectedIndex] = useState(null);
@@ -129,6 +131,15 @@ export function useFileListKeyboardNav({
         }
         break;
 
+      case 'v':
+      case 'V':
+        if (selectedIndex !== null && onCycleViewMode) {
+          e.preventDefault();
+          handled = true;
+          onCycleViewMode(selectedIndex);
+        }
+        break;
+
       default:
         // Not handled
         break;
@@ -138,7 +149,7 @@ export function useFileListKeyboardNav({
     if (handled && newIndex !== selectedIndex) {
       setSelectedIndex(newIndex);
     }
-  }, [filesCount, selectedIndex, onRemoveFile, onFocusTextarea, onSetFileState]);
+  }, [filesCount, selectedIndex, onRemoveFile, onFocusTextarea, onSetFileState, onCycleViewMode]);
 
   return {
     selectedIndex,

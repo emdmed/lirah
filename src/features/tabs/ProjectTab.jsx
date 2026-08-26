@@ -23,6 +23,7 @@ import { useFileSymbols } from "../file-analysis";
 import { useTokenUsage } from "../token-budget";
 import { useTypeChecker } from "../../hooks/useTypeChecker";
 import { usePromptSender } from "../../hooks/usePromptSender";
+import { buildPrompt } from "../../hooks/buildPrompt";
 import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget";
@@ -545,6 +546,64 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     clearSelectedTemplate: () => setSelectedTemplateId(null),
   });
 
+  // The composer's payload preview. Built with the same function the sender
+  // uses, so what is on screen is what the agent receives — not a summary of it.
+  const promptPreview = useMemo(() => buildPrompt({
+    textareaContent,
+    selectedFiles: fileSelection.selectedFiles,
+    currentPath,
+    fileStates: fileSelection.fileStates,
+    selectedTemplateId,
+    getTemplateById,
+    formatFileAnalysis,
+    getLineCount,
+    getViewModeLabel,
+    selectedElements: elementPicker.selectedElements,
+    compactedProject: compact.compactedProject,
+    selectedPatterns: patterns.selectedPatterns,
+    getPatternInstructions: patterns.getPatternInstructions,
+  }), [
+    textareaContent, fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
+    selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
+    elementPicker.selectedElements, compact.compactedProject,
+    patterns.selectedPatterns, patterns.getPatternInstructions,
+  ]);
+
+  const handleClearPromptSection = useCallback((sectionId) => {
+    if (sectionId === 'compacted') compact.setCompactedProject(null);
+    else if (sectionId === 'files') fileSelection.clearFileSelection();
+    else if (sectionId === 'elements') elementPicker.clearSelectedElements();
+    else if (sectionId === 'template') setSelectedTemplateId(null);
+    else if (sectionId === 'patterns') patterns.clearPatterns();
+  }, [compact.setCompactedProject, fileSelection.clearFileSelection, elementPicker.clearSelectedElements, patterns.clearPatterns]);
+
+  const [promptPreviewOpen, setPromptPreviewOpen] = useState(() => {
+    try { return localStorage.getItem('lirah:promptPreviewOpen') === 'true'; } catch { return false; }
+  });
+
+  const togglePromptPreview = useCallback(() => {
+    setPromptPreviewOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('lirah:promptPreviewOpen', String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+
+  // Ctrl+Shift+E toggles the payload preview from anywhere, including while
+  // the terminal has focus. Shifted so it never shadows readline's Ctrl+E.
+  useEffect(() => {
+    if (isActive === false) return;
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePromptPreview();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isActive, togglePromptPreview]);
+
   // Keyboard shortcut hooks
   useViewModeShortcuts({
     sidebarOpen: sidebar.sidebarOpen, setSidebarOpen: sidebar.setSidebarOpen,
@@ -852,6 +911,10 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               patternFiles={patterns.patternFiles}
               selectedPatterns={patterns.selectedPatterns}
               onTogglePattern={patterns.togglePattern}
+              promptPreview={promptPreview}
+              promptPreviewOpen={promptPreviewOpen}
+              onTogglePromptPreview={togglePromptPreview}
+              onClearPromptSection={handleClearPromptSection}
             />
           )
         }

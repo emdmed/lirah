@@ -159,7 +159,7 @@ function Stage({
           ? 'border-foreground/50 bg-foreground/[0.03]'
           : dim
             ? 'border-border/25 opacity-45'
-            : 'border-sketch bg-background'
+            : 'edge-engraved bg-background'
       }`}
     >
       <div className="flex items-center gap-2 px-2 py-1.5">
@@ -286,7 +286,7 @@ function DataEntry({ datum, colors, selected, onSelect, onShowNodes, registerRef
     <div
       ref={registerRef}
       className={`border scroll-mt-2 transition-colors ${
-        selected ? 'border-foreground/50 bg-foreground/[0.03]' : 'border-sketch bg-background'
+        selected ? 'border-foreground/50 bg-foreground/[0.03]' : 'edge-engraved bg-background'
       }`}
     >
       <div className="flex items-center gap-1.5 px-2 py-1.5">

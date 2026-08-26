@@ -42,7 +42,7 @@ export function FileNode({
   return (
     <div
       style={{ paddingLeft: `${depth * INDENT_PX}px` }}
-      className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'bg-foreground/8 border-l-2 border-primary' : ''
+      className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'bg-primary/15' : ''
         } ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
@@ -50,7 +50,7 @@ export function FileNode({
         className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer hover:bg-foreground/5'}`}
         onClick={handleFileClick}
       >
-        <span className={`truncate leading-normal ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
+        <span className={`truncate leading-normal text-foreground/75 ${isDeleted ? 'line-through text-git-deleted' : ''} ${isUntracked ? 'text-git-added' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
 
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}

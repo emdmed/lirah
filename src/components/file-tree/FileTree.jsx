@@ -119,7 +119,7 @@ export function FileTree({
           {pinnedNodes.map((node) => (
             <TreeNode key={`pinned:${node.path}`} node={node} {...treeNodeProps} />
           ))}
-          <div className="border-t border-dashed border-foreground/10 mx-1 mt-1" />
+          <div className="border-t border-foreground/10 mx-1 mt-1" />
         </SidebarMenu>
       )}
 

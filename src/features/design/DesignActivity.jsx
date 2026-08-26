@@ -102,7 +102,7 @@ export function DesignActivity({ eventLog, startedAt, running, logPath, statusLa
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex-1 min-h-0 overflow-auto border border-sketch bg-background/50 p-2 font-mono text-[10px] leading-relaxed"
+        className="flex-1 min-h-0 overflow-auto border edge-engraved bg-background/50 p-2 font-mono text-[10px] leading-relaxed"
       >
         {events.length === 0 && (
           <div className="text-muted-foreground">

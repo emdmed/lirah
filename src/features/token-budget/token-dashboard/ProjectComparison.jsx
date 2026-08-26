@@ -69,7 +69,7 @@ export function ProjectComparison({ projects, totals, colors }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter projects..."
-            className="w-full h-7 text-xs font-mono pl-7 pr-2 border border-sketch rounded-none"
+            className="w-full h-7 text-xs font-mono pl-7 pr-2 border edge-engraved rounded-none"
             style={{ backgroundColor: 'var(--color-input-background)' }}
           />
         </div>
@@ -79,9 +79,9 @@ export function ProjectComparison({ projects, totals, colors }) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto border border-sketch rounded-none">
+      <div className="flex-1 overflow-auto border edge-engraved rounded-none">
         {/* Header */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-sketch bg-muted/30 sticky top-0">
+        <div className="flex items-center gap-2 px-3 py-2 border-b edge-engraved bg-muted/30 sticky top-0">
           {columns.map(col => (
             <button
               key={col.key}
@@ -99,7 +99,7 @@ export function ProjectComparison({ projects, totals, colors }) {
         {sorted.map((p) => (
           <div
             key={p.path}
-            className="flex items-center gap-2 px-3 py-2 border-b border-sketch/50 hover:bg-muted/20 text-xs font-mono"
+            className="flex items-center gap-2 px-3 py-2 border-b edge-engraved/50 hover:bg-muted/20 text-xs font-mono"
           >
             <div className="flex-1 min-w-[120px] truncate font-medium">{p.name}</div>
             <div className="w-20 text-right text-muted-foreground">{formatTokenCount(p.totalTokens)}</div>

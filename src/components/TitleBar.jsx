@@ -17,7 +17,7 @@ export const TitleBar = ({ theme }) => {
 
   return (
     <div
-      className="flex items-center justify-between px-4 h-8 shrink-0 border-b border-b-sketch text-xs font-mono select-none"
+      className="flex items-center justify-between px-4 h-8 shrink-0 border-b edge-b-engraved text-xs font-mono select-none"
       data-tauri-drag-region
       style={{
         backgroundColor: theme.background || 'var(--color-background)',

@@ -35,7 +35,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
     filters.dateFrom || filters.dateTo || filters.minTokens || filters.maxTokens;
 
   return (
-    <div className="bg-background rounded-none border border-sketch p-2">
+    <div className="bg-background rounded-none border edge-engraved p-2">
       <div className="flex items-center justify-between">
         <button
           className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground"

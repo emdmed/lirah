@@ -111,7 +111,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-sketch flex-shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b edge-engraved flex-shrink-0">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-sm truncate">{fileName}</div>
           <div className="font-mono text-xs text-muted-foreground truncate">{relativePath}</div>

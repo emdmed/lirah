@@ -422,7 +422,7 @@ export function DesignDialog({
     <div className="flex-1 flex min-h-0">
       <div
         ref={containerRef}
-        className="flex-1 overflow-hidden border border-sketch rounded-none bg-background/50 select-none"
+        className="flex-1 overflow-hidden border edge-engraved rounded-none bg-background/50 select-none"
         style={{ cursor: panning ? 'grabbing' : 'grab' }}
         onClick={() => {
           if (!consumeDrag()) clearSelection();

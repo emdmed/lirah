@@ -561,16 +561,16 @@ export const themes = {
     ui: {
       background: '#020D1C',                   // Prussian Blue
       foreground: '#A8D5A6',                   // Celadon
-      card: '#020D1C',                         // Prussian Blue
+      card: '#07172C',                         // Prussian Blue
       cardForeground: '#A8D5A6',               // Celadon
-      popover: '#020D1C',                      // Prussian Blue
+      popover: '#07172C',                      // Prussian Blue
       popoverForeground: '#A8D5A6',            // Celadon
       primary: '#F4F7A3',                      // Lime Cream
       primaryForeground: '#020D1C',            // Prussian Blue
       secondary: '#17594F',                    // Pine Teal
       secondaryForeground: '#FEFFC7',          // Cream
       muted: '#17594F',                        // Pine Teal
-      mutedForeground: '#A8D5A6',              // Celadon
+      mutedForeground: '#6E9B6D',              // Celadon
       accent: '#D5FF8C',                       // Lime Green
       accentForeground: '#020D1C',             // Prussian Blue
       destructive: '#F5254E',                  // Red

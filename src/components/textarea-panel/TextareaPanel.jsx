@@ -1,5 +1,4 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { Pencil } from "lucide-react";
 import { CompactSectionsDialog, FlowchartDialog, buildGraphData } from "../../features/compact";
 import { DesignDialog, useDesignExtraction } from "../../features/design";
 import { useTokenBudget } from "../../features/token-budget";
@@ -11,6 +10,10 @@ import { CompactedIndicator } from "./CompactedIndicator";
 import { TokenUsageDisplay } from "./TokenUsageDisplay";
 import { TextareaArea } from "./TextareaArea";
 import { PatternsSelector } from "../../features/patterns";
+import { PromptPreview } from "./PromptPreview";
+import { Button } from "../ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import { ScrollText } from "lucide-react";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 
@@ -56,6 +59,10 @@ export function TextareaPanel({
   patternFiles = [],
   selectedPatterns = new Set(),
   onTogglePattern,
+  promptPreview,
+  promptPreviewOpen = false,
+  onTogglePromptPreview,
+  onClearPromptSection,
 }) {
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
@@ -194,6 +201,16 @@ export function TextareaPanel({
 
   const isSendDisabled = disabled || budgetExhausted || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0);
 
+  // Overflow is a visible mechanical event on this panel: a disabled control
+  // states its reason rather than dimming to 50% with nothing said.
+  const sendBlockedReason = budgetExhausted
+    ? 'Budget spent — raise it in Token Budget'
+    : disabled
+      ? 'No terminal session'
+      : isSendDisabled
+        ? 'Nothing to send'
+        : null;
+
   const elementsIndicator = (
     <ElementsIndicator
       selectedElements={selectedElements}
@@ -265,11 +282,12 @@ export function TextareaPanel({
       isWide={isWide}
       elementsIndicator={elementsIndicator}
       compactedIndicator={compactedIndicator}
-      selectedTemplateId={selectedTemplateId}
       onClearContext={onClearContext}
       sessionId={sessionId}
       handleSend={handleSend}
       isSendDisabled={isSendDisabled}
+      sendBlockedReason={sendBlockedReason}
+      budgetExhausted={budgetExhausted}
       footerInfo={footerInfo}
       atMentionActive={atMentionActive}
       atMentionResults={atMentionResults}
@@ -310,26 +328,50 @@ export function TextareaPanel({
     </>
   );
 
+  const partCount = promptPreview?.sections?.length ?? 0;
+
   const toolbarRow = (
-    <div className="flex items-center justify-between flex-nowrap overflow-hidden min-h-[32px] max-h-[32px]">
-      <div
-        className="flex items-center justify-center h-6 w-6 text-muted-foreground"
-        title="Compose"
-        aria-label="Compose"
-      >
-        <Pencil className="w-4 h-4" />
-      </div>
-      <div className="flex items-center gap-1">
-        {projectZone}
-        {promptZone}
-      </div>
+    <div className="flex items-center gap-2 flex-nowrap overflow-hidden min-h-[32px] max-h-[32px]">
+      {/* Engraved caps on the chassis: each bank of controls is named, so a
+          panel of icons is never unlabelled. */}
+      <span className="engraved-label shrink-0 select-none">Project</span>
+      {projectZone}
+      <span className="engraved-label shrink-0 select-none">Prompt</span>
+      {promptZone}
+      {onTogglePromptPreview && (
+        <div className="ml-auto flex items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={promptPreviewOpen ? "secondary" : "ghost"}
+                size="icon-sm"
+                onClick={onTogglePromptPreview}
+                aria-expanded={promptPreviewOpen}
+                aria-label={promptPreviewOpen ? "Hide what will be sent" : "Show what will be sent"}
+              >
+                <ScrollText className={`h-3.5 w-3.5 ${partCount > 0 ? 'text-primary' : ''}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {promptPreviewOpen ? 'Hide' : 'Show'} what will be sent (Ctrl+Shift+E)
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
     </div>
   );
 
   return (
-    <div ref={containerRef} className="flex flex-col border-t border-t-sketch bg-background p-2 gap-2">
+    <div ref={containerRef} className="chassis-rail flex flex-col border-t edge-t-engraved p-2 gap-2">
       {toolbarRow}
       {dialogs}
+      {promptPreviewOpen && promptPreview && (
+        <PromptPreview
+          sections={promptPreview.sections}
+          text={promptPreview.text}
+          onClearSection={onClearPromptSection}
+        />
+      )}
       {textareaArea}
     </div>
   );

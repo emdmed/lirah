@@ -130,7 +130,7 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
                     onClick={() => handleSelectBookmark(bookmark)}
                     className={`flex flex-col items-start gap-1 px-4 py-2.5 text-left transition-colors ${
                       index === selectedIndex
-                        ? 'bg-foreground/8 border-l-2 border-primary'
+                        ? 'bg-primary/15'
                         : 'hover:bg-foreground/5 border-l-2 border-transparent'
                     }`}
                   >
@@ -143,7 +143,7 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
           </div>
 
           {/* Keyboard hints */}
-          <div className="flex items-center gap-4 text-xs opacity-50 border-t border-t-sketch pt-2">
+          <div className="flex items-center gap-4 text-xs opacity-50 border-t edge-t-engraved pt-2">
             <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
             <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
             <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">ESC</span> Close</span>

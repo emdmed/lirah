@@ -170,7 +170,7 @@ export function GitDiffDialog({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-sketch flex-shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b edge-engraved flex-shrink-0">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-sm flex items-center gap-2">
             <span className="truncate">{fileName}</span>
@@ -287,7 +287,7 @@ export function GitDiffDialog({
 
       {/* Review notes: pin feedback to lines, then send it all back to the agent */}
       {annotationsEnabled && (
-        <div className="flex-shrink-0 border-t border-sketch bg-muted/20">
+        <div className="flex-shrink-0 border-t edge-engraved bg-muted/20">
           {fileNotes.length > 0 && (
             <div className="max-h-28 overflow-y-auto px-3 pt-2">
               {fileNotes.map((n) => (
@@ -331,7 +331,7 @@ export function GitDiffDialog({
                   ? 'What should the agent change here? (Enter to pin)'
                   : 'Click a diff line (shift-click for a range) to attach a note'
               }
-              className="flex-1 min-w-0 h-7 rounded border border-sketch bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+              className="flex-1 min-w-0 h-7 rounded border edge-engraved bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
             />
             <Button
               variant="outline"

@@ -10,7 +10,7 @@ export function TabBar({ tabs, activeTabId, onSwitch, onClose, onAdd, onReorder 
   }, [tabs.length, onClose]);
 
   return (
-    <div className="flex items-center h-7 bg-background border-b border-border select-none shrink-0 overflow-x-auto">
+    <div className="chassis-rail flex items-center h-7 border-b edge-b-engraved select-none shrink-0 overflow-x-auto">
       {tabs.map((tab, idx) => {
         const isActive = tab.id === activeTabId;
         return (
@@ -21,8 +21,8 @@ export function TabBar({ tabs, activeTabId, onSwitch, onClose, onAdd, onReorder 
             className={cn(
               "group relative flex items-center gap-1 px-3 h-full text-xs font-medium border-r border-border transition-colors min-w-0 max-w-[160px]",
               isActive
-                ? "bg-background text-foreground border-b-2 border-b-foreground"
-                : "bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                ? "bg-background text-foreground shadow-[inset_0_-1px_0_0_var(--glow)]"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             <span className="truncate">{tab.label}</span>

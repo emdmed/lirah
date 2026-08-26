@@ -17,17 +17,27 @@ export function SelectedFileItem({
   showKeyboardHints = false,
   isPinned = false,
   onTogglePin,
+  lineCount,
+  viewModeLabel,
+  onCycleViewMode,
 }) {
+  // Below 300 lines the whole file goes to the agent, so there is no detail
+  // level to choose — the digest only exists for larger files.
+  const hasDetailLevel = lineCount != null && lineCount >= 300 && !!viewModeLabel;
   return (
     <div
       ref={itemRef}
       role="listitem"
       aria-selected={isSelected}
-      aria-label={`${file.name}, state: ${currentState.replace(/-/g, ' ')}`}
+      aria-label={
+        hasDetailLevel
+          ? `${file.name}, state: ${currentState.replace(/-/g, ' ')}, sending ${viewModeLabel.toLowerCase()} of ${lineCount} lines`
+          : `${file.name}, state: ${currentState.replace(/-/g, ' ')}${lineCount != null ? `, ${lineCount} lines, sent in full` : ''}`
+      }
       tabIndex={-1}
       className={cn(
         "group flex items-center gap-1 px-1 py-0.5 rounded-sm transition-colors",
-        isSelected && "bg-accent/20 border-l-2 border-accent",
+        isSelected && "bg-accent/20",
         !isSelected && "hover:bg-muted/10"
       )}
     >
@@ -43,6 +53,28 @@ export function SelectedFileItem({
       >
         {file.name}
       </button>
+      {hasDetailLevel ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onCycleViewMode?.(file.absolute); }}
+          disabled={!onCycleViewMode}
+          title={`Sending ${viewModeLabel.toLowerCase()} of this ${lineCount}-line file. Click${isSelected ? ' or press V' : ''} to change.`}
+          aria-label={`Detail level: ${viewModeLabel}. Change.`}
+          className="flex-shrink-0 flex items-center gap-1 px-1 h-3.5 border edge-engraved text-[10px] font-mono leading-none text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors disabled:pointer-events-none"
+        >
+          <span className="engraved-label">{viewModeLabel}</span>
+          <span className="tube-idle">{lineCount}L</span>
+          {showKeyboardHints && isSelected && (
+            <span className="text-muted-foreground/40">V</span>
+          )}
+        </button>
+      ) : lineCount != null ? (
+        <span
+          title={`${lineCount} lines — sent in full`}
+          className="flex-shrink-0 px-1 text-[10px] font-mono leading-none tube-idle"
+        >
+          {lineCount}L
+        </span>
+      ) : null}
       {onTogglePin && (
         <button
           onClick={(e) => { e.stopPropagation(); onTogglePin(file.absolute); }}

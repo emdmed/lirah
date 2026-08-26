@@ -94,10 +94,10 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
 
   return (
     <div 
-      className="absolute top-2 right-2 z-50 w-80 max-h-[70vh] flex flex-col border border-dashed border-primary shadow bg-background"
+      className="absolute top-2 right-2 z-50 w-80 max-h-[70vh] flex flex-col border border-primary shadow bg-background"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-dashed border-border flex-shrink-0">
+      <div className="flex items-center justify-between p-2 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex flex-col min-w-0">
             <span className="font-mono text-sm font-medium truncate">Completed Tasks</span>
@@ -122,7 +122,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
         {/* On base branch warning */}
         {currentBranch === baseBranch && (
           <div
-            className="flex items-start gap-2 p-3 border border-dashed"
+            className="flex items-start gap-2 p-3 border"
             style={{ borderColor: 'color-mix(in srgb, var(--color-status-warning) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-warning) 5%, transparent)' }}
           >
             <GitBranch className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--color-status-warning)' }} />
@@ -155,7 +155,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
         {/* Error State */}
         {error && (
           <div
-            className="flex items-start gap-2 p-3 border border-dashed"
+            className="flex items-start gap-2 p-3 border"
             style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-critical) 5%, transparent)' }}
           >
             <svg className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--color-status-critical)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -170,7 +170,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
         
         {/* No tasks */}
         {stage === 'done' && tasks.length === 0 && (
-          <div className="p-3 text-center border border-dashed border-border">
+          <div className="p-3 text-center border border-border">
             <p className="text-xs text-muted-foreground font-mono">No tasks generated</p>
             <p className="text-xs text-muted-foreground mt-0.5 font-mono">
               The LLM couldn't identify specific tasks from the changes
@@ -188,7 +188,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
               return (
                 <div 
                   key={index}
-                  className="border-b border-dashed border-border overflow-hidden"
+                  className="border-b border-border overflow-hidden"
                 >
                   {/* Task Header */}
                   <button
@@ -226,7 +226,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
 
                   {/* Expanded Details */}
                   {isExpanded && hasFiles && (
-                    <div className="border-t border-dashed border-border bg-muted/20 px-3 py-2">
+                    <div className="border-t border-border bg-muted/20 px-3 py-2">
                       <p className="text-[10px] text-muted-foreground mb-1.5 font-mono uppercase tracking-wider">
                         Changed files
                       </p>

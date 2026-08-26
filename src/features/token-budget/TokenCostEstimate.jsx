@@ -40,15 +40,30 @@ export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath 
   const { status } = checkBudgetStatus(projectPath);
   const wouldExceed = budget?.dailyLimit && (currentUsage.total + estimate) > budget.dailyLimit;
 
-  const colorStyle = wouldExceed ? { color: '#E82424' }
-    : status === 'warning' ? { color: '#FF9E3B' }
-    : { color: 'var(--muted-foreground)' };
+  // Status colours come from the theme's own tokens. The previous literals
+  // were hardcoded hex, and the neutral case pointed at `--muted-foreground`,
+  // which does not exist — the real variable is `--color-muted-foreground` —
+  // so the default silently resolved to nothing.
+  const valueStyle = wouldExceed
+    ? { color: 'var(--color-status-critical)', textShadow: 'none' }
+    : status === 'warning'
+      ? { color: 'var(--color-status-warning)', textShadow: 'none' }
+      : undefined;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="text-xs font-mono cursor-default" style={colorStyle}>
-          Est: ~{estimate.toLocaleString()} tokens (${cost.toFixed(2)})
+        <span className="flex items-baseline gap-1.5 font-mono cursor-default">
+          <span
+            className="tube tube-change leading-none"
+            style={{ fontSize: 'var(--font-xl)', ...valueStyle }}
+          >
+            ~{estimate.toLocaleString()}
+          </span>
+          <span className="engraved-label">est tokens</span>
+          <span className="tube tube-change leading-none" style={valueStyle}>
+            ${cost.toFixed(2)}
+          </span>
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs font-mono">

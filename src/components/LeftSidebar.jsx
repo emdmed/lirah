@@ -59,7 +59,7 @@ export function LeftSidebar({
 
   return (
     <>
-      <Sidebar collapsible="none" className="border-e border-e-sketch m-0 p-1 shrink-0 overflow-hidden h-full flex flex-col" style={{ width: sidebarWidth }}>
+      <Sidebar collapsible="none" className="chassis-rail border-e edge-e-engraved m-0 p-1 shrink-0 overflow-hidden h-full flex flex-col" style={{ width: sidebarWidth }}>
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
             viewMode={viewMode}
@@ -83,6 +83,11 @@ export function LeftSidebar({
             sandboxEnabled={sandboxEnabled}
           />
           <SidebarGroup className="flex flex-col flex-1 min-h-0">
+            <div className="flex items-center justify-between px-1 pb-1 shrink-0">
+              <span className="engraved-label select-none">
+                {viewMode === 'flat' ? 'Navigate' : 'Context'}
+              </span>
+            </div>
             <SidebarGroupContent className="p-1 overflow-y-auto flex-1 min-h-0">
               {viewMode === 'flat' ? (
                 <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={onFolderClick} />
