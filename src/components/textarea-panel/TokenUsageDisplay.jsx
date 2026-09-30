@@ -1,5 +1,4 @@
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
-import { Coins } from "lucide-react";
 import { TokenCostEstimate } from "../../features/token-budget";
 import { formatTokenCount } from "../../features/token-budget/tokenCalculations";
 
@@ -18,7 +17,6 @@ export function TokenUsageDisplay({ tokenUsage, textareaContent, selectedFiles, 
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-baseline gap-1.5 font-mono cursor-default">
-              <Coins className="w-3 h-3 self-center text-muted-foreground/60" />
               <span
                 className="tube-idle leading-none"
                 style={{ fontSize: 'var(--font-lg)' }}

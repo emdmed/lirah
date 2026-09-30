@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { FileText, Check, Settings, X } from "lucide-react";
+import { Check, Settings, X, FileText } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -51,7 +51,7 @@ export function TemplateSelector({
       {selectedTemplate && (
         <Badge
           variant="outline"
-          className={`text-[10px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border edge-engraved ${badgeStyle}`}
+          className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border edge-engraved ${badgeStyle}`}
           onClick={() => onSelectTemplate(null)}
           title="Click to clear template  ·  Alt+Alt"
         >
@@ -62,24 +62,26 @@ export function TemplateSelector({
       <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="outline"
-            size="icon-sm"
+            variant={selectedTemplateId ? "default" : "ghost"}
+            size="xs"
             aria-label={selectedTemplate ? `Template: ${selectedTemplate.title} (Alt+Alt to clear)` : "Select prompt template (Alt+Alt)"}
             title={selectedTemplate ? `Template: ${selectedTemplate.title}  ·  Alt+Alt to clear` : "Select prompt template  ·  Alt+Alt"}
+            className="gap-1 px-1.5"
           >
-            <FileText className={`h-3 w-3 ${selectedTemplateId ? 'text-primary' : ''}`} />
+            <FileText className="h-3 w-3" />
+            template
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-48 text-xs">
           {templates.length === 0 ? (
-            <DropdownMenuItem disabled className="text-[10px] text-muted-foreground">
+            <DropdownMenuItem disabled className="text-[11px] text-muted-foreground">
               No templates available
             </DropdownMenuItem>
           ) : (
             <>
               <DropdownMenuItem
                 onClick={() => onSelectTemplate(null)}
-                className="flex items-center justify-between text-[10px] py-1.5"
+                className="flex items-center justify-between text-[11px] py-1.5"
               >
                 <span className="text-muted-foreground">No template</span>
                 {!selectedTemplateId && <Check className="h-3 w-3 text-primary" />}
@@ -89,7 +91,7 @@ export function TemplateSelector({
                 <DropdownMenuItem
                   key={template.id}
                   onClick={() => onSelectTemplate(template.id)}
-                  className={`flex items-center justify-between text-[10px] py-1.5 ${selectedTemplateId === template.id ? 'bg-primary/10' : ''
+                  className={`flex items-center justify-between text-[11px] py-1.5 ${selectedTemplateId === template.id ? 'bg-primary/10' : ''
                     }`}
                 >
                   <span className="flex items-center">
@@ -110,7 +112,7 @@ export function TemplateSelector({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={onManageTemplates}
-            className="text-[10px] py-1.5"
+            className="text-[11px] py-1.5"
           >
             <Settings className="h-3 w-3 mr-1.5" />
             Manage Templates...

@@ -11,7 +11,7 @@ export function TypeCheckBadge({ result }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-[0.65rem] font-mono flex-shrink-0">
+    <span className="inline-flex items-center gap-1 text-[11px] font-mono flex-shrink-0">
       {result.error_count > 0 && (
         <span className="inline-flex items-center gap-0.5 text-destructive">
           <XCircle className="w-2.5 h-2.5" />

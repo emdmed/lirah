@@ -272,7 +272,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
 
         <div className="flex flex-col gap-3 py-1 flex-1 min-h-0 overflow-y-auto">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Name</span>
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Name</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -292,7 +292,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           {/* Context files: tree selection + pinned, with groups as an add-in */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Context files ({checkedFiles.length})
               </span>
               {groups.length > 0 && (
@@ -300,7 +300,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
                     >
                       <FolderInput className="h-3 w-3" />
                       Add file group
@@ -324,7 +324,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
 
             <div className="max-h-40 overflow-auto rounded border edge-engraved">
               {candidates.length === 0 ? (
-                <div className="px-2 py-3 text-center text-[10px] text-muted-foreground">
+                <div className="px-2 py-3 text-center text-[11px] text-muted-foreground">
                   No files selected. Pick files in the tree, pin files, or add a group.
                 </div>
               ) : (
@@ -341,7 +341,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                         onCheckedChange={() => toggleFile(f.relativePath)}
                       />
                       <span className="flex-1 truncate font-mono text-[11px]">{f.relativePath}</span>
-                      <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                      <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
                         <Icon className="h-2.5 w-2.5" />
                         {meta.label}
                       </span>
@@ -353,7 +353,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Instructions {template ? '(optional)' : ''}
             </span>
             <textarea
@@ -368,11 +368,11 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           {/* Agents: pick one, or several to race them against each other. */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Agents ({clis.size})
               </span>
               {canRace && (
-                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <span>runs each</span>
                   {Array.from({ length: MAX_COPIES }, (_, i) => i + 1).map((n) => (
                     <button
@@ -380,7 +380,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                       type="button"
                       onClick={() => setCopies(n)}
                       className={cn(
-                        'h-4 w-4 rounded-sm border text-[10px] leading-none tabular-nums',
+                        'h-4 w-4 rounded-sm border text-[11px] leading-none tabular-nums',
                         copies === n
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'edge-engraved hover:bg-muted/50'
@@ -424,7 +424,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
               })}
             </div>
             {candidateCount > 1 && (
-              <span className="text-[10px] leading-snug text-muted-foreground/70">
+              <span className="text-[11px] leading-snug text-muted-foreground/70">
                 Races {candidateCount} candidates on the same prompt, one worktree each. Compare the
                 diffs, keep one — the rest are discarded.
               </span>
@@ -452,7 +452,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
         </div>
 
         {overlaps.length > 0 && (
-          <div className="shrink-0 rounded border border-[var(--color-status-warning)]/40 bg-[var(--color-status-warning)]/10 px-2.5 py-2 text-[10px] leading-snug">
+          <div className="shrink-0 rounded border border-[var(--color-status-warning)]/40 bg-[var(--color-status-warning)]/10 px-2.5 py-2 text-[11px] leading-snug">
             <div className="flex items-center gap-1.5 font-medium text-[var(--color-status-warning)]">
               <AlertTriangle className="h-3 w-3 shrink-0" />
               Overlaps {overlaps.length} pending job{overlaps.length === 1 ? '' : 's'}
@@ -488,7 +488,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
 function Picker({ label, value, items, selectedId, onSelect, disabled = false }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={disabled}>
           <Button variant="outline" size="sm" className="h-7 min-w-[150px] justify-between text-xs">

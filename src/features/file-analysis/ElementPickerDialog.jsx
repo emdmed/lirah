@@ -363,7 +363,7 @@ export function ElementPickerDialog({
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="h-5 px-1.5 text-[10px]"
+                        className="h-5 px-1.5 text-[11px]"
                         onClick={(e) => { e.stopPropagation(); toggleGroupSelection(group); }}
                       >
                         {allSelected ? 'none' : 'all'}

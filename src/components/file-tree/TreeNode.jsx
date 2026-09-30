@@ -2,7 +2,8 @@ import React, { memo } from "react";
 import { SidebarMenuItem } from "@/components/ui/sidebar";
 import { FolderNode } from "./FolderNode";
 import { FileNode } from "./FileNode";
-import { INDENT_PX } from "./constants";
+import { GUIDE_PIPE, GUIDE_BLANK } from "./constants";
+import { isDimmedEntry } from "./utils/lsColors";
 
 /**
  * Compare two Sets for equality
@@ -42,6 +43,8 @@ function mapsEqual(a, b) {
  */
 export const TreeNode = memo(function TreeNode({
   node,
+  guide = "",
+  isLast = false,
   expandedFolders,
   currentPath,
   gitStats,
@@ -65,8 +68,7 @@ export const TreeNode = memo(function TreeNode({
   const hasChildren = node.children && Array.isArray(node.children) && node.children.length > 0;
   const isSelected = selectedFiles && selectedFiles.has(node.path);
   const isPinned = pinnedFiles && pinnedFiles.has(node.path);
-  const depth = node.depth || 0;
-  const isDotfile = node.name?.startsWith('.');
+  const isDimmed = isDimmedEntry(node.name);
 
   // Git stats
   const stats = gitStats?.get(node.path);
@@ -78,11 +80,12 @@ export const TreeNode = memo(function TreeNode({
 
   return (
     <>
-      <SidebarMenuItem className="my-0 p-0 w-full" style={isDotfile ? { opacity: 0.45 } : undefined}>
+      <SidebarMenuItem className="my-0 p-0 w-full" style={isDimmed ? { opacity: 0.45 } : undefined}>
         {node.is_dir ? (
           <FolderNode
             node={node}
-            depth={depth}
+            guide={guide}
+            isLast={isLast}
             isExpanded={isExpanded}
             isCurrentPath={isCurrentPath}
             onToggle={onToggle}
@@ -90,7 +93,8 @@ export const TreeNode = memo(function TreeNode({
         ) : (
           <FileNode
             node={node}
-            depth={depth}
+            guide={guide}
+            isLast={isLast}
             isCurrentPath={isCurrentPath}
             stats={stats}
             isSelected={isSelected}
@@ -112,10 +116,12 @@ export const TreeNode = memo(function TreeNode({
 
       {/* Recursively render children if expanded */}
       {node.is_dir && isExpanded && hasChildren && (
-        node.children.map((child) => (
+        node.children.map((child, idx) => (
           <TreeNode
             key={child.path}
             node={child}
+            guide={guide + (isLast ? GUIDE_BLANK : GUIDE_PIPE)}
+            isLast={idx === node.children.length - 1}
             expandedFolders={expandedFolders}
             currentPath={currentPath}
             gitStats={gitStats}
@@ -141,6 +147,8 @@ export const TreeNode = memo(function TreeNode({
 }, (prevProps, nextProps) => {
   // Custom comparison for memo - handle Sets and Maps properly
   if (prevProps.node !== nextProps.node) return false;
+  if (prevProps.guide !== nextProps.guide) return false;
+  if (prevProps.isLast !== nextProps.isLast) return false;
   if (prevProps.currentPath !== nextProps.currentPath) return false;
   if (prevProps.isTextareaPanelOpen !== nextProps.isTextareaPanelOpen) return false;
   if (prevProps.showGitChangesOnly !== nextProps.showGitChangesOnly) return false;

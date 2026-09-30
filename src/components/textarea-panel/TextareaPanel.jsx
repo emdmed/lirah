@@ -12,8 +12,8 @@ import { TextareaArea } from "./TextareaArea";
 import { PatternsSelector } from "../../features/patterns";
 import { PromptPreview } from "./PromptPreview";
 import { Button } from "../ui/button";
+import { PaneInfo } from "../PaneInfo";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
-import { ScrollText } from "lucide-react";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 
@@ -288,7 +288,6 @@ export function TextareaPanel({
       isSendDisabled={isSendDisabled}
       sendBlockedReason={sendBlockedReason}
       budgetExhausted={budgetExhausted}
-      footerInfo={footerInfo}
       atMentionActive={atMentionActive}
       atMentionResults={atMentionResults}
       atMentionSelectedIndex={atMentionSelectedIndex}
@@ -331,7 +330,7 @@ export function TextareaPanel({
   const partCount = promptPreview?.sections?.length ?? 0;
 
   const toolbarRow = (
-    <div className="flex items-center gap-2 flex-nowrap overflow-hidden min-h-[32px] max-h-[32px]">
+    <div className="flex items-center gap-2 flex-nowrap overflow-hidden min-h-[24px] max-h-[24px] pb-1.5 edge-b-engraved">
       {/* Engraved caps on the chassis: each bank of controls is named, so a
           panel of icons is never unlabelled. */}
       <span className="engraved-label shrink-0 select-none">Project</span>
@@ -343,13 +342,13 @@ export function TextareaPanel({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={promptPreviewOpen ? "secondary" : "ghost"}
-                size="icon-sm"
+                variant={promptPreviewOpen ? "default" : "ghost"}
+                size="xs"
                 onClick={onTogglePromptPreview}
                 aria-expanded={promptPreviewOpen}
                 aria-label={promptPreviewOpen ? "Hide what will be sent" : "Show what will be sent"}
               >
-                <ScrollText className={`h-3.5 w-3.5 ${partCount > 0 ? 'text-primary' : ''}`} />
+                preview{partCount > 0 && !promptPreviewOpen && <span className="text-primary">:{partCount}</span>}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
@@ -362,7 +361,7 @@ export function TextareaPanel({
   );
 
   return (
-    <div ref={containerRef} className="chassis-rail flex flex-col border-t edge-t-engraved p-2 gap-2">
+    <div ref={containerRef} data-pane="3" data-title="[3] prompt" className="tui-pane flex flex-col px-2 pb-3 pt-[16px] gap-1.5">
       {toolbarRow}
       {dialogs}
       {promptPreviewOpen && promptPreview && (
@@ -373,6 +372,10 @@ export function TextareaPanel({
         />
       )}
       {textareaArea}
+      <PaneInfo>
+        {footerInfo}
+        {fileArray.length > 0 && <span> · {fileArray.length} file{fileArray.length === 1 ? '' : 's'}</span>}
+      </PaneInfo>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RetroSpinner } from "@/components/ui/RetroSpinner";
-import { Layers, Scan, Zap, Sparkles, FileX } from "lucide-react";
+import { Scan, Zap, Sparkles, FileX, Layers } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**
@@ -55,12 +55,14 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="outline"
-          size="icon-sm"
+          variant="ghost"
+          size="xs"
           onClick={onClick}
           disabled={disabled}
+          className="gap-1 px-1.5"
         >
           <Layers className="h-3 w-3" />
+          compact
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>

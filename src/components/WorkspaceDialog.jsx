@@ -135,7 +135,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                               : 'hover:bg-foreground/5 border-l-2 border-transparent'
                           }`}
                         >
-                          <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[10px] ${isSelected ? 'bg-foreground text-background' : 'edge-engraved'}`}>
+                          <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[11px] ${isSelected ? 'bg-foreground text-background' : 'edge-engraved'}`}>
                             {isSelected ? '✓' : ''}
                           </span>
                           <span className="truncate">{bookmark.name}</span>

@@ -6,6 +6,8 @@ import { useFileSelection } from "../features/file-groups";
 import { usePinnedFiles } from "../features/pinned-files";
 import { useMemo, useCallback } from "react";
 import { RetroSpinner } from "./ui/RetroSpinner";
+import { PaneInfo } from "./PaneInfo";
+import { useRowCursor } from "../hooks/useRowCursor";
 import {
   Sidebar,
   SidebarContent,
@@ -57,9 +59,13 @@ export function LeftSidebar({
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, setFileViewMode, VIEW_MODES } = fileSymbols;
 
+  const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
+  const { containerRef: rowsRef, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
+    useRowCursor({ onSearch: focusSearch });
+
   return (
     <>
-      <Sidebar collapsible="none" className="chassis-rail border-e edge-e-engraved m-0 p-1 shrink-0 overflow-hidden h-full flex flex-col" style={{ width: sidebarWidth }}>
+      <Sidebar collapsible="none" className="tui-pane bg-background m-0 px-1 pt-[14px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" style={{ width: sidebarWidth }}>
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
             viewMode={viewMode}
@@ -83,12 +89,14 @@ export function LeftSidebar({
             sandboxEnabled={sandboxEnabled}
           />
           <SidebarGroup className="flex flex-col flex-1 min-h-0">
-            <div className="flex items-center justify-between px-1 pb-1 shrink-0">
-              <span className="engraved-label select-none">
-                {viewMode === 'flat' ? 'Navigate' : 'Context'}
-              </span>
-            </div>
-            <SidebarGroupContent className="p-1 overflow-y-auto flex-1 min-h-0">
+            <SidebarGroupContent
+              ref={rowsRef}
+              tabIndex={0}
+              data-pane-focus
+              onKeyDown={onRowsKeyDown}
+              onBlur={onRowsBlur}
+              className="p-1 overflow-y-auto flex-1 min-h-0 outline-none focus-visible:outline-none"
+            >
               {viewMode === 'flat' ? (
                 <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={onFolderClick} />
               ) : (
@@ -153,6 +161,9 @@ export function LeftSidebar({
             />
           )}
         </SidebarContent>
+        <PaneInfo>
+          {cursorIndex != null ? `${cursorIndex + 1} of ${rowCount}` : `${rowCount} item${rowCount === 1 ? '' : 's'}`}
+        </PaneInfo>
       </Sidebar>
       <div
         className={`w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50 shrink-0 ${isResizing ? 'bg-primary/50' : ''}`}

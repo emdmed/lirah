@@ -1,5 +1,4 @@
 import React, { useMemo, useCallback } from "react";
-import { Pin } from "lucide-react";
 import { SidebarMenu } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
@@ -111,13 +110,10 @@ export function FileTree({
       {pinnedNodes.length > 0 && (
         <SidebarMenu className="filetree-container mb-0.5">
           <div className="flex items-center gap-1 px-1 pt-0.5 select-none">
-            <Pin className="w-2.5 h-2.5 text-muted-foreground/60" fill="currentColor" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
-              Pinned
-            </span>
+            <span className="engraved-label">pinned</span>
           </div>
-          {pinnedNodes.map((node) => (
-            <TreeNode key={`pinned:${node.path}`} node={node} {...treeNodeProps} />
+          {pinnedNodes.map((node, idx) => (
+            <TreeNode key={`pinned:${node.path}`} node={node} isLast={idx === pinnedNodes.length - 1} {...treeNodeProps} />
           ))}
           <div className="border-t border-foreground/10 mx-1 mt-1" />
         </SidebarMenu>
@@ -129,8 +125,8 @@ export function FileTree({
         )
       ) : (
         <SidebarMenu className="filetree-container">
-          {displayedNodes.map((node) => (
-            <TreeNode key={node.path} node={node} {...treeNodeProps} />
+          {displayedNodes.map((node, idx) => (
+            <TreeNode key={node.path} node={node} isLast={idx === displayedNodes.length - 1} {...treeNodeProps} />
           ))}
         </SidebarMenu>
       )}

@@ -4,7 +4,7 @@ import { FileGroupsDropdown } from "../../features/file-groups";
 
 export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileCount, isWide, onOpenDesign, designRunning, designHasSpec }) {
   return (
-    <div className={`flex items-center gap-1 rounded-none py-1 ${isWide ? 'flex-wrap' : ''}`}>
+    <div className={`flex items-center gap-0.5 ${isWide ? 'flex-wrap' : ''}`}>
       <CompactProjectButton
         onClick={onCompactProject}
         isCompacting={isCompacting}
@@ -17,7 +17,7 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
         hasSpec={designHasSpec}
         disabled={disabled || !projectPath}
       />
-      {isWide && <div className="w-px h-3 bg-border/30" />}
+      
       <FileGroupsDropdown
         projectPath={projectPath}
         onLoadGroup={onLoadGroup}

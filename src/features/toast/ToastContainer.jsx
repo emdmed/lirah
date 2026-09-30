@@ -1,101 +1,66 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useToast } from './ToastContext';
-import { X, AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 
-const ICONS = {
-  error: AlertCircle,
-  success: CheckCircle,
-  warning: AlertTriangle,
-  info: Info,
+// Message line, as in vim: the newest notification occupies one line directly
+// above the status bar, prefixed by a status mark. Older ones wait behind it.
+const MARKS = {
+  error: '✗',
+  success: '✓',
+  warning: '!',
+  info: '·',
 };
 
-const STYLES = {
-  error: { color: 'var(--color-status-critical, #E82424)' },
-  success: { color: 'var(--color-status-success, #76946A)' },
-  warning: { color: 'var(--color-status-warning, #FF9E3B)' },
-  info: { color: 'var(--color-status-info, #6B8CCE)' },
+const COLORS = {
+  error: 'var(--color-status-critical, #E82424)',
+  success: 'var(--color-status-success, #76946A)',
+  warning: 'var(--color-status-warning, #FF9E3B)',
+  info: 'var(--color-status-info, #6B8CCE)',
 };
-
-function Toast({ toast, onDismiss }) {
-  const [progress, setProgress] = useState(100);
-  const Icon = ICONS[toast.type] || Info;
-  const { color } = STYLES[toast.type] || STYLES.info;
-
-  useEffect(() => {
-    if (!toast.duration || toast.duration <= 0) return;
-
-    const startTime = Date.now();
-    const duration = toast.duration;
-
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, duration - elapsed);
-      const percentage = (remaining / duration) * 100;
-      setProgress(percentage);
-
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [toast.duration]);
-
-  return (
-    <div
-      className="relative flex items-start gap-3 p-3 rounded-none border shadow-lg min-w-[320px] max-w-[480px] animate-in slide-in-from-right-4 fade-in duration-300"
-      style={{ borderColor: `color-mix(in srgb, ${color} 50%, transparent)`, backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)` }}
-      role="alert"
-    >
-      <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color }} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-foreground leading-relaxed">{toast.message}</p>
-        {toast.action && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              toast.action.onClick();
-              onDismiss();
-            }}
-            className="mt-2 h-7 text-xs px-2 py-1"
-          >
-            {toast.action.label}
-          </Button>
-        )}
-      </div>
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={onDismiss}
-        className="p-1 h-auto flex-shrink-0 opacity-60 hover:opacity-100"
-        aria-label="Dismiss notification"
-      >
-        <X className="w-3.5 h-3.5" />
-      </Button>
-      {toast.duration > 0 && (
-        <div
-          className="absolute bottom-0 left-0 h-[2px] transition-all duration-100"
-          style={{ width: `${progress}%`, backgroundColor: color }}
-        />
-      )}
-    </div>
-  );
-}
 
 export function ToastContainer() {
   const { toasts, dismiss } = useToast();
 
   if (toasts.length === 0) return null;
 
+  const toast = toasts[toasts.length - 1];
+  const color = COLORS[toast.type] || COLORS.info;
+  const queued = toasts.length - 1;
+
   return (
-    <div className="fixed top-16 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-      {toasts.map((toast) => (
-        <div key={toast.id} className="pointer-events-auto">
-          <Toast toast={toast} onDismiss={() => dismiss(toast.id)} />
-        </div>
-      ))}
+    <div
+      className="fixed left-0 right-0 bottom-0 z-[100] flex items-center gap-2 h-8 px-2 text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
+      role="alert"
+    >
+      <span className="shrink-0" style={{ color }}>{MARKS[toast.type] || MARKS.info}</span>
+      <span className="truncate min-w-0" style={toast.type === 'error' ? { color } : undefined}>
+        {toast.message}
+      </span>
+      {queued > 0 && <span className="shrink-0 text-muted-foreground">+{queued}</span>}
+      <span className="ml-auto flex items-center gap-1 shrink-0">
+        {toast.action && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              toast.action.onClick();
+              dismiss(toast.id);
+            }}
+            className="h-5 px-1"
+          >
+            {toast.action.label}
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() => dismiss(toast.id)}
+          className="h-5 px-1 text-muted-foreground"
+          aria-label="Dismiss notification"
+        >
+          dismiss
+        </Button>
+      </span>
     </div>
   );
 }

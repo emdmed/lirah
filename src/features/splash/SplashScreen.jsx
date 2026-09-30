@@ -23,7 +23,7 @@ function StepIndicator({ step, status, index }) {
         ) : status === 'done' ? (
           <Check className="w-3 h-3 opacity-70" />
         ) : (
-          <span className="text-[10px] font-mono opacity-40">{index + 1}</span>
+          <span className="text-[11px] font-mono opacity-40">{index + 1}</span>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export function SplashScreen({ visible, projectName, currentStep, onComplete }) 
 
         {/* Steps container */}
         <div className="border edge-engraved p-3 flex flex-col gap-3 min-w-[240px]">
-          <div className="text-[10px] font-mono uppercase tracking-wider opacity-40">Initialization</div>
+          <div className="text-[11px] font-mono uppercase tracking-wider opacity-40">Initialization</div>
           {steps.map((step, index) => (
             <StepIndicator key={step.id} step={step} status={getStatus(step.id)} index={index} />
           ))}

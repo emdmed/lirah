@@ -179,7 +179,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
             >
               {f.path.split('/').pop()}
               {!(inA && inB) && (
-                <span className="text-[9px] uppercase text-muted-foreground/70">
+                <span className="text-[11px] uppercase text-muted-foreground/70">
                   {inA ? 'A' : 'B'}
                 </span>
               )}

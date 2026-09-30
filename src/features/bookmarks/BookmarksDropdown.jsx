@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { Button } from '../../components/ui/button';
-import { Bookmark, X } from 'lucide-react';
+import { X, Bookmark } from 'lucide-react';
 import { useBookmarks } from './BookmarksContext';
 
 export function BookmarksDropdown({ onNavigate }) {
@@ -32,10 +32,11 @@ export function BookmarksDropdown({ onNavigate }) {
         <Button
           size="icon-xs"
           variant="ghost"
-          className="h-5 w-5"
+          className="h-6 w-6"
           title="Bookmarks"
+          aria-label="Bookmarks"
         >
-          <Bookmark className="w-2.5 h-2.5" />
+          <Bookmark className="w-3.5 h-3.5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[300px]">
@@ -60,7 +61,7 @@ export function BookmarksDropdown({ onNavigate }) {
                 <span className="text-xs font-medium truncate w-full">
                   {bookmark.name}
                 </span>
-                <span className="text-[0.65rem] opacity-50 truncate w-full">
+                <span className="text-[11px] opacity-50 truncate w-full">
                   {bookmark.path}
                 </span>
                 {hoveredId === bookmark.id && (

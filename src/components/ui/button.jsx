@@ -5,20 +5,20 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center rounded-xs justify-center gap-2 whitespace-nowrap text-sm font-medium transition-opacity disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-primary focus-visible:-outline-offset-1 aria-invalid:text-destructive",
   {
     variants: {
       variant: {
-        default: "border edge-engraved bg-primary/20 text-primary hover:bg-primary/30",
+        default: "tui-btn bg-primary text-primary-foreground hover:bg-primary/85",
         destructive:
-          "border edge-engraved bg-destructive/20 text-destructive hover:bg-destructive/30 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "tui-btn text-destructive hover:bg-destructive hover:text-destructive-foreground",
         outline:
-          "border border-border edge-engraved bg-transparent hover:bg-foreground/5",
+          "tui-btn bg-transparent hover:bg-foreground hover:text-background",
         secondary:
-          "border edge-engraved bg-secondary/50 text-secondary-foreground hover:bg-secondary/70",
+          "tui-btn text-muted-foreground hover:bg-foreground hover:text-background",
         ghost:
-          "hover:bg-accent/50 hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline hover:opacity-80",
+          "tui-btn hover:bg-foreground hover:text-background",
+        link: "text-primary underline underline-offset-4 hover:bg-primary hover:text-primary-foreground hover:no-underline",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

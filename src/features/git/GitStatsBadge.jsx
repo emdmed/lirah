@@ -12,7 +12,7 @@ export function GitStatsBadge({ stats }) {
   // Show "U" badge for untracked files
   if (stats.status === "untracked") {
     return (
-      <span className="inline-flex items-center text-[0.6rem] font-mono flex-shrink-0 ml-0.5">
+      <span className="inline-flex items-center text-[11px] font-mono flex-shrink-0 ml-0.5">
         <span className="text-git-added">U</span>
         {stats.added > 0 && <span className="text-git-added ml-0.5">+{stats.added}</span>}
       </span>
@@ -22,7 +22,7 @@ export function GitStatsBadge({ stats }) {
   // Show "D" badge for deleted files
   if (stats.status === "deleted") {
     return (
-      <span className="inline-flex items-center text-[0.6rem] font-mono flex-shrink-0 ml-0.5">
+      <span className="inline-flex items-center text-[11px] font-mono flex-shrink-0 ml-0.5">
         <span className="text-git-deleted">D</span>
         {stats.deleted > 0 && <span className="text-git-deleted ml-0.5">-{stats.deleted}</span>}
       </span>
@@ -30,7 +30,7 @@ export function GitStatsBadge({ stats }) {
   }
 
   return (
-    <span className="inline-flex items-center text-[0.6rem] font-mono flex-shrink-0 ml-0.5">
+    <span className="inline-flex items-center text-[11px] font-mono flex-shrink-0 ml-0.5">
       <span className="text-git-added">+{stats.added}</span>
       <span className="text-git-deleted ml-0.5">-{stats.deleted}</span>
     </span>

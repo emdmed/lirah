@@ -6,9 +6,12 @@ import { TabBar } from "./features/tabs/TabBar";
 import { SplashScreen } from "./features/splash";
 import { SubagentProvider } from "./contexts/SubagentContext";
 import { RightSidebar } from "./features/agent-jobs/agent-jobs";
+import { usePaneShortcuts } from "./hooks/usePaneShortcuts";
+import { KeyHintBar } from "./components/KeyHintBar";
 
 function App() {
   const { tabs, activeTabId, addTab, removeTab, switchTab, reorderTab } = useTabManager();
+  usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   // CLI initial path (e.g. `nevo /path/to/project`)
@@ -144,6 +147,8 @@ function App() {
           </div>
           <RightSidebar projectPath={activeTab?.projectPath} />
         </div>
+
+        <KeyHintBar />
 
         <SplashScreen
           visible={splashVisible}

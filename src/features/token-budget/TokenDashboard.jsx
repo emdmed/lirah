@@ -295,7 +295,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                     <Button
                       variant={showCacheTokens ? 'default' : 'outline'}
                       size="sm"
-                      className="h-5 text-[10px] px-1.5"
+                      className="h-5 text-[11px] px-1.5"
                       onClick={() => setShowCacheTokens(v => !v)}
                     >
                       Cache

@@ -2,7 +2,7 @@ import { TemplateSelector } from "./TemplateSelector";
 
 export function PromptToolbar({ selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange }) {
   return (
-    <div className="flex items-center gap-1 rounded-none py-1">
+    <div className="flex items-center gap-0.5">
       <TemplateSelector
         selectedTemplateId={selectedTemplateId}
         onSelectTemplate={onSelectTemplate}

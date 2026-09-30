@@ -14,7 +14,7 @@ export function PromptPreview({ sections, text, onClearSection }) {
     <div className="flex flex-col border edge-engraved bg-muted/20">
       <div className="flex items-center justify-between gap-2 px-2 py-1 border-b edge-b-engraved">
         <span className="engraved-label">Will be sent</span>
-        <span className="flex items-baseline gap-1 text-[10px] font-mono">
+        <span className="flex items-baseline gap-1 text-[11px] font-mono">
           <span className={isEmpty ? 'tube-idle' : 'tube tube-change'}>
             {sections.length}
           </span>
@@ -27,7 +27,7 @@ export function PromptPreview({ sections, text, onClearSection }) {
       </div>
 
       {isEmpty ? (
-        <p className="px-2 py-2 text-[10px] text-muted-foreground/70">
+        <p className="px-2 py-2 text-[11px] text-muted-foreground/70">
           Nothing yet. Type a prompt, select files, or pick a template.
         </p>
       ) : (
@@ -35,7 +35,7 @@ export function PromptPreview({ sections, text, onClearSection }) {
           {sections.map((section) => (
             <div key={section.id} className="flex flex-col border-b edge-b-engraved last:shadow-none">
               <div className="flex items-center justify-between gap-2 px-2 py-1 sticky top-0 bg-background/95">
-                <span className="text-[10px] font-mono font-semibold text-foreground/70 truncate">
+                <span className="text-[11px] font-mono font-semibold text-foreground/70 truncate">
                   {section.label}
                   {section.count != null && (
                     <span className="ml-1 text-muted-foreground/70 font-normal">({section.count})</span>
@@ -57,7 +57,7 @@ export function PromptPreview({ sections, text, onClearSection }) {
                   </Tooltip>
                 )}
               </div>
-              <pre className="px-2 pb-1.5 text-[10px] leading-[1.45] font-mono text-foreground/60 whitespace-pre-wrap break-words">
+              <pre className="px-2 pb-1.5 text-[11px] leading-[1.45] font-mono text-foreground/60 whitespace-pre-wrap break-words">
                 {section.body}
               </pre>
             </div>

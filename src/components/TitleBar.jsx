@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Minus, Square, Copy, X } from 'lucide-react';
 
 export const TitleBar = ({ theme }) => {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -24,28 +23,28 @@ export const TitleBar = ({ theme }) => {
         color: theme.foreground || 'var(--color-foreground)',
       }}
     >
-      <span className="opacity-70 pointer-events-none" data-tauri-drag-region>Lirah</span>
-      <div className="flex items-center gap-0.5">
+      <span className="text-muted-foreground pointer-events-none" data-tauri-drag-region>lirah</span>
+      <div className="flex items-center h-full">
         <button
           onClick={() => appWindow.minimize()}
-          className="p-1.5 rounded-xs hover:bg-foreground/10 transition-colors"
+          className="px-2 h-full text-muted-foreground hover:bg-foreground hover:text-background"
           title="Minimize"
         >
-          <Minus className="w-3.5 h-3.5" />
+          [_]
         </button>
         <button
           onClick={() => appWindow.toggleMaximize()}
-          className="p-1.5 rounded-xs hover:bg-foreground/10 transition-colors"
+          className="px-2 h-full text-muted-foreground hover:bg-foreground hover:text-background"
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
-          {isMaximized ? <Copy className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+          {isMaximized ? '[=]' : '[□]'}
         </button>
         <button
           onClick={() => appWindow.close()}
-          className="p-1.5 rounded-xs hover:bg-destructive/80 transition-colors"
+          className="px-2 h-full text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
           title="Close"
         >
-          <X className="w-3.5 h-3.5" />
+          [x]
         </button>
       </div>
     </div>

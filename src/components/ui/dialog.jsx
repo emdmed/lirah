@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -38,7 +37,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60",
         className
       )}
       {...props} />
@@ -53,8 +52,8 @@ function DialogContent({
   ...props
 }) {
   const baseAnimation = instant
-    ? "relative grid w-full max-w-lg gap-4 border edge-engraved p-6 shadow-xs font-mono rounded-none"
-    : "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative grid w-full max-w-lg gap-4 border edge-engraved p-6 shadow-xs font-mono duration-200 rounded-none";
+    ? "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono"
+    : "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono";
   return (
     <DialogPortal>
       <DialogOverlay className={instant ? "!animate-none !duration-0" : overlayClassName} />
@@ -69,10 +68,13 @@ function DialogContent({
           {...props}>
           {children}
           <DialogPrimitive.Close
-            className="ring-offset-background focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-ring/70 focus-visible:outline-offset-0 data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none">
-            <XIcon className="size-4" />
+            className="tui-dialog-close text-muted-foreground hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none">
+            [x]
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
+          <span className="tui-pane-info" aria-hidden="true">
+            <span className="tui-key">esc</span> close
+          </span>
         </DialogPrimitive.Content>
       </div>
     </DialogPortal>
@@ -110,7 +112,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-foreground text-lg font-semibold leading-none tracking-tight", className)}
+      className={cn("text-primary font-bold", className)}
       {...props} />
   );
 }

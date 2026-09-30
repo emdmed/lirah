@@ -65,8 +65,9 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
   return (
     <div
-      className={`px-2 terminal-wrapper ${isFocused
-        ? ''
+      data-title="terminal 2"
+      className={`tui-pane px-2 pb-3 terminal-wrapper ${isFocused
+        ? 'terminal-live'
         : ''
         }`}
       style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}

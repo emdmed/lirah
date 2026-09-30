@@ -144,9 +144,9 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
 
           {/* Keyboard hints */}
           <div className="flex items-center gap-4 text-xs opacity-50 border-t edge-t-engraved pt-2">
-            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
-            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
-            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">ESC</span> Close</span>
+            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">↑↓</span> Navigate</span>
+            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">Enter</span> Select</span>
+            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">ESC</span> Close</span>
           </div>
         </div>
       </SheetContent>

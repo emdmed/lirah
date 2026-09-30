@@ -87,7 +87,7 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
     : '';
 
   return (
-    <div className="absolute right-3 top-1 z-30 flex items-center gap-1 rounded-sm border edge-engraved bg-background/95 px-1.5 py-1 shadow-sm backdrop-blur">
+    <div className="absolute right-3 top-1 z-30 flex items-center gap-1 rounded-sm border edge-engraved bg-background px-1.5 py-1">
       <input
         ref={inputRef}
         value={query}
@@ -98,7 +98,7 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
       />
       <span
         className={cn(
-          'w-16 shrink-0 text-right font-mono text-[10px] tabular-nums',
+          'w-16 shrink-0 text-right font-mono text-[11px] tabular-nums',
           invalid || (query && !results.count) ? 'text-destructive/80' : 'text-muted-foreground'
         )}
       >

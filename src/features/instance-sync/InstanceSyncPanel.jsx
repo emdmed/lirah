@@ -239,11 +239,11 @@ export function InstanceSyncPanel({
 
         {/* Session stats */}
         <div className="flex items-center gap-2 px-1 pb-3">
-          <Badge variant="outline" className="text-[10px] gap-1">
+          <Badge variant="outline" className="text-[11px] gap-1">
             <MessageCircle className="w-3 h-3" />
             {visibleMessages.length} messages
           </Badge>
-          <Badge variant="outline" className="text-[10px] gap-1">
+          <Badge variant="outline" className="text-[11px] gap-1">
             <Bot className="w-3 h-3" />
             {assistantCount} responses
           </Badge>
@@ -262,7 +262,7 @@ export function InstanceSyncPanel({
                 <Button variant="ghost" size="xs" onClick={clearSelection}>
                   Clear
                 </Button>
-                <Badge className="ml-auto text-[10px]">{selectedMessages.size} selected</Badge>
+                <Badge className="ml-auto text-[11px]">{selectedMessages.size} selected</Badge>
               </>
             )}
           </div>
@@ -271,7 +271,7 @@ export function InstanceSyncPanel({
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Sparkles className="w-3 h-3" />
-                <span className="text-[10px] font-mono">
+                <span className="text-[11px] font-mono">
                   Generate implementation prompt from {selectedMessages.size} selected conversation{selectedMessages.size !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -290,7 +290,7 @@ export function InstanceSyncPanel({
                 {onSendToTerminal && (
                   <>
                     <div className="w-px h-4 bg-border mx-1" />
-                    <span className="text-[10px] font-mono text-muted-foreground mr-1">Generate:</span>
+                    <span className="text-[11px] font-mono text-muted-foreground mr-1">Generate:</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="outline" size="xs" onClick={() => handleSendImplementation('ui')} disabled={!!generatingPromptType}>
@@ -369,13 +369,13 @@ export function InstanceSyncPanel({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span
-                            className="text-[10px] font-mono font-semibold"
+                            className="text-[11px] font-mono font-semibold"
                             style={{ color: isUser ? 'var(--color-status-info)' : 'var(--color-status-success)' }}
                           >
                             {isUser ? 'USER' : 'ASSISTANT'}
                           </span>
                           {msg.timestamp && (
-                            <span className="text-[10px] font-mono text-muted-foreground/50">
+                            <span className="text-[11px] font-mono text-muted-foreground/50">
                               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           )}
@@ -390,7 +390,7 @@ export function InstanceSyncPanel({
                               <Button
                                 variant="link"
                                 size="xs"
-                                className="ml-1 h-auto p-0 text-[10px]"
+                                className="ml-1 h-auto p-0 text-[11px]"
                                 onClick={(e) => { e.stopPropagation(); setExpandedMessages(prev => { const n = new Set(prev); n.add(idx); return n; }); }}
                               >
                                 show more
@@ -403,7 +403,7 @@ export function InstanceSyncPanel({
                                 <Button
                                   variant="link"
                                   size="xs"
-                                  className="ml-1 h-auto p-0 text-[10px]"
+                                  className="ml-1 h-auto p-0 text-[11px]"
                                   onClick={(e) => { e.stopPropagation(); setExpandedMessages(prev => { const n = new Set(prev); n.delete(idx); return n; }); }}
                                 >
                                   show less
@@ -481,16 +481,16 @@ export function InstanceSyncPanel({
             {!session.summary && session.first_prompt?.length > 80 ? '...' : ''}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-[10px] gap-1 py-0">
+            <Badge variant="outline" className="text-[11px] gap-1 py-0">
               <Hash className="w-2.5 h-2.5" />
               {session.message_count}
             </Badge>
-            <Badge variant="outline" className="text-[10px] gap-1 py-0">
+            <Badge variant="outline" className="text-[11px] gap-1 py-0">
               <Calendar className="w-2.5 h-2.5" />
               {formatSessionDate(session.modified)}
             </Badge>
             {session.git_branch && (
-              <Badge variant="info" className="text-[10px] gap-1 py-0">
+              <Badge variant="info" className="text-[11px] gap-1 py-0">
                 <GitBranch className="w-2.5 h-2.5" />
                 {session.git_branch}
               </Badge>
@@ -637,7 +637,7 @@ export function InstanceSyncPanel({
             <Users className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs font-mono font-medium text-muted-foreground">Other instances</span>
             {deduplicatedOtherInstances.length > 0 && (
-              <Badge variant="outline" className="text-[10px] py-0">{deduplicatedOtherInstances.length}</Badge>
+              <Badge variant="outline" className="text-[11px] py-0">{deduplicatedOtherInstances.length}</Badge>
             )}
           </div>
           <div className="flex items-center gap-0.5">
@@ -650,7 +650,7 @@ export function InstanceSyncPanel({
                       size="icon-sm"
                       onClick={handleDebugPaths}
                     >
-                      <span className="text-[10px] font-mono">C</span>
+                      <span className="text-[11px] font-mono">C</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Debug: Check Claude data paths</TooltipContent>
@@ -662,7 +662,7 @@ export function InstanceSyncPanel({
                       size="icon-sm"
                       onClick={handleDebugOpencodePaths}
                     >
-                      <span className="text-[10px] font-mono">O</span>
+                      <span className="text-[11px] font-mono">O</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Debug: Check OpenCode data paths</TooltipContent>
@@ -691,8 +691,8 @@ export function InstanceSyncPanel({
         {/* Debug paths - Claude */}
         {debugPaths && (
           <div className="px-1 py-2 mb-2 bg-muted/30">
-            <p className="text-[10px] font-mono text-muted-foreground mb-1">Claude data paths checked:</p>
-            <div className="max-h-20 overflow-y-auto text-[10px] font-mono text-muted-foreground/60 space-y-0.5">
+            <p className="text-[11px] font-mono text-muted-foreground mb-1">Claude data paths checked:</p>
+            <div className="max-h-20 overflow-y-auto text-[11px] font-mono text-muted-foreground/60 space-y-0.5">
               {debugPaths.map((path, idx) => (
                 <div key={idx} className="truncate">{path}</div>
               ))}
@@ -703,8 +703,8 @@ export function InstanceSyncPanel({
         {/* Debug paths - OpenCode */}
         {debugOpencodePaths && (
           <div className="px-1 py-2 mb-2 bg-muted/30">
-            <p className="text-[10px] font-mono text-muted-foreground mb-1">OpenCode data paths checked:</p>
-            <div className="max-h-20 overflow-y-auto text-[10px] font-mono text-muted-foreground/60 space-y-0.5">
+            <p className="text-[11px] font-mono text-muted-foreground mb-1">OpenCode data paths checked:</p>
+            <div className="max-h-20 overflow-y-auto text-[11px] font-mono text-muted-foreground/60 space-y-0.5">
               {debugOpencodePaths.map((path, idx) => (
                 <div key={idx} className="truncate">{path}</div>
               ))}
@@ -738,11 +738,11 @@ export function InstanceSyncPanel({
                         {/* Source Badge */}
                         <Badge 
                           variant={instance.source === 'opencode' ? 'secondary' : instance.source === 'claude' ? 'outline' : 'default'}
-                          className="text-[9px] py-0 px-1.5"
+                          className="text-[11px] py-0 px-1.5"
                         >
                           {instance.source === 'opencode' ? 'OpenCode' : instance.source === 'claude' ? 'Claude' : 'Lirah'}
                         </Badge>
-                        <span className="text-[10px] font-mono text-muted-foreground/60">
+                        <span className="text-[11px] font-mono text-muted-foreground/60">
                           {formatLastUpdated(instance.last_updated)}
                         </span>
                       </div>
@@ -755,12 +755,12 @@ export function InstanceSyncPanel({
                       <div className="flex flex-wrap items-center gap-1">
                         <FileText className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
                         {instance.active_files.slice(0, 2).map((file, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] py-0">
+                          <Badge key={i} variant="outline" className="text-[11px] py-0">
                             {file.split('/').pop()}
                           </Badge>
                         ))}
                         {instance.active_files.length > 2 && (
-                          <span className="text-[10px] font-mono text-muted-foreground/50">
+                          <span className="text-[11px] font-mono text-muted-foreground/50">
                             +{instance.active_files.length - 2}
                           </span>
                         )}

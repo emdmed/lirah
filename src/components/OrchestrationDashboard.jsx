@@ -33,7 +33,7 @@ const STATUS_BADGE = {
 function StatusBadge({ status }) {
   const config = STATUS_BADGE[status] || { label: status, variant: 'outline' };
   return (
-    <Badge variant={config.variant} className="text-[10px] px-1.5 py-0">
+    <Badge variant={config.variant} className="text-[11px] px-1.5 py-0">
       {config.label}
     </Badge>
   );
@@ -93,13 +93,13 @@ function WorkflowRow({ workflow, projectPath, orchestrationCheck, onRefresh, toa
       <div className="flex items-center gap-2">
         {workflow.localInstalled ? STATUS_ICON.installed : STATUS_ICON.missing}
         <span className="opacity-80">{workflow.label}</span>
-        <span className="text-[9px] opacity-30 font-mono">{workflow.path}</span>
+        <span className="text-[11px] opacity-30 font-mono">{workflow.path}</span>
       </div>
       {workflow.cdnAvailable && !workflow.localInstalled ? (
         <Button
           variant="ghost"
           size="xs"
-          className="h-5 px-1.5 text-[10px] gap-1"
+          className="h-5 px-1.5 text-[11px] gap-1"
           onClick={handleInstall}
           disabled={installing}
         >
@@ -222,7 +222,7 @@ export function OrchestrationDashboard({
               {hooksStatus ? (
                 <>
                   {!hooksStatus.installed && (
-                    <div className="flex items-center gap-1.5 text-[10px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
+                    <div className="flex items-center gap-1.5 text-[11px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
                       <AlertTriangle className="w-3 h-3" />
                       Hooks not installed. Install globally via the orchestration setup guide.
                     </div>

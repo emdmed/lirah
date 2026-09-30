@@ -50,6 +50,8 @@ import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { useUpdateChecker } from "../../hooks/useUpdateChecker";
 import { useToast } from "../toast";
+import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
+import { requestJobsPane } from "../agent-jobs/jobsPane";
 import { useAgentJobs } from "../agent-jobs/agent-jobs";
 
 // currentPath doubles as sidebar status text ('Waiting for terminal...',
@@ -104,7 +106,7 @@ export function ProjectTab({ projectPath, isActive, tabId }) {
 }
 
 function ProjectTabInner({ projectPath, isActive, tabId }) {
-  const { theme } = useTheme();
+  const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const { bookmarks, updateBookmark } = useBookmarks();
@@ -833,6 +835,77 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     };
   }, []);
 
+  // Both restart the terminal session, since sandboxing is applied at spawn.
+  const toggleNetwork = useCallback(() => {
+    settings.setNetworkIsolation(prev => !prev);
+    if (settings.sandboxEnabled && terminalSessionId) {
+      invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
+      setTerminalSessionId(null);
+      settings.setSandboxFailed(false);
+      setTerminalKey(k => k + 1);
+    }
+  }, [settings.setNetworkIsolation, settings.sandboxEnabled, terminalSessionId, settings.setSandboxFailed]);
+
+  const toggleSandbox = useCallback(() => {
+    settings.setSandboxEnabled(prev => !prev);
+    settings.setSandboxFailed(false);
+    if (terminalSessionId) {
+      invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
+    }
+    setTerminalSessionId(null);
+    setTerminalKey(k => k + 1);
+  }, [settings.setSandboxEnabled, settings.setSandboxFailed, terminalSessionId]);
+
+  const palette = useCommandPalette({ isActive });
+
+  // `:` commands. Each maps to an action that already exists elsewhere (a
+  // shortcut, a status-bar control or a menu item), so the palette adds reach,
+  // not behaviour.
+  const commands = useMemo(() => {
+    const onOff = (arg, current) => (arg === 'on' ? true : arg === 'off' ? false : !current);
+    return [
+      { id: 'compact', hint: 'compact the project for the prompt', run: () => compact.handleCompactProject() },
+      { id: 'commit', hint: 'auto commit (^⇧space)', run: () => {
+        if (autoCommitStageRef.current !== 'idle') autoCommit.quickCommit();
+        else if (workspaceRef.current?.projects?.length) {
+          dialogs.setProjectPickerAction('autocommit');
+          dialogs.setProjectPickerOpen(true);
+        } else autoCommit.trigger(currentPathRef.current);
+      } },
+      { id: 'theme', hint: 'switch theme', options: () => Object.keys(themes), run: (name) => {
+        if (!name) return;
+        if (!themes[name]) throw new Error(`no theme "${name}"`);
+        changeTheme(name);
+      } },
+      { id: 'sandbox', hint: 'sandbox the terminal (restarts it)', options: ['on', 'off'], run: (arg) => {
+        if (onOff(arg, settings.sandboxEnabled) !== settings.sandboxEnabled) toggleSandbox();
+      } },
+      { id: 'net', hint: 'isolate network in the sandbox', options: ['on', 'off'], run: (arg) => {
+        if (!settings.sandboxEnabled) throw new Error('sandbox is off');
+        // "net on" means network allowed, i.e. isolation off.
+        const wantIsolated = arg === 'off' ? true : arg === 'on' ? false : !settings.networkIsolation;
+        if (wantIsolated !== settings.networkIsolation) toggleNetwork();
+      } },
+      { id: 'git', hint: 'show only git changes (^G)', run: () => treeView.handleToggleGitFilter() },
+      { id: 'md', hint: 'show only markdown files (^M)', run: () => treeView.handleToggleMarkdownFilter() },
+      { id: 'files', hint: 'toggle the files pane', run: () => sidebar.setSidebarOpen(prev => !prev) },
+      { id: 'prompt', hint: 'toggle the prompt pane', run: () => setTextareaVisible(prev => !prev) },
+      { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle') },
+      { id: 'cli', hint: 'choose the CLI tool (^K)', run: () => dialogs.setCliSelectionModalOpen(true) },
+      { id: 'tokens', hint: 'token metrics (^⇧D)', run: () => dialogs.setDashboardOpen(true) },
+      { id: 'budget', hint: 'token budget', run: () => dialogs.setBudgetDialogOpen(true) },
+      { id: 'changelog', hint: 'auto changelog settings', run: () => dialogs.setAutoChangelogDialogOpen(true) },
+      { id: 'templates', hint: 'manage prompt templates', run: () => dialogs.setManageTemplatesDialogOpen(true) },
+      { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => dialogs.setBookmarksPaletteOpen(true) },
+      { id: 'workspace', hint: 'workspaces', run: () => dialogs.setWorkspaceDialogOpen(true) },
+      { id: 'instances', aliases: ['windows'], hint: 'other Lirah windows (^⇧I)', run: () => dialogs.setInstanceSyncPanelOpen(prev => !prev) },
+      { id: 'titlebar', hint: 'show or hide the title bar', run: () => settings.setShowTitleBar(prev => !prev) },
+      { id: 'help', aliases: ['keys'], hint: 'keyboard shortcuts (^H)', run: () => dialogs.setShowHelp(true) },
+    ];
+  }, [compact.handleCompactProject, autoCommit.quickCommit, autoCommit.trigger, dialogs, themes, changeTheme,
+    settings.sandboxEnabled, settings.networkIsolation, settings.setShowTitleBar, toggleSandbox, toggleNetwork,
+    treeView.handleToggleGitFilter, treeView.handleToggleMarkdownFilter, sidebar.setSidebarOpen]);
+
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
@@ -935,15 +1008,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
             networkIsolation={settings.networkIsolation}
-            onToggleNetworkIsolation={useCallback(() => {
-              settings.setNetworkIsolation(prev => !prev);
-              if (settings.sandboxEnabled && terminalSessionId) {
-                invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
-                setTerminalSessionId(null);
-                settings.setSandboxFailed(false);
-                setTerminalKey(k => k + 1);
-              }
-            }, [settings.setNetworkIsolation, settings.sandboxEnabled, terminalSessionId, settings.setSandboxFailed])}
+            onToggleNetworkIsolation={toggleNetwork}
             secondaryTerminalFocused={secondary.secondaryFocused}
             onOpenDashboard={useCallback(() => dialogs.setDashboardOpen(true), [dialogs.setDashboardOpen])}
             onOpenBudgetSettings={useCallback(() => dialogs.setBudgetDialogOpen(true), [dialogs.setBudgetDialogOpen])}
@@ -952,15 +1017,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             onOpenAutoChangelogDialog={useCallback(() => dialogs.setAutoChangelogDialogOpen(true), [dialogs.setAutoChangelogDialogOpen])}
             autoCommitCli={settings.autoCommitCli}
             onOpenAutoCommitConfig={useCallback(() => dialogs.setAutoCommitConfigOpen(true), [dialogs.setAutoCommitConfigOpen])}
-            onToggleSandbox={useCallback(() => {
-              settings.setSandboxEnabled(prev => !prev);
-              settings.setSandboxFailed(false);
-              if (terminalSessionId) {
-                invoke('close_terminal', { sessionId: terminalSessionId }).catch(console.error);
-              }
-              setTerminalSessionId(null);
-              setTerminalKey(k => k + 1);
-            }, [settings.setSandboxEnabled, settings.setSandboxFailed, terminalSessionId])}
+            onToggleSandbox={toggleSandbox}
             branchName={branchName}
             onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
             branchTasksOpen={dialogs.branchTasksOpen}
@@ -1030,6 +1087,9 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
         />
       </Layout>
 
+      {isActive && (
+        <CommandPalette open={palette.open} onClose={palette.close} commands={commands} />
+      )}
       <DialogHost
         dialogs={dialogs}
         currentPath={currentPath}

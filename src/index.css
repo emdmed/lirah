@@ -14,13 +14,21 @@
   /* Font family */
   --font-mono: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
   
-  /* Consistent font scale for OCR A */
-  --font-xs: 10px;
+  /* Two sizes, like a terminal: 11px for chrome (labels, titles, status
+     line), 12px for content (files, prompt, lists). xl/2xl stay for the rare
+     dialog heading. Tailwind's text-xs/sm/base map onto the same two. */
+  --font-xs: 11px;
   --font-sm: 11px;
   --font-base: 12px;
-  --font-lg: 13px;
+  --font-lg: 12px;
   --font-xl: 14px;
   --font-2xl: 16px;
+  --text-xs: 11px;
+  --text-xs--line-height: 1.45;
+  --text-sm: 12px;
+  --text-sm--line-height: 1.5;
+  --text-base: 12px;
+  --text-base--line-height: 1.5;
 
   /* Default theme colors - will be overridden by ThemeProvider */
   --color-border: hsl(240 13% 20%);
@@ -57,32 +65,38 @@
   --color-status-success: #76946A;
   --color-status-info: #6B8CCE;
 
-  /* Zero radius by conviction: a chassis is milled, not moulded. */
-  --radius-lg: 0px;
-  --radius-md: 0px;
+  /* A terminal cell grid has no curves and no depth. */
+  --radius-xs: 0px;
   --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 0 #0000;
+  --shadow-xl: 0 0 #0000;
+  --shadow-2xl: 0 0 #0000;
 }
 
 /*
-  Chassis material. Both cut edges step toward the theme's own foreground at
-  two strengths, never toward black or white: at the poles (hackerman's pure
-  black ground, latte's near-white) a literal has nowhere left to go and the
-  engraving disappears. Stepping toward the foreground keeps a visible delta in
-  both polarities, and the bevel simply reverses on a light panel — which is
-  what a cut in light material actually does.
+  Terminal material. Every region is drawn the way a TUI draws it: a single
+  box-drawing line in a dimmed foreground, never a bevel, glow or shadow.
+  Lines step toward the theme's own foreground so they stay visible in both
+  dark and light themes.
 */
 :root {
-  --chassis-shadow: color-mix(in srgb, var(--color-background) 93%, var(--color-foreground));
-  --chassis-light: color-mix(in srgb, var(--color-background) 82%, var(--color-foreground));
-  /* The well IS the background. The terminal canvas already paints exactly
-     this colour, so the recess costs nothing and never fights the canvas. */
-  --chassis-recess: var(--color-background);
-  /* The panel is raised metal: the one ground that actually moves. */
-  --chassis-raise: color-mix(in srgb, var(--color-background) 88%, var(--color-foreground));
-  /* Plasma. The theme owns the hue; the world owns the scarcity. */
+  --tui-line: color-mix(in srgb, var(--color-background) 72%, var(--color-foreground));
+  --tui-line-strong: color-mix(in srgb, var(--color-background) 45%, var(--color-foreground));
+  /* Status lines (tab bar, status bar) sit one step off the canvas, like tmux. */
+  --tui-bar: color-mix(in srgb, var(--color-background) 93%, var(--color-foreground));
   --glow: var(--color-primary);
-  --glow-dim: color-mix(in srgb, var(--color-primary) 45%, transparent);
-  --glow-bloom: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  /* Tree guides need box-drawing coverage the OCR face lacks; these are the
+     common mono fonts that have it. */
+  --font-glyph: "JetBrainsMono Nerd Font", "JetBrains Mono", "DejaVu Sans Mono", "Adwaita Mono", "Noto Sans Mono", Menlo, Consolas, monospace;
 }
 
 html,
@@ -133,6 +147,36 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+
+  input,
+  textarea,
+  [contenteditable] {
+    caret-color: var(--color-primary);
+  }
+}
+
+/* Selection is inverse video. */
+::selection {
+  background: var(--color-foreground);
+  color: var(--color-background);
+}
+
+/*
+  Soft focus rings become a hard one-cell outline. Ring utilities are
+  neutralised rather than removed from every component.
+*/
+@layer base {
+  *:focus-visible {
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-offset-shadow: 0 0 #0000;
+    outline: 1px solid var(--color-primary);
+    outline-offset: -1px;
+  }
+}
+
+/* No rounded corners anywhere except true dots. */
+*:not(.rounded-full) {
+  border-radius: 0 !important;
 }
 
 /* Semantic color utilities */
@@ -152,9 +196,9 @@ body {
   border-color: hsl(var(--color-tree-guide));
 }
 
-/* Focus visible styles for keyboard navigation */
+/* Focus is a hard cursor outline, not a soft ring. */
 .focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background;
+  @apply focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-primary focus-visible:-outline-offset-1;
 }
 
 /* Theme transition for smooth color changes */
@@ -174,12 +218,11 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--color-foreground) 20%, transparent);
-  border-radius: 3px;
+  background: var(--tui-line-strong);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--color-foreground) 35%, transparent);
+  background: var(--color-muted-foreground);
 }
 
 ::-webkit-scrollbar-button {
@@ -209,182 +252,273 @@ body {
 }
 
 /*
-  Engraved separation. A region is milled into the chassis: a shadow hairline
-  above the cut and a light hairline below it. No border is drawn — these
-  utilities remove the border entirely and cut the edge with inset shadow, so
-  separation is material rather than notation.
+  Box lines. These utilities keep their historical names (they are used across
+  the app) but now draw a flat one-cell line, the way a TUI frames a pane.
+  The border itself is removed and the line is an inset shadow, so switching
+  styles never shifts layout.
 */
 .edge-engraved {
   border-width: 0 !important;
-  box-shadow:
-    inset 0 1px 0 0 var(--chassis-shadow),
-    inset 1px 0 0 0 var(--chassis-shadow),
-    inset 0 -1px 0 0 var(--chassis-light),
-    inset -1px 0 0 0 var(--chassis-light);
+  box-shadow: inset 0 0 0 1px var(--tui-line);
 }
 
 .edge-t-engraved {
   border-top-width: 0 !important;
-  box-shadow:
-    inset 0 1px 0 0 var(--chassis-shadow),
-    inset 0 2px 0 0 var(--chassis-light);
+  box-shadow: inset 0 1px 0 0 var(--tui-line);
 }
 
 .edge-b-engraved {
   border-bottom-width: 0 !important;
-  box-shadow:
-    inset 0 -2px 0 0 var(--chassis-shadow),
-    inset 0 -1px 0 0 var(--chassis-light);
+  box-shadow: inset 0 -1px 0 0 var(--tui-line);
 }
 
 .edge-e-engraved {
   border-inline-end-width: 0 !important;
-  box-shadow:
-    inset -2px 0 0 0 var(--chassis-shadow),
-    inset -1px 0 0 0 var(--chassis-light);
+  box-shadow: inset -1px 0 0 0 var(--tui-line);
 }
 
-/*
-  The chassis has exactly two levels, and every region is one of them. This is
-  what makes the panel read as milled rather than as a flat void: a well is a
-  working surface sunk into the panel, a rail is the panel itself.
-
-  Region grounds derive from background/foreground rather than the `sidebar`
-  and `card` tokens on purpose — those are equal to `background` in all 17
-  themes (`card` too, in `retro`), so a ground built on them cannot separate.
-*/
+/* A framed pane on the canvas. */
 .chassis-well,
 .chassis-well.chassis-well {
-  background-color: var(--chassis-recess);
-  box-shadow:
-    inset 0 1px 0 0 var(--chassis-shadow),
-    inset 1px 0 0 0 var(--chassis-shadow),
-    inset 0 -1px 0 0 var(--chassis-light),
-    inset -1px 0 0 0 var(--chassis-light);
+  background-color: var(--color-background);
+  box-shadow: inset 0 0 0 1px var(--tui-line);
 }
 
-/*
-  The cut without the ground, for surfaces that already paint their own: the
-  terminal (an xterm canvas fills it edge to edge) and the prompt input (whose
-  component sets backgroundColor as an inline style, which no class can beat).
-*/
+/* The frame without the ground, for surfaces that paint their own. */
 .chassis-cut {
-  box-shadow:
-    inset 0 1px 0 0 var(--chassis-shadow),
-    inset 1px 0 0 0 var(--chassis-shadow),
-    inset 0 -1px 0 0 var(--chassis-light),
-    inset -1px 0 0 0 var(--chassis-light);
+  box-shadow: inset 0 0 0 1px var(--tui-line);
 }
 
+/* A status line: tab bar, status bar. */
 .chassis-rail,
 .chassis-rail.chassis-rail {
-  background-color: var(--chassis-raise);
+  background-color: var(--tui-bar);
 }
 
-/* A recessed working area, cut into the panel on all four sides. */
 .panel-recess {
-  background-color: var(--chassis-recess);
-  box-shadow:
-    inset 0 1px 0 0 var(--chassis-shadow),
-    inset 0 -1px 0 0 var(--chassis-light);
+  background-color: var(--color-background);
+  box-shadow: inset 0 1px 0 0 var(--tui-line), inset 0 -1px 0 0 var(--tui-line);
 }
 
-/*
-  Engraved caps. Labels are cut into the panel and catch light from below.
-  This is the world's labelling discipline: a control that needs a label gets
-  one on the chassis, not only in a tooltip.
-*/
+/* Labels read like shell output: lowercase, dim, no ornament. */
 .engraved-label {
   font-size: var(--font-xs);
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: color-mix(in srgb, var(--color-muted-foreground) 78%, transparent);
-  text-shadow: 0 1px 0 var(--chassis-light);
+  text-transform: lowercase;
+  letter-spacing: 0;
+  color: var(--color-muted-foreground);
 }
 
-/*
-  Tube bank. Numerals are the instrument's readout: fixed-position, tabular,
-  and the only warm thing on the panel. Glow is scarce by law — if everything
-  glows, the instrument reads nothing.
-*/
+/* Numeric readouts: fixed-width columns in the accent color, no bloom. */
 .tube {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   color: var(--glow);
-  /* Two-stop bloom. On emerald-mono and hackerman `primary` equals
-     `foreground`, so hue cannot say "lit" — the halo has to. */
-  text-shadow: 0 0 4px var(--glow-bloom), 0 0 10px var(--glow-bloom);
 }
 
 .tube-idle {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
-  text-shadow: none;
+  color: var(--color-muted-foreground);
 }
 
-/* A value that just changed cross-fades rather than jumping. */
 .tube-change {
-  transition: color 220ms ease, text-shadow 220ms ease;
+  transition: none;
 }
 
-/*
-  Overflow is a visible mechanical event, not a silently disabled control.
-  Used when a budget is spent: the readout goes to the critical role and the
-  panel says so rather than dimming to 50% opacity with no explanation.
-*/
 .tube-overflow {
   color: var(--color-status-critical);
-  text-shadow: 0 0 8px color-mix(in srgb, var(--color-status-critical) 30%, transparent);
 }
 
-/* Lit state. The single affordance that says "this one is live". */
 .lit {
   color: var(--glow);
-  text-shadow: 0 0 4px var(--glow-bloom), 0 0 10px var(--glow-bloom);
 }
 
 /*
-  The terminal is the chassis's working surface: unlit while idle, so the
-  scarcity of glow is what makes it the calm centre. Focus lights its cut edge
-  only — the field itself never glows, because that is the surface being read
-  for eight hours at a stretch.
+  Text-only buttons render as [label], the TUI button idiom; icon buttons are a
+  bare icon. Kept in the components layer so a utility such as
+  `before:content-none` can opt a button out (status line segments do).
 */
-.terminal-live {
-  box-shadow:
-    inset 0 0 0 1px var(--glow-dim),
-    0 0 12px -4px var(--glow-bloom);
+@layer components {
+  .tui-btn:not(:has(svg))::before {
+    content: "[";
+    opacity: 0.55;
+  }
+
+  .tui-btn:not(:has(svg))::after {
+    content: "]";
+    opacity: 0.55;
+  }
 }
 
-/* Terminal focus indicator */
-/* .terminal-wrapper::after { */
-/*   content: ''; */
-/*   position: absolute; */
-/*   inset: -4px; */
-/*   border-width: 1px; */
-/*   border-style: solid !important; */
-/*   border-radius: 0rem; */
-/*   opacity: 0; */
-/*   transition: opacity 150ms ease; */
-/*   pointer-events: none; */
-/*   z-index: 1; */
-/* } */
-/**/
-/* .terminal-wrapper.terminal-focused::after { */
-/*   opacity: 1; */
-/* } */
+/* Flex gap would also space the brackets away from the label. */
+.tui-btn:not(:has(svg)) {
+  column-gap: 0 !important;
+}
 
-/* Reduced motion support */
+/* Key hint, as in a terminal footer: `^↵ send`. */
+.tui-key {
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  A pane frame with its title set into the top line and status text set into
+  the bottom line, the way lazygit and btop label panes:
+    ┌─ [1] files ──────┐
+    └───────── 34 items┘
+  The frame is drawn by ::after, inset half a line from top and bottom so the
+  title (::before) and .tui-pane-info can sit on it and mask it. In the
+  components layer so a pane's own padding utilities still apply.
+*/
+@layer components {
+  .tui-pane {
+    --pane-bg: var(--color-background);
+    position: relative;
+    padding-top: 14px;
+    padding-bottom: 12px;
+  }
+
+  .tui-pane::after {
+    content: "";
+    position: absolute;
+    inset: 6px 0 6px 0;
+    border: 1px solid var(--tui-line);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .tui-pane::before {
+    content: attr(data-title);
+    position: absolute;
+    top: 0;
+    left: 10px;
+    padding: 0 5px;
+    font-size: var(--font-sm);
+    line-height: 12px;
+    text-transform: lowercase;
+    color: color-mix(in srgb, var(--color-foreground) 75%, transparent);
+    background: var(--pane-bg);
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  /* The pane holding keyboard focus is the lit one. */
+  .tui-pane:focus-within::after,
+  .tui-pane.terminal-live::after {
+    border-color: var(--color-primary);
+  }
+
+  .tui-pane:focus-within::before,
+  .tui-pane.terminal-live::before {
+    color: var(--color-primary);
+  }
+
+  .tui-pane-info {
+    position: absolute;
+    right: 10px;
+    bottom: 0;
+    padding: 0 5px;
+    font-size: var(--font-sm);
+    line-height: 12px;
+    white-space: nowrap;
+    color: var(--color-muted-foreground);
+    background: var(--pane-bg);
+    z-index: 6;
+  }
+}
+
+/* File tree guides (├─ │ └─), dimmed like tree(1) output in a terminal. */
+.tui-tree-guide {
+  font-family: var(--font-glyph);
+  color: var(--tui-line-strong);
+  user-select: none;
+}
+
+/* Block cursor drawn over the prompt input (see useBlockCaret). */
+.tui-caret {
+  position: absolute;
+  pointer-events: none;
+  background: var(--color-primary);
+  opacity: 0.7;
+  animation: tui-blink 1.06s steps(1) infinite;
+}
+
+@keyframes tui-blink {
+  50% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-pulse {
-    animation: none;
-  }
-  
-  .transition-all,
-  .transition-colors,
-  .transition-opacity,
-  .transition-transform {
-    transition-duration: 0.01ms !important;
-  }
+  .tui-caret { animation: none; }
+}
+
+/* File pane rows: faint hover, inverse-video keyboard cursor (see useRowCursor). */
+[data-nav-row]:hover {
+  background-color: color-mix(in srgb, var(--color-foreground) 7%, transparent);
+}
+
+[data-nav-row][data-cursor],
+[data-nav-row][data-cursor]:hover {
+  background-color: var(--color-foreground);
+  color: var(--color-background);
+}
+
+[data-nav-row][data-cursor] * {
+  color: inherit !important;
+}
+
+/*
+  Dialogs are panes floating over the app: title set into the top line, a
+  close control in the top-right corner of the frame, `esc close` in the
+  bottom line. Unlayered so a dialog's own padding or title classes can't
+  push the content onto the frame.
+*/
+.tui-dialog {
+  --pane-bg: var(--color-input-background);
+  padding-top: 22px !important;
+  padding-bottom: 20px !important;
+}
+
+.tui-dialog::after {
+  border-color: var(--tui-line-strong);
+}
+
+/* The title is a real element (DialogTitle), not the data-title attribute. */
+.tui-dialog::before {
+  content: none;
+}
+
+/* Only simple titles move into the frame; a structured header (icon box,
+   subtitle) stays in flow below the line. */
+.tui-dialog [data-slot="dialog-title"]:not(.sr-only):not(:has(div, p)) {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  margin: 0;
+  padding: 0 5px;
+  max-width: calc(100% - 80px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-sm);
+  line-height: 12px;
+  text-transform: lowercase;
+  background: var(--pane-bg);
+  z-index: 6;
+}
+
+.tui-dialog [data-slot="dialog-title"]:not(:has(div, p)) svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tui-dialog-close {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  padding: 0 4px;
+  font-size: var(--font-sm);
+  line-height: 12px;
+  background: var(--pane-bg);
+  z-index: 6;
 }

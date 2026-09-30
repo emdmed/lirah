@@ -39,7 +39,7 @@ function AgentBubble({ agent, isNew, onDismiss }) {
           {agent.last_tool && (
             <div className="mt-1 flex items-center gap-1.5">
               <span
-                className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono"
+                className="inline-block px-1.5 py-0.5 rounded text-[11px] font-mono"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--color-primary) 15%, transparent)',
                   color: 'var(--color-primary)',
@@ -51,7 +51,7 @@ function AgentBubble({ agent, isNew, onDismiss }) {
           )}
           {agent.description && (
             <div
-              className="mt-1 text-[10px]"
+              className="mt-1 text-[11px]"
               style={{ color: 'var(--color-muted-foreground)', wordBreak: 'break-word' }}
             >
               {agent.description}
@@ -72,7 +72,6 @@ function AgentBubble({ agent, isNew, onDismiss }) {
         style={{
           backgroundColor: isRunning ? '#22c55e' : 'var(--color-card)',
           borderColor: isRunning ? '#16a34a' : 'var(--color-border)',
-          boxShadow: isRunning ? '0 0 10px rgba(34,197,94,0.4)' : undefined,
           opacity: isRunning ? 1 : 0.6,
         }}
         title={`${agent.slug || agent.agent_id} — click: toggle panel, double-click: dismiss`}

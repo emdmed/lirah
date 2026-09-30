@@ -3,8 +3,8 @@ import {
   Bot,
   Boxes,
   Plus,
-  PanelRightClose,
   PanelRightOpen,
+  PanelRightClose,
   Square,
   GitCompare,
   Check,
@@ -28,6 +28,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
+import { JOBS_PANE_EVENT } from './jobsPane';
 import { GitDiffDialog } from '../git';
 import { useBranchName } from '../git/useBranchName';
 import { MarkdownViewerDialog } from '../markdown';
@@ -108,7 +109,9 @@ export function RightSidebar({ projectPath }) {
   const toast = useToast();
   const branchName = useBranchName(projectPath);
 
-  const [collapsed, setCollapsed] = useState(false);
+  // null = automatic: the pane folds away while there is nothing to show.
+  // An explicit true/false is the user's choice and wins until a new job starts.
+  const [collapsedOverride, setCollapsedOverride] = useState(null);
   const [tab, setTab] = useState('jobs');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [review, setReview] = useState(null); // { jobId, filePath }
@@ -125,6 +128,17 @@ export function RightSidebar({ projectPath }) {
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
   const visibleJobs = jobs.filter((j) => !j.archived);
   const archivedJobs = jobs.filter((j) => j.archived);
+  const isEmpty = visibleJobs.length === 0 && totalActiveCount === 0;
+  const collapsed = collapsedOverride ?? isEmpty;
+
+  useEffect(() => {
+    const onRequest = (e) => {
+      if (e.detail?.action === 'toggle') setCollapsedOverride(!collapsed);
+      else setCollapsedOverride(false);
+    };
+    window.addEventListener(JOBS_PANE_EVENT, onRequest);
+    return () => window.removeEventListener(JOBS_PANE_EVENT, onRequest);
+  }, [collapsed]);
 
   // User-resizable panel width — persisted so it survives reloads. A narrow
   // fixed panel is what made the cards feel squashed.
@@ -317,7 +331,7 @@ export function RightSidebar({ projectPath }) {
   const prevCount = useRef(jobs.length);
   useEffect(() => {
     if (jobs.length > prevCount.current) {
-      setCollapsed(false);
+      setCollapsedOverride(null);
       setTab('jobs');
     }
     prevCount.current = jobs.length;
@@ -352,32 +366,42 @@ export function RightSidebar({ projectPath }) {
 
   if (collapsed) {
     return (
-      <div className="chassis-rail flex flex-col items-center gap-1.5 py-2 shrink-0 w-8 border-l border-l-sidebar-border">
+      <div data-pane="4" className="flex flex-col items-center gap-1.5 py-1.5 my-1 mr-1 shrink-0 w-7 edge-engraved">
         <button
-          onClick={() => setCollapsed(false)}
-          className="p-1 rounded hover:bg-sidebar-accent cursor-pointer"
-          title="Expand jobs sidebar"
+          onClick={() => setCollapsedOverride(false)}
+          className="p-1 text-muted-foreground hover:bg-foreground hover:text-background cursor-pointer"
+          title="Expand jobs pane (Alt+4)"
+          aria-label="Expand jobs pane"
         >
-          <PanelRightOpen size={14} className="text-muted-foreground" />
+          <PanelRightOpen size={14} />
+        </button>
+        <button
+          onClick={() => setCollapsedOverride(false)}
+          className="flex flex-col items-center gap-1 px-0.5 py-1 text-[11px] text-muted-foreground hover:bg-foreground hover:text-background cursor-pointer"
+          title="Expand jobs pane (Alt+4)"
+        >
+          <Bot size={14} />
+          <span className="[writing-mode:vertical-rl]">[4] jobs</span>
         </button>
         <button
           onClick={() => {
-            setCollapsed(false);
+            setCollapsedOverride(false);
             setTab('jobs');
             setDialogOpen(true);
           }}
-          className="p-1 rounded hover:bg-sidebar-accent cursor-pointer"
+          className="p-1 text-muted-foreground hover:bg-foreground hover:text-background cursor-pointer"
           title="New background job"
+          aria-label="New background job"
         >
-          <Plus size={14} className="text-muted-foreground" />
+          <Plus size={14} />
         </button>
         {runningJobs > 0 && (
-          <span className="text-[10px] font-bold tabular-nums" style={{ color: 'var(--color-status-success)' }}>
+          <span className="text-[11px] font-bold tabular-nums" style={{ color: 'var(--color-status-success)' }}>
             {runningJobs}
           </span>
         )}
         {totalActiveCount > 0 && (
-          <span className="text-[10px] font-bold tabular-nums text-muted-foreground" title="Active agents">
+          <span className="text-[11px] font-bold tabular-nums text-muted-foreground" title="Active agents">
             {totalActiveCount}
           </span>
         )}
@@ -388,7 +412,9 @@ export function RightSidebar({ projectPath }) {
   return (
     <div
       style={{ width }}
-      className="chassis-rail relative flex flex-col shrink-0 overflow-hidden border-l border-l-sidebar-border text-sidebar-foreground"
+      data-pane="4"
+      data-title={`[4] ${tab}`}
+      className="tui-pane bg-background flex flex-col shrink-0 overflow-hidden m-1 text-sidebar-foreground"
     >
       {/* Drag-to-resize handle sitting over the left edge. */}
       <div
@@ -400,11 +426,11 @@ export function RightSidebar({ projectPath }) {
       {/* Header: tabs + collapse */}
       <div className="flex items-center justify-between px-1.5 py-1 shrink-0 border-b border-b-sidebar-border">
         <div className="flex items-center gap-0.5">
-          <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} icon={Bot} label="Jobs" count={runningJobs} />
-          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} icon={Boxes} label="Agents" count={totalActiveCount} />
+          <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} icon={Bot} label="jobs" count={runningJobs} />
+          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} icon={Boxes} label="agents" count={totalActiveCount} />
         </div>
         <button
-          onClick={() => setCollapsed(true)}
+          onClick={() => setCollapsedOverride(true)}
           className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer"
           title="Collapse sidebar"
         >
@@ -418,7 +444,7 @@ export function RightSidebar({ projectPath }) {
           className="flex items-center gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border text-[11px] text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
         >
           <Plus size={12} />
-          New background job
+          new background job
         </button>
       )}
 
@@ -437,12 +463,12 @@ export function RightSidebar({ projectPath }) {
             <button
               onClick={() => setSelected(new Set())}
               disabled={reconciling}
-              className="text-[10px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer disabled:opacity-60"
+              className="text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer disabled:opacity-60"
             >
               Clear
             </button>
           </div>
-          <span className="text-[10px] leading-snug text-muted-foreground/70">
+          <span className="text-[11px] leading-snug text-muted-foreground/70">
             An agent merges them in an isolated worktree and verifies the build. Review before applying.
           </span>
         </div>
@@ -454,13 +480,14 @@ export function RightSidebar({ projectPath }) {
         ) : (
           <>
             {visibleJobs.length === 0 ? (
-              <div className="flex-1 flex flex-col justify-center px-4 py-8 text-center">
-                <Bot size={18} className="mx-auto mb-2 text-muted-foreground/30" />
-                <div className="text-[11px] text-muted-foreground/60">
-                  {archivedJobs.length > 0 ? 'No active jobs' : 'No background jobs'}
+              <div className="flex flex-col gap-1 px-3 py-2 text-[11px]">
+                <div className="text-foreground">
+                  <span className="text-muted-foreground">-- </span>
+                  {archivedJobs.length > 0 ? 'no active jobs' : 'no background jobs'}
+                  <span className="text-muted-foreground"> --</span>
                 </div>
-                <div className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground/40">
-                  Dispatch a headless agent run with “New background job”.
+                <div className="text-[11px] leading-relaxed text-muted-foreground">
+                  # dispatch a headless agent run with [+ new background job]
                 </div>
               </div>
             ) : (
@@ -485,7 +512,7 @@ export function RightSidebar({ projectPath }) {
               <div className="mt-2 border-t border-t-sidebar-border/60 pt-1">
                 <button
                   onClick={() => setShowArchived((v) => !v)}
-                  className="flex w-full items-center gap-1 px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/70 hover:text-sidebar-foreground cursor-pointer transition-colors"
+                  className="flex w-full items-center gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground/70 hover:text-sidebar-foreground cursor-pointer transition-colors"
                 >
                   {showArchived ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   <Archive className="h-3 w-3" />
@@ -552,7 +579,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   const comparable = jobs.filter((j) => j.status !== 'running' && j.changedFiles.length > 0).length;
   return (
     <div className="rounded-sm border border-primary/30 bg-primary/[0.03]">
-      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[10px] uppercase tracking-wide text-primary/80">
+      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[11px] uppercase tracking-wide text-primary/80">
         <Swords className="h-3 w-3" />
         Race
         <span className="tabular-nums text-muted-foreground/70">
@@ -575,7 +602,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
         )}
       </div>
       {!settled && (
-        <div className="px-2 pb-1 text-[10px] leading-snug text-muted-foreground/70">
+        <div className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground/70">
           Same prompt, separate worktrees. Keeping one applies it and discards the rest.
         </div>
       )}
@@ -589,14 +616,14 @@ function TabButton({ active, onClick, icon: Icon, label, count }) {
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-1 px-1.5 py-1 rounded text-[11px] cursor-pointer transition-colors',
-        active ? 'bg-sidebar-accent text-sidebar-foreground font-medium' : 'text-muted-foreground hover:bg-sidebar-accent/50'
+        'flex items-center gap-1 px-1.5 py-0.5 text-[11px] cursor-pointer',
+        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
     >
       <Icon size={11} />
       {label}
       {count > 0 && (
-        <span className="tabular-nums" style={{ color: 'var(--color-status-success)' }}>
+        <span className="tabular-nums" style={active ? undefined : { color: 'var(--color-status-success)' }}>
           {count}
         </span>
       )}
@@ -669,7 +696,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         </button>
 
         {isRunning && (
-          <span className="flex items-center gap-1 shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground">
+          <span className="flex items-center gap-1 shrink-0 pt-0.5 text-[11px] tabular-nums text-muted-foreground">
             {duration}
             <Loader2 className="h-3 w-3 animate-spin" />
           </span>
@@ -677,7 +704,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       </div>
 
       {/* Meta line: cli, isolation, diff stat, status */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pl-[2.6rem] pr-2.5 text-[10px]">
+      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pl-[2.6rem] pr-2.5 text-[11px]">
         <span className="uppercase tracking-wide text-muted-foreground/80">{job.cli}</span>
         {job.kind === 'reconcile' && (
           <span className="inline-flex items-center gap-1.5">
@@ -752,7 +779,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
 
       {/* Loud conflict record for a reconcile job: which files 2+ jobs edited. */}
       {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
-        <div className="mt-1.5 mx-2.5 rounded-sm border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[10px] leading-snug">
+        <div className="mt-1.5 mx-2.5 rounded-sm border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
           <div className="flex items-center gap-1 font-medium text-[var(--color-status-warning)]">
             <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
             {job.overlaps?.length > 0
@@ -781,7 +808,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
 
       {/* Collapsed preview: last couple of output lines */}
       {lastLines.length > 0 && (
-        <div className="mt-1.5 mx-2.5 rounded-sm bg-background/40 px-2 py-1 font-mono text-[10px] leading-snug text-muted-foreground/70">
+        <div className="mt-1.5 mx-2.5 rounded-sm bg-background/40 px-2 py-1 font-mono text-[11px] leading-snug text-muted-foreground/70">
           {lastLines.map((l, i) => (
             <div key={i} className={cn('truncate', l.stream === 'stderr' && 'text-destructive/80')}>
               {l.chunk || ' '}
@@ -794,7 +821,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       {expanded && (
         <div
           ref={logRef}
-          className="mt-1.5 mx-2.5 max-h-56 overflow-auto rounded-sm border border-sidebar-border/60 bg-background/50 p-2 font-mono text-[10px] leading-relaxed"
+          className="mt-1.5 mx-2.5 max-h-56 overflow-auto rounded-sm border border-sidebar-border/60 bg-background/50 p-2 font-mono text-[11px] leading-relaxed"
         >
           {job.output.length === 0 ? (
             <div className="text-muted-foreground/50">No output yet.</div>
@@ -809,7 +836,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       )}
 
       {job.error && (
-        <div className="mt-1.5 mx-2.5 rounded-sm bg-destructive/5 px-2 py-1 text-[10px] leading-snug text-destructive/90 break-words">
+        <div className="mt-1.5 mx-2.5 rounded-sm bg-destructive/5 px-2 py-1 text-[11px] leading-snug text-destructive/90 break-words">
           {job.error}
         </div>
       )}

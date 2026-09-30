@@ -52,8 +52,8 @@ export function SecondaryTerminalPicker({ onSelect }) {
           </button>
         ))}
         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t edge-t-engraved">
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">↑↓</span> Navigate</span>
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[10px]">Enter</span> Select</span>
+          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">↑↓</span> Navigate</span>
+          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">Enter</span> Select</span>
         </div>
       </div>
     </div>

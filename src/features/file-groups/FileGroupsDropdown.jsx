@@ -1,4 +1,4 @@
-import { FolderOpen, Save, X } from 'lucide-react';
+import { Save, X, FolderOpen } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   DropdownMenu,
@@ -23,17 +23,19 @@ export function FileGroupsDropdown({ projectPath, onLoadGroup, onSaveGroup, hasS
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="outline"
-          size="icon-sm"
+          variant="ghost"
+          size="xs"
           aria-label="File groups"
           title="File groups"
+          className="gap-1 px-1.5"
         >
           <FolderOpen className="h-3 w-3" />
+          groups
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" className="w-48 text-xs">
         {groups.length === 0 ? (
-          <DropdownMenuItem disabled className="text-[10px] text-muted-foreground">
+          <DropdownMenuItem disabled className="text-[11px] text-muted-foreground">
             No groups saved
           </DropdownMenuItem>
         ) : (
@@ -42,7 +44,7 @@ export function FileGroupsDropdown({ projectPath, onLoadGroup, onSaveGroup, hasS
               <DropdownMenuItem
                 key={group.id}
                 onClick={() => onLoadGroup(group)}
-                className="flex items-center justify-between text-[10px] py-1.5 cursor-pointer group"
+                className="flex items-center justify-between text-[11px] py-1.5 cursor-pointer group"
               >
                 <span className="truncate pr-2">{group.name}</span>
                 <span className="flex items-center gap-1">
@@ -64,7 +66,7 @@ export function FileGroupsDropdown({ projectPath, onLoadGroup, onSaveGroup, hasS
         <DropdownMenuItem
           onClick={onSaveGroup}
           disabled={!hasSelectedFiles}
-          className="text-[10px] py-1.5 cursor-pointer"
+          className="text-[11px] py-1.5 cursor-pointer"
         >
           <Save className="h-3 w-3 mr-1.5" />
           Save as Group...

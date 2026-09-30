@@ -55,7 +55,7 @@ export function BookmarksSection({ onNavigate }) {
                   <span className="text-xs font-medium truncate w-full">
                     {bookmark.name}
                   </span>
-                  <span className="text-[0.65rem] opacity-50 truncate w-full">
+                  <span className="text-[11px] opacity-50 truncate w-full">
                     {bookmark.path}
                   </span>
                 </SidebarMenuButton>

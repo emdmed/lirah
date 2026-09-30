@@ -68,7 +68,7 @@ function FileStatusBadge({ status }) {
       style={{ color: config.color }}
     >
       {config.icon}
-      <span className="text-[10px] uppercase tracking-wider font-semibold">{config.label}</span>
+      <span className="text-[11px] uppercase tracking-wider font-semibold">{config.label}</span>
     </div>
   );
 }
@@ -217,7 +217,7 @@ export function AutoCommitDialog({ autoCommit }) {
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
                     Commit Message
                   </label>
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-[11px] text-muted-foreground font-mono">
                     {commitMessage.length} chars
                   </span>
                 </div>
@@ -238,9 +238,9 @@ export function AutoCommitDialog({ autoCommit }) {
         <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20">
           <div className="flex items-center justify-between w-full">
             <span className="text-xs text-muted-foreground font-mono">
-              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[10px]">Enter</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[11px]">Enter</kbd>
               {' '}to commit{' '}
-              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[10px] ml-1">Esc</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[11px] ml-1">Esc</kbd>
               {' '}to cancel
             </span>
             <div className="flex gap-2">

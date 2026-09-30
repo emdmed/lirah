@@ -59,7 +59,7 @@ export function SelectedFileItem({
           disabled={!onCycleViewMode}
           title={`Sending ${viewModeLabel.toLowerCase()} of this ${lineCount}-line file. Click${isSelected ? ' or press V' : ''} to change.`}
           aria-label={`Detail level: ${viewModeLabel}. Change.`}
-          className="flex-shrink-0 flex items-center gap-1 px-1 h-3.5 border edge-engraved text-[10px] font-mono leading-none text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors disabled:pointer-events-none"
+          className="flex-shrink-0 flex items-center gap-1 px-1 h-3.5 border edge-engraved text-[11px] font-mono leading-none text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors disabled:pointer-events-none"
         >
           <span className="engraved-label">{viewModeLabel}</span>
           <span className="tube-idle">{lineCount}L</span>
@@ -70,7 +70,7 @@ export function SelectedFileItem({
       ) : lineCount != null ? (
         <span
           title={`${lineCount} lines — sent in full`}
-          className="flex-shrink-0 px-1 text-[10px] font-mono leading-none tube-idle"
+          className="flex-shrink-0 px-1 text-[11px] font-mono leading-none tube-idle"
         >
           {lineCount}L
         </span>

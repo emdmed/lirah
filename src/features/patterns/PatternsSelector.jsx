@@ -34,7 +34,7 @@ export function PatternsSelector({ patternFiles, selectedPatterns, onTogglePatte
             >
               <Puzzle className={`h-3 w-3 ${selectedCount > 0 ? 'text-primary' : ''}`} />
               {selectedCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center leading-none px-0.5">
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center leading-none px-0.5">
                   {selectedCount}
                 </span>
               )}
@@ -67,7 +67,7 @@ export function PatternsSelector({ patternFiles, selectedPatterns, onTogglePatte
                   <DropdownMenuItem
                     key={filename}
                     onClick={(e) => { e.preventDefault(); onTogglePattern(filename); }}
-                    className={`flex items-center justify-between text-[10px] py-1.5 ${isSelected ? 'bg-primary/10' : ''}`}
+                    className={`flex items-center justify-between text-[11px] py-1.5 ${isSelected ? 'bg-primary/10' : ''}`}
                   >
                     <span className="truncate pr-2">{filename.replace(/\.md$/, '')}</span>
                     <Check className={`h-3 w-3 flex-shrink-0 ${isSelected ? 'text-primary' : 'invisible'}`} />
@@ -76,7 +76,7 @@ export function PatternsSelector({ patternFiles, selectedPatterns, onTogglePatte
               })}
               {Object.entries(groups).map(([dir, files]) => (
                 <DropdownMenuSub key={dir}>
-                  <DropdownMenuSubTrigger className="text-[10px] py-1.5">
+                  <DropdownMenuSubTrigger className="text-[11px] py-1.5">
                     <span className="truncate">{dir}</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-48">
@@ -87,7 +87,7 @@ export function PatternsSelector({ patternFiles, selectedPatterns, onTogglePatte
                         <DropdownMenuItem
                           key={filename}
                           onClick={(e) => { e.preventDefault(); onTogglePattern(filename); }}
-                          className={`flex items-center justify-between text-[10px] py-1.5 ${isSelected ? 'bg-primary/10' : ''}`}
+                          className={`flex items-center justify-between text-[11px] py-1.5 ${isSelected ? 'bg-primary/10' : ''}`}
                         >
                           <span className="truncate pr-2">{label}</span>
                           <Check className={`h-3 w-3 flex-shrink-0 ${isSelected ? 'text-primary' : 'invisible'}`} />
@@ -104,7 +104,7 @@ export function PatternsSelector({ patternFiles, selectedPatterns, onTogglePatte
         <DropdownMenuItem
           disabled={selectedCount === 0}
           onClick={(e) => { e.preventDefault(); selectedPatterns.forEach(p => onTogglePattern(p)); }}
-          className="text-[10px] py-1.5 text-muted-foreground"
+          className="text-[11px] py-1.5 text-muted-foreground"
         >
           Clear all
         </DropdownMenuItem>

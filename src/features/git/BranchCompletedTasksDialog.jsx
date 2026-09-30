@@ -227,7 +227,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
                   {/* Expanded Details */}
                   {isExpanded && hasFiles && (
                     <div className="border-t border-border bg-muted/20 px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground mb-1.5 font-mono uppercase tracking-wider">
+                      <p className="text-[11px] text-muted-foreground mb-1.5 font-mono uppercase tracking-wider">
                         Changed files
                       </p>
                       <div className="space-y-0.5">

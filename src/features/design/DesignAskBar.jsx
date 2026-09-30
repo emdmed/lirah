@@ -57,7 +57,7 @@ export function DesignAskBar({
         type="button"
         onClick={() => onOpenChange(true)}
         title="Ask about the selection"
-        className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 font-mono text-[11px] px-3 py-1.5 border edge-engraved bg-background/95 shadow-lg backdrop-blur-sm hover:border-foreground/40"
+        className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 font-mono text-[11px] px-3 py-1.5 border edge-engraved bg-background hover:border-foreground/40"
       >
         <MessageSquare className="w-3.5 h-3.5" />
         Ask about {selected.length} selected
@@ -72,7 +72,7 @@ export function DesignAskBar({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-1.5 border-t edge-engraved bg-background/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.35)] px-3 py-2"
+      className="absolute bottom-0 left-0 right-0 z-20 flex flex-col gap-1.5 border-t edge-engraved bg-background px-3 py-2"
       onKeyDown={(e) => {
         // The dialog closes on Escape; in here Escape belongs to the drawer.
         if (e.key === 'Escape') {
@@ -84,13 +84,13 @@ export function DesignAskBar({
       }}
     >
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
           Ask about
         </span>
         {selected.map((node) => (
           <span
             key={node.id}
-            className="flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 border border-border"
+            className="flex items-center gap-1 font-mono text-[11px] px-1.5 py-0.5 border border-border"
             style={{ color: kindColor(node.kind, colors) }}
           >
             {node.label}
@@ -103,12 +103,12 @@ export function DesignAskBar({
           <button
             type="button"
             onClick={onClear}
-            className="font-mono text-[10px] text-muted-foreground hover:underline"
+            className="font-mono text-[11px] text-muted-foreground hover:underline"
           >
             clear
           </button>
         )}
-        <span className="font-mono text-[10px] text-muted-foreground/70 ml-auto hidden lg:inline">
+        <span className="font-mono text-[11px] text-muted-foreground/70 ml-auto hidden lg:inline">
           ctrl/⌘-click a box to select several
         </span>
         <button
@@ -158,7 +158,7 @@ export function DesignAskBar({
                 ? 'These files go into the prompt context'
                 : 'Ask about the selection without attaching its files'
             }
-            className={`flex items-center gap-1 font-mono text-[10px] px-1.5 py-1 border ${
+            className={`flex items-center gap-1 font-mono text-[11px] px-1.5 py-1 border ${
               attach ? 'border-border' : 'border-border/40 text-muted-foreground/60'
             }`}
           >

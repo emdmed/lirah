@@ -346,7 +346,7 @@ export function DesignDialog({
             statusLabel={statusLabel}
           />
           <div className="flex items-center justify-center gap-3 pb-2">
-            <span className="text-[10px] text-muted-foreground max-w-[70ch]">
+            <span className="text-[11px] text-muted-foreground max-w-[70ch]">
               Closing this dialog does not cancel the run — the diagram will be here when you reopen it.
             </span>
             <Button variant="outline" size="sm" onClick={extraction.cancel}>
@@ -632,7 +632,7 @@ export function DesignDialog({
           disabled={disabled}
           title={title}
           aria-pressed={view === id}
-          className={`flex items-center gap-1.5 font-mono text-[10px] px-2 py-1 transition-colors ${
+          className={`flex items-center gap-1.5 font-mono text-[11px] px-2 py-1 transition-colors ${
             view === id
               ? 'bg-foreground/10 text-foreground'
               : disabled
@@ -666,7 +666,7 @@ export function DesignDialog({
                 type="button"
                 onClick={() => setShowSummary((v) => !v)}
                 title={showSummary ? 'Hide the summary' : 'Show the summary'}
-                className="flex items-center gap-0.5 font-mono text-[10px] font-normal text-muted-foreground border border-border/60 px-1 py-0.5 hover:text-foreground hover:border-border"
+                className="flex items-center gap-0.5 font-mono text-[11px] font-normal text-muted-foreground border border-border/60 px-1 py-0.5 hover:text-foreground hover:border-border"
               >
                 {showSummary ? (
                   <ChevronDown className="w-3 h-3" />
@@ -689,7 +689,7 @@ export function DesignDialog({
           {/* Which source produced this diagram is not a detail: it decides what
               the diagram can and cannot know, so it stays on screen. */}
           {spec && source && (
-            <div className="font-mono text-[10px] text-muted-foreground truncate">
+            <div className="font-mono text-[11px] text-muted-foreground truncate">
               {source.kind === 'branch' ? (
                 <>
                   from branch {source.branch} vs {source.base} ({source.baseSha}) ·{' '}
@@ -760,7 +760,7 @@ export function DesignDialog({
                 <Button variant="outline" size="sm" onClick={zoomOut} title="Zoom out">
                   <Minus className="w-3.5 h-3.5" />
                 </Button>
-                <span className="font-mono text-[10px] text-muted-foreground w-9 text-center">
+                <span className="font-mono text-[11px] text-muted-foreground w-9 text-center">
                   {Math.round(transform.scale * 100)}%
                 </span>
                 <Button variant="outline" size="sm" onClick={zoomIn} title="Zoom in">
@@ -790,7 +790,7 @@ export function DesignDialog({
                           ? `Stop focusing ${label}`
                           : `Show only ${label}`
                       }
-                      className={`flex items-center gap-1.5 font-mono text-[10px] px-1.5 py-0.5 border rounded-none ${
+                      className={`flex items-center gap-1.5 font-mono text-[11px] px-1.5 py-0.5 border rounded-none ${
                         active ? 'border-border' : 'border-border/40 opacity-40'
                       }`}
                       style={{ color: color || undefined }}
@@ -819,7 +819,7 @@ export function DesignDialog({
                       type="button"
                       onClick={() => toggleLayer(layer.id)}
                       title={hidden ? 'Show layer' : 'Hide layer'}
-                      className={`flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 border rounded-none ${
+                      className={`flex items-center gap-1 font-mono text-[11px] px-1.5 py-0.5 border rounded-none ${
                         hidden
                           ? 'border-border/40 text-muted-foreground/50 line-through'
                           : 'border-border text-muted-foreground'
@@ -834,7 +834,7 @@ export function DesignDialog({
               </>
               )}
 
-              <div className="font-mono text-[10px] text-muted-foreground ml-auto flex items-center gap-3">
+              <div className="font-mono text-[11px] text-muted-foreground ml-auto flex items-center gap-3">
                 {view === 'system' ? (
                   <span className="hidden lg:inline opacity-70">drag to pan · wheel to zoom</span>
                 ) : (

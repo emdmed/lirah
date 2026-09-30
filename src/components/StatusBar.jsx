@@ -2,16 +2,14 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Palette } from 'lucide-react';
 import {
-  Keyboard, Eye, EyeOff, Bot, Terminal, Settings,
-  PanelTop, PanelTopClose, Shield, ShieldOff, ShieldAlert, Wifi, WifiOff,
-  Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
-  CheckCircle2, ListTodo, Monitor, Layers, X, ArrowUpCircle
+  Keyboard, Eye, EyeOff, Bot, Terminal,
+  PanelTop, PanelTopClose, Coins, BarChart3, FileText, FileX, Check, AlertTriangle, AlertCircle,
+  ListTodo, Layers, X, ArrowUpCircle
 } from 'lucide-react';
 import { RetroSpinner } from './ui/RetroSpinner';
 import { useWatcher } from '../features/watcher';
 import { useWatcherShortcut } from '../features/watcher';
 import { Button } from './ui/button';
-import { Badge } from "./ui/badge.jsx"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
@@ -28,6 +26,8 @@ import {
 } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useAgentJobs } from '../features/agent-jobs/agent-jobs';
+import { requestJobsPane } from '../features/agent-jobs/jobsPane';
 import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 
 const CLI_DISPLAY = {
@@ -71,9 +71,9 @@ function ChangelogStatus({ status }) {
 
 function SandboxButton({ enabled, failed, onToggle }) {
   const getIcon = () => {
-    if (enabled && failed) return <ShieldAlert className="w-3 h-3" style={{ color: STATUS_COLORS.warning }} />;
-    if (enabled) return <Shield className="w-3 h-3" />;
-    return <ShieldOff className="w-3 h-3" style={{ color: STATUS_COLORS.critical }} />;
+    if (enabled && failed) return <span style={{ color: STATUS_COLORS.warning }}>fail</span>;
+    if (enabled) return <span style={{ color: STATUS_COLORS.success }}>on</span>;
+    return <span style={{ color: STATUS_COLORS.critical }}>off</span>;
   };
 
   const getTooltip = () => {
@@ -85,8 +85,8 @@ function SandboxButton({ enabled, failed, onToggle }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="ghost" size="xs" onClick={onToggle} className="gap-1 px-1.5">
-          {getIcon()}
+        <Button variant="ghost" size="xs" onClick={onToggle} className="gap-0 px-1 before:content-none after:content-none">
+          <span className="text-muted-foreground">sandbox:</span>{getIcon()}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{getTooltip()}</TooltipContent>
@@ -95,14 +95,14 @@ function SandboxButton({ enabled, failed, onToggle }) {
 }
 
 function NetworkButton({ isolated, enabled, onToggle }) {
-  const icon = isolated && enabled ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" style={enabled ? {} : { opacity: 0.4 }} />;
+  const icon = isolated && enabled ? <span style={{ color: STATUS_COLORS.warning }}>iso</span> : <span>open</span>;
   const tooltip = isolated && enabled ? 'Network: ISOLATED' : 'Network: ALLOWED';
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="ghost" size="xs" onClick={onToggle} disabled={!enabled} className="gap-1 px-1.5">
-          {icon}
+        <Button variant="ghost" size="xs" onClick={onToggle} disabled={!enabled} className="gap-0 px-1 before:content-none after:content-none">
+          <span className="text-muted-foreground">net:</span>{icon}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{tooltip}</TooltipContent>
@@ -120,12 +120,10 @@ function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
           variant="ghost"
           size="xs"
           onClick={onClick}
-          className="gap-1 px-1.5"
+          className="gap-0 px-1 before:content-none after:content-none"
         >
-          <Monitor className="w-3 h-3" />
-          {hasInstances && (
-            <span className="text-xs font-medium">{otherInstancesCount}</span>
-          )}
+          <span className="text-primary">{otherInstancesCount + 1}</span>
+          <span className="text-muted-foreground">&nbsp;windows</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent>
@@ -206,6 +204,11 @@ export const StatusBar = memo(({
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
   const [showNetworkConfirm, setShowNetworkConfirm] = useState(false);
+  const { jobs } = useAgentJobs();
+  const jobCounts = useMemo(() => {
+    const visible = jobs.filter((j) => !j.archived);
+    return { total: visible.length, running: visible.filter((j) => j.status === 'running').length };
+  }, [jobs]);
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
 
@@ -254,7 +257,7 @@ export const StatusBar = memo(({
   return (
     <>
     <div
-      className="chassis-rail flex items-center justify-between px-2 h-8 border-t edge-t-engraved text-xs font-mono"
+      className="chassis-rail flex items-center justify-between pr-1 h-8 text-xs font-mono"
       style={{
         color: theme.foreground || 'var(--color-foreground)',
       }}
@@ -263,8 +266,8 @@ export const StatusBar = memo(({
       <div className="flex items-center gap-1 overflow-hidden min-w-0">
         {/* Location group: path + workspace + branch */}
         <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
-          <span className="overflow-hidden whitespace-nowrap text-ellipsis opacity-70">
-            {currentPath ? currentPath.split('/').pop() || '~' : '~'}
+          <span className="overflow-hidden whitespace-nowrap text-ellipsis bg-primary text-primary-foreground px-2 self-stretch flex items-center">
+            [{currentPath ? currentPath.split('/').pop() || '~' : '~'}]
           </span>
           {workspace && (
             <Tooltip>
@@ -280,16 +283,16 @@ export const StatusBar = memo(({
             </Tooltip>
           )}
           {branchName && (
-            <Badge variant="secondary">
-              {branchName}
-            </Badge>
+            <span className="whitespace-nowrap text-muted-foreground">
+              ± <span className="text-foreground">{branchName}</span>
+            </span>
           )}
         </div>
 
         {/* Context actions: tasks + update (shown when relevant) */}
         {(branchName && branchName !== 'main' && branchName !== 'master' || availableUpdate) && (
           <>
-            <div className="w-px h-3 bg-border/30 mx-0.5 shrink-0" />
+            <span className="text-[var(--tui-line-strong)] mx-0.5 shrink-0 select-none">│</span>
             <div className="flex items-center gap-0.5">
               {branchName && branchName !== 'main' && branchName !== 'master' && (
                 <Tooltip>
@@ -343,26 +346,42 @@ export const StatusBar = memo(({
         )}
 
         {/* Runtime zone: instances + CLI + sandbox + network — unified background */}
-        <div className="flex items-center gap-0.5 bg-secondary/20 px-1 py-0.5">
-          <InstanceSyncIndicator
-            otherInstancesCount={otherInstancesCount}
-            onClick={onToggleInstanceSyncPanel}
-          />
-          <div className="w-px h-3 bg-border/20 mx-0.5" />
+        <div className="flex items-center gap-0.5">
+          {jobCounts.total > 0 && (
+            <>
+              <Button variant="ghost" size="xs" onClick={() => requestJobsPane('toggle')} className="gap-0 px-1 before:content-none after:content-none" title="Toggle jobs pane (Alt+4)">
+                <span className="text-muted-foreground">jobs:</span>
+                <span style={jobCounts.running > 0 ? { color: STATUS_COLORS.success } : undefined}>
+                  {jobCounts.running > 0 ? `${jobCounts.running} running` : jobCounts.total}
+                </span>
+              </Button>
+              <span className="text-[var(--tui-line-strong)] mx-0.5 select-none">│</span>
+            </>
+          )}
+          {otherInstancesCount > 0 && (
+            <>
+              <InstanceSyncIndicator
+                otherInstancesCount={otherInstancesCount}
+                onClick={onToggleInstanceSyncPanel}
+              />
+              <span className="text-[var(--tui-line-strong)] mx-0.5 select-none">│</span>
+            </>
+          )}
           {selectedCli && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1 px-1.5 h-5">
-                  <CliIcon cli={selectedCli} />
-                  <span className="opacity-60">{cliName}</span>
+                <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1 px-1 h-5 lowercase before:content-none after:content-none">
+                  {cliName}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
             </Tooltip>
           )}
-          <div className="w-px h-3 bg-border/20 mx-0.5" />
+          <span className="text-[var(--tui-line-strong)] mx-0.5 select-none">│</span>
           <SandboxButton enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
-          <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
+          {sandboxEnabled && (
+            <NetworkButton isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
+          )}
         </div>
 
         {/* Settings — visually separated as the final anchor */}
@@ -370,15 +389,15 @@ export const StatusBar = memo(({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="h-6 w-6 p-0" aria-label="Open settings menu">
-                  <Settings className="w-3.5 h-3.5" />
+                <Button variant="ghost" size="xs" className="px-1.5 bg-foreground/10 before:content-none after:content-none" aria-label="Open settings menu">
+                  menu
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end" className="w-56 text-xs">
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Analytics</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-normal">Analytics</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
                 <BarChart3 className="mr-2 w-3 h-3" />
@@ -391,7 +410,7 @@ export const StatusBar = memo(({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Automation</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-normal">Automation</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1">
                 {autoChangelogEnabled ? (
@@ -408,7 +427,7 @@ export const StatusBar = memo(({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Preferences</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-normal">Preferences</DropdownMenuLabel>
             <DropdownMenuGroup>
               <ThemeSwitcherMenuItem />
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
@@ -434,7 +453,7 @@ export const StatusBar = memo(({
               <ScrollbackMenuItem />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-normal">Workspaces</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-normal">Workspaces</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenWorkspaceDialog} className="cursor-pointer py-1">
                 <Layers className="mr-2 w-3 h-3" />

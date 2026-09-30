@@ -1,5 +1,6 @@
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from './ui/sidebar';
 import { Folder, File, FileX } from 'lucide-react';
+import { isDimmedEntry } from './file-tree/utils/lsColors';
 
 export function FlatViewMenu({ folders, currentPath, onFolderClick }) {
   return (
@@ -12,19 +13,22 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick }) {
         folders.map((item) => {
           const isCurrentPath = item.path === currentPath;
           const isDeleted = item.is_deleted;
+          const dimStyle = isDimmedEntry(item.name) ? { opacity: 0.45 } : undefined;
 
           if (item.is_dir) {
             return (
-              <SidebarMenuItem key={item.path} className="relative my-0 p-0 w-full">
+              <SidebarMenuItem key={item.path} className="relative my-0 p-0 w-full" style={dimStyle}>
                 <SidebarMenuButton
                   size="sm"
                   onClick={() => onFolderClick(item.path)}
+                  data-nav-row
+                  data-nav-activate
                   className={`p-0 cursor-pointer h-5 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
                 >
                   <div className="flex items-center w-full">
                     <div className="w-3 flex items-center" /> {/* Chevron placeholder for alignment */}
                     <Folder className="w-3 h-3 ml-1 mr-1 text-folder" />
-                    <span className="truncate" title={item.name}>{item.name}</span>
+                    <span className="truncate font-semibold text-folder" title={item.name}>{item.name}</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -32,10 +36,10 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick }) {
           }
 
           return (
-            <SidebarMenuItem key={item.path} className="relative my-0 p-0 w-full">
-              <div className={`flex h-5 items-center justify-between w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}>
+            <SidebarMenuItem key={item.path} className="relative my-0 p-0 w-full" style={dimStyle}>
+              <div data-nav-row className={`flex h-5 items-center justify-between w-full py-0 pr-px ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}>
                 <div className="w-5 flex items-center justify-center flex-shrink-0">
-                  {isDeleted && <span className="text-git-deleted text-[0.65rem] font-mono">D</span>}
+                  {isDeleted && <span className="text-git-deleted text-[11px] font-mono">D</span>}
                 </div>
                 <div className="flex items-center justify-start min-w-0 gap-1 flex-1">
                   {isDeleted ? (

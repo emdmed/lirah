@@ -95,9 +95,6 @@ function AgentCard({ agent, onDismiss, now }) {
               ? 'var(--color-status-success)'
               : 'var(--color-muted-foreground)',
             opacity: isRunning ? 1 : 0.35,
-            boxShadow: isRunning
-              ? '0 0 6px color-mix(in srgb, var(--color-status-success) 50%, transparent)'
-              : undefined,
           }}
         />
         <span className="text-[11px] text-sidebar-foreground leading-tight line-clamp-2 break-words min-w-0">
@@ -118,7 +115,7 @@ function AgentCard({ agent, onDismiss, now }) {
       </div>
 
       {/* Row 2: metadata — tool, turns, elapsed */}
-      <div className="flex items-center gap-1.5 mt-1 ml-3 text-[10px] text-muted-foreground/60">
+      <div className="flex items-center gap-1.5 mt-1 ml-3 text-[11px] text-muted-foreground/60">
         {agent.last_tool && (
           <span className="inline-block px-1 py-px rounded font-mono bg-primary/10 text-primary/70">
             {agent.last_tool}
@@ -137,7 +134,7 @@ function AgentCard({ agent, onDismiss, now }) {
 
       {/* Expanded: full task label */}
       {expanded && label && label !== summary && (
-        <div className="mt-1.5 ml-3 text-[10px] text-muted-foreground/60 break-words leading-relaxed">
+        <div className="mt-1.5 ml-3 text-[11px] text-muted-foreground/60 break-words leading-relaxed">
           {label}
         </div>
       )}
@@ -150,7 +147,7 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
 
   return (
     <div className="mb-1">
-      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground/60">
+      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground/60">
         <span className="truncate">{tabLabel}</span>
         <span className="shrink-0 ml-1 tabular-nums">
           {runningCount > 0 ? (
@@ -211,7 +208,7 @@ export function SubagentList() {
       <div className="px-3 py-6 text-center">
         <Bot size={16} className="mx-auto mb-2 text-muted-foreground/30" />
         <div className="text-[11px] text-muted-foreground/50">No agents running</div>
-        <div className="mt-1 text-[10px] text-muted-foreground/30">
+        <div className="mt-1 text-[11px] text-muted-foreground/30">
           Agents appear here when spawned during tool use
         </div>
       </div>
@@ -290,7 +287,7 @@ export function AgentSidebar() {
         </button>
         {totalActiveCount > 0 && (
           <span
-            className="text-[10px] font-bold tabular-nums"
+            className="text-[11px] font-bold tabular-nums"
             style={{ color: 'var(--color-status-success)' }}
           >
             {totalActiveCount}
@@ -308,9 +305,6 @@ export function AgentSidebar() {
                 ? 'var(--color-status-success)'
                 : 'var(--color-muted-foreground)',
               opacity: agent.status === 'running' ? 1 : 0.3,
-              boxShadow: agent.status === 'running'
-                ? '0 0 4px color-mix(in srgb, var(--color-status-success) 40%, transparent)'
-                : undefined,
             }}
           />
         ))}
@@ -327,7 +321,7 @@ export function AgentSidebar() {
           <span className="text-xs font-medium">Agents</span>
           {totalActiveCount > 0 && (
             <span
-              className="inline-flex items-center justify-center px-1 py-px rounded text-[10px] font-bold min-w-[16px] tabular-nums"
+              className="inline-flex items-center justify-center px-1 py-px rounded text-[11px] font-bold min-w-[16px] tabular-nums"
               style={{
                 backgroundColor: 'color-mix(in srgb, var(--color-status-success) 20%, transparent)',
                 color: 'var(--color-status-success)',
@@ -354,7 +348,7 @@ export function AgentSidebar() {
             <div className="text-[11px] text-muted-foreground/50">
               No agents running
             </div>
-            <div className="mt-1 text-[10px] text-muted-foreground/30">
+            <div className="mt-1 text-[11px] text-muted-foreground/30">
               Agents appear here when spawned during tool use
             </div>
           </div>

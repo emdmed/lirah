@@ -55,7 +55,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
               {other?.label || otherId}
             </button>
             {edge.contracts.length > 0 && (
-              <div className="pl-4 font-mono text-[10px] text-muted-foreground break-words">
+              <div className="pl-4 font-mono text-[11px] text-muted-foreground break-words">
                 {edge.contracts.join(' · ')}
               </div>
             )}
@@ -67,7 +67,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
 
   const section = (title, children) => (
     <div className="space-y-1.5">
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{title}</div>
+      <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{title}</div>
       {children}
     </div>
   );
@@ -84,11 +84,11 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
             <span className="truncate">{node.label}</span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-mono text-[10px] uppercase text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase text-muted-foreground">
               {typeLabel(node)}
             </span>
             <span
-              className="font-mono text-[10px] px-1 rounded"
+              className="font-mono text-[11px] px-1 rounded"
               style={{
                 color: proposed ? '#fbbf24' : colors.mutedText,
                 border: `1px solid ${proposed ? 'color-mix(in srgb, var(--color-status-warning) 40%, transparent)' : 'color-mix(in srgb, var(--color-border) 70%, transparent)'}`,
@@ -99,7 +99,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
             {/* What this work did to it, and whether that came from git or from
                 the extractor's reading of the conversation. */}
             <span
-              className="font-mono text-[10px] px-1 rounded"
+              className="font-mono text-[11px] px-1 rounded"
               title={
                 node.changeSource === 'git'
                   ? 'Derived from this branch’s git changes'
@@ -163,7 +163,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
                     {/* Per-file change marker: which of these the work touched
                         is usually the first question about a modified node. */}
                     <span
-                      className="font-mono text-[10px] w-2 flex-shrink-0 leading-4"
+                      className="font-mono text-[11px] w-2 flex-shrink-0 leading-4"
                       style={{ color: cls?.color || 'rgba(148,163,184,0.45)' }}
                       title={cls ? `This file was ${cls.label}` : undefined}
                     >
@@ -174,7 +174,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
                       onClick={() => !isMissing && onOpenFile?.(file)}
                       disabled={isMissing}
                       title={isMissing ? 'Not found on disk' : 'Open file'}
-                      className={`font-mono text-[10px] text-left break-all flex items-start gap-1 ${
+                      className={`font-mono text-[11px] text-left break-all flex items-start gap-1 ${
                         isMissing ? 'text-amber-500/80 cursor-default' : 'text-muted-foreground hover:underline'
                       }`}
                     >
@@ -193,7 +193,7 @@ export function DesignPanel({ node, edges, nodes, concerns, onSelectNode, onClos
             <ul className="space-y-1.5">
               {nodeConcerns.map((c, i) => (
                 <li key={i} className="text-xs">
-                  <span className="font-mono text-[10px] uppercase text-amber-500/90">{c.kind || 'note'}</span>
+                  <span className="font-mono text-[11px] uppercase text-amber-500/90">{c.kind || 'note'}</span>
                   <div className="text-muted-foreground leading-relaxed">{c.text}</div>
                 </li>
               ))}

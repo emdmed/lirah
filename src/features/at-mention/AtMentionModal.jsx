@@ -83,19 +83,19 @@ export const AtMentionModal = memo(function AtMentionModal({
         </span>
         <div className="flex items-center gap-3 text-muted-foreground">
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">↑↓</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[11px] font-mono">↑↓</kbd>
             navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">←→</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[11px] font-mono">←→</kbd>
             mode
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">↵</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[11px] font-mono">↵</kbd>
             select
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[9px] font-mono">esc</kbd>
+            <kbd className="px-1 rounded-sm bg-muted/50 border edge-engraved text-[11px] font-mono">esc</kbd>
             close
           </span>
         </div>

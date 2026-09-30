@@ -1,8 +1,9 @@
 import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Button } from "../ui/button";
-import { Send, RotateCcw } from "lucide-react";
 import { AtMentionModal } from "../../features/at-mention";
+import { useAutoGrow } from "../../hooks/useAutoGrow";
+import { useBlockCaret } from "../../hooks/useBlockCaret";
 
 export function TextareaArea({
   textareaRef,
@@ -10,7 +11,6 @@ export function TextareaArea({
   onChange,
   onKeyDown,
   disabled,
-  isWide,
   elementsIndicator,
   compactedIndicator,
   onClearContext,
@@ -31,20 +31,35 @@ export function TextareaArea({
 }) {
   const hasIndicators = !!elementsIndicator || !!compactedIndicator;
   const sortedAtMentionResults = atMentionResults || [];
+  // One line until there is more to show, at any pane width.
+  useAutoGrow(textareaRef, value, { maxLines: 8 });
+  const { caret } = useBlockCaret(textareaRef, value);
 
   return (
-    <div className={`relative flex flex-col gap-2 ${isWide ? 'flex-1 min-h-[200px]' : 'min-h-[120px] max-h-[340px]'}`}>
-      <Textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        disabled={disabled}
-        placeholder={disabled ? "Waiting for terminal session..." : "Type your command here... (Ctrl+Enter to send)"}
-        aria-label="Multi-line command input"
-        aria-describedby="textarea-instructions"
-        className="chassis-cut w-full flex-1 resize-none"
-      />
+    <div className="relative flex flex-col gap-1">
+      <div className="relative flex flex-1 min-h-0">
+        <span className="absolute left-0 top-[3px] text-primary select-none pointer-events-none" aria-hidden="true">❯</span>
+        {caret && (
+          <span
+            className="tui-caret"
+            aria-hidden="true"
+            style={{ left: caret.left, top: caret.top, width: caret.width, height: caret.height }}
+          />
+        )}
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          placeholder={disabled ? "waiting for terminal session…" : "type a prompt, @ to mention files"}
+          aria-label="Multi-line command input"
+          aria-describedby="textarea-instructions"
+          rows={1}
+          className="w-full flex-1 resize-none shadow-none! pl-5 pr-0 py-1 min-h-0 max-h-none caret-transparent focus-visible:outline-none"
+          style={{ backgroundColor: 'transparent' }}
+        />
+      </div>
       {hasIndicators && (
         <div className="flex flex-col gap-1.5">
           {elementsIndicator}
@@ -55,7 +70,7 @@ export function TextareaArea({
         <div className="flex items-center gap-2 min-w-0 overflow-hidden">
           {footerInfo}
           {budgetExhausted && (
-            <span className="flex items-baseline gap-1 text-[10px] font-mono shrink-0">
+            <span className="flex items-baseline gap-1 text-[11px] font-mono shrink-0">
               <span className="tube-overflow">OVER</span>
               <span className="engraved-label">budget</span>
             </span>
@@ -69,12 +84,13 @@ export function TextareaArea({
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon-sm"
+                size="xs"
                 onClick={onClearContext}
                 disabled={!sessionId}
                 aria-label="Clear CLI context"
+                className="before:content-none after:content-none text-muted-foreground"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <span className="tui-key mr-1">^⇧L</span>clear
               </Button>
             </TooltipTrigger>
             <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
@@ -85,13 +101,13 @@ export function TextareaArea({
                   never surface. The wrapper keeps the tooltip reachable. */}
               <span className="inline-flex">
                 <Button
-                  size="icon-sm"
+                  size="xs"
                   onClick={handleSend}
                   disabled={isSendDisabled}
                   className={isSendDisabled ? 'pointer-events-none' : undefined}
                   aria-label={sendBlockedReason ? `Send to CLI — unavailable: ${sendBlockedReason}` : 'Send to CLI'}
                 >
-                  <Send className="h-3.5 w-3.5" />
+                  ^↵ send
                 </Button>
               </span>
             </TooltipTrigger>

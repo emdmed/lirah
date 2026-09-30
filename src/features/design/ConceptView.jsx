@@ -79,7 +79,7 @@ function DataPill({ datum, colors, active, dimmed, onClick }) {
       onClick={onClick}
       title={datum.what || `${datum.label} — ${datum.shape}`}
       aria-pressed={active}
-      className={`flex items-center gap-1 max-w-full text-left font-mono text-[10px] px-1.5 py-px border transition-colors ${
+      className={`flex items-center gap-1 max-w-full text-left font-mono text-[11px] px-1.5 py-px border transition-colors ${
         active
           ? 'border-foreground/60 bg-foreground/5'
           : dimmed
@@ -99,7 +99,7 @@ function PillRow({ label, data, colors, selectedId, onSelectData, icon: Icon, no
   if (!data.length) return null;
   return (
     <div className="flex items-start gap-1.5 flex-wrap">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60 w-10 flex-shrink-0 leading-4">
+      <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/60 w-10 flex-shrink-0 leading-4">
         {label}
       </span>
       {Icon && <Icon className="w-3 h-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />}
@@ -113,7 +113,7 @@ function PillRow({ label, data, colors, selectedId, onSelectData, icon: Icon, no
           onClick={() => onSelectData(datum.id)}
         />
       ))}
-      {note && <span className="font-mono text-[10px] text-muted-foreground/50">{note}</span>}
+      {note && <span className="font-mono text-[11px] text-muted-foreground/50">{note}</span>}
     </div>
   );
 }
@@ -132,7 +132,7 @@ function Handoff({ stage }) {
         // Two adjacent stages with nothing between them is information: the
         // sequence is real but the data is not handed along, so say so rather
         // than drawing an arrow that implies a payload.
-        <span className="font-mono text-[10px] text-muted-foreground/40 italic">
+        <span className="font-mono text-[11px] text-muted-foreground/40 italic">
           nothing handed along
         </span>
       )}
@@ -174,14 +174,14 @@ function Stage({
           ) : (
             <ChevronRight className="w-3 h-3 text-muted-foreground/60 flex-shrink-0" />
           )}
-          <span className="font-mono text-[10px] text-muted-foreground/70 tabular-nums flex-shrink-0">
+          <span className="font-mono text-[11px] text-muted-foreground/70 tabular-nums flex-shrink-0">
             {String(stage.index + 1).padStart(2, '0')}
           </span>
           <span className="font-mono text-xs font-semibold truncate group-hover:underline">
             {stage.label}
           </span>
           {stage.actor && (
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70 border border-border/50 px-1 flex-shrink-0 hidden sm:inline">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70 border border-border/50 px-1 flex-shrink-0 hidden sm:inline">
               {stage.actor}
             </span>
           )}
@@ -189,7 +189,7 @@ function Stage({
         {/* Closed, a stage still says how much data it touches — the one number
             that tells the reader whether opening it is worth it. */}
         {!open && (stage.consumesData.length > 0 || stage.producesData.length > 0) && (
-          <span className="font-mono text-[10px] text-muted-foreground/50 tabular-nums flex-shrink-0">
+          <span className="font-mono text-[11px] text-muted-foreground/50 tabular-nums flex-shrink-0">
             {stage.consumesData.length}↓ {stage.producesData.length}↑
           </span>
         )}
@@ -198,7 +198,7 @@ function Stage({
             type="button"
             onClick={() => onShowNodes(stage.systemNodes)}
             title="Show these parts in the system diagram"
-            className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/70 hover:text-foreground hover:underline flex-shrink-0"
+            className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline flex-shrink-0"
           >
             <Layers className="w-3 h-3" />
             {stage.systemNodes.length}
@@ -220,7 +220,7 @@ function Stage({
             <p className="text-xs text-muted-foreground max-w-[80ch]">{stage.does}</p>
           ) : (
             derived && (
-              <p className="text-[10px] italic text-muted-foreground/50">
+              <p className="text-[11px] italic text-muted-foreground/50">
                 no plain-language description — regenerate for one
               </p>
             )
@@ -325,7 +325,7 @@ function DataEntry({ datum, colors, selected, onSelect, onShowNodes, registerRef
             </span>
           )}
         </button>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/50 flex-shrink-0">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/50 flex-shrink-0">
           {datum.form}
         </span>
       </div>
@@ -336,28 +336,28 @@ function DataEntry({ datum, colors, selected, onSelect, onShowNodes, registerRef
 
           {/* The shape is the point of the entry, so it is set as code and never
               truncated — a contract the reader cannot read in full is not one. */}
-          <div className="font-mono text-[10px] text-foreground/90 bg-muted/40 border border-border/50 px-1.5 py-1 overflow-x-auto whitespace-pre-wrap break-words">
+          <div className="font-mono text-[11px] text-foreground/90 bg-muted/40 border border-border/50 px-1.5 py-1 overflow-x-auto whitespace-pre-wrap break-words">
             {datum.shape}
           </div>
 
           {datum.livesIn && (
             <div className="flex items-baseline gap-1.5">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60 flex-shrink-0">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/60 flex-shrink-0">
                 lives in
               </span>
-              <span className="font-mono text-[10px] text-muted-foreground break-all">
+              <span className="font-mono text-[11px] text-muted-foreground break-all">
                 {datum.livesIn}
               </span>
             </div>
           )}
 
           {datum.example && (
-            <pre className="font-mono text-[10px] text-muted-foreground/90 bg-muted/30 border border-border/40 px-1.5 py-1 overflow-x-auto">
+            <pre className="font-mono text-[11px] text-muted-foreground/90 bg-muted/30 border border-border/40 px-1.5 py-1 overflow-x-auto">
               {datum.example}
             </pre>
           )}
 
-          <div className="flex items-baseline gap-x-3 gap-y-1 flex-wrap font-mono text-[10px] text-muted-foreground/70">
+          <div className="flex items-baseline gap-x-3 gap-y-1 flex-wrap font-mono text-[11px] text-muted-foreground/70">
             {datum.producedBy.length > 0 && (
               <span>written by {datum.producedBy.map((s) => s.label).join(', ')}</span>
             )}
@@ -389,7 +389,7 @@ function DensityToggle({ detailed, onChange }) {
       type="button"
       onClick={() => onChange(!detailed)}
       title={detailed ? 'Collapse every row' : 'Expand every row'}
-      className="font-mono text-[10px] text-muted-foreground/70 hover:text-foreground hover:underline"
+      className="font-mono text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline"
     >
       {detailed ? 'collapse all' : 'expand all'}
     </button>
@@ -481,17 +481,17 @@ export function ConceptView({ model, onShowNodes }) {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-3 min-h-0">
         <div className="flex flex-col min-h-0">
           <div className="flex items-baseline gap-2 pb-1.5 flex-shrink-0">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               How the data flows
             </span>
-            <span className="font-mono text-[10px] text-muted-foreground/60">
+            <span className="font-mono text-[11px] text-muted-foreground/60">
               {model.stages.length} stages
             </span>
             {selectedId && (
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
-                className="font-mono text-[10px] text-muted-foreground hover:underline"
+                className="font-mono text-[11px] text-muted-foreground hover:underline"
               >
                 clear highlight
               </button>
@@ -524,10 +524,10 @@ export function ConceptView({ model, onShowNodes }) {
 
         <div className="flex flex-col min-h-0">
           <div className="flex items-baseline gap-2 pb-1.5 flex-shrink-0">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               What the data is
             </span>
-            <span className="font-mono text-[10px] text-muted-foreground/60">
+            <span className="font-mono text-[11px] text-muted-foreground/60">
               {model.data.length} kinds
             </span>
           </div>

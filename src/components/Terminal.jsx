@@ -1,11 +1,21 @@
-import { useRef, useEffect, useCallback, forwardRef, memo } from 'react';
+import { useRef, useEffect, useCallback, useState, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { TerminalSearchBar } from './TerminalSearchBar';
+import { PaneInfo } from './PaneInfo';
 
 export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true }, ref) => {
   const terminalRef = useRef(null);
-  const { handleResize, sessionId, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
+  const { terminal, handleResize, sessionId, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive);
+
+  // Grid size for the pane's bottom border.
+  const [dims, setDims] = useState(null);
+  useEffect(() => {
+    if (!terminal) return;
+    setDims({ cols: terminal.cols, rows: terminal.rows });
+    const sub = terminal.onResize(({ cols, rows }) => setDims({ cols, rows }));
+    return () => sub.dispose();
+  }, [terminal]);
 
   // Notify parent when session is ready
   useEffect(() => {
@@ -57,8 +67,9 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
 
   return (
     <div
-
-      className={`px-2 mt-2 terminal-wrapper chassis-cut ${isFocused
+      data-pane="2"
+      data-title="[2] terminal"
+      className={`tui-pane px-2 pb-3 terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
         }`}
@@ -79,6 +90,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
           overflow: 'hidden',
         }}
       />
+      <PaneInfo>{dims && `${sandboxEnabled ? 'sandbox · ' : ''}${dims.cols}×${dims.rows}`}</PaneInfo>
       {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
     </div>
   );

@@ -49,14 +49,14 @@ function Card({ selected, disabled, icon: Icon, title, lines, reason, onSelect }
       <div className="flex items-center gap-2 font-mono text-xs">
         <Icon className="w-3.5 h-3.5" />
         {title}
-        {selected && !disabled && <span className="ml-auto text-[10px] text-primary">selected</span>}
+        {selected && !disabled && <span className="ml-auto text-[11px] text-primary">selected</span>}
       </div>
       {lines.map((line, i) => (
-        <div key={i} className="font-mono text-[10px] text-muted-foreground truncate">
+        <div key={i} className="font-mono text-[11px] text-muted-foreground truncate">
           {line}
         </div>
       ))}
-      {reason && <div className="font-mono text-[10px] text-amber-500/90">{reason}</div>}
+      {reason && <div className="font-mono text-[11px] text-amber-500/90">{reason}</div>}
     </button>
   );
 }
@@ -111,7 +111,7 @@ function BasePicker({ choices, value, onChange }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
-        <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-wider">
+        <DropdownMenuLabel className="font-mono text-[11px] uppercase tracking-wider">
           {choices.refs.length ? 'Compare against' : 'No other branch in this repo'}
         </DropdownMenuLabel>
         {choices.refs.map((ref) => (
@@ -122,7 +122,7 @@ function BasePicker({ choices, value, onChange }) {
           >
             <Check className={`w-3 h-3 ${ref.name === value ? '' : 'invisible'}`} />
             <span className="truncate">{ref.name}</span>
-            <span className="ml-auto text-[10px] text-muted-foreground">
+            <span className="ml-auto text-[11px] text-muted-foreground">
               {ref.name === choices.detected ? 'default · ' : ''}
               {ref.age}
             </span>
@@ -155,7 +155,7 @@ function BasePicker({ choices, value, onChange }) {
 function DepthPicker({ value, onChange, sourceKind }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         Digest depth
       </span>
       <div className="flex items-center border border-border">
@@ -166,7 +166,7 @@ function DepthPicker({ value, onChange, sourceKind }) {
             onClick={() => onChange(id)}
             aria-pressed={value === id}
             title={hint}
-            className={`font-mono text-[10px] px-2 py-1 transition-colors ${
+            className={`font-mono text-[11px] px-2 py-1 transition-colors ${
               value === id
                 ? 'bg-foreground/10 text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -176,7 +176,7 @@ function DepthPicker({ value, onChange, sourceKind }) {
           </button>
         ))}
       </div>
-      <span className="font-mono text-[10px] text-muted-foreground">
+      <span className="font-mono text-[11px] text-muted-foreground">
         {value === 'full'
           ? sourceKind === 'branch'
             ? 'every patch, uncut — slower and costs more'
@@ -299,12 +299,12 @@ export function DesignSourcePicker({
 
       {sourceKind === 'branch' && (
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             Base branch
           </span>
           <BasePicker choices={choices} value={baseRef} onChange={chooseBase} />
           {choices.current && (
-            <span className="font-mono text-[10px] text-muted-foreground">
+            <span className="font-mono text-[11px] text-muted-foreground">
               diffed against {choices.current}
             </span>
           )}

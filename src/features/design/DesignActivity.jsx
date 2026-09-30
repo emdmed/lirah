@@ -80,7 +80,7 @@ export function DesignActivity({ eventLog, startedAt, running, logPath, statusLa
       <div className="flex items-baseline gap-3 flex-wrap">
         <span className="font-mono text-sm">{statusLabel}</span>
         <span className="font-mono text-xs text-muted-foreground tabular-nums">{formatElapsed(elapsed)}</span>
-        <span className="font-mono text-[10px] text-muted-foreground">
+        <span className="font-mono text-[11px] text-muted-foreground">
           {counters.tools} tool calls
           {counters.turns ? ` · ${counters.turns} turns` : ''}
           {typeof counters.costUsd === 'number' ? ` · $${counters.costUsd.toFixed(2)}` : ''}
@@ -102,7 +102,7 @@ export function DesignActivity({ eventLog, startedAt, running, logPath, statusLa
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex-1 min-h-0 overflow-auto border edge-engraved bg-background/50 p-2 font-mono text-[10px] leading-relaxed"
+        className="flex-1 min-h-0 overflow-auto border edge-engraved bg-background/50 p-2 font-mono text-[11px] leading-relaxed"
       >
         {events.length === 0 && (
           <div className="text-muted-foreground">
@@ -132,7 +132,7 @@ export function DesignActivity({ eventLog, startedAt, running, logPath, statusLa
       </div>
 
       {logPath && (
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
           <span className="truncate" title={logPath}>
             Raw log: {logPath}
           </span>

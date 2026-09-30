@@ -19,20 +19,20 @@ export function TabBar({ tabs, activeTabId, onSwitch, onClose, onAdd, onReorder 
             onClick={() => onSwitch(tab.id)}
             onMouseDown={(e) => handleMiddleClick(e, tab.id)}
             className={cn(
-              "group relative flex items-center gap-1 px-3 h-full text-xs font-medium border-r border-border transition-colors min-w-0 max-w-[160px]",
+              "group relative flex items-center gap-1 px-2 h-full text-xs min-w-0 max-w-[180px]",
               isActive
-                ? "bg-background text-foreground shadow-[inset_0_-1px_0_0_var(--glow)]"
+                ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <span className="truncate">{tab.label}</span>
+            <span className="truncate">{idx + 1}:{tab.label}{isActive ? "*" : ""}</span>
             <span
               onClick={(e) => {
                 e.stopPropagation();
                 if (tabs.length > 1) onClose(tab.id);
               }}
               className={cn(
-                "inline-flex items-center justify-center w-4 h-4 rounded-sm text-[10px] shrink-0 hover:bg-destructive/20 hover:text-destructive",
+                "inline-flex items-center justify-center w-4 h-4 text-[11px] shrink-0 hover:bg-destructive hover:text-destructive-foreground",
                 isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
               )}
             >
@@ -43,10 +43,10 @@ export function TabBar({ tabs, activeTabId, onSwitch, onClose, onAdd, onReorder 
       })}
       <button
         onClick={onAdd}
-        className="flex items-center justify-center w-7 h-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors text-sm shrink-0"
+        className="flex items-center justify-center px-2 h-full text-muted-foreground hover:bg-foreground hover:text-background text-xs shrink-0"
         title="New tab (Ctrl+T)"
       >
-        +
+        [+]
       </button>
     </div>
   );
