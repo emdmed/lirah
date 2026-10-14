@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-export function useTokenUsage(projectPath, enabled = true) {
+// terminalSessionId lets the backend read the session of the `claude` process
+// running in this tab's PTY; without it usage falls back to the project's
+// most recently written session.
+export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
   const [tokenUsage, setTokenUsage] = useState(null);
   const [projectStats, setProjectStats] = useState(null);
   const lastUsageRef = useRef(null);
@@ -11,16 +14,23 @@ export function useTokenUsage(projectPath, enabled = true) {
     if (!projectPath || !enabled) return;
 
     try {
-      const usage = await invoke('get_session_token_usage', { projectPath });
+      const usage = await invoke('get_session_token_usage', { projectPath, terminalSessionId: terminalSessionId ?? null });
 
-      const usageKey = `${usage.input_tokens}-${usage.output_tokens}`;
+      const usageKey = `${usage.session_id}-${usage.session_file}-${usage.input_tokens}-${usage.output_tokens}-${usage.context_tokens}`;
       if (usageKey !== lastUsageRef.current) {
         lastUsageRef.current = usageKey;
         setTokenUsage(usage);
       }
     } catch (error) {
     }
-  }, [projectPath, enabled]);
+  }, [projectPath, terminalSessionId, enabled]);
+
+  // Drop the previous project's/terminal's numbers instead of showing them
+  // until the next poll lands.
+  useEffect(() => {
+    lastUsageRef.current = null;
+    setTokenUsage(null);
+  }, [projectPath, terminalSessionId]);
 
   const fetchProjectStats = useCallback(async () => {
     if (!projectPath || !enabled) return;

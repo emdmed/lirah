@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
+use crate::state::AppState;
 
 #[derive(Serialize, Default, Clone)]
 pub struct TokenUsage {
@@ -22,6 +23,13 @@ pub struct TokenUsage {
     /// Model id of the most recent assistant turn (picks the context window).
     #[serde(default)]
     pub last_model: Option<String>,
+    /// Claude session id the numbers belong to.
+    #[serde(default)]
+    pub session_id: Option<String>,
+    /// True when the session was resolved from the tab's own `claude` process;
+    /// false when we fell back to the project's most recently written session.
+    #[serde(default)]
+    pub tab_bound: bool,
 }
 
 #[derive(Serialize)]
@@ -47,6 +55,7 @@ struct ClaudeMessage {
     kind: Option<String>,
     message: Option<MessageContent>,
     timestamp: Option<String>,
+    #[serde(rename = "sessionId", alias = "session_id")]
     session_id: Option<String>,
 }
 
@@ -100,25 +109,156 @@ fn parse_timestamp(ts: &str) -> Option<String> {
     }
 }
 
+/// Claude Code's directory name for a project: every character that is not
+/// an ASCII letter or digit becomes '-'.
+pub fn claude_project_dir_name(project_path: &str) -> String {
+    project_path
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
+}
+
+fn claude_sessions_dir(project_path: &str) -> Option<PathBuf> {
+    let home = super::home_dir()?;
+    Some(
+        PathBuf::from(home)
+            .join(".claude")
+            .join("projects")
+            .join(claude_project_dir_name(project_path)),
+    )
+}
+
+/// Session currently open in a running `claude` process, as recorded by
+/// Claude Code in ~/.claude/sessions/<pid>.json (updated on /clear, /resume).
+/// `<pid>` is the pid as seen inside the process's own pid namespace.
+#[derive(Deserialize)]
+struct LiveClaudeSession {
+    #[serde(rename = "sessionId")]
+    session_id: String,
+    cwd: String,
+    /// Process start time (clock ticks since boot, /proc/<pid>/stat field 22).
+    #[serde(rename = "procStart")]
+    proc_start: Option<String>,
+}
+
+/// All descendants of `root` (breadth-first), via /proc/<pid>/task/<tid>/children.
+#[cfg(target_os = "linux")]
+fn descendant_pids(root: u32) -> Vec<u32> {
+    let mut out = Vec::new();
+    let mut queue = vec![root];
+    while let Some(pid) = queue.pop() {
+        let Ok(tasks) = fs::read_dir(format!("/proc/{}/task", pid)) else { continue };
+        for task in tasks.flatten() {
+            let children = task.path().join("children");
+            if let Ok(content) = fs::read_to_string(children) {
+                for child in content.split_whitespace().filter_map(|c| c.parse::<u32>().ok()) {
+                    out.push(child);
+                    queue.push(child);
+                }
+            }
+        }
+    }
+    out
+}
+
+#[cfg(not(target_os = "linux"))]
+fn descendant_pids(_root: u32) -> Vec<u32> {
+    Vec::new()
+}
+
+/// Pid of a host process inside its innermost pid namespace — the last
+/// column of `NSpid:` in /proc/<pid>/status. Differs from the host pid when
+/// the terminal is sandboxed with bwrap --unshare-pid.
+fn namespaced_pid(status: &str) -> Option<u32> {
+    status
+        .lines()
+        .find_map(|l| l.strip_prefix("NSpid:"))
+        .and_then(|cols| cols.split_whitespace().last())
+        .and_then(|p| p.parse().ok())
+}
+
+/// Start time field of /proc/<pid>/stat. The comm field may contain spaces
+/// and parens, so count fields after the last ')': state is field 3,
+/// starttime field 22.
+fn proc_start_time(stat: &str) -> Option<&str> {
+    stat.rsplit_once(')')?.1.split_whitespace().nth(19)
+}
+
+/// Find the Claude session of a `claude` process running under the given PTY.
+fn live_session_for_pty(pty_pid: u32) -> Option<LiveClaudeSession> {
+    let home = super::home_dir()?;
+    let registry = PathBuf::from(home).join(".claude").join("sessions");
+    descendant_pids(pty_pid).into_iter().find_map(|pid| {
+        let status = fs::read_to_string(format!("/proc/{}/status", pid)).ok()?;
+        let inner_pid = namespaced_pid(&status).unwrap_or(pid);
+        let raw = fs::read_to_string(registry.join(format!("{}.json", inner_pid))).ok()?;
+        let live = serde_json::from_str::<LiveClaudeSession>(&raw).ok()?;
+        // Sandboxed tabs each start their own pid namespace, so several can
+        // write the same <pid>.json; only accept the entry for this process.
+        if let Some(ref expected) = live.proc_start {
+            let stat = fs::read_to_string(format!("/proc/{}/stat", pid)).ok()?;
+            if proc_start_time(&stat)? != expected {
+                return None;
+            }
+        }
+        Some(live)
+    })
+}
+
+fn usage_from_session(session: SessionInfo, tab_bound: bool) -> TokenUsage {
+    TokenUsage {
+        input_tokens: session.input_tokens,
+        output_tokens: session.output_tokens,
+        cache_read_input_tokens: session.cache_read_input_tokens,
+        cache_creation_input_tokens: session.cache_creation_input_tokens,
+        billable_input_tokens: session.billable_input_tokens,
+        billable_output_tokens: session.billable_output_tokens,
+        model: session.model,
+        session_file: Some(session.session_file),
+        context_tokens: session.context_tokens,
+        last_model: session.last_model,
+        session_id: if session.session_id.is_empty() { None } else { Some(session.session_id) },
+        tab_bound,
+    }
+}
+
+/// Token usage for one tab. When `terminal_session_id` names a PTY that is
+/// running `claude`, the usage is that process's own session; otherwise it
+/// falls back to the most recently written session in `project_path`.
 #[tauri::command]
-pub async fn get_session_token_usage(project_path: String) -> Result<TokenUsage, String> {
-    tauri::async_runtime::spawn_blocking(move || get_session_token_usage_internal(&project_path))
+pub async fn get_session_token_usage(
+    project_path: String,
+    terminal_session_id: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<TokenUsage, String> {
+    let pty_pid = terminal_session_id.and_then(|id| {
+        let guard = state.lock().ok()?;
+        guard.pty_sessions.get(&id)?.child.process_id()
+    });
+    tauri::async_runtime::spawn_blocking(move || get_session_token_usage_internal(&project_path, pty_pid))
         .await
         .map_err(|e| format!("Task join error: {}", e))?
 }
 
-fn get_session_token_usage_internal(project_path: &str) -> Result<TokenUsage, String> {
-    let claude_path_segment = project_path
-        .replace("\\", "-")
-        .replace("/", "-")
-        .replace(".", "-");
+fn get_session_token_usage_internal(project_path: &str, pty_pid: Option<u32>) -> Result<TokenUsage, String> {
+    if let Some(live) = pty_pid.and_then(live_session_for_pty) {
+        let dir = claude_sessions_dir(&live.cwd).ok_or("Could not get home directory")?;
+        let file = dir.join(format!("{}.jsonl", live.session_id));
+        // A fresh session has no transcript until the first message: it is
+        // still this tab's session, so report zero rather than another one.
+        if !file.exists() {
+            return Ok(TokenUsage {
+                session_id: Some(live.session_id),
+                tab_bound: true,
+                ..Default::default()
+            });
+        }
+        let mut session = parse_session_file(&file)?;
+        add_subagent_usage(&mut session, &file);
+        return Ok(usage_from_session(session, true));
+    }
 
-    let home = super::home_dir().ok_or("Could not get home directory")?;
-    let sessions_dir = PathBuf::from(&home)
-        .join(".claude")
-        .join("projects")
-        .join(&claude_path_segment);
-
+    let sessions_dir = claude_sessions_dir(project_path).ok_or("Could not get home directory")?;
     if !sessions_dir.exists() {
         return Ok(TokenUsage::default());
     }
@@ -132,21 +272,34 @@ fn get_session_token_usage_internal(project_path: &str) -> Result<TokenUsage, St
 
     match latest {
         Some(entry) => {
-            let session = parse_session_file(&entry.path())?;
-            Ok(TokenUsage {
-                input_tokens: session.input_tokens,
-                output_tokens: session.output_tokens,
-                cache_read_input_tokens: session.cache_read_input_tokens,
-                cache_creation_input_tokens: session.cache_creation_input_tokens,
-                billable_input_tokens: session.billable_input_tokens,
-                billable_output_tokens: session.billable_output_tokens,
-                model: session.model,
-                session_file: Some(session.session_file),
-                context_tokens: session.context_tokens,
-                last_model: session.last_model,
-            })
+            let path = entry.path();
+            let mut session = parse_session_file(&path)?;
+            add_subagent_usage(&mut session, &path);
+            Ok(usage_from_session(session, false))
         }
         None => Ok(TokenUsage::default()),
+    }
+}
+
+/// Fold the session's subagent transcripts (<session>/subagents/*.jsonl) into
+/// its cumulative totals. Context fill stays that of the main conversation.
+fn add_subagent_usage(info: &mut SessionInfo, session_file: &PathBuf) {
+    let subagents_dir = session_file.with_extension("").join("subagents");
+    let Ok(entries) = fs::read_dir(&subagents_dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map_or(true, |ext| ext != "jsonl") {
+            continue;
+        }
+        if let Ok(sub) = parse_session_file(&path) {
+            info.input_tokens += sub.input_tokens;
+            info.output_tokens += sub.output_tokens;
+            info.cache_read_input_tokens += sub.cache_read_input_tokens;
+            info.cache_creation_input_tokens += sub.cache_creation_input_tokens;
+            info.billable_input_tokens += sub.billable_input_tokens;
+            info.billable_output_tokens += sub.billable_output_tokens;
+            info.message_count += sub.message_count;
+        }
     }
 }
 
@@ -158,16 +311,7 @@ pub async fn get_project_stats(project_path: String) -> Result<ProjectStats, Str
 }
 
 fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String> {
-    let claude_path_segment = project_path
-        .replace("\\", "-")
-        .replace("/", "-")
-        .replace(".", "-");
-
-    let home = super::home_dir().ok_or("Could not get home directory")?;
-    let sessions_dir = PathBuf::from(&home)
-        .join(".claude")
-        .join("projects")
-        .join(&claude_path_segment);
+    let sessions_dir = claude_sessions_dir(project_path).ok_or("Could not get home directory")?;
 
     if !sessions_dir.exists() {
         return Ok(ProjectStats::default());
@@ -182,7 +326,8 @@ fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().map_or(false, |ext| ext == "jsonl") {
-            if let Ok(session_info) = parse_session_file(&path) {
+            if let Ok(mut session_info) = parse_session_file(&path) {
+                add_subagent_usage(&mut session_info, &path);
                 let model = session_info.model.clone();
                 let timestamp = session_info.timestamp.clone();
                 
@@ -354,7 +499,8 @@ fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
         for se in session_entries.flatten() {
             let sp = se.path();
             if sp.extension().map_or(false, |ext| ext == "jsonl") {
-                if let Ok(session_info) = parse_session_file(&sp) {
+                if let Ok(mut session_info) = parse_session_file(&sp) {
+                    add_subagent_usage(&mut session_info, &sp);
                     let model = session_info.model.clone();
                     let ts = session_info.timestamp.clone();
 
@@ -645,6 +791,58 @@ mod tests {
         let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
         assert_eq!(info.context_tokens, 6);
         assert_eq!(info.last_model.as_deref(), Some("claude-opus-4-6"));
+    }
+
+    #[test]
+    fn session_id_read_from_camel_case_key() {
+        let jsonl = concat!(
+            r#"{"type":"assistant","sessionId":"abc-123","message":{"id":"m1","model":"claude-opus-4-6","usage":{"input_tokens":1}}}"#, "\n",
+        );
+        let mut state = CachedSession::default();
+        merge_session_lines(&mut Cursor::new(jsonl.as_bytes()), &mut state);
+        assert_eq!(build_session_info(&PathBuf::from("x.jsonl"), &state).session_id, "abc-123");
+    }
+
+    #[test]
+    fn project_dir_name_replaces_all_non_alphanumerics() {
+        assert_eq!(claude_project_dir_name("/home/u/my_proj v2/.cfg@x"), "-home-u-my-proj-v2--cfg-x");
+        assert_eq!(claude_project_dir_name("/home/enrique/projects/nevo-terminal"), "-home-enrique-projects-nevo-terminal");
+    }
+
+    #[test]
+    fn subagent_usage_added_to_totals_not_context() {
+        let dir = std::env::temp_dir().join(format!("nevo-tokens-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let main = dir.join("s1.jsonl");
+        fs::create_dir_all(dir.join("s1").join("subagents")).unwrap();
+        fs::write(&main, concat!(
+            r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-4-6","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100}}}"#, "\n",
+        )).unwrap();
+        fs::write(dir.join("s1").join("subagents").join("agent-a.jsonl"), concat!(
+            r#"{"type":"assistant","message":{"id":"a1","model":"claude-haiku-4-5","usage":{"input_tokens":7,"output_tokens":3,"cache_read_input_tokens":50}}}"#, "\n",
+        )).unwrap();
+
+        let mut info = parse_session_file(&main).unwrap();
+        add_subagent_usage(&mut info, &main);
+        assert_eq!(info.input_tokens, 17);
+        assert_eq!(info.output_tokens, 8);
+        assert_eq!(info.cache_read_input_tokens, 150);
+        assert_eq!(info.message_count, 2);
+        assert_eq!(info.context_tokens, 110);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn namespaced_pid_uses_innermost_namespace() {
+        assert_eq!(namespaced_pid("Name:\tclaude\nNSpid:\t569045\t2\nNSpgid:\t1\n"), Some(2));
+        assert_eq!(namespaced_pid("NSpid:\t564494\n"), Some(564494));
+        assert_eq!(namespaced_pid("Name:\tx\n"), None);
+    }
+
+    #[test]
+    fn proc_start_time_handles_spaces_in_comm() {
+        let stat = "569045 (my (odd) proc) S 569044 1 1 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 11 0 10284320 7000 300";
+        assert_eq!(proc_start_time(stat), Some("10284320"));
     }
 
     #[test]

@@ -765,10 +765,9 @@ fn decode_project_path(encoded: &str) -> String {
 }
 
 /// Encode a project path for the Claude directory structure
-/// Claude replaces ALL / with - (including leading /)
 /// So /home/enrique/projects/nevo-terminal becomes -home-enrique-projects-nevo-terminal
 fn encode_project_path(path: &str) -> String {
-    path.replace('/', "-").replace(' ', "-")
+    crate::fs::claude_project_dir_name(path)
 }
 
 /// Store for the subagent filesystem watchers (one per project path)

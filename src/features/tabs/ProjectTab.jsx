@@ -288,7 +288,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     }
   }, [sidebarSearch.searchResults]);
 
-  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, isActive && !!currentPath && !secondary.secondaryFullscreen);
+  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
   const compact = useCompact({
     currentPath,
