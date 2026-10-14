@@ -208,8 +208,8 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   background: transparent;
 }
 
@@ -218,11 +218,11 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--tui-line-strong);
+  background: var(--tui-line);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-muted-foreground);
+  background: var(--tui-line-strong);
 }
 
 ::-webkit-scrollbar-button {

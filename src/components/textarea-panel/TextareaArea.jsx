@@ -1,6 +1,7 @@
 import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Button } from "../ui/button";
+import { Send, RotateCcw } from "lucide-react";
 import { AtMentionModal } from "../../features/at-mention";
 import { useAutoGrow } from "../../hooks/useAutoGrow";
 import { useBlockCaret } from "../../hooks/useBlockCaret";
@@ -88,9 +89,11 @@ export function TextareaArea({
                 onClick={onClearContext}
                 disabled={!sessionId}
                 aria-label="Clear CLI context"
-                className="before:content-none after:content-none text-muted-foreground"
+                className="gap-1 px-1.5 before:content-none after:content-none text-muted-foreground"
               >
-                <span className="tui-key mr-1">^⇧L</span>clear
+                <RotateCcw className="h-3 w-3" />
+                clear
+                <span className="tui-key ml-1 opacity-70">^⇧L</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
@@ -104,10 +107,12 @@ export function TextareaArea({
                   size="xs"
                   onClick={handleSend}
                   disabled={isSendDisabled}
-                  className={isSendDisabled ? 'pointer-events-none' : undefined}
+                  className={`gap-1 px-1.5 disabled:opacity-100 disabled:bg-transparent disabled:text-muted-foreground ${isSendDisabled ? 'pointer-events-none' : ''}`}
                   aria-label={sendBlockedReason ? `Send to CLI — unavailable: ${sendBlockedReason}` : 'Send to CLI'}
                 >
-                  ^↵ send
+                  <Send className="h-3 w-3" />
+                  send
+                  <span className="ml-1 opacity-70">^↵</span>
                 </Button>
               </span>
             </TooltipTrigger>

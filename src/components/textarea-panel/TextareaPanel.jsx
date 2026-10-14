@@ -13,6 +13,7 @@ import { PatternsSelector } from "../../features/patterns";
 import { PromptPreview } from "./PromptPreview";
 import { Button } from "../ui/button";
 import { PaneInfo } from "../PaneInfo";
+import { ScrollText } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
@@ -344,10 +345,12 @@ export function TextareaPanel({
               <Button
                 variant={promptPreviewOpen ? "default" : "ghost"}
                 size="xs"
+                className="gap-1 px-1.5"
                 onClick={onTogglePromptPreview}
                 aria-expanded={promptPreviewOpen}
                 aria-label={promptPreviewOpen ? "Hide what will be sent" : "Show what will be sent"}
               >
+                <ScrollText className="h-3 w-3" />
                 preview{partCount > 0 && !promptPreviewOpen && <span className="text-primary">:{partCount}</span>}
               </Button>
             </TooltipTrigger>
