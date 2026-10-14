@@ -60,7 +60,7 @@ export const AtMentionModal = memo(function AtMentionModal({
     return (
       <>
         {name.substring(0, idx)}
-        <span className="text-primary font-semibold">{name.substring(idx, idx + q.length)}</span>
+        <span className="text-[var(--ins-lamp)] font-semibold">{name.substring(idx, idx + q.length)}</span>
         {name.substring(idx + q.length)}
       </>
     );
@@ -120,7 +120,7 @@ export const AtMentionModal = memo(function AtMentionModal({
               className={`
                 flex items-center gap-2 px-3 py-1 mx-0.5 rounded-sm transition-colors
                 ${isDir ? 'opacity-40 cursor-default' : 'cursor-pointer'}
-                ${!isDir && isSelected ? 'bg-primary/15' : ''}
+                ${!isDir && isSelected ? 'ins-row-selected' : ''}
                 ${!isDir && !isSelected ? 'hover:bg-accent/40' : ''}
               `}
               style={{ fontSize: 'var(--font-xs)' }}
@@ -162,7 +162,7 @@ export const AtMentionModal = memo(function AtMentionModal({
 
               {/* Enter hint on selected row */}
               {isSelected && !isDir && !isAlreadySelected && (
-                <CornerDownLeft className="w-3 h-3 text-primary flex-shrink-0" />
+                <CornerDownLeft className="w-3 h-3 text-[var(--ins-lamp)] flex-shrink-0" />
               )}
             </div>
           );

@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState, forwardRef, memo } from 'reac
 import { useTerminal } from '../hooks/useTerminal';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { PaneInfo } from './PaneInfo';
+import { PaneLegend } from './instrument/PaneLegend';
 
 export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true }, ref) => {
   const terminalRef = useRef(null);
@@ -69,7 +70,8 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     <div
       data-pane="2"
       data-title="[2] terminal"
-      className={`tui-pane px-2 pb-3 terminal-wrapper ${isFocused
+      data-legend
+      className={`tui-pane px-2.5 pb-3 terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
         }`}
@@ -82,16 +84,21 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
         position: 'relative',
       }}
     >
-      <div
-        ref={terminalRef}
-        style={{
-          width: '100%',
-          height: '100%',
-          overflow: 'hidden',
-        }}
-      />
+      <PaneLegend index={2} title="Terminal" status={isFocused ? 'live' : undefined} lit={isFocused} />
+      {/* The glass carries the inset; the ref div stays unpadded so FitAddon
+          measures exactly the cell area. */}
+      <div className="ins-glass ins-round relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
+        <div
+          ref={terminalRef}
+          style={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+          }}
+        />
+        {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
+      </div>
       <PaneInfo>{dims && `${sandboxEnabled ? 'sandbox · ' : ''}${dims.cols}×${dims.rows}`}</PaneInfo>
-      {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
     </div>
   );
 }));

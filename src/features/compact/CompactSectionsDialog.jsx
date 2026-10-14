@@ -203,7 +203,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                       : <ChevronDown className="w-3 h-3 text-muted-foreground" />
                     }
                     <span
-                      className="shrink-0 px-1 py-0 rounded-xs bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
+                      className="shrink-0 px-1 py-0 rounded-xs border border-[var(--ins-edge-strong)] text-[var(--ins-lamp)]/70 font-mono cursor-pointer hover:bg-foreground/10 hover:text-[var(--ins-lamp)] transition-colors text-center"
                       style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
                       onClick={(e) => { e.stopPropagation(); toggleDir(dirPath, filePaths); }}
                     >
@@ -232,7 +232,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                           }`}
                         >
                           <span
-                            className="shrink-0 px-1 py-0 rounded-xs bg-primary/15 border border-primary/25 text-primary/70 font-mono cursor-pointer hover:bg-primary/25 hover:text-primary transition-colors text-center"
+                            className="shrink-0 px-1 py-0 rounded-xs border border-[var(--ins-edge-strong)] text-[var(--ins-lamp)]/70 font-mono cursor-pointer hover:bg-foreground/10 hover:text-[var(--ins-lamp)] transition-colors text-center"
                             style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
                             onClick={() => togglePath(file.path)}
                           >

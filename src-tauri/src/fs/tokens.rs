@@ -15,6 +15,13 @@ pub struct TokenUsage {
     pub billable_output_tokens: u64,
     pub model: Option<String>,
     pub session_file: Option<String>,
+    /// Context window occupancy of the most recent assistant turn:
+    /// input + cache_read + cache_creation of that message's usage.
+    #[serde(default)]
+    pub context_tokens: u64,
+    /// Model id of the most recent assistant turn (picks the context window).
+    #[serde(default)]
+    pub last_model: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -30,10 +37,14 @@ pub struct SessionInfo {
     pub billable_output_tokens: u64,
     pub message_count: u64,
     pub timestamp: String,
+    pub context_tokens: u64,
+    pub last_model: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct ClaudeMessage {
+    #[serde(rename = "type")]
+    kind: Option<String>,
     message: Option<MessageContent>,
     timestamp: Option<String>,
     session_id: Option<String>,
@@ -131,6 +142,8 @@ fn get_session_token_usage_internal(project_path: &str) -> Result<TokenUsage, St
                 billable_output_tokens: session.billable_output_tokens,
                 model: session.model,
                 session_file: Some(session.session_file),
+                context_tokens: session.context_tokens,
+                last_model: session.last_model,
             })
         }
         None => Ok(TokenUsage::default()),
@@ -446,6 +459,10 @@ struct CachedSession {
     session_id: String,
     model: Option<String>,
     timestamp: Option<String>,
+    /// Usage of the last assistant message seen (file order = chronological).
+    last_usage: Option<UsageData>,
+    /// Model id of that last assistant message.
+    last_model: Option<String>,
 }
 
 /// Per-file incremental parse cache. Claude session files are append-only and
@@ -479,7 +496,16 @@ fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
         billable_output_tokens: output_tokens,
         message_count: c.usage_by_msg.len() as u64,
         timestamp: c.timestamp.clone().unwrap_or_default(),
+        context_tokens: c.last_usage.as_ref().map(context_tokens_of).unwrap_or(0),
+        last_model: c.last_model.clone(),
     }
+}
+
+/// Tokens occupying the context window for one assistant turn.
+fn context_tokens_of(u: &UsageData) -> u64 {
+    u.input_tokens.unwrap_or(0)
+        + u.cache_read_input_tokens.unwrap_or(0)
+        + u.cache_creation_input_tokens.unwrap_or(0)
 }
 
 /// Read complete (newline-terminated) lines from `reader` and merge them into
@@ -516,6 +542,18 @@ fn merge_session_lines<R: BufRead>(reader: &mut R, state: &mut CachedSession) ->
                     if let Some(ref m) = message.model {
                         if !m.starts_with('<') {
                             state.model = Some(m.clone());
+                        }
+                    }
+                }
+                // Track the latest real assistant turn for context fill.
+                // Synthetic entries (model "<synthetic>") carry zeroed usage.
+                let is_assistant = msg.kind.as_deref().map_or(true, |k| k == "assistant");
+                let is_synthetic = message.model.as_deref().map_or(false, |m| m.starts_with('<'));
+                if is_assistant && !is_synthetic {
+                    if let Some(ref u) = message.usage {
+                        state.last_usage = Some(u.clone());
+                        if message.model.is_some() {
+                            state.last_model = message.model.clone();
                         }
                     }
                 }
@@ -566,4 +604,54 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
         }
     }
     Ok(info)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn last_assistant_usage_drives_context_tokens() {
+        let jsonl = concat!(
+            r#"{"type":"assistant","timestamp":"2026-10-14T10:00:00Z","message":{"id":"m1","model":"claude-opus-4-6","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20}}}"#, "\n",
+            r#"{"type":"user","timestamp":"2026-10-14T10:00:05Z","message":{"role":"user","content":"hi"}}"#, "\n",
+            r#"{"type":"assistant","timestamp":"2026-10-14T10:00:10Z","message":{"id":"m2","model":"claude-sonnet-4-5-20250929","usage":{"input_tokens":3,"output_tokens":7,"cache_read_input_tokens":1000,"cache_creation_input_tokens":50}}}"#, "\n",
+        );
+        let mut state = CachedSession::default();
+        let consumed = merge_session_lines(&mut Cursor::new(jsonl.as_bytes()), &mut state);
+        assert_eq!(consumed, jsonl.len() as u64);
+
+        let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
+        assert_eq!(info.context_tokens, 3 + 1000 + 50);
+        assert_eq!(info.last_model.as_deref(), Some("claude-sonnet-4-5-20250929"));
+        // Cumulative totals still cover both assistant messages; the
+        // usage-less user line is ignored.
+        assert_eq!(info.message_count, 2);
+        assert_eq!(info.input_tokens, 13);
+        assert_eq!(info.model.as_deref(), Some("claude-opus-4-6"));
+    }
+
+    #[test]
+    fn missing_usage_and_synthetic_do_not_reset_context() {
+        let jsonl = concat!(
+            r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-4-6","usage":{"input_tokens":1,"cache_read_input_tokens":2,"cache_creation_input_tokens":3}}}"#, "\n",
+            r#"{"type":"assistant","message":{"id":"m2","model":"claude-opus-4-6"}}"#, "\n",
+            r#"{"type":"assistant","message":{"id":"m3","model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0}}}"#, "\n",
+            "not json at all\n",
+        );
+        let mut state = CachedSession::default();
+        merge_session_lines(&mut Cursor::new(jsonl.as_bytes()), &mut state);
+        let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
+        assert_eq!(info.context_tokens, 6);
+        assert_eq!(info.last_model.as_deref(), Some("claude-opus-4-6"));
+    }
+
+    #[test]
+    fn empty_session_has_zero_context() {
+        let state = CachedSession::default();
+        let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
+        assert_eq!(info.context_tokens, 0);
+        assert!(info.last_model.is_none());
+    }
 }

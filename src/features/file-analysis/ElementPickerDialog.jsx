@@ -385,7 +385,7 @@ export function ElementPickerDialog({
                             onClick={() => toggleElement(el.key)}
                           >
                             <span className="w-4 h-4 flex items-center justify-center">
-                              {selectedKeys.has(el.key) && <Check className="w-3.5 h-3.5 text-primary" />}
+                              {selectedKeys.has(el.key) && <Check className="w-3.5 h-3.5 text-[var(--ins-lamp)]" />}
                             </span>
                             <span className="text-sm flex-1 truncate">
                               {el.displayName}

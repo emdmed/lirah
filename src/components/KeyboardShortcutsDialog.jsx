@@ -33,6 +33,7 @@ const shortcuts = [
       { keys: ['@'], description: 'Quick File Search', note: 'in textarea, type @' },
       { keys: ['Ctrl', 'F'], description: 'Focus File Search' },
       { keys: ['Ctrl', 'G'], description: 'Toggle Git Changes Filter' },
+      { keys: ['Backspace'], description: 'Parent Directory', note: 'files pane, nav mode · also h or -' },
     ],
   },
   {
@@ -79,7 +80,7 @@ function KeyCombo({ keys, note, highlight = false }) {
           {isDoubleTap && index > 0 && <span className='text-muted-foreground text-xs mx-0.5'>⇢</span>}
           <kbd className={`px-2 py-1 text-xs font-mono border border-border rounded-sm transition-all ${
             highlight || isDoubleTap
-              ? 'bg-primary/10 border-primary/30 text-primary'
+              ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
               : 'bg-muted/50 border-muted/30 hover:bg-muted'
           }`}>
             {key}
@@ -90,7 +91,7 @@ function KeyCombo({ keys, note, highlight = false }) {
         <span className='text-xs text-muted-foreground ml-2 italic'>{note}</span>
       )}
       {isDoubleTap && (
-        <span className='text-xs text-primary ml-1 font-medium'>×2</span>
+        <span className='text-xs text-[var(--ins-lamp)] ml-1 font-medium'>×2</span>
       )}
     </div>
   )
@@ -102,7 +103,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
       <DialogContent className='max-w-2xl max-h-[80vh]'>
         <DialogHeader className='pb-4 border-b edge-b-engraved'>
           <DialogTitle className='flex items-center gap-3 text-lg'>
-            <div className='p-2 bg-primary/10'>
+            <div className='p-2 bg-[var(--ins-raised)] shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]'>
               <Keyboard className='w-5 h-5 text-primary' />
             </div>
             <div>
@@ -132,7 +133,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
                     className='group flex items-center justify-between py-1.5 px-2 bg-muted/20 hover:bg-muted/40 transition-colors'
                   >
                     <div className='flex items-center gap-3 flex-1 min-w-0'>
-                      <div className='w-2 h-2 bg-primary/20 group-hover:bg-primary/40 transition-colors flex-shrink-0' />
+                      <div className='w-2 h-2 bg-[var(--ins-edge-strong)] group-hover:bg-[var(--ins-lamp)] transition-colors flex-shrink-0' />
                       <span className='text-sm text-foreground truncate'>
                         {shortcut.description}
                       </span>

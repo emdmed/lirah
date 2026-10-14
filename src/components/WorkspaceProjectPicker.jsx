@@ -41,7 +41,7 @@ export function WorkspaceProjectPicker({ projects, onSelect, onCancel }) {
           <button
             key={project.name}
             className={`flex items-center gap-3 px-3 py-2 text-sm text-foreground transition-colors outline-none rounded-sm hover:bg-foreground/5 ${
-              index === selectedIndex ? 'bg-foreground/8 border-l-2 border-primary' : 'border-l-2 border-transparent'
+              index === selectedIndex ? 'ins-row-selected' : ''
             }`}
             onClick={() => onSelect(project)}
             onMouseEnter={() => setSelectedIndex(index)}

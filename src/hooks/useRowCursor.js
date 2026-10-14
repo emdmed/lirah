@@ -3,13 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const ROW = '[data-nav-row]';
 
 /**
- * Vim-style cursor over the rows of a list (j/k, g/G, Enter, p, /).
+ * Vim-style cursor over the rows of a list (j/k, g/G, Enter, p, /; with
+ * `onParent`, Backspace / h / - go up a directory, as in ranger and netrw).
  * Works on the DOM rather than on data so it covers any list that marks its
  * rows with `data-nav-row`; Enter clicks the row's `[data-nav-activate]`
  * element (or the row), `p` clicks `[data-nav-pin]`.
  * The cursor row gets `data-cursor`, styled as inverse video.
  */
-export function useRowCursor({ onSearch } = {}) {
+export function useRowCursor({ onSearch, onParent } = {}) {
   const containerRef = useRef(null);
   const [index, setIndexState] = useState(null);
   // Mirrors `index` so key repeat faster than a render still steps one row per press.
@@ -80,6 +81,13 @@ export function useRowCursor({ onSearch } = {}) {
         if (!onSearch) return;
         onSearch();
         break;
+      case 'Backspace':
+      case 'h':
+      case '-':
+        if (!onParent) return;
+        onParent();
+        setIndex(null);
+        break;
       case 'Escape':
         setIndex(null);
         break;
@@ -88,7 +96,7 @@ export function useRowCursor({ onSearch } = {}) {
     }
     e.preventDefault();
     e.stopPropagation();
-  }, [rows, move, onSearch, setIndex]);
+  }, [rows, move, onSearch, onParent, setIndex]);
 
   // Leaving the pane drops the cursor, so a stale highlight never lingers.
   const onBlur = useCallback((e) => {

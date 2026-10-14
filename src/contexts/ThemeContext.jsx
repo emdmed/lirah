@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { themes, loadTheme, saveTheme } from '../themes/theme-config';
+import { themes, defaultTheme, loadTheme, saveTheme } from '../themes/theme-config';
 
 const ThemeContext = createContext(undefined);
 
@@ -10,16 +10,17 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     const theme = themes[currentTheme];
     if (!theme) {
-      console.warn(`Theme "${currentTheme}" not found, falling back to kanagawa`);
-      setCurrentTheme('kanagawa');
+      console.warn(`Theme "${currentTheme}" not found, falling back to ${defaultTheme}`);
+      setCurrentTheme(defaultTheme);
       return;
     }
 
     const root = document.documentElement;
-    const { ui } = theme;
+    const { ui, terminal } = theme;
 
-    // Apply all UI color variables
+    // Apply all UI color variables (objects such as `flowchart` are read in JS)
     Object.entries(ui).forEach(([key, value]) => {
+      if (typeof value !== 'string') return;
       // Convert camelCase to kebab-case for CSS variables
       const cssVarName = key.replace(/([A-Z])/g, '-$1').toLowerCase();
       root.style.setProperty(`--color-${cssVarName}`, value);
@@ -28,9 +29,13 @@ export function ThemeProvider({ children }) {
     // Apply theme type (light/dark) as data attribute
     root.setAttribute('data-theme', theme.type);
 
-    // Update body background color for terminal background
-    document.body.style.backgroundColor = theme.terminal.background;
-    document.body.style.color = theme.terminal.foreground;
+    // Instrument material: the glass matches the xterm canvas, lamps and
+    // status colours come from the theme's ANSI palette.
+    root.style.setProperty('--color-terminal-bg', terminal.background);
+    root.style.setProperty('--color-lamp', ui.lamp ?? terminal.brightYellow);
+    root.style.setProperty('--color-ok', ui.ok ?? terminal.brightGreen);
+    root.style.setProperty('--color-warn', ui.warn ?? terminal.brightYellow);
+    root.style.setProperty('--color-fault', ui.fault ?? terminal.brightRed);
 
     // Save theme preference
     saveTheme(currentTheme);

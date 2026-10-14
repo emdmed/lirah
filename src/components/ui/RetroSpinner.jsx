@@ -19,7 +19,7 @@ export function RetroSpinner({ size = 20, lineWidth = 1, className = '' }) {
         }}
       />
       <div 
-        className="absolute left-0 top-0 border-primary"
+        className="absolute left-0 top-0 border-[var(--ins-lamp)]"
         style={{ 
           width: dimension, 
           height: dimension,

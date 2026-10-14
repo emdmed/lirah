@@ -126,6 +126,8 @@ export const themes = {
     },
     // UI colors
     ui: {
+      ok: '#a7c080',
+      fault: '#e67e80',
       background: 'hsl(0 0% 8%)',
       foreground: 'hsl(30 15% 81%)',
       card: 'hsl(0 0% 12%)',
@@ -214,6 +216,13 @@ export const themes = {
     },
     // UI colors (CSS variables for Tailwind)
     ui: {
+      // Instrument lamp colour (lit state, live values, the prompt caret).
+      // Optional: defaults to terminal.brightYellow. Status lamps (ok, warn,
+      // fault) come from terminal brightGreen/brightYellow/brightRed unless
+      // the theme sets `ok`/`warn`/`fault` here, for themes whose ANSI
+      // colours sit too close in lightness to tell apart (see
+      // scripts/check-contrast.mjs).
+      lamp: '#FFA066',
       background: 'hsl(240 13% 14%)',
       foreground: 'hsl(45 26% 80%)',
       card: 'hsl(240 13% 16%)',
@@ -300,6 +309,7 @@ export const themes = {
     },
     // UI colors
     ui: {
+      warn: '#fd971f',
       background: 'hsl(70 8% 15%)',
       foreground: 'hsl(60 30% 96%)',
       card: 'hsl(70 8% 18%)',
@@ -384,6 +394,8 @@ export const themes = {
     },
     // UI colors
     ui: {
+      warn: '#a7f3d0',
+      fault: '#f87171',
       background: 'hsl(0 0% 0%)',
       foreground: 'hsl(156 72% 67%)',
       card: 'hsl(0 0% 5%)',
@@ -559,6 +571,7 @@ export const themes = {
     },
     // UI colors — only: Prussian Blue, Celadon, Lime Cream, Pine Teal, Cream
     ui: {
+      ok: '#A8D5A6',
       background: '#020D1C',                   // Prussian Blue
       foreground: '#A8D5A6',                   // Celadon
       card: '#07172C',                         // Prussian Blue
@@ -658,7 +671,7 @@ export const themes = {
       secondary: 'hsl(233 27% 20%)',
       secondaryForeground: 'hsl(229 34% 75%)',
       muted: 'hsl(233 27% 20%)',
-      mutedForeground: 'hsl(229 20% 55%)',
+      mutedForeground: 'hsl(229 20% 57%)',
       accent: 'hsl(24 89% 70%)',
       accentForeground: 'hsl(233 27% 13%)',
       destructive: 'hsl(351 95% 72%)',
@@ -735,6 +748,7 @@ export const themes = {
     },
     // UI colors
     ui: {
+      warn: '#e69875',
       background: 'hsl(200 13% 20%)',
       foreground: 'hsl(40 26% 77%)',
       card: 'hsl(200 13% 23%)',
@@ -746,7 +760,7 @@ export const themes = {
       secondary: 'hsl(200 13% 28%)',
       secondaryForeground: 'hsl(40 26% 77%)',
       muted: 'hsl(200 13% 28%)',
-      mutedForeground: 'hsl(40 15% 55%)',
+      mutedForeground: 'hsl(40 15% 60%)',
       accent: 'hsl(78 36% 62%)',
       accentForeground: 'hsl(200 13% 20%)',
       destructive: 'hsl(1 56% 70%)',
@@ -922,7 +936,7 @@ export const themes = {
       secondary: 'hsl(248 25% 22%)',
       secondaryForeground: 'hsl(245 50% 91%)',
       muted: 'hsl(248 25% 22%)',
-      mutedForeground: 'hsl(249 12% 47%)',
+      mutedForeground: 'hsl(249 12% 58%)',
       accent: 'hsl(35 88% 72%)',
       accentForeground: 'hsl(249 22% 12%)',
       destructive: 'hsl(343 76% 68%)',
@@ -999,6 +1013,8 @@ export const themes = {
     },
     // UI colors
     ui: {
+      warn: '#ff9f43',
+      fault: '#ff6b6b',
       background: 'hsl(0 0% 5%)',
       foreground: 'hsl(0 0% 96%)',
       card: 'hsl(0 0% 8%)',
@@ -1087,6 +1103,8 @@ export const themes = {
     },
     // UI colors
     ui: {
+      warn: '#ccff66',
+      fault: '#ff5555',
       background: 'hsl(0 0% 0%)',
       foreground: 'hsl(120 100% 50%)',
       card: 'hsl(120 100% 5%)',
@@ -1351,6 +1369,7 @@ export const themes = {
     },
     // UI colors
     ui: {
+      lamp: '#BC5215',
       background: 'hsl(50 33% 97%)',
       foreground: 'hsl(15 5% 6%)',
       card: 'hsl(45 14% 93%)',
@@ -1439,6 +1458,7 @@ export const themes = {
     },
     // UI colors
     ui: {
+      lamp: '#c2410c',
       background: 'hsl(220 23% 95%)',
       foreground: 'hsl(234 16% 35%)',
       card: 'hsl(220 23% 91%)',
@@ -1450,7 +1470,7 @@ export const themes = {
       secondary: 'hsl(223 16% 83%)',
       secondaryForeground: 'hsl(234 16% 35%)',
       muted: 'hsl(223 16% 83%)',
-      mutedForeground: 'hsl(233 10% 47%)',
+      mutedForeground: 'hsl(233 10% 43%)',
       accent: 'hsl(11 59% 67%)',
       accentForeground: 'hsl(220 23% 95%)',
       destructive: 'hsl(347 87% 44%)',

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { Lamp } from './instrument/Lamp';
 
-export const TitleBar = ({ theme }) => {
+export const TitleBar = ({ hasTerminalSession = false, currentPath }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const appWindow = getCurrentWindow();
 
@@ -16,35 +17,38 @@ export const TitleBar = ({ theme }) => {
 
   return (
     <div
-      className="flex items-center justify-between px-4 h-8 shrink-0 border-b edge-b-engraved text-xs font-mono select-none"
+      className="flex items-center justify-between px-3 h-[30px] shrink-0 edge-b-engraved bg-[var(--tui-bar)] text-xs font-mono select-none"
       data-tauri-drag-region
-      style={{
-        backgroundColor: theme.background || 'var(--color-background)',
-        color: theme.foreground || 'var(--color-foreground)',
-      }}
     >
-      <span className="text-muted-foreground pointer-events-none" data-tauri-drag-region>lirah</span>
-      <div className="flex items-center h-full">
+      <div className="flex items-center gap-2 min-w-0 pointer-events-none" data-tauri-drag-region>
+        <Lamp state={hasTerminalSession ? 'on' : 'off'} label={hasTerminalSession ? 'Session live' : 'No session'} />
+        <span className="ins-legend">Lirah</span>
+        {currentPath && <span className="text-muted-foreground truncate">{currentPath}</span>}
+      </div>
+      <div className="flex items-center gap-1.5">
         <button
           onClick={() => appWindow.minimize()}
-          className="px-2 h-full text-muted-foreground hover:bg-foreground hover:text-background"
+          className="ins-cap ins-round text-muted-foreground hover:text-foreground"
           title="Minimize"
+          aria-label="Minimize"
         >
-          [_]
+          _
         </button>
         <button
           onClick={() => appWindow.toggleMaximize()}
-          className="px-2 h-full text-muted-foreground hover:bg-foreground hover:text-background"
+          className="ins-cap ins-round text-muted-foreground hover:text-foreground"
           title={isMaximized ? 'Restore' : 'Maximize'}
+          aria-label={isMaximized ? 'Restore' : 'Maximize'}
         >
-          {isMaximized ? '[=]' : '[□]'}
+          {isMaximized ? '=' : '□'}
         </button>
         <button
           onClick={() => appWindow.close()}
-          className="px-2 h-full text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
+          className="ins-cap ins-round text-muted-foreground hover:text-[var(--ins-fault)] hover:border-[var(--ins-fault)]"
           title="Close"
+          aria-label="Close"
         >
-          [x]
+          ×
         </button>
       </div>
     </div>

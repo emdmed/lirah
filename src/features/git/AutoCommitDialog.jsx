@@ -225,7 +225,7 @@ export function AutoCommitDialog({ autoCommit }) {
                   value={commitMessage}
                   onChange={(e) => setCommitMessage(e.target.value)}
                   placeholder="Describe the changes..."
-                  className="w-full h-24 text-sm font-mono bg-muted/30 border border-border p-3 resize-none focus:outline-none focus:border-primary/50 transition-all"
+                  className="w-full h-24 text-sm font-mono bg-muted/30 border border-border p-3 resize-none focus:outline-none focus:border-[var(--ins-lamp)] transition-all"
                   disabled={stage === 'committing'}
                   autoFocus
                 />
@@ -249,7 +249,7 @@ export function AutoCommitDialog({ autoCommit }) {
                 size="sm"
                 onClick={cancel}
                 disabled={stage === 'committing'}
-                className="text-xs border border-transparent hover:border-border"
+                className="text-xs"
               >
                 Cancel
               </Button>
@@ -258,7 +258,7 @@ export function AutoCommitDialog({ autoCommit }) {
                   size="sm"
                   onClick={() => confirm(commitMessage)}
                   disabled={stage === 'committing' || !commitMessage.trim()}
-                  className="text-xs min-w-[80px] border border-primary/50"
+                  className="text-xs min-w-[80px]"
                 >
                   {stage === 'committing' ? (
                     <span className="flex items-center gap-2">

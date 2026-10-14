@@ -30,11 +30,11 @@ export function CliSelectionModal({ open, onOpenChange, selectedCli, onCliChange
                 disabled={!isAvailable}
                 onClick={() => handleCliSelect(option.id)}
                 className={`flex items-center justify-between px-3 py-2 rounded-none text-sm text-left transition-colors ${
-                  isSelected ? 'bg-foreground/8 border-l-2 border-primary' : 'border-l-2 border-transparent hover:bg-foreground/5'
+                  isSelected ? 'ins-row-selected' : 'hover:bg-foreground/5'
                 } ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
                 <span>{option.name}</span>
-                {isSelected && <Check className="w-4 h-4 text-primary" />}
+                {isSelected && <Check className="w-4 h-4 text-[var(--ins-lamp)]" />}
               </button>
             );
           })}

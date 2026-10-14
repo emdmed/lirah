@@ -42,14 +42,14 @@ function Card({ selected, disabled, icon: Icon, title, lines, reason, onSelect }
         disabled
           ? 'border-border/40 opacity-50 cursor-not-allowed'
           : selected
-            ? 'border-primary bg-primary/5'
-            : 'border-border hover:border-primary/60'
+            ? 'border-[var(--ins-lamp)]'
+            : 'border-border hover:border-[var(--ins-edge-strong)]'
       }`}
     >
       <div className="flex items-center gap-2 font-mono text-xs">
         <Icon className="w-3.5 h-3.5" />
         {title}
-        {selected && !disabled && <span className="ml-auto text-[11px] text-primary">selected</span>}
+        {selected && !disabled && <span className="ml-auto text-[11px] text-[var(--ins-lamp)]">selected</span>}
       </div>
       {lines.map((line, i) => (
         <div key={i} className="font-mono text-[11px] text-muted-foreground truncate">

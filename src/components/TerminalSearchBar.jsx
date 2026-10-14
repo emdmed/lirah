@@ -87,7 +87,7 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
     : '';
 
   return (
-    <div className="absolute right-3 top-1 z-30 flex items-center gap-1 rounded-sm border edge-engraved bg-background px-1.5 py-1">
+    <div className="ins-raised absolute right-2 top-2 z-30 flex items-center gap-1 px-1.5 py-1">
       <input
         ref={inputRef}
         value={query}
@@ -131,7 +131,8 @@ function IconButton({ onClick, title, children }) {
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
+      data-icon-only
+      className="ins-key ins-key-panel ins-round"
     >
       {children}
     </button>
@@ -145,10 +146,8 @@ function ToggleButton({ active, onClick, title, children }) {
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className={cn(
-        'flex h-5 w-5 items-center justify-center rounded-sm cursor-pointer transition-colors',
-        active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-      )}
+      data-icon-only
+      className="ins-key ins-key-panel ins-round"
     >
       {children}
     </button>

@@ -99,7 +99,7 @@ export function ProjectComparison({ projects, totals, colors }) {
         {sorted.map((p) => (
           <div
             key={p.path}
-            className="flex items-center gap-2 px-3 py-2 border-b edge-engraved/50 hover:bg-muted/20 text-xs font-mono"
+            className="flex items-center gap-2 px-3 py-2 border-b edge-engraved hover:bg-muted/20 text-xs font-mono"
           >
             <div className="flex-1 min-w-[120px] truncate font-medium">{p.name}</div>
             <div className="w-20 text-right text-muted-foreground">{formatTokenCount(p.totalTokens)}</div>

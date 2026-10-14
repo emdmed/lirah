@@ -43,8 +43,8 @@ export function FileNode({
   return (
     <div
       data-nav-row
-      className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isTextareaPanelOpen && isSelected ? 'bg-primary/15' : ''
-        } ${isDeleted ? 'opacity-60' : ''}`}
+      data-selected={(isTextareaPanelOpen && isSelected) || undefined}
+      className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
       <div

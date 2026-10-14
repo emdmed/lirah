@@ -8,6 +8,15 @@
   font-style: normal;
 }
 
+/* Panel legend face (OFL, bundled: the app runs offline). */
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  src: url('/fonts/BarlowSemiCondensed-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -59,10 +68,10 @@
   --color-popover: hsl(240 13% 16%);
   --color-popover-foreground: hsl(45 26% 80%);
 
-  /* Status colors */
-  --color-status-critical: #E82424;
-  --color-status-warning: #FF9E3B;
-  --color-status-success: #76946A;
+  /* Status colors follow the theme's ANSI palette (set by ThemeProvider). */
+  --color-status-critical: var(--color-fault, #E82424);
+  --color-status-warning: var(--color-warn, #FF9E3B);
+  --color-status-success: var(--color-ok, #76946A);
   --color-status-info: #6B8CCE;
 
   /* A terminal cell grid has no curves and no depth. */
@@ -83,20 +92,45 @@
 }
 
 /*
-  Terminal material. Every region is drawn the way a TUI draws it: a single
-  box-drawing line in a dimmed foreground, never a bevel, glow or shadow.
-  Lines step toward the theme's own foreground so they stay visible in both
-  dark and light themes.
+  Instrument material. Chrome is flat: a hairline in a dimmed foreground,
+  zero radius, no shadow. Three exceptions carry meaning and nothing else
+  does: one glass screen (the terminal), lamps for live state, and keycaps
+  for keys. Every value derives from the active theme.
 */
 :root {
-  --tui-line: color-mix(in srgb, var(--color-background) 72%, var(--color-foreground));
-  --tui-line-strong: color-mix(in srgb, var(--color-background) 45%, var(--color-foreground));
-  /* Status lines (tab bar, status bar) sit one step off the canvas, like tmux. */
-  --tui-bar: color-mix(in srgb, var(--color-background) 93%, var(--color-foreground));
-  --glow: var(--color-primary);
+  --ins-gutter:      color-mix(in srgb, var(--color-background) 78%, #000);
+  --ins-panel:       var(--color-background);
+  --ins-raised:      color-mix(in srgb, var(--color-background) 94%, var(--color-foreground));
+  --ins-well:        color-mix(in srgb, var(--color-background) 88%, #000);
+  --ins-glass:       var(--color-terminal-bg, var(--color-background));
+  --ins-edge:        color-mix(in srgb, var(--color-background) 84%, var(--color-foreground));
+  --ins-edge-strong: color-mix(in srgb, var(--color-background) 70%, var(--color-foreground));
+  --ins-legend:      color-mix(in srgb, var(--color-foreground) 85%, var(--color-background));
+  --ins-lamp:        var(--color-lamp, var(--color-primary));
+  --ins-lamp-off:    color-mix(in srgb, var(--color-foreground) 18%, var(--color-background));
+  --ins-ok:          var(--color-ok, #98BB6C);
+  --ins-warn:        var(--color-warn, #E6C384);
+  --ins-fault:       var(--color-fault, #E82424);
+  --ins-glow:        6px;
+  --font-legend: "Barlow Semi Condensed", var(--font-mono);
+
+  /* Historical aliases, remapped so existing users pick up the material. */
+  --tui-line: var(--ins-edge);
+  --tui-line-strong: var(--ins-edge-strong);
+  /* Status lines (tab bar, status bar) sit between gutter and panel. */
+  --tui-bar: color-mix(in srgb, var(--ins-gutter) 60%, var(--ins-panel));
+  --glow: var(--ins-lamp);
   /* Tree guides need box-drawing coverage the OCR face lacks; these are the
      common mono fonts that have it. */
   --font-glyph: "JetBrainsMono Nerd Font", "JetBrains Mono", "DejaVu Sans Mono", "Adwaita Mono", "Noto Sans Mono", Menlo, Consolas, monospace;
+}
+
+/* Light themes: a gutter one step darker than the panel, not black. */
+:root[data-theme="light"] {
+  --ins-gutter: color-mix(in srgb, var(--color-background) 92%, var(--color-foreground));
+  --ins-legend: color-mix(in srgb, var(--color-foreground) 92%, var(--color-background));
+  --ins-well:   color-mix(in srgb, var(--color-background) 95%, var(--color-foreground));
+  --ins-glow:   4px;
 }
 
 html,
@@ -108,7 +142,8 @@ body,
 }
 
 body {
-  /* Background color will be set dynamically by ThemeProvider */
+  /* The window edge is gutter, so it meets the pane gutters seamlessly. */
+  background: var(--ins-gutter);
   font-family: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
 }
 
@@ -145,13 +180,14 @@ body {
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: var(--ins-gutter);
   }
 
   input,
   textarea,
   [contenteditable] {
-    caret-color: var(--color-primary);
+    caret-color: var(--ins-lamp);
   }
 }
 
@@ -169,13 +205,14 @@ body {
   *:focus-visible {
     --tw-ring-shadow: 0 0 #0000;
     --tw-ring-offset-shadow: 0 0 #0000;
-    outline: 1px solid var(--color-primary);
+    outline: 1px solid var(--ins-lamp);
     outline-offset: -1px;
   }
 }
 
-/* No rounded corners anywhere except true dots. */
-*:not(.rounded-full) {
+/* No rounded corners anywhere except true dots and the opted-in glass and
+   keycaps (.ins-round). */
+*:not(.rounded-full):not(.ins-round) {
   border-radius: 0 !important;
 }
 
@@ -198,7 +235,7 @@ body {
 
 /* Focus is a hard cursor outline, not a soft ring. */
 .focus-ring {
-  @apply focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-primary focus-visible:-outline-offset-1;
+  @apply focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1;
 }
 
 /* Theme transition for smooth color changes */
@@ -272,48 +309,28 @@ body {
   box-shadow: inset 0 -1px 0 0 var(--tui-line);
 }
 
-.edge-e-engraved {
-  border-inline-end-width: 0 !important;
-  box-shadow: inset -1px 0 0 0 var(--tui-line);
-}
-
-/* A framed pane on the canvas. */
-.chassis-well,
-.chassis-well.chassis-well {
-  background-color: var(--color-background);
-  box-shadow: inset 0 0 0 1px var(--tui-line);
-}
-
-/* The frame without the ground, for surfaces that paint their own. */
-.chassis-cut {
-  box-shadow: inset 0 0 0 1px var(--tui-line);
-}
-
 /* A status line: tab bar, status bar. */
 .chassis-rail,
 .chassis-rail.chassis-rail {
   background-color: var(--tui-bar);
 }
 
-.panel-recess {
-  background-color: var(--color-background);
-  box-shadow: inset 0 1px 0 0 var(--tui-line), inset 0 -1px 0 0 var(--tui-line);
-}
-
-/* Labels read like shell output: lowercase, dim, no ornament. */
+/* Panel legends: printed caps (the 10px variant of .ins-legend). */
 .engraved-label {
-  font-size: var(--font-xs);
+  font-family: var(--font-legend);
+  font-weight: 600;
+  font-size: 10px;
   line-height: 1;
-  text-transform: lowercase;
-  letter-spacing: 0;
-  color: var(--color-muted-foreground);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ins-legend);
 }
 
-/* Numeric readouts: fixed-width columns in the accent color, no bloom. */
+/* Numeric readouts: fixed-width columns in the lamp colour. */
 .tube {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  color: var(--glow);
+  color: var(--ins-lamp);
 }
 
 .tube-idle {
@@ -327,11 +344,7 @@ body {
 }
 
 .tube-overflow {
-  color: var(--color-status-critical);
-}
-
-.lit {
-  color: var(--glow);
+  color: var(--ins-fault);
 }
 
 /*
@@ -351,6 +364,12 @@ body {
   }
 }
 
+/* A text toggle that is on reads in the lamp colour. */
+.tui-btn[data-lit],
+.tui-btn[data-lit]:hover {
+  color: var(--ins-lamp);
+}
+
 /* Flex gap would also space the brackets away from the label. */
 .tui-btn:not(:has(svg)) {
   column-gap: 0 !important;
@@ -358,7 +377,7 @@ body {
 
 /* Key hint, as in a terminal footer: `^↵ send`. */
 .tui-key {
-  color: var(--color-primary);
+  color: var(--ins-lamp);
   font-variant-numeric: tabular-nums;
 }
 
@@ -373,17 +392,20 @@ body {
 */
 @layer components {
   .tui-pane {
-    --pane-bg: var(--color-background);
+    /* The legend sits outside the panel face, so it masks with the gutter. */
+    --pane-bg: var(--ins-gutter);
     position: relative;
     padding-top: 14px;
     padding-bottom: 12px;
+    /* The panel face, inset like the frame so legends sit on the gutter. */
+    background: linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat;
   }
 
   .tui-pane::after {
     content: "";
     position: absolute;
     inset: 6px 0 6px 0;
-    border: 1px solid var(--tui-line);
+    border: 1px solid var(--ins-edge);
     pointer-events: none;
     z-index: 5;
   }
@@ -394,24 +416,45 @@ body {
     top: 0;
     left: 10px;
     padding: 0 5px;
-    font-size: var(--font-sm);
+    font-family: var(--font-legend);
+    font-weight: 600;
+    font-size: var(--font-xs);
     line-height: 12px;
-    text-transform: lowercase;
-    color: color-mix(in srgb, var(--color-foreground) 75%, transparent);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ins-legend);
     background: var(--pane-bg);
     pointer-events: none;
     z-index: 6;
   }
 
-  /* The pane holding keyboard focus is the lit one. */
+  .tui-pane[data-legend]::before {
+    content: none;
+  }
+
+  /* The pane holding keyboard focus is the lit one: its keycap and lamp
+     light, and the frame steps up. No colour flood. */
   .tui-pane:focus-within::after,
   .tui-pane.terminal-live::after {
-    border-color: var(--color-primary);
+    border-color: var(--ins-edge-strong);
   }
 
   .tui-pane:focus-within::before,
   .tui-pane.terminal-live::before {
-    color: var(--color-primary);
+    color: var(--ins-lamp);
+  }
+
+  .tui-pane:focus-within > .ins-pane-legend .ins-cap,
+  .tui-pane.terminal-live > .ins-pane-legend .ins-cap {
+    border-color: var(--ins-lamp);
+    color: var(--ins-lamp);
+  }
+
+  .tui-pane:focus-within > .ins-pane-legend .ins-lamp,
+  .tui-pane.terminal-live > .ins-pane-legend .ins-lamp {
+    --lamp-c: var(--ins-lamp);
+    background: var(--lamp-c);
+    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 70%, transparent);
   }
 
   .tui-pane-info {
@@ -419,7 +462,7 @@ body {
     right: 10px;
     bottom: 0;
     padding: 0 5px;
-    font-size: var(--font-sm);
+    font-size: var(--font-xs);
     line-height: 12px;
     white-space: nowrap;
     color: var(--color-muted-foreground);
@@ -439,7 +482,7 @@ body {
 .tui-caret {
   position: absolute;
   pointer-events: none;
-  background: var(--color-primary);
+  background: var(--ins-lamp);
   opacity: 0.7;
   animation: tui-blink 1.06s steps(1) infinite;
 }
@@ -452,19 +495,72 @@ body {
   .tui-caret { animation: none; }
 }
 
-/* File pane rows: faint hover, inverse-video keyboard cursor (see useRowCursor). */
+/*
+  File pane rows (see useRowCursor): faint hover; the keyboard cursor is a
+  slightly stronger tint with a lamp `›` marker; inverse video is reserved
+  for files selected into the prompt context ([data-selected]).
+*/
 [data-nav-row]:hover {
-  background-color: color-mix(in srgb, var(--color-foreground) 7%, transparent);
+  background-color: color-mix(in srgb, var(--color-foreground) 5%, transparent);
 }
 
 [data-nav-row][data-cursor],
 [data-nav-row][data-cursor]:hover {
+  position: relative;
+  background-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+}
+
+/* Tree rows draw the marker over the guide's trailing space; flat rows at
+   the left edge. */
+[data-nav-row][data-cursor] .tui-tree-guide {
+  position: relative;
+}
+
+[data-nav-row][data-cursor] .tui-tree-guide::after {
+  content: "›";
+  position: absolute;
+  right: 0;
+  width: 1ch;
+  text-align: center;
+  color: var(--ins-lamp);
+}
+
+[data-nav-row][data-cursor]:not(:has(.tui-tree-guide))::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  line-height: 1;
+  color: var(--ins-lamp);
+  pointer-events: none;
+}
+
+[data-nav-row][data-selected],
+[data-nav-row][data-selected]:hover {
   background-color: var(--color-foreground);
   color: var(--color-background);
 }
 
-[data-nav-row][data-cursor] * {
+[data-nav-row][data-selected] * {
   color: inherit !important;
+}
+
+/* Generic selected-row idiom for pickers and palettes. */
+.ins-row-selected {
+  position: relative;
+  background-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+}
+
+.ins-row-selected::before {
+  content: "›";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  line-height: 1;
+  color: var(--ins-lamp);
+  pointer-events: none;
 }
 
 /*
@@ -474,13 +570,15 @@ body {
   push the content onto the frame.
 */
 .tui-dialog {
-  --pane-bg: var(--color-input-background);
+  /* A dialog floats over the app, so its legends mask with its own face. */
+  --pane-bg: var(--ins-raised);
+  background: var(--ins-raised);
   padding-top: 22px !important;
   padding-bottom: 20px !important;
 }
 
 .tui-dialog::after {
-  border-color: var(--tui-line-strong);
+  border-color: var(--ins-edge-strong);
 }
 
 /* The title is a real element (DialogTitle), not the data-title attribute. */
@@ -500,9 +598,12 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-sm);
+  font-family: var(--font-legend);
+  font-weight: 600;
+  font-size: var(--font-xs);
   line-height: 12px;
-  text-transform: lowercase;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   background: var(--pane-bg);
   z-index: 6;
 }
@@ -514,11 +615,388 @@ body {
 
 .tui-dialog-close {
   position: absolute;
-  top: 0;
+  top: -2px;
   right: 10px;
-  padding: 0 4px;
-  font-size: var(--font-sm);
-  line-height: 12px;
-  background: var(--pane-bg);
   z-index: 6;
+}
+
+/*
+  Instrument primitives (see src/components/instrument/). Each sets its own
+  border colour so the `*` base rule never restyles them.
+*/
+@layer components {
+  /* Printed panel legend. */
+  .ins-legend {
+    font-family: var(--font-legend);
+    font-weight: 600;
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ins-legend);
+  }
+
+  /* Keycap. Pair with .ins-round to keep its 2px radius. */
+  .ins-cap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 16px;
+    min-width: 16px;
+    padding: 0 4px;
+    border: 1px solid var(--ins-edge-strong);
+    border-bottom-width: 2px;
+    border-radius: 2px;
+    background: var(--ins-raised);
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ins-cap[data-size="sm"] {
+    height: 14px;
+    min-width: 14px;
+    padding: 0 3px;
+    font-size: 9px;
+  }
+
+  .ins-cap[data-lit] {
+    border-color: var(--ins-lamp);
+    color: var(--ins-lamp);
+  }
+
+  .ins-cap[data-down] {
+    transform: translateY(1px);
+    border-bottom-width: 1px;
+  }
+
+  button.ins-cap {
+    cursor: pointer;
+  }
+
+  button.ins-cap:hover {
+    border-color: var(--ins-legend);
+  }
+
+  button.ins-cap:active {
+    transform: translateY(1px);
+    border-bottom-width: 1px;
+  }
+
+  /* Push button material, shared by ui/button, ui/toggle and PanelButton.
+     Same material as a keycap: raised face, a 2px bottom edge that collapses
+     as the key travels 1px down. A latched key (on, pressed, menu open)
+     stays down in a recessed face. Size comes from the user of the class;
+     .ins-key-panel is the 20px chassis size. Pair with .ins-round. */
+  .ins-key {
+    box-sizing: border-box;
+    border: 1px solid var(--ins-edge-strong);
+    border-bottom-width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(color-mix(in srgb, var(--color-foreground) 5%, var(--ins-raised)), var(--ins-raised));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 1px rgb(0 0 0 / 0.35);
+    color: var(--ins-legend);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: transform 60ms ease-out, border-color 120ms, color 120ms;
+  }
+
+  .ins-key:hover {
+    border-color: var(--ins-legend);
+    color: var(--color-foreground);
+  }
+
+  .ins-key:active,
+  .ins-key:is([data-latched], [data-lit], [aria-pressed="true"], [data-state="on"], [data-state="open"]) {
+    transform: translateY(1px);
+    border-bottom-width: 1px;
+    background: var(--ins-well);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.45);
+  }
+
+  .ins-key:is([data-latched], [data-lit], [aria-pressed="true"], [data-state="on"]) {
+    color: var(--ins-lamp);
+  }
+
+  /* Primary: the legend and edge are printed in the lamp colour. */
+  .ins-key-primary {
+    border-color: color-mix(in srgb, var(--ins-lamp) 70%, var(--ins-edge-strong));
+    color: var(--ins-lamp);
+  }
+
+  .ins-key-primary:hover {
+    border-color: var(--ins-lamp);
+    color: var(--ins-lamp);
+  }
+
+  .ins-key-danger {
+    color: var(--ins-fault);
+  }
+
+  .ins-key-danger:hover {
+    border-color: var(--ins-fault);
+    color: var(--ins-fault);
+  }
+
+  .ins-key:focus-visible {
+    outline: 1px solid var(--ins-lamp);
+    outline-offset: 1px;
+  }
+
+  .ins-key:disabled {
+    cursor: default;
+    opacity: 0.5;
+    transform: none;
+  }
+
+  .ins-key-panel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: var(--font-xs);
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ins-key-panel svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+
+  .ins-key-panel[data-icon-only] {
+    width: 20px;
+    padding: 0;
+  }
+
+  :root[data-theme="light"] .ins-key {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), 0 1px 1px rgb(0 0 0 / 0.12);
+  }
+
+  :root[data-theme="light"] .ins-key:is(:active, [data-latched], [data-lit], [aria-pressed="true"], [data-state="on"], [data-state="open"]) {
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
+  }
+
+  /* Lamp. Off is a dark lens; lit states glow in their own colour. */
+  .ins-lamp {
+    --lamp-c: var(--ins-lamp);
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--ins-lamp-off);
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
+  }
+
+  .ins-lamp[data-state="on"]    { --lamp-c: var(--ins-lamp); }
+  .ins-lamp[data-state="ok"]    { --lamp-c: var(--ins-ok); }
+  .ins-lamp[data-state="warn"]  { --lamp-c: var(--ins-warn); }
+  .ins-lamp[data-state="fault"] { --lamp-c: var(--ins-fault); }
+
+  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]) {
+    background: var(--lamp-c);
+    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 70%, transparent);
+  }
+
+  :root[data-theme="light"] .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]) {
+    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 50%, transparent);
+  }
+
+  .ins-lamp[data-blink] {
+    animation: ins-blink 1s steps(1) infinite;
+  }
+
+  /* Recessed well for inputs. */
+  .ins-well {
+    background: var(--ins-well);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.45);
+  }
+
+  /* The one glass screen. Pair with .ins-round. */
+  .ins-glass {
+    background: var(--ins-glass);
+    border-radius: 6px;
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.5),
+      inset 0 10px 28px rgb(0 0 0 / 0.45),
+      0 1px 0 rgb(255 255 255 / 0.04);
+  }
+
+  :root[data-theme="light"] .ins-glass {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.18),
+      inset 0 6px 18px rgb(0 0 0 / 0.12);
+  }
+
+  :root[data-theme="light"] .ins-well {
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
+  }
+
+  /* Glass preference off: a flat screen with square corners. */
+  .ins-glass.ins-glass-flat,
+  :root[data-glass="flat"] .ins-glass {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* Raised face for cards and overlays. */
+  .ins-raised {
+    background: var(--ins-raised);
+    box-shadow: inset 0 0 0 1px var(--ins-edge);
+  }
+
+  /* Meter: ticks + 3px fill + lamp-coloured needle. */
+  .ins-meter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ins-meter-scale {
+    position: relative;
+    width: 72px;
+    height: 10px;
+    flex-shrink: 0;
+  }
+
+  .ins-meter-ticks {
+    position: absolute;
+    inset: 0 0 4px 0;
+    background:
+      linear-gradient(to right, transparent calc(50% - 0.5px), var(--ins-edge-strong) calc(50% - 0.5px), var(--ins-edge-strong) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+      repeating-linear-gradient(to right, var(--ins-edge-strong) 0 1px, transparent 1px 10%);
+    background-size: 100% 100%, 100% 50%;
+    background-position: 0 0, 0 100%;
+    background-repeat: no-repeat;
+  }
+
+  .ins-meter-zone {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--ins-fault) 55%, transparent) 0 2px, transparent 2px 4px);
+  }
+
+  .ins-meter-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--ins-well);
+  }
+
+  .ins-meter-fill {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--color-foreground);
+  }
+
+  .ins-meter[data-level="warn"] .ins-meter-fill { background: var(--ins-warn); }
+  .ins-meter[data-level="fault"] .ins-meter-fill { background: var(--ins-fault); }
+
+  .ins-meter-needle {
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 0;
+    margin-left: -3px;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 4px solid var(--ins-lamp);
+    transition: left 120ms ease-out;
+  }
+
+  .ins-meter-readout {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    white-space: nowrap;
+  }
+
+  /* Toggle switch: a well track with a knob. */
+  .ins-switch {
+    position: relative;
+    display: inline-block;
+    width: 24px;
+    height: 12px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .ins-switch-knob {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--ins-edge-strong);
+    transition: left 100ms ease-out, background-color 100ms ease-out;
+  }
+
+  .ins-switch[aria-checked="true"] .ins-switch-knob {
+    left: 13px;
+    background: var(--switch-c, var(--ins-ok));
+    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--switch-c, var(--ins-ok)) 60%, transparent);
+  }
+
+  .ins-switch:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* Pane legend: keycap + legend on the top border line, status + lamp on
+     the right. Masks the frame line with the gutter colour. */
+  .ins-pane-legend {
+    position: absolute;
+    top: 0;
+    left: 8px;
+    right: 8px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  .ins-pane-legend > * {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 5px;
+    background: var(--pane-bg);
+    pointer-events: auto;
+  }
+
+  .ins-pane-legend-status {
+    font-size: var(--font-xs);
+    line-height: 1;
+    color: var(--color-muted-foreground);
+  }
+}
+
+@keyframes ins-blink {
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ins-lamp[data-blink] { animation: none; }
+  .ins-meter-needle,
+  .ins-switch-knob,
+  .ins-key { transition: none; }
 }

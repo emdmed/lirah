@@ -13,6 +13,7 @@ import { PatternsSelector } from "../../features/patterns";
 import { PromptPreview } from "./PromptPreview";
 import { Button } from "../ui/button";
 import { PaneInfo } from "../PaneInfo";
+import { PaneLegend } from "../instrument/PaneLegend";
 import { ScrollText } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
@@ -280,7 +281,6 @@ export function TextareaPanel({
       onChange={onChange}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      isWide={isWide}
       elementsIndicator={elementsIndicator}
       compactedIndicator={compactedIndicator}
       onClearContext={onClearContext}
@@ -332,26 +332,25 @@ export function TextareaPanel({
 
   const toolbarRow = (
     <div className="flex items-center gap-2 flex-nowrap overflow-hidden min-h-[24px] max-h-[24px] pb-1.5 edge-b-engraved">
-      {/* Engraved caps on the chassis: each bank of controls is named, so a
-          panel of icons is never unlabelled. */}
-      <span className="engraved-label shrink-0 select-none">Project</span>
+      {/* Every control carries its own label, so the two banks (project,
+          prompt) are split by a rule rather than named. */}
       {projectZone}
-      <span className="engraved-label shrink-0 select-none">Prompt</span>
+      <span className="text-[var(--ins-edge-strong)] shrink-0 select-none" aria-hidden="true">│</span>
       {promptZone}
       {onTogglePromptPreview && (
         <div className="ml-auto flex items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={promptPreviewOpen ? "default" : "ghost"}
+                variant="ghost"
                 size="xs"
-                className="gap-1 px-1.5"
+                className={`gap-1 px-1.5 ${promptPreviewOpen ? 'text-[var(--ins-lamp)]' : ''}`}
                 onClick={onTogglePromptPreview}
                 aria-expanded={promptPreviewOpen}
                 aria-label={promptPreviewOpen ? "Hide what will be sent" : "Show what will be sent"}
               >
                 <ScrollText className="h-3 w-3" />
-                preview{partCount > 0 && !promptPreviewOpen && <span className="text-primary">:{partCount}</span>}
+                preview{partCount > 0 && !promptPreviewOpen && <span className="tube">:{partCount}</span>}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
@@ -364,7 +363,8 @@ export function TextareaPanel({
   );
 
   return (
-    <div ref={containerRef} data-pane="3" data-title="[3] prompt" className="tui-pane flex flex-col px-2 pb-3 pt-[16px] gap-1.5">
+    <div ref={containerRef} data-pane="3" data-title="[3] prompt" data-legend className="tui-pane flex flex-col px-2 pb-4 pt-[16px] gap-1.5">
+      <PaneLegend index={3} title="Prompt" />
       {toolbarRow}
       {dialogs}
       {promptPreviewOpen && promptPreview && (

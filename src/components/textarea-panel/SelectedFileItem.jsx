@@ -84,7 +84,7 @@ export function SelectedFileItem({
           className={cn(
             "ml-auto flex-shrink-0 flex items-center justify-center h-3.5 w-3.5 rounded-sm hover:bg-foreground/10 transition-opacity bg-transparent border-0 p-0 cursor-pointer",
             isPinned
-              ? "opacity-80 text-primary"
+              ? "opacity-80 text-[var(--ins-lamp)]"
               : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-foreground"
           )}
         >

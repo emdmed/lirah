@@ -127,8 +127,8 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
                 onClick={() => handleSelectItem(item)}
                 className={`flex flex-col items-start gap-1 px-4 py-2.5 text-left font-mono transition-colors rounded-sm ${
                   index === selectedIndex
-                    ? 'bg-primary/15'
-                    : 'hover:bg-foreground/5 border-l-2 border-transparent'
+                    ? 'ins-row-selected'
+                    : 'hover:bg-foreground/5'
                 }`}
               >
                 <span className="font-medium flex items-center gap-2">

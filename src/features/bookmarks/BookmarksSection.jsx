@@ -64,7 +64,7 @@ export function BookmarksSection({ onNavigate }) {
                     size="icon-xs"
                     variant="ghost"
                     onClick={(e) => handleDelete(e, bookmark.id)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 opacity-60 hover:opacity-100 hover:bg-destructive/20"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 opacity-60 hover:opacity-100 hover:text-destructive"
                     title="Remove bookmark"
                   >
                     <X className="w-2.5 h-2.5" />

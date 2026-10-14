@@ -3,6 +3,7 @@ import { useTerminal } from '../hooks/useTerminal';
 import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { PaneLegend } from './instrument/PaneLegend';
 
 const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir, isActive = true }, ref) => {
   const terminalRef = useRef(null);
@@ -66,17 +67,21 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
   return (
     <div
       data-title="terminal 2"
-      className={`tui-pane px-2 pb-3 terminal-wrapper ${isFocused
+      data-legend
+      className={`tui-pane px-2.5 pb-3 terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
         }`}
       style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}
     >
-      <div
-        ref={terminalRef}
-        style={{ width: '100%', height: '100%', overflow: 'hidden' }}
-      />
-      {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
+      <PaneLegend title="Terminal 2" status={isFocused ? 'live' : undefined} lit={isFocused} />
+      <div className="ins-glass ins-round relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
+        <div
+          ref={terminalRef}
+          style={{ width: '100%', height: '100%', overflow: 'hidden' }}
+        />
+        {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
+      </div>
     </div>
   );
 }));
@@ -96,8 +101,8 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
   if (!visible) return null;
 
   const containerStyle = fullscreen
-    ? { position: 'absolute', inset: 0, zIndex: 40, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)' }
-    : { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background)', borderLeft: '1px solid var(--color-border)' };
+    ? { position: 'absolute', inset: 0, zIndex: 40, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--ins-gutter)' }
+    : { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--ins-gutter)', marginLeft: '6px' };
 
   if (selectedCommand === null) {
     return (
@@ -111,10 +116,11 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
     <div style={containerStyle}>
       <button
         onClick={onToggleFullscreen}
-        className="absolute top-2 right-2 z-50 p-1 text-muted-foreground hover:text-foreground transition-colors opacity-50 hover:opacity-100"
+        className="ins-cap ins-round absolute top-[22px] right-5 z-50 text-muted-foreground hover:text-foreground"
         title={fullscreen ? 'Restore' : 'Maximize'}
+        aria-label={fullscreen ? 'Restore' : 'Maximize'}
       >
-        {fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+        {fullscreen ? <Minimize2 className="size-2.5" /> : <Maximize2 className="size-2.5" />}
       </button>
       <SecondaryTerminalInstance
         ref={ref}

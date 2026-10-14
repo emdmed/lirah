@@ -382,7 +382,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                       className={cn(
                         'h-4 w-4 rounded-sm border text-[11px] leading-none tabular-nums',
                         copies === n
-                          ? 'border-primary bg-primary text-primary-foreground'
+                          ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
                           : 'edge-engraved hover:bg-muted/50'
                       )}
                     >
@@ -413,7 +413,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                     className={cn(
                       'rounded-sm border px-1.5 py-0.5 text-[11px] transition-colors',
                       on
-                        ? 'border-primary/70 bg-primary/10 text-foreground'
+                        ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
                         : 'edge-engraved text-muted-foreground hover:bg-muted/50',
                       missing && !on && 'opacity-40 cursor-not-allowed line-through'
                     )}
@@ -445,7 +445,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                   : 'Runs in-place — edits your working tree directly'
               }
             >
-              {useWorktree ? <GitBranch className="h-3 w-3 text-primary" /> : <FolderGit2 className="h-3 w-3" />}
+              {useWorktree ? <GitBranch className="h-3 w-3 text-[var(--ins-lamp)]" /> : <FolderGit2 className="h-3 w-3" />}
               {!isGitRepo ? 'In-place (no git repo)' : useWorktree ? 'Isolated worktree' : 'In-place'}
             </button>
           </div>
@@ -504,7 +504,7 @@ function Picker({ label, value, items, selectedId, onSelect, disabled = false })
               className="flex items-center justify-between text-[11px] py-1.5"
             >
               <span className="truncate pr-2">{item.name}</span>
-              {selectedId === item.id && <Check className="h-3 w-3 text-primary flex-shrink-0" />}
+              {selectedId === item.id && <Check className="h-3 w-3 text-[var(--ins-lamp)] flex-shrink-0" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

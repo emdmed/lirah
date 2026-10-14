@@ -12,7 +12,8 @@
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "benchmark:tokens": "node scripts/benchmark-tokens.js",
-    "check:design": "node scripts/check-design.mjs"
+    "check:design": "node scripts/check-design.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",

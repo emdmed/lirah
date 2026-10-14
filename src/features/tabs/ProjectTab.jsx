@@ -137,6 +137,13 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   const settings = useTerminalSettings();
   const dialogs = useDialogs();
 
+  // The Glass preference is global; the active tab owns the root attribute.
+  useEffect(() => {
+    if (!isActive) return;
+    if (settings.instrumentGlass) document.documentElement.removeAttribute('data-glass');
+    else document.documentElement.setAttribute('data-glass', 'flat');
+  }, [isActive, settings.instrumentGlass]);
+
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
 
   // Set currentPath from projectPath prop on mount
@@ -991,17 +998,19 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             />
           )
         }
-        titleBar={settings.showTitleBar && <TitleBar theme={theme.terminal} />}
+        titleBar={settings.showTitleBar && <TitleBar hasTerminalSession={!!terminalSessionId} currentPath={currentPath} />}
         statusBar={
           <StatusBar
             viewMode={viewMode}
             currentPath={currentPath}
             sessionId={terminalSessionId}
-            theme={theme.terminal}
             onToggleHelp={useCallback(() => dialogs.setShowHelp(prev => !prev), [dialogs.setShowHelp])}
             selectedCli={settings.selectedCli}
             onOpenCliSettings={useCallback(() => dialogs.setCliSelectionModalOpen(true), [dialogs.setCliSelectionModalOpen])}
             showTitleBar={settings.showTitleBar}
+            instrumentGlass={settings.instrumentGlass}
+            onToggleInstrumentGlass={useCallback(() => settings.setInstrumentGlass(prev => !prev), [settings.setInstrumentGlass])}
+            tokenUsage={tokenUsage}
             onToggleTitleBar={useCallback(() => settings.setShowTitleBar(prev => !prev), [settings.setShowTitleBar])}
             autoLaunchCli={settings.autoLaunchCli}
             onToggleAutoLaunchCli={useCallback(() => settings.setAutoLaunchCli(prev => !prev), [settings.setAutoLaunchCli])}

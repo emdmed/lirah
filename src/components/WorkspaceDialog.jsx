@@ -131,8 +131,8 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                           onClick={() => toggleProject(bookmark)}
                           className={`flex items-center gap-2 px-3 py-2 text-left text-sm font-mono rounded-sm transition-colors ${
                             isSelected
-                              ? 'bg-primary/15'
-                              : 'hover:bg-foreground/5 border-l-2 border-transparent'
+                              ? 'ins-row-selected'
+                              : 'hover:bg-foreground/5'
                           }`}
                         >
                           <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[11px] ${isSelected ? 'bg-foreground text-background' : 'edge-engraved'}`}>

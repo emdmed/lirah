@@ -130,8 +130,8 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
                     onClick={() => handleSelectBookmark(bookmark)}
                     className={`flex flex-col items-start gap-1 px-4 py-2.5 text-left transition-colors ${
                       index === selectedIndex
-                        ? 'bg-primary/15'
-                        : 'hover:bg-foreground/5 border-l-2 border-transparent'
+                        ? 'ins-row-selected'
+                        : 'hover:bg-foreground/5'
                     }`}
                   >
                     <span className="font-medium">{bookmark.name}</span>

@@ -27,7 +27,7 @@ export function DesignButton({ onClick, isRunning, hasSpec, disabled }) {
           size="xs"
           onClick={onClick}
           disabled={disabled}
-          className={`gap-1 px-1.5 ${hasSpec ? 'text-primary' : ''}`}
+          className={`gap-1 px-1.5 ${hasSpec ? 'text-[var(--ins-lamp)]' : ''}`}
         >
           <Network className="h-3 w-3" />
           design

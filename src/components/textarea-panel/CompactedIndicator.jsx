@@ -15,12 +15,12 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
           >
             <span className="text-muted-foreground/70 uppercase text-[11px] tracking-wider border-r border-border/30 pr-2">Compacted</span>
             <div className="flex items-center gap-1.5">
-              <span className="text-primary font-medium">{compactedProject.fileCount}</span>
+              <span className="text-[var(--ins-lamp)] font-medium">{compactedProject.fileCount}</span>
               <span className="text-muted-foreground">files</span>
             </div>
             <div className="w-px h-3 bg-border/50" />
             <div className="flex items-center gap-1.5">
-              <span className="text-primary font-medium">{compactedProject.formattedTokens}</span>
+              <span className="text-[var(--ins-lamp)] font-medium">{compactedProject.formattedTokens}</span>
               <span className="text-muted-foreground">tokens</span>
             </div>
             <div className="w-px h-3 bg-border/50" />
@@ -36,7 +36,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{compactedProject.formattedOriginalTokens}</span>
               <span>→</span>
-              <span className="text-primary">{compactedProject.formattedTokens}</span>
+              <span className="text-[var(--ins-lamp)]">{compactedProject.formattedTokens}</span>
             </div>
             {compactedProject.fileName && (
               <div className="text-muted-foreground text-xs truncate">
@@ -53,7 +53,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
               variant="ghost"
               size="xs"
               onClick={onOpenFlowchart}
-              className="p-0.5 h-auto text-muted-foreground hover:text-primary hover:bg-foreground/10"
+              className="p-0.5 h-auto text-muted-foreground hover:text-[var(--ins-lamp)]"
               aria-label="View flowchart"
             >
               <Map className="w-3 h-3" />
@@ -65,7 +65,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
           variant="ghost"
           size="xs"
           onClick={onClearCompactedProject}
-          className="p-0.5 h-auto text-muted-foreground hover:text-destructive hover:bg-foreground/10"
+          className="p-0.5 h-auto text-muted-foreground hover:text-destructive"
           aria-label="Clear compacted project"
         >
           <X className="w-3 h-3" />

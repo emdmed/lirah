@@ -173,7 +173,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
               className={cn(
                 'flex shrink-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
                 f.path === filePath
-                  ? 'border-primary/70 bg-primary/10'
+                  ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
                   : 'edge-engraved text-muted-foreground hover:bg-muted/40'
               )}
             >

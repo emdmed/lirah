@@ -239,7 +239,7 @@ export function GitDiffDialog({
                 size="icon-sm"
                 onClick={handleTogglePin}
                 aria-pressed={pinned}
-                className={`ml-2 ${pinned ? 'text-primary' : ''}`}
+                className={`ml-2 ${pinned ? 'text-[var(--ins-lamp)]' : ''}`}
               >
                 {pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
               </Button>

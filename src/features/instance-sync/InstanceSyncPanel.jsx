@@ -347,7 +347,7 @@ export function InstanceSyncPanel({
                   <div
                     key={idx}
                     className={`px-3 py-2.5 transition-colors ${
-                      isSelected ? 'bg-primary/15' : 'hover:bg-muted/30'
+                      isSelected ? 'ins-row-selected' : 'hover:bg-muted/30'
                     }`}
                   >
                     <div className="flex gap-3">
@@ -464,17 +464,17 @@ export function InstanceSyncPanel({
         key={session.session_id}
         onClick={() => onFetchSessionContent(session.session_id, selectedInstance.project_path, selectedInstance.source)}
         className={`group w-full text-left px-3 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3 rounded-none ${
-          isActive ? 'bg-primary/5 border border-primary/20' : ''
+          isActive ? 'bg-[var(--ins-raised)] shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]' : ''
         }`}
       >
         <div className="flex flex-col items-center gap-1">
-          <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+          <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-[var(--ins-lamp)]' : 'text-muted-foreground'}`} />
           {isActive && (
             <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--color-status-success)' }} />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-mono font-medium mb-1.5 line-clamp-2 group-hover:text-primary transition-colors ${
+          <p className={`text-sm font-mono font-medium mb-1.5 line-clamp-2 group-hover:text-[var(--ins-lamp)] transition-colors ${
             isActive ? 'text-foreground' : 'text-foreground/80'
           }`}>
             {session.summary || session.first_prompt?.substring(0, 80) || 'Untitled'}
@@ -731,7 +731,7 @@ export function InstanceSyncPanel({
                   <div className="w-2 h-2 mt-1.5 flex-shrink-0 bg-muted-foreground" style={getStatusDotStyle(instance.status)} />
                      <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-mono font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      <span className="text-sm font-mono font-medium text-foreground truncate group-hover:text-[var(--ins-lamp)] transition-colors">
                         {instance.project_name || 'Unknown'}
                       </span>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-2">

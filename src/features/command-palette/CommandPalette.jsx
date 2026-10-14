@@ -142,7 +142,7 @@ export function CommandPalette({ open, onClose, commands }) {
         </div>
       )}
       <div className="flex items-center h-8 px-2 bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]">
-        <span className="text-primary select-none">:</span>
+        <span className="text-[var(--ins-lamp)] select-none">:</span>
         <input
           ref={inputRef}
           value={text}

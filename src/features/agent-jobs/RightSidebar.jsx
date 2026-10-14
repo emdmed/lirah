@@ -1,33 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  Bot,
-  Boxes,
-  Plus,
-  PanelRightOpen,
-  PanelRightClose,
-  Square,
-  GitCompare,
-  Check,
-  Trash2,
-  Loader2,
-  FileText,
-  GitMerge,
-  RotateCcw,
-  ChevronRight,
-  ChevronDown,
-  AlertTriangle,
-  Copy,
-  Archive,
-  ArchiveRestore,
-  Swords,
-  Trophy,
-} from 'lucide-react';
+import { Square, GitCompare, Check, Trash2, Loader2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, ChevronsRight } from 'lucide-react';
+import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
 import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
+import { Lamp, jobLamp } from '../../components/instrument/Lamp';
+import { PaneLegend } from '../../components/instrument/PaneLegend';
+import { DiffBar } from '../../components/instrument/DiffBar';
 import { JOBS_PANE_EVENT } from './jobsPane';
 import { GitDiffDialog } from '../git';
 import { useBranchName } from '../git/useBranchName';
@@ -55,7 +37,7 @@ function formatDuration(startedAt, endedAt) {
 const STATUS_META = {
   running: { color: 'var(--color-status-success)', label: 'running' },
   done: { color: 'var(--color-status-success)', label: 'done' },
-  applied: { color: 'var(--color-primary)', label: 'applied' },
+  applied: { color: 'var(--ins-ok)', label: 'applied' },
   conflict: { color: 'var(--color-status-warning)', label: 'conflict' },
   failed: { color: 'var(--color-destructive)', label: 'failed' },
   cancelled: { color: 'var(--color-muted-foreground)', label: 'cancelled' },
@@ -366,22 +348,21 @@ export function RightSidebar({ projectPath }) {
 
   if (collapsed) {
     return (
-      <div data-pane="4" className="flex flex-col items-center gap-1.5 py-1.5 my-1 mr-1 shrink-0 w-7 edge-engraved">
+      <div data-pane="4" className="flex flex-col items-center gap-1.5 py-1.5 my-1.5 mr-2 ml-1.5 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
         <button
           onClick={() => setCollapsedOverride(false)}
-          className="p-1 text-muted-foreground hover:bg-foreground hover:text-background cursor-pointer"
+          className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
           title="Expand jobs pane (Alt+4)"
           aria-label="Expand jobs pane"
         >
-          <PanelRightOpen size={14} />
+          «
         </button>
         <button
           onClick={() => setCollapsedOverride(false)}
-          className="flex flex-col items-center gap-1 px-0.5 py-1 text-[11px] text-muted-foreground hover:bg-foreground hover:text-background cursor-pointer"
+          className="flex flex-col items-center gap-1.5 px-0.5 py-1 text-muted-foreground hover:text-foreground cursor-pointer"
           title="Expand jobs pane (Alt+4)"
         >
-          <Bot size={14} />
-          <span className="[writing-mode:vertical-rl]">[4] jobs</span>
+          <span className="ins-legend [writing-mode:vertical-rl]">4 Jobs</span>
         </button>
         <button
           onClick={() => {
@@ -389,14 +370,15 @@ export function RightSidebar({ projectPath }) {
             setTab('jobs');
             setDialogOpen(true);
           }}
-          className="p-1 text-muted-foreground hover:bg-foreground hover:text-background cursor-pointer"
+          className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
           title="New background job"
           aria-label="New background job"
         >
-          <Plus size={14} />
+          +
         </button>
         {runningJobs > 0 && (
-          <span className="text-[11px] font-bold tabular-nums" style={{ color: 'var(--color-status-success)' }}>
+          <span className="flex flex-col items-center gap-1 text-[11px] tabular-nums text-foreground" title={`${runningJobs} running`}>
+            <Lamp state="on" blink />
             {runningJobs}
           </span>
         )}
@@ -414,28 +396,44 @@ export function RightSidebar({ projectPath }) {
       style={{ width }}
       data-pane="4"
       data-title={`[4] ${tab}`}
-      className="tui-pane bg-background flex flex-col shrink-0 overflow-hidden m-1 text-sidebar-foreground"
+      data-legend
+      className="tui-pane flex flex-col shrink-0 overflow-hidden my-1.5 mr-2 ml-1.5 text-sidebar-foreground"
     >
+      <PaneLegend
+        index={4}
+        title={tab === 'jobs' ? 'Jobs' : 'Agents'}
+        status={tab === 'jobs' ? (runningJobs > 0 ? `${runningJobs} running` : undefined) : (totalActiveCount > 0 ? `${totalActiveCount} active` : undefined)}
+        lamp={(tab === 'jobs' ? runningJobs : totalActiveCount) > 0 ? 'on' : undefined}
+      />
       {/* Drag-to-resize handle sitting over the left edge. */}
       <div
         onMouseDown={startResize}
-        className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary/60 transition-colors"
+        className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] active:bg-[var(--ins-lamp)] transition-colors"
         title="Drag to resize"
       />
 
       {/* Header: tabs + collapse */}
       <div className="flex items-center justify-between px-1.5 py-1 shrink-0 border-b border-b-sidebar-border">
         <div className="flex items-center gap-0.5">
-          <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} icon={Bot} label="jobs" count={runningJobs} />
-          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} icon={Boxes} label="agents" count={totalActiveCount} />
+          <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
+          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         </div>
-        <button
-          onClick={() => setCollapsedOverride(true)}
-          className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer"
-          title="Collapse sidebar"
-        >
-          <PanelRightClose size={14} className="text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-2 text-[11px]">
+          {tab === 'jobs' && (
+            <PanelButton
+              icon={Plus}
+              onClick={() => setDialogOpen(true)}
+              title="New background job"
+              aria-label="New background job"
+            />
+          )}
+          <PanelButton
+            icon={ChevronsRight}
+            onClick={() => setCollapsedOverride(true)}
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+          />
+        </div>
       </div>
 
       {tab === 'jobs' && (
@@ -443,8 +441,7 @@ export function RightSidebar({ projectPath }) {
           onClick={() => setDialogOpen(true)}
           className="flex items-center gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border text-[11px] text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
         >
-          <Plus size={12} />
-          new background job
+          + new background job
         </button>
       )}
 
@@ -454,7 +451,7 @@ export function RightSidebar({ projectPath }) {
             <button
               onClick={handleReconcile}
               disabled={reconciling}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60 cursor-pointer"
+              className="flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)] disabled:opacity-60 cursor-pointer"
               title="Merge the selected jobs with an agent that resolves conflicts and verifies the combined result"
             >
               {reconciling ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitMerge className="h-3 w-3" />}
@@ -578,31 +575,34 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   // Comparing needs two candidates that actually produced changes.
   const comparable = jobs.filter((j) => j.status !== 'running' && j.changedFiles.length > 0).length;
   return (
-    <div className="rounded-sm border border-primary/30 bg-primary/[0.03]">
-      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[11px] uppercase tracking-wide text-primary/80">
-        <Swords className="h-3 w-3" />
-        Race
-        <span className="tabular-nums text-muted-foreground/70">
-          {jobs.length} candidate{jobs.length === 1 ? '' : 's'}
+    // A bracket frame with its legend inset into the top line, like a group
+    // of controls on a panel.
+    <div className="relative mt-1.5 shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]">
+      <div className="absolute -top-[6px] left-2 right-2 flex items-center justify-between text-[11px] leading-none">
+        <span className="flex items-center gap-1.5 bg-[var(--ins-panel)] px-1.5 min-w-0">
+          <span className="ins-legend shrink-0">Race</span>
+          <span className="truncate text-muted-foreground" title={jobs[0]?.label}>{jobs[0]?.label}</span>
         </span>
-        {running > 0 && (
-          <span className="ml-auto normal-case tabular-nums text-muted-foreground/70">
-            {running} running
-          </span>
-        )}
-        {running === 0 && comparable > 1 && (
-          <button
-            onClick={onCompare}
-            title="Diff two candidates against each other"
-            className="ml-auto flex items-center gap-1 rounded-sm px-1 py-0.5 normal-case text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground cursor-pointer transition-colors"
-          >
-            <GitCompare className="h-3 w-3" />
-            Compare
-          </button>
-        )}
+        <span className="flex items-center gap-1.5 bg-[var(--ins-panel)] px-1.5 shrink-0 tabular-nums text-muted-foreground">
+          {running > 0 ? (
+            <>
+              <Lamp state="on" blink />
+              {running}/{jobs.length}
+            </>
+          ) : (
+            <span>{jobs.length} candidate{jobs.length === 1 ? '' : 's'}</span>
+          )}
+        </span>
       </div>
+      {running === 0 && comparable > 1 && (
+        <div className="flex justify-end px-2 pt-2 text-[11px]">
+          <PanelButton icon={GitCompare} onClick={onCompare} title="Diff two candidates against each other">
+            compare
+          </PanelButton>
+        </div>
+      )}
       {!settled && (
-        <div className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground/70">
+        <div className="px-2 pt-2.5 pb-1 text-[11px] leading-snug text-muted-foreground/70">
           Same prompt, separate worktrees. Keeping one applies it and discards the rest.
         </div>
       )}
@@ -611,22 +611,18 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   );
 }
 
-function TabButton({ active, onClick, icon: Icon, label, count }) {
+function TabButton({ active, onClick, label, count }) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        'flex items-center gap-1 px-1.5 py-0.5 text-[11px] cursor-pointer',
-        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+        'ins-legend flex items-center gap-1 px-1.5 py-0.5 cursor-pointer border-b-2',
+        active ? 'text-[var(--ins-lamp)] border-[var(--ins-lamp)]' : 'text-muted-foreground border-transparent hover:text-foreground'
       )}
     >
-      <Icon size={11} />
       {label}
-      {count > 0 && (
-        <span className="tabular-nums" style={active ? undefined : { color: 'var(--color-status-success)' }}>
-          {count}
-        </span>
-      )}
+      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
     </button>
   );
 }
@@ -640,6 +636,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
+  const lamp = jobLamp(job.status);
   const changedCount = job.changedFiles.length;
   const isRunning = job.status === 'running';
   const isDone =
@@ -667,8 +664,10 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
   return (
     <div
       className={cn(
-        'rounded-sm border transition-colors',
-        selected ? 'border-primary/70 bg-primary/[0.06]' : 'border-sidebar-border/60 hover:border-sidebar-border'
+        'bg-[var(--ins-raised)] transition-shadow',
+        selected
+          ? 'shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]'
+          : 'shadow-[inset_0_0_0_1px_var(--ins-edge)] hover:shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]'
       )}
     >
       {/* Header: status marker + label + live duration */}
@@ -676,10 +675,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         {selectable ? (
           <Checkbox checked={selected} onCheckedChange={onToggleSelect} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         ) : (
-          <span
-            className={cn('mt-1 inline-block h-2 w-2 rounded-full shrink-0', isRunning && 'animate-pulse')}
-            style={{ backgroundColor: meta.color, opacity: isRunning ? 1 : 0.6 }}
-          />
+          <Lamp {...lamp} label={meta.label} className="mt-1" />
         )}
 
         <button
@@ -696,9 +692,8 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         </button>
 
         {isRunning && (
-          <span className="flex items-center gap-1 shrink-0 pt-0.5 text-[11px] tabular-nums text-muted-foreground">
+          <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-foreground">
             {duration}
-            <Loader2 className="h-3 w-3 animate-spin" />
           </span>
         )}
       </div>
@@ -709,7 +704,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         {job.kind === 'reconcile' && (
           <span className="inline-flex items-center gap-1.5">
             <Dot />
-            <span className="inline-flex items-center gap-0.5 font-medium text-primary/80">
+            <span className="inline-flex items-center gap-0.5 font-medium text-[var(--ins-lamp)]">
               <GitMerge className="h-2.5 w-2.5" />
               merge
             </span>
@@ -730,9 +725,12 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         {hasStat && (
           <span className="inline-flex items-center gap-1.5">
             <Dot />
-            <span className="tabular-nums whitespace-nowrap">
-              <span style={{ color: 'var(--color-status-success)' }}>+{stat.added}</span>{' '}
-              <span className="text-destructive/80">−{stat.removed}</span>
+            <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
+              <span>
+                <span style={{ color: 'var(--ins-ok)' }}>+{stat.added}</span>{' '}
+                <span style={{ color: 'var(--ins-fault)' }}>−{stat.removed}</span>
+              </span>
+              <DiffBar added={stat.added} removed={stat.removed} />
             </span>
           </span>
         )}
@@ -915,8 +913,8 @@ function PrimaryAction({ icon: Icon, label, onClick, variant = 'outline', title,
       title={title}
       disabled={disabled}
       className={cn(
-        'flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-2 py-1 text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
-        variant === 'primary' && 'bg-primary text-primary-foreground hover:opacity-90',
+        'flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-1 text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
+        variant === 'primary' && 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)]',
         variant === 'outline' && 'border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent',
         variant === 'danger' && 'border border-destructive/40 text-destructive hover:bg-destructive/10'
       )}

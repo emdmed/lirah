@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
+import { Lamp } from './instrument/Lamp';
 
 function formatElapsed(isoString, now = Date.now()) {
   if (!isoString) return null;
@@ -74,10 +75,10 @@ function AgentCard({ agent, onDismiss, now }) {
   return (
     <div
       className={cn(
-        'relative rounded-sm px-2 py-1.5 text-xs cursor-pointer transition-colors',
+        'relative px-2 py-1.5 text-xs cursor-pointer transition-shadow bg-[var(--ins-raised)]',
         isRunning
-          ? 'bg-[color-mix(in_srgb,var(--color-status-success)_8%,transparent)]'
-          : 'hover:bg-sidebar-accent/50',
+          ? 'shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]'
+          : 'shadow-[inset_0_0_0_1px_var(--ins-edge)] hover:shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]',
       )}
       onClick={() => setExpanded(e => !e)}
       onMouseEnter={() => setHovered(true)}
@@ -85,18 +86,7 @@ function AgentCard({ agent, onDismiss, now }) {
     >
       {/* Row 1: status dot + task summary + dismiss */}
       <div className="flex items-start gap-1.5">
-        <span
-          className={cn(
-            'inline-block w-1.5 h-1.5 rounded-full shrink-0 mt-[3px]',
-            isRunning && 'animate-pulse',
-          )}
-          style={{
-            backgroundColor: isRunning
-              ? 'var(--color-status-success)'
-              : 'var(--color-muted-foreground)',
-            opacity: isRunning ? 1 : 0.35,
-          }}
-        />
+        <Lamp state={isRunning ? 'on' : 'off'} blink={isRunning} label={isRunning ? 'running' : 'done'} className="mt-[2px]" />
         <span className="text-[11px] text-sidebar-foreground leading-tight line-clamp-2 break-words min-w-0">
           {summary || agent.slug || agent.agent_id.slice(0, 8)}
         </span>
@@ -117,7 +107,7 @@ function AgentCard({ agent, onDismiss, now }) {
       {/* Row 2: metadata — tool, turns, elapsed */}
       <div className="flex items-center gap-1.5 mt-1 ml-3 text-[11px] text-muted-foreground/60">
         {agent.last_tool && (
-          <span className="inline-block px-1 py-px rounded font-mono bg-primary/10 text-primary/70">
+          <span className="inline-block px-1 py-px font-mono shadow-[inset_0_0_0_1px_var(--ins-edge)] text-foreground/80">
             {agent.last_tool}
           </span>
         )}
@@ -294,18 +284,10 @@ export function AgentSidebar() {
           </span>
         )}
         {visibleSubagents.map(agent => (
-          <span
+          <Lamp
             key={agent.agent_id}
-            className={cn(
-              'w-1.5 h-1.5 rounded-full',
-              agent.status === 'running' && 'animate-pulse',
-            )}
-            style={{
-              backgroundColor: agent.status === 'running'
-                ? 'var(--color-status-success)'
-                : 'var(--color-muted-foreground)',
-              opacity: agent.status === 'running' ? 1 : 0.3,
-            }}
+            state={agent.status === 'running' ? 'on' : 'off'}
+            blink={agent.status === 'running'}
           />
         ))}
       </div>

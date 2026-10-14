@@ -94,7 +94,7 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
 
   return (
     <div 
-      className="absolute top-2 right-2 z-50 w-80 max-h-[70vh] flex flex-col border border-primary shadow bg-background"
+      className="absolute top-2 right-2 z-50 w-80 max-h-[70vh] flex flex-col border border-[var(--ins-lamp)] shadow bg-background"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-2 border-b border-border flex-shrink-0">

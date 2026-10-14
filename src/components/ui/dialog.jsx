@@ -4,6 +4,7 @@ import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 
 import { cn } from "@/lib/utils"
+import { KeyChord } from "@/components/instrument/Keycap"
 
 function Dialog({
   ...props
@@ -51,9 +52,6 @@ function DialogContent({
   instant,
   ...props
 }) {
-  const baseAnimation = instant
-    ? "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono"
-    : "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono";
   return (
     <DialogPortal>
       <DialogOverlay className={instant ? "!animate-none !duration-0" : overlayClassName} />
@@ -61,19 +59,18 @@ function DialogContent({
         <DialogPrimitive.Content
           data-slot="dialog-content"
           className={cn(
-            baseAnimation,
+            "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono",
             className
           )}
-          style={{ backgroundColor: 'var(--color-input-background)' }}
           {...props}>
           {children}
           <DialogPrimitive.Close
-            className="tui-dialog-close text-muted-foreground hover:bg-destructive hover:text-destructive-foreground disabled:pointer-events-none">
-            [x]
+            className="tui-dialog-close ins-cap ins-round text-muted-foreground hover:text-foreground disabled:pointer-events-none">
+            esc
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
           <span className="tui-pane-info" aria-hidden="true">
-            <span className="tui-key">esc</span> close
+            <KeyChord keys={['esc']} label="close" size="sm" />
           </span>
         </DialogPrimitive.Content>
       </div>
@@ -112,7 +109,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-primary font-bold", className)}
+      className={cn("ins-legend text-foreground", className)}
       {...props} />
   );
 }

@@ -42,16 +42,15 @@ export function TemplateSelector({
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  // The badge takes the theme's own accent token, so it is correct in every
-  // theme without a per-theme table to keep in sync.
-  const badgeStyle = 'bg-primary/20 text-primary hover:bg-primary/30';
+  // An active template is a lit state: lamp-coloured outline, no fill.
+  const badgeStyle = 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-foreground/10';
 
   return (
     <div className="flex items-center gap-1">
       {selectedTemplate && (
         <Badge
           variant="outline"
-          className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border edge-engraved ${badgeStyle}`}
+          className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border-0 ${badgeStyle}`}
           onClick={() => onSelectTemplate(null)}
           title="Click to clear template  ·  Alt+Alt"
         >
@@ -81,17 +80,17 @@ export function TemplateSelector({
             <>
               <DropdownMenuItem
                 onClick={() => onSelectTemplate(null)}
-                className="flex items-center justify-between text-[11px] py-1.5"
+                className="flex items-center justify-between text-[11px] py-1.5 pl-3"
               >
                 <span className="text-muted-foreground">No template</span>
-                {!selectedTemplateId && <Check className="h-3 w-3 text-primary" />}
+                {!selectedTemplateId && <Check className="h-3 w-3 text-[var(--ins-lamp)]" />}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {templates.map((template, index) => (
                 <DropdownMenuItem
                   key={template.id}
                   onClick={() => onSelectTemplate(template.id)}
-                  className={`flex items-center justify-between text-[11px] py-1.5 ${selectedTemplateId === template.id ? 'bg-primary/10' : ''
+                  className={`flex items-center justify-between text-[11px] py-1.5 pl-3 ${selectedTemplateId === template.id ? 'ins-row-selected' : ''
                     }`}
                 >
                   <span className="flex items-center">
@@ -103,7 +102,7 @@ export function TemplateSelector({
                     <span className="truncate pr-2">{template.title}</span>
                   </span>
                   {selectedTemplateId === template.id && (
-                    <Check className="h-3 w-3 text-primary flex-shrink-0" />
+                    <Check className="h-3 w-3 text-[var(--ins-lamp)] flex-shrink-0" />
                   )}
                 </DropdownMenuItem>
               ))}

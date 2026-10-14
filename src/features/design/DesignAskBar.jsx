@@ -57,7 +57,7 @@ export function DesignAskBar({
         type="button"
         onClick={() => onOpenChange(true)}
         title="Ask about the selection"
-        className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 font-mono text-[11px] px-3 py-1.5 border edge-engraved bg-background hover:border-foreground/40"
+        className="ins-key ins-key-panel ins-round absolute bottom-3 left-1/2 -translate-x-1/2 z-20 gap-2 h-7 px-3 text-[11px]"
       >
         <MessageSquare className="w-3.5 h-3.5" />
         Ask about {selected.length} selected

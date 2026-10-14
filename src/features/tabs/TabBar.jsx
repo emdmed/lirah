@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { Keycap } from "@/components/instrument/Keycap";
 
 export function TabBar({ tabs, activeTabId, onSwitch, onClose, onAdd, onReorder }) {
   const handleMiddleClick = useCallback((e, tabId) => {
@@ -19,21 +20,24 @@ export function TabBar({ tabs, activeTabId, onSwitch, onClose, onAdd, onReorder 
             onClick={() => onSwitch(tab.id)}
             onMouseDown={(e) => handleMiddleClick(e, tab.id)}
             className={cn(
-              "group relative flex items-center gap-1 px-2 h-full text-xs min-w-0 max-w-[180px]",
+              "group relative flex items-center gap-1.5 px-2 h-full text-xs min-w-0 max-w-[200px]",
               isActive
-                ? "bg-primary text-primary-foreground"
+                ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
             )}
+            aria-current={isActive ? "page" : undefined}
           >
-            <span className="truncate">{idx + 1}:{tab.label}{isActive ? "*" : ""}</span>
+            <Keycap size="sm" lit={isActive}>{idx + 1}</Keycap>
+            <span className="truncate">{tab.label}</span>
+            {isActive && <span className="absolute left-2 right-2 bottom-0 h-[2px] bg-[var(--ins-lamp)]" aria-hidden="true" />}
             <span
               onClick={(e) => {
                 e.stopPropagation();
                 if (tabs.length > 1) onClose(tab.id);
               }}
               className={cn(
-                "inline-flex items-center justify-center w-4 h-4 text-[11px] shrink-0 hover:bg-destructive hover:text-destructive-foreground",
-                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                "inline-flex items-center justify-center w-4 h-4 text-[11px] shrink-0 text-muted-foreground hover:text-[var(--ins-fault)]",
+                "opacity-0 group-hover:opacity-100"
               )}
             >
               ×

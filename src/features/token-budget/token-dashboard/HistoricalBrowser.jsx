@@ -106,7 +106,7 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
 
         <div className="flex-1 overflow-auto border edge-engraved rounded-none">
           {paged.map((s) => (
-            <div key={s.sessionId + s.timestamp} className="border-b edge-engraved/50">
+            <div key={s.sessionId + s.timestamp} className="border-b edge-engraved">
               <button
                 className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/20 text-xs font-mono text-left"
                 onClick={() => setExpandedSession(expandedSession === s.sessionId ? null : s.sessionId)}
@@ -121,7 +121,7 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
               </button>
 
               {expandedSession === s.sessionId && (
-                <div className="px-8 py-2 bg-muted/10 font-mono space-y-1 border-t edge-engraved/30" style={{ fontSize: 'var(--font-xs)' }}>
+                <div className="px-8 py-2 bg-muted/10 font-mono space-y-1 border-t edge-engraved" style={{ fontSize: 'var(--font-xs)' }}>
                   <div className="grid grid-cols-3 gap-2">
                     <div>Input: {formatTokenCount(s.inputTokens)}</div>
                     <div>Output: {formatTokenCount(s.outputTokens)}</div>

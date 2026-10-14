@@ -122,7 +122,7 @@ function App() {
 
   return (
     <SubagentProvider tabs={tabs}>
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
         {tabs.length > 1 && (
           <TabBar
             tabs={tabs}
@@ -134,7 +134,7 @@ function App() {
           />
         )}
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
             {tabs.map(tab => (
               <ProjectTab

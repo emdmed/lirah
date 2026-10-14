@@ -7,6 +7,7 @@ import { usePinnedFiles } from "../features/pinned-files";
 import { useMemo, useCallback } from "react";
 import { RetroSpinner } from "./ui/RetroSpinner";
 import { PaneInfo } from "./PaneInfo";
+import { PaneLegend } from "./instrument/PaneLegend";
 import { useRowCursor } from "../hooks/useRowCursor";
 import {
   Sidebar,
@@ -61,16 +62,20 @@ export function LeftSidebar({
 
   const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
   const { containerRef: rowsRef, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
-    useRowCursor({ onSearch: focusSearch });
+    useRowCursor({ onSearch: focusSearch, onParent: viewMode === 'flat' ? onNavigateParent : undefined });
 
   return (
     <>
-      <Sidebar collapsible="none" className="tui-pane bg-background m-0 px-1 pt-[14px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" style={{ width: sidebarWidth }}>
+      <Sidebar collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" data-legend style={{ width: sidebarWidth }}>
+        <PaneLegend
+          index={1}
+          title="Files"
+          status={`${viewMode === 'tree' ? 'agent' : 'nav'}${sandboxEnabled ? ' · sandbox' : ''}`}
+        />
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
-            viewMode={viewMode}
+            onNavigateParent={viewMode === 'flat' ? onNavigateParent : undefined}
             currentPath={currentPath}
-            onNavigateParent={onNavigateParent}
             searchQuery={searchQuery}
             onSearchChange={onSearchChange}
             onSearchClear={handleSearchClear}
@@ -86,7 +91,6 @@ export function LeftSidebar({
             onAddBookmark={onAddBookmark}
             onNavigateBookmark={onNavigateBookmark}
             hasTerminalSession={hasTerminalSession}
-            sandboxEnabled={sandboxEnabled}
           />
           <SidebarGroup className="flex flex-col flex-1 min-h-0">
             <SidebarGroupContent
@@ -166,7 +170,7 @@ export function LeftSidebar({
         </PaneInfo>
       </Sidebar>
       <div
-        className={`w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-50 shrink-0 ${isResizing ? 'bg-primary/50' : ''}`}
+        className={`w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] transition-colors z-50 shrink-0 ${isResizing ? 'bg-[var(--ins-lamp)]' : ''}`}
         onMouseDown={handleResizeStart}
       />
     </>

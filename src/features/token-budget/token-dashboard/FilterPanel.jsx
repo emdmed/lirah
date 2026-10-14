@@ -44,7 +44,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
           <Filter size={12} />
           Filters
           {hasActiveFilters && (
-            <span className="bg-primary/20 text-primary rounded-xs px-1" style={{ fontSize: 'var(--font-xs)' }}>Active</span>
+            <span className="text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] rounded-xs px-1" style={{ fontSize: 'var(--font-xs)' }}>Active</span>
           )}
         </button>
         {hasActiveFilters && (

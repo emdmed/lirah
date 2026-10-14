@@ -11,7 +11,7 @@ export function ElementsIndicator({ selectedElements, currentPath, elementCount,
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex items-center gap-2 cursor-default">
-            <span className="text-primary font-medium">
+            <span className="text-[var(--ins-lamp)] font-medium">
               {elementCount} element{elementCount !== 1 ? 's' : ''} selected
             </span>
             <span className="text-muted-foreground">
@@ -27,7 +27,7 @@ export function ElementsIndicator({ selectedElements, currentPath, elementCount,
         variant="ghost"
         size="xs"
         onClick={onClearElements}
-        className="ml-auto p-0.5 h-auto hover:bg-foreground/10"
+        className="ml-auto p-0.5 h-auto"
         aria-label="Clear selected elements"
       >
         <X className="w-3 h-3" />
