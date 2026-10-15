@@ -1,10 +1,53 @@
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use std::io::Read;
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::mpsc::{self, Sender};
+use std::sync::OnceLock;
+use std::thread;
 use crate::pty::session::SessionHandle;
 
+type SpawnResult = Result<(SessionHandle, Box<dyn Read + Send>), String>;
+type SpawnJob = Box<dyn FnOnce() + Send>;
+
+/// The one thread every PTY child is forked from. It never exits.
+///
+/// bwrap's `--die-with-parent` is PR_SET_PDEATHSIG, which fires when the
+/// *thread* that forked it exits, not the process. Forked from a tokio
+/// blocking-pool thread, the sandbox was SIGKILLed as soon as the pool reaped
+/// that thread after ~10 s idle — e.g. while lazygit is fullscreen and the
+/// tab's pollers stop — and the main terminal showed "[Process exited]".
+fn spawner() -> &'static Sender<SpawnJob> {
+    static SPAWNER: OnceLock<Sender<SpawnJob>> = OnceLock::new();
+    SPAWNER.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<SpawnJob>();
+        thread::Builder::new()
+            .name("pty-spawner".into())
+            .spawn(move || {
+                while let Ok(job) = rx.recv() {
+                    // A panicking spawn must not take this thread down: every
+                    // sandbox forked from it would be killed along with it.
+                    let _ = panic::catch_unwind(AssertUnwindSafe(job));
+                }
+            })
+            .expect("failed to start pty-spawner thread");
+        tx
+    })
+}
+
 /// Spawn the user's shell on a new PTY. Returns the session and the reader for
-/// its output, which the caller drains on its own thread.
-pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> Result<(SessionHandle, Box<dyn Read + Send>), String> {
+/// its output, which the caller drains on its own thread. Blocks until the
+/// spawner thread has forked the child, so call it from a blocking thread.
+pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> SpawnResult {
+    let (tx, rx) = mpsc::channel();
+    spawner()
+        .send(Box::new(move || {
+            let _ = tx.send(spawn_pty_here(rows, cols, sandbox, sandbox_no_net, project_dir));
+        }))
+        .map_err(|_| "PTY spawner thread is gone".to_string())?;
+    rx.recv().map_err(|_| "PTY spawn panicked".to_string())?
+}
+
+fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> SpawnResult {
     let pty_system = NativePtySystem::default();
 
     // Create a new PTY with the specified size
