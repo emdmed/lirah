@@ -34,29 +34,8 @@ pub struct ClaudeSessionEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeSessionsIndex {
-    pub version: i32,
-    pub entries: Vec<ClaudeSessionEntry>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeSessionsPage {
     pub sessions: Vec<ClaudeSessionEntry>,
     pub total: usize,
     pub has_more: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeMessage {
-    pub role: String,
-    pub content: String,
-    pub timestamp: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeSession {
-    pub session_id: String,
-    pub messages: Vec<ClaudeMessage>,
-    pub summary: Option<String>,
-    pub project_path: String,
 }

@@ -12,6 +12,11 @@ const PREFS_EVENT = 'lirah:terminal-prefs';
 // straight through. 10k is roughly a session's worth without a real memory cost.
 export const SCROLLBACK_DEFAULT = 10000;
 
+// Past this, scrollback gets expensive: each line costs memory per column (a
+// 200-column terminal at 200k lines is hundreds of MB), and every resize
+// reflows the whole buffer. The settings UI flags options above it.
+export const SCROLLBACK_WARN_THRESHOLD = 50000;
+
 export const SCROLLBACK_OPTIONS = [
   { value: 1000, label: '1,000 lines' },
   { value: 10000, label: '10,000 lines' },

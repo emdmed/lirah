@@ -12,11 +12,11 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
     try {
       let files = allFiles;
       if (!files || files.length === 0) {
-        files = await invoke('read_directory_recursive', {
+        ({ entries: files } = await invoke('read_directory_recursive', {
           path: currentPath,
           maxDepth: 10,
           maxFiles: 10000
-        });
+        }));
       }
 
       const result = await compactProject(currentPath, files);

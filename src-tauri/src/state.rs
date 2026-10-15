@@ -1,16 +1,6 @@
-use portable_pty::{Child, MasterPty};
+use crate::pty::session::SessionHandle;
 use std::collections::HashMap;
-use std::io::Write;
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
-
-pub struct PtySession {
-    pub master: Box<dyn MasterPty + Send>,
-    pub child: Box<dyn Child + Send>,
-    pub writer: Box<dyn Write + Send>,
-    pub shutdown: Arc<AtomicBool>,
-    pub sandboxed: bool,
-}
 
 pub struct WorkspaceContext {
     pub workspace_path: String,
@@ -18,7 +8,9 @@ pub struct WorkspaceContext {
 }
 
 pub struct AppStateData {
-    pub pty_sessions: HashMap<String, PtySession>,
+    /// Each session sits behind its own `Arc`: clone it out and drop this lock
+    /// right away — never hold the global lock across PTY work.
+    pub pty_sessions: HashMap<String, Arc<SessionHandle>>,
     pub git_cache: crate::git_cache::GitStatsCache,
     pub directory_cache: crate::directory_cache::DirectoryCache,
     pub workspace_context: Option<WorkspaceContext>,

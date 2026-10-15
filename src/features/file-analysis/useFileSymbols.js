@@ -1,14 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import {
-  extractSymbols,
-  extractSignatures,
-  extractSkeleton,
-  isBabelParseable,
-  formatSymbolsForPrompt,
-  formatSignaturesForPrompt,
-  formatSkeletonForPrompt,
-} from './babelSymbolParser';
+import { isBabelParseable } from './babelSupport';
+import { formatSymbolsForPrompt, formatSignaturesForPrompt, formatSkeletonForPrompt } from './babelFormat';
+import { analyzeFile } from './babelClient';
 
 // View modes for file analysis
 export const VIEW_MODES = {
@@ -58,10 +52,8 @@ export function useFileSymbols() {
       // Count lines
       const lineCount = content.split('\n').length;
 
-      // Parse all three formats
-      const symbols = extractSymbols(content, filePath);
-      const signatures = extractSignatures(content, filePath);
-      const skeleton = extractSkeleton(content, filePath);
+      // All three formats from one parse, off the main thread
+      const { symbols, signatures, skeleton } = await analyzeFile(content, filePath);
 
       // Store results
       setFileSymbols(prev => {

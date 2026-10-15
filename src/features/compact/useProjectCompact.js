@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { isBabelParseable, extractSkeleton as extractBabelSkeleton, formatSkeletonForPrompt as formatBabelSkeleton } from '../../features/file-analysis';
-import { isPythonParseable, extractSkeleton as extractPythonSkeleton, formatSkeletonForPrompt as formatPythonSkeleton } from '../../features/file-analysis';
+import { isBabelParseable } from '../file-analysis/babelSupport';
+import { formatSkeletonForPrompt as formatBabelSkeleton } from '../file-analysis/babelFormat';
+import { analyzeSkeleton as extractBabelSkeleton } from '../file-analysis/babelClient';
+import { isPythonParseable, extractSkeleton as extractPythonSkeleton, formatSkeletonForPrompt as formatPythonSkeleton } from '../file-analysis/pythonSymbolParser';
 
 /**
  * Estimate token count for a string
@@ -94,7 +96,7 @@ export function useProjectCompact() {
             // Use appropriate parser based on file type
             const skeleton = isPythonParseable(file.path)
               ? await extractPythonSkeleton(content, file.path)
-              : extractBabelSkeleton(content, file.path);
+              : await extractBabelSkeleton(content, file.path);
 
             // Get relative path
             const relativePath = file.path.startsWith(rootPath + '/')

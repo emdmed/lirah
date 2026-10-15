@@ -1,6 +1,6 @@
 use std::process::Command;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn check_command_exists(command: String) -> Result<bool, String> {
     #[cfg(target_family = "unix")]
     let checker = "which";
@@ -23,7 +23,7 @@ pub fn get_home_dir() -> Result<String, String> {
         .ok_or_else(|| "Could not determine home directory".into())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_file_executable(path: String) -> Result<(), String> {
     #[cfg(unix)]
     {

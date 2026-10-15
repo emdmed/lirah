@@ -1,83 +1,75 @@
 use crate::commit_watcher::CommitWatcherStore;
 use crate::pty::manager;
+use crate::pty::session::SessionHandle;
 use crate::state::AppState;
 use std::io::Read;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, ProcessesToUpdate, System};
+use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
-/// Drain the longest valid UTF-8 prefix from `carry` and return it as a String,
-/// keeping any trailing incomplete byte sequence in `carry` for the next read.
-///
-/// PTY reads land on arbitrary byte boundaries; a multi-byte glyph or a long
-/// ANSI escape sequence can straddle a chunk. Using `from_utf8_lossy` on a
-/// raw chunk replaces those trailing bytes with `U+FFFD`, permanently
-/// corrupting the stream — visible as scrambled characters in xterm while a
-/// TUI app like Claude Code or vim is running. Buffering the tail bytes
-/// preserves the original byte stream.
-fn split_valid_utf8(carry: &mut Vec<u8>) -> String {
-    if carry.is_empty() {
-        return String::new();
-    }
-    let valid_up_to = match std::str::from_utf8(carry) {
-        Ok(_) => carry.len(),
-        Err(e) => e.valid_up_to(),
-    };
-    if valid_up_to == 0 {
-        // No valid prefix yet (rare: first byte mid-sequence). If the carry
-        // grows unreasonably large, drop it to avoid unbounded growth on a
-        // genuinely malformed stream.
-        if carry.len() > 8 {
-            carry.clear();
-        }
-        return String::new();
-    }
-    // Safe: from_utf8 guaranteed bytes 0..valid_up_to are a valid UTF-8 string.
-    let head = unsafe { std::str::from_utf8_unchecked(&carry[..valid_up_to]).to_string() };
-    carry.drain(..valid_up_to);
-    head
-}
-
-/// Flush the accumulated buffer at most this often — bounds added latency so
-/// interactive echo (typing a char, prompt redraw) still feels instant.
+/// While output is continuous, flush at most this often. An isolated chunk
+/// (interactive echo, a prompt redraw) goes out immediately instead.
 const PTY_FLUSH_INTERVAL: Duration = Duration::from_millis(8);
 /// Flush early once this many bytes accumulate — bounds memory and keeps big
 /// bursts moving without waiting out the interval.
 const PTY_FLUSH_SIZE: usize = 32 * 1024;
 
+const PROCESS_EXITED_NOTICE: &[u8] = b"\r\n[Process exited]\r\n";
+
+fn join_error(e: impl std::fmt::Display) -> String {
+    format!("Task join error: {}", e)
+}
+
+/// Clone a session's handle out of the map and release the global lock at once.
+fn get_session(state: &AppState, session_id: &str) -> Result<Arc<SessionHandle>, String> {
+    state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?
+        .pty_sessions
+        .get(session_id)
+        .cloned()
+        .ok_or_else(|| format!("Session not found: {}", session_id))
+}
+
+fn send_output(out: &Channel, data: Vec<u8>) {
+    // Fails only once the webview is gone; nothing left to deliver to.
+    let _ = out.send(InvokeResponseBody::Raw(data));
+}
+
 /// Coalesce PTY output before it crosses the Rust→JS IPC boundary.
 ///
-/// A naive reader emits one Tauri event per read (~8 KB). Under heavy output
-/// (build logs, TUI redraws, `cat` of a large file) that is thousands of IPC
-/// round-trips per second — each allocating a payload and waking the webview
-/// event loop, the classic cause of terminal jank and pinned CPU.
+/// A naive reader sends one IPC message per read (~8 KB). Under heavy output
+/// (build logs, TUI redraws, `cat` of a large file) that is thousands of
+/// round-trips per second — each waking the webview event loop, the classic
+/// cause of terminal jank and pinned CPU.
 ///
-/// This runs on its own thread, draining decoded UTF-8 chunks from `rx` and
-/// emitting one `event_name` event per flush. It flushes when the buffer
-/// reaches `PTY_FLUSH_SIZE` (throughput) or `PTY_FLUSH_INTERVAL` elapses since
-/// the *first* buffered byte (latency). When the reader drops its sender the
-/// channel disconnects; we flush whatever remains and return — so a caller that
-/// joins this thread is guaranteed all output has been delivered before it
-/// emits any subsequent lifecycle event (e.g. "[Process exited]").
+/// Leading edge: a chunk that arrives after the stream has been quiet for a
+/// full `PTY_FLUSH_INTERVAL` is sent immediately, so a single echoed keystroke
+/// pays no batching latency. Only while output keeps coming are chunks held,
+/// until `PTY_FLUSH_SIZE` bytes or `PTY_FLUSH_INTERVAL` after the first held
+/// byte. When the reader drops its sender we flush what remains and return —
+/// so a caller that joins this thread knows all output was sent before it
+/// sends anything after it (e.g. "[Process exited]").
 ///
-/// When nothing is buffered we block on `recv()` (no timeout) rather than
-/// polling every interval — an idle terminal must cost zero wakeups, which
-/// matters when many tabs each hold a quiet nvim/lazygit. The flush deadline is
-/// anchored to the first byte, so a steady sub-interval trickle still flushes
-/// within one `PTY_FLUSH_INTERVAL` instead of being deferred indefinitely by a
-/// per-recv timeout reset.
-fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, event_name: String) {
-    let mut pending = String::new();
+/// When nothing is buffered we block on `recv()` (no timeout): an idle terminal
+/// must cost zero wakeups, which matters when many tabs each hold a quiet
+/// nvim/lazygit.
+fn batch_emit_loop(rx: Receiver<Vec<u8>>, out: Channel) {
+    let mut pending: Vec<u8> = Vec::new();
     // Some(_) once data is buffered: the instant by which we must flush.
     let mut deadline: Option<Instant> = None;
+    let mut last_flush: Option<Instant> = None;
+    let flush = |pending: &mut Vec<u8>, deadline: &mut Option<Instant>, last_flush: &mut Option<Instant>| {
+        send_output(&out, std::mem::take(pending));
+        *deadline = None;
+        *last_flush = Some(Instant::now());
+    };
     loop {
-        // Idle: block until the first chunk arrives. Buffered: wait only until
-        // the flush deadline. Past the deadline: force a flush this iteration.
         let next = match deadline {
             None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
             Some(dl) => match dl.checked_duration_since(Instant::now()) {
@@ -87,35 +79,23 @@ fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, eve
         };
         match next {
             Ok(chunk) => {
-                if pending.is_empty() {
+                let quiet = deadline.is_none()
+                    && last_flush.is_none_or(|t| t.elapsed() >= PTY_FLUSH_INTERVAL);
+                pending.extend_from_slice(&chunk);
+                if quiet || pending.len() >= PTY_FLUSH_SIZE {
+                    flush(&mut pending, &mut deadline, &mut last_flush);
+                } else if deadline.is_none() {
                     deadline = Some(Instant::now() + PTY_FLUSH_INTERVAL);
-                }
-                pending.push_str(&chunk);
-                if pending.len() >= PTY_FLUSH_SIZE {
-                    let data = std::mem::take(&mut pending);
-                    deadline = None;
-                    let _ = app.emit(
-                        &event_name,
-                        serde_json::json!({ "session_id": &session_id, "data": data }),
-                    );
                 }
             }
             Err(RecvTimeoutError::Timeout) => {
                 if !pending.is_empty() {
-                    let data = std::mem::take(&mut pending);
-                    deadline = None;
-                    let _ = app.emit(
-                        &event_name,
-                        serde_json::json!({ "session_id": &session_id, "data": data }),
-                    );
+                    flush(&mut pending, &mut deadline, &mut last_flush);
                 }
             }
             Err(RecvTimeoutError::Disconnected) => {
                 if !pending.is_empty() {
-                    let _ = app.emit(
-                        &event_name,
-                        serde_json::json!({ "session_id": &session_id, "data": pending }),
-                    );
+                    flush(&mut pending, &mut deadline, &mut last_flush);
                 }
                 break;
             }
@@ -123,128 +103,103 @@ fn batch_emit_loop(rx: Receiver<String>, app: AppHandle, session_id: String, eve
     }
 }
 
+/// Drain the PTY until EOF, an error, or the session is closed, handing each
+/// chunk to `forward` (which returns false to stop). Parks while the frontend
+/// has paused the session. Returns true when the child exited on its own.
+fn pump_output(
+    session: &SessionHandle,
+    reader: &mut dyn Read,
+    mut forward: impl FnMut(&[u8]) -> bool,
+) -> bool {
+    let mut buf = [0u8; 8192];
+    loop {
+        if !session.gate.wait_while_paused() {
+            return false;
+        }
+        match reader.read(&mut buf) {
+            Ok(0) => return !session.gate.is_closed(),
+            Ok(n) => {
+                if session.gate.is_closed() || !forward(&buf[..n]) {
+                    return false;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => {
+                if !session.gate.is_closed() {
+                    eprintln!("Error reading from PTY: {}", e);
+                }
+                return false;
+            }
+        }
+    }
+}
+
+/// Reader thread for an interactive terminal: raw bytes go to the frontend over
+/// `out` (xterm decodes UTF-8 itself, including sequences split across reads).
+fn spawn_output_reader(session: Arc<SessionHandle>, mut reader: Box<dyn Read + Send>, out: Channel) {
+    thread::spawn(move || {
+        // Batch on a dedicated emitter thread: the reader stays tight on the
+        // PTY while sends are coalesced (see batch_emit_loop).
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let emitter = {
+            let out = out.clone();
+            thread::spawn(move || batch_emit_loop(rx, out))
+        };
+
+        let exited = pump_output(&session, &mut reader, |chunk| tx.send(chunk.to_vec()).is_ok());
+
+        // Drain the emitter first, then send the notice down the same ordered
+        // channel, so it always lands after the last byte of output.
+        drop(tx);
+        let _ = emitter.join();
+        if exited {
+            send_output(&out, PROCESS_EXITED_NOTICE.to_vec());
+        }
+    });
+}
+
+/// Spawn an interactive shell. Output streams as raw bytes over `output`
+/// (a `Channel` from `@tauri-apps/api/core`), in order; when the shell exits
+/// on its own a final "[Process exited]" line is sent on the same channel.
 #[tauri::command]
-pub fn spawn_terminal(
+pub async fn spawn_terminal(
     rows: u16,
     cols: u16,
     sandbox: bool,
     sandbox_no_net: bool,
     project_dir: Option<String>,
-    app: AppHandle,
-    state: tauri::State<AppState>,
+    output: Channel,
+    state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    // Generate a unique session ID
+    let (session, reader) = tauri::async_runtime::spawn_blocking(move || {
+        manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir)
+    })
+    .await
+    .map_err(join_error)??;
+
     let session_id = Uuid::new_v4().to_string();
+    let session = Arc::new(session);
+    let sandboxed = session.sandboxed;
 
-    // Spawn the PTY
-    let session = manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir)?;
-    let actually_sandboxed = session.sandboxed;
-
-    // Clone the master for the reader thread
-    let mut reader = session
-        .master
-        .try_clone_reader()
-        .map_err(|e| format!("Failed to clone reader: {}", e))?;
-
-    // Clone shutdown flag for the reader thread
-    let shutdown_flag = session.shutdown.clone();
-
-    // Spawn a thread to read from PTY and emit events
-    let session_id_clone = session_id.clone();
-    let app_clone = app.clone();
-    thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        // Carryover for incomplete UTF-8 sequences that straddle a read boundary.
-        // Without this, from_utf8_lossy replaces the trailing bytes with U+FFFD
-        // and ANSI sequences / multibyte glyphs from TUI apps get corrupted —
-        // visible as "scrambled characters" while Claude Code or vim is running.
-        let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
-
-        // Per-session event name so each terminal's output reaches only its own
-        // listener. A single shared "terminal-output" event forces every mounted
-        // terminal (all tabs stay mounted) to wake and filter every other
-        // terminal's output — O(M²) across M live terminals. Scoping the event
-        // to the session makes each listener see only its own stream.
-        let event_name = format!("terminal-output-{}", session_id_clone);
-
-        // Batch output on a dedicated emitter thread: the reader stays tight on
-        // the PTY while emits are coalesced by time/size (see batch_emit_loop).
-        let (tx, rx) = std::sync::mpsc::channel::<String>();
-        let emitter = {
-            let app = app_clone.clone();
-            let sid = session_id_clone.clone();
-            let ev = event_name.clone();
-            thread::spawn(move || batch_emit_loop(rx, app, sid, ev))
-        };
-
-        loop {
-            // Check shutdown flag before reading
-            if shutdown_flag.load(Ordering::SeqCst) {
-                break;
-            }
-
-            match reader.read(&mut buf) {
-                Ok(n) if n > 0 => {
-                    // Check shutdown flag after read
-                    if shutdown_flag.load(Ordering::SeqCst) {
-                        break;
-                    }
-
-                    carry.extend_from_slice(&buf[..n]);
-                    let data = split_valid_utf8(&mut carry);
-                    if data.is_empty() {
-                        continue;
-                    }
-
-                    // Hand off to the emitter; if it's gone, stop reading.
-                    if tx.send(data).is_err() {
-                        break;
-                    }
-                }
-                Ok(_) => {
-                    // EOF reached, process exited. Drain the emitter first so
-                    // the "[Process exited]" notice lands after all output.
-                    drop(tx);
-                    let _ = emitter.join();
-                    if !shutdown_flag.load(Ordering::SeqCst) {
-                        let _ = app_clone.emit(
-                            &event_name,
-                            serde_json::json!({
-                                "session_id": session_id_clone,
-                                "data": "\r\n[Process exited]\r\n",
-                            }),
-                        );
-                    }
-                    return;
-                }
-                Err(e) => {
-                    drop(tx);
-                    let _ = emitter.join();
-                    if !shutdown_flag.load(Ordering::SeqCst) {
-                        eprintln!("Error reading from PTY: {}", e);
-                    }
-                    return;
-                }
-            }
-        }
-
-        // Shutdown path: drop the sender and let the emitter flush and exit.
-        drop(tx);
-        let _ = emitter.join();
-    });
-
-    // Store the session
     state
         .lock()
         .map_err(|e| format!("Failed to lock state: {}", e))?
         .pty_sessions
-        .insert(session_id.clone(), session);
+        .insert(session_id.clone(), session.clone());
+
+    spawn_output_reader(session, reader, output);
 
     Ok(serde_json::json!({
         "session_id": session_id,
-        "sandboxed": actually_sandboxed,
+        "sandboxed": sandboxed,
     }))
 }
+
+// write/resize/pause/resume stay synchronous on purpose: each is a map lookup
+// plus a non-blocking call (channel send, ioctl, atomic flip), so the main
+// thread pays microseconds — and synchronous commands run in invocation order,
+// which keystrokes and successive resizes depend on. Async commands are each
+// spawned as their own task and can overtake one another.
 
 #[tauri::command]
 pub fn write_to_terminal(
@@ -252,16 +207,7 @@ pub fn write_to_terminal(
     data: String,
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
-    let mut state_lock = state
-        .lock()
-        .map_err(|e| format!("Failed to lock state: {}", e))?;
-
-    let session = state_lock
-        .pty_sessions
-        .get_mut(&session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
-
-    manager::write_to_pty(session, &data)
+    get_session(&state, &session_id)?.write(data.into_bytes())
 }
 
 #[tauri::command]
@@ -271,36 +217,41 @@ pub fn resize_terminal(
     cols: u16,
     state: tauri::State<AppState>,
 ) -> Result<(), String> {
-    let mut state_lock = state
-        .lock()
-        .map_err(|e| format!("Failed to lock state: {}", e))?;
+    get_session(&state, &session_id)?.resize(rows, cols)
+}
 
-    let session = state_lock
-        .pty_sessions
-        .get_mut(&session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
-
-    manager::resize_pty(session, rows, cols)
+/// Flow control: stop draining the PTY while xterm catches up. The kernel
+/// buffer then fills and throttles the child.
+#[tauri::command]
+pub fn pty_pause(session_id: String, state: tauri::State<AppState>) -> Result<(), String> {
+    get_session(&state, &session_id)?.gate.pause();
+    Ok(())
 }
 
 #[tauri::command]
-pub fn close_terminal(
+pub fn pty_resume(session_id: String, state: tauri::State<AppState>) -> Result<(), String> {
+    get_session(&state, &session_id)?.gate.resume();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn close_terminal(
     session_id: String,
     app: AppHandle,
-    state: tauri::State<AppState>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut state_lock = state
+    let session = state
         .lock()
-        .map_err(|e| format!("Failed to lock state: {}", e))?;
+        .map_err(|e| format!("Failed to lock state: {}", e))?
+        .pty_sessions
+        .remove(&session_id);
 
-    if let Some(mut session) = state_lock.pty_sessions.remove(&session_id) {
-        // Signal reader thread to stop
-        session.shutdown.store(true, Ordering::SeqCst);
+    if let Some(session) = session {
+        // Kill, then wait so the child is reaped rather than left a zombie.
+        tauri::async_runtime::spawn_blocking(move || session.terminate())
+            .await
+            .map_err(join_error)?;
 
-        // Kill child process
-        let _ = session.child.kill();
-
-        // Emit closed event
         let _ = app.emit(
             "terminal-closed",
             serde_json::json!({"session_id": session_id}),
@@ -310,135 +261,75 @@ pub fn close_terminal(
     Ok(())
 }
 
+/// Run `command` through the login shell on a PTY nobody sees. Its output is
+/// drained and discarded; "hidden-terminal-closed" fires when it exits.
 #[tauri::command]
-pub fn spawn_hidden_terminal(
+pub async fn spawn_hidden_terminal(
     project_dir: String,
     command: String,
     app: AppHandle,
-    state: tauri::State<AppState>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
-    use std::sync::atomic::AtomicBool;
-    use std::sync::Arc;
 
     let session_id = Uuid::new_v4().to_string();
     eprintln!("[hidden-terminal] Spawning: {} in {}", command, project_dir);
 
-    let pty_system = NativePtySystem::default();
-    let pty_pair = pty_system
-        .openpty(PtySize {
-            rows: 24,
-            cols: 80,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("Failed to open PTY: {}", e))?;
+    let (session, mut reader) = tauri::async_runtime::spawn_blocking(move || {
+        let pty_system = NativePtySystem::default();
+        let pty_pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    // Parse the command: run via shell -c
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-    let mut cmd = CommandBuilder::new(&shell);
-    cmd.args(&["-lc", &command]);
-    cmd.env("TERM", "xterm-256color");
-    cmd.cwd(&project_dir);
+        // Parse the command: run via shell -c
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+        let mut cmd = CommandBuilder::new(&shell);
+        cmd.args(["-lc", &command]);
+        cmd.env("TERM", "xterm-256color");
+        cmd.cwd(&project_dir);
 
-    let child = pty_pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| format!("Failed to spawn hidden terminal: {}", e))?;
+        let child = pty_pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| format!("Failed to spawn hidden terminal: {}", e))?;
 
-    let master = pty_pair.master;
-    let writer = master
-        .take_writer()
-        .map_err(|e| format!("Failed to take writer: {}", e))?;
+        SessionHandle::new(pty_pair.master, child, false)
+    })
+    .await
+    .map_err(join_error)??;
 
-    let mut reader = master
-        .try_clone_reader()
-        .map_err(|e| format!("Failed to clone reader: {}", e))?;
-
-    let shutdown = Arc::new(AtomicBool::new(false));
-    let shutdown_flag = shutdown.clone();
-
-    let session_id_clone = session_id.clone();
-    let app_clone = app.clone();
+    let session = Arc::new(session);
     let state_inner = state.inner().clone();
-
-    thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        let mut carry: Vec<u8> = Vec::with_capacity(8 + 8192);
-
-        // Coalesce output on a dedicated emitter thread (see batch_emit_loop).
-        let (tx, rx) = std::sync::mpsc::channel::<String>();
-        let emitter = {
-            let app = app_clone.clone();
-            let sid = session_id_clone.clone();
-            thread::spawn(move || batch_emit_loop(rx, app, sid, "hidden-terminal-output".to_string()))
-        };
-
-        loop {
-            if shutdown_flag.load(Ordering::SeqCst) {
-                break;
-            }
-            match reader.read(&mut buf) {
-                Ok(n) if n > 0 => {
-                    if shutdown_flag.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    carry.extend_from_slice(&buf[..n]);
-                    let data = split_valid_utf8(&mut carry);
-                    if data.is_empty() {
-                        continue;
-                    }
-                    if tx.send(data).is_err() {
-                        break;
-                    }
-                }
-                Ok(_) => {
-                    // Process exited - drain output first, then notify + cleanup.
-                    drop(tx);
-                    let _ = emitter.join();
-                    let _ = app_clone.emit(
-                        "hidden-terminal-closed",
-                        serde_json::json!({"session_id": session_id_clone}),
-                    );
-                    // Remove from state
-                    if let Ok(mut st) = state_inner.lock() {
-                        st.pty_sessions.remove(&session_id_clone);
-                    }
-                    return;
-                }
-                Err(_) => {
-                    drop(tx);
-                    let _ = emitter.join();
-                    let _ = app_clone.emit(
-                        "hidden-terminal-closed",
-                        serde_json::json!({"session_id": session_id_clone, "error": true}),
-                    );
-                    if let Ok(mut st) = state_inner.lock() {
-                        st.pty_sessions.remove(&session_id_clone);
-                    }
-                    return;
-                }
-            }
-        }
-
-        // Shutdown path: drop the sender and let the emitter flush and exit.
-        drop(tx);
-        let _ = emitter.join();
-    });
-
-    let session = crate::state::PtySession {
-        master,
-        child,
-        writer,
-        shutdown,
-        sandboxed: false,
-    };
-
     state
         .lock()
         .map_err(|e| format!("Failed to lock state: {}", e))?
         .pty_sessions
-        .insert(session_id.clone(), session);
+        .insert(session_id.clone(), session.clone());
+
+    let sid = session_id.clone();
+    thread::spawn(move || {
+        // Keep draining so the child never blocks on a full PTY buffer.
+        let exited = pump_output(&session, &mut reader, |_| true);
+        if session.gate.is_closed() {
+            // close_terminal took it down and is reaping it.
+            return;
+        }
+        let _ = session.child.wait();
+        if let Ok(mut st) = state_inner.lock() {
+            st.pty_sessions.remove(&sid);
+        }
+        let payload = if exited {
+            serde_json::json!({"session_id": sid})
+        } else {
+            serde_json::json!({"session_id": sid, "error": true})
+        };
+        let _ = app.emit("hidden-terminal-closed", payload);
+    });
 
     Ok(session_id)
 }
@@ -462,7 +353,7 @@ pub fn stop_commit_watcher(
     crate::commit_watcher::stop_watcher(&path, store.inner())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_committable_files(repo_path: String) -> Result<Vec<serde_json::Value>, String> {
     let output = std::process::Command::new("git")
         .args(&["status", "--porcelain"])
@@ -501,21 +392,25 @@ pub fn get_committable_files(repo_path: String) -> Result<Vec<serde_json::Value>
 }
 
 #[tauri::command]
-pub fn run_git_command(repo_path: String, args: Vec<String>) -> Result<String, String> {
-    let output = std::process::Command::new("git")
-        .args(&args)
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| format!("Failed to run git: {}", e))?;
+pub async fn run_git_command(repo_path: String, args: Vec<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let output = std::process::Command::new("git")
+            .args(&args)
+            .current_dir(&repo_path)
+            .output()
+            .map_err(|e| format!("Failed to run git: {}", e))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        if !stderr.is_empty() {
-            return Err(stderr);
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            if !stderr.is_empty() {
+                return Err(stderr);
+            }
         }
-    }
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    })
+    .await
+    .map_err(join_error)?
 }
 
 const DEFAULT_PROMPT: &str = "Generate a concise conventional commit message for this diff. Reply with ONLY the commit message, no explanation, no markdown formatting, no backticks:";
@@ -994,92 +889,169 @@ fn parse_llm_task_response(
     }
 }
 
-#[tauri::command]
-pub fn check_pty_child_process(
-    session_id: String,
-    process_name: String,
-    state: tauri::State<AppState>,
-) -> Result<bool, String> {
-    let state_lock = state
-        .lock()
-        .map_err(|e| format!("Failed to lock state: {}", e))?;
-    let session = state_lock
-        .pty_sessions
-        .get(&session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+/// How deep below the shell to look (bwrap → shell → wrapper → cli …).
+const MAX_DESCENDANT_DEPTH: usize = 10;
 
-    let shell_pid = session
+/// The PID of a session's shell, copied out so no lock is held while the
+/// process tree is walked.
+fn session_pid(state: &AppState, session_id: &str) -> Result<u32, String> {
+    get_session(state, session_id)?
         .child
         .process_id()
-        .ok_or_else(|| "Process has no PID".to_string())?;
+        .ok_or_else(|| "Process has no PID".to_string())
+}
+
+/// Find a descendant of `root` whose process name contains `target`
+/// (lowercase). Blocking: run it off the main thread.
+fn find_descendant(root: u32, target: &str) -> Option<u32> {
+    #[cfg(target_os = "linux")]
+    if procfs::children_supported() {
+        return procfs::find_descendant(root, target);
+    }
+    find_descendant_sysinfo(root, target)
+}
+
+/// Linux fast path: walk only the shell's subtree through
+/// /proc/<pid>/task/<tid>/children instead of scanning every process.
+#[cfg(target_os = "linux")]
+mod procfs {
+    use super::MAX_DESCENDANT_DEPTH;
+    use std::fs;
+    use std::os::unix::ffi::OsStrExt;
+    use std::sync::OnceLock;
+
+    /// The children files need CONFIG_PROC_CHILDREN; probe our own once.
+    pub fn children_supported() -> bool {
+        static SUPPORTED: OnceLock<bool> = OnceLock::new();
+        *SUPPORTED.get_or_init(|| {
+            let pid = std::process::id();
+            fs::metadata(format!("/proc/{}/task/{}/children", pid, pid)).is_ok()
+        })
+    }
+
+    fn children(pid: u32) -> Vec<u32> {
+        let Ok(tasks) = fs::read_dir(format!("/proc/{}/task", pid)) else {
+            return Vec::new();
+        };
+        tasks
+            .flatten()
+            .filter_map(|task| fs::read_to_string(task.path().join("children")).ok())
+            .flat_map(|list| {
+                list.split_whitespace()
+                    .filter_map(|p| p.parse().ok())
+                    .collect::<Vec<u32>>()
+            })
+            .collect()
+    }
+
+    /// Same notion of "name" as sysinfo: `comm`, or argv[0]'s basename when
+    /// `comm` hit the kernel's 15-byte limit and may be cut short.
+    fn name_matches(pid: u32, target: &str) -> bool {
+        let Ok(comm) = fs::read_to_string(format!("/proc/{}/comm", pid)) else {
+            return false;
+        };
+        let comm = comm.trim_end();
+        if comm.to_lowercase().contains(target) {
+            return true;
+        }
+        if comm.len() < 15 {
+            return false;
+        }
+        fs::read(format!("/proc/{}/cmdline", pid))
+            .ok()
+            .and_then(|cmdline| {
+                let argv0 = cmdline.split(|b| *b == 0).next()?;
+                let base = std::path::Path::new(std::ffi::OsStr::from_bytes(argv0)).file_name()?;
+                Some(base.to_string_lossy().to_lowercase().contains(target))
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn find_descendant(root: u32, target: &str) -> Option<u32> {
+        let mut level = vec![root];
+        for _ in 0..MAX_DESCENDANT_DEPTH {
+            let mut next = Vec::new();
+            for pid in level {
+                for child in children(pid) {
+                    if name_matches(child, target) {
+                        return Some(child);
+                    }
+                    next.push(child);
+                }
+            }
+            if next.is_empty() {
+                break;
+            }
+            level = next;
+        }
+        None
+    }
+}
+
+/// Portable fallback: one full process scan, then check ancestry.
+fn find_descendant_sysinfo(root: u32, target: &str) -> Option<u32> {
+    use sysinfo::{Pid, ProcessesToUpdate, System};
 
     let mut sys = System::new();
     sys.refresh_processes(ProcessesToUpdate::All, true);
+    let ancestor = Pid::from_u32(root);
 
-    let target = process_name.to_lowercase();
-    for (pid, process) in sys.processes() {
-        let name: String = process.name().to_string_lossy().to_lowercase();
-        if name.contains(&target) {
-            if is_descendant(&sys, *pid, Pid::from_u32(shell_pid)) {
-                return Ok(true);
+    let is_descendant = |pid: Pid| {
+        let mut current = pid;
+        for _ in 0..MAX_DESCENDANT_DEPTH {
+            match sys.process(current).and_then(|p| p.parent()) {
+                Some(parent) if parent == ancestor => return true,
+                Some(parent) => current = parent,
+                None => return false,
             }
         }
-    }
-    Ok(false)
+        false
+    };
+
+    sys.processes()
+        .iter()
+        .find(|(pid, process)| {
+            process.name().to_string_lossy().to_lowercase().contains(target) && is_descendant(**pid)
+        })
+        .map(|(pid, _)| pid.as_u32())
 }
 
-fn is_descendant(sys: &System, pid: Pid, ancestor: Pid) -> bool {
-    let mut current = pid;
-    for _ in 0..10 {
-        if let Some(proc_info) = sys.process(current) {
-            if let Some(parent) = proc_info.parent() {
-                if parent == ancestor {
-                    return true;
-                }
-                current = parent;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-    false
+#[tauri::command]
+pub async fn check_pty_child_process(
+    session_id: String,
+    process_name: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<bool, String> {
+    let shell_pid = session_pid(&state, &session_id)?;
+    let target = process_name.to_lowercase();
+    tauri::async_runtime::spawn_blocking(move || find_descendant(shell_pid, &target).is_some())
+        .await
+        .map_err(join_error)
 }
 
 /// Kill a named child process running under the PTY session (e.g. claude, opencode).
 /// Sends SIGKILL to terminate the process immediately.
 #[tauri::command]
-pub fn kill_pty_child_process(
+pub async fn kill_pty_child_process(
     session_id: String,
     process_name: String,
-    state: tauri::State<AppState>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<bool, String> {
-    let state_lock = state
-        .lock()
-        .map_err(|e| format!("Failed to lock state: {}", e))?;
-    let session = state_lock
-        .pty_sessions
-        .get(&session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+    use sysinfo::{Pid, ProcessesToUpdate, System};
 
-    let shell_pid = session
-        .child
-        .process_id()
-        .ok_or_else(|| "Process has no PID".to_string())?;
-
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
-
+    let shell_pid = session_pid(&state, &session_id)?;
     let target = process_name.to_lowercase();
-    for (pid, process) in sys.processes() {
-        let name: String = process.name().to_string_lossy().to_lowercase();
-        if name.contains(&target) {
-            if is_descendant(&sys, *pid, Pid::from_u32(shell_pid)) {
-                process.kill();
-                return Ok(true);
-            }
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(pid) = find_descendant(shell_pid, &target).map(Pid::from_u32) else {
+            return false;
+        };
+        let mut sys = System::new();
+        sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+        if let Some(process) = sys.process(pid) {
+            process.kill();
         }
-    }
-    Ok(false)
+        true
+    })
+    .await
+    .map_err(join_error)
 }

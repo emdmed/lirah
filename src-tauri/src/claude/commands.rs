@@ -1,8 +1,13 @@
-use crate::claude::types::{ClaudeMessage, ClaudeSession, ClaudeSessionEntry, ClaudeSessionsPage, SubagentInfo, SubagentStatus};
+use crate::claude::types::{ClaudeSessionEntry, ClaudeSessionsPage, SubagentInfo, SubagentStatus};
+use crate::watch_registry::{drain_debounced, Acquired, WatchRegistry};
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Cached result of Claude data directory discovery (retries on None)
 static CLAUDE_DATA_DIR_CACHE: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -172,73 +177,8 @@ fn check_claude_data_dir(path: &PathBuf) -> Option<PathBuf> {
     None
 }
 
-/// Get all possible Claude data paths for debugging
-#[tauri::command]
-pub fn get_claude_data_paths() -> Result<Vec<String>, String> {
-    let home_dir = dirs::home_dir().ok_or("Could not find home directory")?;
-
-    let mut paths = Vec::new();
-
-    // Add env var path if set
-    if let Ok(env_path) = env::var(CLAUDE_DATA_ENV) {
-        paths.push(format!("ENV[{}]: {}", CLAUDE_DATA_ENV, env_path));
-    }
-
-    // Add all standard locations
-    for location in CLAUDE_DATA_LOCATIONS {
-        let full_path = home_dir.join(location);
-        let exists = full_path.exists();
-        let has_projects = full_path.join("projects").exists();
-        paths.push(format!(
-            "{}{}{}",
-            full_path.to_string_lossy(),
-            if exists { " [EXISTS]" } else { "" },
-            if has_projects { " [VALID]" } else { "" }
-        ));
-    }
-
-    // Add npx patterns
-    let npm_dir = home_dir.join(".npm");
-    if npm_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&npm_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.starts_with("_npx"))
-                    .unwrap_or(false)
-                {
-                    let claude_path = path
-                        .join("node_modules")
-                        .join("@anthropic-ai")
-                        .join("claude-code")
-                        .join(".claude");
-                    let exists = claude_path.exists();
-                    let has_projects = claude_path.join("projects").exists();
-                    paths.push(format!(
-                        "{}{}{}",
-                        claude_path.to_string_lossy(),
-                        if exists { " [EXISTS]" } else { "" },
-                        if has_projects { " [VALID]" } else { "" }
-                    ));
-                }
-            }
-        }
-    }
-
-    // Show what discover_claude_data_dir actually resolved to
-    match find_claude_data_dir() {
-        Some(p) => paths.push(format!("RESOLVED: {} [ACTIVE]", p.to_string_lossy())),
-        None => paths.push("RESOLVED: <none>".to_string()),
-    }
-
-    Ok(paths)
-}
-
 /// Get the Claude Code sessions index for a project (paginated)
-#[tauri::command]
-pub fn get_claude_sessions(
+fn get_claude_sessions(
     project_path: String,
     limit: Option<usize>,
     offset: Option<usize>,
@@ -523,139 +463,6 @@ fn build_session_entry_from_file(
     })
 }
 
-/// Get a specific Claude Code session with its messages
-#[tauri::command]
-pub fn get_claude_session(
-    session_id: String,
-    project_path: String,
-) -> Result<ClaudeSession, String> {
-    // Encode the project path
-    let encoded_path = encode_project_path(&project_path);
-
-    // Find Claude data directory
-    let claude_dir = find_claude_data_dir().ok_or("Could not find Claude Code data directory")?;
-
-    let session_file = claude_dir
-        .join("projects")
-        .join(&encoded_path)
-        .join(format!("{}.jsonl", session_id));
-
-    if !session_file.exists() {
-        return Err(format!("Session file not found: {:?}", session_file));
-    }
-
-    use std::io::{BufRead, BufReader};
-    let file = std::fs::File::open(&session_file).map_err(|e| {
-        format!("Failed to open session file: {}", e)
-    })?;
-    let reader = BufReader::new(file);
-
-    let mut messages = Vec::new();
-    let mut summary = None;
-
-
-    for line_result in reader.lines() {
-        let line = match line_result {
-            Ok(l) => l,
-            Err(_) => continue,
-        };
-
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-            // Check the type field - Claude uses "user" and "assistant" types
-            if let Some(msg_type) = json.get("type").and_then(|v| v.as_str()) {
-                match msg_type {
-                    "user" => {
-                        if let Some(message) = json.get("message") {
-                            let role = message
-                                .get("role")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("user")
-                                .to_string();
-
-                            let content = message
-                                .get("content")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or_default()
-                                .to_string();
-
-                            let timestamp = json
-                                .get("timestamp")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string());
-
-                            messages.push(ClaudeMessage {
-                                role,
-                                content,
-                                timestamp,
-                            });
-                        }
-                    }
-                    "assistant" => {
-                        if let Some(message) = json.get("message") {
-                            let role = message
-                                .get("role")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("assistant")
-                                .to_string();
-
-                            // Assistant content is an array of blocks
-                            let content_blocks = message.get("content").and_then(|v| v.as_array());
-
-                            // Filter out thinking blocks, keep only text blocks
-                            let content = if let Some(blocks) = content_blocks {
-                                let texts: Vec<String> = blocks
-                                    .iter()
-                                    .filter_map(|block| {
-                                        // Only include text blocks, skip thinking blocks
-                                        block
-                                            .get("text")
-                                            .and_then(|t| t.as_str())
-                                            .map(|s| s.to_string())
-                                    })
-                                    .collect();
-                                if texts.is_empty() {
-                                    // Skip assistant messages with only thinking blocks
-                                    continue;
-                                }
-                                texts.join("\n\n")
-                            } else {
-                                message
-                                    .get("content")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or_default()
-                                    .to_string()
-                            };
-
-                            let timestamp = json
-                                .get("timestamp")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string());
-
-                            messages.push(ClaudeMessage {
-                                role,
-                                content,
-                                timestamp,
-                            });
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    Ok(ClaudeSession {
-        session_id,
-        messages,
-        summary,
-        project_path,
-    })
-}
-
 /// Get the most recent active session for a project.
 ///
 /// `async` because this is not cheap: it scans every session file for the
@@ -683,191 +490,221 @@ fn encode_project_path(path: &str) -> String {
     crate::fs::claude_project_dir_name(path)
 }
 
-/// Store for the subagent filesystem watchers (one per project path)
+/// Store for the subagent filesystem watchers, ref-counted per project path.
 pub struct SubagentWatcherStore {
-    active: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, SubagentWatcherHandle>>>,
+    registry: WatchRegistry<String, SubagentWatcherHandle>,
 }
 
 struct SubagentWatcherHandle {
+    // Dropping the sender stops the debounce thread, which owns the watcher.
     _stop_tx: std::sync::mpsc::Sender<()>,
 }
 
 impl SubagentWatcherStore {
     pub fn new() -> Self {
         Self {
-            active: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            registry: WatchRegistry::new(),
         }
     }
 }
 
-/// Get subagents for a given session
-#[tauri::command]
-pub fn get_session_subagents(
-    session_id: String,
-    project_path: String,
-) -> Result<Vec<SubagentInfo>, String> {
-    use std::io::{BufRead, BufReader};
+/// A subagent whose transcript was written this recently is still running.
+const SUBAGENT_RUNNING_WINDOW: Duration = Duration::from_secs(30);
 
-    let encoded_path = encode_project_path(&project_path);
-    let claude_dir = find_claude_data_dir().ok_or("Could not find Claude Code data directory")?;
+/// The fields of a transcript line that the subagent list needs. Everything
+/// else (tool inputs, results, thinking) is skipped by serde without being
+/// materialized.
+#[derive(Deserialize)]
+struct TranscriptLine {
+    #[serde(rename = "agentId")]
+    agent_id: Option<String>,
+    // Both spellings can appear on one line, so they are separate fields
+    // rather than an alias (an alias rejects the line as a duplicate field).
+    #[serde(rename = "agent_id")]
+    agent_id_snake: Option<String>,
+    slug: Option<String>,
+    timestamp: Option<String>,
+    message: Option<TranscriptMessage>,
+}
 
-    let subagents_dir = claude_dir
-        .join("projects")
-        .join(&encoded_path)
-        .join(&session_id)
-        .join("subagents");
+#[derive(Deserialize)]
+struct TranscriptMessage {
+    content: Option<TranscriptContent>,
+}
 
-    if !subagents_dir.exists() || !subagents_dir.is_dir() {
-        return Ok(Vec::new());
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum TranscriptContent {
+    Text(String),
+    Blocks(Vec<TranscriptBlock>),
+    Other(serde::de::IgnoredAny),
+}
+
+#[derive(Deserialize)]
+struct TranscriptBlock {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    name: Option<String>,
+    text: Option<String>,
+}
+
+/// Parse state of one `agent-*.jsonl`, kept between calls so a growing
+/// transcript is only read from where the previous call stopped.
+#[derive(Default)]
+struct CachedSubagent {
+    /// File length and mtime when last read; both unchanged means nothing to do.
+    file_len: u64,
+    mtime: Option<SystemTime>,
+    /// Bytes of complete lines merged so far (a trailing partial line is not).
+    consumed: u64,
+    /// The first line was not a JSON object; the file is not listed.
+    invalid: bool,
+    has_header: bool,
+    agent_id: String,
+    slug: String,
+    description: String,
+    started_at: String,
+    message_count: u32,
+    last_tool: Option<String>,
+    last_activity: String,
+}
+
+/// Per-file subagent parse cache. Pruned to the files seen by the latest scan
+/// of each project, so it is bounded by the transcripts currently listed.
+static SUBAGENT_CACHE: Mutex<Option<HashMap<PathBuf, CachedSubagent>>> = Mutex::new(None);
+
+fn first_text(content: &TranscriptContent) -> Option<&str> {
+    match content {
+        TranscriptContent::Text(s) => Some(s),
+        TranscriptContent::Blocks(blocks) => blocks.iter().find_map(|b| b.text.as_deref()),
+        TranscriptContent::Other(_) => None,
     }
+}
 
-    let now = std::time::SystemTime::now();
-    let mut subagents = Vec::new();
-
-    let entries = fs::read_dir(&subagents_dir).map_err(|e| e.to_string())?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n.to_string(),
-            None => continue,
+/// Merge complete lines from `reader` into `state`; returns the bytes consumed.
+fn merge_subagent_lines<R: BufRead>(reader: &mut R, state: &mut CachedSubagent) -> u64 {
+    let mut consumed = 0u64;
+    let mut line: Vec<u8> = Vec::new();
+    loop {
+        line.clear();
+        let n = match reader.read_until(b'\n', &mut line) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => n,
         };
-
-        if !name.starts_with("agent-") || !name.ends_with(".jsonl") {
+        // A final line without its newline is still being written.
+        if line.last() != Some(&b'\n') {
+            break;
+        }
+        consumed += n as u64;
+        let content = line[..line.len() - 1].trim_ascii();
+        if content.is_empty() {
             continue;
         }
+        let parsed = serde_json::from_slice::<TranscriptLine>(content).ok();
 
-        let file = match std::fs::File::open(&path) {
-            Ok(f) => f,
-            Err(_) => continue,
-        };
-
-        let metadata = match file.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-
-        // Determine status based on mtime
-        let mtime_age = now
-            .duration_since(metadata.modified().unwrap_or(now))
-            .unwrap_or_default();
-        let status = if mtime_age.as_secs() < 30 {
-            SubagentStatus::Running
-        } else {
-            SubagentStatus::Completed
-        };
-
-        let mut reader = BufReader::new(&file);
-
-        // Parse first line for agent_id, slug, description, started_at
-        let mut first_line = String::new();
-        if reader.read_line(&mut first_line).unwrap_or(0) == 0 {
-            continue;
-        }
-
-        let first_json: serde_json::Value = match serde_json::from_str(first_line.trim()) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-
-        let agent_id = first_json
-            .get("agentId")
-            .or_else(|| first_json.get("agent_id"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-
-        let slug = first_json
-            .get("slug")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-
-        let started_at = first_json
-            .get("timestamp")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-
-        // Extract description from first user message content
-        let description = first_json
-            .get("message")
-            .and_then(|m| m.get("content"))
-            .and_then(|c| {
-                if let Some(s) = c.as_str() {
-                    Some(s.chars().take(500).collect::<String>())
-                } else if let Some(arr) = c.as_array() {
-                    arr.iter()
-                        .find_map(|block| block.get("text").and_then(|t| t.as_str()))
-                        .map(|s| s.chars().take(500).collect::<String>())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
-
-        // Scan file for message_count, last_tool, last_activity
-        let mut message_count: u32 = 1; // count first line
-        let mut last_tool: Option<String> = None;
-        let mut last_activity = started_at.clone();
-
-        // Read remaining lines
-        for line_result in reader.lines() {
-            let line = match line_result {
-                Ok(l) => l,
-                Err(_) => continue,
+        if !state.has_header {
+            let Some(first) = parsed else {
+                state.invalid = true;
+                break;
             };
-            if line.trim().is_empty() {
-                continue;
-            }
+            state.has_header = true;
+            state.agent_id = first.agent_id.or(first.agent_id_snake).unwrap_or_default();
+            state.slug = first.slug.unwrap_or_default();
+            state.started_at = first.timestamp.unwrap_or_default();
+            state.last_activity = state.started_at.clone();
+            state.description = first
+                .message
+                .as_ref()
+                .and_then(|m| m.content.as_ref())
+                .and_then(first_text)
+                .map(|s| s.chars().take(500).collect())
+                .unwrap_or_default();
+            state.message_count = 1;
+            continue;
+        }
 
-            message_count += 1;
-
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                if let Some(ts) = json.get("timestamp").and_then(|v| v.as_str()) {
-                    last_activity = ts.to_string();
-                }
-
-                // Check for tool_use in assistant message content blocks
-                if let Some(message) = json.get("message") {
-                    if let Some(blocks) = message.get("content").and_then(|c| c.as_array()) {
-                        for block in blocks {
-                            if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                                if let Some(tool_name) =
-                                    block.get("name").and_then(|n| n.as_str())
-                                {
-                                    last_tool = Some(tool_name.to_string());
-                                }
-                            }
-                        }
+        state.message_count += 1;
+        let Some(parsed) = parsed else { continue };
+        if let Some(ts) = parsed.timestamp {
+            state.last_activity = ts;
+        }
+        if let Some(TranscriptContent::Blocks(blocks)) = parsed.message.and_then(|m| m.content) {
+            for block in blocks {
+                if block.kind.as_deref() == Some("tool_use") {
+                    if let Some(name) = block.name {
+                        state.last_tool = Some(name);
                     }
                 }
             }
         }
-
-        subagents.push(SubagentInfo {
-            agent_id,
-            slug,
-            status,
-            description,
-            last_tool,
-            message_count,
-            started_at: started_at.clone(),
-            last_activity,
-        });
     }
-
-    // Sort by started_at descending (most recent first)
-    subagents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
-
-    Ok(subagents)
+    consumed
 }
 
-/// Get all subagents across all sessions for a project (scans all session dirs)
-#[tauri::command]
-pub fn get_project_subagents(
-    project_path: String,
+/// Bring the cached parse of one transcript up to date and describe it.
+fn load_subagent(
+    path: &Path,
+    file_len: u64,
+    mtime: Option<SystemTime>,
+    now: SystemTime,
+) -> Option<SubagentInfo> {
+    // Take the entry out (no clone) and put it back when done.
+    let cached = {
+        let mut guard = SUBAGENT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        guard.get_or_insert_with(HashMap::new).remove(path)
+    };
+    let mut state = match cached {
+        Some(c) if c.file_len == file_len && c.mtime == mtime => c,
+        // Appended to: resume after the last complete line.
+        Some(c) if file_len > c.file_len && !c.invalid => c,
+        // New, truncated or rewritten: start over.
+        _ => CachedSubagent::default(),
+    };
+
+    if state.file_len != file_len || state.mtime != mtime || state.consumed == 0 {
+        if let Ok(file) = fs::File::open(path) {
+            let mut reader = BufReader::new(file);
+            if reader.seek(SeekFrom::Start(state.consumed)).is_ok() {
+                let consumed = merge_subagent_lines(&mut reader, &mut state);
+                state.consumed += consumed;
+            }
+        }
+        state.file_len = file_len;
+        state.mtime = mtime;
+    }
+
+    let info = (state.has_header && !state.invalid).then(|| {
+        let age = mtime
+            .and_then(|m| now.duration_since(m).ok())
+            .unwrap_or_default();
+        SubagentInfo {
+            agent_id: state.agent_id.clone(),
+            slug: state.slug.clone(),
+            status: if age < SUBAGENT_RUNNING_WINDOW {
+                SubagentStatus::Running
+            } else {
+                SubagentStatus::Completed
+            },
+            description: state.description.clone(),
+            last_tool: state.last_tool.clone(),
+            message_count: state.message_count,
+            started_at: state.started_at.clone(),
+            last_activity: state.last_activity.clone(),
+        }
+    });
+
+    let mut guard = SUBAGENT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    guard
+        .get_or_insert_with(HashMap::new)
+        .insert(path.to_path_buf(), state);
+    info
+}
+
+fn project_subagents_blocking(
+    project_path: &str,
+    since_ms: Option<u64>,
 ) -> Result<Vec<SubagentInfo>, String> {
-    let encoded_path = encode_project_path(&project_path);
+    let encoded_path = encode_project_path(project_path);
     let claude_dir = find_claude_data_dir().ok_or("Could not find Claude Code data directory")?;
 
     let project_dir = claude_dir.join("projects").join(&encoded_path);
@@ -875,47 +712,84 @@ pub fn get_project_subagents(
         return Ok(Vec::new());
     }
 
+    let now = SystemTime::now();
+    // Transcripts untouched since before the caller's cutoff are neither
+    // running nor recent, and the frontend would drop them; skip them unread.
+    let cutoff = since_ms.map(|ms| {
+        let since = UNIX_EPOCH + Duration::from_millis(ms);
+        let running_floor = now.checked_sub(SUBAGENT_RUNNING_WINDOW).unwrap_or(UNIX_EPOCH);
+        since.min(running_floor)
+    });
+
+    let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut all_subagents = Vec::new();
 
     // Scan all session directories for subagents
-    let entries = fs::read_dir(&project_dir).map_err(|e| e.to_string())?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
+    let sessions = fs::read_dir(&project_dir).map_err(|e| e.to_string())?;
+    for session in sessions.flatten() {
+        let Ok(transcripts) = fs::read_dir(session.path().join("subagents")) else {
             continue;
-        }
-        let subagents_dir = path.join("subagents");
-        if !subagents_dir.is_dir() {
-            continue;
-        }
-
-        // Get session_id from directory name
-        let session_id = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
-
-        match get_session_subagents(session_id, project_path.clone()) {
-            Ok(mut subs) => all_subagents.append(&mut subs),
-            Err(_) => continue,
+        };
+        for transcript in transcripts.flatten() {
+            let path = transcript.path();
+            let is_transcript = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("agent-") && n.ends_with(".jsonl"));
+            if !is_transcript {
+                continue;
+            }
+            let Ok(meta) = transcript.metadata() else { continue };
+            let mtime = meta.modified().ok();
+            if let (Some(cutoff), Some(mtime)) = (cutoff, mtime) {
+                if mtime < cutoff {
+                    continue;
+                }
+            }
+            if let Some(info) = load_subagent(&path, meta.len(), mtime, now) {
+                all_subagents.push(info);
+            }
+            seen.insert(path);
         }
     }
 
-    // Sort by started_at descending
+    // Forget transcripts of this project that this scan did not use.
+    if let Some(cache) = SUBAGENT_CACHE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_mut()
+    {
+        cache.retain(|path, _| !path.starts_with(&project_dir) || seen.contains(path));
+    }
+
+    // Sort by started_at descending (most recent first)
     all_subagents.sort_by(|a, b| b.started_at.cmp(&a.started_at));
 
     Ok(all_subagents)
 }
 
-/// Start watching a project's subagent directories for changes
+/// Get all subagents across all sessions for a project.
+///
+/// Transcripts are parsed incrementally: an unchanged file costs one stat, a
+/// growing one only its new lines. With `since_ms` (unix ms), transcripts last
+/// written before it, and not within the running window, are skipped.
 #[tauri::command]
-pub fn watch_project_subagents(
+pub async fn get_project_subagents(
+    project_path: String,
+    since_ms: Option<u64>,
+) -> Result<Vec<SubagentInfo>, String> {
+    crate::ipc::blocking("get_project_subagents", move || {
+        project_subagents_blocking(&project_path, since_ms)
+    })
+    .await
+}
+
+fn build_subagent_watcher(
     project_path: String,
     app_handle: tauri::AppHandle,
-    store: tauri::State<std::sync::Arc<SubagentWatcherStore>>,
-) -> Result<(), String> {
+) -> Result<SubagentWatcherHandle, String> {
     use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+    use std::sync::mpsc;
     use tauri::Emitter;
 
     let encoded_path = encode_project_path(&project_path);
@@ -926,28 +800,23 @@ pub fn watch_project_subagents(
         return Err("Project directory not found".to_string());
     }
 
-    let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
+    let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let (event_tx, event_rx) = mpsc::channel::<()>();
 
-    // If already watching this path, no-op (idempotent)
-    if active.contains_key(&project_path) {
-        return Ok(());
-    }
-
-    let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
-    let (event_tx, event_rx) = std::sync::mpsc::channel::<()>();
-
-    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-        if let Ok(event) = res {
-            // Only emit for subagent file changes
-            let is_subagent = event.paths.iter().any(|p| {
-                p.to_string_lossy().contains("/subagents/")
-            });
-            if is_subagent {
-                let _ = event_tx.send(());
+    let mut watcher: RecommendedWatcher =
+        notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+            if let Ok(event) = res {
+                // Only emit for subagent file changes
+                let is_subagent = event
+                    .paths
+                    .iter()
+                    .any(|p| p.to_string_lossy().contains("/subagents/"));
+                if is_subagent {
+                    let _ = event_tx.send(());
+                }
             }
-        }
-    })
-    .map_err(|e| format!("Failed to create watcher: {}", e))?;
+        })
+        .map_err(|e| format!("Failed to create watcher: {}", e))?;
 
     // Watch the entire project dir recursively to catch new session dirs + subagent files
     watcher
@@ -955,43 +824,117 @@ pub fn watch_project_subagents(
         .map_err(|e| format!("Failed to watch project dir: {}", e))?;
 
     // Debounce thread — emits project_path so frontend knows which path changed
-    let emit_path = project_path.clone();
     std::thread::spawn(move || {
         let _watcher = watcher; // keep alive
-        let debounce = std::time::Duration::from_millis(500);
+        let quiet = Duration::from_millis(500);
+        let max_wait = Duration::from_secs(2);
 
         loop {
             match stop_rx.try_recv() {
-                Ok(()) | Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
-                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Ok(()) | Err(mpsc::TryRecvError::Disconnected) => break,
+                Err(mpsc::TryRecvError::Empty) => {}
             }
 
-            match event_rx.recv_timeout(std::time::Duration::from_millis(200)) {
+            match event_rx.recv_timeout(Duration::from_millis(200)) {
                 Ok(()) => {
-                    // Drain further events within debounce window
-                    while event_rx.recv_timeout(debounce).is_ok() {}
-                    let _ = app_handle.emit("subagents-changed", &emit_path);
+                    drain_debounced(&event_rx, Instant::now(), quiet, max_wait, |_| {});
+                    let _ = app_handle.emit("subagents-changed", &project_path);
                 }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
             }
         }
     });
 
-    active.insert(project_path, SubagentWatcherHandle {
-        _stop_tx: stop_tx,
-    });
-
-    Ok(())
+    Ok(SubagentWatcherHandle { _stop_tx: stop_tx })
 }
 
-/// Stop the subagent filesystem watcher for a specific project path
+/// Start watching a project's subagent directories for changes. Ref-counted:
+/// each call must be paired with `stop_project_subagents_watcher`.
+#[tauri::command]
+pub async fn watch_project_subagents(
+    project_path: String,
+    app_handle: tauri::AppHandle,
+    store: tauri::State<'_, Arc<SubagentWatcherStore>>,
+) -> Result<(), String> {
+    let store = store.inner().clone();
+    let Acquired::New(generation) = store.registry.acquire(&project_path) else {
+        return Ok(());
+    };
+    let key = project_path.clone();
+    let built = crate::ipc::blocking("watch_project_subagents", move || {
+        build_subagent_watcher(project_path, app_handle)
+    })
+    .await;
+    match built {
+        Ok(handle) => {
+            store.registry.attach(&key, generation, handle);
+            Ok(())
+        }
+        Err(e) => {
+            store.registry.abandon(&key, generation);
+            Err(e)
+        }
+    }
+}
+
+/// Release one user of a project's subagent watcher; it stops with the last.
 #[tauri::command]
 pub fn stop_project_subagents_watcher(
     project_path: String,
     store: tauri::State<std::sync::Arc<SubagentWatcherStore>>,
 ) -> Result<(), String> {
-    let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
-    active.remove(&project_path);
+    store.registry.release(&project_path);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn subagent_lines_merge_incrementally() {
+        let first = concat!(
+            r#"{"agentId":"a1","slug":"explore","timestamp":"T0","message":{"role":"user","content":"Find the bug"}}"#, "\n",
+            r#"{"timestamp":"T1","message":{"content":[{"type":"tool_use","name":"Grep","input":{"q":1}}]}}"#, "\n",
+            r#"{"timestamp":"T2","message":{"con"#,
+        );
+        let mut state = CachedSubagent::default();
+        let consumed = merge_subagent_lines(&mut Cursor::new(first.as_bytes()), &mut state);
+        assert_eq!(state.agent_id, "a1");
+        assert_eq!(state.description, "Find the bug");
+        assert_eq!(state.message_count, 2);
+        assert_eq!(state.last_tool.as_deref(), Some("Grep"));
+        assert_eq!(state.last_activity, "T1");
+
+        // The partial line was left for the next call.
+        let rest = concat!(
+            r#"{"timestamp":"T2","message":{"content":[{"type":"text","text":"ok"},{"type":"tool_use","name":"Read"}]}}"#, "\n",
+        );
+        state.consumed = consumed;
+        merge_subagent_lines(&mut Cursor::new(rest.as_bytes()), &mut state);
+        assert_eq!(state.message_count, 3);
+        assert_eq!(state.last_tool.as_deref(), Some("Read"));
+        assert_eq!(state.last_activity, "T2");
+    }
+
+    #[test]
+    fn description_from_text_block_and_snake_case_id() {
+        let jsonl = concat!(
+            r#"{"agent_id":"b2","agentId":"b2","message":{"content":[{"type":"text","text":"Plan it"}]}}"#, "\n",
+        );
+        let mut state = CachedSubagent::default();
+        merge_subagent_lines(&mut Cursor::new(jsonl.as_bytes()), &mut state);
+        assert_eq!(state.agent_id, "b2");
+        assert_eq!(state.description, "Plan it");
+    }
+
+    #[test]
+    fn invalid_first_line_hides_transcript() {
+        let mut state = CachedSubagent::default();
+        merge_subagent_lines(&mut Cursor::new(b"not json\n{}\n".as_slice()), &mut state);
+        assert!(state.invalid);
+        assert!(!state.has_header);
+    }
 }

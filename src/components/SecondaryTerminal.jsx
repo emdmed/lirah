@@ -38,16 +38,14 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     }
   }, [sessionId, initialCommand, ref]);
 
+  // One fit per frame; the SIGWINCH is debounced inside handleResize, so a
+  // trailing second fit would only double the local work.
   const rafRef = useRef(null);
-  const trailingRef = useRef(null);
   const debouncedResize = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
     rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
       handleResize();
-      trailingRef.current = requestAnimationFrame(() => {
-        handleResize();
-      });
     });
   }, [handleResize]);
 
@@ -60,7 +58,6 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
       resizeObserver.disconnect();
       window.removeEventListener('resize', debouncedResize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (trailingRef.current) cancelAnimationFrame(trailingRef.current);
     };
   }, [debouncedResize]);
 

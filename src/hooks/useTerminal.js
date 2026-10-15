@@ -5,10 +5,10 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { invoke, Channel } from '@tauri-apps/api/core';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
+import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
 import '@xterm/xterm/css/xterm.css';
 
 // Smallest geometry we will ever apply. FitAddon floors its proposal at 2 cols /
@@ -25,6 +25,21 @@ const MIN_USABLE_ROWS = 4;
 // of resize events can never starve the final delivery.
 const SIGWINCH_DEBOUNCE_MS = 120;
 const SIGWINCH_MAX_WAIT_MS = 400;
+
+// Output flow control. xterm parses asynchronously; past HIGH bytes written but
+// not yet parsed, the backend stops draining the PTY so the kernel buffer
+// throttles the child (`yes`, `cat bigfile`) instead of the JS thread.
+const FLOW_HIGH_WATERMARK = 512 * 1024;
+const FLOW_LOW_WATERMARK = 128 * 1024;
+
+// WebGL budget. Browsers cap live contexts (~16) and evict the least recently
+// used, so a terminal that has been out of sight this long gives its context
+// back and rebuilds it when it is shown again.
+const WEBGL_IDLE_DISPOSE_MS = 30_000;
+// A restored renderer that survives this long resets the restore budget, so a
+// few context losses spread over a long session don't strand us on the DOM
+// renderer for good.
+const WEBGL_RETRY_RESET_MS = 60_000;
 
 export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true) {
   const [terminal, setTerminal] = useState(null);
@@ -48,6 +63,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const webglRef = useRef(null);
   const [rendererLost, setRendererLost] = useState(false);
   const rendererRetriesRef = useRef(0);
+  const rendererRetryResetRef = useRef(0);
+  // Disposed for the WebGL budget (as opposed to lost): rebuild on activation.
+  const webglSuspendedRef = useRef(false);
+  // A resize arrived while hidden; refit when shown again.
+  const resizeDirtyRef = useRef(false);
   // Repaint scheduling. Several signals can ask for the same repaint in one
   // frame (the tab becoming visible also focuses the window, which also fires
   // visibilitychange), and clearing the atlas re-rasterizes every glyph — so
@@ -55,6 +75,29 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const repaintRafRef = useRef(0);
   const isActiveRef = useRef(isActive);
   const { error, warning } = useToast();
+
+  // Load a fresh WebGL renderer. Must be called after open(). If the context
+  // can't be created (headless, driver issues) we stay on the DOM renderer.
+  const attachWebgl = useCallback((term) => {
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => {
+        // Only the live renderer's loss matters; one we disposed ourselves is
+        // already gone.
+        if (webglRef.current !== webgl) return;
+        webglRef.current = null;
+        webgl.dispose();
+        setRendererLost(true);
+      });
+      term.loadAddon(webgl);
+      webglRef.current = webgl;
+      return webgl;
+    } catch (e) {
+      webglRef.current = null;
+      console.debug('WebGL renderer unavailable, using DOM renderer:', e?.message);
+      return null;
+    }
+  }, []);
 
   // Initialize terminal
   useEffect(() => {
@@ -98,26 +141,12 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // styled cell and thrashes layout/paint on heavy TUI output (Claude Code
     // redraws, build logs, `cat` of large files). WebGL offloads glyph
     // rendering to the GPU — an order-of-magnitude win under bursty output.
-    // Must be loaded after open(). If the context can't be created (headless,
-    // driver issues) or is lost, dispose and fall back to the DOM renderer.
     // Browsers cap live WebGL contexts and evict the least recently used one
     // first — with several tabs, each holding a primary and maybe a secondary
-    // terminal, a background tab's context is exactly what gets taken. Losing it
-    // used to be permanent: dispose, fall back to DOM, stay slow forever. Now the
-    // loss is recorded and the renderer is rebuilt when the tab is active again.
-    try {
-      const webgl = new WebglAddon();
-      webgl.onContextLoss(() => {
-        webgl.dispose();
-        if (webglRef.current === webgl) webglRef.current = null;
-        setRendererLost(true);
-      });
-      term.loadAddon(webgl);
-      webglRef.current = webgl;
-    } catch (e) {
-      webglRef.current = null;
-      console.debug('WebGL renderer unavailable, using DOM renderer:', e?.message);
-    }
+    // terminal, a background tab's context is exactly what gets taken. A loss
+    // is recorded and the renderer rebuilt when the tab is active again, and
+    // background terminals hand their context back (see the budget below).
+    attachWebgl(term);
 
     // Initial fit
     try {
@@ -132,12 +161,13 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     setSearchAddon(search);
 
     return () => {
-      webglRef.current?.dispose();
+      const webgl = webglRef.current;
       webglRef.current = null;
+      webgl?.dispose();
       terminalInstRef.current = null;
       term.dispose();
     };
-  }, [terminalRef]);
+  }, [terminalRef, attachWebgl]);
 
   // Attach keyboard event handler (updates when callbacks change)
   useEffect(() => {
@@ -190,8 +220,33 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   useEffect(() => {
     if (!terminal || !fitAddon) return;
 
-    let unlisten;
     let cancelled = false;
+    let id = null;
+
+    // Raw PTY bytes for this session only, in order — including whatever the
+    // shell prints before spawn_terminal resolves. xterm decodes the UTF-8
+    // itself, so sequences split across chunks need no special care.
+    const output = new Channel();
+    let pendingBytes = 0;
+    let paused = false;
+    output.onmessage = (buf) => {
+      if (cancelled) return;
+      const bytes = new Uint8Array(buf);
+      pendingBytes += bytes.length;
+      terminal.write(bytes, () => {
+        perfFirstOutput();
+        perfOutputWritten();
+        pendingBytes -= bytes.length;
+        if (paused && pendingBytes < FLOW_LOW_WATERMARK && !cancelled) {
+          paused = false;
+          invoke('pty_resume', { sessionId: id }).catch(() => {});
+        }
+      });
+      if (!paused && id && pendingBytes > FLOW_HIGH_WATERMARK) {
+        paused = true;
+        invoke('pty_pause', { sessionId: id }).catch(() => {});
+      }
+    };
 
     const initTerminal = async () => {
       try {
@@ -200,8 +255,13 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         const cols = terminal.cols;
 
         // Spawn terminal backend
-        const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null });
-        const id = result.session_id;
+        const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, output });
+        id = result.session_id;
+        // Unmounted while spawning: the cleanup had no id to close yet.
+        if (cancelled) {
+          invoke('close_terminal', { sessionId: id }).catch(() => {});
+          return;
+        }
         sessionIdRef.current = id;
         setSessionId(id);
 
@@ -220,23 +280,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
           });
         }
 
-        // Listen for terminal output on this session's own event channel. The
-        // backend scopes the event name per session (terminal-output-<id>), so
-        // this listener only ever receives its own stream — no cross-terminal
-        // fan-out or filtering needed even with many tabs mounted at once.
-        const fn = await listen(`terminal-output-${id}`, (event) => {
-          terminal.write(event.payload.data);
-        });
-        // Unmounted while listen() was resolving — tear down immediately
-        if (cancelled) {
-          fn();
-        } else {
-          unlisten = fn;
-        }
-
         // Handle terminal input. Held so the cleanup below can dispose it — an
         // undisposed handler would double every keystroke if this effect re-ran.
         const dataDisposable = terminal.onData((data) => {
+          perfInput();
           invoke('write_to_terminal', { sessionId: id, data }).catch((error) => {
             console.error('Failed to write to terminal:', error);
           });
@@ -290,9 +337,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
 
     return () => {
       cancelled = true;
-      if (unlisten) {
-        unlisten();
-      }
+      output.onmessage = () => {};
       onDataDisposableRef.current?.dispose();
       onDataDisposableRef.current = null;
       const id = sessionIdRef.current;
@@ -429,6 +474,14 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   // would otherwise overlay the next paint from a TUI app.
   const handleResize = useCallback(({ immediate = false } = {}) => {
     if (!fitAddon || !terminal || !sessionId) return;
+    // A hidden terminal skips the refit and the SIGWINCH — a background TUI
+    // would redraw for nobody. It catches up when shown (see below); an
+    // explicit immediate resize (tab activation) always goes through.
+    if (!immediate && !isActiveRef.current) {
+      resizeDirtyRef.current = true;
+      return;
+    }
+    resizeDirtyRef.current = false;
     try {
       if (!terminal._core || !terminal._core._renderService) {
         return;
@@ -472,6 +525,16 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       console.debug('Resize skipped (terminal not ready):', error.message);
     }
   }, [fitAddon, terminal, sessionId, flushSigwinch]);
+
+  // Catch up on resizes skipped while hidden. ProjectTab also forces a resize of
+  // the primary terminal on activation; this covers the secondary one too.
+  useEffect(() => {
+    if (!isActive || !resizeDirtyRef.current) return;
+    const raf = requestAnimationFrame(() => {
+      if (resizeDirtyRef.current) handleResize({ immediate: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isActive, handleResize]);
 
   // Cleanup pending SIGWINCH timer on unmount
   useEffect(() => {
@@ -521,25 +584,43 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     if (!terminal || !rendererLost || !isActive) return;
     if (rendererRetriesRef.current >= 3) return;
     rendererRetriesRef.current += 1;
-    try {
-      const webgl = new WebglAddon();
-      webgl.onContextLoss(() => {
-        webgl.dispose();
-        if (webglRef.current === webgl) webglRef.current = null;
-        setRendererLost(true);
-      });
-      terminal.loadAddon(webgl);
-      webglRef.current = webgl;
-      setRendererLost(false);
-      // The atlas is cached per terminal by the addon and survives the addon
-      // that built it, so a fresh renderer can come back pointing at pages that
-      // were uploaded to the context we just lost — which paints the right
-      // glyph shapes from the wrong slots. Force a re-rasterization.
-      repaintAll();
-    } catch (e) {
-      console.debug('WebGL renderer could not be restored:', e?.message);
+    const webgl = attachWebgl(terminal);
+    if (!webgl) return;
+    setRendererLost(false);
+    // The atlas is cached per terminal by the addon and survives the addon
+    // that built it, so a fresh renderer can come back pointing at pages that
+    // were uploaded to the context we just lost — which paints the right
+    // glyph shapes from the wrong slots. Force a re-rasterization.
+    repaintAll();
+    clearTimeout(rendererRetryResetRef.current);
+    rendererRetryResetRef.current = setTimeout(() => {
+      if (webglRef.current === webgl) rendererRetriesRef.current = 0;
+    }, WEBGL_RETRY_RESET_MS);
+  }, [terminal, rendererLost, isActive, attachWebgl, repaintAll]);
+
+  useEffect(() => () => clearTimeout(rendererRetryResetRef.current), []);
+
+  // WebGL budget: give the context back after a while out of sight, and
+  // rebuild it when the terminal is shown again. Hidden terminals don't render
+  // (xterm pauses off-screen), so the DOM renderer costs them nothing meanwhile.
+  useEffect(() => {
+    if (!terminal) return;
+    if (isActive) {
+      if (webglSuspendedRef.current) {
+        webglSuspendedRef.current = false;
+        if (!webglRef.current && attachWebgl(terminal)) repaintAll();
+      }
+      return;
     }
-  }, [terminal, rendererLost, isActive, repaintAll]);
+    const timer = setTimeout(() => {
+      const webgl = webglRef.current;
+      if (!webgl) return;
+      webglRef.current = null;
+      webglSuspendedRef.current = true;
+      webgl.dispose();
+    }, WEBGL_IDLE_DISPOSE_MS);
+    return () => clearTimeout(timer);
+  }, [terminal, isActive, attachWebgl, repaintAll]);
 
   // Apply preference changes to this already-open terminal, including ones made
   // in another window of the app.

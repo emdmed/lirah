@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { usePageVisible } from '../hooks/usePageVisible';
 import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
@@ -164,11 +165,13 @@ export function SubagentList() {
   const { allSubagents, totalActiveCount, dismissedIds, dismiss } = useSubagentContext();
 
   const [now, setNow] = useState(Date.now());
+  const pageVisible = usePageVisible();
   useEffect(() => {
-    if (totalActiveCount === 0) return;
+    if (totalActiveCount === 0 || !pageVisible) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(id);
-  }, [totalActiveCount]);
+  }, [totalActiveCount, pageVisible]);
 
   const visibleSubagents = useMemo(
     () => allSubagents.filter(s => !dismissedIds.has(s.agent_id)),
@@ -233,11 +236,13 @@ export function AgentSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   // Tick every 5s to keep elapsed times fresh
   const [now, setNow] = useState(Date.now());
+  const pageVisible = usePageVisible();
   useEffect(() => {
-    if (totalActiveCount === 0) return;
+    if (totalActiveCount === 0 || !pageVisible) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(id);
-  }, [totalActiveCount]);
+  }, [totalActiveCount, pageVisible]);
 
   const visibleSubagents = useMemo(
     () => allSubagents.filter(s => !dismissedIds.has(s.agent_id)),

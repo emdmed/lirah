@@ -8,6 +8,15 @@ const CONTEXT_LINES = 3; // Lines of context to show around changes
 const VIRTUALIZATION_BUFFER = 10; // Extra lines to render above/below viewport
 
 /**
+ * Word-level diff of a modified line pair, computed on first render of either
+ * side and cached on the pair, so a large diff only pays for the rows shown.
+ */
+function wordDiffOf(pair) {
+  if (!pair.parts) pair.parts = computeWordDiff(pair.oldStr, pair.newStr);
+  return pair.parts;
+}
+
+/**
  * Compute word-level diff between two strings
  */
 function computeWordDiff(oldStr, newStr) {
@@ -109,19 +118,19 @@ export function DiffContent({
           const newLine = addedLines[j];
 
           if (oldLine !== undefined && newLine !== undefined) {
-            // Modified line - compute word diff
-            const wordDiff = computeWordDiff(oldLine, newLine);
+            // Modified line - word diff deferred until the row renders
+            const wordDiff = { oldStr: oldLine, newStr: newLine, parts: null };
             oldLines.push({
               content: oldLine,
               type: 'modified-old',
               lineNum: oldLineNum++,
-              wordDiff: wordDiff.oldParts
+              wordDiff
             });
             newLines.push({
               content: newLine,
               type: 'modified-new',
               lineNum: newLineNum++,
-              wordDiff: wordDiff.newParts
+              wordDiff
             });
           } else if (oldLine !== undefined) {
             // Only removed
@@ -526,7 +535,9 @@ export function DiffContent({
                   isSelected={selectedLines.has(item.lineIndex)}
                   lineIndex={item.lineIndex}
                   showCopyButton={isChunkStart}
-                  onCopy={() => copyChunk(chunkIndex, 'old')}
+                  chunkIndex={chunkIndex}
+                  side="old"
+                  onCopy={copyChunk}
                   isCopied={copiedChunk === `${chunkIndex}-old`}
                 />
               );
@@ -571,7 +582,9 @@ export function DiffContent({
                   isSelected={selectedLines.has(item.lineIndex)}
                   lineIndex={item.lineIndex}
                   showCopyButton={isChunkStart}
-                  onCopy={() => copyChunk(chunkIndex, 'new')}
+                  chunkIndex={chunkIndex}
+                  side="new"
+                  onCopy={copyChunk}
                   isCopied={copiedChunk === `${chunkIndex}-new`}
                 />
               );
@@ -655,6 +668,8 @@ const DiffLine = memo(function DiffLine({
   isSelected,
   lineIndex,
   showCopyButton,
+  chunkIndex,
+  side,
   onCopy,
   isCopied,
 }) {
@@ -686,6 +701,11 @@ const DiffLine = memo(function DiffLine({
     bgColor = 'rgba(126, 156, 216, 0.25)';
   }
 
+  // `wordDiff` is the modified line's pair, shared with the other side.
+  const wordParts = wordDiff
+    ? wordDiffOf(wordDiff)[type === 'modified-old' ? 'oldParts' : 'newParts']
+    : null;
+
   // Render content - plain text with word-level diff highlighting only
   const renderContent = () => {
     if (!content || type === 'empty') {
@@ -693,10 +713,10 @@ const DiffLine = memo(function DiffLine({
     }
 
     // If we have word-level diff, render with highlights
-    if (wordDiff && wordDiff.length > 0) {
+    if (wordParts && wordParts.length > 0) {
       return (
         <span>
-          {wordDiff.map((part, i) => (
+          {wordParts.map((part, i) => (
             <span
               key={i}
               className={part.highlight ? 'rounded-sm' : ''}
@@ -744,7 +764,7 @@ const DiffLine = memo(function DiffLine({
           title={isCopied ? 'Copied!' : 'Copy chunk'}
           onClick={(e) => {
             e.stopPropagation();
-            onCopy();
+            onCopy(chunkIndex, side);
           }}
         >
           {isCopied ? (

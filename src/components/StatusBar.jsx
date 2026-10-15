@@ -26,7 +26,7 @@ import {
 } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
-import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, subscribeTerminalPrefs } from '../lib/terminalPrefs';
+import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, SCROLLBACK_WARN_THRESHOLD, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
 import { getContextFill } from '../config/models';
 import { Lamp } from './instrument/Lamp';
@@ -545,6 +545,15 @@ function ScrollbackMenuItem() {
           >
             {o.value === value && <Check className="mr-2 w-3 h-3" />}
             <span className={o.value === value ? '' : 'ml-5'}>{o.label}</span>
+            {o.value > SCROLLBACK_WARN_THRESHOLD && (
+              <span
+                className="ml-auto flex items-center gap-1 pl-3 text-[10px] text-destructive/80"
+                title="Uses a lot of memory per terminal and slows down resizing"
+              >
+                <AlertCircle className="w-3 h-3" />
+                heavy
+              </span>
+            )}
           </DropdownMenuItem>
         ))}
       </DropdownMenuSubContent>

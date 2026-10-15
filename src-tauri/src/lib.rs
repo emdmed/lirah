@@ -8,19 +8,19 @@ mod typecheck;
 mod python_parser;
 mod commit_watcher;
 mod claude;
-mod opencode;
 mod workspace;
 mod fs_watcher;
 mod agent_runner;
 mod design;
+mod ipc;
+mod watch_registry;
 
 use state::create_state;
-use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, check_pty_child_process, kill_pty_child_process};
-use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_branch_completed_tasks, get_home_dir, set_file_executable, path_exists};
-use typecheck::check_file_types;
+use pty::commands::{spawn_terminal, write_to_terminal, resize_terminal, close_terminal, pty_pause, pty_resume, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, generate_branch_tasks, check_pty_child_process, kill_pty_child_process};
+use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_home_dir, set_file_executable, path_exists};
+use typecheck::{check_file_types, check_project_types};
 use python_parser::parse_python_skeleton;
-use claude::{get_claude_data_paths, get_claude_sessions, get_claude_session, get_active_claude_session, get_session_subagents, get_project_subagents, watch_project_subagents, stop_project_subagents_watcher, SubagentWatcherStore};
-use opencode::{get_opencode_data_paths, get_opencode_sessions, get_opencode_session, get_active_opencode_session};
+use claude::{get_active_claude_session, get_project_subagents, watch_project_subagents, stop_project_subagents_watcher, SubagentWatcherStore};
 use workspace::{create_workspace, delete_workspace, list_workspaces, open_workspace, close_workspace};
 use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
 use agent_runner::{create_agent_job_store};
@@ -43,6 +43,8 @@ pub fn run(initial_path: Option<String>) {
     #[cfg(target_os = "linux")]
     std::env::set_var("GTK_OVERLAY_SCROLLING", "0");
 
+    ipc::init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(create_state())
@@ -51,11 +53,13 @@ pub fn run(initial_path: Option<String>) {
         .manage(std::sync::Arc::new(SubagentWatcherStore::new()))
         .manage(create_agent_job_store())
         .manage(InitialPath(initial_path))
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(ipc::wrap(tauri::generate_handler![
             spawn_terminal,
             write_to_terminal,
             resize_terminal,
             close_terminal,
+            pty_pause,
+            pty_resume,
             read_directory,
             get_terminal_cwd,
             read_file_content,
@@ -63,6 +67,7 @@ pub fn run(initial_path: Option<String>) {
             read_directory_recursive,
             get_git_stats,
             check_file_types,
+            check_project_types,
             enable_file_watchers,
             disable_file_watchers,
             get_file_watchers_status,
@@ -80,18 +85,10 @@ pub fn run(initial_path: Option<String>) {
             run_git_command,
             generate_commit_message,
             generate_branch_tasks,
-            get_claude_sessions,
-            get_claude_session,
-            get_claude_data_paths,
             get_active_claude_session,
-            get_session_subagents,
             get_project_subagents,
             watch_project_subagents,
             stop_project_subagents_watcher,
-            get_opencode_sessions,
-            get_opencode_session,
-            get_opencode_data_paths,
-            get_active_opencode_session,
             create_workspace,
             delete_workspace,
             list_workspaces,
@@ -117,7 +114,7 @@ pub fn run(initial_path: Option<String>) {
             paths_change_status,
             latest_design_run,
             get_initial_path
-        ])
+        ]))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

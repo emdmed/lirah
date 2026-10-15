@@ -1,9 +1,10 @@
 use crate::state::AppState;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct GitStats {
@@ -25,11 +26,10 @@ pub struct GitDiffResult {
 }
 
 /// Find the git repository root by walking up the directory tree
-fn find_git_root(start_path: &PathBuf) -> Option<PathBuf> {
-    let mut current = start_path.clone();
+fn find_git_root(start_path: &Path) -> Option<PathBuf> {
+    let mut current = start_path.to_path_buf();
     loop {
-        let git_dir = current.join(".git");
-        if git_dir.exists() {
+        if current.join(".git").exists() {
             return Some(current);
         }
         if !current.pop() {
@@ -38,161 +38,240 @@ fn find_git_root(start_path: &PathBuf) -> Option<PathBuf> {
     }
 }
 
-fn get_git_diff_stats(repo_path: &PathBuf) -> Result<HashMap<String, GitStats>, String> {
+/// The git directory of a work tree: `.git` itself, or for a linked worktree or
+/// submodule, the directory its `.git` file points at.
+pub(crate) fn resolve_git_dir(work_tree: &Path) -> Option<PathBuf> {
+    let dot_git = work_tree.join(".git");
+    let meta = fs::metadata(&dot_git).ok()?;
+    if meta.is_dir() {
+        return Some(dot_git);
+    }
+    let content = fs::read_to_string(&dot_git).ok()?;
+    let target = PathBuf::from(content.trim().strip_prefix("gitdir:")?.trim());
+    Some(if target.is_absolute() {
+        target
+    } else {
+        work_tree.join(target)
+    })
+}
+
+/// Branch checked out in `work_tree`, or None when HEAD is detached.
+fn branch_from_head(head: &str) -> Option<String> {
+    head.trim()
+        .strip_prefix("ref: refs/heads/")
+        .map(|s| s.to_string())
+}
+
+/// Current branch of a work tree; None if it is not a repo or HEAD is detached.
+pub(crate) fn read_current_branch(work_tree: &Path) -> Option<String> {
+    let head = fs::read_to_string(resolve_git_dir(work_tree)?.join("HEAD")).ok()?;
+    branch_from_head(&head)
+}
+
+/// Run git in `dir` without taking optional locks: a background status must not
+/// rewrite .git/index, or the watcher would see the write and ask for stats again.
+fn git_output(dir: &Path, args: &[&str]) -> Result<Option<Vec<u8>>, String> {
+    let output = Command::new("git")
+        .arg("--no-optional-locks")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .map_err(|e| format!("Failed to execute git {}: {}", args.first().unwrap_or(&""), e))?;
+    Ok(output.status.success().then_some(output.stdout))
+}
+
+/// Untracked files whose lines are actually counted; the rest get a size-based
+/// estimate so a huge untracked tree (an unignored build dir) stays cheap.
+const MAX_COUNTED_UNTRACKED: usize = 200;
+/// Files at least this big are estimated even within the cap.
+const MAX_COUNTED_UNTRACKED_BYTES: u64 = 100_000;
+/// Average bytes per line used for the estimate.
+const BYTES_PER_LINE_ESTIMATE: u64 = 50;
+
+fn untracked_line_count(path: &Path, count_exactly: bool) -> usize {
+    let size = match fs::metadata(path) {
+        Ok(m) if m.is_file() => m.len(),
+        _ => return 0,
+    };
+    if count_exactly && size < MAX_COUNTED_UNTRACKED_BYTES {
+        if let Ok(bytes) = fs::read(path) {
+            let newlines = bytes.iter().filter(|&&b| b == b'\n').count();
+            // Same as str::lines(): a final line without a newline still counts.
+            let unterminated = !bytes.is_empty() && bytes.last() != Some(&b'\n');
+            return newlines + usize::from(unterminated);
+        }
+    }
+    (size / BYTES_PER_LINE_ESTIMATE) as usize
+}
+
+/// What `git status --porcelain=v2 -z` says about the work tree.
+#[derive(Default)]
+struct StatusSummary {
+    /// Repo-relative paths deleted in the index or the work tree.
+    deleted: HashSet<String>,
+    /// Repo-relative untracked paths, in git's order.
+    untracked: Vec<String>,
+}
+
+fn parse_porcelain_v2(raw: &[u8]) -> StatusSummary {
+    let text = String::from_utf8_lossy(raw);
+    let mut summary = StatusSummary::default();
+    let mut records = text.split('\0');
+    while let Some(record) = records.next() {
+        let mut kind = record.splitn(2, ' ');
+        match kind.next() {
+            // 1 XY sub mH mI mW hH hI path
+            Some("1") => {
+                let fields: Vec<&str> = record.splitn(9, ' ').collect();
+                if fields.len() == 9 && fields[1].contains('D') {
+                    summary.deleted.insert(fields[8].to_string());
+                }
+            }
+            // 2 XY sub mH mI mW hH hI Xscore path, then origPath as its own record
+            Some("2") => {
+                let fields: Vec<&str> = record.splitn(10, ' ').collect();
+                if fields.len() == 10 && fields[1].contains('D') {
+                    summary.deleted.insert(fields[9].to_string());
+                }
+                records.next();
+            }
+            Some("?") => {
+                if let Some(path) = kind.next().filter(|p| !p.is_empty()) {
+                    summary.untracked.push(path.to_string());
+                }
+            }
+            // "u" (unmerged), "!" (ignored), "#" (headers), "" (trailing NUL)
+            _ => {}
+        }
+    }
+    summary
+}
+
+/// Parse `git diff --numstat -z` into (repo-relative path, added, deleted).
+/// Binary files report "-" and count as 0; renames carry the old and new path
+/// as two extra NUL-terminated records, and the new path is the one kept.
+fn parse_numstat_z(raw: &[u8]) -> Vec<(String, usize, usize)> {
+    let text = String::from_utf8_lossy(raw);
+    let mut out = Vec::new();
+    let mut records = text.split('\0');
+    while let Some(record) = records.next() {
+        let mut fields = record.splitn(3, '\t');
+        let (Some(added), Some(deleted), Some(path)) = (fields.next(), fields.next(), fields.next())
+        else {
+            continue;
+        };
+        let path = if path.is_empty() {
+            records.next();
+            match records.next() {
+                Some(new_path) => new_path,
+                None => break,
+            }
+        } else {
+            path
+        };
+        out.push((
+            path.to_string(),
+            added.parse().unwrap_or(0),
+            deleted.parse().unwrap_or(0),
+        ));
+    }
+    out
+}
+
+fn get_git_diff_stats(repo_path: &Path) -> Result<HashMap<String, GitStats>, String> {
     let git_root = match find_git_root(repo_path) {
         Some(root) => root,
         None => return Ok(HashMap::new()),
     };
 
-    let mut stats_map = HashMap::new();
+    // One status for deletions + untracked files, one numstat for line counts.
+    let status = git_output(
+        &git_root,
+        &["status", "--porcelain=v2", "-z", "--untracked-files=all"],
+    )?
+    .map(|raw| parse_porcelain_v2(&raw))
+    .unwrap_or_default();
+    // Fails on a repo with no commits yet (no HEAD); status still covers it.
+    let numstat = git_output(&git_root, &["diff", "HEAD", "--numstat", "-z"])?
+        .map(|raw| parse_numstat_z(&raw))
+        .unwrap_or_default();
 
-    // Run: git diff HEAD --numstat for modified files
-    let output = Command::new("git")
-        .arg("diff")
-        .arg("HEAD")
-        .arg("--numstat")
-        .current_dir(&git_root)
-        .output()
-        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+    let mut stats_map = HashMap::with_capacity(numstat.len() + status.untracked.len());
 
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        for line in stdout.lines() {
-            let parts: Vec<&str> = line.split('\t').collect();
-            if parts.len() != 3 {
-                continue;
-            }
-
-            let added = parts[0].parse::<usize>().unwrap_or(0);
-            let deleted = parts[1].parse::<usize>().unwrap_or(0);
-            let relative_path = parts[2];
-
-            // Convert relative path to absolute (relative to git root)
-            let absolute_path = git_root.join(relative_path);
-            let absolute_path_str = absolute_path.to_string_lossy().to_string();
-
-            // Check if this is a deleted file (file no longer exists)
-            let status = if !absolute_path.exists() {
-                Some("deleted".to_string())
-            } else {
-                None
-            };
-
-            stats_map.insert(
-                absolute_path_str,
-                GitStats {
-                    added,
-                    deleted,
-                    status,
-                },
-            );
-        }
+    for (relative_path, added, deleted) in numstat {
+        let status_label = status
+            .deleted
+            .contains(&relative_path)
+            .then(|| "deleted".to_string());
+        stats_map.insert(
+            git_root.join(&relative_path).to_string_lossy().to_string(),
+            GitStats {
+                added,
+                deleted,
+                status: status_label,
+            },
+        );
     }
 
-    // Get untracked files using git ls-files --others --exclude-standard
-    let untracked_output = Command::new("git")
-        .arg("ls-files")
-        .arg("--others")
-        .arg("--exclude-standard")
-        .current_dir(&git_root)
-        .output()
-        .map_err(|e| format!("Failed to execute git ls-files command: {}", e))?;
-
-    if untracked_output.status.success() {
-        let stdout = String::from_utf8_lossy(&untracked_output.stdout);
-
-        for relative_path in stdout.lines() {
-            if relative_path.is_empty() {
-                continue;
-            }
-
-            let absolute_path = git_root.join(relative_path);
-            let absolute_path_str = absolute_path.to_string_lossy().to_string();
-
-            // Skip if already in stats (shouldn't happen, but be safe)
-            if stats_map.contains_key(&absolute_path_str) {
-                continue;
-            }
-
-            // Estimate line count using file size (much faster than reading entire file)
-            // Uses average of 50 bytes per line as a heuristic estimate
-            const BYTES_PER_LINE_ESTIMATE: u64 = 50;
-            let line_count = if absolute_path.is_file() {
-                fs::metadata(&absolute_path)
-                    .map(|m| {
-                        let size = m.len();
-                        // For small files (< 100KB), do actual line count for accuracy
-                        if size < 100_000 {
-                            fs::read_to_string(&absolute_path)
-                                .map(|content| content.lines().count())
-                                .unwrap_or((size / BYTES_PER_LINE_ESTIMATE) as usize)
-                        } else {
-                            (size / BYTES_PER_LINE_ESTIMATE) as usize
-                        }
-                    })
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-
-            stats_map.insert(
-                absolute_path_str,
-                GitStats {
-                    added: line_count,
-                    deleted: 0,
-                    status: Some("untracked".to_string()),
-                },
-            );
+    for (i, relative_path) in status.untracked.iter().enumerate() {
+        let absolute_path = git_root.join(relative_path);
+        let key = absolute_path.to_string_lossy().to_string();
+        if stats_map.contains_key(&key) {
+            continue;
         }
+        let line_count = untracked_line_count(&absolute_path, i < MAX_COUNTED_UNTRACKED);
+        stats_map.insert(
+            key,
+            GitStats {
+                added: line_count,
+                deleted: 0,
+                status: Some("untracked".to_string()),
+            },
+        );
     }
 
     Ok(stats_map)
 }
 
 #[tauri::command]
-pub fn get_git_stats(
+pub async fn get_git_stats(
     path: Option<String>,
-    state: tauri::State<AppState>,
-) -> Result<HashMap<String, GitStats>, String> {
-    let repo_path = if let Some(p) = path {
-        PathBuf::from(p)
-    } else {
-        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?
-    };
+    state: tauri::State<'_, AppState>,
+) -> Result<Arc<HashMap<String, GitStats>>, String> {
+    let state = state.inner().clone();
+    crate::ipc::blocking("get_git_stats", move || {
+        let repo_path = match path {
+            Some(p) => PathBuf::from(p),
+            None => std::env::current_dir()
+                .map_err(|e| format!("Failed to get current directory: {}", e))?,
+        };
 
-    // Canonicalize path for consistent cache keys
-    let canonical_path = repo_path
-        .canonicalize()
-        .unwrap_or_else(|_| repo_path.clone());
+        // Canonical cache key; the fs watcher invalidates with the same key.
+        let canonical_path = repo_path
+            .canonicalize()
+            .unwrap_or_else(|_| repo_path.clone());
 
-    // Try cache first
-    {
-        let state_lock = state
+        // The state lock is only held for the cache lookups, never across git.
+        let cached = state
             .lock()
-            .map_err(|e| format!("Failed to lock state: {}", e))?;
-
-        if let Some(cached_stats) = state_lock.git_cache.get(&canonical_path) {
-            // Clone from Arc - cheap if caller just reads, necessary for Tauri serialization
-            return Ok((*cached_stats).clone());
+            .map_err(|e| format!("Failed to lock state: {}", e))?
+            .git_cache
+            .get(&canonical_path);
+        if let Some(stats) = cached {
+            return Ok(stats);
         }
-    }
 
-    // Cache miss - run git diff
-    let stats = get_git_diff_stats(&repo_path)?;
+        let stats = Arc::new(get_git_diff_stats(&repo_path)?);
 
-    // Store in cache (watcher is handled by the unified fs_watcher)
-    {
-        let state_lock = state
+        state
             .lock()
-            .map_err(|e| format!("Failed to lock state: {}", e))?;
-
-        state_lock
+            .map_err(|e| format!("Failed to lock state: {}", e))?
             .git_cache
             .set(canonical_path, stats.clone());
-    }
 
-    Ok(stats)
+        Ok(stats)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -225,33 +304,29 @@ pub fn get_file_watchers_status(state: tauri::State<AppState>) -> Result<bool, S
 }
 
 #[tauri::command]
-pub fn get_current_branch(repo_path: String) -> Result<Option<String>, String> {
-    let repo = PathBuf::from(&repo_path);
-    let git_dir = repo.join(".git");
-    if !git_dir.exists() {
-        return Ok(None);
-    }
-
-    let head_path = git_dir.join("HEAD");
-    let head_content =
-        std::fs::read_to_string(&head_path).map_err(|e| format!("Failed to read HEAD: {}", e))?;
-    let trimmed = head_content.trim();
-
-    let branch = trimmed
-        .strip_prefix("ref: refs/heads/")
-        .map(|s| s.to_string());
-
-    Ok(branch)
+pub async fn get_current_branch(repo_path: String) -> Result<Option<String>, String> {
+    crate::ipc::blocking("get_current_branch", move || {
+        let Some(git_dir) = resolve_git_dir(Path::new(&repo_path)) else {
+            return Ok(None);
+        };
+        let head = fs::read_to_string(git_dir.join("HEAD"))
+            .map_err(|e| format!("Failed to read HEAD: {}", e))?;
+        Ok(branch_from_head(&head))
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
+pub async fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
+    crate::ipc::blocking("get_git_diff", move || git_diff_blocking(file_path, repo_path)).await
+}
+
+fn git_diff_blocking(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
     let repo = PathBuf::from(&repo_path);
     let file = PathBuf::from(&file_path);
 
-    // Check if .git directory exists
-    let git_dir = repo.join(".git");
-    if !git_dir.exists() {
+    // Check if .git exists (a directory, or a file for linked worktrees)
+    if !repo.join(".git").exists() {
         return Err("Not a git repository".to_string());
     }
 
@@ -327,359 +402,39 @@ pub fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResul
     })
 }
 
-#[derive(Serialize, Clone, Debug)]
-pub struct CompletedTask {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub files: Vec<String>,
-    pub file_count: usize,
-    pub additions: usize,
-    pub deletions: usize,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Serialize)]
-pub struct BranchCompletedTasksResult {
-    pub base_branch: String,
-    pub current_branch: String,
-    pub tasks: Vec<CompletedTask>,
-}
-
-/// Detect the base branch (main or master) for the repository
-fn detect_base_branch(repo_path: &PathBuf) -> Option<String> {
-    for branch in &["main", "master"] {
-        let output = Command::new("git")
-            .args(["rev-parse", "--verify", branch])
-            .current_dir(repo_path)
-            .output();
-
-        if let Ok(out) = output {
-            if out.status.success() {
-                return Some(branch.to_string());
-            }
-        }
-    }
-    None
-}
-
-/// Get the merge base between current branch and base branch
-fn get_merge_base(repo_path: &PathBuf, base_branch: &str) -> Result<Option<String>, String> {
-    let output = Command::new("git")
-        .args(["merge-base", base_branch, "HEAD"])
-        .current_dir(repo_path)
-        .output()
-        .map_err(|e| format!("Failed to get merge base: {}", e))?;
-
-    if output.status.success() {
-        let base = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !base.is_empty() {
-            return Ok(Some(base));
-        }
-    }
-    Ok(None)
-}
-
-/// Analyze file changes to determine the type of task
-fn analyze_file_patterns(files: &[String]) -> (String, Option<String>) {
-    use std::collections::HashSet;
-
-    let mut patterns = HashSet::new();
-    let mut components = Vec::new();
-    let mut has_tests = false;
-    let mut has_docs = false;
-    let mut has_config = false;
-
-    for file in files {
-        let lower = file.to_lowercase();
-
-        // Check for test files
-        if lower.contains("test") || lower.contains("spec") || lower.contains("__tests__") {
-            has_tests = true;
-        }
-
-        // Check for documentation
-        if lower.ends_with(".md")
-            || lower.ends_with(".mdx")
-            || lower.contains("readme")
-            || lower.contains("changelog")
-        {
-            has_docs = true;
-        }
-
-        // Check for config files
-        if lower.starts_with(".")
-            || lower.contains("config")
-            || lower.contains("rc")
-            || lower.ends_with(".toml")
-            || lower.ends_with(".yaml")
-            || lower.ends_with(".yml")
-            || lower.ends_with(".json")
-        {
-            has_config = true;
-        }
-
-        // Extract component/feature names from paths
-        let parts: Vec<&str> = file.split('/').collect();
-        if parts.len() >= 2 {
-            // Get the directory name (potential feature/component)
-            if let Some(dir) = parts.get(parts.len() - 2) {
-                if !dir.starts_with('.')
-                    && dir.len() > 1
-                    && !matches!(
-                        dir.as_ref(),
-                        "src" | "lib" | "app" | "components" | "pages" | "hooks" | "utils"
-                    )
-                {
-                    components.push(dir.to_string());
-                }
-            }
-        }
-
-        // Detect patterns from file extensions and paths
-        if lower.contains("api") || lower.contains("endpoint") || lower.contains("route") {
-            patterns.insert("API");
-        }
-        if lower.contains("component")
-            || lower.contains("jsx")
-            || lower.contains("tsx")
-            || lower.contains("vue")
-        {
-            patterns.insert("UI");
-        }
-        if lower.contains("hook") || lower.contains("context") || lower.contains("provider") {
-            patterns.insert("Logic");
-        }
-        if lower.contains("style")
-            || lower.contains("css")
-            || lower.contains("scss")
-            || lower.contains("less")
-        {
-            patterns.insert("Styling");
-        }
-        if lower.contains("type") || lower.contains("interface") || lower.contains(".d.ts") {
-            patterns.insert("Types");
-        }
-        if lower.contains("migration") || lower.contains("schema") || lower.contains("model") {
-            patterns.insert("Database");
-        }
+    #[test]
+    fn porcelain_v2_collects_deleted_and_untracked() {
+        let raw = b"1 .D N... 100644 100644 000000 abc abc gone.txt\x00\
+1 M. N... 100644 100644 100644 abc def dir/with space.rs\x00\
+2 R. N... 100644 100644 100644 abc abc R100 new name.rs\x00old name.rs\x00\
+? notes/todo.md\x00? b.txt\x00";
+        let s = parse_porcelain_v2(raw);
+        assert!(s.deleted.contains("gone.txt"));
+        assert_eq!(s.deleted.len(), 1);
+        assert_eq!(s.untracked, vec!["notes/todo.md", "b.txt"]);
     }
 
-    // Generate task title based on patterns
-    let title = if patterns.len() == 1 {
-        format!("{} implementation", patterns.iter().next().unwrap())
-    } else if patterns.len() > 1 {
-        let pattern_list: Vec<_> = patterns.iter().cloned().collect();
-        format!(
-            "{} and {} implementation",
-            pattern_list[..pattern_list.len() - 1].join(", "),
-            pattern_list.last().unwrap()
-        )
-    } else if !components.is_empty() {
-        // Use component name if available
-        let unique_components: HashSet<_> = components.iter().cloned().collect();
-        let comp_list: Vec<_> = unique_components.into_iter().take(2).collect();
-        if comp_list.len() == 1 {
-            format!("Implement {}", comp_list[0])
-        } else {
-            format!("Implement {} and related features", comp_list[0])
-        }
-    } else {
-        "Code changes".to_string()
-    };
-
-    // Generate description
-    let mut desc_parts = Vec::new();
-    if has_tests {
-        desc_parts.push("includes tests");
-    }
-    if has_docs {
-        desc_parts.push("includes documentation");
-    }
-    if has_config {
-        desc_parts.push("configuration updates");
+    #[test]
+    fn numstat_z_handles_renames_and_binary() {
+        let raw = b"3\t1\tsrc/a.rs\x00-\t-\timg.png\x002\t0\t\x00old.rs\x00new.rs\x00";
+        let rows = parse_numstat_z(raw);
+        assert_eq!(
+            rows,
+            vec![
+                ("src/a.rs".to_string(), 3, 1),
+                ("img.png".to_string(), 0, 0),
+                ("new.rs".to_string(), 2, 0),
+            ]
+        );
     }
 
-    let description = if desc_parts.is_empty() {
-        None
-    } else {
-        Some(format!("Changes {}", desc_parts.join(", ")))
-    };
-
-    (title, description)
-}
-
-/// Group related file changes into logical tasks
-fn group_changes_into_tasks(
-    repo_path: &PathBuf,
-    merge_base: &str,
-) -> Result<Vec<CompletedTask>, String> {
-    let mut tasks = Vec::new();
-
-    // Get all files changed since merge base with stats
-    let output = Command::new("git")
-        .args(["diff", "--stat", &format!("{}..HEAD", merge_base)])
-        .current_dir(repo_path)
-        .output()
-        .map_err(|e| format!("Failed to get diff stats: {}", e))?;
-
-    if !output.status.success() {
-        return Ok(tasks);
+    #[test]
+    fn branch_from_head_detached_is_none() {
+        assert_eq!(branch_from_head("ref: refs/heads/main\n").as_deref(), Some("main"));
+        assert_eq!(branch_from_head("0123456789abcdef\n"), None);
     }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut file_changes: Vec<(String, usize, usize)> = Vec::new();
-
-    // Parse diff --stat output
-    for line in stdout.lines() {
-        // Format: " path/to/file | 10 +++++-----"
-        if let Some(pipe_pos) = line.find(" | ") {
-            let file_path = line[..pipe_pos].trim().to_string();
-            let stats_part = &line[pipe_pos + 3..];
-
-            // Extract insertions and deletions
-            let mut insertions = 0;
-            let mut deletions = 0;
-
-            if let Some(plus_pos) = stats_part.find('+') {
-                let num_str: String = stats_part[..plus_pos]
-                    .chars()
-                    .filter(|c| c.is_digit(10))
-                    .collect();
-                insertions = num_str.parse().unwrap_or(0);
-            }
-
-            if stats_part.contains('-') {
-                let minus_part: String = stats_part.chars().skip_while(|c| *c != '-').collect();
-                let num_str: String = minus_part.chars().filter(|c| c.is_digit(10)).collect();
-                deletions = num_str.parse().unwrap_or(0);
-            }
-
-            file_changes.push((file_path, insertions, deletions));
-        }
-    }
-
-    // Group files by directory/feature
-    use std::collections::HashMap;
-    let mut groups: HashMap<String, Vec<(String, usize, usize)>> = HashMap::new();
-
-    for (file, insertions, deletions) in file_changes {
-        let group_key = if file.contains('/') {
-            let parts: Vec<&str> = file.split('/').collect();
-            if parts.len() >= 2 {
-                parts[0..parts.len() - 1].join("/")
-            } else {
-                "root".to_string()
-            }
-        } else {
-            "root".to_string()
-        };
-
-        groups
-            .entry(group_key)
-            .or_default()
-            .push((file, insertions, deletions));
-    }
-
-    // Create tasks from groups
-    let mut task_id = 0;
-    for (group_path, files) in groups {
-        task_id += 1;
-
-        let file_paths: Vec<String> = files.iter().map(|(f, _, _)| f.clone()).collect();
-        let total_additions: usize = files.iter().map(|(_, a, _)| a).sum();
-        let total_deletions: usize = files.iter().map(|(_, _, d)| d).sum();
-
-        let (title, description) = analyze_file_patterns(&file_paths);
-
-        // Refine title based on group path
-        let refined_title = if group_path != "root" && !title.starts_with("Implement") {
-            if group_path.contains('/') {
-                format!(
-                    "{} in {}",
-                    title,
-                    group_path.split('/').last().unwrap_or(&group_path)
-                )
-            } else {
-                format!("{} in {}", title, group_path)
-            }
-        } else {
-            title
-        };
-
-        tasks.push(CompletedTask {
-            id: format!("task-{}", task_id),
-            title: refined_title,
-            description,
-            files: file_paths,
-            file_count: files.len(),
-            additions: total_additions,
-            deletions: total_deletions,
-        });
-    }
-
-    // Sort tasks by significance (file count + changes)
-    tasks.sort_by(|a, b| {
-        let a_score = a.file_count + a.additions + a.deletions;
-        let b_score = b.file_count + b.additions + b.deletions;
-        b_score.cmp(&a_score)
-    });
-
-    Ok(tasks)
-}
-
-/// Get files changed in a specific commit
-fn get_files_for_commit(repo_path: &PathBuf, commit_hash: &str) -> Result<Vec<String>, String> {
-    let output = Command::new("git")
-        .args([
-            "diff-tree",
-            "--no-commit-id",
-            "--name-only",
-            "-r",
-            commit_hash,
-        ])
-        .current_dir(repo_path)
-        .output()
-        .map_err(|e| format!("Failed to get files for commit: {}", e))?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let files: Vec<String> = stdout
-            .lines()
-            .filter(|line| !line.is_empty())
-            .map(|line| line.to_string())
-            .collect();
-        Ok(files)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-#[tauri::command]
-pub fn get_branch_completed_tasks(repo_path: String) -> Result<BranchCompletedTasksResult, String> {
-    let repo = PathBuf::from(&repo_path);
-    let git_dir = repo.join(".git");
-    if !git_dir.exists() {
-        return Err("Not a git repository".to_string());
-    }
-
-    // Detect base branch
-    let base_branch =
-        detect_base_branch(&repo).ok_or("Could not detect base branch (main or master)")?;
-
-    // Get current branch name
-    let current_branch =
-        get_current_branch(repo_path.clone())?.unwrap_or_else(|| "HEAD".to_string());
-
-    // Get merge base
-    let merge_base =
-        get_merge_base(&repo, &base_branch)?.ok_or("Could not find merge base with base branch")?;
-
-    // Group file changes into logical tasks
-    let tasks = group_changes_into_tasks(&repo, &merge_base)?;
-
-    Ok(BranchCompletedTasksResult {
-        base_branch,
-        current_branch,
-        tasks,
-    })
 }

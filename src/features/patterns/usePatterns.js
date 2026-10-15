@@ -15,7 +15,7 @@ export function usePatterns(currentPath) {
     const loadPatterns = async () => {
       try {
         const patternsDir = `${currentPath}/.patterns`;
-        const entries = await invoke('read_directory_recursive', { path: patternsDir, maxDepth: 10 });
+        const { entries } = await invoke('read_directory_recursive', { path: patternsDir, maxDepth: 10 });
         const files = entries
           .filter(e => !e.is_dir && e.name.endsWith('.md') && e.name !== 'patterns.md')
           .map(e => e.path.slice(patternsDir.length + 1))

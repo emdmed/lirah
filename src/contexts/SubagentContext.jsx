@@ -1,8 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { usePageVisible } from '../hooks/usePageVisible';
 
 const SubagentContext = createContext(null);
+
+function stopWatcher(projectPath, started) {
+  started.then((ok) => {
+    if (ok) invoke('stop_project_subagents_watcher', { projectPath }).catch(() => {});
+  });
+}
 
 export function SubagentProvider({ tabs, children }) {
   // Map of projectPath -> SubagentInfo[]
@@ -10,9 +17,15 @@ export function SubagentProvider({ tabs, children }) {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [dismissedIds, setDismissedIds] = useState(new Set());
   const mountTimeRef = useRef(new Date().toISOString());
+  const pageVisible = usePageVisible();
+  // Bumped by the poll so the watcher effect retries failed starts.
+  const [watcherRetry, setWatcherRetry] = useState(0);
 
   // Track which paths have active watchers
-  const activeWatchersRef = useRef(new Set());
+  // path -> promise of its start command. Watchers are ref-counted in the
+  // backend and start/stop are async, so each stop is chained onto its start
+  // (and skipped if the start failed) to keep the count balanced.
+  const activeWatchersRef = useRef(new Map());
   const pollIntervalRef = useRef(null);
   const unlistenRef = useRef(null);
 
@@ -28,8 +41,12 @@ export function SubagentProvider({ tabs, children }) {
   // Fetch subagents for a specific path
   const fetchForPath = useCallback(async (projectPath) => {
     try {
-      const result = await invoke('get_project_subagents', { projectPath });
       const mountTime = mountTimeRef.current;
+      // sinceMs lets the backend skip (unread) transcripts this filter drops.
+      const result = await invoke('get_project_subagents', {
+        projectPath,
+        sinceMs: Date.parse(mountTime),
+      });
       const relevant = result.filter(s => {
         if (s.status === 'running') return true;
         return s.started_at >= mountTime;
@@ -59,16 +76,21 @@ export function SubagentProvider({ tabs, children }) {
     // Start watchers for new paths
     for (const path of desiredPaths) {
       if (!currentWatchers.has(path)) {
-        invoke('watch_project_subagents', { projectPath: path }).catch(() => {});
-        currentWatchers.add(path);
+        const started = invoke('watch_project_subagents', { projectPath: path }).then(() => true, () => {
+          // Usually the project's transcript dir doesn't exist yet (Claude
+          // never ran there). Forget it so the next poll retries the start.
+          if (activeWatchersRef.current.get(path) === started) activeWatchersRef.current.delete(path);
+          return false;
+        });
+        currentWatchers.set(path, started);
         fetchForPath(path);
       }
     }
 
     // Stop watchers for removed paths
-    for (const path of currentWatchers) {
+    for (const [path, started] of currentWatchers) {
       if (!desiredPaths.has(path)) {
-        invoke('stop_project_subagents_watcher', { projectPath: path }).catch(() => {});
+        stopWatcher(path, started);
         currentWatchers.delete(path);
         setSubagentsByPath(prev => {
           const next = { ...prev };
@@ -77,7 +99,7 @@ export function SubagentProvider({ tabs, children }) {
         });
       }
     }
-  }, [uniquePaths, fetchForPath]);
+  }, [uniquePaths, fetchForPath, watcherRetry]);
 
   // Listen for watcher events (payload is the project path string)
   useEffect(() => {
@@ -106,18 +128,29 @@ export function SubagentProvider({ tabs, children }) {
     };
   }, [fetchForPath]);
 
-  // Fallback polling every 10s
+  // Fallback poll — the watcher's subagents-changed event is the primary
+  // signal, so this only catches what it misses. "Running" is derived from
+  // recent writes, and a subagent going quiet emits no event, so poll faster
+  // while any is running. Each poll also retries watchers that failed to
+  // start. Paused while hidden.
+  const anyRunning = useMemo(
+    () => Object.values(subagentsByPath).some(list => list.some(s => s.status === 'running')),
+    [subagentsByPath]
+  );
   useEffect(() => {
-    pollIntervalRef.current = setInterval(fetchAll, 10000);
+    if (!pageVisible) return;
+    fetchAll();
+    pollIntervalRef.current = setInterval(() => {
+      fetchAll();
+      setWatcherRetry(n => n + 1);
+    }, anyRunning ? 10000 : 60000);
     return () => clearInterval(pollIntervalRef.current);
-  }, [fetchAll]);
+  }, [fetchAll, pageVisible, anyRunning]);
 
   // Cleanup all watchers on unmount
   useEffect(() => {
     return () => {
-      for (const path of activeWatchersRef.current) {
-        invoke('stop_project_subagents_watcher', { projectPath: path }).catch(() => {});
-      }
+      for (const [path, started] of activeWatchersRef.current) stopWatcher(path, started);
       activeWatchersRef.current.clear();
     };
   }, []);

@@ -1,14 +1,28 @@
-import React, { useMemo, useCallback } from "react";
-import { SidebarMenu } from "@/components/ui/sidebar";
+import React, { useMemo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
-import { useGitStats } from "../../features/git";
+import { useGitStats } from "../../features/git/useGitStats";
 import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtils";
+import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
+
+// Row pitch: an 18px row plus the 4px gap the (non-virtual) menu used to add.
+const ROW_HEIGHT = 22;
+const HEADER_HEIGHT = 18;
+const SEPARATOR_HEIGHT = 9;
+
+const rowHeight = (row) =>
+  row.kind === 'separator' ? SEPARATOR_HEIGHT : row.kind === 'node' ? ROW_HEIGHT : HEADER_HEIGHT;
 
 /**
  * Main FileTree component - renders a tree view of files and folders
- * Supports git stats display and filtering
+ * Supports git stats display and filtering.
+ *
+ * The nested tree is flattened into the rows that are currently visible
+ * (pinned section first, then the tree) and only the rows in the viewport
+ * are rendered, positioned inside `scrollRef` (the pane's scroll container).
  */
 export function FileTree({
   nodes,
@@ -27,16 +41,15 @@ export function FileTree({
   pinnedPaths,
   onTogglePin,
   isTextareaPanelOpen,
-  typeCheckResults,
-  checkingFiles,
-  successfulChecks,
-  onCheckFileTypes,
   fileWatchingEnabled,
   onGitChanges,
-  onOpenElementPicker,
   onClearSearch,
   onToggleGitFilter,
   onToggleMarkdownFilter,
+  truncated = false,
+  scrollRef,
+  cursorIndex = null,
+  registerList,
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
@@ -70,66 +83,182 @@ export function FileTree({
     }
   }, [showGitChangesOnly, showMarkdownOnly, onViewDiff, onViewMarkdown, onToggleFileSelection]);
 
-  // Build flat node objects for pinned files so they can be rendered through
-  // the same TreeNode pipeline (selection highlight, git stats, type checks).
-  const pinnedNodes = useMemo(() => {
-    if (!pinnedPaths || pinnedPaths.length === 0) return [];
-    return pinnedPaths.map((path) => ({
-      path,
-      name: basename(path),
-      is_dir: false,
-      depth: 0,
-    }));
-  }, [pinnedPaths]);
+  // Clicking (or Enter on) a file: select it into the prompt when the panel
+  // is open, otherwise send it to the terminal. Deleted files are inert.
+  const handleActivateFile = useCallback((filePath, isDeleted) => {
+    if (isDeleted) return;
+    if (isTextareaPanelOpen) handleToggleFileSelection(filePath);
+    else onSendToTerminal(filePath);
+  }, [isTextareaPanelOpen, handleToggleFileSelection, onSendToTerminal]);
+
+  // Flat list of every visible row: pinned section, then the tree.
+  const rows = useMemo(() => {
+    const result = [];
+    if (pinnedPaths && pinnedPaths.length > 0) {
+      result.push({ kind: 'pinned-header', key: 'pinned-header' });
+      for (const path of pinnedPaths) {
+        result.push({
+          kind: 'node',
+          key: `pinned:${path}`,
+          node: { path, name: basename(path), is_dir: false },
+          depth: 0,
+        });
+      }
+      result.push({ kind: 'separator', key: 'pinned-separator' });
+    }
+    for (const { node, depth } of flattenVisibleTree(displayedNodes, expandedFolders)) {
+      result.push({ kind: 'node', key: node.path, node, depth });
+    }
+    return result;
+  }, [pinnedPaths, displayedNodes, expandedFolders]);
 
   const treeIsEmpty = !displayedNodes || displayedNodes.length === 0;
+  const hasPinned = !!pinnedPaths && pinnedPaths.length > 0;
+  const showList = !treeIsEmpty || hasPinned;
 
-  // Shared props for every TreeNode (pinned section + main tree)
-  const treeNodeProps = {
-    expandedFolders,
-    currentPath,
-    gitStats,
-    onToggle,
-    onSendToTerminal,
-    onViewDiff,
-    selectedFiles,
-    pinnedFiles,
-    onTogglePin,
-    showGitChangesOnly,
-    onToggleFileSelection: handleToggleFileSelection,
-    isTextareaPanelOpen,
-    typeCheckResults,
-    checkingFiles,
-    successfulChecks,
-    onCheckFileTypes,
-    onOpenElementPicker,
-  };
+  const allRows = useMemo(
+    () => (truncated && !treeIsEmpty ? [...rows, { kind: 'truncated', key: 'truncated' }] : rows),
+    [rows, truncated, treeIsEmpty]
+  );
+
+  // Keyboard-cursor index (navigable rows only) <-> row index
+  const navRowIndices = useMemo(() => {
+    const indices = [];
+    allRows.forEach((row, i) => { if (row.kind === 'node') indices.push(i); });
+    return indices;
+  }, [allRows]);
+  const cursorRowIndex = cursorIndex != null ? navRowIndices[cursorIndex] ?? -1 : -1;
+
+  // The pane's scroll container. On the first commit the parent's ref may not
+  // be attached yet when our layout effects run, so fall back to the list's
+  // parent element (which is that same container).
+  const listRef = useRef(null);
+  const getScrollElement = useCallback(
+    () => scrollRef?.current ?? listRef.current?.parentElement ?? null,
+    [scrollRef]
+  );
+
+  // Offset of the list inside the scroll container (its padding), so the
+  // virtualizer's viewport math lines up with the real row positions.
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const scroller = getScrollElement();
+    if (!list || !scroller) return;
+    const margin = list.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    setScrollMargin(Math.max(0, Math.round(margin)));
+  }, [getScrollElement, showList]);
+
+  const estimateSize = useCallback((i) => rowHeight(allRows[i]), [allRows]);
+  const getItemKey = useCallback((i) => allRows[i].key, [allRows]);
+  const virtualizer = useVirtualizer({
+    count: showList ? allRows.length : 0,
+    getScrollElement,
+    estimateSize,
+    getItemKey,
+    overscan: 12,
+    scrollMargin,
+  });
+
+  // Expose the navigable rows to the keyboard cursor (see useRowCursor)
+  useEffect(() => {
+    if (!registerList) return;
+    const nodeAt = (i) => allRows[navRowIndices[i]]?.node;
+    registerList({
+      count: navRowIndices.length,
+      activate: (i) => {
+        const node = nodeAt(i);
+        if (!node) return;
+        if (node.is_dir) onToggle(node.path);
+        else handleActivateFile(node.path, !!node.is_deleted || gitStats?.get(node.path)?.status === 'deleted');
+      },
+      pin: (i) => {
+        const node = nodeAt(i);
+        if (!node || node.is_dir || !onTogglePin) return;
+        if (node.is_deleted || gitStats?.get(node.path)?.status === 'deleted') return;
+        onTogglePin(node.path);
+      },
+      scrollToIndex: (i) => {
+        const rowIndex = navRowIndices[i];
+        if (rowIndex != null) virtualizer.scrollToIndex(rowIndex, { align: 'auto' });
+      },
+    });
+  }, [registerList, allRows, navRowIndices, onToggle, handleActivateFile, onTogglePin, gitStats, virtualizer]);
+  useEffect(() => (registerList ? () => registerList(null) : undefined), [registerList]);
+
+  if (!showList) {
+    return (
+      <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} onClearSearch={onClearSearch} onToggleGitFilter={onToggleGitFilter} onToggleMarkdownFilter={onToggleMarkdownFilter} />
+    );
+  }
 
   return (
-    <>
-      {pinnedNodes.length > 0 && (
-        <SidebarMenu className="filetree-container mb-0.5">
-          <div className="flex items-center gap-1 px-1 pt-0.5 select-none">
-            <span className="engraved-label">pinned</span>
-          </div>
-          {pinnedNodes.map((node, idx) => (
-            <TreeNode key={`pinned:${node.path}`} node={node} {...treeNodeProps} />
-          ))}
-          <div className="border-t border-foreground/10 mx-1 mt-1" />
-        </SidebarMenu>
-      )}
+    <SidebarMenu
+      ref={listRef}
+      className="filetree-container relative"
+      style={{ height: virtualizer.getTotalSize() }}
+    >
+      {virtualizer.getVirtualItems().map((item) => {
+        const row = allRows[item.index];
+        const style = {
+          height: item.size,
+          transform: `translateY(${item.start - scrollMargin}px)`,
+        };
+        const itemClass = "absolute left-0 top-0 my-0 p-0 w-full";
 
-      {treeIsEmpty ? (
-        pinnedNodes.length === 0 && (
-          <EmptyState searchQuery={searchQuery} showGitChangesOnly={showGitChangesOnly} showMarkdownOnly={showMarkdownOnly} onClearSearch={onClearSearch} onToggleGitFilter={onToggleGitFilter} onToggleMarkdownFilter={onToggleMarkdownFilter} />
-        )
-      ) : (
-        <SidebarMenu className="filetree-container">
-          {displayedNodes.map((node, idx) => (
-            <TreeNode key={node.path} node={node} {...treeNodeProps} />
-          ))}
-        </SidebarMenu>
-      )}
-    </>
+        if (row.kind === 'pinned-header') {
+          return (
+            <SidebarMenuItem key={row.key} className={`${itemClass} flex items-center gap-1 px-1 select-none`} style={style}>
+              <span className="engraved-label">pinned</span>
+            </SidebarMenuItem>
+          );
+        }
+        if (row.kind === 'separator') {
+          return (
+            <SidebarMenuItem key={row.key} className={`${itemClass} flex items-center`} style={style} aria-hidden>
+              <div className="border-t border-foreground/10 mx-1 w-full" />
+            </SidebarMenuItem>
+          );
+        }
+        if (row.kind === 'truncated') {
+          return (
+            <SidebarMenuItem
+              key={row.key}
+              className={`${itemClass} flex items-center px-1 select-none text-muted-foreground opacity-70`}
+              style={style}
+              title="The project has more entries than the tree loads; search and listings are partial"
+            >
+              <span className="truncate" style={{ fontSize: 'var(--font-sm)' }}>… tree truncated</span>
+            </SidebarMenuItem>
+          );
+        }
+
+        const { node, depth } = row;
+        const path = node.path;
+        const stats = gitStats?.get(path);
+        return (
+          <SidebarMenuItem key={row.key} className={itemClass} style={style}>
+            <TreeNode
+              path={path}
+              name={node.name}
+              depth={depth}
+              isDir={!!node.is_dir}
+              isExpanded={node.is_dir ? expandedFolders.has(path) : false}
+              isCurrentPath={currentPath === path}
+              isCursor={item.index === cursorRowIndex}
+              isSelected={!!(isTextareaPanelOpen && selectedFiles?.has(path))}
+              isPinned={!!pinnedFiles?.has(path)}
+              isDeleted={!!node.is_deleted}
+              gitAdded={stats?.added || 0}
+              gitDeleted={stats?.deleted || 0}
+              gitStatus={stats?.status || undefined}
+              onToggle={onToggle}
+              onActivateFile={handleActivateFile}
+              onTogglePin={onTogglePin}
+            />
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
   );
 }

@@ -2,9 +2,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+// Every tab open on the same repo receives the same commit-detected event.
+// The first to claim a commit runs the changelog CLI; the rest skip it, so one
+// commit never spawns N `claude -p` runs editing the same file.
+const claimedCommits = new Set();
+
 export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.md", trigger = "commit", cli = "claude-code") {
   const [status, setStatus] = useState(null); // null | 'updating' | 'done' | 'error'
-  const watcherStarted = useRef(null);
   const dismissTimer = useRef(null);
   // Track per-commit "hidden-terminal-closed" listeners so they can't leak if
   // the close event never arrives or the component unmounts while pending.
@@ -12,28 +16,25 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
 
   // Start/stop commit watcher when path or enabled changes
   useEffect(() => {
-    if (!currentPath || !enabled) {
-      if (watcherStarted.current) {
-        invoke("stop_commit_watcher", { repoPath: watcherStarted.current }).catch(() => {});
-        watcherStarted.current = null;
-      }
-      return;
-    }
+    // The previous run's cleanup already released its watcher.
+    if (!currentPath || !enabled) return;
 
-    // Start watcher for current path
-    invoke("start_commit_watcher", { repoPath: currentPath })
-      .then(() => {
-        watcherStarted.current = currentPath;
-      })
+    // Start watcher for current path. Commit watchers are ref-counted per
+    // repo, so the stop is chained onto the start: a cleanup that runs before
+    // the start resolves must still release it, exactly once.
+    const repoPath = currentPath;
+    const started = invoke("start_commit_watcher", { repoPath })
+      .then(() => true)
       .catch((err) => {
         console.warn("Failed to start commit watcher:", err);
+        return false;
       });
 
     return () => {
-      if (watcherStarted.current) {
-        invoke("stop_commit_watcher", { repoPath: watcherStarted.current }).catch(() => {});
-        watcherStarted.current = null;
-      }
+      started.then((ok) => {
+        if (!ok) return;
+        invoke("stop_commit_watcher", { repoPath }).catch(() => {});
+      });
     };
   }, [currentPath, enabled]);
 
@@ -49,6 +50,10 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
 
       // Filter by trigger mode
       if (trigger === 'merge' && branch !== 'main' && branch !== 'master') return;
+
+      const commitKey = `${repo_path}\0${commit_hash}`;
+      if (claimedCommits.has(commitKey)) return;
+      claimedCommits.add(commitKey);
 
       setStatus("updating");
       if (dismissTimer.current) clearTimeout(dismissTimer.current);

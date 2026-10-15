@@ -13,7 +13,7 @@ import { buildPrompt } from "./buildPrompt";
 export function usePromptSender({
   terminalSessionId,
   terminalRef,
-  textareaContent,
+  getTextareaContent,
   selectedFiles,
   currentPath,
   fileStates,
@@ -39,6 +39,7 @@ export function usePromptSender({
   const sendPrompt = useCallback(async () => {
     if (!terminalSessionId) return;
 
+    const textareaContent = getTextareaContent();
     const { text: fullCommand } = buildPrompt({
       textareaContent,
       selectedFiles,
@@ -104,7 +105,7 @@ export function usePromptSender({
     } catch (error) {
       console.error('Failed to send to terminal:', error);
     }
-  }, [terminalSessionId, textareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate]);
+  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate]);
 
   return sendPrompt;
 }

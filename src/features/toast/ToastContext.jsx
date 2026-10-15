@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
 
+// Actions and state live in separate contexts: nearly every consumer only
+// fires toasts, and shouldn't re-render each time one appears or expires.
 const ToastContext = createContext(null);
+const ToastStateContext = createContext(null);
 
 const TOAST_DURATION = 5000; // 5 seconds default
 const MAX_TOASTS = 5;
@@ -12,6 +15,9 @@ export const useToast = () => {
   }
   return context;
 };
+
+// The live toast list — only the container needs it.
+export const useToasts = () => useContext(ToastStateContext);
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
@@ -105,8 +111,7 @@ export function ToastProvider({ children }) {
     setToasts([]);
   }, []);
 
-  const value = {
-    toasts,
+  const actions = useMemo(() => ({
     toast,
     error,
     success,
@@ -114,11 +119,13 @@ export function ToastProvider({ children }) {
     info,
     dismiss,
     dismissAll,
-  };
+  }), [toast, error, success, warning, info, dismiss, dismissAll]);
 
   return (
-    <ToastContext.Provider value={value}>
-      {children}
+    <ToastContext.Provider value={actions}>
+      <ToastStateContext.Provider value={toasts}>
+        {children}
+      </ToastStateContext.Provider>
     </ToastContext.Provider>
   );
 }

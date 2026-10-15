@@ -1,11 +1,22 @@
-@import "tailwindcss";
+@import "tailwindcss" source(".");
 
 /* Local Typestar OCR font declaration */
 @font-face {
   font-family: 'Typestar OCR';
-  src: url('/Typestar-OCR.otf') format('opentype');
+  src: url('/fonts/Typestar-OCR.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
+}
+
+/* Splash/wordmark face (OFL, bundled: no render-blocking network request,
+   and the app runs offline). Latin subset. */
+@font-face {
+  font-family: 'Grenze Gotisch';
+  src: url('/fonts/GrenzeGotisch-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
 /* Panel legend face (OFL, bundled: the app runs offline). */

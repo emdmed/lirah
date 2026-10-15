@@ -8,7 +8,13 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar, secon
           <div className="flex-1 flex flex-col gap-1.5 min-h-0 min-w-0 relative overflow-hidden">
             {children}
             {textarea && (
-              <div className="flex-shrink-0">
+              // The prompt grows upward over the terminal's last rows instead of
+              // shrinking it: a row-count change sends SIGWINCH and the CLI
+              // repaints its whole UI. useAutoGrow sets --grow-overlay.
+              <div
+                data-grow-overlay
+                className="flex-shrink-0 relative z-10 bg-[var(--ins-gutter)] mt-[calc(var(--grow-overlay,0px)*-1)]"
+              >
                 {textarea}
               </div>
             )}

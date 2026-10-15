@@ -5,14 +5,43 @@ import { ProjectTab } from "./features/tabs/ProjectTab";
 import { TabBar } from "./features/tabs/TabBar";
 import { SplashScreen } from "./features/splash";
 import { SubagentProvider } from "./contexts/SubagentContext";
-import { RightSidebar } from "./features/agent-jobs/agent-jobs";
+import { RightSidebar } from "./features/agent-jobs/RightSidebar";
 import { usePaneShortcuts } from "./hooks/usePaneShortcuts";
 import { KeyHintBar } from "./components/KeyHintBar";
+import { ToastContainer, useToast } from "./features/toast";
+import { useUpdateChecker } from "./hooks/useUpdateChecker";
+import { DevProfiler } from "./components/DevProfiler";
 
 function App() {
   const { tabs, activeTabId, addTab, removeTab, switchTab, reorderTab } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const toast = useToast();
+
+  // One update check for the whole app (it hits GitHub's unauthenticated API).
+  const availableUpdate = useUpdateChecker();
+
+  // Show toast when a new release is available — but only once per version,
+  // so restarts and the 4h re-check don't re-fire it.
+  useEffect(() => {
+    if (!availableUpdate) return;
+    const NOTIFIED_KEY = 'nevo-terminal:update-notified-version';
+    try {
+      if (localStorage.getItem(NOTIFIED_KEY) === availableUpdate.version) return;
+      localStorage.setItem(NOTIFIED_KEY, availableUpdate.version);
+    } catch { /* ignore */ }
+    toast.info(`Update available: ${availableUpdate.version}`, {
+      duration: 15000,
+      action: {
+        label: 'View Release',
+        onClick: () => {
+          import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
+            openUrl(availableUpdate.url);
+          });
+        },
+      },
+    });
+  }, [availableUpdate, toast]);
 
   // CLI initial path (e.g. `nevo /path/to/project`)
   const [initialProjectDir, setInitialProjectDir] = useState(undefined); // undefined = not yet checked
@@ -135,18 +164,21 @@ function App() {
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
             {tabs.map(tab => (
-              <ProjectTab
-                key={tab.id}
-                tabId={tab.id}
-                projectPath={tab.projectPath}
-                isActive={tab.id === activeTabId}
-              />
+              <DevProfiler key={tab.id} id={`ProjectTab:${tab.label}`}>
+                <ProjectTab
+                  tabId={tab.id}
+                  projectPath={tab.projectPath}
+                  isActive={tab.id === activeTabId}
+                  availableUpdate={availableUpdate}
+                />
+              </DevProfiler>
             ))}
           </div>
           <RightSidebar projectPath={activeTab?.projectPath} />
         </div>
 
         <KeyHintBar />
+        <ToastContainer />
 
         <SplashScreen
           visible={splashVisible}

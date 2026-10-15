@@ -10,7 +10,7 @@ import {
   DropdownMenuSubTrigger,
 } from "../ui/dropdown-menu";
 import { CompactProjectButton } from "../../features/compact";
-import { DesignButton } from "../../features/design";
+import { DesignButton } from "../../features/design/DesignButton";
 import { FileGroupsMenuItems } from "../../features/file-groups";
 import { KeyChord } from "../instrument/Keycap";
 

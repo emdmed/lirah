@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronUp, ChevronDown, X, CaseSensitive, Regex } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+const SEARCH_DEBOUNCE_MS = 150;
+
 /**
  * Search over the terminal's scrollback, driven by xterm's search addon.
  * Mounted over the terminal (its wrapper is position:relative) so it doesn't
@@ -19,6 +21,7 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
   const [results, setResults] = useState({ index: -1, count: 0 });
   const [invalid, setInvalid] = useState(false);
   const inputRef = useRef(null);
+  const debounceRef = useRef(0);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -55,8 +58,8 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
     [searchAddon, query, caseSensitive, regex, decorations]
   );
 
-  // Re-run on every keystroke and whenever a modifier flips, so the match count
-  // tracks what's in the box.
+  // Re-run as the query or a modifier changes, so the match count tracks what's
+  // in the box — debounced, since each run walks the whole scrollback.
   useEffect(() => {
     if (!query) {
       setResults({ index: -1, count: 0 });
@@ -64,7 +67,8 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
       searchAddon?.clearDecorations?.();
       return;
     }
-    find('next', query);
+    debounceRef.current = setTimeout(() => find('next', query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(debounceRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, caseSensitive, regex]);
 
@@ -74,6 +78,8 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
       onClose();
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // Search now; the pending debounced run would step past this match.
+      clearTimeout(debounceRef.current);
       find(e.shiftKey ? 'prev' : 'next');
     }
   };

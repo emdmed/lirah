@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, memo } from "react";
 import { Terminal } from "../../components/Terminal";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
@@ -9,25 +9,29 @@ import { usePromptTemplates } from "../templates";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useWatcher } from "../watcher";
 import { useBookmarks } from "../bookmarks";
-import { useTabManager } from "../tabs";
+import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "../../hooks/useCwdMonitor";
-import { useBranchName, useAutoChangelog, useAutoCommit, useBranchTasks, GitDiffDialog, BranchCompletedTasksDialog } from "../git";
-import { MarkdownViewerDialog } from "../markdown";
+import { useBranchName } from "../git/useBranchName";
+import { useAutoChangelog } from "../git/useAutoChangelog";
+import { useAutoCommit } from "../git/useAutoCommit";
+import { useBranchTasks } from "../git/useBranchTasks";
+import { lazyNamed } from "../../lib/lazyNamed";
 import { useFlatViewNavigation } from "../../hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "../../hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "../../hooks/useTextareaShortcuts";
 import { useHelpShortcut } from "../../hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "../bookmarks";
 import { useClaudeLauncher } from "../cli-selection";
-import { useFileSymbols } from "../file-analysis";
-import { useTokenUsage } from "../token-budget";
+import { useFileSymbols } from "../file-analysis/useFileSymbols";
+import { useTokenUsage } from "../token-budget/useTokenUsage";
 import { useTypeChecker } from "../../hooks/useTypeChecker";
 import { usePromptSender } from "../../hooks/usePromptSender";
+import { usePromptStore } from "../../hooks/usePromptStore";
 import { buildPrompt } from "../../hooks/buildPrompt";
 import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
-import { TokenBudgetProvider } from "../token-budget";
+import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
 import { TextareaPanel } from "../../components/textarea-panel/textarea-panel";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -38,8 +42,8 @@ import { FileSelectionProvider } from "../file-groups";
 import { useSecondaryTerminal } from "../../hooks/useSecondaryTerminal";
 import { useDialogs } from "../../hooks/useDialogs";
 import { useTerminalSettings } from "../../hooks/useTerminalSettings";
-import { useCompact } from "../compact";
-import { useElementPicker } from "../file-analysis";
+import { useCompact } from "../compact/useCompact";
+import { useElementPicker } from "../file-analysis/useElementPicker";
 import { useAtMention } from "../at-mention";
 import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
@@ -47,22 +51,28 @@ import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
 import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
-import { useUpdateChecker } from "../../hooks/useUpdateChecker";
-import { useToast } from "../toast";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
-import { requestJobsPane } from "../agent-jobs/jobsPane";
-import { useAgentJobs } from "../agent-jobs/agent-jobs";
+import { useTabShortcuts } from "./useTabShortcuts";
+import { useTabCommands } from "./useTabCommands";
+import { useAgentJobsActions } from "../agent-jobs/AgentJobsContext";
 
 // currentPath doubles as sidebar status text ('Waiting for terminal...',
 // 'Error loading directory') before the terminal session exists. Terminals
 // spawned with that text as projectDir fall back to the home dir, and the
 // cwd monitor then persists home over the tab's restored path — so anything
 // that treats currentPath as a filesystem path must go through this guard.
+// Loaded on first open, mounted only while open.
+const GitDiffDialog = lazyNamed(() => import("../git/GitDiffDialog"), "GitDiffDialog");
+const MarkdownViewerDialog = lazyNamed(() => import("../markdown/MarkdownViewerDialog"), "MarkdownViewerDialog");
+const BranchCompletedTasksDialog = lazyNamed(() => import("../git/BranchCompletedTasksDialog"), "BranchCompletedTasksDialog");
+
 function isRealPath(p) {
   return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
 }
 
-export function ProjectTab({ projectPath, isActive, tabId }) {
+// Memoized: App re-renders on every tab switch and tab-path update, which
+// must not re-render the tabs whose props didn't change.
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -95,21 +105,31 @@ export function ProjectTab({ projectPath, isActive, tabId }) {
     pointerEvents: isActive ? 'auto' : 'none',
     zIndex: isActive ? 1 : 0,
   };
+
+  // Restored tabs boot on first activation, not at startup: each one spawns a
+  // PTY, a WebGL context and its pollers, so N persisted tabs used to cost N
+  // of everything before the user looked at any but one. Once booted a tab
+  // stays mounted, as before.
+  const [booted, setBooted] = useState(isActive);
+  if (isActive && !booted) setBooted(true);
+
   return (
     <div style={style} aria-hidden={!isActive}>
-      <FileSelectionProvider>
-        <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} />
-      </FileSelectionProvider>
+      {booted && (
+        <FileSelectionProvider>
+          <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} availableUpdate={availableUpdate} />
+        </FileSelectionProvider>
+      )}
     </div>
   );
-}
+});
 
-function ProjectTabInner({ projectPath, isActive, tabId }) {
+function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const { bookmarks, updateBookmark } = useBookmarks();
-  const { updateTabPath } = useTabManager();
+  const { updateTabPath } = useTabActions();
 
   // Core terminal state
   const [terminalSessionId, setTerminalSessionId] = useState(null);
@@ -119,7 +139,10 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
 
   // Textarea state
   const [textareaVisible, setTextareaVisible] = useState(true);
-  const [textareaContent, setTextareaContent] = useState('');
+  // The prompt text lives in a store, not state: typing must re-render only
+  // the textarea panel, not this whole tab.
+  const promptStore = usePromptStore();
+  const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
   const [viewMode, setViewMode] = useState('flat');
 
@@ -177,7 +200,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
 
   // Bridge this tab's file-tree selection up to the global agent-jobs context
   // (only while active) so the Run Job dialog can use it as context.
-  const { registerContextFiles } = useAgentJobs();
+  const { registerContextFiles } = useAgentJobsActions();
   useEffect(() => {
     if (!isActive) return;
     registerContextFiles(fileSelection.filesForGroup);
@@ -284,7 +307,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     viewMode,
     search: sidebarSearch.search,
     toggleFileSelection: fileSelection.toggleFileSelection,
-    textareaContent,
     setTextareaContent,
     textareaRef,
   });
@@ -292,8 +314,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
 
-  const toast = useToast();
-  const availableUpdate = useUpdateChecker();
   const orchestrationCheck = useOrchestrationCheck();
 
   const switchToClaudeMode = useCallback(() => {
@@ -374,40 +394,48 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     await launchClaude();
     await new Promise(resolve => {
       const cliName = settings.selectedCli === 'opencode' ? 'opencode' : 'claude';
-      const checkCli = setInterval(async () => {
+      // setTimeout chain, not setInterval: the next check is only scheduled
+      // once the previous one has answered, so checks never pile up.
+      const deadline = Date.now() + 15000;
+      const checkCli = async () => {
         try {
           const running = await invoke('check_pty_child_process', {
             sessionId: terminalSessionId,
             processName: cliName,
           });
-          if (running) { clearInterval(checkCli); resolve(); }
+          if (running) { resolve(); return; }
         } catch { /* ignore */ }
-      }, 300);
-      setTimeout(() => { clearInterval(checkCli); resolve(); }, 15000);
+        if (Date.now() >= deadline) resolve();
+        else setTimeout(checkCli, 300);
+      };
+      setTimeout(checkCli, 300);
     });
     await new Promise(resolve => setTimeout(resolve, 1500));
   }, [navigateToBookmark, switchToClaudeMode, launchClaude, currentPath, settings]);
 
   // Git changes handler
   const handleGitChanges = useCallback((changes) => {
-    if (changes.newUntracked.length > 0 && !changes.newDeleted.length && !changes.noLongerUntracked.length) {
-      treeView.handleIncrementalUpdate(changes, currentPath);
-    } else if (changes.hasChanges) {
+    // A file that stops being untracked (staged/committed) still exists, so
+    // only additions, deletions and restored deletions change the tree.
+    if (changes.newDeleted.length > 0 || changes.noLongerUntracked.some(c => c.status === 'deleted')) {
       treeView.loadTreeData();
+    } else if (changes.newUntracked.length > 0) {
+      treeView.handleIncrementalUpdate(changes, currentPath);
     }
   }, [treeView.handleIncrementalUpdate, treeView.loadTreeData, currentPath]);
 
   // View git diff
+  const { setDiffFilePath, setDiffDialogOpen, setMarkdownFilePath, setMarkdownViewerOpen } = dialogs;
   const viewFileDiff = useCallback((filePath) => {
-    dialogs.setDiffFilePath(filePath);
-    dialogs.setDiffDialogOpen(true);
-  }, [dialogs]);
+    setDiffFilePath(filePath);
+    setDiffDialogOpen(true);
+  }, [setDiffFilePath, setDiffDialogOpen]);
 
   // View markdown file
   const viewMarkdownFile = useCallback((filePath) => {
-    dialogs.setMarkdownFilePath(filePath);
-    dialogs.setMarkdownViewerOpen(true);
-  }, [dialogs]);
+    setMarkdownFilePath(filePath);
+    setMarkdownViewerOpen(true);
+  }, [setMarkdownFilePath, setMarkdownViewerOpen]);
 
   // Collect markdown file paths
   const markdownFiles = useMemo(() => {
@@ -450,9 +478,11 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     }
   }, [viewMode, sidebar.sidebarOpen]);
 
+  const clearSelectedTemplate = useCallback(() => setSelectedTemplateId(null), []);
+
   // Prompt sender
   const sendTextareaToTerminal = usePromptSender({
-    terminalSessionId, terminalRef, textareaContent,
+    terminalSessionId, terminalRef, getTextareaContent: promptStore.get,
     selectedFiles: fileSelection.selectedFiles,
     currentPath, fileStates: fileSelection.fileStates,
     keepFilesAfterSend: settings.keepFilesAfterSend,
@@ -467,13 +497,15 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
     clearPatterns: patterns.clearPatterns,
-    clearSelectedTemplate: () => setSelectedTemplateId(null),
+    clearSelectedTemplate,
   });
 
   // The composer's payload preview. Built with the same function the sender
   // uses, so what is on screen is what the agent receives — not a summary of it.
+  // Everything but the typed text is built here; TextareaPanel splices the
+  // text in (withPromptText), so keystrokes don't redo file analysis.
   const promptPreview = useMemo(() => buildPrompt({
-    textareaContent,
+    textareaContent: '',
     selectedFiles: fileSelection.selectedFiles,
     currentPath,
     fileStates: fileSelection.fileStates,
@@ -487,7 +519,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
   }), [
-    textareaContent, fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
+    fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
     elementPicker.selectedElements, compact.compactedProject,
     patterns.selectedPatterns, patterns.getPatternInstructions,
@@ -559,29 +591,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd, isActive);
 
-  // Show toast when a new release is available — but only once per version.
-  // useUpdateChecker runs in every ProjectTab and polls every 4h, so without
-  // this guard the toast re-fires on each tab, remount, and interval forever.
-  useEffect(() => {
-    if (!availableUpdate) return;
-    const NOTIFIED_KEY = 'nevo-terminal:update-notified-version';
-    try {
-      if (localStorage.getItem(NOTIFIED_KEY) === availableUpdate.version) return;
-      localStorage.setItem(NOTIFIED_KEY, availableUpdate.version);
-    } catch { /* ignore */ }
-    toast.info(`Update available: ${availableUpdate.version}`, {
-      duration: 15000,
-      action: {
-        label: 'View Release',
-        onClick: () => {
-          import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
-            openUrl(availableUpdate.url);
-          });
-        },
-      },
-    });
-  }, [availableUpdate]);
-
   // Keyboard shortcuts
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
     textareaVisible, setTextareaVisible, textareaRef,
@@ -589,6 +598,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     selectedTemplateId, onSelectTemplate: setSelectedTemplateId,
     onRestoreLastPrompt: setTextareaContent,
     secondaryTerminalFocused: secondary.secondaryFocused,
+    isActive,
   });
 
   useHelpShortcut({
@@ -637,84 +647,42 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     };
   }, [isActive, terminalReady]);
 
-  // Global keyboard shortcuts - use refs to avoid unstable dependencies
-  const viewModeRef = useRef(viewMode);
-  const sidebarOpenRef = useRef(sidebar.sidebarOpen);
+  // Auto-commit and lazygit ask which project first when a workspace holds
+  // several. Refs keep these callbacks stable across stage/workspace changes.
   const autoCommitStageRef = useRef(autoCommit.stage);
   const workspaceRef = useRef(workspaceHook.workspace);
-
-  useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
-  useEffect(() => { sidebarOpenRef.current = sidebar.sidebarOpen; }, [sidebar.sidebarOpen]);
   useEffect(() => { autoCommitStageRef.current = autoCommit.stage; }, [autoCommit.stage]);
   useEffect(() => { workspaceRef.current = workspaceHook.workspace; }, [workspaceHook.workspace]);
 
-  useEffect(() => {
-    // Only register per-tab shortcuts when this tab is active
-    if (!isActive) return;
+  const { setProjectPickerAction, setProjectPickerOpen } = dialogs;
+  const handleAutoCommit = useCallback(() => {
+    if (autoCommitStageRef.current !== 'idle') autoCommit.quickCommit();
+    else if (workspaceRef.current?.projects?.length) {
+      setProjectPickerAction('autocommit');
+      setProjectPickerOpen(true);
+    } else autoCommit.trigger(currentPathRef.current);
+  }, [autoCommit.quickCommit, autoCommit.trigger, setProjectPickerAction, setProjectPickerOpen]);
 
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (secondary.secondaryVisible) secondary.closeSecondaryTerminal();
-        else secondary.setSecondaryVisible(true);
-        return;
-      }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'l') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (workspaceRef.current?.projects?.length) {
-          dialogs.setProjectPickerAction('lazygit');
-          dialogs.setProjectPickerOpen(true);
-        } else {
-          secondary.openWithCommand('lazygit');
-        }
-        return;
-      }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'n') {
-        e.preventDefault();
-        e.stopPropagation();
-        secondary.openWithCommand('nvim');
-        return;
-      }
-      if (secondary.secondaryFocused) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && viewModeRef.current === 'tree' && sidebarOpenRef.current) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
-        e.preventDefault();
-        compact.handleCompactProject();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-        e.preventDefault();
-        dialogs.setBudgetDialogOpen(true);
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
-        e.preventDefault();
-        dialogs.setDashboardOpen(true);
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === ' ') {
-        e.preventDefault();
-        if (autoCommitStageRef.current === 'idle') {
-          if (workspaceRef.current?.projects?.length) {
-            dialogs.setProjectPickerAction('autocommit');
-            dialogs.setProjectPickerOpen(true);
-          } else {
-            autoCommit.trigger(currentPathRef.current);
-          }
-        } else {
-          autoCommit.quickCommit();
-        }
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
-        e.preventDefault();
-        dialogs.setBranchTasksOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isActive, compact.handleCompactProject, secondary.secondaryVisible, secondary.secondaryFocused, secondary.closeSecondaryTerminal, secondary.openWithCommand, autoCommit.trigger, autoCommit.quickCommit, dialogs]);
+  const handleOpenLazygit = useCallback(() => {
+    if (workspaceRef.current?.projects?.length) {
+      setProjectPickerAction('lazygit');
+      setProjectPickerOpen(true);
+    } else {
+      secondary.openWithCommand('lazygit');
+    }
+  }, [secondary.openWithCommand, setProjectPickerAction, setProjectPickerOpen]);
+
+  useTabShortcuts({
+    isActive,
+    secondary,
+    dialogs,
+    viewMode,
+    sidebarOpen: sidebar.sidebarOpen,
+    searchInputRef,
+    onCompactProject: compact.handleCompactProject,
+    onOpenLazygit: handleOpenLazygit,
+    onAutoCommit: handleAutoCommit,
+  });
 
   const handleClearContext = useCallback(async () => {
     if (!terminalSessionId) return;
@@ -734,20 +702,17 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     }
   }, [terminalSessionId, settings.selectedCli]);
 
-  // Cleanup on unmount: stop watcher and close terminal
-  // Use refs so this effect only runs on unmount (empty deps), not when values change
+  // Cleanup on unmount: close the terminal. The fs watcher is not stopped
+  // here — useTreeView owns it, and watchers are ref-counted per path, so a
+  // second stop would release another tab's watcher on the same project.
+  // Use a ref so this effect only runs on unmount (empty deps), not when values change
   const terminalSessionIdCleanupRef = useRef(terminalSessionId);
-  const currentPathCleanupRef = useRef(currentPath);
   useEffect(() => { terminalSessionIdCleanupRef.current = terminalSessionId; }, [terminalSessionId]);
-  useEffect(() => { currentPathCleanupRef.current = currentPath; }, [currentPath]);
 
   useEffect(() => {
     return () => {
       if (terminalSessionIdCleanupRef.current) {
         invoke('close_terminal', { sessionId: terminalSessionIdCleanupRef.current }).catch(() => {});
-      }
-      if (currentPathCleanupRef.current) {
-        invoke('stop_fs_watcher', { path: currentPathCleanupRef.current }).catch(() => {});
       }
     };
   }, []);
@@ -775,52 +740,51 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
 
   const palette = useCommandPalette({ isActive });
 
-  // `:` commands. Each maps to an action that already exists elsewhere (a
-  // shortcut, a status-bar control or a menu item), so the palette adds reach,
-  // not behaviour.
-  const commands = useMemo(() => {
-    const onOff = (arg, current) => (arg === 'on' ? true : arg === 'off' ? false : !current);
-    return [
-      { id: 'compact', hint: 'compact the project for the prompt', run: () => compact.handleCompactProject() },
-      { id: 'commit', hint: 'auto commit (^⇧space)', run: () => {
-        if (autoCommitStageRef.current !== 'idle') autoCommit.quickCommit();
-        else if (workspaceRef.current?.projects?.length) {
-          dialogs.setProjectPickerAction('autocommit');
-          dialogs.setProjectPickerOpen(true);
-        } else autoCommit.trigger(currentPathRef.current);
-      } },
-      { id: 'theme', hint: 'switch theme', options: () => Object.keys(themes), run: (name) => {
-        if (!name) return;
-        if (!themes[name]) throw new Error(`no theme "${name}"`);
-        changeTheme(name);
-      } },
-      { id: 'sandbox', hint: 'sandbox the terminal (restarts it)', options: ['on', 'off'], run: (arg) => {
-        if (onOff(arg, settings.sandboxEnabled) !== settings.sandboxEnabled) toggleSandbox();
-      } },
-      { id: 'net', hint: 'isolate network in the sandbox', options: ['on', 'off'], run: (arg) => {
-        if (!settings.sandboxEnabled) throw new Error('sandbox is off');
-        // "net on" means network allowed, i.e. isolation off.
-        const wantIsolated = arg === 'off' ? true : arg === 'on' ? false : !settings.networkIsolation;
-        if (wantIsolated !== settings.networkIsolation) toggleNetwork();
-      } },
-      { id: 'git', hint: 'show only git changes (^G)', run: () => treeView.handleToggleGitFilter() },
-      { id: 'md', hint: 'show only markdown files (^M)', run: () => treeView.handleToggleMarkdownFilter() },
-      { id: 'files', hint: 'toggle the files pane', run: () => sidebar.setSidebarOpen(prev => !prev) },
-      { id: 'prompt', hint: 'toggle the prompt pane', run: () => setTextareaVisible(prev => !prev) },
-      { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle') },
-      { id: 'cli', hint: 'choose the CLI tool (^K)', run: () => dialogs.setCliSelectionModalOpen(true) },
-      { id: 'tokens', hint: 'token metrics (^⇧D)', run: () => dialogs.setDashboardOpen(true) },
-      { id: 'budget', hint: 'token budget', run: () => dialogs.setBudgetDialogOpen(true) },
-      { id: 'changelog', hint: 'auto changelog settings', run: () => dialogs.setAutoChangelogDialogOpen(true) },
-      { id: 'templates', hint: 'manage prompt templates', run: () => dialogs.setManageTemplatesDialogOpen(true) },
-      { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => dialogs.setBookmarksPaletteOpen(true) },
-      { id: 'workspace', hint: 'workspaces', run: () => dialogs.setWorkspaceDialogOpen(true) },
-      { id: 'titlebar', hint: 'show or hide the title bar', run: () => settings.setShowTitleBar(prev => !prev) },
-      { id: 'help', aliases: ['keys'], hint: 'keyboard shortcuts (^H)', run: () => dialogs.setShowHelp(true) },
-    ];
-  }, [compact.handleCompactProject, autoCommit.quickCommit, autoCommit.trigger, dialogs, themes, changeTheme,
-    settings.sandboxEnabled, settings.networkIsolation, settings.setShowTitleBar, toggleSandbox, toggleNetwork,
-    treeView.handleToggleGitFilter, treeView.handleToggleMarkdownFilter, sidebar.setSidebarOpen]);
+  // Callbacks handed to children. Declared up here, never inline in JSX: the
+  // sidebar is conditionally rendered, and a hook inside that branch changes
+  // the hook count whenever it toggles.
+  const handleSidebarSearchChange = useCallback((query) => {
+    sidebarSearch.handleSearchChange(query);
+    atMention.setAtMentionQuery(null);
+  }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery]);
+  const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen,
+    setAutoChangelogDialogOpen, setAutoCommitConfigOpen, setBranchTasksOpen,
+    setWorkspaceDialogOpen, setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
+    setSaveFileGroupDialogOpen } = dialogs;
+  const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [setShowHelp]);
+  const openCliSettings = useCallback(() => setCliSelectionModalOpen(true), [setCliSelectionModalOpen]);
+  const toggleInstrumentGlass = useCallback(() => settings.setInstrumentGlass(prev => !prev), [settings.setInstrumentGlass]);
+  const toggleTitleBar = useCallback(() => settings.setShowTitleBar(prev => !prev), [settings.setShowTitleBar]);
+  const toggleAutoLaunchCli = useCallback(() => settings.setAutoLaunchCli(prev => !prev), [settings.setAutoLaunchCli]);
+  const openDashboard = useCallback(() => setDashboardOpen(true), [setDashboardOpen]);
+  const openBudgetSettings = useCallback(() => setBudgetDialogOpen(true), [setBudgetDialogOpen]);
+  const openAutoChangelogDialog = useCallback(() => setAutoChangelogDialogOpen(true), [setAutoChangelogDialogOpen]);
+  const openAutoCommitConfig = useCallback(() => setAutoCommitConfigOpen(true), [setAutoCommitConfigOpen]);
+  const toggleBranchTasks = useCallback(() => setBranchTasksOpen(prev => !prev), [setBranchTasksOpen]);
+  const openWorkspaceDialog = useCallback(() => setWorkspaceDialogOpen(true), [setWorkspaceDialogOpen]);
+  const openAddBookmark = useCallback(() => setAddBookmarkDialogOpen(true), [setAddBookmarkDialogOpen]);
+  const openManageTemplates = useCallback(() => setManageTemplatesDialogOpen(true), [setManageTemplatesDialogOpen]);
+  const openSaveFileGroup = useCallback(() => setSaveFileGroupDialogOpen(true), [setSaveFileGroupDialogOpen]);
+  const closeTextarea = useCallback(() => setTextareaVisible(false), []);
+  const clearCompactedProject = useCallback(() => compact.setCompactedProject(null), [compact.setCompactedProject]);
+  const toggleSecondaryFullscreen = useCallback(() => secondary.setSecondaryFullscreen(f => !f), [secondary.setSecondaryFullscreen]);
+  const handleTerminalReady = useCallback(() => setTerminalReady(true), []);
+  const handleSandboxFailed = useCallback(() => settings.setSandboxFailed(true), [settings.setSandboxFailed]);
+
+  const commands = useTabCommands({
+    dialogs,
+    settings,
+    themes,
+    changeTheme,
+    onCompactProject: compact.handleCompactProject,
+    onAutoCommit: handleAutoCommit,
+    toggleSandbox,
+    toggleNetwork,
+    onToggleGitFilter: treeView.handleToggleGitFilter,
+    onToggleMarkdownFilter: treeView.handleToggleMarkdownFilter,
+    setSidebarOpen: sidebar.setSidebarOpen,
+    setTextareaVisible,
+  });
 
   return (
     <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
@@ -832,18 +796,18 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               sidebar={sidebar}
               search={sidebarSearch}
               searchInputRef={searchInputRef}
-              onSearchChange={useCallback((query) => { sidebarSearch.handleSearchChange(query); atMention.setAtMentionQuery(null); }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery])}
+              onSearchChange={handleSidebarSearchChange}
               treeView={treeView}
               typeChecker={typeChecker}
               fileSymbols={fileSymbolsHook}
               viewMode={viewMode}
               currentPath={currentPath}
               folders={folders}
-              fileWatchingEnabled={fileWatchingEnabled && !secondary.secondaryFullscreen}
+              fileWatchingEnabled={fileWatchingEnabled && isActive && !secondary.secondaryFullscreen}
               isTextareaPanelOpen={textareaVisible}
               onNavigateParent={navigateToParent}
               onFolderClick={loadFolders}
-              onAddBookmark={() => dialogs.setAddBookmarkDialogOpen(true)}
+              onAddBookmark={openAddBookmark}
               onNavigateBookmark={navigateToBookmark}
               hasTerminalSession={!!terminalSessionId}
               sandboxEnabled={settings.sandboxEnabled}
@@ -860,27 +824,27 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
         textarea={
           textareaVisible && (
             <TextareaPanel
-              value={textareaContent}
+              promptStore={promptStore}
               onChange={handleTextareaChange}
               onSend={sendTextareaToTerminal}
-              onClose={() => setTextareaVisible(false)}
+              onClose={closeTextarea}
               textareaRef={textareaRef}
               disabled={!terminalSessionId}
               selectedFiles={fileSelection.selectedFiles}
               currentPath={currentPath}
               selectedTemplateId={selectedTemplateId}
               onSelectTemplate={setSelectedTemplateId}
-              onManageTemplates={() => dialogs.setManageTemplatesDialogOpen(true)}
+              onManageTemplates={openManageTemplates}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
               projectPath={currentPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
-              onSaveGroup={() => dialogs.setSaveFileGroupDialogOpen(true)}
+              onSaveGroup={openSaveFileGroup}
               onCompactProject={compact.handleCompactProject}
               isCompacting={compact.isCompacting}
               compactProgress={compact.compactProgress}
               compactedProject={compact.compactedProject}
-              onClearCompactedProject={() => compact.setCompactedProject(null)}
+              onClearCompactedProject={clearCompactedProject}
               onUpdateCompactedProject={compact.setCompactedProject}
               selectedElements={elementPicker.selectedElements}
               onClearElements={elementPicker.clearSelectedElements}
@@ -913,34 +877,34 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             viewMode={viewMode}
             currentPath={currentPath}
             sessionId={terminalSessionId}
-            onToggleHelp={useCallback(() => dialogs.setShowHelp(prev => !prev), [dialogs.setShowHelp])}
+            onToggleHelp={toggleHelp}
             selectedCli={settings.selectedCli}
-            onOpenCliSettings={useCallback(() => dialogs.setCliSelectionModalOpen(true), [dialogs.setCliSelectionModalOpen])}
+            onOpenCliSettings={openCliSettings}
             showTitleBar={settings.showTitleBar}
             instrumentGlass={settings.instrumentGlass}
-            onToggleInstrumentGlass={useCallback(() => settings.setInstrumentGlass(prev => !prev), [settings.setInstrumentGlass])}
+            onToggleInstrumentGlass={toggleInstrumentGlass}
             tokenUsage={tokenUsage}
-            onToggleTitleBar={useCallback(() => settings.setShowTitleBar(prev => !prev), [settings.setShowTitleBar])}
+            onToggleTitleBar={toggleTitleBar}
             autoLaunchCli={settings.autoLaunchCli}
-            onToggleAutoLaunchCli={useCallback(() => settings.setAutoLaunchCli(prev => !prev), [settings.setAutoLaunchCli])}
+            onToggleAutoLaunchCli={toggleAutoLaunchCli}
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
             networkIsolation={settings.networkIsolation}
             onToggleNetworkIsolation={toggleNetwork}
             secondaryTerminalFocused={secondary.secondaryFocused}
-            onOpenDashboard={useCallback(() => dialogs.setDashboardOpen(true), [dialogs.setDashboardOpen])}
-            onOpenBudgetSettings={useCallback(() => dialogs.setBudgetDialogOpen(true), [dialogs.setBudgetDialogOpen])}
+            onOpenDashboard={openDashboard}
+            onOpenBudgetSettings={openBudgetSettings}
             autoChangelogEnabled={settings.autoChangelogEnabled}
             changelogStatus={changelogStatus}
-            onOpenAutoChangelogDialog={useCallback(() => dialogs.setAutoChangelogDialogOpen(true), [dialogs.setAutoChangelogDialogOpen])}
+            onOpenAutoChangelogDialog={openAutoChangelogDialog}
             autoCommitCli={settings.autoCommitCli}
-            onOpenAutoCommitConfig={useCallback(() => dialogs.setAutoCommitConfigOpen(true), [dialogs.setAutoCommitConfigOpen])}
+            onOpenAutoCommitConfig={openAutoCommitConfig}
             onToggleSandbox={toggleSandbox}
             branchName={branchName}
-            onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
+            onToggleBranchTasks={toggleBranchTasks}
             branchTasksOpen={dialogs.branchTasksOpen}
             workspace={workspaceHook.workspace}
-            onOpenWorkspaceDialog={useCallback(() => dialogs.setWorkspaceDialogOpen(true), [dialogs.setWorkspaceDialogOpen])}
+            onOpenWorkspaceDialog={openWorkspaceDialog}
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
             availableUpdate={availableUpdate}
@@ -959,7 +923,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               onSessionReady={secondary.setSecondarySessionId}
               projectDir={secondary.projectDirOverride || resolvedProjectDir}
               fullscreen={secondary.secondaryFullscreen}
-              onToggleFullscreen={() => secondary.setSecondaryFullscreen(f => !f)}
+              onToggleFullscreen={toggleSecondaryFullscreen}
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
               initialCommand={secondary.pendingCommand}
               isActive={isActive}
@@ -973,35 +937,37 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
           theme={theme.terminal}
           isActive={isActive}
           onSessionReady={handleSessionReady}
-          onReady={() => setTerminalReady(true)}
+          onReady={handleTerminalReady}
           onSearchFocus={handleSearchFocus}
           onToggleGitFilter={treeView.handleToggleGitFilter}
           sandboxEnabled={settings.sandboxEnabled}
           networkIsolation={settings.networkIsolation}
           projectDir={resolvedProjectDir}
-          onSandboxFailed={() => settings.setSandboxFailed(true)}
+          onSandboxFailed={handleSandboxFailed}
         />
-        <GitDiffDialog
+        <Suspense fallback={null}>
+        {dialogs.diffDialogOpen && <GitDiffDialog
           open={dialogs.diffDialogOpen}
           onOpenChange={dialogs.setDiffDialogOpen}
           filePath={dialogs.diffFilePath}
           repoPath={currentPath}
-        />
-        <MarkdownViewerDialog
+        />}
+        {dialogs.markdownViewerOpen && <MarkdownViewerDialog
           open={dialogs.markdownViewerOpen}
           onOpenChange={dialogs.setMarkdownViewerOpen}
           filePath={dialogs.markdownFilePath}
           repoPath={currentPath}
           markdownFiles={markdownFiles}
           onFileChange={viewMarkdownFile}
-        />
-        <BranchCompletedTasksDialog
+        />}
+        {dialogs.branchTasksOpen && <BranchCompletedTasksDialog
           open={dialogs.branchTasksOpen}
           onOpenChange={dialogs.setBranchTasksOpen}
           repoPath={currentPath}
           branchTasks={branchTasks}
           currentBranch={branchName}
-        />
+        />}
+        </Suspense>
       </Layout>
 
       {isActive && (

@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-
-const ROW = '[data-nav-row]';
+import { useCallback, useRef, useState } from 'react';
 
 /**
  * Vim-style cursor over the rows of a list (j/k, g/G, Enter, p, /; with
  * `onParent`, Backspace / h / - go up a directory, as in ranger and netrw).
- * Works on the DOM rather than on data so it covers any list that marks its
- * rows with `data-nav-row`; Enter clicks the row's `[data-nav-activate]`
- * element (or the row), `p` clicks `[data-nav-pin]`.
- * The cursor row gets `data-cursor`, styled as inverse video.
+ *
+ * The cursor is an index into the list's navigable rows. The list (which may
+ * be virtualized, so most rows have no DOM node) registers itself through
+ * `registerList({ count, activate(i), pin(i), scrollToIndex(i) })` and marks
+ * the row at `cursorIndex` with `data-cursor`, styled as a lamp marker.
  */
 export function useRowCursor({ onSearch, onParent } = {}) {
   const containerRef = useRef(null);
+  const listRef = useRef(null);
   const [index, setIndexState] = useState(null);
   // Mirrors `index` so key repeat faster than a render still steps one row per press.
   const indexRef = useRef(null);
@@ -21,33 +21,28 @@ export function useRowCursor({ onSearch, onParent } = {}) {
   }, []);
   const [count, setCount] = useState(0);
 
-  const rows = useCallback(
-    () => (containerRef.current ? [...containerRef.current.querySelectorAll(ROW)] : []),
-    []
-  );
-
-  // Re-mark the cursor row after every render: rows are re-created as folders
-  // expand or the list filters, and React doesn't own this attribute.
-  useEffect(() => {
-    const all = rows();
-    if (all.length !== count) setCount(all.length);
-    all.forEach((row, i) => {
-      if (i === index) row.setAttribute('data-cursor', '');
-      else row.removeAttribute('data-cursor');
-    });
-  });
+  // Called by the rendered list whenever its rows change (and with null on unmount).
+  const registerList = useCallback((api) => {
+    listRef.current = api;
+    const nextCount = api ? api.count : 0;
+    setCount(nextCount);
+    // Keep the cursor on a real row when the list shrinks (folder collapsed, filter).
+    if (indexRef.current != null && indexRef.current >= nextCount) {
+      setIndex(nextCount > 0 ? nextCount - 1 : null);
+    }
+  }, [setIndex]);
 
   const move = useCallback((next) => {
-    const all = rows();
-    if (all.length === 0) return;
-    const clamped = Math.max(0, Math.min(all.length - 1, next));
+    const list = listRef.current;
+    if (!list || list.count === 0) return;
+    const clamped = Math.max(0, Math.min(list.count - 1, next));
     setIndex(clamped);
-    all[clamped].scrollIntoView({ block: 'nearest' });
-  }, [rows, setIndex]);
+    list.scrollToIndex(clamped);
+  }, [setIndex]);
 
   const onKeyDown = useCallback((e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const all = rows();
+    const list = listRef.current;
     const current = indexRef.current ?? -1;
     switch (e.key) {
       case 'j':
@@ -64,19 +59,16 @@ export function useRowCursor({ onSearch, onParent } = {}) {
         break;
       case 'G':
       case 'End':
-        move(all.length - 1);
+        move((list?.count ?? 0) - 1);
         break;
       case 'Enter':
-      case 'o': {
-        const row = all[current];
-        if (!row) return;
-        (row.querySelector('[data-nav-activate]') || row).click();
+      case 'o':
+        if (!list || current < 0 || current >= list.count) return;
+        list.activate(current);
         break;
-      }
-      case 'p': {
-        all[current]?.querySelector('[data-nav-pin]')?.click();
+      case 'p':
+        if (list && current >= 0 && current < list.count) list.pin?.(current);
         break;
-      }
       case '/':
         if (!onSearch) return;
         onSearch();
@@ -96,12 +88,12 @@ export function useRowCursor({ onSearch, onParent } = {}) {
     }
     e.preventDefault();
     e.stopPropagation();
-  }, [rows, move, onSearch, onParent, setIndex]);
+  }, [move, onSearch, onParent, setIndex]);
 
   // Leaving the pane drops the cursor, so a stale highlight never lingers.
   const onBlur = useCallback((e) => {
     if (!e.currentTarget.contains(e.relatedTarget)) setIndex(null);
   }, [setIndex]);
 
-  return { containerRef, onKeyDown, onBlur, cursorIndex: index, rowCount: count };
+  return { containerRef, registerList, onKeyDown, onBlur, cursorIndex: index, rowCount: count };
 }

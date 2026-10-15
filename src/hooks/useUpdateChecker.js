@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { usePageVisible } from './usePageVisible';
 import { version as CURRENT_VERSION } from '../../package.json';
 
 const GITHUB_REPO = 'emdmed/lirah';
 const CHECK_INTERVAL = 4 * 60 * 60 * 1000; // 4 hours
+let lastCheckAt = 0;
 
 function isNewer(remote, local) {
   const r = remote.replace(/^v/, '').split('.').map(Number);
@@ -18,8 +20,10 @@ function isNewer(remote, local) {
 
 export function useUpdateChecker() {
   const [update, setUpdate] = useState(null);
+  const pageVisible = usePageVisible();
 
   useEffect(() => {
+    if (!pageVisible) return;
     let cancelled = false;
 
     const check = async () => {
@@ -39,10 +43,16 @@ export function useUpdateChecker() {
       }
     };
 
-    check();
-    const interval = setInterval(check, CHECK_INTERVAL);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+    // Becoming visible re-checks, but no more than once per interval.
+    const sinceLast = Date.now() - lastCheckAt;
+    let interval = null;
+    const start = setTimeout(() => {
+      lastCheckAt = Date.now();
+      check();
+      interval = setInterval(() => { lastCheckAt = Date.now(); check(); }, CHECK_INTERVAL);
+    }, Math.max(0, CHECK_INTERVAL - sinceLast));
+    return () => { cancelled = true; clearTimeout(start); clearInterval(interval); };
+  }, [pageVisible]);
 
   return update;
 }

@@ -8,7 +8,7 @@ pub struct ProjectInput {
     pub description: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_workspace(
     name: String,
     projects: Vec<ProjectInput>,
@@ -32,7 +32,7 @@ pub fn create_workspace(
     Ok(info)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_workspace(workspace_path: String, state: tauri::State<AppState>) -> Result<(), String> {
     manager::delete_workspace(&workspace_path)?;
 
@@ -47,12 +47,12 @@ pub fn delete_workspace(workspace_path: String, state: tauri::State<AppState>) -
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_workspaces() -> Result<Vec<manager::WorkspaceInfo>, String> {
     manager::list_workspaces()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_workspace(workspace_path: String, state: tauri::State<AppState>) -> Result<manager::WorkspaceInfo, String> {
     // Read workspace metadata
     let metadata_path = std::path::Path::new(&workspace_path).join(".lirah-workspace.json");

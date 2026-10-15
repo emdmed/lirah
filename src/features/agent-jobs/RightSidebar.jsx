@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
 import { Square, GitCompare, Check, Trash2, Loader2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, ChevronsRight } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -11,12 +11,14 @@ import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { JOBS_PANE_EVENT } from './jobsPane';
-import { GitDiffDialog } from '../git';
-import { useBranchName } from '../git/useBranchName';
-import { MarkdownViewerDialog } from '../markdown';
 import { useAgentJobs } from './AgentJobsContext';
-import { RunJobDialog } from './RunJobDialog';
-import { RaceCompareDialog } from './RaceCompareDialog';
+import { lazyNamed } from '../../lib/lazyNamed';
+
+// Loaded on first open, mounted only while open.
+const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
+const MarkdownViewerDialog = lazyNamed(() => import('../markdown/MarkdownViewerDialog'), 'MarkdownViewerDialog');
+const RunJobDialog = lazyNamed(() => import('./RunJobDialog'), 'RunJobDialog');
+const RaceCompareDialog = lazyNamed(() => import('./RaceCompareDialog'), 'RaceCompareDialog');
 
 const MIN_WIDTH = 224;
 const MAX_WIDTH = 560;
@@ -89,7 +91,6 @@ export function RightSidebar({ projectPath }) {
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const toast = useToast();
-  const branchName = useBranchName(projectPath);
 
   // null = automatic: the pane folds away while there is nothing to show.
   // An explicit true/false is the user's choice and wins until a new job starts.
@@ -128,23 +129,35 @@ export function RightSidebar({ projectPath }) {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10);
     return Number.isFinite(saved) ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, saved)) : DEFAULT_WIDTH;
   });
-  useEffect(() => {
-    localStorage.setItem(WIDTH_KEY, String(width));
-  }, [width]);
+  const paneRef = useRef(null);
 
+  // A drag writes the width straight onto the pane once per frame; state and
+  // storage are committed on mouseup so the pane doesn't re-render per move.
   const startResize = (e) => {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = width;
+    let frame = 0;
+    let pending = null;
+    const apply = () => {
+      frame = 0;
+      if (paneRef.current) paneRef.current.style.width = `${pending}px`;
+    };
     const onMove = (ev) => {
       // Panel is anchored right, so dragging left (smaller clientX) widens it.
-      setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (startX - ev.clientX))));
+      pending = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (startX - ev.clientX)));
+      if (!frame) frame = requestAnimationFrame(apply);
     };
     const onUp = () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (pending == null) return;
+      apply();
+      setWidth(pending);
+      localStorage.setItem(WIDTH_KEY, String(pending));
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -153,14 +166,6 @@ export function RightSidebar({ projectPath }) {
   };
 
   const runningJobs = jobs.filter((j) => j.status === 'running').length;
-
-  // Tick once a second while any job is running so elapsed times stay live.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (runningJobs === 0) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [runningJobs]);
 
   // Keep the selection in sync with the jobs that are still reconcilable
   // (finished/discarded jobs drop out on their own).
@@ -220,6 +225,11 @@ export function RightSidebar({ projectPath }) {
     } else if (result?.ok) {
       const files = `${count} file${count === 1 ? '' : 's'}`;
       const suffix = result.forced ? ' (typecheck skipped)' : '';
+      // Looked up on demand: the toast is the only consumer, so a poll for
+      // it would cost 2 Hz of git calls for one string.
+      const branchName = projectPath
+        ? await invoke('get_current_branch', { repoPath: projectPath }).catch(() => null)
+        : null;
       toast.success(
         `Applied ${files} into your ${branchName ? `${branchName} ` : ''}working tree — uncommitted${suffix}`
       );
@@ -250,7 +260,9 @@ export function RightSidebar({ projectPath }) {
     }
   };
 
-  const openReview = (job) => {
+  const openReview = (id) => {
+    const job = jobs.find((j) => j.id === id);
+    if (!job) return;
     setNotes([]);
     setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null });
   };
@@ -287,7 +299,9 @@ export function RightSidebar({ projectPath }) {
   // Copy just the LLM output — no prompt, no metadata — so it can be pasted as a
   // prompt elsewhere. Prefer the full on-disk log; fall back to the in-memory
   // buffer (capped, so long jobs may be truncated).
-  const handleCopyOutput = async (job) => {
+  const handleCopyOutput = async (id) => {
+    const job = jobs.find((j) => j.id === id);
+    if (!job) return;
     try {
       let output = job.output.map((o) => o.chunk).join('\n');
       if (job.logPath) {
@@ -322,27 +336,43 @@ export function RightSidebar({ projectPath }) {
   const reviewJob = review ? jobs.find((j) => j.id === review.jobId) : null;
   const compareJobs = compareRaceId ? jobs.filter((j) => j.raceId === compareRaceId) : [];
 
+  // Card actions take a job id and keep their identity across renders, so
+  // memo(JobCard) re-renders only the card whose job changed. They forward to
+  // the latest handlers, which close over `jobs` (new on every output batch).
+  const handlersRef = useRef(null);
+  useLayoutEffect(() => {
+    handlersRef.current = {
+      toggleSelect,
+      cancel: cancelJob,
+      approve: handleApprove,
+      pickWinner: handlePickWinner,
+      rerun: handleRerun,
+      discard: discardJob,
+      archive: archiveJob,
+      unarchive: unarchiveJob,
+      review: openReview,
+      report: (id) => setReportPath(jobs.find((j) => j.id === id)?.reportPath ?? null),
+      copyOutput: handleCopyOutput,
+    };
+  });
+  const cardActions = useMemo(() => {
+    const forward = (name) => (...args) => handlersRef.current[name](...args);
+    return Object.fromEntries(
+      ['toggleSelect', 'cancel', 'approve', 'pickWinner', 'rerun', 'discard', 'archive', 'unarchive', 'review', 'report', 'copyOutput']
+        .map((name) => [name, forward(name)])
+    );
+  }, []);
+
   // One place that knows how a job card is wired, shared by the active list, the
   // race groups and the archived section.
   const renderCard = (job, { archived = false } = {}) => (
     <JobCard
       key={job.id}
       job={job}
-      now={now}
+      archived={archived}
       selectable={!archived && isReconcilable(job)}
       selected={selected.has(job.id)}
-      onToggleSelect={() => toggleSelect(job.id)}
-      onCancel={() => cancelJob(job.id)}
-      onApprove={(force) => handleApprove(job.id, force)}
-      // A race candidate is applied by winning, which also clears the others.
-      onPickWinner={job.raceId ? (force) => handlePickWinner(job.id, force) : null}
-      onRerun={() => handleRerun(job.id)}
-      onDiscard={() => discardJob(job.id)}
-      onArchive={archived ? undefined : () => archiveJob(job.id)}
-      onUnarchive={archived ? () => unarchiveJob(job.id) : undefined}
-      onReview={() => openReview(job)}
-      onReport={() => setReportPath(job.reportPath)}
-      onCopyOutput={() => handleCopyOutput(job)}
+      actions={cardActions}
     />
   );
 
@@ -387,6 +417,7 @@ export function RightSidebar({ projectPath }) {
 
   return (
     <div
+      ref={paneRef}
       style={{ width }}
       data-pane="4"
       data-title={`[4] ${tab}`}
@@ -521,7 +552,8 @@ export function RightSidebar({ projectPath }) {
         )}
       </div>
 
-      <RunJobDialog open={dialogOpen} onOpenChange={setDialogOpen} projectPath={projectPath} />
+      <Suspense fallback={null}>
+      {dialogOpen && <RunJobDialog open={dialogOpen} onOpenChange={setDialogOpen} projectPath={projectPath} />}
 
       {reviewJob && review.filePath && (
         <div className="fixed inset-0 z-50">
@@ -557,6 +589,7 @@ export function RightSidebar({ projectPath }) {
           />
         </div>
       )}
+      </Suspense>
     </div>
   );
 }
@@ -626,7 +659,32 @@ function Dot() {
   return <span className="text-muted-foreground/30">·</span>;
 }
 
-function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onApprove, onPickWinner, onRerun, onDiscard, onArchive, onUnarchive, onReview, onReport, onCopyOutput }) {
+// Live elapsed time for a running job. Owns its ticker so only this text
+// re-renders each second, not the pane or the card.
+function Elapsed({ startedAt }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return formatDuration(startedAt, now);
+}
+
+// Consecutive lines from the same stream joined into one string, so the log
+// renders as a few text runs instead of one keyed element per line.
+function outputRuns(output) {
+  const runs = [];
+  output.forEach((l, i) => {
+    const text = (l.chunk || ' ') + (i < output.length - 1 ? '\n' : '');
+    const stderr = l.stream === 'stderr';
+    const last = runs[runs.length - 1];
+    if (last && last.stderr === stderr) last.text += text;
+    else runs.push({ stderr, text });
+  });
+  return runs;
+}
+
+const JobCard = memo(function JobCard({ job, archived, selectable, selected, actions }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
@@ -639,7 +697,9 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
     job.status === 'conflict' ||
     job.status === 'interrupted';
   const lastLines = expanded ? [] : job.output.slice(-2);
-  const duration = formatDuration(job.startedAt, isRunning ? now : job.endedAt);
+  const duration = isRunning ? null : formatDuration(job.startedAt, job.endedAt);
+  // A race candidate is applied by winning, which also clears the others.
+  const isRace = !!job.raceId;
   const stat = job.diffStat;
   const hasStat = stat && (stat.added > 0 || stat.removed > 0);
   // A dedicated status chip for anything that isn't a clean running/done state.
@@ -650,10 +710,11 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
   const tcErrors = tc?.status === 'done' && tc.errorCount > 0;
   const tcClean = tc?.status === 'done' && tc.errorCount === 0;
 
-  // Keep the expanded log pinned to the newest output while a job streams.
+  // Keep the expanded log pinned to the newest output while a job streams. Keyed
+  // on the array, not its length: once the buffer caps the length stops changing.
   useEffect(() => {
     if (expanded && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [expanded, job.output.length]);
+  }, [expanded, job.output]);
 
   return (
     <div
@@ -667,7 +728,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       {/* Header: status marker + label + live duration */}
       <div className="flex items-start gap-2 px-2.5 pt-2">
         {selectable ? (
-          <Checkbox checked={selected} onCheckedChange={onToggleSelect} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <Checkbox checked={selected} onCheckedChange={() => actions.toggleSelect(job.id)} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         ) : (
           <Lamp {...lamp} label={meta.label} className="mt-1" />
         )}
@@ -687,7 +748,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
 
         {isRunning && (
           <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-foreground">
-            {duration}
+            <Elapsed startedAt={job.startedAt} />
           </span>
         )}
       </div>
@@ -809,20 +870,25 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         </div>
       )}
 
-      {/* Expanded: full streaming log */}
+      {/* Expanded: full streaming log, one <pre> of stream runs; skipped by
+          the renderer while scrolled out of the pane. */}
       {expanded && (
         <div
           ref={logRef}
-          className="mt-1.5 mx-2.5 max-h-56 overflow-auto rounded-sm border border-sidebar-border/60 bg-background/50 p-2 font-mono text-[11px] leading-relaxed"
+          className="mt-1.5 mx-2.5 max-h-56 overflow-auto rounded-sm border border-sidebar-border/60 bg-background/50 p-2 font-mono text-[11px] leading-relaxed [content-visibility:auto] [contain-intrinsic-size:auto_14rem]"
         >
           {job.output.length === 0 ? (
             <div className="text-muted-foreground/50">No output yet.</div>
           ) : (
-            job.output.map((l, i) => (
-              <div key={i} className={cn('whitespace-pre-wrap break-words', l.stream === 'stderr' && 'text-destructive/80')}>
-                {l.chunk || ' '}
-              </div>
-            ))
+            <pre className="m-0 [font:inherit] whitespace-pre-wrap break-words">
+              {outputRuns(job.output).map((run, i) =>
+                run.stderr ? (
+                  <span key={i} className="text-destructive/80">{run.text}</span>
+                ) : (
+                  <Fragment key={i}>{run.text}</Fragment>
+                )
+              )}
+            </pre>
           )}
         </div>
       )}
@@ -836,38 +902,38 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       {/* Actions: emphasized primary on the left, ghost icons on the right */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 px-2.5 pb-2">
         {isRunning && (
-          <PrimaryAction icon={Square} label="Cancel" onClick={onCancel} variant="danger" title="Stop this running job" />
+          <PrimaryAction icon={Square} label="Cancel" onClick={() => actions.cancel(job.id)} variant="danger" title="Stop this running job" />
         )}
         {isDone && changedCount > 0 && (
           <PrimaryAction
             icon={GitCompare}
             label={`Review ${changedCount}`}
-            onClick={onReview}
+            onClick={() => actions.review(job.id)}
             variant="outline"
             title="Review the isolated diff before applying"
           />
         )}
         {canApprove && (
           <PrimaryAction
-            icon={tcErrors ? AlertTriangle : onPickWinner ? Trophy : Check}
+            icon={tcErrors ? AlertTriangle : isRace ? Trophy : Check}
             label={
               tcChecking
                 ? 'Checking…'
                 : tcErrors
-                ? onPickWinner
+                ? isRace
                   ? 'Keep anyway'
                   : 'Apply anyway'
-                : onPickWinner
+                : isRace
                 ? 'Keep this'
                 : 'Apply'
             }
-            onClick={() => (onPickWinner ? onPickWinner(tcErrors) : onApprove(tcErrors))}
+            onClick={() => (isRace ? actions.pickWinner(job.id, tcErrors) : actions.approve(job.id, tcErrors))}
             disabled={tcChecking}
             variant={tcErrors ? 'danger' : 'primary'}
             title={
               tcErrors
                 ? 'These changes have type errors — applying anyway skips the check. Review before committing.'
-                : onPickWinner
+                : isRace
                 ? 'Keep this candidate: applies it to your working tree and discards the other candidates'
                 : 'Apply these changes into your working tree — uncommitted, so you review and commit them yourself'
             }
@@ -875,22 +941,22 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
         )}
 
         <div className="ml-auto flex items-center gap-0.5">
-          {isDone && <IconAction icon={RotateCcw} title="Re-run job" onClick={onRerun} />}
-          {job.reportPath && <IconAction icon={FileText} title="View run report" onClick={onReport} />}
+          {isDone && <IconAction icon={RotateCcw} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
+          {job.reportPath && <IconAction icon={FileText} title="View run report" onClick={() => actions.report(job.id)} />}
           {isDone && (job.logPath || job.output.length > 0) && (
-            <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={onCopyOutput} />
+            <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={() => actions.copyOutput(job.id)} />
           )}
-          {!isRunning && onArchive && (
-            <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={onArchive} />
+          {!isRunning && !archived && (
+            <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={() => actions.archive(job.id)} />
           )}
-          {onUnarchive && (
-            <IconAction icon={ArchiveRestore} title="Restore to the jobs list" onClick={onUnarchive} />
+          {archived && (
+            <IconAction icon={ArchiveRestore} title="Restore to the jobs list" onClick={() => actions.unarchive(job.id)} />
           )}
           {!isRunning && (
             <IconAction
               icon={Trash2}
               title={job.worktreePath ? 'Discard changes' : 'Dismiss'}
-              onClick={onDiscard}
+              onClick={() => actions.discard(job.id)}
               danger
             />
           )}
@@ -898,7 +964,7 @@ function JobCard({ job, now, selectable, selected, onToggleSelect, onCancel, onA
       </div>
     </div>
   );
-}
+});
 
 function PrimaryAction({ icon: Icon, label, onClick, variant = 'outline', title, disabled = false }) {
   return (

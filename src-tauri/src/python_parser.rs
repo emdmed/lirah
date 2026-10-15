@@ -99,9 +99,14 @@ fn extract_bases<R>(bases: &[Expr<R>]) -> Vec<String> {
     }).collect()
 }
 
+/// CPU-bound on large files, so it runs on the blocking pool, not the UI thread.
 #[tauri::command]
-pub fn parse_python_skeleton(content: String, file_path: String) -> Result<PythonSkeleton, String> {
-    let parsed = parse(&content, Mode::Module, &file_path)
+pub async fn parse_python_skeleton(content: String, file_path: String) -> Result<PythonSkeleton, String> {
+    crate::ipc::blocking("parse_python_skeleton", move || parse_skeleton(&content, &file_path)).await
+}
+
+fn parse_skeleton(content: &str, file_path: &str) -> Result<PythonSkeleton, String> {
+    let parsed = parse(content, Mode::Module, file_path)
         .map_err(|e| format!("Parse error: {}", e))?;
 
     let mut skeleton = PythonSkeleton {

@@ -1,9 +1,10 @@
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use crate::state::PtySession;
+use std::io::Read;
+use crate::pty::session::SessionHandle;
 
-pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> Result<PtySession, String> {
+/// Spawn the user's shell on a new PTY. Returns the session and the reader for
+/// its output, which the caller drains on its own thread.
+pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> Result<(SessionHandle, Box<dyn Read + Send>), String> {
     let pty_system = NativePtySystem::default();
 
     // Create a new PTY with the specified size
@@ -189,43 +190,7 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, proj
     };
     eprintln!("[sandbox] spawned pid={:?}, sandboxed={}", child.process_id(), actually_sandboxed);
 
-    // Take writer from master before moving it
-    let master = pty_pair.master;
-    let writer = master
-        .take_writer()
-        .map_err(|e| format!("Failed to take writer: {}", e))?;
-
-    Ok(PtySession {
-        master,
-        child,
-        writer,
-        shutdown: Arc::new(AtomicBool::new(false)),
-        sandboxed: actually_sandboxed,
-    })
-}
-
-pub fn write_to_pty(session: &mut PtySession, data: &str) -> Result<(), String> {
-    use std::io::Write;
-    session
-        .writer
-        .write_all(data.as_bytes())
-        .map_err(|e| format!("Failed to write to PTY: {}", e))?;
-    session
-        .writer
-        .flush()
-        .map_err(|e| format!("Failed to flush PTY: {}", e))
-}
-
-pub fn resize_pty(session: &mut PtySession, rows: u16, cols: u16) -> Result<(), String> {
-    session
-        .master
-        .resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("Failed to resize PTY: {}", e))
+    SessionHandle::new(pty_pair.master, child, actually_sandboxed)
 }
 
 /// On Ubuntu 24.04+, AppArmor restricts unprivileged user namespaces.

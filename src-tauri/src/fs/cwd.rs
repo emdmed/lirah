@@ -18,25 +18,48 @@ fn find_child_pid(parent_pid: u32) -> Option<u32> {
 }
 
 #[tauri::command]
-pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Result<String, String> {
-    let state_lock = state
-        .lock()
-        .map_err(|e| format!("Failed to lock state: {}", e))?;
+pub async fn get_terminal_cwd(
+    session_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let state = state.inner().clone();
+    crate::ipc::blocking("get_terminal_cwd", move || {
+        // Copy what we need and release the global lock before touching /proc.
+        let (pid, sandboxed, path_map) = {
+            let state_lock = state
+                .lock()
+                .map_err(|e| format!("Failed to lock state: {}", e))?;
+            let session = state_lock
+                .pty_sessions
+                .get(&session_id)
+                .ok_or_else(|| format!("Session not found: {}", session_id))?;
+            // PID of the child process (shell or bwrap wrapper)
+            let pid = session
+                .child
+                .process_id()
+                .ok_or_else(|| "Failed to get process ID".to_string())?;
+            let path_map = state_lock
+                .workspace_context
+                .as_ref()
+                .map(|ctx| ctx.path_map.clone());
+            (pid, session.sandboxed, path_map)
+        };
+        process_cwd(pid, sandboxed, path_map.as_ref())
+    })
+    .await
+}
 
-    let session = state_lock
-        .pty_sessions
-        .get(&session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
-
-    // Get the PID of the child process (shell or bwrap wrapper)
-    let pid = session.child.process_id()
-        .ok_or_else(|| "Failed to get process ID".to_string())?;
-
+#[allow(unused_variables)]
+fn process_cwd(
+    pid: u32,
+    sandboxed: bool,
+    path_map: Option<&std::collections::HashMap<String, String>>,
+) -> Result<String, String> {
     #[cfg(target_os = "linux")]
     {
         // When sandboxed, the child PID is bwrap, not the shell.
         // Find the shell by looking for bwrap's child process.
-        let target_pid = if session.sandboxed {
+        let target_pid = if sandboxed {
             find_child_pid(pid).unwrap_or(pid)
         } else {
             pid
@@ -49,10 +72,9 @@ pub fn get_terminal_cwd(session_id: String, state: tauri::State<AppState>) -> Re
             .map_err(|e| format!("Failed to read cwd from /proc: {}", e))?;
 
         // If workspace is active, translate real path to workspace-relative symlink path
-        if let Some(ref ctx) = state_lock.workspace_context {
-            Ok(crate::workspace::manager::translate_path(&real_path, &ctx.path_map))
-        } else {
-            Ok(real_path)
+        match path_map {
+            Some(map) => Ok(crate::workspace::manager::translate_path(&real_path, map)),
+            None => Ok(real_path),
         }
     }
 

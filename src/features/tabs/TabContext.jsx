@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
 
+// Actions are split from state so a tab can call updateTabPath without
+// re-rendering whenever any tab's path or the active tab changes.
 const TabContext = createContext(null);
+const TabActionsContext = createContext(null);
 
 const STORAGE_KEY = 'nevo-terminal:tabs';
 const MAX_TABS = 8;
@@ -46,16 +49,25 @@ export function TabProvider({ children }) {
     } catch { /* ignore */ }
   }, [tabs, activeTabId]);
 
+  // Latest values for the actions below, so they can stay referentially stable.
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+  useEffect(() => {
+    tabsRef.current = tabs;
+    activeTabIdRef.current = activeTabId;
+  }, [tabs, activeTabId]);
+
   const addTab = useCallback((projectPath) => {
-    if (tabs.length >= MAX_TABS) {
+    if (tabsRef.current.length >= MAX_TABS) {
       console.warn(`Maximum of ${MAX_TABS} tabs reached`);
       return null;
     }
     const tab = createTab(projectPath);
+    tabsRef.current = [...tabsRef.current, tab];
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
     return tab;
-  }, [tabs.length]);
+  }, []);
 
   const removeTab = useCallback((tabId) => {
     setTabs(prev => {
@@ -64,13 +76,13 @@ export function TabProvider({ children }) {
       const next = prev.filter(t => t.id !== tabId);
       if (next.length === 0) return prev; // Don't remove last tab here; lifecycle handles it
       // If removing active tab, switch to adjacent
-      if (tabId === activeTabId) {
+      if (tabId === activeTabIdRef.current) {
         const newIdx = Math.min(idx, next.length - 1);
         setActiveTabId(next[newIdx].id);
       }
       return next;
     });
-  }, [activeTabId]);
+  }, []);
 
   const switchTab = useCallback((tabId) => {
     setActiveTabId(tabId);
@@ -93,25 +105,34 @@ export function TabProvider({ children }) {
     ));
   }, []);
 
-  const value = {
-    tabs,
-    activeTabId,
+  const actions = useMemo(() => ({
     addTab,
     removeTab,
     switchTab,
     reorderTab,
     updateTabPath,
-  };
+  }), [addTab, removeTab, switchTab, reorderTab, updateTabPath]);
+
+  const value = useMemo(() => ({ tabs, activeTabId, ...actions }), [tabs, activeTabId, actions]);
 
   return (
-    <TabContext.Provider value={value}>
-      {children}
-    </TabContext.Provider>
+    <TabActionsContext.Provider value={actions}>
+      <TabContext.Provider value={value}>
+        {children}
+      </TabContext.Provider>
+    </TabActionsContext.Provider>
   );
 }
 
 export function useTabManager() {
   const ctx = useContext(TabContext);
   if (!ctx) throw new Error('useTabManager must be used within TabProvider');
+  return ctx;
+}
+
+// Stable tab actions without subscribing to tab state.
+export function useTabActions() {
+  const ctx = useContext(TabActionsContext);
+  if (!ctx) throw new Error('useTabActions must be used within TabProvider');
   return ctx;
 }

@@ -38,6 +38,7 @@ export function useTextareaShortcuts({
   onSelectTemplate,
   onRestoreLastPrompt,
   secondaryTerminalFocused,
+  isActive = true,
 }) {
   // Track last Alt keydown timestamp for double-tap detection
   const lastAltDownRef = useRef(0);
@@ -46,7 +47,13 @@ export function useTextareaShortcuts({
   // Template dropdown open state
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
 
+  // onSendContent changes whenever the prompt does; reading it through a ref
+  // keeps the listener subscribed once instead of once per keystroke.
+  const onSendContentRef = useRef(onSendContent);
+  useEffect(() => { onSendContentRef.current = onSendContent; }, [onSendContent]);
+
   useEffect(() => {
+    if (!isActive) return;
     const handleKeyDown = (e) => {
       if (secondaryTerminalFocused) return;
 
@@ -89,7 +96,7 @@ export function useTextareaShortcuts({
         if (document.activeElement === textareaRef.current) {
           e.preventDefault();
           e.stopPropagation();
-          onSendContent();
+          onSendContentRef.current();
         }
         return;
       }
@@ -115,7 +122,7 @@ export function useTextareaShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [textareaVisible, setTextareaVisible, textareaRef, onSendContent, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt, secondaryTerminalFocused]);
+  }, [isActive, textareaVisible, setTextareaVisible, textareaRef, selectedTemplateId, onSelectTemplate, onRestoreLastPrompt, secondaryTerminalFocused]);
 
   return { templateDropdownOpen, setTemplateDropdownOpen };
 }

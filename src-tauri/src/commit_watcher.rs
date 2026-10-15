@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
 pub struct CommitWatcherState {
-    pub watchers: HashMap<PathBuf, RecommendedWatcher>,
+    /// One watcher per repo with its number of users (tabs on that repo), so
+    /// stopping one tab's watcher does not stop it for the others.
+    pub watchers: HashMap<PathBuf, (RecommendedWatcher, usize)>,
     pub last_hashes: HashMap<PathBuf, String>,
 }
 
@@ -63,6 +65,17 @@ pub fn start_watcher(
         return Err("Not a git repository".to_string());
     }
 
+    // Already watched by another tab: just count the new user.
+    if let Some((_, users)) = store
+        .lock()
+        .map_err(|e| e.to_string())?
+        .watchers
+        .get_mut(&repo_path)
+    {
+        *users += 1;
+        return Ok(());
+    }
+
     // Store initial commit hash
     if let Some(hash) = get_current_commit(&repo_path) {
         store
@@ -110,7 +123,7 @@ pub fn start_watcher(
                 }
 
                 // Debounce: skip if last event was < 2s ago
-                let mut last = last_event.lock().unwrap();
+                let mut last = last_event.lock().unwrap_or_else(|e| e.into_inner());
                 let now = Instant::now();
                 if now.duration_since(*last) < Duration::from_secs(2) {
                     continue;
@@ -123,7 +136,7 @@ pub fn start_watcher(
 
                 // Check if commit actually changed
                 if let Some(new_hash) = get_current_commit(&repo_path_clone) {
-                    let mut st = store_clone.lock().unwrap();
+                    let mut st = store_clone.lock().unwrap_or_else(|e| e.into_inner());
                     let changed = st
                         .last_hashes
                         .get(&repo_path_clone)
@@ -154,18 +167,32 @@ pub fn start_watcher(
         }
     });
 
-    store
-        .lock()
-        .map_err(|e| e.to_string())?
-        .watchers
-        .insert(repo_path, watcher);
+    let mut st = store.lock().map_err(|e| e.to_string())?;
+    match st.watchers.get_mut(&repo_path) {
+        // Another start won the race while this one was being set up.
+        Some((_, users)) => *users += 1,
+        None => {
+            st.watchers.insert(repo_path, (watcher, 1));
+        }
+    }
 
     Ok(())
 }
 
+/// Drop one user of a repo's commit watcher; it stops with the last one.
 pub fn stop_watcher(repo_path: &Path, store: &CommitWatcherStore) -> Result<(), String> {
     let mut st = store.lock().map_err(|e| e.to_string())?;
-    st.watchers.remove(repo_path);
-    st.last_hashes.remove(repo_path);
+    let last_user = match st.watchers.get_mut(repo_path) {
+        Some((_, users)) if *users > 1 => {
+            *users -= 1;
+            false
+        }
+        Some(_) => true,
+        None => false,
+    };
+    if last_user {
+        st.watchers.remove(repo_path);
+        st.last_hashes.remove(repo_path);
+    }
     Ok(())
 }

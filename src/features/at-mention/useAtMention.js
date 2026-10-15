@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 
-export function useAtMention({ viewMode, search, toggleFileSelection, textareaContent, setTextareaContent, textareaRef }) {
+export function useAtMention({ viewMode, search, toggleFileSelection, setTextareaContent, textareaRef }) {
   const [atMentionQuery, setAtMentionQuery] = useState(null);
   const [atMentionResults, setAtMentionResults] = useState(null);
   const [atMentionSelectedIndex, setAtMentionSelectedIndex] = useState(0);
@@ -70,14 +70,13 @@ export function useAtMention({ viewMode, search, toggleFileSelection, textareaCo
   const handleAtMentionSelect = useCallback((filePath, isDirectory) => {
     if (!filePath || isDirectory) return;
     toggleFileSelection(filePath);
-    const newContent = textareaContent.replace(/@[^\s@]*$/, '');
-    setTextareaContent(newContent);
+    setTextareaContent(prev => prev.replace(/@[^\s@]*$/, ''));
     setAtMentionQuery(null);
     setAtMentionSelectedIndex(0);
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [toggleFileSelection, textareaContent, setTextareaContent, textareaRef]);
+  }, [toggleFileSelection, setTextareaContent, textareaRef]);
 
   const handleAtMentionClose = useCallback(() => {
     setTextareaContent(prev => prev.replace(/@[^\s@]*$/, ''));

@@ -1,8 +1,13 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
-const AgentJobsContext = createContext(undefined);
+// Split so consumers subscribe only to what they read: streamed job output
+// changes `jobs` many times a second, and ProjectTab — which only registers its
+// file selection — must not re-render for it.
+const AgentJobsActionsContext = createContext(undefined);
+const AgentJobsStateContext = createContext(undefined);
+const AgentJobsContextFilesContext = createContext(undefined);
 
 const MAX_OUTPUT_LINES = 500;
 
@@ -118,41 +123,44 @@ async function computeDiffStat(cwd) {
 // Files worth type-checking as a post-merge gate. tsc follows imports, so
 // checking a changed file also catches references to symbols another job
 // renamed or removed elsewhere.
-const TYPECHECK_EXT = /\.(ts|tsx|js|jsx)$/i;
-const TYPECHECK_MAX_FILES = 25;
+const TYPECHECK_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/i;
 
 // Path of a job's change relative to the repo root, given its cwd (worktree).
 function relToRepo(job, p) {
   return job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p;
 }
 
-// Run tsc over a set of changed files and aggregate. `files` is an array of
-// { path } with ABSOLUTE paths (in whatever tree you want checked). Missing
+// Type-check a job's changed files and aggregate. `changedFiles` is an array
+// of { path } with ABSOLUTE paths inside `projectPath` (the tree to check).
+// One tsc run per tsconfig covers every file, with the project's real
+// compiler options; diagnostics are filtered to the changed files. Missing
 // files (deletions), non-JS/TS files, and a missing tsc are skipped rather than
-// treated as failures — this gate only fails on real type errors. Capped so a
-// huge job can't spawn hundreds of tsc runs; the cap is reported, never silent.
-async function typecheckChangedFiles(changedFiles) {
+// treated as failures — this gate only fails on real type errors.
+async function typecheckChangedFiles(projectPath, changedFiles) {
   const candidates = (changedFiles || [])
     .map((f) => f.path)
     .filter((p) => TYPECHECK_EXT.test(p));
-  const checked = candidates.slice(0, TYPECHECK_MAX_FILES);
   let errorCount = 0;
   const failed = [];
-  for (const path of checked) {
+  let checked = 0;
+  if (candidates.length > 0) {
     try {
-      const res = await invoke('check_file_types', { filePath: path });
-      if (res && res.error_count > 0) {
-        errorCount += res.error_count;
-        failed.push({ path, errorCount: res.error_count });
+      const results = await invoke('check_project_types', { projectPath, files: candidates });
+      for (const [path, res] of Object.entries(results || {})) {
+        checked++;
+        if (res && res.error_count > 0) {
+          errorCount += res.error_count;
+          failed.push({ path, errorCount: res.error_count });
+        }
       }
     } catch {
-      // File gone, unsupported type, or tsc not installed — skip, don't fail.
+      // tsc not installed or not runnable — skip, don't fail.
     }
   }
   return {
     status: 'done',
-    checked: checked.length,
-    skipped: candidates.length - checked.length,
+    checked,
+    skipped: candidates.length - checked,
     errorCount,
     failed,
   };
@@ -675,7 +683,7 @@ export function AgentJobsProvider({ children }) {
     try {
       if (!force) {
         patchJob(id, { typecheck: { status: 'checking' } });
-        typecheck = await typecheckChangedFiles(job.changedFiles);
+        typecheck = await typecheckChangedFiles(job.worktreePath, job.changedFiles);
         patchJob(id, { typecheck });
         if (typecheck.errorCount > 0) {
           return { ok: false, blocked: true, typecheck, label: job.label };
@@ -938,7 +946,7 @@ export function AgentJobsProvider({ children }) {
     const want = new Set(relativePaths);
     const active = new Set(['running', 'done', 'interrupted', 'conflict']);
     const out = [];
-    for (const job of jobs) {
+    for (const job of jobsRef.current) {
       if (job.repoPath !== repoPath || !active.has(job.status)) continue;
       const scope = new Set([
         ...(job.intendedFiles || []),
@@ -948,10 +956,9 @@ export function AgentJobsProvider({ children }) {
       if (files.length) out.push({ id: job.id, label: job.label, status: job.status, files });
     }
     return out;
-  }, [jobs]);
+  }, []);
 
-  const value = {
-    jobs,
+  const actions = useMemo(() => ({
     launchJob,
     launchRace,
     pickRaceWinner,
@@ -964,17 +971,34 @@ export function AgentJobsProvider({ children }) {
     discardJob,
     archiveJob,
     unarchiveJob,
-    selectedContextFiles,
     registerContextFiles,
-  };
+  }), [launchJob, launchRace, pickRaceWinner, reviseJob, findOverlappingJobs, cancelJob, approveJob,
+    rerunJob, reconcileJobs, discardJob, archiveJob, unarchiveJob, registerContextFiles]);
 
-  return <AgentJobsContext.Provider value={value}>{children}</AgentJobsContext.Provider>;
+  return (
+    <AgentJobsActionsContext.Provider value={actions}>
+      <AgentJobsStateContext.Provider value={jobs}>
+        <AgentJobsContextFilesContext.Provider value={selectedContextFiles}>
+          {children}
+        </AgentJobsContextFilesContext.Provider>
+      </AgentJobsStateContext.Provider>
+    </AgentJobsActionsContext.Provider>
+  );
 }
 
-export function useAgentJobs() {
-  const context = useContext(AgentJobsContext);
-  if (context === undefined) {
-    throw new Error('useAgentJobs must be used within an AgentJobsProvider');
+// Stable callbacks only — never re-renders the caller when jobs change.
+export function useAgentJobsActions() {
+  const actions = useContext(AgentJobsActionsContext);
+  if (actions === undefined) {
+    throw new Error('useAgentJobsActions must be used within an AgentJobsProvider');
   }
-  return context;
+  return actions;
+}
+
+// Everything, including the live job list. For the jobs pane and its dialogs.
+export function useAgentJobs() {
+  const actions = useAgentJobsActions();
+  const jobs = useContext(AgentJobsStateContext);
+  const selectedContextFiles = useContext(AgentJobsContextFilesContext);
+  return useMemo(() => ({ ...actions, jobs, selectedContextFiles }), [actions, jobs, selectedContextFiles]);
 }

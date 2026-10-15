@@ -1,5 +1,5 @@
 import React from 'react';
-import { useToast } from './ToastContext';
+import { useToast, useToasts } from './ToastContext';
 import { Button } from '../../components/ui/button';
 
 // Message line, as in vim: the newest notification occupies one line directly
@@ -19,7 +19,8 @@ const COLORS = {
 };
 
 export function ToastContainer() {
-  const { toasts, dismiss } = useToast();
+  const { dismiss } = useToast();
+  const toasts = useToasts();
 
   if (toasts.length === 0) return null;
 

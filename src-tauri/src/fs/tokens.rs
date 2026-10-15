@@ -600,10 +600,12 @@ fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
 
 /// Accumulated parse state for one session file, retained between calls so a
 /// growing (append-only) JSONL is never re-read from the top.
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct CachedSession {
     /// Byte offset up to which complete lines have been merged into `usage_by_msg`.
     len: u64,
+    /// Value of `CACHE_CLOCK` when last used, for least-recently-used eviction.
+    last_used: u64,
     /// Usage keyed by message id (dedup: a resent id overwrites, never double-counts).
     usage_by_msg: HashMap<String, UsageData>,
     session_id: String,
@@ -618,9 +620,35 @@ struct CachedSession {
 /// Per-file incremental parse cache. Claude session files are append-only and
 /// the active one is polled every 5s; without this each poll re-parsed the
 /// entire (tens-of-MB) file, and get_project_stats re-parsed every session
-/// file in the project on every call. Keyed by path; grows with distinct
-/// session files viewed (bounded in practice by the user's projects/sessions).
+/// file in the project on every call. Keyed by path, capped at
+/// `SESSION_CACHE_CAPACITY` files with least-recently-used eviction.
 static SESSION_USAGE_CACHE: Mutex<Option<HashMap<PathBuf, CachedSession>>> = Mutex::new(None);
+
+/// Most session files kept parsed. Each holds a usage entry per message, so an
+/// unbounded cache grew with every session ever opened in the dashboard.
+const SESSION_CACHE_CAPACITY: usize = 200;
+
+/// Logical clock for `CachedSession::last_used`.
+static CACHE_CLOCK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn cache_tick() -> u64 {
+    CACHE_CLOCK.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Insert `state` for `path`, evicting the least recently used entry when full.
+fn cache_insert(cache: &mut HashMap<PathBuf, CachedSession>, path: PathBuf, mut state: CachedSession) {
+    state.last_used = cache_tick();
+    if cache.len() >= SESSION_CACHE_CAPACITY && !cache.contains_key(&path) {
+        if let Some(oldest) = cache
+            .iter()
+            .min_by_key(|(_, c)| c.last_used)
+            .map(|(p, _)| p.clone())
+        {
+            cache.remove(&oldest);
+        }
+    }
+    cache.insert(path, state);
+}
 
 /// Sum the cached per-message usage into a `SessionInfo` — cheap, no file I/O.
 fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
@@ -723,13 +751,23 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
     let (mut state, start_offset) = {
         let mut guard = SESSION_USAGE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         let cache = guard.get_or_insert_with(HashMap::new);
-        match cache.get(path) {
-            // Unchanged since last parse — recompute totals from cached usage
-            // with no file read. Hot path for the 5s poll between new messages
-            // and for every unchanged file in get_project_stats.
-            Some(c) if c.len == current_len => return Ok(build_session_info(path, c)),
+        // Unchanged since last parse — recompute totals from cached usage
+        // with no file read. Hot path for the 5s poll between new messages
+        // and for every unchanged file in get_project_stats.
+        if let Some(c) = cache.get_mut(path) {
+            if c.len == current_len {
+                c.last_used = cache_tick();
+                return Ok(build_session_info(path, c));
+            }
+        }
+        // Take the entry out rather than cloning its whole message map; it
+        // goes back in once the new lines are merged.
+        match cache.remove(path) {
             // Grew (append-only) — resume from the last consumed offset.
-            Some(c) if current_len > c.len => (c.clone(), c.len),
+            Some(c) if current_len > c.len => {
+                let offset = c.len;
+                (c, offset)
+            }
             // New file, or truncated/rotated — parse from the start.
             _ => (CachedSession::default(), 0),
         }
@@ -749,9 +787,7 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
     let info = build_session_info(path, &state);
     {
         let mut guard = SESSION_USAGE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(cache) = guard.as_mut() {
-            cache.insert(path.clone(), state);
-        }
+        cache_insert(guard.get_or_insert_with(HashMap::new), path.clone(), state);
     }
     Ok(info)
 }
@@ -860,6 +896,20 @@ mod tests {
     fn proc_start_time_handles_spaces_in_comm() {
         let stat = "569045 (my (odd) proc) S 569044 1 1 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 11 0 10284320 7000 300";
         assert_eq!(proc_start_time(stat), Some("10284320"));
+    }
+
+    #[test]
+    fn cache_evicts_least_recently_used() {
+        let mut cache = HashMap::new();
+        for i in 0..SESSION_CACHE_CAPACITY {
+            cache_insert(&mut cache, PathBuf::from(format!("s{}", i)), CachedSession::default());
+        }
+        // Touch s0 so s1 becomes the oldest.
+        cache.get_mut(&PathBuf::from("s0")).unwrap().last_used = cache_tick();
+        cache_insert(&mut cache, PathBuf::from("new"), CachedSession::default());
+        assert_eq!(cache.len(), SESSION_CACHE_CAPACITY);
+        assert!(cache.contains_key(&PathBuf::from("s0")));
+        assert!(!cache.contains_key(&PathBuf::from("s1")));
     }
 
     #[test]

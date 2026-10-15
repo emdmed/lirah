@@ -183,7 +183,7 @@ fn append_log(log: &Option<Arc<Mutex<File>>>, line: &str) {
 /// Spawn a background agent job. Returns immediately; output is streamed to the
 /// frontend via `agent-job://output` events and completion via `agent-job://done`.
 /// The job runs headless in `cwd` (typically an isolated git worktree).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn run_agent_job(
     app_handle: AppHandle,
     store: tauri::State<Arc<AgentJobStore>>,
@@ -353,7 +353,7 @@ pub fn run_agent_job(
 }
 
 /// Cancel a running agent job by killing its process group (SIGTERM).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cancel_agent_job(
     store: tauri::State<Arc<AgentJobStore>>,
     job_id: String,

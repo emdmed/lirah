@@ -53,19 +53,19 @@ export function LeftSidebar({
   const handleTogglePin = useCallback((path) => togglePin(path), [togglePin]);
 
   // Destructure only needed fields from grouped props (fix #2: explicit dependencies)
-  const { sidebarWidth, isResizing, handleResizeStart } = sidebar;
+  const { sidebarWidth, sidebarRef, isResizing, handleResizeStart } = sidebar;
   const { searchQuery, handleSearchClear } = search;
-  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, displayedTreeData, expandedFolders, toggleFolder, loadTreeData } = treeView;
+  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, treeTruncated, displayedTreeData, expandedFolders, toggleFolder, loadTreeData } = treeView;
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, setFileViewMode, VIEW_MODES } = fileSymbols;
 
   const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
-  const { containerRef: rowsRef, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
+  const { containerRef: rowsRef, registerList, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
     useRowCursor({ onSearch: focusSearch, onParent: viewMode === 'flat' ? onNavigateParent : undefined });
 
   return (
     <>
-      <Sidebar collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" data-legend style={{ width: sidebarWidth }}>
+      <Sidebar ref={sidebarRef} collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" data-legend style={{ width: sidebarWidth }}>
         <PaneLegend index={1} title="Files" />
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
@@ -97,7 +97,7 @@ export function LeftSidebar({
               className="p-1 overflow-y-auto flex-1 min-h-0 outline-none focus-visible:outline-none"
             >
               {viewMode === 'flat' ? (
-                <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={onFolderClick} />
+                <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={onFolderClick} cursorIndex={cursorIndex} registerList={registerList} />
               ) : (
                 treeLoading ? (
                   <div className="p-4 text-center">
@@ -134,6 +134,10 @@ export function LeftSidebar({
                     onClearSearch={handleSearchClear}
                     onToggleGitFilter={handleToggleGitFilter}
                     onToggleMarkdownFilter={handleToggleMarkdownFilter}
+                    truncated={treeTruncated}
+                    scrollRef={rowsRef}
+                    cursorIndex={cursorIndex}
+                    registerList={registerList}
                   />
                 )
               )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export function useDialogs() {
   const [addBookmarkDialogOpen, setAddBookmarkDialogOpen] = useState(false);
@@ -23,7 +23,9 @@ export function useDialogs() {
   const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
   const [markdownFilePath, setMarkdownFilePath] = useState(null);
 
-  return {
+  // Setters are stable, so the object only changes when a dialog opens or
+  // closes — consumers that depend on `dialogs` don't re-run on every render.
+  return useMemo(() => ({
     addBookmarkDialogOpen, setAddBookmarkDialogOpen,
     bookmarksPaletteOpen, setBookmarksPaletteOpen,
     initialProjectDialogOpen, setInitialProjectDialogOpen,
@@ -45,5 +47,11 @@ export function useDialogs() {
     orchestrationDashboardOpen, setOrchestrationDashboardOpen,
     markdownViewerOpen, setMarkdownViewerOpen,
     markdownFilePath, setMarkdownFilePath,
-  };
+  }), [
+    addBookmarkDialogOpen, bookmarksPaletteOpen, initialProjectDialogOpen,
+    manageTemplatesDialogOpen, saveFileGroupDialogOpen, diffDialogOpen, diffFilePath,
+    cliSelectionModalOpen, showHelp, branchTasksOpen, budgetDialogOpen, dashboardOpen,
+    autoChangelogDialogOpen, autoCommitConfigOpen, workspaceDialogOpen, projectPickerOpen,
+    projectPickerAction, orchestrationDashboardOpen, markdownViewerOpen, markdownFilePath,
+  ]);
 }

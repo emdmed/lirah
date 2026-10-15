@@ -10,8 +10,12 @@ struct CacheEntry {
     cached_at: Instant,
 }
 
-// Cache configuration
-const CACHE_TTL_SECONDS: u64 = 1;
+// Cache configuration. While file watchers are on, the fs watcher invalidates
+// an entry on any index/HEAD change or content write, so the TTL only bounds
+// staleness for changes it cannot see. With watchers off nothing invalidates,
+// so entries expire almost immediately.
+const CACHE_TTL_SECONDS: u64 = 15;
+const UNWATCHED_CACHE_TTL_SECONDS: u64 = 1;
 const CLEANUP_INTERVAL_SECONDS: u64 = 60;
 
 // Main cache structure - uses RwLock for better read performance
@@ -38,7 +42,7 @@ impl GitStatsCache {
         let entry = entries.get(repo_path)?;
 
         // Check TTL
-        if entry.cached_at.elapsed() > Duration::from_secs(CACHE_TTL_SECONDS) {
+        if entry.cached_at.elapsed() > self.ttl() {
             return None;
         }
 
@@ -46,16 +50,24 @@ impl GitStatsCache {
     }
 
     // Store stats in cache and periodically cleanup expired entries
-    pub fn set(&self, repo_path: PathBuf, stats: HashMap<String, crate::fs::GitStats>) {
+    pub fn set(&self, repo_path: PathBuf, stats: Arc<HashMap<String, crate::fs::GitStats>>) {
         if let Ok(mut entries) = self.entries.write() {
             entries.insert(repo_path, CacheEntry {
-                stats: Arc::new(stats),
+                stats,
                 cached_at: Instant::now(),
             });
         }
 
         // Periodic cleanup of expired entries
         self.maybe_cleanup();
+    }
+
+    fn ttl(&self) -> Duration {
+        Duration::from_secs(if self.is_enabled() {
+            CACHE_TTL_SECONDS
+        } else {
+            UNWATCHED_CACHE_TTL_SECONDS
+        })
     }
 
     // Remove expired entries to prevent memory accumulation
@@ -74,7 +86,7 @@ impl GitStatsCache {
             }
 
             if let Ok(mut entries) = self.entries.write() {
-                let ttl = Duration::from_secs(CACHE_TTL_SECONDS);
+                let ttl = self.ttl();
                 entries.retain(|_, entry| entry.cached_at.elapsed() <= ttl);
             }
         }

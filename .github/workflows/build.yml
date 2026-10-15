@@ -159,6 +159,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Performance guardrails: startup JS budget, and no Tauri command doing
+      # IO synchronously on the main (UI) thread.
+      - name: Check bundle size and async commands
+        shell: bash
+        run: |
+          npm run build
+          npm run check:bundle
+          npm run check:async-commands
+
       # ═══════════════════════════════════════════════════════════════════
       # TAURI BUILD
       # Uses the official tauri-action for consistent builds

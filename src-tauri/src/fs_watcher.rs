@@ -1,22 +1,44 @@
-use notify::{RecommendedWatcher, RecursiveMode, Watcher, Event, EventKind};
+use notify::event::ModifyKind;
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::path::{Component, Path, PathBuf};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
+use crate::fs::directory::{dir_key, DirKey};
+use crate::fs::{read_current_branch, resolve_git_dir};
 use crate::ignore_dirs::{should_ignore_file, IGNORE_DIRS};
 use crate::state::AppState;
+use crate::watch_registry::{drain_debounced, Acquired, WatchRegistry};
+
+/// One created or deleted path in an "fs-changes" event.
+#[derive(Serialize, Clone, Debug)]
+pub struct FsChange {
+    pub path: String,
+    /// For a deleted path: whether it was a directory the watcher knew about.
+    pub is_dir: bool,
+}
 
 /// Payload emitted with "fs-changes" events so the frontend can do incremental updates.
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct FsChangesPayload {
-    pub created: Vec<String>,
-    pub deleted: Vec<String>,
+    pub created: Vec<FsChange>,
+    pub deleted: Vec<FsChange>,
+    /// The path exactly as passed to `start_fs_watcher`.
     pub root_path: String,
+}
+
+/// Payload of "branch-changed", emitted when .git/HEAD now names another branch.
+#[derive(Serialize, Clone, Debug)]
+struct BranchChangedPayload {
+    /// The path exactly as passed to `start_fs_watcher`.
+    path: String,
+    /// The checked-out branch, or None for a detached HEAD.
+    branch: Option<String>,
 }
 
 struct WatcherHandle {
@@ -24,172 +46,201 @@ struct WatcherHandle {
     _stop_tx: mpsc::Sender<()>,
 }
 
-/// Global store for active filesystem watchers (multiple per project path)
+/// Active filesystem watchers, one per project path, shared by every tab that
+/// shows that project (ref-counted: start adds a user, stop removes one).
 pub struct FsWatcherStore {
-    active: Arc<Mutex<HashMap<PathBuf, WatcherHandle>>>,
+    registry: WatchRegistry<PathBuf, WatcherHandle>,
 }
 
 impl FsWatcherStore {
     pub fn new() -> Self {
         Self {
-            active: Arc::new(Mutex::new(HashMap::new())),
+            registry: WatchRegistry::new(),
         }
     }
 }
 
-/// Walk a directory tree and watch each non-ignored directory individually.
-/// This avoids setting up inotify watches on .git, node_modules, target, etc.
-fn watch_directory_selective(
-    watcher: &mut RecommendedWatcher,
-    root: &Path,
-    ignore_set: &HashSet<&str>,
-) -> Result<(), String> {
-    // Watch the root itself
-    watcher
-        .watch(root, RecursiveMode::NonRecursive)
-        .map_err(|e| format!("Failed to watch {}: {}", root.display(), e))?;
+/// Git state files that indicate index/HEAD changes worth notifying about.
+const GIT_STATE_FILES: &[&str] = &[
+    "index", "HEAD", "ORIG_HEAD", "MERGE_HEAD",
+    "CHERRY_PICK_HEAD", "REBASE_HEAD", "COMMIT_EDITMSG",
+];
 
-    let mut stack = vec![root.to_path_buf()];
+/// Quiet period that ends a batch of events.
+const DEBOUNCE_QUIET: Duration = Duration::from_millis(1000);
+/// Longest a batch may grow before it is emitted anyway.
+const DEBOUNCE_MAX_WAIT: Duration = Duration::from_millis(3000);
 
-    while let Some(dir) = stack.pop() {
-        let entries = match std::fs::read_dir(&dir) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
+/// Per-event info sent from the notify callback to the debounce thread.
+#[derive(Debug)]
+enum FsEvent {
+    /// Created, removed or renamed; whether it now exists is checked at emit time.
+    Touched(PathBuf),
+    /// A file's content was written.
+    ContentModified,
+    /// A git state file changed; `head` when it was HEAD itself.
+    GitChanged { head: bool },
+}
 
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
+fn in_ignored_dir(path: &Path, ignore_set: &HashSet<&str>) -> bool {
+    path.components().any(|c| match c {
+        Component::Normal(name) => name.to_str().is_some_and(|s| ignore_set.contains(s)),
+        _ => false,
+    })
+}
 
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if ignore_set.contains(name) || name.starts_with('.') && ignore_set.contains(name) {
+/// The directories being watched, by path and by identity. The identity set
+/// keeps a symlink loop (or two links to one target) from being walked twice.
+#[derive(Default)]
+struct WatchedDirs {
+    by_path: HashMap<PathBuf, DirKey>,
+    visited: HashSet<DirKey>,
+}
+
+impl WatchedDirs {
+    /// Watch `root` and every non-ignored directory below it, one non-recursive
+    /// watch each, so .git, node_modules, target, etc. never get inotify watches.
+    fn watch_tree(
+        &mut self,
+        watcher: &mut RecommendedWatcher,
+        root: &Path,
+        ignore_set: &HashSet<&str>,
+    ) -> Result<(), String> {
+        if !self.add(watcher, root)? {
+            return Ok(());
+        }
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                // Follows symlinks: workspaces are made of symlinked projects.
+                if !path.is_dir() {
                     continue;
                 }
-            }
-
-            if watcher.watch(&path, RecursiveMode::NonRecursive).is_ok() {
-                stack.push(path);
+                let ignored = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| ignore_set.contains(n));
+                if ignored {
+                    continue;
+                }
+                if self.add(watcher, &path).unwrap_or(false) {
+                    stack.push(path);
+                }
             }
         }
+        Ok(())
     }
 
-    Ok(())
+    /// Watch one directory. Ok(false) if it is already watched under any path.
+    fn add(&mut self, watcher: &mut RecommendedWatcher, dir: &Path) -> Result<bool, String> {
+        let Some(key) = dir_key(dir) else { return Ok(false) };
+        // DirKey is Copy on unix but a PathBuf elsewhere.
+        #[allow(clippy::clone_on_copy)]
+        if !self.visited.insert(key.clone()) {
+            return Ok(false);
+        }
+        if let Err(e) = watcher.watch(dir, RecursiveMode::NonRecursive) {
+            self.visited.remove(&key);
+            return Err(format!("Failed to watch {}: {}", dir.display(), e));
+        }
+        self.by_path.insert(dir.to_path_buf(), key);
+        Ok(true)
+    }
+
+    /// Forget a deleted path and everything watched below it. Returns whether
+    /// it was a watched directory. (inotify drops the watches by itself.)
+    fn remove(&mut self, path: &Path) -> bool {
+        let was_dir = self.by_path.contains_key(path);
+        if was_dir {
+            let visited = &mut self.visited;
+            self.by_path.retain(|p, key| {
+                let gone = p.starts_with(path);
+                if gone {
+                    visited.remove(key);
+                }
+                !gone
+            });
+        }
+        was_dir
+    }
 }
 
-/// Start watching a directory for file create/delete events.
-/// Emits "fs-changes" Tauri event with debouncing.
-#[tauri::command]
-pub fn start_fs_watcher(
+fn build_fs_watcher(
     path: String,
     app_handle: AppHandle,
-    store: tauri::State<Arc<FsWatcherStore>>,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
+    app_state: AppState,
+) -> Result<WatcherHandle, String> {
     let watch_path = PathBuf::from(&path);
     if !watch_path.is_dir() {
         return Err(format!("Path is not a directory: {}", path));
     }
-
-    let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
-
-    // If already watching this path, no-op
-    if active.contains_key(&watch_path) {
-        return Ok(());
-    }
-
-    let (stop_tx, stop_rx) = mpsc::channel::<()>();
-
-    /// Per-event info sent from the notify callback to the debounce thread.
-    #[derive(Debug)]
-    enum FsEvent {
-        Created(String),
-        Deleted(String),
-        GitChanged,
-    }
-
-    let (event_tx, event_rx) = mpsc::channel::<FsEvent>();
+    // get_git_stats caches under the canonical path, so invalidate with that.
+    let canonical_path = watch_path
+        .canonicalize()
+        .unwrap_or_else(|_| watch_path.clone());
 
     let ignore_set: HashSet<&'static str> = IGNORE_DIRS.iter().copied().collect();
     let ignore_set_for_callback = ignore_set.clone();
-    let watch_path_clone = watch_path.clone();
-    let app_state = state.inner().clone();
 
-    /// Git state files that indicate index/HEAD changes worth notifying about.
-    const GIT_STATE_FILES: &[&str] = &[
-        "index", "HEAD", "ORIG_HEAD", "MERGE_HEAD",
-        "CHERRY_PICK_HEAD", "REBASE_HEAD", "COMMIT_EDITMSG",
-    ];
+    // `.git` may be a file pointing elsewhere (linked worktree, submodule).
+    let git_dir = resolve_git_dir(&watch_path);
+    let git_dir_for_callback = git_dir.clone();
+    let root_for_callback = watch_path.clone();
 
-    let git_dir = watch_path.join(".git");
-    let has_git = git_dir.is_dir();
+    let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let (event_tx, event_rx) = mpsc::channel::<FsEvent>();
 
     // Create the notify watcher — filter events in the callback and tag them
     let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-        if let Ok(event) = res {
-            // Check if this is a .git state file change
-            let is_git_event = event.paths.iter().any(|p| {
-                p.components().any(|c| {
-                    matches!(c, std::path::Component::Normal(n) if n == ".git")
-                }) && p.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|name| GIT_STATE_FILES.contains(&name))
-                    .unwrap_or(false)
+        let Ok(event) = res else { return };
+
+        if let Some(git_dir) = &git_dir_for_callback {
+            let git_file = event.paths.iter().find_map(|p| {
+                let name = p.file_name()?.to_str()?;
+                (p.starts_with(git_dir) && GIT_STATE_FILES.contains(&name)).then_some(name)
             });
-
-            if is_git_event {
-                let _ = event_tx.send(FsEvent::GitChanged);
+            if let Some(name) = git_file {
+                let _ = event_tx.send(FsEvent::GitChanged { head: name == "HEAD" });
                 return;
             }
+        }
 
-            let is_create = matches!(event.kind, EventKind::Create(_));
-            let is_remove = matches!(event.kind, EventKind::Remove(_));
+        let touched = match event.kind {
+            EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(_)) => true,
+            EventKind::Modify(ModifyKind::Data(_)) | EventKind::Modify(ModifyKind::Any) => false,
+            _ => return,
+        };
 
-            if !is_create && !is_remove {
-                return;
+        for p in &event.paths {
+            // Filter out temp/editor files and ignored directories
+            // Only components below the root count: a project may itself live
+            // under a directory named like an ignored one (~/build/app).
+            let relative = p.strip_prefix(&root_for_callback).unwrap_or(p);
+            if should_ignore_file(p) || in_ignored_dir(relative, &ignore_set_for_callback) {
+                continue;
             }
-
-            for p in &event.paths {
-                // Filter out temp/editor files and ignored directories
-                if should_ignore_file(p) {
-                    continue;
-                }
-                let dominated_by_ignore = p.components().any(|c| {
-                    if let std::path::Component::Normal(name) = c {
-                        if let Some(s) = name.to_str() {
-                            return ignore_set_for_callback.contains(s);
-                        }
-                    }
-                    false
-                });
-                if dominated_by_ignore {
-                    continue;
-                }
-
-                let path_str = p.to_string_lossy().to_string();
-                if is_create {
-                    let _ = event_tx.send(FsEvent::Created(path_str));
-                } else {
-                    let _ = event_tx.send(FsEvent::Deleted(path_str));
-                }
-            }
+            let _ = event_tx.send(if touched {
+                FsEvent::Touched(p.clone())
+            } else {
+                FsEvent::ContentModified
+            });
         }
     }).map_err(|e| format!("Failed to create watcher: {}", e))?;
 
-    // Watch directories selectively — skip ignored dirs at inotify level
-    watch_directory_selective(&mut watcher, &watch_path, &ignore_set)?;
+    let mut dirs = WatchedDirs::default();
+    dirs.watch_tree(&mut watcher, &watch_path, &ignore_set)?;
 
-    // Also watch .git directory for index/HEAD changes (unified watcher)
-    if has_git {
-        let _ = watcher.watch(&git_dir, RecursiveMode::NonRecursive);
+    // Also watch the git directory for index/HEAD changes (unified watcher)
+    if let Some(git_dir) = &git_dir {
+        let _ = watcher.watch(git_dir, RecursiveMode::NonRecursive);
     }
 
-    // Debounce thread: collect events, aggregate paths, emit after quiet period
+    // Debounce thread: owns the watcher, collects events, emits after a quiet
+    // period (or the max wait).
     thread::spawn(move || {
-        // Keep watcher alive in this thread
-        let _watcher = watcher;
-        let debounce = Duration::from_millis(1000);
+        let mut last_branch = read_current_branch(&watch_path);
 
         loop {
             // Wait for either a stop signal or a FS event
@@ -198,80 +249,133 @@ pub fn start_fs_watcher(
                 Err(mpsc::TryRecvError::Empty) => {}
             }
 
-            match event_rx.recv_timeout(Duration::from_millis(200)) {
-                Ok(first_event) => {
-                    // Start collecting — seed with the first event
-                    let mut payload = FsChangesPayload::default();
-                    let mut git_changed = false;
-                    match first_event {
-                        FsEvent::Created(p) => payload.created.push(p),
-                        FsEvent::Deleted(p) => payload.deleted.push(p),
-                        FsEvent::GitChanged => git_changed = true,
-                    }
-
-                    // Drain further events within debounce window
-                    while let Ok(ev) = event_rx.recv_timeout(debounce) {
-                        match ev {
-                            FsEvent::Created(p) => payload.created.push(p),
-                            FsEvent::Deleted(p) => payload.deleted.push(p),
-                            FsEvent::GitChanged => git_changed = true,
-                        }
-                    }
-
-                    // Deduplicate
-                    payload.created.sort();
-                    payload.created.dedup();
-                    payload.deleted.sort();
-                    payload.deleted.dedup();
-
-                    let has_fs_changes = !payload.created.is_empty() || !payload.deleted.is_empty();
-
-                    // Invalidate directory cache and emit fs-changes if there were file changes
-                    if has_fs_changes {
-                        if let Ok(state_lock) = app_state.lock() {
-                            state_lock.directory_cache.invalidate(&watch_path_clone);
-                        }
-                        payload.root_path = watch_path_clone.to_string_lossy().to_string();
-                        let _ = app_handle.emit("fs-changes", &payload);
-                    }
-
-                    // Invalidate git cache and emit git-stats-changed if .git changed
-                    if git_changed {
-                        if let Ok(state_lock) = app_state.lock() {
-                            state_lock.git_cache.invalidate(&watch_path_clone);
-                        }
-                        let _ = app_handle.emit("git-stats-changed", watch_path_clone.to_string_lossy().to_string());
-                    }
-                }
+            let first_event = match event_rx.recv_timeout(Duration::from_millis(200)) {
+                Ok(ev) => ev,
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            };
+
+            let mut touched: BTreeSet<PathBuf> = BTreeSet::new();
+            let mut removed_dirs: HashSet<PathBuf> = HashSet::new();
+            let mut content_modified = false;
+            let mut git_changed = false;
+            let mut head_changed = false;
+            let mut handle = |ev: FsEvent| match ev {
+                FsEvent::Touched(p) => {
+                    if p.is_dir() {
+                        // Watch a new directory right away, so files created
+                        // in it during this batch are seen too.
+                        let _ = dirs.watch_tree(&mut watcher, &p, &ignore_set);
+                    } else if dirs.remove(&p) {
+                        // Forget a vanished directory now, so the same inode
+                        // reappearing under a new name (a rename) gets watched.
+                        removed_dirs.insert(p.clone());
+                    }
+                    touched.insert(p);
+                }
+                FsEvent::ContentModified => content_modified = true,
+                FsEvent::GitChanged { head } => {
+                    git_changed = true;
+                    head_changed |= head;
+                }
+            };
+            handle(first_event);
+            drain_debounced(&event_rx, Instant::now(), DEBOUNCE_QUIET, DEBOUNCE_MAX_WAIT, &mut handle);
+
+            // Whether a path was created or deleted is decided by what is on
+            // disk now, so a file created and removed within one batch is
+            // reported once, as deleted.
+            let mut payload = FsChangesPayload {
+                root_path: path.clone(),
+                ..Default::default()
+            };
+            for p in touched {
+                let path_str = p.to_string_lossy().to_string();
+                if p.symlink_metadata().is_ok() {
+                    payload.created.push(FsChange { path: path_str, is_dir: p.is_dir() });
+                } else {
+                    let is_dir = removed_dirs.contains(&p) || dirs.remove(&p);
+                    payload.deleted.push(FsChange { path: path_str, is_dir });
+                }
+            }
+            let has_fs_changes = !payload.created.is_empty() || !payload.deleted.is_empty();
+
+            // Invalidate directory cache and emit fs-changes if there were file changes
+            if has_fs_changes {
+                if let Ok(state_lock) = app_state.lock() {
+                    state_lock.directory_cache.invalidate(&watch_path);
+                }
+                let _ = app_handle.emit("fs-changes", &payload);
+            }
+
+            // Git index/HEAD changes, content writes and created/deleted files
+            // all move the per-file stats.
+            if git_changed || content_modified || has_fs_changes {
+                if let Ok(state_lock) = app_state.lock() {
+                    state_lock.git_cache.invalidate(&canonical_path);
+                }
+                let _ = app_handle.emit("git-stats-changed", &path);
+            }
+
+            if head_changed {
+                let branch = read_current_branch(&watch_path);
+                if branch != last_branch {
+                    last_branch = branch.clone();
+                    let _ = app_handle.emit(
+                        "branch-changed",
+                        BranchChangedPayload { path: path.clone(), branch },
+                    );
+                }
             }
         }
     });
 
-    active.insert(watch_path, WatcherHandle {
-        _stop_tx: stop_tx,
-    });
-
-    Ok(())
+    Ok(WatcherHandle { _stop_tx: stop_tx })
 }
 
-/// Stop the filesystem watcher for a specific path.
+/// Start watching a directory for file create/delete/modify events.
+/// Emits "fs-changes", "git-stats-changed" and "branch-changed" (debounced).
+/// Ref-counted per path: pair every call with `stop_fs_watcher`.
+#[tauri::command]
+pub async fn start_fs_watcher(
+    path: String,
+    app_handle: AppHandle,
+    store: tauri::State<'_, Arc<FsWatcherStore>>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let store = store.inner().clone();
+    let app_state = state.inner().clone();
+    let key = PathBuf::from(&path);
+
+    let Acquired::New(generation) = store.registry.acquire(&key) else {
+        return Ok(());
+    };
+    let built = crate::ipc::blocking("start_fs_watcher", move || {
+        build_fs_watcher(path, app_handle, app_state)
+    })
+    .await;
+    match built {
+        Ok(handle) => {
+            store.registry.attach(&key, generation, handle);
+            Ok(())
+        }
+        Err(e) => {
+            store.registry.abandon(&key, generation);
+            Err(e)
+        }
+    }
+}
+
+/// Release one user of the watcher for a path; it stops with the last user.
 /// If no path is given, stops all watchers (backwards compat).
 #[tauri::command]
 pub fn stop_fs_watcher(
     path: Option<String>,
     store: tauri::State<Arc<FsWatcherStore>>,
 ) -> Result<(), String> {
-    let mut active = store.active.lock().map_err(|e| format!("Lock error: {}", e))?;
     match path {
-        Some(p) => {
-            let key = PathBuf::from(p);
-            active.remove(&key); // Dropping the sender signals the thread to stop
-        }
-        None => {
-            active.clear(); // Stop all watchers
-        }
+        Some(p) => store.registry.release(&PathBuf::from(p)),
+        None => store.registry.clear(),
     }
     Ok(())
 }

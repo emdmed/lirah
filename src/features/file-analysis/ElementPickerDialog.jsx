@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Search, ChevronDown, ChevronRight, Check } from "lucide-react";
 import { RetroSpinner } from "@/components/ui/RetroSpinner";
 import { invoke } from "@tauri-apps/api/core";
-import { extractSkeleton as extractBabelSkeleton, isBabelParseable } from "./babelSymbolParser";
+import { isBabelParseable } from "./babelSupport";
+import { analyzeSkeleton as extractBabelSkeleton } from "./babelClient";
 import { normalizePath, getRelativePath } from "@/utils/pathUtils";
 import { extractSkeleton as extractPythonSkeleton, isPythonParseable } from "./pythonSymbolParser";
 
@@ -230,7 +231,7 @@ export function ElementPickerDialog({
         let isPython = false;
 
         if (isBabelParseable(filePath)) {
-          skeleton = extractBabelSkeleton(content, filePath);
+          skeleton = await extractBabelSkeleton(content, filePath);
         } else if (isPythonParseable(filePath)) {
           skeleton = await extractPythonSkeleton(content, filePath);
           isPython = true;

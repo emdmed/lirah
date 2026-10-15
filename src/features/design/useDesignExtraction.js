@@ -574,7 +574,7 @@ export function useDesignExtraction() {
       let outline = null;
       try {
         await stage('Compacting project', 'outlining every JS/TS/Python file');
-        const files = await invoke('read_directory_recursive', {
+        const { entries: files } = await invoke('read_directory_recursive', {
           path: projectPath,
           maxDepth: 10,
           maxFiles: 10000,

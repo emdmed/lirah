@@ -67,7 +67,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   const { getGroupsForProject } = useFileGroups();
   const { templates } = usePromptTemplates();
   const { getPinnedPaths } = usePinnedFiles();
-  const { launchRace, selectedContextFiles, findOverlappingJobs } = useAgentJobs();
+  const { jobs, launchRace, selectedContextFiles, findOverlappingJobs } = useAgentJobs();
 
   const groups = useMemo(
     () => (projectPath ? getGroupsForProject(projectPath) : []),
@@ -184,7 +184,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   // same files — the collision the reconciler would otherwise have to untangle.
   const overlaps = useMemo(
     () => (open ? findOverlappingJobs(projectPath, modifiablePaths) : []),
-    [open, findOverlappingJobs, projectPath, modifiablePaths]
+    // findOverlappingJobs is stable and reads the latest jobs; `jobs` is a
+    // dep so the warning tracks jobs finishing, applying or being discarded.
+    [open, findOverlappingJobs, projectPath, modifiablePaths, jobs]
   );
 
   const toggleFile = (relativePath) => {

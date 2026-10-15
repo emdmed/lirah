@@ -56,6 +56,26 @@ export default defineConfig(async () => {
       'process.env': {}
     },
 
+    build: {
+      // The webview's engine, not a generic browser baseline: WebView2
+      // (Chromium) on Windows, WebKit on macOS and Linux.
+      target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari15',
+      rollupOptions: {
+        output: {
+          // Stable vendor chunks so an app update doesn't re-ship them. Babel,
+          // recharts and markdown are deliberately absent: lazy boundaries own
+          // those, and naming them here would pull them back into startup.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+            if (id.includes('node_modules/@xterm/')) return 'xterm';
+            if (id.includes('node_modules/@radix-ui/')) return 'radix';
+            return undefined;
+          },
+        },
+      },
+    },
+
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     //
     // 1. prevent Vite from obscuring rust errors

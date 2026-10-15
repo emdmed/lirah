@@ -101,7 +101,11 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
   const normalizedRoot = normalizePath(rootPath);
   let newData = [...prevTreeData];
 
-  changes.newUntracked.forEach(({ path: filePath, stats }) => {
+  // Parents before children, so a directory created in the same batch as
+  // its contents exists by the time its children are attached.
+  const created = [...changes.newUntracked].sort((a, b) => a.path.length - b.path.length);
+
+  created.forEach(({ path: filePath, is_dir: isDir }) => {
     const normalized = normalizePath(filePath);
     const lastSep = normalized.lastIndexOf('/');
     const parentPath = normalized.substring(0, lastSep);
@@ -114,8 +118,9 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
     const newNode = {
       name: fileName,
       path: filePath,
-      is_dir: false,
-      parent_path: parentPath
+      is_dir: !!isDir,
+      parent_path: parentPath,
+      children: isDir ? [] : undefined,
     };
 
     // Root-level file

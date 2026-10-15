@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pin, PinOff } from "lucide-react";
-import { GitStatsBadge } from "../../features/git";
+import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { GUIDE_INDENT } from "./constants";
 import { gitColorClass } from "./utils/lsColors";
 
@@ -8,41 +8,43 @@ import { gitColorClass } from "./utils/lsColors";
  * Renders a file node in the tree with action buttons
  */
 export function FileNode({
-  node,
+  path,
+  name,
   guide,
   isCurrentPath,
-  stats,
+  isCursor,
   isSelected,
   isPinned,
+  isDeleted: isDeletedEntry,
+  gitAdded,
+  gitDeleted,
+  gitStatus,
+  onActivateFile,
   onTogglePin,
-  isTextareaPanelOpen,
-  onSendToTerminal,
-  showGitChangesOnly,
-  onToggleFileSelection,
 }) {
-  const hasGitChanges = stats && (stats.added > 0 || stats.deleted > 0 || stats.status);
-  const isDeleted = node.is_deleted || (stats && stats.status === 'deleted');
+  // Git stats arrive as primitives (so the row memo holds across git polls)
+  const stats = useMemo(
+    () => (gitStatus || gitAdded || gitDeleted
+      ? { added: gitAdded || 0, deleted: gitDeleted || 0, status: gitStatus }
+      : undefined),
+    [gitAdded, gitDeleted, gitStatus]
+  );
+  const hasGitChanges = !!stats;
+  const isDeleted = isDeletedEntry || gitStatus === 'deleted';
 
-  const handleFileClick = () => {
-    // Don't allow interaction with deleted files
-    if (isDeleted) return;
-
-    if (isTextareaPanelOpen) {
-      onToggleFileSelection(node.path);
-    } else {
-      onSendToTerminal(node.path);
-    }
-  };
+  // Deleted files ignore clicks (handled by onActivateFile)
+  const handleFileClick = () => onActivateFile(path, isDeleted);
 
   const handleTogglePin = (e) => {
     e.stopPropagation();
-    if (onTogglePin) onTogglePin(node.path);
+    if (onTogglePin) onTogglePin(path);
   };
 
   return (
     <div
       data-nav-row
-      data-selected={(isTextareaPanelOpen && isSelected) || undefined}
+      data-cursor={isCursor ? '' : undefined}
+      data-selected={isSelected || undefined}
       className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
@@ -52,7 +54,7 @@ export function FileNode({
         data-nav-activate
       >
         <span className="tui-tree-guide shrink-0 whitespace-pre" style={{ fontSize: 'var(--font-lg)' }}>{guide}{GUIDE_INDENT}</span>
-        <span className={`truncate leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
+        <span className={`truncate leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{name}</span>
 
         {/* Git stats badge */}
         {hasGitChanges && <GitStatsBadge stats={stats} />}

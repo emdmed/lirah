@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { usePageVisible } from '../../hooks/usePageVisible';
 
 // terminalSessionId lets the backend read the session of the `claude` process
 // running in this tab's PTY; without it usage falls back to the project's
 // most recently written session.
 export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
+  const pageVisible = usePageVisible();
   const [tokenUsage, setTokenUsage] = useState(null);
   const [projectStats, setProjectStats] = useState(null);
   const lastUsageRef = useRef(null);
@@ -43,18 +45,15 @@ export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
     }
   }, [projectPath, enabled]);
 
-  // Fetch project stats once, then start polling only session usage
+  // Fetch full project stats once per project/activation
   useEffect(() => {
-    if (!enabled || !projectPath) {
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-        checkIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Fetch full stats once on mount, then poll lightweight session usage
+    if (!enabled || !projectPath) return;
     fetchProjectStats();
+  }, [projectPath, enabled, fetchProjectStats]);
+
+  // Poll lightweight session usage while enabled and the window is visible
+  useEffect(() => {
+    if (!enabled || !projectPath || !pageVisible) return;
 
     // Delay first session poll to avoid overlapping with fetchProjectStats on startup
     const initialTimeout = setTimeout(() => {
@@ -66,9 +65,10 @@ export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
       clearTimeout(initialTimeout);
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
       }
     };
-  }, [projectPath, enabled, checkUsage, fetchProjectStats]);
+  }, [projectPath, enabled, pageVisible, checkUsage]);
 
   const refreshProjectStats = useCallback(() => {
     fetchProjectStats();

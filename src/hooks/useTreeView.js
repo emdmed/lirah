@@ -27,19 +27,79 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
+/**
+ * Normalize a `read_directory_recursive` result. Older backends return a bare
+ * array; newer ones return `{ entries, truncated }` and may omit
+ * `parent_path`, which the tree builder needs, so derive it from the path.
+ */
+function parseDirectoryResult(result) {
+  const entries = Array.isArray(result) ? result : (result?.entries || []);
+  const truncated = !Array.isArray(result) && !!result?.truncated;
+  if (entries.length === 0 || entries[0].parent_path !== undefined) {
+    return { entries, truncated };
+  }
+  return {
+    entries: entries.map(e => ({ ...e, parent_path: e.path.substring(0, lastSepIndex(e.path)) })),
+    truncated,
+  };
+}
+
+/**
+ * `fs-changes` entries are either bare paths or `{ path, is_dir }`.
+ * @returns {{path: string, is_dir: boolean}}
+ */
+function parseChange(change) {
+  return typeof change === 'string'
+    ? { path: change, is_dir: false }
+    : { path: change.path, is_dir: !!change.is_dir };
+}
+
+/** Flat file-list entry for a path created after the initial scan. */
+function makeFileEntry({ path, is_dir }) {
+  const lastSep = lastSepIndex(path);
+  return {
+    name: path.substring(lastSep + 1),
+    path,
+    is_dir: !!is_dir,
+    parent_path: path.substring(0, lastSep),
+  };
+}
+
+/** True when `path` or one of its ancestors is in `pathSet`. */
+function isSelfOrDescendantOf(path, pathSet) {
+  let current = path;
+  while (current) {
+    if (pathSet.has(current)) return true;
+    const lastSep = lastSepIndex(current);
+    if (lastSep <= 0) return false;
+    current = current.substring(0, lastSep);
+  }
+  return false;
+}
+
 export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults }) {
   const [treeData, setTreeData] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
+  const [treeTruncated, setTreeTruncated] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
   const [showMarkdownOnly, setShowMarkdownOnly] = useState(false);
   const [allFiles, setAllFiles] = useState([]);
+  // Source of truth for the flat file list, so fs changes can update it (and
+  // the search) outside state updaters, which must stay pure.
+  const allFilesRef = useRef([]);
   const projectRootRef = useRef(null);
   const { error } = useToast();
   const { fileWatchingEnabled } = useWatcher();
 
   // Debounce search results to prevent expensive tree filtering on every keystroke
   const debouncedSearchResults = useDebounce(searchResults, 150);
+
+  const commitAllFiles = useCallback((files) => {
+    allFilesRef.current = files;
+    setAllFiles(files);
+    initializeSearch(files, projectRootRef.current);
+  }, [initializeSearch]);
 
   const loadTreeData = useCallback(async () => {
     try {
@@ -56,20 +116,22 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
         cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
         projectRootRef.current = cwd;
       }
-      const allEntries = await invoke('read_directory_recursive', {
+      const result = await invoke('read_directory_recursive', {
         path: cwd, maxDepth: 10, maxFiles: 10000
       });
-      const treeNodes = buildTreeFromFlatList(allEntries, cwd);
+      const { entries, truncated } = parseDirectoryResult(result);
+      const treeNodes = buildTreeFromFlatList(entries, cwd);
       setTreeData(treeNodes);
+      setTreeTruncated(truncated);
       setCurrentPath(cwd);
-      setAllFiles(allEntries);
+      commitAllFiles(entries);
       setTreeLoading(false);
       setWatchPath(cwd);
-      initializeSearch(allEntries);
     } catch (err) {
       console.error('Failed to load tree data:', err);
       const errorMessage = err?.message || err?.toString() || 'Unknown error';
       setTreeData([]);
+      setTreeTruncated(false);
       setCurrentPath('Error loading directory');
       setTreeLoading(false);
       error(`Failed to load directory tree: ${errorMessage}`, {
@@ -82,7 +144,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
         }
       });
     }
-  }, [terminalSessionId, setCurrentPath, initializeSearch]);
+  }, [terminalSessionId, setCurrentPath, commitAllFiles]);
 
   // Track project root for fs watcher (set after first loadTreeData)
   const [watchPath, setWatchPath] = useState(null);
@@ -102,6 +164,24 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     return filterNodes(nodes);
   }, []);
 
+  // Drop deleted paths (and anything under a deleted directory) from the file list
+  const removeFromAllFiles = useCallback((deletedPaths) => {
+    const deletedSet = new Set(deletedPaths);
+    const prev = allFilesRef.current;
+    const updated = prev.filter(f => !isSelfOrDescendantOf(f.path, deletedSet));
+    if (updated.length !== prev.length) commitAllFiles(updated);
+  }, [commitAllFiles]);
+
+  // Append newly created paths to the file list
+  const addToAllFiles = useCallback((createdChanges) => {
+    const prev = allFilesRef.current;
+    const existingPaths = new Set(prev.map(f => f.path));
+    const newEntries = createdChanges
+      .filter(c => !existingPaths.has(c.path))
+      .map(makeFileEntry);
+    if (newEntries.length > 0) commitAllFiles([...prev, ...newEntries]);
+  }, [commitAllFiles]);
+
   // Start native FS watcher and listen for create/delete events
   useEffect(() => {
     if (!watchPath || !fileWatchingEnabled) return;
@@ -109,9 +189,20 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     let unlisten;
     let stopped = false;
 
+    // Watchers are ref-counted per path in the backend, and start/stop are
+    // async commands that can overtake each other — so the stop is chained
+    // onto this start and only sent if the start succeeded.
+    const started = invoke('start_fs_watcher', { path: watchPath }).then(
+      () => true,
+      (err) => {
+        console.warn('[useTreeView] Failed to start fs watcher:', err);
+        return false;
+      }
+    );
+
     const setup = async () => {
       try {
-        await invoke('start_fs_watcher', { path: watchPath });
+        if (!(await started) || stopped) return;
         const fn = await listen('fs-changes', (event) => {
           if (stopped) return;
           const { created, deleted, root_path } = event.payload || {};
@@ -126,45 +217,18 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
             return;
           }
 
-          // Handle deletions — filter them out of the tree
+          // Handle deletions — filter them out of the tree and the file list
           if (hasDeleted) {
-            setTreeData(prev => removeDeletedFromTree(prev, deleted));
-            // Also remove from allFiles and update search index
-            setAllFiles(prev => {
-              const deletedSet = new Set(deleted);
-              const updated = prev.filter(f => !deletedSet.has(f.path));
-              initializeSearch(updated);
-              return updated;
-            });
+            const deletedPaths = deleted.map(d => parseChange(d).path);
+            setTreeData(prev => removeDeletedFromTree(prev, deletedPaths));
+            removeFromAllFiles(deletedPaths);
           }
 
           // Handle creations — add new nodes incrementally
           if (hasCreated) {
-            const changes = {
-              newUntracked: created.map(p => ({ path: p })),
-            };
-            setTreeData(prev => incrementallyUpdateTree(prev, changes, watchPath));
-            // Also add to allFiles and update search index
-            setAllFiles(prev => {
-              const existingPaths = new Set(prev.map(f => f.path));
-              const newEntries = created
-                .filter(p => !existingPaths.has(p))
-                .map(p => {
-                  const lastSep = p.lastIndexOf('/');
-                  return {
-                    name: p.substring(lastSep + 1),
-                    path: p,
-                    is_dir: false,
-                    parent_path: p.substring(0, lastSep),
-                  };
-                });
-              if (newEntries.length > 0) {
-                const updated = [...prev, ...newEntries];
-                initializeSearch(updated);
-                return updated;
-              }
-              return prev;
-            });
+            const createdChanges = created.map(parseChange);
+            setTreeData(prev => incrementallyUpdateTree(prev, { newUntracked: createdChanges }, watchPath));
+            addToAllFiles(createdChanges);
           }
         });
         // Unmounted while listen() was resolving — tear down immediately
@@ -180,37 +244,20 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     return () => {
       stopped = true;
       if (unlisten) unlisten();
-      invoke('stop_fs_watcher', { path: watchPath }).catch(() => {});
+      started.then((ok) => {
+        if (ok) invoke('stop_fs_watcher', { path: watchPath }).catch(() => {});
+      });
     };
-  }, [watchPath, fileWatchingEnabled, loadTreeData, removeDeletedFromTree, initializeSearch]);
+  }, [watchPath, fileWatchingEnabled, loadTreeData, removeDeletedFromTree, removeFromAllFiles, addToAllFiles]);
 
   const handleIncrementalUpdate = useCallback((changes, rootPath) => {
     setTreeData(prev => incrementallyUpdateTree(prev, changes, rootPath));
 
-    // Update allFiles and search index with new untracked files
+    // Update allFiles and search with new untracked files
     if (changes.newUntracked.length > 0) {
-      setAllFiles(prev => {
-        const existingPaths = new Set(prev.map(f => f.path));
-        const newEntries = changes.newUntracked
-          .filter(({ path }) => !existingPaths.has(path))
-          .map(({ path }) => {
-            const lastSep = path.lastIndexOf('/');
-            return {
-              name: path.substring(lastSep + 1),
-              path,
-              is_dir: false,
-              parent_path: path.substring(0, lastSep),
-            };
-          });
-        if (newEntries.length > 0) {
-          const updated = [...prev, ...newEntries];
-          initializeSearch(updated);
-          return updated;
-        }
-        return prev;
-      });
+      addToAllFiles(changes.newUntracked.map(({ path }) => ({ path, is_dir: false })));
     }
-  }, [initializeSearch]);
+  }, [addToAllFiles]);
 
   const handleGitChanges = useCallback((changes) => {
     if (changes.newUntracked.length > 0 && !changes.newDeleted.length && !changes.noLongerUntracked.length) {
@@ -325,6 +372,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   return useMemo(() => ({
     treeData, setTreeData,
     treeLoading,
+    treeTruncated,
     expandedFolders, setExpandedFolders,
     showGitChangesOnly,
     showMarkdownOnly,
@@ -339,7 +387,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     handleToggleMarkdownFilter,
     displayedTreeData,
   }), [
-    treeData, treeLoading, expandedFolders, showGitChangesOnly, showMarkdownOnly, allFiles,
+    treeData, treeLoading, treeTruncated, expandedFolders, showGitChangesOnly, showMarkdownOnly, allFiles,
     loadTreeData, handleIncrementalUpdate, handleGitChanges, toggleFolder,
     filterTreeBySearch, expandSearchResults, handleToggleGitFilter, handleToggleMarkdownFilter, displayedTreeData,
   ]);

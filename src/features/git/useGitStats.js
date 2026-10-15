@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { usePageVisible } from "../../hooks/usePageVisible";
 
 /**
  * Custom hook to fetch and manage git statistics for files
  * @param {string} currentPath - The current directory path to fetch stats for
- * @param {boolean} enabled - Whether to enable git stats polling (default: true)
+ * @param {boolean} enabled - Whether to fetch and listen (false for inactive tabs; the last stats are kept)
  * @param {Function} onGitChanges - Callback for specific git changes (type, data)
  * @returns {Object} Object containing gitStats Map
  */
@@ -14,6 +15,7 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
   const prevStatsRef = useRef(new Map());
   const onGitChangesRef = useRef(onGitChanges);
   onGitChangesRef.current = onGitChanges;
+  const pageVisible = usePageVisible();
 
   const fetchGitStats = useCallback(async () => {
     if (!currentPath || !enabled) return;
@@ -42,11 +44,14 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
   }, [currentPath, enabled]);
 
   useEffect(() => {
-    if (!currentPath || !enabled) {
+    if (!currentPath) {
       setGitStats(new Map());
       prevStatsRef.current = new Map();
       return;
     }
+    // Paused (inactive tab): keep the last stats on screen; re-enabling
+    // refetches below.
+    if (!enabled) return;
 
     // Initial fetch
     fetchGitStats();
@@ -55,8 +60,10 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
     let cancelled = false;
     let unlisten;
     const setup = async () => {
-      const fn = await listen('git-stats-changed', () => {
-        if (cancelled) return;
+      // The payload is the path the fs watcher was started with; ignore
+      // other projects' changes.
+      const fn = await listen('git-stats-changed', (event) => {
+        if (cancelled || event.payload !== currentPath) return;
         fetchGitStats();
       });
       // Unmounted while listen() was resolving — tear down immediately
@@ -65,15 +72,16 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
     };
     setup();
 
-    // Safety net: low-frequency poll (30s) to catch any missed events
-    const fallbackInterval = setInterval(fetchGitStats, 30000);
+    // Safety net: low-frequency poll (30s) to catch any missed events,
+    // paused while the window is hidden
+    const fallbackInterval = pageVisible ? setInterval(fetchGitStats, 30000) : null;
 
     return () => {
       cancelled = true;
       if (unlisten) unlisten();
-      clearInterval(fallbackInterval);
+      if (fallbackInterval) clearInterval(fallbackInterval);
     };
-  }, [currentPath, enabled, fetchGitStats]);
+  }, [currentPath, enabled, pageVisible, fetchGitStats]);
 
   return { gitStats };
 }
@@ -136,7 +144,7 @@ function detectGitChanges(prevStats, newStats) {
   // Files that were previously untracked/deleted but no longer appear
   for (const [filePath, stats] of prevStats.entries()) {
     if ((stats.status === 'untracked' || stats.status === 'deleted') && !newStats.has(filePath)) {
-      changes.noLongerUntracked.push({ path: filePath });
+      changes.noLongerUntracked.push({ path: filePath, status: stats.status });
       changes.hasChanges = true;
     }
   }

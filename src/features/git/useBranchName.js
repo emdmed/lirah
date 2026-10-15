@@ -1,10 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { usePageVisible } from '../../hooks/usePageVisible';
+
+// The fs watcher emits `branch-changed` when .git/HEAD moves. The poll covers
+// what it can't see — watching disabled, a project nested inside a repo, a
+// terminal cd'd into another repo — at a tenth of the old 2 Hz rate.
+const FALLBACK_POLL_MS = 5000;
 
 export function useBranchName(repoPath, enabled = true) {
   const [branchName, setBranchName] = useState(null);
   const lastBranchRef = useRef(null);
-  const intervalRef = useRef(null);
+  const pageVisible = usePageVisible();
 
   const fetchBranch = useCallback(async () => {
     if (!repoPath) {
@@ -37,18 +44,25 @@ export function useBranchName(repoPath, enabled = true) {
       return;
     }
 
-    // Initial fetch
-    fetchBranch();
+    // The event's path is whatever the watcher was started with, which can
+    // differ from repoPath (subdirectory, symlink), so any HEAD move triggers
+    // a refetch — it's one cheap git call.
+    let unlisten = null;
+    let cancelled = false;
+    listen('branch-changed', () => { fetchBranch(); }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
 
-    // Poll every 500ms to detect branch changes
-    intervalRef.current = setInterval(fetchBranch, 500);
+    fetchBranch();
+    const interval = pageVisible ? setInterval(fetchBranch, FALLBACK_POLL_MS) : null;
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      cancelled = true;
+      unlisten?.();
+      if (interval) clearInterval(interval);
     };
-  }, [repoPath, enabled, fetchBranch]);
+  }, [repoPath, enabled, pageVisible, fetchBranch]);
 
   return branchName;
 }

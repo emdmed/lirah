@@ -186,3 +186,22 @@ export function buildPrompt({
 
   return { sections, text: sections.map(s => s.body).join('\n\n') };
 }
+
+/**
+ * Adds the typed prompt to a result built with an empty `textareaContent`.
+ * Lets the preview memoize the expensive sections (file analysis, elements)
+ * on their own inputs and re-run only this cheap step per keystroke. Matches
+ * buildPrompt's ordering: the prompt follows the compacted-project section.
+ */
+export function withPromptText(base, textareaContent) {
+  if (!textareaContent?.trim()) return base;
+  const sections = [...base.sections];
+  const at = sections[0]?.id === 'compacted' ? 1 : 0;
+  sections.splice(at, 0, {
+    id: 'prompt',
+    label: 'YOUR PROMPT',
+    body: textareaContent,
+    clearable: false,
+  });
+  return { sections, text: sections.map(s => s.body).join('\n\n') };
+}

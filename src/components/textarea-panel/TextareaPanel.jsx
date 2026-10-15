@@ -1,7 +1,11 @@
-import { useRef, useMemo, useState, useCallback, useEffect } from "react";
-import { CompactSectionsDialog, FlowchartDialog, buildGraphData } from "../../features/compact";
-import { DesignDialog, useDesignExtraction } from "../../features/design";
-import { useTokenBudget, TokenCostEstimate } from "../../features/token-budget";
+import { useRef, useMemo, useState, useCallback, useEffect, Suspense } from "react";
+import { buildGraphData } from "../../features/compact/generateFlowchart";
+import { useDesignExtraction } from "../../features/design/useDesignExtraction";
+import { useTokenBudget } from "../../features/token-budget/TokenBudgetContext";
+import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
+import { lazyNamed } from "../../lib/lazyNamed";
+import { usePromptText } from "../../hooks/usePromptStore";
+import { withPromptText } from "../../hooks/buildPrompt";
 
 import { ProjectToolbar } from "./ProjectToolbar";
 import { PromptToolbar } from "./PromptToolbar";
@@ -18,8 +22,14 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 
+// Loaded on first open. The compact dialogs mount only while open;
+// DesignDialog (a large hook tree) mounts on first open and then stays.
+const CompactSectionsDialog = lazyNamed(() => import("../../features/compact/CompactSectionsDialog"), "CompactSectionsDialog");
+const FlowchartDialog = lazyNamed(() => import("../../features/compact/FlowchartDialog"), "FlowchartDialog");
+const DesignDialog = lazyNamed(() => import("../../features/design/DesignDialog"), "DesignDialog");
+
 export function TextareaPanel({
-  value,
+  promptStore,
   onChange,
   onSend,
   onClose,
@@ -59,13 +69,18 @@ export function TextareaPanel({
   patternFiles = [],
   selectedPatterns = new Set(),
   onTogglePattern,
-  promptPreview,
+  promptPreview: promptPreviewBase,
   promptPreviewOpen = false,
   onTogglePromptPreview,
   onClearPromptSection,
 }) {
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
+  const value = usePromptText(promptStore);
+  const promptPreview = useMemo(
+    () => (promptPreviewBase ? withPromptText(promptPreviewBase, value) : promptPreviewBase),
+    [promptPreviewBase, value]
+  );
 
   useEffect(() => {
     const el = containerRef.current;
@@ -105,6 +120,10 @@ export function TextareaPanel({
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
   const [flowchartOpen, setFlowchartOpen] = useState(false);
   const [designOpen, setDesignOpen] = useState(false);
+  // DesignDialog holds view state (drill-down, hidden layers, last source)
+  // that must survive a close, so once opened it stays mounted.
+  const [designMounted, setDesignMounted] = useState(false);
+  if (designOpen && !designMounted) setDesignMounted(true);
 
   // Lives above the dialog on purpose: closing the dialog must not cancel a
   // running extraction, and reopening should show the finished diagram.
@@ -271,8 +290,8 @@ export function TextareaPanel({
   );
 
   const dialogs = (
-    <>
-      {compactedProject && (
+    <Suspense fallback={null}>
+      {compactedProject && compactDialogOpen && (
         <CompactSectionsDialog
           open={compactDialogOpen}
           onOpenChange={setCompactDialogOpen}
@@ -280,22 +299,24 @@ export function TextareaPanel({
           onUpdateCompactedProject={onUpdateCompactedProject}
         />
       )}
-      {compactedProject && graphData && (
+      {compactedProject && graphData && flowchartOpen && (
         <FlowchartDialog
           open={flowchartOpen}
           onOpenChange={setFlowchartOpen}
           graphData={graphData}
         />
       )}
-      <DesignDialog
-        open={designOpen}
-        onOpenChange={setDesignOpen}
-        extraction={designExtraction}
-        projectPath={projectPath || currentPath}
-        onOpenFile={handleOpenDesignFile}
-        onAsk={handleDesignAsk}
-      />
-    </>
+      {designMounted && (
+        <DesignDialog
+          open={designOpen}
+          onOpenChange={setDesignOpen}
+          extraction={designExtraction}
+          projectPath={projectPath || currentPath}
+          onOpenFile={handleOpenDesignFile}
+          onAsk={handleDesignAsk}
+        />
+      )}
+    </Suspense>
   );
 
   const partCount = promptPreview?.sections?.length ?? 0;
