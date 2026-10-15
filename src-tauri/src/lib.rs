@@ -28,8 +28,8 @@ use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
 use agent_runner::{create_agent_job_store};
 use agent_runner::commands::{run_agent_job, cancel_agent_job, list_running_agent_jobs};
 use design::{
-    branch_diff_summary, build_branch_digest, build_session_digest, latest_design_run,
-    list_base_choices, paths_change_status, paths_exist,
+    branch_diff_summary, build_branch_digest, build_project_digest, build_session_digest,
+    latest_design_run, list_base_choices, paths_change_status, paths_exist, project_summary,
 };
 
 pub struct InitialPath(pub Option<String>);
@@ -120,6 +120,8 @@ pub fn run(initial_path: Option<String>) {
             list_running_agent_jobs,
             build_session_digest,
             build_branch_digest,
+            build_project_digest,
+            project_summary,
             branch_diff_summary,
             list_base_choices,
             paths_exist,

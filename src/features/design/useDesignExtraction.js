@@ -3,24 +3,32 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
   buildBranchExtractionPrompt,
+  buildDomainExpansionPrompt,
   buildExtractionPrompt,
+  buildProjectExtractionPrompt,
   buildRepairPrompt,
 } from './designPrompt';
 import { parseSpecJson, validateSpec, normalizeSpec } from './spec';
+import { mergeDomainDetail, nodesInDomain, validateFragment } from './domainExpand';
 import { createEventLog } from './designEvents';
+import { useProjectCompact } from '../compact/useProjectCompact';
 
 /**
  * Drives source → design spec.
  *
- *   1. resolve the source the caller picked — the current conversation, or this
- *      branch's diff against its base
- *   2. digest it in Rust (`build_session_digest` / `build_branch_digest`)
+ *   1. resolve the source the caller picked — the current conversation, this
+ *      branch's diff against its base, or the whole project
+ *   2. digest it in Rust (`build_session_digest` / `build_branch_digest` /
+ *      `build_project_digest`)
  *   3. run the extractor headless (`run_agent_job`) — it reads the digest, checks
  *      the repo, and writes spec JSON to a file
  *   4. validate; on failure run exactly one repair pass
  *   5. verify every `files` entry against disk and mark what is missing
  *
- * Only step 1 differs between the two sources: each produces digest text, a
+ * A project diagram has a second pass, `expandDomain`, run on demand per domain:
+ * it details one domain and splices the result into the stored spec.
+ *
+ * Only step 1 differs between the sources: each produces digest text, a
  * description of itself for the UI, and the prompt that explains that flavour of
  * digest to the extractor. Everything downstream — the run directory, the job,
  * validation, the repair pass, git grounding — is shared, because the spec
@@ -36,7 +44,7 @@ import { createEventLog } from './designEvents';
 
 const STATUS_LABELS = {
   idle: '',
-  digesting: 'Reading the conversation…',
+  digesting: 'Reading the source…',
   extracting: 'Designing the diagram…',
   repairing: 'Fixing the spec…',
   verifying: 'Checking against the repo…',
@@ -92,6 +100,8 @@ export function useDesignExtraction() {
   const [truncated, setTruncated] = useState(false);
   const [source, setSource] = useState(null);
   const [runDir, setRunDir] = useState(null);
+  /** The domain a detail pass is running for, or null. */
+  const [expanding, setExpanding] = useState(null);
 
   // The activity log is a store, not state: it moves several times a second and
   // this hook lives in the composer panel, which must not re-render for it.
@@ -102,6 +112,17 @@ export function useDesignExtraction() {
   const cancelledRef = useRef(false);
   const stagesRef = useRef([]);
   const pipelineLogRef = useRef(null);
+  /**
+   * The validated spec exactly as written to disk, before verification
+   * decorates it — what a domain detail pass merges into and writes back. The
+   * published spec is normalized and annotated, so it cannot be reused for that.
+   */
+  const rawSpecRef = useRef(null);
+  const specPathRef = useRef(null);
+
+  // The composer's project compaction, reused as the project diagram's code
+  // outline — see `prepareProject`.
+  const { compactProject } = useProjectCompact();
 
   // There is deliberately no "is still mounted" guard here. The previous version
   // kept one and cleared it in an effect cleanup — which StrictMode invokes on
@@ -303,7 +324,7 @@ export function useDesignExtraction() {
       parsed,
       projectPath,
       baseWarnings = [],
-      { truncated = false, truncationWarning, baseRef = null } = {}
+      { truncated = false, truncationWarning, baseRef = null, classify = true } = {}
     ) => {
       const fileCount = (parsed.nodes || []).reduce((a, n) => a + (n.files || []).length, 0);
       const verified = await verifyFiles(parsed, projectPath);
@@ -311,17 +332,22 @@ export function useDesignExtraction() {
       await stage('Files verified', `${fileCount} referenced · ${missingCount} not found`);
       if (cancelledRef.current) return false;
 
-      await classifyChanges(verified, projectPath, baseRef);
-      const changed = (verified.nodes || []).filter(
-        (n) => n.change === 'added' || n.change === 'modified'
-      );
-      await stage(
-        'Change state resolved',
-        `${changed.filter((n) => n.change === 'added').length} added · ${
-          changed.filter((n) => n.change === 'modified').length
-        } modified`
-      );
-      if (cancelledRef.current) return false;
+      // A project diagram describes what is there, not a piece of work, so
+      // colouring it by whatever the current branch happens to touch would
+      // mislead.
+      if (classify) {
+        await classifyChanges(verified, projectPath, baseRef);
+        const changed = (verified.nodes || []).filter(
+          (n) => n.change === 'added' || n.change === 'modified'
+        );
+        await stage(
+          'Change state resolved',
+          `${changed.filter((n) => n.change === 'added').length} added · ${
+            changed.filter((n) => n.change === 'modified').length
+          } modified`
+        );
+        if (cancelledRef.current) return false;
+      }
 
       const unverified = (verified.nodes || []).filter(
         (n) => (n.status || 'existing') === 'existing' && n.filesMissing?.length
@@ -392,12 +418,25 @@ export function useDesignExtraction() {
             `The stored spec at ${specPath} is not valid — regenerate to replace it.`
           );
         }
-        setSource(null);
-        setRunDir(specPath.replace(/\/spec\.json$/, ''));
-        await publish(parsed, projectPath, [
-          ...result.warnings,
-          'Loaded from a previous run — regenerate to pick up newer conversation.',
-        ]);
+        const dir = specPath.replace(/\/spec\.json$/, '');
+        // Runs older than source.json have no record of their source; they
+        // load as before, just without the source line.
+        let storedSource = null;
+        try {
+          storedSource = JSON.parse(await invoke('read_file_content', { path: `${dir}/source.json` }));
+        } catch {
+          storedSource = null;
+        }
+        setSource(storedSource);
+        setRunDir(dir);
+        rawSpecRef.current = structuredClone(parsed);
+        specPathRef.current = specPath;
+        await publish(
+          parsed,
+          projectPath,
+          [...result.warnings, 'Loaded from a previous run — regenerate to pick up newer changes.'],
+          { classify: storedSource?.kind !== 'project' }
+        );
         return true;
       } catch (e) {
         setError(e.message || String(e));
@@ -516,6 +555,79 @@ export function useDesignExtraction() {
   );
 
   /**
+   * As `prepareConversation`, but for the repository as a whole.
+   *
+   * The project is compacted first — every JS/TS/Python file reduced to its
+   * imports, exports and functions — and that outline becomes the heart of the
+   * digest (Rust is outlined in the digest builder itself). It is a fraction of
+   * the source's size yet names every file and every local import, so the
+   * extractor sees the whole codebase's shape up front instead of sampling it
+   * one file read at a time: cheaper, and nothing is missed for lack of a read.
+   *
+   * Compacted fresh on every run rather than reusing one on disk: parsing takes
+   * seconds next to minutes of extraction, and a stale outline would draw parts
+   * that no longer exist. Failing to compact is not fatal — the digest falls
+   * back to entry points and the file list.
+   */
+  const prepareProject = useCallback(
+    async ({ projectPath, depth = 'standard' }) => {
+      let outline = null;
+      try {
+        await stage('Compacting project', 'outlining every JS/TS/Python file');
+        const files = await invoke('read_directory_recursive', {
+          path: projectPath,
+          maxDepth: 10,
+          maxFiles: 10000,
+        });
+        const result = await compactProject(projectPath, files);
+        const output = result?.output || '';
+        if (output && !output.startsWith('# Project Compact\n# Error')) {
+          outline = output;
+          await stage(
+            'Project compacted',
+            `${(output.match(/^## /gm) || []).length} files · ${Math.round(output.length / 1024)} KB outline from ${Math.round(
+              (result.originalSize || 0) / 1024
+            )} KB of source`
+          );
+        } else {
+          await stage('Nothing to compact', 'no JS/TS/Python files — Rust is outlined in the digest');
+        }
+      } catch (e) {
+        await stage('Compaction skipped', e.message || String(e), 'warn');
+      }
+
+      const digest = await invoke('build_project_digest', {
+        projectPath,
+        maxChars: digestBudget(depth),
+        outline,
+      });
+      await stage(
+        'Digest built',
+        `${digest.file_count} files · ${digest.outlined_files} outlined · ${Math.round(
+          digest.chars / 1024
+        )} KB · ${depth} depth${digest.truncated ? ' · clipped' : ''}`
+      );
+      return {
+        digest: digest.digest,
+        truncated: digest.truncated,
+        truncationWarning: `The project map was large; part of the code outline or file list was clipped.${retryHint(depth)}`,
+        classifyBase: null,
+        classify: false,
+        source: {
+          kind: 'project',
+          fileCount: digest.file_count,
+          dirCount: digest.dir_count,
+          outlinedFiles: digest.outlined_files,
+          branch: digest.branch,
+        },
+        buildPrompt: ({ digestPath, outPath }) =>
+          buildProjectExtractionPrompt({ digestPath, outPath, repoPath: projectPath }),
+      };
+    },
+    [stage, compactProject]
+  );
+
+  /**
    * What the conversation source would cover. Same contract as
    * `probeBranchSource`: cheap, never throws, and an unusable source explains
    * itself so the picker can grey it out with a reason instead of failing a run.
@@ -553,6 +665,16 @@ export function useDesignExtraction() {
       return await invoke('list_base_choices', { projectPath });
     } catch {
       return { detected: null, current: null, refs: [] };
+    }
+  }, []);
+
+  /** What the project source would cover. Never throws. */
+  const probeProjectSource = useCallback(async ({ projectPath } = {}) => {
+    if (!projectPath) return { available: false, reason: 'No project folder open.' };
+    try {
+      return await invoke('project_summary', { projectPath });
+    } catch (e) {
+      return { available: false, reason: e.message || String(e) };
     }
   }, []);
 
@@ -599,7 +721,9 @@ export function useDesignExtraction() {
         const prepared =
           sourceKind === 'branch'
             ? await prepareBranch({ projectPath, baseRef, depth })
-            : await prepareConversation({ projectPath, depth });
+            : sourceKind === 'project'
+              ? await prepareProject({ projectPath, depth })
+              : await prepareConversation({ projectPath, depth });
         setSource(prepared.source);
 
         const home = await invoke('get_home_dir');
@@ -611,6 +735,12 @@ export function useDesignExtraction() {
         setLogPath(logPath);
         pipelineLogRef.current = `${dir}/pipeline.log`;
         await invoke('write_file_content', { path: digestPath, content: prepared.digest });
+        // Kept beside the spec so a stored run knows what it was drawn from —
+        // a project run needs that to offer domain detailing after a reload.
+        await invoke('write_file_content', {
+          path: `${dir}/source.json`,
+          content: JSON.stringify(prepared.source, null, 2),
+        });
         await stage('Run directory', dir);
 
         if (cancelledRef.current) return;
@@ -698,10 +828,13 @@ export function useDesignExtraction() {
         // Report what actually happened: an earlier version logged "Diagram
         // ready" unconditionally, so a publish that bailed still looked like a
         // success in the log — which is precisely the trail needed to diagnose it.
+        rawSpecRef.current = structuredClone(parsed);
+        specPathRef.current = specPath;
         const published = await publish(parsed, projectPath, result.warnings, {
           truncated: prepared.truncated,
           truncationWarning: prepared.truncationWarning,
           baseRef: prepared.classifyBase,
+          classify: prepared.classify !== false,
         });
         await stage(
           published ? 'Diagram ready' : 'Cancelled before publishing',
@@ -716,7 +849,124 @@ export function useDesignExtraction() {
         setStatus('error');
       }
     },
-    [runJob, publish, stage, prepareConversation, prepareBranch]
+    [runJob, publish, stage, prepareConversation, prepareBranch, prepareProject]
+  );
+
+  /**
+   * Pass two of a project diagram: detail one domain and splice it into the
+   * spec on disk, so the detail survives a reload and "Load last run".
+   *
+   * The diagram stays on screen throughout — this is not a run of its own, and
+   * a failure costs only the detail, never the diagram. The spec before the
+   * merge is kept beside it, so a bad merge can be recovered by hand.
+   */
+  const expandDomain = useCallback(
+    async ({ projectPath, domainId, cli = 'claude' }) => {
+      const raw = rawSpecRef.current;
+      const specPath = specPathRef.current;
+      if (!raw || !specPath || !projectPath || jobIdRef.current) return false;
+      const domain = (raw.groups || []).find((g) => g.id === domainId && !g.parent);
+      if (!domain) return false;
+
+      const dir = specPath.replace(/\/spec\.json$/, '');
+      const fragmentPath = `${dir}/domain-${domainId}.json`;
+      const logPath = `${dir}/domain-${domainId}.log`;
+      // Its own log: the run's pipeline.log belongs to the extraction that
+      // produced the spec, and after a reload the stages in memory are not its.
+      stagesRef.current = [];
+      pipelineLogRef.current = `${dir}/domain-${domainId}.pipeline.log`;
+      cancelledRef.current = false;
+      setExpanding(domainId);
+
+      const readFragment = async () =>
+        parseSpecJson(await invoke('read_file_content', { path: fragmentPath }));
+
+      try {
+        await stage('Detailing domain', domain.label);
+        const inDomain = nodesInDomain(raw, domainId);
+        await runJob({
+          jobId: `design-domain-${Date.now()}`,
+          cli,
+          prompt: buildDomainExpansionPrompt({
+            specPath,
+            digestPath: `${dir}/digest.md`,
+            outPath: fragmentPath,
+            repoPath: projectPath,
+            domain,
+            features: (raw.groups || []).filter((g) => g.parent === domainId),
+            current: (raw.nodes || []).filter((n) => inDomain.has(n.id)),
+            layers: raw.layers || [],
+          }),
+          cwd: projectPath,
+          logPath,
+        });
+        if (cancelledRef.current) return false;
+
+        let fragment;
+        try {
+          fragment = await readFragment();
+        } catch (e) {
+          throw new Error(`the extractor did not write a usable fragment (${e.message}). Log: ${logPath}`);
+        }
+
+        let check = validateFragment(raw, domainId, fragment);
+        if (!check.ok) {
+          await stage('Fragment invalid — repairing', `${check.errors.length} errors`, 'warn');
+          await runJob({
+            jobId: `design-domain-repair-${Date.now()}`,
+            cli,
+            prompt: buildRepairPrompt({ outPath: fragmentPath, errors: check.errors }),
+            cwd: projectPath,
+            logPath,
+          });
+          if (cancelledRef.current) return false;
+          fragment = await readFragment();
+          check = validateFragment(raw, domainId, fragment);
+          if (!check.ok) {
+            const summary = check.errors
+              .slice(0, 3)
+              .map((e) => `${e.path || '(root)'}: ${e.message}`)
+              .join('; ');
+            throw new Error(`the fragment was still invalid after one repair — ${summary}`);
+          }
+        }
+
+        const { spec: merged, dropped } = mergeDomainDetail(raw, domainId, fragment);
+        const result = validateSpec(merged);
+        if (!result.ok) {
+          throw new Error(
+            `the merged spec did not validate — ${result.errors[0].path}: ${result.errors[0].message}`
+          );
+        }
+
+        await invoke('write_file_content', {
+          path: `${dir}/spec.before-${domainId}.json`,
+          content: JSON.stringify(raw, null, 2),
+        });
+        await invoke('write_file_content', { path: specPath, content: JSON.stringify(merged, null, 2) });
+        await stage(
+          'Domain detailed',
+          `${domain.label} · ${fragment.nodes.length} parts${dropped ? ` · ${dropped} links lost` : ''}`
+        );
+
+        rawSpecRef.current = structuredClone(merged);
+        const extra = dropped
+          ? [
+              `Detailing ${domain.label} lost ${dropped} link${dropped === 1 ? '' : 's'} from other domains — the extractor did not say which new part replaced them.`,
+            ]
+          : [];
+        await publish(merged, projectPath, [...result.warnings, ...extra], { classify: false });
+        return true;
+      } catch (e) {
+        const message = e.message || String(e);
+        await stage('Detailing failed', message, 'warn');
+        setWarnings((prev) => [...prev, `Could not detail ${domain.label}: ${message}`]);
+        return false;
+      } finally {
+        setExpanding(null);
+      }
+    },
+    [runJob, publish, stage]
   );
 
   const cancel = useCallback(async () => {
@@ -755,11 +1005,14 @@ export function useDesignExtraction() {
     truncated,
     source,
     runDir,
+    expanding,
     generate,
+    expandDomain,
     loadLastRun,
     probeStoredRun,
     probeConversationSource,
     probeBranchSource,
+    probeProjectSource,
     listBaseChoices,
     cancel,
     reset,

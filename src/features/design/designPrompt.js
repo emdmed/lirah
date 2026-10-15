@@ -4,11 +4,15 @@ import { NODE_SUBKINDS } from './designIcons';
 /**
  * Prompts for the extractor agent.
  *
- * There are two, one per source: a conversation digest and a branch digest. They
- * share everything that decides whether a spec is *valid* (the schema, the
- * read-only warning, the output contract) and differ only in how to read the
- * digest and how to judge `status`/`change` from it — because "what someone
- * meant to build" and "what got built" imply opposite defaults there.
+ * There is one per source — a conversation digest, a branch digest and a
+ * project digest. They share everything that decides whether a spec is *valid*
+ * (the schema, the read-only warning, the output contract) and differ only in
+ * how to read the digest and how to judge `status`/`change` from it — because
+ * "what someone meant to build", "what got built" and "what is there" imply
+ * different defaults.
+ *
+ * A fourth prompt details one domain of an existing project spec; it writes a
+ * fragment that `domainExpand.js` splices in.
  *
  * The agent runs through the shared headless runner (`run_agent_job`), whose
  * system prompt tells it to apply code changes directly — so both prompts below
@@ -25,11 +29,16 @@ const SCHEMA_DOC = `{
   "layers": [
     { "id": "kebab-id", "label": "Human label", "order": 0 }
   ],
+  "groups": [
+    { "id": "kebab-id", "label": "Domain, e.g. 'API'", "purpose": "ONE sentence: what this area is for" },
+    { "id": "kebab-id", "label": "Feature, e.g. 'Jobs'", "parent": "<id of a domain>", "purpose": "ONE sentence" }
+  ],
   "nodes": [
     {
       "id": "kebab-id",
       "label": "Human label",
       "layer": "<id of a declared layer>",
+      "group": "<id of the most specific group this part belongs to>",
       "kind": "${NODE_KINDS.join(' | ')}",
       "subkind": "optional, what it actually is: ${NODE_SUBKINDS.join(' | ')}",
       "status": "existing | proposed",
@@ -93,9 +102,12 @@ const SCHEMA_DOC = `{
  * `header` names the source and where its digest is; `howToRead` is items 1-4 of
  * the quality rules, which are the source-specific ones.
  *
- * @param {{ outPath: string, repoPath: string, header: string, howToRead: string }} opts
+ * `nodeBudget` is the node cap stated to the extractor; a project overview
+ * gets a larger one because its nodes are coarse and filed into groups.
+ *
+ * @param {{ outPath: string, repoPath: string, header: string, howToRead: string, nodeBudget?: number }} opts
  */
-function buildCommonPrompt({ outPath, repoPath, header, howToRead }) {
+function buildCommonPrompt({ outPath, repoPath, header, howToRead, nodeBudget = NODE_CAP }) {
   return `${header}
 
 The repository it concerns is at ${repoPath} (your working directory).
@@ -143,7 +155,7 @@ ${howToRead}
 9. **Layers** are the horizontal bands of the diagram — for example Frontend / Tauri core /
    Filesystem, or Client / API / Domain / Storage. Order them \`0\` at the top, flowing
    downward. 2-5 layers is usually right.
-10. **Budget: at most ${NODE_CAP} nodes.** If the system is bigger, *abstract* — collapse a
+10. **Budget: at most ${nodeBudget} nodes.** If the system is bigger, *abstract* — collapse a
    subsystem into one node whose responsibility describes the whole — rather than dropping
    parts silently. Note any collapsing you did in \`summary\`.
 11. **\`concerns\`** captures the risks, open questions and tradeoffs the source
@@ -175,17 +187,36 @@ ${howToRead}
       the two diagrams — it lets the reader jump from a step to the parts implementing it.
     - A \`concepts\` block that merely renames the layers and repeats the node labels is
       worse than none: it must carry the explanation the system diagram cannot.
+14. **\`groups\` is the third diagram: the system broken into its big areas.** It is what
+    someone draws on a whiteboard when asked "what are the pieces of this?", and the reader
+    drills into it one level at a time.
+    - **Domains** are the groups with no \`parent\`: 3-8 areas a newcomer would name, split
+      by *responsibility*, e.g. Ingestion, Solver, API, Auth & login, Storage. List them
+      upstream first — where data enters the system before where it ends up.
+    - **Features** are groups whose \`parent\` is a domain: the distinct capabilities inside
+      it, e.g. API › Jobs, API › Billing, API › Users. Give a domain features when it does
+      more than one thing; leave a small domain without any.
+    - **Exactly two levels.** A feature never has features of its own.
+    - **Not a copy of the layers.** Layers say *where* code runs (frontend, core, database);
+      groups say *what it is for*. One feature usually spans several layers — a "Jobs" feature
+      has a UI part, a service part and a table — and that is the point.
+    - **Every node sets \`group\`** to the most specific group it belongs to: its feature
+      when its domain has features, otherwise the domain itself.
+    - Arrows between groups are worked out from your flows, so do not declare them; just
+      make sure the flows that cross between areas are in \`flows\`.
 
 ## Output rules
 
 - \`${outPath}\` must contain **only** the JSON object — no prose, no markdown fence.
 - Every \`node.layer\` must match a declared \`layers[].id\`; every step's \`from\`/\`to\` must
   match a declared \`nodes[].id\`. Ids are kebab-case and unique.
+- Every \`group.parent\` must be the id of a group that itself has no parent, and every
+  \`node.group\` must match a declared \`groups[].id\`.
 - Every id in a stage's \`consumes\`/\`produces\` must match a declared \`concepts.data[].id\`,
   and every id in a stage's or datum's \`nodes\` must match a declared \`nodes[].id\`.
-- When you are done, reply with one short paragraph: how many nodes, layers and flows you
-  wrote, how many concept stages and data kinds, and anything you deliberately abstracted
-  or could not determine.`;
+- When you are done, reply with one short paragraph: how many nodes, layers, domains,
+  features and flows you wrote, how many concept stages and data kinds, and anything you
+  deliberately abstracted or could not determine.`;
 }
 
 /**
@@ -267,6 +298,188 @@ messages, the list of changed files, and the patch itself.`,
    parts cannot be understood without them — the caller that invokes the new code, the
    store it writes to — but keep them to the ones that carry an arrow.`,
   });
+}
+
+/**
+ * Extract from the repository as a whole: pass one of a project diagram.
+ *
+ * A repository is too big to describe part by part in one go, so this pass is
+ * about breadth — every domain and feature, each with a few coarse nodes — and
+ * `buildDomainExpansionPrompt` fills in one domain at a time when the reader
+ * drills into it.
+ *
+ * @param {{ digestPath: string, outPath: string, repoPath: string }} opts
+ */
+export function buildProjectExtractionPrompt({ digestPath, outPath, repoPath }) {
+  return buildCommonPrompt({
+    outPath,
+    repoPath,
+    nodeBudget: 60,
+    header: `# Task: map a whole repository as a system-design spec
+
+You are extracting a **design diagram spec** for an entire codebase, not one feature. Read
+the project digest at:
+
+    ${digestPath}
+
+It is a map of the repository: its directory tree with file counts, its docs and manifests,
+and a **code outline** — for every source file the app could parse, its local imports and
+its exported components, functions and types. It is not the code itself.`,
+    howToRead: `1. **The code outline is your primary map — work from it.** It already names every
+   outlined file and what it exports, so you do not need to open files to learn what exists.
+   Group files into domains and features from the tree and the outline, and draw flows from
+   the \`imports:\` lines (and \`renders:\` / \`[command]\` markers): an import between two
+   areas is a real dependency edge, which is far better evidence than a guess. The
+   \`groups\` breakdown is the headline of this diagram — get it right before anything else.
+2. **Read files only to confirm.** Open a file when the outline cannot tell you a part's
+   responsibility or what payload crosses an arrow — not to discover structure the outline
+   already shows. Every path in \`files\` must be one that appears in the digest or that you
+   verified exists. Prefer pointing a node at a directory's main file over listing every
+   file in it. A run that works from the outline should need well under fifty tool calls.
+3. **Breadth over depth — this is pass one of two.** Cover the *whole* repository, with
+   coarse nodes: about 1-3 per feature, each standing for a module or a cluster of files.
+   A later pass details one domain at a time on request, so do not spend your budget
+   describing one corner in depth while leaving another area undrawn.
+4. **\`status\` is \`existing\` and \`change\` is \`untouched\`** for everything: this
+   describes what is in the repository, not a piece of work. Leave \`proposed\` out.`,
+  });
+}
+
+/**
+ * Pass two of a project diagram: detail one domain.
+ *
+ * The extractor gets the current spec for context and writes a *fragment* — the
+ * domain's new nodes, features and flows — which `mergeDomainDetail` splices in.
+ * The part that matters most is `replaces`: other domains' arrows point at the
+ * coarse nodes being retired, and listing which new node takes over each one is
+ * what keeps those arrows connected.
+ *
+ * @param {{
+ *   specPath: string, digestPath: string, outPath: string, repoPath: string,
+ *   domain: { id: string, label: string, purpose: string },
+ *   features: Array<{ id: string, label: string, purpose: string }>,
+ *   current: Array<{ id: string, label: string, group: string, files?: string[] }>,
+ *   layers: Array<{ id: string, label: string }>,
+ * }} opts
+ */
+export function buildDomainExpansionPrompt({ specPath, digestPath, outPath, repoPath, domain, features, current, layers }) {
+  const tick = (s) => `\`${s}\``;
+  const featureList = features.length
+    ? features.map((f) => `  - ${tick(f.id)} — ${f.label}: ${f.purpose}`).join('\n')
+    : '  (none — the domain has no features yet)';
+  const currentList = current
+    .map((n) => {
+      const files = n.files?.length ? ` — ${n.files.slice(0, 4).join(', ')}` : '';
+      return `  - ${tick(n.id)} (${n.label}, in ${tick(n.group)})${files}`;
+    })
+    .join('\n');
+  const layerList = layers.map((l) => `${tick(l.id)} (${l.label})`).join(', ');
+
+  return `# Task: detail one domain of a system-design spec
+
+The repository at ${repoPath} (your working directory) already has a design spec at:
+
+    ${specPath}
+
+It maps the whole system coarsely. Your job is to replace the coarse picture of **one
+domain** with a detailed one:
+
+  **${domain.label}** (${tick(domain.id)}) — ${domain.purpose}
+
+Its features today:
+
+${featureList}
+
+Its nodes today, which your detailed nodes replace:
+
+${currentList}
+
+The project digest the spec was drawn from is at:
+
+    ${digestPath}
+
+Its **Code outline** section lists every source file with its local imports and exports.
+Use it to find all of this domain's files and how they import each other before you open
+anything, then read only what you need to confirm responsibilities and payloads.
+
+## THIS JOB IS READ-ONLY
+
+Write exactly ONE file: ${tick(outPath)}. Do **not** modify, create or delete anything else —
+in particular do not edit the spec itself. Do not fix bugs, refactor, build, test or commit.
+
+## Work directly — this is a single pass
+
+Do not run any repository-level orchestration, compaction, discovery or multi-agent
+protocol, and do not spawn subagents. Read the spec for context, read this domain's code,
+and write the fragment. Aim to finish in well under a hundred tool calls.
+
+## What to produce
+
+A single JSON object:
+
+\`\`\`json
+{
+  "domain": "${domain.id}",
+  "groups": [
+    { "id": "kebab-id", "label": "Feature name", "purpose": "ONE sentence" }
+  ],
+  "nodes": [
+    {
+      "id": "kebab-id",
+      "label": "Human label",
+      "layer": "<one of: ${layers.map((l) => l.id).join(' | ')}>",
+      "group": "${domain.id} or one of its feature ids",
+      "kind": "${NODE_KINDS.join(' | ')}",
+      "subkind": "optional",
+      "status": "existing",
+      "change": "untouched",
+      "responsibility": "ONE sentence: what this part is responsible for",
+      "owns": ["state or data this part exclusively owns"],
+      "files": ["repo-relative/path"],
+      "replaces": ["ids of today's nodes this one takes over from"]
+    }
+  ],
+  "flows": [
+    { "id": "kebab-id", "label": "Named scenario", "steps": [
+      { "from": "<node id>", "to": "<node id>", "data": "the payload crossing this arrow" }
+    ]}
+  ],
+  "concerns": [
+    { "node": "<node id, optional>", "kind": "risk | open-question | tradeoff", "text": "..." }
+  ]
+}
+\`\`\`
+
+## How to do it well
+
+1. **Start from the outline, then read.** Find this domain's files in the digest's code
+   outline — beginning with the files today's nodes point at and following their imports —
+   then read the ones whose role the outline leaves unclear. Every path in
+   ${tick('files')} must be one you verified exists.
+2. **5-30 nodes**, one per real module, service, store, table or screen. This is the detailed
+   view, so name the actual parts — but still collapse trivial helpers into their owner.
+3. **${tick('groups')} is optional.** Omit it to keep today's features. Include it to
+   restructure them — it then *replaces* the domain's whole feature list, so list every
+   feature you want to keep. Features have no ${tick('parent')} field here; they all belong
+   to this domain.
+4. **Keep the border connected — this is the critical part.** Other domains' flows point at
+   today's nodes listed above. For each of today's nodes, either reuse its exact id for the
+   node that now plays that role, or list it in ${tick('replaces')} on the node that took
+   over. A node of today's that you neither reuse nor list in ${tick('replaces')} loses every
+   arrow pointing at it.
+5. **Flows**: 1-4 named scenarios inside this domain, plus steps that cross into other
+   domains where that is how the scenario really goes. A step's ${tick('from')}/${tick('to')}
+   is either one of your new node ids or an existing node id from another domain in the
+   spec. Every ${tick('data')} names the real payload — a type with its fields, an event
+   name, a row.
+6. **Layers** are fixed: use only ${layerList}.
+
+## Output rules
+
+- ${tick(outPath)} must contain **only** the JSON object — no prose, no markdown fence.
+- Node ids are kebab-case, unique, and must not collide with another domain's node ids.
+- When you are done, reply with one short paragraph: how many nodes, features and flows you
+  wrote, and which of today's nodes you replaced with what.`;
 }
 
 /**

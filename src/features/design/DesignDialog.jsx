@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,8 @@ import {
   ChevronDown,
   ChevronRight,
   History,
+  LayoutGrid,
+  Loader2,
   Maximize2,
   Minus,
   Network,
@@ -30,6 +32,8 @@ import { DesignAskBar } from './DesignAskBar';
 import { DesignSourcePicker } from './DesignSourcePicker';
 import { ConceptView } from './ConceptView';
 import { buildConceptModel } from './conceptModel';
+import { DomainView } from './DomainView';
+import { buildDomainModel } from './domainModel';
 import { iconForLayer } from './designIcons';
 import { buildAskPrompt, filesOfSelection } from './designAsk';
 
@@ -53,7 +57,9 @@ export function DesignDialog({
   onOpenFile,
   onAsk,
 }) {
-  const { status, statusLabel, isRunning, error, spec, warnings, truncated, source } = extraction;
+  const {
+    status, statusLabel, isRunning, error, spec, warnings, truncated, source, runDir, expanding,
+  } = extraction;
 
   const {
     svgRef, graphGRef, containerRef,
@@ -82,11 +88,22 @@ export function DesignDialog({
   const [askOpen, setAskOpen] = useState(false);
   const [storedRun, setStoredRun] = useState(false);
   /**
-   * Which of the two diagrams is on screen. `concepts` explains the data flow in
-   * plain language; `system` is the file-grounded map. They are separate views of
-   * one spec rather than two modes of one renderer — see `ConceptView`.
+   * Which of the three diagrams is on screen. `domains` is the system broken
+   * into its big areas, drilled into one level at a time; `concepts` explains
+   * the data flow in plain language; `system` is the file-grounded map. They are
+   * separate views of one spec rather than modes of one renderer.
    */
-  const [view, setView] = useState('concepts');
+  const [view, setView] = useState('domains');
+  /** Which domain the domains view is opened into; null is the top level. */
+  const [domainScope, setDomainScope] = useState(null);
+  /**
+   * A group the system view is narrowed to — set by opening a feature in the
+   * domains view. Its parts are drawn, plus their direct neighbours faded for
+   * context; everything else is left out of the layout entirely.
+   */
+  const [groupFocus, setGroupFocus] = useState(null);
+  /** The run the view choice was last made for — see the effect below. */
+  const viewChosenFor = useRef(null);
   /**
    * What the last Generate was asked to cover. Held here so "Try again" and
    * "Regenerate" repeat that choice instead of silently falling back to the
@@ -98,6 +115,12 @@ export function DesignDialog({
     baseRef: null,
     depth: 'standard',
   });
+
+  // A stored run remembers its source, so Regenerate repeats it rather than
+  // falling back to the conversation.
+  useEffect(() => {
+    if (source?.kind) setLastSource((prev) => ({ ...prev, sourceKind: source.kind }));
+  }, [source]);
 
   // Offer a previous run only when one is actually on disk.
   // Depend on the stable callback, NOT on `extraction`: the hook returns a fresh
@@ -133,25 +156,88 @@ export function DesignDialog({
   const edges = spec?.edges || EMPTY_ARRAY;
   const concerns = spec?.concerns || EMPTY_ARRAY;
 
-  const { positioned, bandRects, measured, routes, totalW, totalH } = useMemo(
-    () => layoutDesign(layers, nodes, edges, hiddenLayers),
-    [layers, nodes, edges, hiddenLayers]
-  );
-
   const conceptModel = useMemo(() => buildConceptModel(spec), [spec]);
+  const domainModel = useMemo(() => buildDomainModel(spec), [spec]);
+
+  // A focus that no longer exists (the domain was re-detailed and the feature
+  // renamed) is dropped rather than drawing an empty diagram.
+  const focusGroup = groupFocus ? domainModel.groups.get(groupFocus) : null;
 
   /**
-   * Open on whichever view actually helps.
+   * The slice of the spec the system view lays out. Without a focus that is all
+   * of it; with one, the focused group's parts plus anything one arrow away —
+   * those neighbours are what make the feature's arrows mean something.
+   */
+  const { viewNodes, viewEdges, neighbourIds } = useMemo(() => {
+    if (!focusGroup) return { viewNodes: nodes, viewEdges: edges, neighbourIds: null };
+    const core = new Set(focusGroup.nodeIds);
+    const keep = new Set(core);
+    for (const e of edges) {
+      if (core.has(e.from)) keep.add(e.to);
+      if (core.has(e.to)) keep.add(e.from);
+    }
+    const viewNodes = new Map([...nodes].filter(([id]) => keep.has(id)));
+    const viewEdges = edges.filter(
+      (e) => keep.has(e.from) && keep.has(e.to) && (core.has(e.from) || core.has(e.to))
+    );
+    return {
+      viewNodes,
+      viewEdges,
+      neighbourIds: new Set([...keep].filter((id) => !core.has(id))),
+    };
+  }, [focusGroup, nodes, edges]);
+
+  const { positioned, bandRects, measured, routes, totalW, totalH } = useMemo(
+    () => layoutDesign(layers, viewNodes, viewEdges, hiddenLayers),
+    [layers, viewNodes, viewEdges, hiddenLayers]
+  );
+
+  /**
+   * Open on whichever view actually helps — once per run, not once per spec: a
+   * domain being detailed replaces the spec, and the reader who asked for that
+   * is mid-drill and must stay where they are.
    *
-   * A written concepts block is the fastest way into an unfamiliar system, so it
-   * leads. A derived one is a skeleton with no sentences in it — leading with that
-   * would sell the feature short — so the system diagram leads instead, with the
-   * concepts tab still one click away.
+   * A written domain breakdown is the map of the whole thing, so it leads. Next
+   * best is a written concepts block. Derived versions of either are skeletons
+   * with no sentences in them, so the system diagram leads over those.
    */
   useEffect(() => {
-    if (!spec) return;
-    setView(conceptModel.ok && !conceptModel.derived ? 'concepts' : 'system');
-  }, [spec, conceptModel]);
+    if (!spec) {
+      viewChosenFor.current = null;
+      return;
+    }
+    const key = runDir || spec.title;
+    if (viewChosenFor.current === key) return;
+    viewChosenFor.current = key;
+    setDomainScope(null);
+    setGroupFocus(null);
+    setView(
+      domainModel.ok && !domainModel.derived
+        ? 'domains'
+        : conceptModel.ok && !conceptModel.derived
+          ? 'concepts'
+          : 'system'
+    );
+  }, [spec, runDir, conceptModel, domainModel]);
+
+  // Re-detailing a domain can retire the feature or domain being looked at.
+  useEffect(() => {
+    if (domainScope && !domainModel.groups.has(domainScope)) setDomainScope(null);
+    if (groupFocus && !domainModel.groups.has(groupFocus)) setGroupFocus(null);
+  }, [domainModel, domainScope, groupFocus]);
+
+  /** Hand over from the domains view to the system view, narrowed to a group. */
+  const showGroupInSystem = useCallback((groupId) => {
+    setSelection(EMPTY_SELECTION);
+    setGroupFocus(groupId);
+    setView('system');
+  }, []);
+
+  const handleExpand = useCallback(
+    (domainId) => extraction.expandDomain({ projectPath, domainId }),
+    [extraction, projectPath]
+  );
+  const canExpand = source?.kind === 'project' && domainModel.ok && !domainModel.derived;
 
   /**
    * Jump from the concepts view into the system diagram with the relevant parts
@@ -162,6 +248,7 @@ export function DesignDialog({
     (ids) => {
       const known = (ids || []).filter((id) => nodes.has(id));
       if (known.length === 0) return;
+      setGroupFocus(null);
       setSelection({ ids: known, primary: known[known.length - 1] });
       setView('system');
     },
@@ -199,12 +286,12 @@ export function DesignDialog({
   const connectedIds = useMemo(() => {
     if (selectedIds.length === 0) return null;
     const set = new Set(selectedIds);
-    for (const edge of edges) {
+    for (const edge of viewEdges) {
       if (selectedSet.has(edge.from)) set.add(edge.to);
       if (selectedSet.has(edge.to)) set.add(edge.from);
     }
     return set;
-  }, [selectedIds, selectedSet, edges]);
+  }, [selectedIds, selectedSet, viewEdges]);
 
   // A click that ended a pan gesture must not also toggle a node.
   const selectNode = useCallback(
@@ -245,13 +332,15 @@ export function DesignDialog({
   }, [nodes]);
 
   const fadedIds = useMemo(() => {
-    if (!changeFocus) return null;
-    const set = new Set();
-    for (const node of nodes.values()) {
-      if (!changeFocus.has(changeOf(node))) set.add(node.id);
+    if (!changeFocus && !neighbourIds) return null;
+    const set = new Set(neighbourIds || []);
+    if (changeFocus) {
+      for (const node of nodes.values()) {
+        if (!changeFocus.has(changeOf(node))) set.add(node.id);
+      }
     }
     return set;
-  }, [changeFocus, nodes]);
+  }, [changeFocus, nodes, neighbourIds]);
 
   const toggleChange = useCallback((cls) => {
     setChangeFocus((prev) => {
@@ -310,7 +399,7 @@ export function DesignDialog({
     return [...routes].sort((a, b) => Number(hot(a)) - Number(hot(b)));
   }, [routes, selectedIds, selectedSet]);
 
-  const labelAllEdges = edges.length < LABEL_ALL_EDGES_BELOW;
+  const labelAllEdges = viewEdges.length < LABEL_ALL_EDGES_BELOW;
   const selected = primaryId ? nodes.get(primaryId) : null;
 
   // Click order is what the reader built up, so the ask bar and the composed
@@ -406,6 +495,7 @@ export function DesignDialog({
           projectPath={projectPath}
           probeConversationSource={extraction.probeConversationSource}
           probeBranchSource={extraction.probeBranchSource}
+          probeProjectSource={extraction.probeProjectSource}
           listBaseChoices={extraction.listBaseChoices}
           onGenerate={handleGenerate}
           storedRun={storedRun}
@@ -594,28 +684,55 @@ export function DesignDialog({
 
   // ---- chrome ---------------------------------------------------------------
 
+  const domainCount = domainModel.domains.length;
+  const featureCount = domainModel.domains.reduce(
+    (a, id) => a + domainModel.groups.get(id).children.length,
+    0
+  );
   const statusCounts = spec
-    ? view === 'concepts'
-      ? `${conceptModel.stages.length} stages · ${conceptModel.data.length} kinds of data`
-      : `${nodes.size} nodes · ${layers.length} layers · ${edges.length} arrows · ${spec.flows.length} flows`
+    ? view === 'domains'
+      ? `${domainCount} domains · ${featureCount} features · ${nodes.size} parts`
+      : view === 'concepts'
+        ? `${conceptModel.stages.length} stages · ${conceptModel.data.length} kinds of data`
+        : focusGroup
+          ? `${focusGroup.nodeIds.length} of ${nodes.size} nodes · ${viewEdges.length} arrows`
+          : `${nodes.size} nodes · ${layers.length} layers · ${edges.length} arrows · ${spec.flows.length} flows`
+    : '';
+
+  // Where the focused group sits in the tree, for the focus chip.
+  const focusPath = focusGroup
+    ? [focusGroup.parent && domainModel.groups.get(focusGroup.parent)?.label, focusGroup.label]
+        .filter(Boolean)
+        .join(' › ')
     : '';
 
   /**
-   * The two diagrams, as a switch rather than two dialogs: they describe the same
-   * work at different altitudes, and the whole value is being able to move between
-   * them without losing your place.
+   * The three diagrams, as a switch rather than three dialogs: they describe the
+   * same work at different altitudes, and the whole value is being able to move
+   * between them without losing your place.
    */
   const viewToggle = spec && (
     <div className="flex items-center border border-border">
       {[
         {
+          id: 'domains',
+          label: 'Domains',
+          icon: LayoutGrid,
+          title: domainModel.ok
+            ? 'The big areas of the system and how they talk — open one to see its features'
+            : 'No domains in this spec',
+          disabled: !domainModel.ok,
+          derived: domainModel.derived,
+        },
+        {
           id: 'concepts',
-          label: 'Concepts',
+          label: 'Data flow',
           icon: Waypoints,
           title: conceptModel.ok
-            ? 'What the data is and how it flows — start here'
-            : 'No concepts data in this spec',
+            ? 'What the data is and how it flows, in plain language'
+            : 'No data flow in this spec',
           disabled: !conceptModel.ok,
+          derived: conceptModel.derived,
         },
         {
           id: 'system',
@@ -623,8 +740,9 @@ export function DesignDialog({
           icon: Network,
           title: 'The parts, their layers and the files they live in',
           disabled: false,
+          derived: false,
         },
-      ].map(({ id, label, icon: Icon, title, disabled }) => (
+      ].map(({ id, label, icon: Icon, title, disabled, derived }) => (
         <button
           key={id}
           type="button"
@@ -642,7 +760,7 @@ export function DesignDialog({
         >
           <Icon className="w-3 h-3" />
           {label}
-          {id === 'concepts' && conceptModel.derived && conceptModel.ok && (
+          {derived && !disabled && (
             <span className="text-amber-500/80" title="Derived — regenerate for the written version">
               ·
             </span>
@@ -683,14 +801,20 @@ export function DesignDialog({
             {spec ? (
               <span className="block max-w-[110ch]">{spec.summary}</span>
             ) : (
-              'Turn a conversation or a branch into a concepts diagram and a system-design diagram.'
+              'Turn the project, a conversation or a branch into a domain map, a data flow and a system-design diagram.'
             )}
           </DialogDescription>
           {/* Which source produced this diagram is not a detail: it decides what
               the diagram can and cannot know, so it stays on screen. */}
           {spec && source && (
             <div className="font-mono text-[11px] text-muted-foreground truncate">
-              {source.kind === 'branch' ? (
+              {source.kind === 'project' ? (
+                <>
+                  whole project · {source.fileCount} files
+                  {source.outlinedFiles ? ` · ${source.outlinedFiles} outlined` : ''}
+                  {source.branch ? ` · on ${source.branch}` : ''}
+                </>
+              ) : source.kind === 'branch' ? (
                 <>
                   from branch {source.branch} vs {source.base} ({source.baseSha}) ·{' '}
                   {source.commitCount} commits · {source.fileCount} files
@@ -740,7 +864,18 @@ export function DesignDialog({
             instead of taking a row of its own. */}
         <div className="relative flex-1 flex min-h-0">
           {overlay ||
-            (view === 'concepts' ? (
+            (view === 'domains' ? (
+              <DomainView
+                model={domainModel}
+                edges={edges}
+                scope={domainScope}
+                onScopeChange={setDomainScope}
+                onShowParts={showGroupInSystem}
+                onExpand={canExpand ? handleExpand : undefined}
+                expanding={expanding}
+                highlightChanges={source?.kind !== 'project' && (changeCounts.added + changeCounts.modified > 0)}
+              />
+            ) : view === 'concepts' ? (
               <ConceptView model={conceptModel} onShowNodes={showNodesInSystem} />
             ) : (
               diagram
@@ -754,6 +889,17 @@ export function DesignDialog({
               {/* Canvas controls, the change legend and the layer toggles all act
                   on the SVG diagram, so they belong to that view only — showing
                   them over a scrolling document would be controls that do nothing. */}
+              {view === 'system' && focusGroup && (
+                <button
+                  type="button"
+                  onClick={() => setGroupFocus(null)}
+                  title="Show the whole system again"
+                  className="flex items-center gap-1.5 font-mono text-[11px] px-1.5 py-0.5 border border-[var(--ins-lamp)] text-[var(--ins-lamp)]"
+                >
+                  focus: {focusPath}
+                  <X className="w-3 h-3" />
+                </button>
+              )}
               {view === 'system' && (
               <>
               <div className="flex items-center gap-1">
@@ -835,8 +981,18 @@ export function DesignDialog({
               )}
 
               <div className="font-mono text-[11px] text-muted-foreground ml-auto flex items-center gap-3">
+                {expanding && (
+                  <span className="flex items-center gap-1 text-[var(--ins-lamp)]">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    detailing {domainModel.groups.get(expanding)?.label || expanding}…
+                  </span>
+                )}
                 {view === 'system' ? (
                   <span className="hidden lg:inline opacity-70">drag to pan · wheel to zoom</span>
+                ) : view === 'domains' ? (
+                  <span className="hidden lg:inline opacity-70">
+                    click a box for detail · double-click to open it
+                  </span>
                 ) : (
                   <span className="hidden lg:inline opacity-70">
                     click a piece of data to trace it
@@ -868,7 +1024,11 @@ export function DesignDialog({
                 onClick={handleRegenerate}
                 disabled={isRunning}
                 title={`Re-run from ${
-                  lastSource.sourceKind === 'branch' ? 'this branch’s changes' : 'this conversation'
+                  lastSource.sourceKind === 'branch'
+                    ? 'this branch’s changes'
+                    : lastSource.sourceKind === 'project'
+                      ? 'the whole project'
+                      : 'this conversation'
                 }${lastSource.depth === 'full' ? ' at full digest depth' : ''}`}
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regenerate

@@ -12,8 +12,11 @@
  * `flows` is also the only source of edges: the rendered graph is the union of
  * every flow's steps, which keeps structure and data flow from drifting apart.
  *
- * One spec feeds two diagrams:
+ * One spec feeds three diagrams:
  *
+ *   - the **domains** diagram — the optional `groups` tree (domain › feature),
+ *     which every node is filed under; its arrows are rolled up from the node
+ *     flows rather than declared, so it cannot disagree with the system diagram;
  *   - the **system** diagram — `layers`/`nodes`/`flows`, grounded in real files;
  *   - the **concepts** diagram — the optional `concepts` block, which names the
  *     data itself and the stages it moves through, in plain language and with no
@@ -49,6 +52,14 @@ export const NODE_CHANGES = ['added', 'modified', 'untouched'];
 
 /** Beyond this the diagram stops being readable — the extractor is told to abstract. */
 export const NODE_CAP = 40;
+
+/**
+ * The budget once nodes are filed into groups. The domains view only ever shows
+ * one level of the tree at a time, and the system view can focus a single
+ * feature, so a grouped spec can carry far more parts before any one screen
+ * stops being readable.
+ */
+export const GROUPED_NODE_CAP = 160;
 
 const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
 const isStringArray = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
@@ -92,6 +103,52 @@ export function validateSpec(spec) {
         err(`${at}.order`, 'must be a number when present');
       }
     });
+  }
+
+  // --- groups ---
+  //
+  // Domain › feature, and no deeper: a fixed two levels keeps a generated
+  // breakdown disciplined, and it is what the drill-down is built around.
+  // Optional, so a spec written before groups existed still renders — the
+  // domains view derives a stand-in from the layers (see `domainModel.js`).
+  const groupIds = new Set();
+  if (spec.groups !== undefined && !Array.isArray(spec.groups)) {
+    err('groups', 'must be an array when present');
+  } else if (Array.isArray(spec.groups)) {
+    const byId = new Map();
+    spec.groups.forEach((group, i) => {
+      const at = `groups[${i}]`;
+      if (!group || typeof group !== 'object') {
+        err(at, 'must be an object');
+        return;
+      }
+      if (!isNonEmptyString(group.id)) err(`${at}.id`, 'must be a non-empty string');
+      else if (groupIds.has(group.id)) err(`${at}.id`, `duplicate group id "${group.id}"`);
+      else {
+        groupIds.add(group.id);
+        byId.set(group.id, group);
+      }
+      if (!isNonEmptyString(group.label)) err(`${at}.label`, 'must be a non-empty string');
+      if (!isNonEmptyString(group.purpose)) {
+        err(`${at}.purpose`, 'must be a non-empty string — one sentence on what this area is for');
+      }
+      if (group.parent !== undefined && group.parent !== null && !isNonEmptyString(group.parent)) {
+        err(`${at}.parent`, 'must be a group id or null when present');
+      }
+    });
+    spec.groups.forEach((group, i) => {
+      const parent = group?.parent;
+      if (!isNonEmptyString(parent)) return;
+      const at = `groups[${i}].parent`;
+      if (parent === group.id) err(at, 'a group cannot be its own parent');
+      else if (!byId.has(parent)) err(at, `"${parent}" is not a declared group id`);
+      else if (isNonEmptyString(byId.get(parent).parent)) {
+        err(at, `groups nest at most two levels — "${parent}" is itself a feature, not a domain`);
+      }
+    });
+    if (spec.groups.length > 0 && !spec.groups.some((g) => g && !isNonEmptyString(g.parent))) {
+      err('groups', 'needs at least one top-level domain (a group with no parent)');
+    }
   }
 
   // --- nodes ---
@@ -138,10 +195,20 @@ export function validateSpec(spec) {
       if (node.subkind !== undefined && !isNonEmptyString(node.subkind)) {
         err(`${at}.subkind`, 'must be a non-empty string when present');
       }
+      if (groupIds.size > 0) {
+        if (!isNonEmptyString(node.group)) {
+          err(`${at}.group`, 'must name a declared group — every node belongs to a domain or feature');
+        } else if (!groupIds.has(node.group)) {
+          err(`${at}.group`, `"${node.group}" is not a declared group id`);
+        }
+      } else if (node.group !== undefined && !isNonEmptyString(node.group)) {
+        err(`${at}.group`, 'must be a non-empty string when present');
+      }
     });
-    if (spec.nodes.length > NODE_CAP) {
+    const cap = groupIds.size > 0 ? GROUPED_NODE_CAP : NODE_CAP;
+    if (spec.nodes.length > cap) {
       warnings.push(
-        `${spec.nodes.length} nodes exceeds the ${NODE_CAP}-node budget — the diagram may be hard to read.`
+        `${spec.nodes.length} nodes exceeds the ${cap}-node budget — the diagram may be hard to read.`
       );
     }
   }
@@ -292,7 +359,13 @@ export function validateSpec(spec) {
     }
   } else {
     warnings.push(
-      'No concepts block — the concepts view will be derived from the system diagram. Regenerate for the plain-language version.'
+      'No concepts block — the data flow view will be derived from the system diagram. Regenerate for the plain-language version.'
+    );
+  }
+
+  if (spec.groups === undefined || (Array.isArray(spec.groups) && spec.groups.length === 0)) {
+    warnings.push(
+      'No groups — the domains view will be derived from the layers. Regenerate for a real domain breakdown.'
     );
   }
 
@@ -319,7 +392,7 @@ export function validateSpec(spec) {
 /**
  * Fill in defaults and derive the render model from a validated spec.
  *
- * Returns `{ title, summary, layers, nodes, edges, flows, concerns }` where
+ * Returns `{ title, summary, layers, groups, nodes, edges, flows, concerns }` where
  * `layers` is ordered, `nodes` is a Map keyed by id, and `edges` is the deduped
  * union of every flow step (each edge remembering which flows it belongs to and
  * the data contracts declared on it).
@@ -375,10 +448,21 @@ export function normalizeSpec(spec) {
 
   const concerns = spec.concerns || [];
 
+  // Declaration order is the reading order — the extractor is asked to list
+  // domains roughly upstream to downstream, so it is kept rather than sorted.
+  const groups = (spec.groups || []).map((g, i) => ({
+    ...g,
+    parent: typeof g.parent === 'string' && g.parent.trim() ? g.parent : null,
+    purpose: g.purpose || '',
+    order: i,
+    expanded: !!g.expanded,
+  }));
+
   return {
     title: spec.title,
     summary: spec.summary || '',
     layers,
+    groups,
     nodes,
     edges: [...edges.values()],
     flows,

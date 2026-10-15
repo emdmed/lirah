@@ -13,6 +13,9 @@ import { validateSpec, normalizeSpec, parseSpecJson } from '../src/features/desi
 import { buildConceptModel, formOf } from '../src/features/design/conceptModel.js';
 import { layoutDesign, wrapText } from '../src/features/design/designLayout.js';
 import { parseStreamLine, createEventLog, MAX_EVENTS } from '../src/features/design/designEvents.js';
+import { buildDomainModel, levelOf, rollUpEdges } from '../src/features/design/domainModel.js';
+import { layoutDomainLevel } from '../src/features/design/domainLayout.js';
+import { validateFragment, mergeDomainDetail, nodesInDomain } from '../src/features/design/domainExpand.js';
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
@@ -28,17 +31,23 @@ const good = {
     { id: 'core', label: 'Tauri core', order: 1 },
     { id: 'fs', label: 'Filesystem', order: 2 },
   ],
+  groups: [
+    { id: 'jobs', label: 'Agent jobs', purpose: 'Runs headless agents and shows their output.' },
+    { id: 'jobs-ui', label: 'Job sidebar', parent: 'jobs', purpose: 'Lists jobs and streams their output.' },
+    { id: 'jobs-run', label: 'Job runner', parent: 'jobs', purpose: 'Spawns and supervises the CLI.' },
+    { id: 'design', label: 'Design view', purpose: 'Turns work into diagrams.' },
+  ],
   nodes: [
-    { id: 'jobs-ctx', label: 'AgentJobsContext', layer: 'ui', kind: 'store', status: 'existing',
+    { id: 'jobs-ctx', label: 'AgentJobsContext', layer: 'ui', group: 'jobs-ui', kind: 'store', status: 'existing',
       responsibility: 'Holds job state and streams output into the sidebar for each running job',
       owns: ['job list', 'output ring buffer'], files: ['src/features/agent-jobs/AgentJobsContext.jsx'] },
-    { id: 'runner', label: 'agent_runner', layer: 'core', kind: 'service', status: 'existing',
+    { id: 'runner', label: 'agent_runner', layer: 'core', group: 'jobs-run', kind: 'service', status: 'existing',
       responsibility: 'Spawns the headless CLI and streams its stdout back as events',
       owns: ['child process handles'], files: ['src-tauri/src/agent_runner/commands.rs'] },
-    { id: 'digest', label: 'session digest', layer: 'core', kind: 'module', status: 'proposed',
+    { id: 'digest', label: 'session digest', layer: 'core', group: 'design', kind: 'module', status: 'proposed',
       responsibility: 'Compacts a session transcript down to text plus tool targets',
       owns: [], files: ['src-tauri/src/design/digest.rs'] },
-    { id: 'log', label: 'run log', layer: 'fs', kind: 'db', status: 'existing',
+    { id: 'log', label: 'run log', layer: 'fs', group: 'jobs', kind: 'db', status: 'existing',
       responsibility: 'Persists the full output stream so it survives a reload', owns: ['~/.lirah/jobs'], files: [] },
   ],
   flows: [
@@ -315,7 +324,7 @@ console.log('concepts — validation');
   delete noConcepts.concepts;
   const r = validateSpec(noConcepts);
   check('a spec without concepts is still valid', r.ok, JSON.stringify(r.errors));
-  check('missing concepts warns instead', r.warnings.some(w => w.includes('concepts view will be derived')),
+  check('missing concepts warns instead', r.warnings.some(w => w.includes('data flow view will be derived')),
     JSON.stringify(r.warnings));
 
   const badC = structuredClone(good);
@@ -408,6 +417,125 @@ check('stages do not count as tool calls', (() => {
   log.flushNow();
   return log.getSnapshot().counters.tools === 0 && log.getSnapshot().events.length === 1;
 })());
+
+console.log('validateSpec — groups');
+{
+  const g = structuredClone(good);
+  g.groups.push({ id: 'deep', label: 'Too deep', parent: 'jobs-ui', purpose: 'x' });
+  g.groups.push({ id: 'orphan', label: 'Orphan', parent: 'ghost', purpose: 'x' });
+  g.groups.push({ id: 'mute', label: 'Mute', purpose: '' });
+  g.nodes[0].group = 'nope';
+  delete g.nodes[1].group;
+  const r = validateSpec(g);
+  const p = r.errors.map(e => e.path);
+  check('rejects a third level', p.includes('groups[4].parent'), JSON.stringify(p));
+  check('rejects an unknown parent', p.includes('groups[5].parent'), JSON.stringify(p));
+  check('requires a purpose', p.includes('groups[6].purpose'), JSON.stringify(p));
+  check('rejects an unknown node group', p.includes('nodes[0].group'), JSON.stringify(p));
+  check('requires a group once groups exist', p.includes('nodes[1].group'), JSON.stringify(p));
+  const noGroups = structuredClone(good);
+  delete noGroups.groups;
+  for (const n of noGroups.nodes) delete n.group;
+  const r2 = validateSpec(noGroups);
+  check('groups stay optional', r2.ok, JSON.stringify(r2.errors));
+  check('missing groups warns', r2.warnings.some(w => w.includes('domains view will be derived')));
+}
+
+console.log('domainModel');
+{
+  const spec = normalizeSpec(good);
+  const m = buildDomainModel(spec);
+  check('model ok and not derived', m.ok && !m.derived);
+  check('domains in declaration order', m.domains.join(',') === 'jobs,design', m.domains.join(','));
+  check('direct node gets a synthetic core feature', m.featureOf.get('log') === 'jobs::core' && m.groups.get('jobs::core').synthetic);
+  check('core feature is a child of its domain', m.groups.get('jobs').children.includes('jobs::core'));
+  check('featureless domain files nodes without a feature', m.domainOf.get('digest') === 'design' && !m.featureOf.has('digest'));
+  check('domain counts every node beneath it', m.groups.get('jobs').nodeIds.length === 3);
+  check('proposed counted', m.groups.get('design').counts.proposed === 1);
+
+  const top = levelOf(m, spec.edges, null);
+  check('top level is the domains', top.boxes.map(b => b.id).join(',') === 'jobs,design');
+  const d2j = top.edges.find(e => e.key === 'design->jobs');
+  check('cross-domain arrow rolled up', !!d2j && d2j.count === 1 && d2j.contracts[0] === 'digest.md path', JSON.stringify(top.edges));
+  check('arrows inside one domain are not drawn at the top', !top.edges.some(e => e.from === e.to));
+
+  const inJobs = levelOf(m, spec.edges, 'jobs');
+  const ids = inJobs.boxes.map(b => b.id);
+  check('domain level shows its features', ['jobs-ui', 'jobs-run', 'jobs::core'].every(id => ids.includes(id)), ids.join(','));
+  check('domain level stubs the neighbours', inJobs.boxes.some(b => b.id === 'design' && b.external));
+  const ui2run = inJobs.edges.find(e => e.key === 'jobs-ui->jobs-run');
+  check('feature arrow merges contracts from both flows', ui2run?.count === 1 && ui2run.contracts.length === 2, JSON.stringify(ui2run));
+  check('feature arrow keeps flow names', ui2run?.flows.length === 2);
+
+  const legacy = structuredClone(good);
+  delete legacy.groups;
+  const lm = buildDomainModel(normalizeSpec(legacy));
+  check('legacy spec derives one domain per layer', lm.ok && lm.derived && lm.domains.length === 3);
+
+  check('rollUp counts parallel node arrows', rollUpEdges(
+    [{ from: 'a', to: 'b', contracts: ['x'], flows: [] }, { from: 'c', to: 'd', contracts: ['x', 'y'], flows: [] }],
+    (n) => (n === 'a' || n === 'c' ? 'L' : 'R')
+  )[0].count === 2);
+
+  const lay = layoutDomainLevel(inJobs, m.groups);
+  const ui = lay.positioned.get('jobs-ui');
+  const run = lay.positioned.get('jobs-run');
+  check('layout places every box', lay.positioned.size === inJobs.boxes.length);
+  check('upstream feature sits left of downstream', ui && run && ui.x < run.x, JSON.stringify({ ui, run }));
+  check('layout routes every arrow', lay.routes.length === inJobs.edges.length);
+  check('back arrows are flagged', lay.routes.some(r => r.back && r.edge.key === 'jobs-run->jobs-ui'));
+  check('layout extent is finite', Number.isFinite(lay.totalW) && Number.isFinite(lay.totalH) && lay.totalW > 0);
+}
+
+console.log('domainExpand');
+{
+  check('nodesInDomain covers features and direct nodes', [...nodesInDomain(good, 'jobs')].sort().join(',') === 'jobs-ctx,log,runner');
+  const fragment = {
+    domain: 'jobs',
+    groups: [
+      { id: 'jobs-ui', label: 'Job sidebar', purpose: 'Lists jobs.' },
+      { id: 'jobs-exec', label: 'Execution', purpose: 'Runs the CLI.' },
+    ],
+    nodes: [
+      { id: 'jobs-ctx', label: 'AgentJobsContext', layer: 'ui', group: 'jobs-ui', responsibility: 'Holds job state.' },
+      { id: 'spawner', label: 'spawn', layer: 'core', group: 'jobs-exec', responsibility: 'Spawns the CLI.', replaces: ['runner'] },
+      { id: 'streamer', label: 'stream', layer: 'core', group: 'jobs-exec', responsibility: 'Streams stdout back.' },
+    ],
+    flows: [{ id: 'run', label: 'Spawn and stream', steps: [
+      { from: 'spawner', to: 'streamer', data: 'Child { stdout }' },
+      { from: 'streamer', to: 'jobs-ctx', data: 'agent-job://output' },
+    ]}],
+  };
+  const v = validateFragment(good, 'jobs', fragment);
+  check('valid fragment accepted', v.ok, JSON.stringify(v.errors));
+
+  const badFrag = structuredClone(fragment);
+  badFrag.nodes[1].id = 'digest';
+  badFrag.nodes[2].group = 'design';
+  badFrag.nodes[2].replaces = ['digest'];
+  badFrag.flows[0].steps[0].to = 'ghost';
+  const bv = validateFragment(good, 'jobs', badFrag);
+  const bp = bv.errors.map(e => e.path);
+  check('fragment cannot steal another domain\'s node id', bp.includes('nodes[1].id'), JSON.stringify(bp));
+  check('fragment nodes stay inside the domain', bp.includes('nodes[2].group'), JSON.stringify(bp));
+  check('replaces must name this domain\'s nodes', bp.includes('nodes[2].replaces'), JSON.stringify(bp));
+  check('fragment steps must resolve', bp.includes('flows[0].steps[0].to'), JSON.stringify(bp));
+
+  const { spec: merged, dropped } = mergeDomainDetail(good, 'jobs', fragment);
+  const mv = validateSpec(merged);
+  check('merged spec validates', mv.ok, JSON.stringify(mv.errors));
+  check('domain marked expanded', merged.groups.find(g => g.id === 'jobs').expanded === true);
+  check('old features replaced', !merged.groups.some(g => g.id === 'jobs-run') && merged.groups.some(g => g.id === 'jobs-exec'));
+  check('other domains untouched', merged.nodes.some(n => n.id === 'digest'));
+  const cross = merged.flows.flatMap(f => f.steps).find(s => s.from === 'digest');
+  check('cross-domain arrow follows replaces', cross?.to === 'spawner', JSON.stringify(cross));
+  check('reused id keeps its arrows', merged.flows.flatMap(f => f.steps).some(s => s.from === 'jobs-ctx' && s.to === 'spawner'));
+  check('unreplaced references are counted', dropped > 0, `dropped=${dropped}`);
+  check('concern follows its node', merged.concerns[0].node === 'spawner', JSON.stringify(merged.concerns));
+  check('flow ids stay unique', new Set(merged.flows.map(f => f.id)).size === merged.flows.length, merged.flows.map(f => f.id).join(','));
+  check('replaces is not written into the spec', merged.nodes.every(n => n.replaces === undefined));
+  check('input spec not mutated', good.nodes.some(n => n.id === 'runner') && !good.groups[0].expanded);
+}
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`);
 process.exit(failures ? 1 : 0);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, ChevronDown, GitBranch, History, MessagesSquare, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, FolderTree, GitBranch, History, MessagesSquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,14 +15,16 @@ import { DIGEST_DEPTHS } from './useDesignExtraction';
 /**
  * "Which feature are we diagramming?" — asked before anything is spent.
  *
- * A diagram is only as well-scoped as its source, and the two available sources
- * answer the scope question in opposite ways: the conversation knows what was
- * *intended* (including parts nobody has built), the branch knows what was
- * *built* (exactly the files it touched). Neither is right in general, so the
- * choice is the user's — and it is made explicitly rather than inferred, because
- * the wrong one costs minutes of extraction to find out.
+ * A diagram is only as well-scoped as its source, and the sources answer the
+ * scope question differently: the conversation knows what was *intended*
+ * (including parts nobody has built), the branch knows what was *built*
+ * (exactly the files it touched), and the project is *everything there is*,
+ * mapped coarsely by domain and detailed one domain at a time on request.
+ * None is right in general, so the choice is the user's — and it is made
+ * explicitly rather than inferred, because the wrong one costs minutes of
+ * extraction to find out.
  *
- * Both options are probed first so each card can say what it actually covers.
+ * Every option is probed first so each card can say what it actually covers.
  * An unavailable source stays visible with its reason attached: "no session yet"
  * and "this branch has no changes" are both useful things to learn here, and
  * hiding the option would leave the user wondering whether it exists at all.
@@ -180,7 +182,9 @@ function DepthPicker({ value, onChange, sourceKind }) {
         {value === 'full'
           ? sourceKind === 'branch'
             ? 'every patch, uncut — slower and costs more'
-            : 'the whole conversation — slower and costs more'
+            : sourceKind === 'project'
+              ? 'every doc, manifest and file path, uncut — slower and costs more'
+              : 'the whole conversation — slower and costs more'
           : DIGEST_DEPTHS.standard.hint}
       </span>
     </div>
@@ -191,6 +195,7 @@ export function DesignSourcePicker({
   projectPath,
   probeConversationSource,
   probeBranchSource,
+  probeProjectSource,
   listBaseChoices,
   onGenerate,
   storedRun,
@@ -203,6 +208,7 @@ export function DesignSourcePicker({
   const [choices, setChoices] = useState({ detected: null, current: null, refs: [] });
   const [conversation, setConversation] = useState(null);
   const [branch, setBranch] = useState(null);
+  const [project, setProject] = useState(null);
 
   /** Adopt a base and re-count what it covers — the numbers move with the base. */
   const chooseBase = useCallback(
@@ -219,6 +225,7 @@ export function DesignSourcePicker({
     let live = true;
     probeConversationSource({ projectPath }).then((r) => live && setConversation(r));
     probeBranchSource({ projectPath, baseRef: null }).then((r) => live && setBranch(r));
+    probeProjectSource({ projectPath }).then((r) => live && setProject(r));
     // Detection's answer becomes the initial selection, so the control always
     // shows a concrete branch name rather than the word "auto".
     listBaseChoices({ projectPath }).then((c) => {
@@ -229,16 +236,17 @@ export function DesignSourcePicker({
     return () => {
       live = false;
     };
-  }, [projectPath, probeConversationSource, probeBranchSource, listBaseChoices]);
+  }, [projectPath, probeConversationSource, probeBranchSource, probeProjectSource, listBaseChoices]);
 
   // Do not leave the user pointed at a source that cannot run. Only auto-switch
   // away from the default; once they have chosen, respect it and let the Generate
   // button be the thing that is disabled.
-  const chosen = sourceKind === 'branch' ? branch : conversation;
+  const chosen = sourceKind === 'branch' ? branch : sourceKind === 'project' ? project : conversation;
   useEffect(() => {
-    if (sourceKind !== 'conversation') return;
-    if (conversation && !conversation.available && branch?.available) setSourceKind('branch');
-  }, [sourceKind, conversation, branch]);
+    if (sourceKind !== 'conversation' || !conversation || conversation.available) return;
+    if (branch?.available) setSourceKind('branch');
+    else if (project?.available) setSourceKind('project');
+  }, [sourceKind, conversation, branch, project]);
 
   const canGenerate = !!chosen?.available;
 
@@ -248,13 +256,14 @@ export function DesignSourcePicker({
         <Sparkles className="w-6 h-6 text-muted-foreground" />
         <div className="font-mono text-sm">Turn this work into a design diagram</div>
         <div className="text-xs text-muted-foreground max-w-[62ch] leading-relaxed">
-          Works out the parts involved, what each is responsible for and what data moves between
-          them, then checks it against the repo so you can see what exists, what changed, and what
-          is still just proposed. Pick what the diagram should cover.
+          Breaks the system into domains and features, works out the parts involved, what each is
+          responsible for and what data moves between them, then checks it against the repo so you
+          can see what exists, what changed, and what is still just proposed. Pick what the diagram
+          should cover.
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap justify-center w-full max-w-[76ch]">
+      <div className="flex gap-2 flex-wrap justify-center w-full max-w-[112ch]">
         <Card
           selected={sourceKind === 'conversation'}
           disabled={conversation ? !conversation.available : false}
@@ -294,6 +303,26 @@ export function DesignSourcePicker({
           }
           reason={branch && !branch.available ? branch.reason : null}
           onSelect={() => setSourceKind('branch')}
+        />
+        <Card
+          selected={sourceKind === 'project'}
+          disabled={project ? !project.available : false}
+          icon={FolderTree}
+          title="The whole project"
+          lines={
+            project === null
+              ? ['checking…']
+              : project.available
+                ? [
+                    `${project.file_count} files in ${project.dir_count} folders${
+                      project.branch ? ` · ${project.branch}` : ''
+                    }`,
+                    'compacts the code first, so the map covers every file',
+                  ]
+                : ['the architecture of everything in this folder']
+          }
+          reason={project && !project.available ? project.reason : null}
+          onSelect={() => setSourceKind('project')}
         />
       </div>
 
