@@ -10,8 +10,10 @@
  */
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DIST = new URL('../dist/', import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows the latter yields "/D:/...".
+const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 const ENTRY_BUDGET = 1.3 * 1024 * 1024;
 const STARTUP_BUDGET = 1.6 * 1024 * 1024;
 
