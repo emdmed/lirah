@@ -26,16 +26,13 @@ import {
 } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useAgentJobs } from '../features/agent-jobs/agent-jobs';
-import { requestJobsPane } from '../features/agent-jobs/jobsPane';
 import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, subscribeTerminalPrefs } from '../lib/terminalPrefs';
-import { useTabManager } from '../features/tabs/TabContext';
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
 import { getContextFill } from '../config/models';
-import { Keycap } from './instrument/Keycap';
 import { Lamp } from './instrument/Lamp';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
+import { useToast } from '../features/toast';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -103,46 +100,77 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
   );
 }
 
-// Context-window fill, or (when context data isn't available yet) the daily
-// budget. Hidden when neither is known.
+// Token gauge: context-window fill (or, before context data arrives, the
+// daily budget) plus the session's billable count. Hidden when neither a
+// ceiling nor billable usage is known.
 function ContextMeter({ tokenUsage, currentPath }) {
   const { getBudget, currentUsage, formatTokenCount } = useTokenBudget();
   const ctx = getContextFill(tokenUsage);
   const dailyLimit = getBudget(currentPath)?.dailyLimit;
   const fmt = (n) => (formatTokenCount ? formatTokenCount(n) : String(n));
 
+  const billableIn = tokenUsage?.billable_input_tokens || 0;
+  const billableOut = tokenUsage?.billable_output_tokens || 0;
+  const billable = billableIn + billableOut;
+
   let legend, value, max;
   if (ctx) {
     legend = 'Ctx'; value = ctx.used; max = ctx.max;
   } else if (dailyLimit) {
     legend = 'Budget'; value = currentUsage.total; max = dailyLimit;
-  } else {
+  } else if (!billable) {
     return null;
   }
+  const pct = max ? Math.round((value / max) * 100) : null;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center gap-1.5 px-1">
-          <span className="ins-legend">{legend}</span>
-          <Meter value={value} max={max} label={legend === 'Ctx' ? 'Context window' : 'Daily budget'} />
+        <span className="flex items-center gap-3 px-1 cursor-default">
+          {legend && (
+            <span className="flex items-center gap-2">
+              <span className="ins-legend">{legend}</span>
+              <Meter value={value} max={max} size="lg" label={legend === 'Ctx' ? 'Context window' : 'Daily budget'} />
+              <span className="tube tabular-nums">{pct}%</span>
+            </span>
+          )}
+          {billable > 0 && (
+            <span className="flex items-baseline gap-1.5">
+              <span className="tabular-nums">{fmt(billable)}</span>
+              <span className="engraved-label">billable</span>
+            </span>
+          )}
         </span>
       </TooltipTrigger>
-      <TooltipContent>
-        <div className="flex flex-col">
-          {ctx && <span>context {fmt(ctx.used)} / {fmt(ctx.max)} ({Math.round(ctx.ratio * 100)}%)</span>}
-          <span>session billable {fmt(currentUsage.total)}</span>
-          {dailyLimit ? <span>daily budget {fmt(dailyLimit)}</span> : null}
+      <TooltipContent side="bottom">
+        <div className="flex flex-col font-mono">
+          {ctx && <span>context {fmt(ctx.used)} / {fmt(ctx.max)} ({pct}%)</span>}
+          {billable > 0 && <span>billable {billable.toLocaleString()} (in {billableIn.toLocaleString()} · out {billableOut.toLocaleString()})</span>}
+          {tokenUsage?.cache_read_input_tokens ? <span>cache read {tokenUsage.cache_read_input_tokens.toLocaleString()} (free)</span> : null}
+          {dailyLimit ? <span>daily budget {fmt(currentUsage.total)} / {fmt(dailyLimit)}</span> : null}
         </div>
       </TooltipContent>
     </Tooltip>
   );
 }
 
-const SEP = <span className="text-[var(--ins-edge-strong)] mx-0.5 shrink-0 select-none">│</span>;
 
-function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
-  const hasInstances = otherInstancesCount > 0;
+// Always shown so the row doesn't reflow between repos and plain dirs.
+// Click copies the branch name (without the dirty marker).
+function BranchBadge({ branchName }) {
+  const toast = useToast();
+  const branch = branchName ? branchName.replace(/\*$/, '') : null;
+  const dirty = !!branchName?.endsWith('*');
+
+  const handleCopy = useCallback(async () => {
+    if (!branch) return;
+    try {
+      await navigator.clipboard.writeText(branch);
+      toast.success(`Copied ${branch}`);
+    } catch {
+      toast.error('Could not copy branch name');
+    }
+  }, [branch, toast]);
 
   return (
     <Tooltip>
@@ -150,19 +178,18 @@ function InstanceSyncIndicator({ otherInstancesCount, onClick }) {
         <Button
           variant="ghost"
           size="xs"
-          onClick={onClick}
-          className="gap-0 px-1 before:content-none after:content-none"
+          onClick={handleCopy}
+          disabled={!branch}
+          className="gap-1 px-1.5 h-5 shrink-0 max-w-[220px] before:content-none after:content-none"
         >
-          <span className="tube">{otherInstancesCount + 1}</span>
-          <span className="text-muted-foreground">&nbsp;windows</span>
+          <span className="text-muted-foreground">±</span>
+          <span className={cn('truncate', branch ? 'text-foreground' : 'text-muted-foreground')}>
+            {branch || 'no git'}
+          </span>
+          {dirty && <span className="text-[var(--ins-warn)]">*</span>}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
-        {hasInstances
-          ? `${otherInstancesCount} other instance${otherInstancesCount > 1 ? 's' : ''} active (Ctrl+Shift+I)`
-          : 'Instance Sync (Ctrl+Shift+I)'
-        }
-      </TooltipContent>
+      <TooltipContent>{branch ? `${branch}${dirty ? ' (uncommitted changes)' : ''} — click to copy` : 'Not a git repository'}</TooltipContent>
     </Tooltip>
   );
 }
@@ -228,20 +255,13 @@ export const StatusBar = memo(({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
-  onToggleBranchTasks, branchTasksOpen, otherInstancesCount, onToggleInstanceSyncPanel,
+  onToggleBranchTasks, branchTasksOpen,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
   availableUpdate, instrumentGlass, onToggleInstrumentGlass, tokenUsage
 }) => {
-  const { tabs, activeTabId } = useTabManager();
-  const tabIndex = Math.max(0, tabs.findIndex((t) => t.id === activeTabId)) + 1;
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
   const [showNetworkConfirm, setShowNetworkConfirm] = useState(false);
-  const { jobs } = useAgentJobs();
-  const jobCounts = useMemo(() => {
-    const visible = jobs.filter((j) => !j.archived);
-    return { total: visible.length, running: visible.filter((j) => j.status === 'running').length };
-  }, [jobs]);
 
   useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
 
@@ -290,18 +310,12 @@ export const StatusBar = memo(({
   return (
     <>
     <div
-      className="chassis-rail flex items-center justify-between pl-2 pr-1 h-8 text-xs font-mono text-foreground edge-t-engraved"
+      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
     >
-      {/* LEFT: Location + Context */}
+      {/* LEFT: branch + workspace + context. The tab itself names the project. */}
       <div className="flex items-center gap-1 overflow-hidden min-w-0">
-        {/* Location group: path + workspace + branch */}
-        <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <Keycap lit>{tabIndex}</Keycap>
-            <span className="overflow-hidden whitespace-nowrap text-ellipsis text-foreground">
-              {currentPath ? currentPath.split('/').pop() || '~' : '~'}
-            </span>
-          </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <BranchBadge branchName={branchName} />
           {workspace && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -315,18 +329,11 @@ export const StatusBar = memo(({
               </TooltipContent>
             </Tooltip>
           )}
-          {branchName && (
-            <span className="whitespace-nowrap text-muted-foreground">
-              ± <span className="text-foreground">{branchName.replace(/\*$/, '')}</span>
-              {branchName.endsWith('*') && <span className="text-[var(--ins-warn)]">*</span>}
-            </span>
-          )}
         </div>
 
         {/* Context actions: tasks + update (shown when relevant) */}
         {(branchName && branchName !== 'main' && branchName !== 'master' || availableUpdate) && (
           <>
-            {SEP}
             <div className="flex items-center gap-0.5">
               {branchName && branchName !== 'main' && branchName !== 'master' && (
                 <Tooltip>
@@ -369,37 +376,22 @@ export const StatusBar = memo(({
         )}
       </div>
 
+      {/* CENTRE: token gauge, the one live quantity on the rail. The wrapper
+          keeps the grid's middle column even when the gauge has nothing to show. */}
+      <div className="flex justify-center min-w-0">
+        <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} />
+      </div>
+
       {/* RIGHT: Runtime status + Settings */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center justify-end gap-1.5 min-w-0">
         {/* Transient status (changelog) — only visible when active */}
         {changelogStatus && (
           <ChangelogStatus status={changelogStatus} />
         )}
 
-        {/* Runtime zone: instances + CLI + sandbox + network — unified background */}
-        <div className="flex items-center gap-0.5">
-          {jobCounts.total > 0 && (
-            <>
-              <Button variant="ghost" size="xs" onClick={() => requestJobsPane('toggle')} className="gap-1.5 px-1 before:content-none after:content-none" title="Toggle jobs pane (Alt+4)">
-                <Lamp state={jobCounts.running > 0 ? 'on' : 'off'} blink={jobCounts.running > 0} />
-                <span className="text-muted-foreground">jobs</span>
-                <span className="tabular-nums">
-                  {jobCounts.running > 0 ? jobCounts.running : jobCounts.total}
-                </span>
-              </Button>
-              {SEP}
-            </>
-          )}
-          {otherInstancesCount > 0 && (
-            <>
-              <InstanceSyncIndicator
-                otherInstancesCount={otherInstancesCount}
-                onClick={onToggleInstanceSyncPanel}
-              />
-              {SEP}
-            </>
-          )}
-          <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} />
+        {/* Runtime zone: CLI, sandbox, network. Jobs live
+            in their own rail, so they are not repeated here. */}
+        <div className="flex items-center gap-1.5">
           {selectedCli && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -411,7 +403,6 @@ export const StatusBar = memo(({
               <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
             </Tooltip>
           )}
-          {SEP}
           <SandboxSwitch enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
           {sandboxEnabled && (
             <NetworkSwitch isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
@@ -419,6 +410,7 @@ export const StatusBar = memo(({
         </div>
 
         {/* Settings — visually separated as the final anchor */}
+        <span className="w-px h-4 bg-[var(--tui-line)] mx-1" aria-hidden="true" />
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>

@@ -123,16 +123,14 @@ function App() {
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
-        {tabs.length > 1 && (
-          <TabBar
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onSwitch={switchTab}
-            onClose={removeTab}
-            onAdd={handleNewTab}
-            onReorder={reorderTab}
-          />
-        )}
+        <TabBar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSwitch={switchTab}
+          onClose={removeTab}
+          onAdd={handleNewTab}
+          onReorder={reorderTab}
+        />
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>

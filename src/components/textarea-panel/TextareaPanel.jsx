@@ -1,13 +1,12 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { CompactSectionsDialog, FlowchartDialog, buildGraphData } from "../../features/compact";
 import { DesignDialog, useDesignExtraction } from "../../features/design";
-import { useTokenBudget } from "../../features/token-budget";
+import { useTokenBudget, TokenCostEstimate } from "../../features/token-budget";
 
 import { ProjectToolbar } from "./ProjectToolbar";
 import { PromptToolbar } from "./PromptToolbar";
 import { ElementsIndicator } from "./ElementsIndicator";
 import { CompactedIndicator } from "./CompactedIndicator";
-import { TokenUsageDisplay } from "./TokenUsageDisplay";
 import { TextareaArea } from "./TextareaArea";
 import { PatternsSelector } from "../../features/patterns";
 import { PromptPreview } from "./PromptPreview";
@@ -34,7 +33,6 @@ export function TextareaPanel({
 
   templateDropdownOpen,
   onTemplateDropdownOpenChange,
-  tokenUsage,
   projectPath,
   onLoadGroup,
   onSaveGroup,
@@ -241,7 +239,6 @@ export function TextareaPanel({
       onLoadGroup={onLoadGroup}
       onSaveGroup={onSaveGroup}
       fileCount={fileArray.length}
-      isWide={false}
       onOpenDesign={() => setDesignOpen(true)}
       designRunning={designExtraction.isRunning}
       designHasSpec={!!designExtraction.spec}
@@ -266,37 +263,10 @@ export function TextareaPanel({
   );
 
   const footerInfo = (
-    <TokenUsageDisplay
-      tokenUsage={tokenUsage}
+    <TokenCostEstimate
       textareaContent={value}
       selectedFiles={selectedFiles}
       projectPath={currentPath}
-    />
-  );
-
-  const textareaArea = (
-    <TextareaArea
-      textareaRef={textareaRef}
-      value={value}
-      onChange={onChange}
-      onKeyDown={handleKeyDown}
-      disabled={disabled}
-      elementsIndicator={elementsIndicator}
-      compactedIndicator={compactedIndicator}
-      onClearContext={onClearContext}
-      sessionId={sessionId}
-      handleSend={handleSend}
-      isSendDisabled={isSendDisabled}
-      sendBlockedReason={sendBlockedReason}
-      budgetExhausted={budgetExhausted}
-      atMentionActive={atMentionActive}
-      atMentionResults={atMentionResults}
-      atMentionSelectedIndex={atMentionSelectedIndex}
-      onAtMentionSelect={onAtMentionSelect}
-      currentPath={currentPath}
-      atMentionQuery={atMentionQuery}
-      selectedFiles={selectedFiles}
-      fileStates={fileStates}
     />
   );
 
@@ -331,14 +301,14 @@ export function TextareaPanel({
   const partCount = promptPreview?.sections?.length ?? 0;
 
   const toolbarRow = (
-    <div className="flex items-center gap-2 flex-nowrap overflow-hidden min-h-[24px] max-h-[24px] pb-1.5 edge-b-engraved">
+    <div className="flex items-center justify-end gap-2 flex-nowrap">
       {/* Every control carries its own label, so the two banks (project,
           prompt) are split by a rule rather than named. */}
       {projectZone}
       <span className="text-[var(--ins-edge-strong)] shrink-0 select-none" aria-hidden="true">│</span>
       {promptZone}
       {onTogglePromptPreview && (
-        <div className="ml-auto flex items-center">
+        <div className="flex items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -362,10 +332,36 @@ export function TextareaPanel({
     </div>
   );
 
+  const textareaArea = (
+    <TextareaArea
+      textareaRef={textareaRef}
+      value={value}
+      onChange={onChange}
+      onKeyDown={handleKeyDown}
+      disabled={disabled}
+      elementsIndicator={elementsIndicator}
+      compactedIndicator={compactedIndicator}
+      onClearContext={onClearContext}
+      sessionId={sessionId}
+      handleSend={handleSend}
+      isSendDisabled={isSendDisabled}
+      sendBlockedReason={sendBlockedReason}
+      budgetExhausted={budgetExhausted}
+      atMentionActive={atMentionActive}
+      atMentionResults={atMentionResults}
+      atMentionSelectedIndex={atMentionSelectedIndex}
+      onAtMentionSelect={onAtMentionSelect}
+      currentPath={currentPath}
+      atMentionQuery={atMentionQuery}
+      selectedFiles={selectedFiles}
+      fileStates={fileStates}
+      toolbar={toolbarRow}
+    />
+  );
+
   return (
     <div ref={containerRef} data-pane="3" data-title="[3] prompt" data-legend className="tui-pane flex flex-col px-2 pb-4 pt-[16px] gap-1.5">
       <PaneLegend index={3} title="Prompt" />
-      {toolbarRow}
       {dialogs}
       {promptPreviewOpen && promptPreview && (
         <PromptPreview

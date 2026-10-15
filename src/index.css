@@ -471,10 +471,10 @@ body {
   }
 }
 
-/* File tree guides (├─ │ └─), dimmed like tree(1) output in a terminal. */
+/* File tree indentation: blank columns that carry the cursor marker. */
 .tui-tree-guide {
   font-family: var(--font-glyph);
-  color: var(--tui-line-strong);
+  color: var(--ins-edge);
   user-select: none;
 }
 
@@ -918,6 +918,21 @@ body {
     border-right: 3px solid transparent;
     border-top: 4px solid var(--ins-lamp);
     transition: left 120ms ease-out;
+  }
+
+  .ins-meter[data-size="lg"] { gap: 8px; }
+  .ins-meter[data-size="lg"] .ins-meter-scale {
+    width: clamp(140px, 16vw, 260px);
+    height: 14px;
+  }
+  .ins-meter[data-size="lg"] .ins-meter-ticks { inset: 0 0 7px 0; }
+  .ins-meter[data-size="lg"] :is(.ins-meter-track, .ins-meter-fill, .ins-meter-zone) { height: 5px; }
+  .ins-meter[data-size="lg"] .ins-meter-fill { min-width: 2px; }
+  .ins-meter[data-size="lg"] .ins-meter-needle {
+    margin-left: -4px;
+    border-left-width: 4px;
+    border-right-width: 4px;
+    border-top-width: 5px;
   }
 
   .ins-meter-readout {

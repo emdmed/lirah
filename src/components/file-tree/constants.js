@@ -2,8 +2,6 @@
  * Shared constants for file tree components
  */
 
-// Tree guides, drawn like `tree(1)`: each depth adds one three-cell column.
-export const GUIDE_BRANCH = "├─ ";
-export const GUIDE_LAST = "└─ ";
-export const GUIDE_PIPE = "│  ";
-export const GUIDE_BLANK = "   ";
+// Tree indentation: each depth adds one two-cell column of blank space. The
+// trailing column also hosts the keyboard cursor `›` (see index.css).
+export const GUIDE_INDENT = "  ";

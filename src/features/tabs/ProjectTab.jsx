@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Terminal } from "../../components/Terminal";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
+import { TabBarStatusSlot } from "./TabBar";
 import { TitleBar } from "../../components/TitleBar";
 import { LeftSidebar } from "../../components/LeftSidebar";
 import { usePromptTemplates } from "../templates";
@@ -44,8 +45,6 @@ import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
 import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
-import { useInstanceSync } from "../instance-sync/useInstanceSync";
-import { useInstanceSyncShortcut } from "../instance-sync/useInstanceSyncShortcut";
 import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { useUpdateChecker } from "../../hooks/useUpdateChecker";
@@ -209,23 +208,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
   // Workspace state
   const workspaceHook = useWorkspace();
 
-  // Instance sync
-  const selectedFilesArray = useMemo(() => Array.from(fileSelection.selectedFiles), [fileSelection.selectedFiles]);
-  const instanceSync = useInstanceSync(currentPath, selectedFilesArray, terminalSessionId, isActive);
-
-  // Calculate deduplicated instance count
-  const deduplicatedOtherInstancesCount = useMemo(() => {
-    const uniquePaths = new Set();
-    let count = 0;
-    for (const instance of instanceSync.otherInstances) {
-      if (!uniquePaths.has(instance.project_path)) {
-        uniquePaths.add(instance.project_path);
-        count++;
-      }
-    }
-    return count;
-  }, [instanceSync.otherInstances]);
-
   const sidebarSearch = useSidebarSearch();
 
   const treeView = useTreeView({
@@ -365,73 +347,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
       console.error('Failed to navigate to bookmark:', error);
     }
   }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess, settings.autoLaunchCli, launchClaude]);
-
-  // Handle loading context from another instance's session
-  const handleLoadInstanceContext = useCallback(async (session) => {
-    if (!session?.messages?.length) return;
-    try {
-      const contextLines = [];
-      contextLines.push(`# Context from ${session.project_path}`);
-      contextLines.push(`## Session: ${session.summary || 'Previous Work'}`);
-      contextLines.push('');
-      contextLines.push('### Recent conversation:');
-      contextLines.push('');
-      const recentMessages = session.messages.slice(-10);
-      recentMessages.forEach((msg) => {
-        const role = msg.role === 'user' ? '**User**' : '**Claude**';
-        contextLines.push(`${role}: ${msg.content.substring(0, 300)}${msg.content.length > 300 ? '...' : ''}`);
-        contextLines.push('');
-      });
-      contextLines.push('---');
-      contextLines.push('Please continue based on the above context.');
-      const contextText = contextLines.join('\n');
-      setTextareaContent(prev => {
-        if (prev.trim()) return prev + '\n\n' + contextText;
-        return contextText;
-      });
-      setTextareaVisible(true);
-      dialogs.setInstanceSyncPanelOpen(false);
-      setTimeout(() => { textareaRef.current?.focus?.(); }, 100);
-    } catch (error) {
-      console.error('Failed to load instance context:', error);
-    }
-  }, [setTextareaContent, setTextareaVisible, dialogs]);
-
-  // Handle sending implementation prompt generation via hidden CLI
-  const handleSendImplementationPrompt = useCallback(async ({ selectedMessages, promptType, action, prompt }) => {
-    if (action === 'send-to-textarea' && prompt) {
-      setTextareaContent(prev => {
-        const separator = prev.trim() ? '\n\n' : '';
-        return prev + separator + prompt;
-      });
-      setTextareaVisible(true);
-      dialogs.setInstanceSyncPanelOpen(false);
-      setTimeout(() => { textareaRef.current?.focus?.(); }, 100);
-      return;
-    }
-    if (!currentPath || !instanceSync.selectedSession) return;
-    const allVisibleMessages = instanceSync.selectedSession.messages.filter(
-      msg => !msg.content.startsWith('[Thinking]:')
-    );
-    const selectedMessageObjects = Array.from(selectedMessages)
-      .sort((a, b) => a - b)
-      .map(idx => allVisibleMessages[idx])
-      .filter(Boolean)
-      .map(msg => ({ role: msg.role, content: msg.content }));
-    if (selectedMessageObjects.length === 0) return;
-    try {
-      const generatedPrompt = await invoke('generate_instance_sync_prompt', {
-        projectDir: currentPath,
-        cli: settings.selectedCli,
-        promptType,
-        messages: selectedMessageObjects,
-      });
-      return generatedPrompt;
-    } catch (error) {
-      console.error('Failed to generate implementation prompt:', error);
-      throw error;
-    }
-  }, [currentPath, instanceSync.selectedSession, settings.selectedCli, setTextareaContent, setTextareaVisible, dialogs, textareaRef, instanceSync]);
 
   // Handle project selection from initial dialog (with splash screen) — kept for bookmark navigation
   const handleSelectProject = useCallback(async (bookmark) => {
@@ -687,11 +602,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
     secondaryTerminalFocused: secondary.secondaryFocused,
   });
 
-  useInstanceSyncShortcut({
-    onTogglePanel: () => dialogs.setInstanceSyncPanelOpen(prev => !prev),
-    secondaryTerminalFocused: secondary.secondaryFocused,
-  });
-
   // Fetch data when sidebar opens
   useEffect(() => {
     if (sidebar.sidebarOpen) {
@@ -905,7 +815,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
       { id: 'templates', hint: 'manage prompt templates', run: () => dialogs.setManageTemplatesDialogOpen(true) },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => dialogs.setBookmarksPaletteOpen(true) },
       { id: 'workspace', hint: 'workspaces', run: () => dialogs.setWorkspaceDialogOpen(true) },
-      { id: 'instances', aliases: ['windows'], hint: 'other Lirah windows (^⇧I)', run: () => dialogs.setInstanceSyncPanelOpen(prev => !prev) },
       { id: 'titlebar', hint: 'show or hide the title bar', run: () => settings.setShowTitleBar(prev => !prev) },
       { id: 'help', aliases: ['keys'], hint: 'keyboard shortcuts (^H)', run: () => dialogs.setShowHelp(true) },
     ];
@@ -964,7 +873,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
               onManageTemplates={() => dialogs.setManageTemplatesDialogOpen(true)}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
-              tokenUsage={tokenUsage}
               projectPath={currentPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
               onSaveGroup={() => dialogs.setSaveFileGroupDialogOpen(true)}
@@ -1000,6 +908,7 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
         }
         titleBar={settings.showTitleBar && <TitleBar hasTerminalSession={!!terminalSessionId} currentPath={currentPath} />}
         statusBar={
+          <TabBarStatusSlot active={isActive}>
           <StatusBar
             viewMode={viewMode}
             currentPath={currentPath}
@@ -1030,14 +939,13 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
             branchName={branchName}
             onToggleBranchTasks={useCallback(() => dialogs.setBranchTasksOpen(prev => !prev), [dialogs.setBranchTasksOpen])}
             branchTasksOpen={dialogs.branchTasksOpen}
-            otherInstancesCount={deduplicatedOtherInstancesCount}
-            onToggleInstanceSyncPanel={useCallback(() => dialogs.setInstanceSyncPanelOpen(prev => !prev), [dialogs.setInstanceSyncPanelOpen])}
             workspace={workspaceHook.workspace}
             onOpenWorkspaceDialog={useCallback(() => dialogs.setWorkspaceDialogOpen(true), [dialogs.setWorkspaceDialogOpen])}
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
             availableUpdate={availableUpdate}
           />
+          </TabBarStatusSlot>
         }
         secondaryTerminal={
           secondary.secondaryVisible && (
@@ -1106,7 +1014,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
         cliAvailability={cliAvailability}
         elementPicker={elementPicker}
         fileSelection={fileSelection}
-        instanceSync={instanceSync}
         branchName={branchName}
         branchTasks={branchTasks}
         autoCommit={autoCommit}
@@ -1122,8 +1029,6 @@ function ProjectTabInner({ projectPath, isActive, tabId }) {
         handleSelectProject={handleSelectProject}
         handleCreateWorkspace={handleCreateWorkspace}
         handleOpenWorkspace={handleOpenWorkspace}
-        handleLoadInstanceContext={handleLoadInstanceContext}
-        handleSendImplementationPrompt={handleSendImplementationPrompt}
       />
     </SidebarProvider>
     </TokenBudgetProvider>

@@ -144,11 +144,6 @@ If you use CLI agents seriously, Lirah becomes the place you run them.
 - **Project Comparison** — Compare token usage and costs across all your projects.
 - **Export Reports** — Export usage data as CSV or JSON with date range filtering.
 
-### Instance Sync
-
-- **Instance Sync** — Discovers other Claude Code or opencode instances running on the same machine by scanning their session directories.
-- **Instance Sync Panel** — Browse other instances' sessions, read their conversation history, and generate review or continuation prompts to load their context into your current session.
-
 ### UI & Theming
 
 - **Theme System** — Multiple built-in themes with runtime switching. Persisted in localStorage.

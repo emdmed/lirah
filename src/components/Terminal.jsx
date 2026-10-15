@@ -1,22 +1,12 @@
-import { useRef, useEffect, useCallback, useState, forwardRef, memo } from 'react';
+import { useRef, useEffect, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { TerminalSearchBar } from './TerminalSearchBar';
-import { PaneInfo } from './PaneInfo';
 import { PaneLegend } from './instrument/PaneLegend';
 
 export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true }, ref) => {
   const terminalRef = useRef(null);
-  const { terminal, handleResize, sessionId, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
+  const { handleResize, sessionId, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive);
-
-  // Grid size for the pane's bottom border.
-  const [dims, setDims] = useState(null);
-  useEffect(() => {
-    if (!terminal) return;
-    setDims({ cols: terminal.cols, rows: terminal.rows });
-    const sub = terminal.onResize(({ cols, rows }) => setDims({ cols, rows }));
-    return () => sub.dispose();
-  }, [terminal]);
 
   // Notify parent when session is ready
   useEffect(() => {
@@ -84,7 +74,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
         position: 'relative',
       }}
     >
-      <PaneLegend index={2} title="Terminal" status={isFocused ? 'live' : undefined} lit={isFocused} />
+      <PaneLegend index={2} title="Terminal" lit={isFocused} />
       {/* The glass carries the inset; the ref div stays unpadded so FitAddon
           measures exactly the cell area. */}
       <div className="ins-glass ins-round relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
@@ -98,7 +88,6 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
         />
         {searchOpen && <TerminalSearchBar searchAddon={searchAddon} decorations={searchDecorations} onClose={closeSearch} />}
       </div>
-      <PaneInfo>{dims && `${sandboxEnabled ? 'sandbox · ' : ''}${dims.cols}×${dims.rows}`}</PaneInfo>
     </div>
   );
 }));

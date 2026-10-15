@@ -351,17 +351,11 @@ export function RightSidebar({ projectPath }) {
       <div data-pane="4" className="flex flex-col items-center gap-1.5 py-1.5 my-1.5 mr-2 ml-1.5 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
         <button
           onClick={() => setCollapsedOverride(false)}
-          className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="flex flex-col items-center gap-1.5 px-0.5 py-1 text-muted-foreground hover:text-foreground cursor-pointer"
           title="Expand jobs pane (Alt+4)"
           aria-label="Expand jobs pane"
         >
-          «
-        </button>
-        <button
-          onClick={() => setCollapsedOverride(false)}
-          className="flex flex-col items-center gap-1.5 px-0.5 py-1 text-muted-foreground hover:text-foreground cursor-pointer"
-          title="Expand jobs pane (Alt+4)"
-        >
+          <span className="text-[11px]" aria-hidden="true">«</span>
           <span className="ins-legend [writing-mode:vertical-rl]">4 Jobs</span>
         </button>
         <button

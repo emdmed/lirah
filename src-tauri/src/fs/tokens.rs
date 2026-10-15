@@ -55,8 +55,12 @@ struct ClaudeMessage {
     kind: Option<String>,
     message: Option<MessageContent>,
     timestamp: Option<String>,
-    #[serde(rename = "sessionId", alias = "session_id")]
+    // Separate fields, not an alias: assistant lines carry both keys, and
+    // serde rejects a line whose aliased field appears twice.
+    #[serde(rename = "sessionId")]
     session_id: Option<String>,
+    #[serde(rename = "session_id")]
+    session_id_snake: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -678,7 +682,7 @@ fn merge_session_lines<R: BufRead>(reader: &mut R, state: &mut CachedSession) ->
         }
         if let Ok(msg) = serde_json::from_slice::<ClaudeMessage>(content) {
             if state.session_id.is_empty() {
-                state.session_id = msg.session_id.unwrap_or_default();
+                state.session_id = msg.session_id.or(msg.session_id_snake).unwrap_or_default();
             }
             if state.timestamp.is_none() {
                 state.timestamp = msg.timestamp;
@@ -791,6 +795,19 @@ mod tests {
         let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
         assert_eq!(info.context_tokens, 6);
         assert_eq!(info.last_model.as_deref(), Some("claude-opus-4-6"));
+    }
+
+    #[test]
+    fn line_with_both_session_id_keys_still_counts_usage() {
+        let jsonl = concat!(
+            r#"{"type":"assistant","sessionId":"abc-123","session_id":"abc-123","message":{"id":"m1","model":"claude-opus-5-5","usage":{"input_tokens":2,"output_tokens":168,"cache_read_input_tokens":26477,"cache_creation_input_tokens":14697}}}"#, "\n",
+        );
+        let mut state = CachedSession::default();
+        merge_session_lines(&mut Cursor::new(jsonl.as_bytes()), &mut state);
+        let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
+        assert_eq!(info.session_id, "abc-123");
+        assert_eq!(info.output_tokens, 168);
+        assert_eq!(info.context_tokens, 2 + 26477 + 14697);
     }
 
     #[test]

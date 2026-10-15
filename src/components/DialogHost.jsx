@@ -14,7 +14,6 @@ import { AutoChangelogDialog, AutoCommitDialog, AutoCommitConfigDialog } from ".
 
 import { OrchestrationDashboard } from "./OrchestrationDashboard";
 import { ToastContainer } from "../features/toast";
-import { InstanceSyncPanel } from "../features/instance-sync/InstanceSyncPanel";
 import { WorkspaceDialog } from "./WorkspaceDialog";
 import { WorkspaceProjectPicker } from "./WorkspaceProjectPicker";
 
@@ -25,7 +24,6 @@ export function DialogHost({
   cliAvailability,
   elementPicker,
   fileSelection,
-  instanceSync,
   branchName,
   branchTasks,
   autoCommit,
@@ -41,38 +39,9 @@ export function DialogHost({
   handleSelectProject,
   handleCreateWorkspace,
   handleOpenWorkspace,
-  handleLoadInstanceContext,
-  handleSendImplementationPrompt,
 }) {
   return (
     <>
-      <InstanceSyncPanel
-        open={dialogs.instanceSyncPanelOpen}
-        onOpenChange={(open) => {
-          dialogs.setInstanceSyncPanelOpen(open);
-          if (!open) instanceSync.clearSelectedInstance();
-        }}
-        ownState={instanceSync.ownState}
-        otherInstances={instanceSync.otherInstances}
-        selectedInstance={instanceSync.selectedInstance}
-        selectedInstanceSessions={instanceSync.selectedInstanceSessions}
-        selectedSession={instanceSync.selectedSession}
-        isLoadingSessions={instanceSync.isLoadingSessions}
-        sessionsHasMore={instanceSync.sessionsHasMore}
-        onSelectInstance={instanceSync.selectInstance}
-        onClearSelectedInstance={instanceSync.clearSelectedInstance}
-        onLoadMoreSessions={instanceSync.loadMoreSessions}
-        onFetchSessionContent={instanceSync.fetchSessionContent}
-        onRefresh={instanceSync.refreshInstances}
-        onCleanup={instanceSync.cleanupStaleInstances}
-        onLoadContext={handleLoadInstanceContext}
-        onSendToTerminal={handleSendImplementationPrompt}
-        onDebugPaths={instanceSync.debugClaudeDataPaths}
-        onDebugOpencodePaths={instanceSync.debugOpencodeDataPaths}
-        isLoading={false}
-        error={instanceSync.error}
-      />
-
       <AddBookmarkDialog
         open={dialogs.addBookmarkDialogOpen}
         onOpenChange={dialogs.setAddBookmarkDialogOpen}

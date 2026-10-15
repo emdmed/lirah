@@ -7,11 +7,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { Bookmark, X } from 'lucide-react';
+import { Bookmark, BookmarkPlus, X } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useBookmarks } from './BookmarksContext';
 
-export function BookmarksDropdown({ onNavigate }) {
+export function BookmarksDropdown({ onNavigate, onAdd }) {
   const { bookmarks, removeBookmark } = useBookmarks();
   const [hoveredId, setHoveredId] = useState(null);
 
@@ -34,11 +34,18 @@ export function BookmarksDropdown({ onNavigate }) {
       <DropdownMenuContent align="start" className="w-[300px]">
         <DropdownMenuLabel>Project Bookmarks</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {onAdd && (
+          <>
+            <DropdownMenuItem onSelect={onAdd} className="cursor-pointer text-xs">
+              <BookmarkPlus className="w-3 h-3" />
+              Bookmark current directory
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         {bookmarks.length === 0 ? (
           <div className="px-2 py-4 text-xs opacity-50 text-center">
             No bookmarks yet.
-            <br />
-            Use [+★] to add one.
           </div>
         ) : (
           <div className="max-h-[400px] overflow-y-auto">

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pin, PinOff } from "lucide-react";
 import { GitStatsBadge } from "../../features/git";
-import { GUIDE_BRANCH, GUIDE_LAST } from "./constants";
+import { GUIDE_INDENT } from "./constants";
 import { gitColorClass } from "./utils/lsColors";
 
 /**
@@ -10,7 +10,6 @@ import { gitColorClass } from "./utils/lsColors";
 export function FileNode({
   node,
   guide,
-  isLast,
   isCurrentPath,
   stats,
   isSelected,
@@ -52,7 +51,7 @@ export function FileNode({
         onClick={handleFileClick}
         data-nav-activate
       >
-        <span className="tui-tree-guide shrink-0 whitespace-pre" style={{ fontSize: 'var(--font-lg)' }}>{guide}{isLast ? GUIDE_LAST : GUIDE_BRANCH}</span>
+        <span className="tui-tree-guide shrink-0 whitespace-pre" style={{ fontSize: 'var(--font-lg)' }}>{guide}{GUIDE_INDENT}</span>
         <span className={`truncate leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{node.name}</span>
 
         {/* Git stats badge */}

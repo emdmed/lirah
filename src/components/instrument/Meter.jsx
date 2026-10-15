@@ -8,8 +8,9 @@ function formatCompact(n) {
 
 // A meter for a quantity with a ceiling: ticks every 10%, a 3px fill that
 // turns warn at `warnAt` and fault at 95%, a hatched red zone, and a
-// lamp-coloured needle. Readout uses tabular numerals.
-export function Meter({ value, max, warnAt = 0.8, label, format = formatCompact, className }) {
+// lamp-coloured needle. Readout uses tabular numerals. `size="lg"` is the
+// status-bar gauge: a wider, taller scale that stays legible at low fill.
+export function Meter({ value, max, warnAt = 0.8, label, format = formatCompact, size, className }) {
   const ratio = max > 0 ? Math.min(Math.max(value / max, 0), 1) : 0;
   const level = ratio >= 0.95 ? 'fault' : ratio >= warnAt ? 'warn' : 'ok';
   const pct = `${(ratio * 100).toFixed(1)}%`;
@@ -17,6 +18,7 @@ export function Meter({ value, max, warnAt = 0.8, label, format = formatCompact,
     <span
       className={cn('ins-meter', className)}
       data-level={level}
+      data-size={size}
       role="meter"
       aria-label={label}
       aria-valuenow={Math.round(value)}

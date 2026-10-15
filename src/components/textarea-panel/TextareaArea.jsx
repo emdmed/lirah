@@ -5,7 +5,6 @@ import { Send, RotateCcw } from "lucide-react";
 import { AtMentionModal } from "../../features/at-mention";
 import { useAutoGrow } from "../../hooks/useAutoGrow";
 import { useBlockCaret } from "../../hooks/useBlockCaret";
-import { KeyChord } from "../instrument/Keycap";
 
 export function TextareaArea({
   textareaRef,
@@ -29,6 +28,7 @@ export function TextareaArea({
   atMentionQuery,
   selectedFiles,
   fileStates,
+  toolbar,
 }) {
   const hasIndicators = !!elementsIndicator || !!compactedIndicator;
   const sortedAtMentionResults = atMentionResults || [];
@@ -38,11 +38,22 @@ export function TextareaArea({
 
   return (
     <div className="relative flex flex-col gap-1">
-      {/* The input sits in a recessed well with its actions on the right
-          edge; the caret is positioned relative to the inner box, which
-          aligns with the textarea. */}
-      <div className="ins-well flex flex-1 min-h-0 items-end gap-2 pl-[10px] pr-1.5 py-1.5">
-        <div className="relative flex flex-1 min-h-0 self-stretch py-0.5">
+      {/* The input well takes the full width and height; every control sits in
+          a column on the right (prompt tools above, send actions below), so
+          no toolbar strip steals a line from the text. The caret is
+          positioned relative to the inner box, which aligns with the textarea. */}
+      <div className="flex items-stretch gap-2 min-h-0">
+      <div
+        className="ins-well flex flex-1 min-w-0 min-h-[56px] pl-[10px] pr-1.5 py-1.5 cursor-text"
+        onMouseDown={(e) => {
+          // Clicks in the well's empty space below the text land in the input.
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            textareaRef.current?.focus();
+          }
+        }}
+      >
+        <div className="relative flex flex-1 min-h-0 self-start py-0.5">
           <span className="absolute left-0 top-[5px] text-[var(--ins-lamp)] select-none pointer-events-none" aria-hidden="true">❯</span>
           {caret && (
             <span
@@ -65,7 +76,10 @@ export function TextareaArea({
             style={{ backgroundColor: 'transparent' }}
           />
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+      </div>
+      <div className="flex flex-col items-end justify-between gap-1 shrink-0">
+        {toolbar}
+        <div className="flex items-center gap-1">
           {budgetExhausted && (
             <span className="flex items-baseline gap-1 text-[11px] font-mono mr-1">
               <span className="tube-overflow">OVER</span>
@@ -83,10 +97,9 @@ export function TextareaArea({
                 onClick={onClearContext}
                 disabled={!sessionId}
                 aria-label="Clear CLI context"
-                className="gap-1 px-1.5 before:content-none after:content-none text-muted-foreground"
+                className="px-1.5 before:content-none after:content-none text-muted-foreground"
               >
                 <RotateCcw className="h-3 w-3" />
-                clear
               </Button>
             </TooltipTrigger>
             <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
@@ -105,7 +118,6 @@ export function TextareaArea({
                 >
                   <Send className="h-3 w-3" />
                   send
-                  <KeyChord keys={['^', '↵']} size="sm" className="ml-1" />
                 </Button>
               </span>
             </TooltipTrigger>
@@ -114,6 +126,7 @@ export function TextareaArea({
             </TooltipContent>
           </Tooltip>
         </div>
+      </div>
       </div>
       {hasIndicators && (
         <div className="flex flex-col gap-1.5">

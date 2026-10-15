@@ -34,7 +34,6 @@ export function LeftSidebar({
   onAddBookmark,
   onNavigateBookmark,
   hasTerminalSession,
-  sandboxEnabled,
   onSendToTerminal,
   onViewDiff,
   onViewMarkdown,
@@ -67,11 +66,7 @@ export function LeftSidebar({
   return (
     <>
       <Sidebar collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" data-legend style={{ width: sidebarWidth }}>
-        <PaneLegend
-          index={1}
-          title="Files"
-          status={`${viewMode === 'tree' ? 'agent' : 'nav'}${sandboxEnabled ? ' · sandbox' : ''}`}
-        />
+        <PaneLegend index={1} title="Files" />
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
             onNavigateParent={viewMode === 'flat' ? onNavigateParent : undefined}

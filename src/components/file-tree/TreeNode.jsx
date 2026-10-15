@@ -2,7 +2,7 @@ import React, { memo } from "react";
 import { SidebarMenuItem } from "@/components/ui/sidebar";
 import { FolderNode } from "./FolderNode";
 import { FileNode } from "./FileNode";
-import { GUIDE_PIPE, GUIDE_BLANK } from "./constants";
+import { GUIDE_INDENT } from "./constants";
 import { isDimmedEntry } from "./utils/lsColors";
 
 /**
@@ -44,7 +44,6 @@ function mapsEqual(a, b) {
 export const TreeNode = memo(function TreeNode({
   node,
   guide = "",
-  isLast = false,
   expandedFolders,
   currentPath,
   gitStats,
@@ -85,7 +84,6 @@ export const TreeNode = memo(function TreeNode({
           <FolderNode
             node={node}
             guide={guide}
-            isLast={isLast}
             isExpanded={isExpanded}
             isCurrentPath={isCurrentPath}
             onToggle={onToggle}
@@ -94,7 +92,6 @@ export const TreeNode = memo(function TreeNode({
           <FileNode
             node={node}
             guide={guide}
-            isLast={isLast}
             isCurrentPath={isCurrentPath}
             stats={stats}
             isSelected={isSelected}
@@ -120,8 +117,7 @@ export const TreeNode = memo(function TreeNode({
           <TreeNode
             key={child.path}
             node={child}
-            guide={guide + (isLast ? GUIDE_BLANK : GUIDE_PIPE)}
-            isLast={idx === node.children.length - 1}
+            guide={guide + GUIDE_INDENT}
             expandedFolders={expandedFolders}
             currentPath={currentPath}
             gitStats={gitStats}
@@ -148,7 +144,6 @@ export const TreeNode = memo(function TreeNode({
   // Custom comparison for memo - handle Sets and Maps properly
   if (prevProps.node !== nextProps.node) return false;
   if (prevProps.guide !== nextProps.guide) return false;
-  if (prevProps.isLast !== nextProps.isLast) return false;
   if (prevProps.currentPath !== nextProps.currentPath) return false;
   if (prevProps.isTextareaPanelOpen !== nextProps.isTextareaPanelOpen) return false;
   if (prevProps.showGitChangesOnly !== nextProps.showGitChangesOnly) return false;

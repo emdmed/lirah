@@ -113,7 +113,7 @@ export function FileTree({
             <span className="engraved-label">pinned</span>
           </div>
           {pinnedNodes.map((node, idx) => (
-            <TreeNode key={`pinned:${node.path}`} node={node} isLast={idx === pinnedNodes.length - 1} {...treeNodeProps} />
+            <TreeNode key={`pinned:${node.path}`} node={node} {...treeNodeProps} />
           ))}
           <div className="border-t border-foreground/10 mx-1 mt-1" />
         </SidebarMenu>
@@ -126,7 +126,7 @@ export function FileTree({
       ) : (
         <SidebarMenu className="filetree-container">
           {displayedNodes.map((node, idx) => (
-            <TreeNode key={node.path} node={node} isLast={idx === displayedNodes.length - 1} {...treeNodeProps} />
+            <TreeNode key={node.path} node={node} {...treeNodeProps} />
           ))}
         </SidebarMenu>
       )}

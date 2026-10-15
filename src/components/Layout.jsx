@@ -16,9 +16,8 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar, secon
           {secondaryTerminal}
         </div>
       </div>
-      <div className="flex-shrink-0 h-8">
-        {statusBar}
-      </div>
+      {/* Portals into the tab bar; renders nothing here */}
+      {statusBar}
     </div>
   );
 }
