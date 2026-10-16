@@ -57,7 +57,11 @@ export function FileNode({
         <span className={`truncate leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{name}</span>
 
         {/* Git stats badge */}
-        {hasGitChanges && <GitStatsBadge stats={stats} />}
+        {hasGitChanges && (
+          <span className="ml-auto pl-1.5 shrink-0">
+            <GitStatsBadge stats={stats} />
+          </span>
+        )}
       </div>
 
       {/* Pin toggle */}
@@ -69,13 +73,19 @@ export function FileNode({
           title={isPinned ? 'Unpin file' : 'Pin file to top'}
           aria-label={isPinned ? 'Unpin file' : 'Pin file to top'}
           aria-pressed={!!isPinned}
-          className={`shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 hover:bg-foreground hover:text-background text-muted-foreground ${
-            isPinned ? 'opacity-80' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+          className={`group/pin shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 hover:bg-foreground hover:text-background text-muted-foreground ${
+            isPinned ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
           }`}
         >
-          {isPinned
-            ? <PinOff className="w-2.5 h-2.5" />
-            : <Pin className="w-2.5 h-2.5" />}
+          {/* A pinned row carries a quiet pin; hovering the button offers the unpin. */}
+          {isPinned ? (
+            <>
+              <Pin className="w-2.5 h-2.5 opacity-60 group-hover/pin:hidden" />
+              <PinOff className="w-2.5 h-2.5 hidden group-hover/pin:block" />
+            </>
+          ) : (
+            <Pin className="w-2.5 h-2.5" />
+          )}
         </button>
       )}
     </div>

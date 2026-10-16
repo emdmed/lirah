@@ -9,6 +9,7 @@ import { invoke, Channel } from '@tauri-apps/api/core';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
+import { markTerminalInput, markTerminalOutput } from '../features/tabs/terminalActivity';
 import '@xterm/xterm/css/xterm.css';
 
 // Smallest geometry we will ever apply. FitAddon floors its proposal at 2 cols /
@@ -232,6 +233,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     output.onmessage = (buf) => {
       if (cancelled) return;
       const bytes = new Uint8Array(buf);
+      markTerminalOutput(id);
       pendingBytes += bytes.length;
       terminal.write(bytes, () => {
         perfFirstOutput();
@@ -284,6 +286,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // undisposed handler would double every keystroke if this effect re-ran.
         const dataDisposable = terminal.onData((data) => {
           perfInput();
+          markTerminalInput(id);
           invoke('write_to_terminal', { sessionId: id, data }).catch((error) => {
             console.error('Failed to write to terminal:', error);
           });

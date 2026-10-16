@@ -734,6 +734,12 @@ body {
     color: var(--ins-lamp);
   }
 
+  /* A latching panel key carries its own lamp, which says "on"; printing the
+     legend in the lamp colour too would say it twice. */
+  .ins-key[data-latched] {
+    color: var(--color-foreground);
+  }
+
   /* Primary: the legend and edge are printed in the lamp colour. */
   .ins-key-primary {
     border-color: color-mix(in srgb, var(--ins-lamp) 70%, var(--ins-edge-strong));
@@ -827,6 +833,29 @@ body {
     animation: ins-blink 1s steps(1) infinite;
   }
 
+  /* Busy scanner (Scanner.jsx): square lamp segments, one lit cell chasing
+     across with a dimmer trail. Stepped, like a TUI redraw. */
+  .ins-scan {
+    --scan-cell: 3px;
+    --scan-gap: 1px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--scan-gap);
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+
+  .ins-scan[data-size="md"] { --scan-cell: 4px; --scan-gap: 2px; }
+  .ins-scan[data-size="lg"] { --scan-cell: 6px; --scan-gap: 3px; }
+
+  .ins-scan > i {
+    display: block;
+    width: var(--scan-cell);
+    height: var(--scan-cell);
+    background: var(--ins-lamp-off);
+    animation: ins-scan 0.6s steps(1) infinite;
+  }
+
   /* Recessed well for inputs. */
   .ins-well {
     background: var(--ins-well);
@@ -897,7 +926,11 @@ body {
     bottom: 0;
     height: 3px;
     background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--ins-fault) 55%, transparent) 0 2px, transparent 2px 4px);
+    transition: opacity 200ms ease-out;
   }
+
+  /* Far from the zone, keep it a faint hint rather than an alarm. */
+  .ins-meter[data-calm] .ins-meter-zone { opacity: 0.3; }
 
   .ins-meter-track {
     position: absolute;
@@ -952,25 +985,38 @@ body {
     white-space: nowrap;
   }
 
-  /* Toggle switch: a well track with a knob. */
+  /* Toggle switch: a framed well track with a knob. Off, the knob is an
+     unlit lens on the left; on, it slides right and lights in its tone. */
   .ins-switch {
     position: relative;
     display: inline-block;
+    box-sizing: border-box;
     width: 24px;
     height: 12px;
     flex-shrink: 0;
+    border: 1px solid var(--ins-edge-strong);
     border-radius: 6px;
     cursor: pointer;
+  }
+
+  .ins-switch:hover {
+    border-color: var(--ins-legend);
+  }
+
+  .ins-switch:focus-visible {
+    outline: 1px solid var(--ins-lamp);
+    outline-offset: 1px;
   }
 
   .ins-switch-knob {
     position: absolute;
     top: 1px;
     left: 1px;
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 9999px;
-    background: var(--ins-edge-strong);
+    background: var(--ins-lamp-off);
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
     transition: left 100ms ease-out, background-color 100ms ease-out;
   }
 
@@ -1020,9 +1066,30 @@ body {
   50% { opacity: 0.25; }
 }
 
+@keyframes ins-scan {
+  0% {
+    background: var(--ins-lamp);
+    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--ins-lamp) 60%, transparent);
+  }
+  25% {
+    background: color-mix(in srgb, var(--ins-lamp) 45%, var(--ins-lamp-off));
+    box-shadow: none;
+  }
+  50%, 100% {
+    background: var(--ins-lamp-off);
+    box-shadow: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ins-lamp[data-blink] { animation: none; }
+  /* Still reads as "busy": every segment held half-lit. */
+  .ins-scan > i {
+    animation: none;
+    background: color-mix(in srgb, var(--ins-lamp) 55%, var(--ins-lamp-off));
+  }
   .ins-meter-needle,
+  .ins-meter-zone,
   .ins-switch-knob,
   .ins-key { transition: none; }
 }

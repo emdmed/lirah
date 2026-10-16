@@ -13,6 +13,7 @@ import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "../../hooks/useCwdMonitor";
 import { useBranchName } from "../git/useBranchName";
+import { registerTabSession } from "./terminalActivity";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
 import { useBranchTasks } from "../git/useBranchTasks";
@@ -587,6 +588,12 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       updateTabPath(tabId, detectedCwd);
     }
   }, [detectedCwd, tabId, updateTabPath]);
+
+  // Lets the tabs summary pane find this tab's terminal activity.
+  useEffect(() => {
+    if (!terminalSessionId || !tabId) return;
+    return registerTabSession(tabId, terminalSessionId);
+  }, [tabId, terminalSessionId]);
 
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd, isActive);

@@ -1,7 +1,7 @@
 import { Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RetroSpinner } from '@/components/ui/RetroSpinner';
+import { Scanner } from '@/components/instrument/Scanner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 /**
@@ -13,7 +13,7 @@ export function DesignButton({ onClick, isRunning, hasSpec, disabled }) {
   if (isRunning) {
     return (
       <Badge variant="outline" size="icon" onClick={onClick} className="cursor-pointer">
-        <RetroSpinner size={12} lineWidth={1.5} />
+        <Scanner />
         Design
       </Badge>
     );

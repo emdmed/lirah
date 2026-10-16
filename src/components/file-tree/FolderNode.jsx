@@ -30,8 +30,8 @@ export function FolderNode({ path, name, guide, isExpanded, isCurrentPath, isCur
         ) : (
           <ChevronRight className="w-2.5 h-2.5 shrink-0" />
         )}
-        <Folder className="w-2.5 h-2.5 ml-0.5 shrink-0 text-folder" />
-        <span className="truncate pl-1 font-semibold text-folder" title={name}>{name}</span>
+        <Folder className="w-2.5 h-2.5 ml-0.5 shrink-0 text-muted-foreground" />
+        <span className="truncate pl-1 font-semibold text-foreground" title={name}>{name}</span>
       </div>
     </SidebarMenuButton>
   );

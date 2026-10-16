@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
-import { Square, GitCompare, Check, Trash2, Loader2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, ChevronsRight } from 'lucide-react';
+import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -8,11 +8,15 @@ import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
+import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
+import { Keycap, KeyChord } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { JOBS_PANE_EVENT } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
 import { lazyNamed } from '../../lib/lazyNamed';
+import { useTabManager } from '../tabs/TabContext';
+import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -22,7 +26,7 @@ const RaceCompareDialog = lazyNamed(() => import('./RaceCompareDialog'), 'RaceCo
 
 const MIN_WIDTH = 224;
 const MAX_WIDTH = 560;
-const DEFAULT_WIDTH = 288;
+const DEFAULT_WIDTH = 256;
 const WIDTH_KEY = 'agentJobsSidebarWidth';
 
 // Compact human duration between two epoch-ms timestamps (endedAt || now).
@@ -90,12 +94,13 @@ export function RightSidebar({ projectPath }) {
     reviseJob,
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
+  const { tabs: openTabs } = useTabManager();
   const toast = useToast();
 
   // null = automatic: the pane folds away while there is nothing to show.
   // An explicit true/false is the user's choice and wins until a new job starts.
   const [collapsedOverride, setCollapsedOverride] = useState(null);
-  const [tab, setTab] = useState('jobs');
+  const [tab, setTab] = useState('tabs');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [review, setReview] = useState(null); // { jobId, filePath }
   // Review notes pinned to lines of the job being reviewed, sent back to the
@@ -111,7 +116,8 @@ export function RightSidebar({ projectPath }) {
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
   const visibleJobs = jobs.filter((j) => !j.archived);
   const archivedJobs = jobs.filter((j) => j.archived);
-  const isEmpty = visibleJobs.length === 0 && totalActiveCount === 0;
+  // With several tabs open the tabs summary always has something to show.
+  const isEmpty = visibleJobs.length === 0 && totalActiveCount === 0 && openTabs.length < 2;
   const collapsed = collapsedOverride ?? isEmpty;
 
   useEffect(() => {
@@ -372,45 +378,53 @@ export function RightSidebar({ projectPath }) {
       archived={archived}
       selectable={!archived && isReconcilable(job)}
       selected={selected.has(job.id)}
+      selectionActive={selected.size > 0}
       actions={cardActions}
     />
   );
 
   if (collapsed) {
+    // One lamp per job reads the whole queue at a glance; the pane index sits
+    // on a keycap instead of a rotated label.
+    const railJobs = visibleJobs.slice(0, 8);
     return (
-      <div data-pane="4" className="flex flex-col items-center gap-1.5 py-1.5 my-1.5 mr-2 ml-1.5 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
+      <div data-pane="4" className="flex flex-col items-center gap-2 py-2 my-1.5 mr-2 ml-1.5 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
         <button
           onClick={() => setCollapsedOverride(false)}
-          className="flex flex-col items-center gap-1.5 px-0.5 py-1 text-muted-foreground hover:text-foreground cursor-pointer"
-          title="Expand jobs pane (Alt+4)"
-          aria-label="Expand jobs pane"
+          className="flex flex-col items-center gap-2 px-0.5 py-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+          title="Expand pane (Alt+4)"
+          aria-label="Expand pane"
         >
           <span className="text-[11px]" aria-hidden="true">«</span>
-          <span className="ins-legend [writing-mode:vertical-rl]">4 Jobs</span>
+          <Keycap size="sm">4</Keycap>
         </button>
-        <button
-          onClick={() => {
-            setCollapsedOverride(false);
-            setTab('jobs');
-            setDialogOpen(true);
-          }}
-          className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
-          title="New background job"
-          aria-label="New background job"
-        >
-          +
-        </button>
-        {runningJobs > 0 && (
-          <span className="flex flex-col items-center gap-1 text-[11px] tabular-nums text-foreground" title={`${runningJobs} running`}>
-            <Lamp state="on" blink />
-            {runningJobs}
-          </span>
+        {railJobs.length > 0 && (
+          <div className="flex flex-col items-center gap-2 pt-0.5">
+            {railJobs.map((j) => (
+              <Lamp key={j.id} {...jobLamp(j.status)} label={`${j.label}: ${j.status}`} />
+            ))}
+            {visibleJobs.length > railJobs.length && (
+              <span className="text-[10px] tabular-nums text-muted-foreground">+{visibleJobs.length - railJobs.length}</span>
+            )}
+          </div>
         )}
         {totalActiveCount > 0 && (
           <span className="text-[11px] font-bold tabular-nums text-muted-foreground" title="Active agents">
             {totalActiveCount}
           </span>
         )}
+        <button
+          onClick={() => {
+            setCollapsedOverride(false);
+            setTab('jobs');
+            setDialogOpen(true);
+          }}
+          className="mt-auto text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+          title="New background job"
+          aria-label="New background job"
+        >
+          +
+        </button>
       </div>
     );
   }
@@ -419,16 +433,41 @@ export function RightSidebar({ projectPath }) {
     <div
       ref={paneRef}
       style={{ width }}
+      onKeyDown={(e) => {
+        // N opens a new job while focus is in the pane (not in a text field).
+        if (tab !== 'jobs' || e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
+        e.preventDefault();
+        setDialogOpen(true);
+      }}
+      tabIndex={-1}
       data-pane="4"
       data-title={`[4] ${tab}`}
       data-legend
-      className="tui-pane flex flex-col shrink-0 overflow-hidden my-1.5 mr-2 ml-1.5 text-sidebar-foreground"
+      className="tui-pane flex flex-col shrink-0 overflow-hidden my-1.5 mr-2 ml-1.5 text-sidebar-foreground outline-none"
     >
       <PaneLegend
         index={4}
-        title={tab === 'jobs' ? 'Jobs' : 'Agents'}
-        status={tab === 'jobs' ? (runningJobs > 0 ? `${runningJobs} running` : undefined) : (totalActiveCount > 0 ? `${totalActiveCount} active` : undefined)}
-        lamp={(tab === 'jobs' ? runningJobs : totalActiveCount) > 0 ? 'on' : undefined}
+        title={tab === 'tabs' ? 'Tabs' : tab === 'jobs' ? 'Jobs' : 'Agents'}
+        status={
+          tab === 'tabs' ? `${openTabs.length} open`
+            : tab === 'jobs' ? (runningJobs > 0 ? `${runningJobs} running` : undefined)
+            : (totalActiveCount > 0 ? `${totalActiveCount} active` : undefined)
+        }
+        lamp={tab !== 'tabs' && (tab === 'jobs' ? runningJobs : totalActiveCount) > 0 ? 'on' : undefined}
+        trailing={
+          <>
+            <KeyChord keys={['alt', '4']} size="sm" />
+            <button
+              onClick={() => setCollapsedOverride(true)}
+              className="text-[11px] leading-none text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Collapse pane"
+              aria-label="Collapse pane"
+            >
+              »
+            </button>
+          </>
+        }
       />
       {/* Drag-to-resize handle sitting over the left edge. */}
       <div
@@ -437,38 +476,14 @@ export function RightSidebar({ projectPath }) {
         title="Drag to resize"
       />
 
-      {/* Header: tabs + collapse */}
-      <div className="flex items-center justify-between px-1.5 py-1 shrink-0 border-b border-b-sidebar-border">
-        <div className="flex items-center gap-0.5">
-          <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
+      {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
+      <div className="flex items-center gap-0.5 px-1.5 py-1 shrink-0 edge-b-engraved">
+        <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
+        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
+        {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
-        </div>
-        <div className="flex items-center gap-2 text-[11px]">
-          {tab === 'jobs' && (
-            <PanelButton
-              icon={Plus}
-              onClick={() => setDialogOpen(true)}
-              title="New background job"
-              aria-label="New background job"
-            />
-          )}
-          <PanelButton
-            icon={ChevronsRight}
-            onClick={() => setCollapsedOverride(true)}
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
-          />
-        </div>
+        )}
       </div>
-
-      {tab === 'jobs' && (
-        <button
-          onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border text-[11px] text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-        >
-          + new background job
-        </button>
-      )}
 
       {tab === 'jobs' && selected.size > 0 && (
         <div className="flex flex-col gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border bg-sidebar-accent/40">
@@ -479,7 +494,7 @@ export function RightSidebar({ projectPath }) {
               className="flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)] disabled:opacity-60 cursor-pointer"
               title="Merge the selected jobs with an agent that resolves conflicts and verifies the combined result"
             >
-              {reconciling ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitMerge className="h-3 w-3" />}
+              {reconciling ? <Scanner /> : <GitMerge className="h-3 w-3" />}
               Reconcile {selected.size}
             </button>
             <button
@@ -496,8 +511,10 @@ export function RightSidebar({ projectPath }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto min-h-0 py-1.5 flex flex-col">
-        {tab === 'agents' ? (
+      <div className="flex-1 overflow-y-auto min-h-0 pb-1.5 flex flex-col">
+        {tab === 'tabs' ? (
+          <TabsSummaryPane />
+        ) : tab === 'agents' ? (
           <SubagentList />
         ) : (
           <>
@@ -509,11 +526,11 @@ export function RightSidebar({ projectPath }) {
                   <span className="text-muted-foreground"> --</span>
                 </div>
                 <div className="text-[11px] leading-relaxed text-muted-foreground">
-                  # dispatch a headless agent run with [+ new background job]
+                  # dispatch a headless agent run with [+ new job]
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5 px-2">
+              <div className="flex flex-col">
                 {groupJobs(visibleJobs).map((entry) =>
                   entry.type === 'race' ? (
                     <RaceGroup
@@ -528,6 +545,15 @@ export function RightSidebar({ projectPath }) {
                 )}
               </div>
             )}
+
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-2 text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              new job
+              <Keycap size="sm" className="ml-auto">N</Keycap>
+            </button>
 
             {/* Archived jobs: stored but out of immediate sight, browsable on demand. */}
             {archivedJobs.length > 0 && (
@@ -633,7 +659,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
           Same prompt, separate worktrees. Keeping one applies it and discards the rest.
         </div>
       )}
-      <div className="flex flex-col gap-1.5 p-1.5 pt-0.5">{jobs.map((job) => renderCard(job))}</div>
+      <div className="flex flex-col p-1.5 pt-0.5">{jobs.map((job) => renderCard(job))}</div>
     </div>
   );
 }
@@ -652,11 +678,6 @@ function TabButton({ active, onClick, label, count }) {
       {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
     </button>
   );
-}
-
-// Middot divider between meta tokens.
-function Dot() {
-  return <span className="text-muted-foreground/30">·</span>;
 }
 
 // Live elapsed time for a running job. Owns its ticker so only this text
@@ -684,7 +705,7 @@ function outputRuns(output) {
   return runs;
 }
 
-const JobCard = memo(function JobCard({ job, archived, selectable, selected, actions }) {
+const JobCard = memo(function JobCard({ job, archived, selectable, selected, selectionActive, actions }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
@@ -696,15 +717,16 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, act
     job.status === 'failed' ||
     job.status === 'conflict' ||
     job.status === 'interrupted';
-  const lastLines = expanded ? [] : job.output.slice(-2);
   const duration = isRunning ? null : formatDuration(job.startedAt, job.endedAt);
   // A race candidate is applied by winning, which also clears the others.
   const isRace = !!job.raceId;
   const stat = job.diffStat;
   const hasStat = stat && (stat.added > 0 || stat.removed > 0);
-  // A dedicated status chip for anything that isn't a clean running/done state.
+  // A status word for anything that isn't a clean running/done state.
   const showStatusChip = !isRunning && job.status !== 'done';
   const canApprove = isDone && !!job.worktreePath && changedCount > 0;
+  // Checkboxes replace lamps only while a reconcile selection is being built.
+  const showCheckbox = selectable && (selected || selectionActive);
   const tc = job.typecheck;
   const tcChecking = tc?.status === 'checking';
   const tcErrors = tc?.status === 'done' && tc.errorCount > 0;
@@ -717,122 +739,81 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, act
   }, [expanded, job.output]);
 
   return (
+    // One row per job, split by hairlines: lamp, title and time on the first
+    // line, agent and diff on the second. Output and actions open on demand.
     <div
       className={cn(
-        'bg-[var(--ins-raised)] transition-shadow',
-        selected
-          ? 'shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]'
-          : 'shadow-[inset_0_0_0_1px_var(--ins-edge)] hover:shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]'
+        'edge-b-engraved transition-colors',
+        selected || expanded ? 'bg-[color-mix(in_srgb,var(--ins-lamp)_6%,transparent)]' : 'hover:bg-[color-mix(in_srgb,var(--ins-lamp)_4%,transparent)]'
       )}
     >
-      {/* Header: status marker + label + live duration */}
-      <div className="flex items-start gap-2 px-2.5 pt-2">
-        {selectable ? (
-          <Checkbox checked={selected} onCheckedChange={() => actions.toggleSelect(job.id)} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <div className="flex items-center gap-2 px-2.5 pt-2">
+        {showCheckbox ? (
+          <Checkbox
+            checked={selected}
+            onCheckedChange={() => actions.toggleSelect(job.id)}
+            aria-label={`Select ${job.label} for reconcile`}
+            className="h-3 w-3 shrink-0"
+          />
         ) : (
-          <Lamp {...lamp} label={meta.label} className="mt-1" />
+          <Lamp {...lamp} label={meta.label} />
         )}
-
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex min-w-0 flex-1 items-start gap-1 text-left cursor-pointer group"
-          title={expanded ? 'Hide output' : 'Show full output'}
+          aria-expanded={expanded}
+          className="min-w-0 flex-1 truncate text-left text-xs cursor-pointer hover:text-foreground"
+          title={expanded ? 'Hide output and actions' : `${job.label} — show output and actions`}
         >
-          {expanded ? (
-            <ChevronDown className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground group-hover:text-sidebar-foreground" />
-          ) : (
-            <ChevronRight className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground group-hover:text-sidebar-foreground" />
-          )}
-          <span className="text-xs font-medium leading-snug line-clamp-2 break-words">{job.label}</span>
+          {job.label}
         </button>
-
-        {isRunning && (
-          <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-foreground">
-            <Elapsed startedAt={job.startedAt} />
-          </span>
-        )}
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          {isRunning ? <Elapsed startedAt={job.startedAt} /> : duration}
+        </span>
       </div>
 
-      {/* Meta line: cli, isolation, diff stat, status */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pl-[2.6rem] pr-2.5 text-[11px]">
-        <span className="uppercase tracking-wide text-muted-foreground/80">{job.cli}</span>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 pr-2.5 pb-2 text-[11px]">
+        <span className="text-muted-foreground">{job.cli}</span>
         {job.kind === 'reconcile' && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="inline-flex items-center gap-0.5 font-medium text-[var(--ins-lamp)]">
-              <GitMerge className="h-2.5 w-2.5" />
-              merge
-            </span>
-          </span>
-        )}
-        {job.useWorktree && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="text-muted-foreground/50">worktree</span>
-          </span>
-        )}
-        {!isRunning && duration && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="tabular-nums text-muted-foreground/60">{duration}</span>
+          <span className="inline-flex items-center gap-0.5 text-[var(--ins-lamp)]">
+            <GitMerge className="h-2.5 w-2.5" />
+            merge
           </span>
         )}
         {hasStat && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
-              <span>
-                <span style={{ color: 'var(--ins-ok)' }}>+{stat.added}</span>{' '}
-                <span style={{ color: 'var(--ins-fault)' }}>−{stat.removed}</span>
-              </span>
-              <DiffBar added={stat.added} removed={stat.removed} />
-            </span>
+          <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
+            <DiffBar added={stat.added} removed={stat.removed} />
+            <span style={{ color: 'var(--ins-ok)' }}>+{stat.added}</span>
+            <span style={{ color: 'var(--ins-fault)' }}>−{stat.removed}</span>
           </span>
         )}
-        {showStatusChip && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="uppercase tracking-wide font-medium" style={{ color: meta.color }}>
-              {meta.label}
-            </span>
-          </span>
-        )}
+        {showStatusChip && <span style={{ color: meta.color }}>{meta.label}</span>}
         {tcChecking && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
-              <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              typecheck
-            </span>
+          <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
+            <Scanner />
+            typecheck
           </span>
         )}
         {tcErrors && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span
-              className="inline-flex items-center gap-0.5 font-medium"
-              style={{ color: 'var(--color-destructive)' }}
-              title={tc.failed.map((f) => `${f.path.split('/').pop()}: ${f.errorCount}`).join('\n')}
-            >
-              <AlertTriangle className="h-2.5 w-2.5" />
-              {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}
-            </span>
+          <span
+            className="inline-flex items-center gap-0.5"
+            style={{ color: 'var(--color-destructive)' }}
+            title={tc.failed.map((f) => `${f.path.split('/').pop()}: ${f.errorCount}`).join('\n')}
+          >
+            <AlertTriangle className="h-2.5 w-2.5" />
+            {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}
           </span>
         )}
         {tcClean && (
-          <span className="inline-flex items-center gap-1.5">
-            <Dot />
-            <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-status-success)' }}>
-              <Check className="h-2.5 w-2.5" />
-              types ok
-            </span>
+          <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-status-success)' }}>
+            <Check className="h-2.5 w-2.5" />
+            types ok
           </span>
         )}
       </div>
 
       {/* Loud conflict record for a reconcile job: which files 2+ jobs edited. */}
       {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
-        <div className="mt-1.5 mx-2.5 rounded-sm border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
+        <div className="mb-2 mx-2.5 border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
           <div className="flex items-center gap-1 font-medium text-[var(--color-status-warning)]">
             <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
             {job.overlaps?.length > 0
@@ -859,109 +840,109 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, act
         </div>
       )}
 
-      {/* Collapsed preview: last couple of output lines */}
-      {lastLines.length > 0 && (
-        <div className="mt-1.5 mx-2.5 rounded-sm bg-background/40 px-2 py-1 font-mono text-[11px] leading-snug text-muted-foreground/70">
-          {lastLines.map((l, i) => (
-            <div key={i} className={cn('truncate', l.stream === 'stderr' && 'text-destructive/80')}>
-              {l.chunk || ' '}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Expanded: full streaming log, one <pre> of stream runs; skipped by
-          the renderer while scrolled out of the pane. */}
-      {expanded && (
-        <div
-          ref={logRef}
-          className="mt-1.5 mx-2.5 max-h-56 overflow-auto rounded-sm border border-sidebar-border/60 bg-background/50 p-2 font-mono text-[11px] leading-relaxed [content-visibility:auto] [contain-intrinsic-size:auto_14rem]"
-        >
-          {job.output.length === 0 ? (
-            <div className="text-muted-foreground/50">No output yet.</div>
-          ) : (
-            <pre className="m-0 [font:inherit] whitespace-pre-wrap break-words">
-              {outputRuns(job.output).map((run, i) =>
-                run.stderr ? (
-                  <span key={i} className="text-destructive/80">{run.text}</span>
-                ) : (
-                  <Fragment key={i}>{run.text}</Fragment>
-                )
-              )}
-            </pre>
-          )}
-        </div>
-      )}
-
       {job.error && (
-        <div className="mt-1.5 mx-2.5 rounded-sm bg-destructive/5 px-2 py-1 text-[11px] leading-snug text-destructive/90 break-words">
+        <div className="mb-2 mx-2.5 bg-destructive/5 px-2 py-1 text-[11px] leading-snug text-destructive/90 break-words">
           {job.error}
         </div>
       )}
 
-      {/* Actions: emphasized primary on the left, ghost icons on the right */}
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 px-2.5 pb-2">
-        {isRunning && (
-          <PrimaryAction icon={Square} label="Cancel" onClick={() => actions.cancel(job.id)} variant="danger" title="Stop this running job" />
-        )}
-        {isDone && changedCount > 0 && (
-          <PrimaryAction
-            icon={GitCompare}
-            label={`Review ${changedCount}`}
-            onClick={() => actions.review(job.id)}
-            variant="outline"
-            title="Review the isolated diff before applying"
-          />
-        )}
-        {canApprove && (
-          <PrimaryAction
-            icon={tcErrors ? AlertTriangle : isRace ? Trophy : Check}
-            label={
-              tcChecking
-                ? 'Checking…'
-                : tcErrors
-                ? isRace
-                  ? 'Keep anyway'
-                  : 'Apply anyway'
-                : isRace
-                ? 'Keep this'
-                : 'Apply'
-            }
-            onClick={() => (isRace ? actions.pickWinner(job.id, tcErrors) : actions.approve(job.id, tcErrors))}
-            disabled={tcChecking}
-            variant={tcErrors ? 'danger' : 'primary'}
-            title={
-              tcErrors
-                ? 'These changes have type errors — applying anyway skips the check. Review before committing.'
-                : isRace
-                ? 'Keep this candidate: applies it to your working tree and discards the other candidates'
-                : 'Apply these changes into your working tree — uncommitted, so you review and commit them yourself'
-            }
-          />
-        )}
+      {expanded && (
+        <>
+          {/* Full streaming log, one <pre> of stream runs; skipped by the
+              renderer while scrolled out of the pane. */}
+          <div
+            ref={logRef}
+            className="mx-2.5 max-h-56 overflow-auto ins-well p-2 font-mono text-[11px] leading-relaxed [content-visibility:auto] [contain-intrinsic-size:auto_14rem]"
+          >
+            {job.output.length === 0 ? (
+              <div className="text-muted-foreground/50">No output yet.</div>
+            ) : (
+              <pre className="m-0 [font:inherit] whitespace-pre-wrap break-words">
+                {outputRuns(job.output).map((run, i) =>
+                  run.stderr ? (
+                    <span key={i} className="text-destructive/80">{run.text}</span>
+                  ) : (
+                    <Fragment key={i}>{run.text}</Fragment>
+                  )
+                )}
+              </pre>
+            )}
+          </div>
 
-        <div className="ml-auto flex items-center gap-0.5">
-          {isDone && <IconAction icon={RotateCcw} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
-          {job.reportPath && <IconAction icon={FileText} title="View run report" onClick={() => actions.report(job.id)} />}
-          {isDone && (job.logPath || job.output.length > 0) && (
-            <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={() => actions.copyOutput(job.id)} />
-          )}
-          {!isRunning && !archived && (
-            <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={() => actions.archive(job.id)} />
-          )}
-          {archived && (
-            <IconAction icon={ArchiveRestore} title="Restore to the jobs list" onClick={() => actions.unarchive(job.id)} />
-          )}
-          {!isRunning && (
-            <IconAction
-              icon={Trash2}
-              title={job.worktreePath ? 'Discard changes' : 'Dismiss'}
-              onClick={() => actions.discard(job.id)}
-              danger
-            />
-          )}
-        </div>
-      </div>
+          {/* Actions: emphasized primary on the left, ghost icons on the right */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 px-2.5 pb-2">
+            {isRunning && (
+              <PrimaryAction icon={Square} label="Cancel" onClick={() => actions.cancel(job.id)} variant="danger" title="Stop this running job" />
+            )}
+            {isDone && changedCount > 0 && (
+              <PrimaryAction
+                icon={GitCompare}
+                label={`Review ${changedCount}`}
+                onClick={() => actions.review(job.id)}
+                variant="outline"
+                title="Review the isolated diff before applying"
+              />
+            )}
+            {canApprove && (
+              <PrimaryAction
+                icon={tcErrors ? AlertTriangle : isRace ? Trophy : Check}
+                label={
+                  tcChecking
+                    ? 'Checking…'
+                    : tcErrors
+                    ? isRace
+                      ? 'Keep anyway'
+                      : 'Apply anyway'
+                    : isRace
+                    ? 'Keep this'
+                    : 'Apply'
+                }
+                onClick={() => (isRace ? actions.pickWinner(job.id, tcErrors) : actions.approve(job.id, tcErrors))}
+                disabled={tcChecking}
+                variant={tcErrors ? 'danger' : 'primary'}
+                title={
+                  tcErrors
+                    ? 'These changes have type errors — applying anyway skips the check. Review before committing.'
+                    : isRace
+                    ? 'Keep this candidate: applies it to your working tree and discards the other candidates'
+                    : 'Apply these changes into your working tree — uncommitted, so you review and commit them yourself'
+                }
+              />
+            )}
+            {selectable && !showCheckbox && (
+              <PrimaryAction
+                icon={GitMerge}
+                label="Select"
+                onClick={() => actions.toggleSelect(job.id)}
+                variant="outline"
+                title="Select for reconcile: merge several finished jobs with an agent"
+              />
+            )}
+
+            <div className="ml-auto flex items-center gap-0.5">
+              {isDone && <IconAction icon={RotateCcw} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
+              {job.reportPath && <IconAction icon={FileText} title="View run report" onClick={() => actions.report(job.id)} />}
+              {isDone && (job.logPath || job.output.length > 0) && (
+                <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={() => actions.copyOutput(job.id)} />
+              )}
+              {!isRunning && !archived && (
+                <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={() => actions.archive(job.id)} />
+              )}
+              {archived && (
+                <IconAction icon={ArchiveRestore} title="Restore to the jobs list" onClick={() => actions.unarchive(job.id)} />
+              )}
+              {!isRunning && (
+                <IconAction
+                  icon={Trash2}
+                  title={job.worktreePath ? 'Discard changes' : 'Dismiss'}
+                  onClick={() => actions.discard(job.id)}
+                  danger
+                />
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 });

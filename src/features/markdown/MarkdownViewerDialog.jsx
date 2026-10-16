@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
 import { ChevronLeft, ChevronRight, X, Pin, PinOff } from 'lucide-react';
-import { RetroSpinner } from '../../components/ui/RetroSpinner';
+import { Scanner } from '../../components/instrument/Scanner';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 import './markdown.css';
@@ -169,7 +169,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
       <div className="flex-1 min-h-0 overflow-auto px-8 py-6">
         {loading ? (
           <div className="flex items-center justify-center p-8">
-            <RetroSpinner size={24} lineWidth={2} />
+            <Scanner size="lg" />
           </div>
         ) : error ? (
           <div className="p-4 text-center text-destructive">

@@ -5,8 +5,7 @@ import { SidebarFileSelection } from "../features/file-groups";
 import { useFileSelection } from "../features/file-groups";
 import { usePinnedFiles } from "../features/pinned-files";
 import { useMemo, useCallback } from "react";
-import { RetroSpinner } from "./ui/RetroSpinner";
-import { PaneInfo } from "./PaneInfo";
+import { Scanner } from "./instrument/Scanner";
 import { PaneLegend } from "./instrument/PaneLegend";
 import { useRowCursor } from "../hooks/useRowCursor";
 import {
@@ -66,7 +65,11 @@ export function LeftSidebar({
   return (
     <>
       <Sidebar ref={sidebarRef} collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" data-legend style={{ width: sidebarWidth }}>
-        <PaneLegend index={1} title="Files" />
+        <PaneLegend
+          index={1}
+          title="Files"
+          status={cursorIndex != null ? `${cursorIndex + 1}/${rowCount}` : rowCount}
+        />
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader
             onNavigateParent={viewMode === 'flat' ? onNavigateParent : undefined}
@@ -102,7 +105,7 @@ export function LeftSidebar({
                 treeLoading ? (
                   <div className="p-4 text-center">
                     <div className="flex flex-col items-center gap-3">
-                      <RetroSpinner size={20} lineWidth={2} />
+                      <Scanner size="lg" />
                       <div className="text-sm opacity-60 font-mono">Loading directory tree...</div>
                     </div>
                   </div>
@@ -164,9 +167,6 @@ export function LeftSidebar({
             />
           )}
         </SidebarContent>
-        <PaneInfo>
-          {cursorIndex != null ? `${cursorIndex + 1} of ${rowCount}` : `${rowCount} item${rowCount === 1 ? '' : 's'}`}
-        </PaneInfo>
       </Sidebar>
       <div
         className={`w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] transition-colors z-50 shrink-0 ${isResizing ? 'bg-[var(--ins-lamp)]' : ''}`}

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, Layers, Loader2, Network, ScanSearch, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Layers, Network, ScanSearch, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Scanner } from '@/components/instrument/Scanner';
 import { CHANGE_STYLE, getDesignColors } from './DesignNode';
 import { BODY_CHAR_W } from './designLayout';
 import { DOMAIN_BOX, layoutDomainLevel } from './domainLayout';
@@ -267,7 +268,7 @@ function DomainPanel({ model, id, edges, onSelect, onOpen, onShowParts, onExpand
             }
           >
             {expanding === id ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              <Scanner className="mr-1.5" />
             ) : (
               <ScanSearch className="w-3.5 h-3.5 mr-1.5" />
             )}

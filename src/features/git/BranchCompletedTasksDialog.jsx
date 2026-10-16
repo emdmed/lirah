@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle2, ChevronDown, ChevronRight, X, FileText, GitBranch } from 'lucide-react';
-import { RetroSpinner } from '../../components/ui/RetroSpinner';
+import { Scanner } from '../../components/instrument/Scanner';
 import { cn } from '@/lib/utils';
 
 /**
@@ -138,14 +138,14 @@ export function BranchCompletedTasksDialog({ open, onOpenChange, repoPath, branc
         {/* Loading States */}
         {!baseBranch && (
           <div className="flex items-center gap-2 py-4 justify-center">
-            <RetroSpinner size={13} />
+            <Scanner />
             <span className="text-xs text-muted-foreground font-mono">Detecting base branch...</span>
           </div>
         )}
         
         {(stage === 'loading' || stage === 'generating') && (
           <div className="flex items-center gap-2 py-4 justify-center">
-            <RetroSpinner size={13} />
+            <Scanner />
             <span className="text-xs text-muted-foreground font-mono">
               {stage === 'generating' ? '' : 'Loading...'}
             </span>

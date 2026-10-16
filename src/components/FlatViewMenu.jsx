@@ -52,8 +52,8 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
                 >
                   <div className="flex items-center w-full">
                     <div className="w-3 flex items-center" /> {/* Chevron placeholder for alignment */}
-                    <Folder className="w-3 h-3 ml-1 mr-1 text-folder" />
-                    <span className="truncate font-semibold text-folder" title={item.name}>{item.name}</span>
+                    <Folder className="w-3 h-3 ml-1 mr-1 text-muted-foreground" />
+                    <span className="truncate font-semibold text-foreground" title={item.name}>{item.name}</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>

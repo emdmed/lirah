@@ -6,7 +6,7 @@ import {
   PanelTop, PanelTopClose, Coins, BarChart3, FileText, FileX, Check, AlertCircle,
   Layers, X, Monitor
 } from 'lucide-react';
-import { RetroSpinner } from './ui/RetroSpinner';
+import { Scanner } from './instrument/Scanner';
 import { useWatcher } from '../features/watcher';
 import { useWatcherShortcut } from '../features/watcher';
 import { Button } from './ui/button';
@@ -53,7 +53,7 @@ function CliIcon({ cli }) {
 
 function ChangelogStatus({ status }) {
   const config = useMemo(() => ({
-    updating: { component: RetroSpinner, text: 'Updating changelog...', props: { size: 12, lineWidth: 1.5 } },
+    updating: { component: Scanner, text: 'Updating changelog...', props: {} },
     done: { lamp: 'ok', text: 'Changelog updated' },
     error: { lamp: 'fault', text: 'Changelog failed' }
   }), []);
@@ -101,59 +101,110 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
 }
 
 // Token gauge: context-window fill (or, before context data arrives, the
-// daily budget) plus the session's billable count. Hidden when neither a
-// ceiling nor billable usage is known.
-function ContextMeter({ tokenUsage, currentPath }) {
+// daily budget) plus the session's billable count, idle when neither a
+// ceiling nor billable usage is known. Every slot has a fixed width and an
+// idle placeholder so the centred gauge never shifts between tabs. Click
+// opens the token dashboard.
+function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
   const { getBudget, currentUsage, formatTokenCount } = useTokenBudget();
   const ctx = getContextFill(tokenUsage);
   const dailyLimit = getBudget(currentPath)?.dailyLimit;
   const fmt = (n) => (formatTokenCount ? formatTokenCount(n) : String(n));
+  const num = (n) => n.toLocaleString();
 
   const billableIn = tokenUsage?.billable_input_tokens || 0;
   const billableOut = tokenUsage?.billable_output_tokens || 0;
   const billable = billableIn + billableOut;
+  const cacheRead = tokenUsage?.cache_read_input_tokens || 0;
+  const cacheHit = cacheRead ? Math.round((cacheRead / (cacheRead + billableIn)) * 100) : null;
 
-  let legend, value, max;
+  let legend = 'Ctx', value = 0, max = 0;
   if (ctx) {
-    legend = 'Ctx'; value = ctx.used; max = ctx.max;
+    value = ctx.used; max = ctx.max;
   } else if (dailyLimit) {
     legend = 'Budget'; value = currentUsage.total; max = dailyLimit;
-  } else if (!billable) {
-    return null;
   }
   const pct = max ? Math.round((value / max) * 100) : null;
+  // Mirrors Meter's thresholds: the % only lights once it means something.
+  const pctTone = pct >= 95 ? 'tube tube-overflow' : pct >= 80 ? 'tube text-[var(--ins-warn)]' : 'tube-idle';
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center gap-3 px-1 cursor-default">
-          {legend && (
-            <span className="flex items-center gap-2">
-              <span className="ins-legend">{legend}</span>
-              <Meter value={value} max={max} size="lg" label={legend === 'Ctx' ? 'Context window' : 'Daily budget'} />
-              <span className="tube tabular-nums">{pct}%</span>
+        <span
+          role={onOpenDashboard ? 'button' : undefined}
+          tabIndex={onOpenDashboard ? 0 : undefined}
+          onClick={onOpenDashboard}
+          onKeyDown={(e) => {
+            if (onOpenDashboard && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpenDashboard(); }
+          }}
+          className={cn('flex items-center gap-3 px-1 focus-ring', onOpenDashboard ? 'cursor-pointer' : 'cursor-default')}
+        >
+          <span className="flex items-center gap-2">
+            <span className="ins-legend w-[7ch] shrink-0 text-right">{legend}</span>
+            <Meter
+              value={value}
+              max={max || 1}
+              size="lg"
+              readout={false}
+              label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}
+              className={max ? undefined : 'opacity-40'}
+            />
+            <span className={cn('w-[4ch] text-right', pct == null ? 'tube-idle' : pctTone)}>
+              {pct == null ? '--' : `${pct}%`}
             </span>
-          )}
-          {billable > 0 && (
-            <span className="flex items-baseline gap-1.5">
-              <span className="tabular-nums">{fmt(billable)}</span>
-              <span className="engraved-label">billable</span>
+          </span>
+          <span className="flex items-baseline gap-1.5">
+            <span className={cn('w-[6ch] text-right', billable ? 'tabular-nums' : 'tube-idle')}>
+              {billable ? fmt(billable) : '--'}
             </span>
-          )}
+            <span className="engraved-label">billable</span>
+          </span>
         </span>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        <div className="flex flex-col font-mono">
-          {ctx && <span>context {fmt(ctx.used)} / {fmt(ctx.max)} ({pct}%)</span>}
-          {billable > 0 && <span>billable {billable.toLocaleString()} (in {billableIn.toLocaleString()} · out {billableOut.toLocaleString()})</span>}
-          {tokenUsage?.cache_read_input_tokens ? <span>cache read {tokenUsage.cache_read_input_tokens.toLocaleString()} (free)</span> : null}
-          {dailyLimit ? <span>daily budget {fmt(currentUsage.total)} / {fmt(dailyLimit)}</span> : null}
+        <div className="grid grid-cols-[auto_auto_auto] gap-x-3 font-mono tabular-nums">
+          {ctx && (
+            <>
+              <span>context</span>
+              <span className="text-right">{num(ctx.used)} / {num(ctx.max)}</span>
+              <span className="text-right">{pct}%</span>
+            </>
+          )}
+          {dailyLimit ? (
+            <>
+              <span>daily budget</span>
+              <span className="text-right">{num(currentUsage.total)} / {num(dailyLimit)}</span>
+              <span className="text-right">{Math.round((currentUsage.total / dailyLimit) * 100)}%</span>
+            </>
+          ) : null}
+          {billable > 0 && (
+            <>
+              <span>billable</span>
+              <span className="text-right">{num(billable)}</span>
+              <span />
+              <span className="pl-2 opacity-70">├ in</span>
+              <span className="text-right opacity-70">{num(billableIn)}</span>
+              <span />
+              <span className="pl-2 opacity-70">└ out</span>
+              <span className="text-right opacity-70">{num(billableOut)}</span>
+              <span />
+            </>
+          )}
+          {cacheRead ? (
+            <>
+              <span>cache read</span>
+              <span className="text-right">{num(cacheRead)}</span>
+              <span className="text-right">{cacheHit}% hit</span>
+              <span className="col-span-3 opacity-70">cache reads bill at ≈0.1× input</span>
+            </>
+          ) : null}
+          {onOpenDashboard && <span className="col-span-3 mt-1 opacity-70">click for token metrics</span>}
         </div>
       </TooltipContent>
     </Tooltip>
   );
 }
-
 
 // Always shown so the row doesn't reflow between repos and plain dirs.
 // Click copies the branch name (without the dirty marker).
@@ -310,7 +361,7 @@ export const StatusBar = memo(({
   return (
     <>
     <div
-      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
     >
       {/* LEFT: branch + workspace + context. The tab itself names the project. */}
       <div className="flex items-center gap-1 overflow-hidden min-w-0">
@@ -376,12 +427,6 @@ export const StatusBar = memo(({
         )}
       </div>
 
-      {/* CENTRE: token gauge, the one live quantity on the rail. The wrapper
-          keeps the grid's middle column even when the gauge has nothing to show. */}
-      <div className="flex justify-center min-w-0">
-        <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} />
-      </div>
-
       {/* RIGHT: Runtime status + Settings */}
       <div className="flex items-center justify-end gap-1.5 min-w-0">
         {/* Transient status (changelog) — only visible when active */}
@@ -408,6 +453,13 @@ export const StatusBar = memo(({
             <NetworkSwitch isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
           )}
         </div>
+
+        {/* Token gauge, pinned against the fixed-width menu: the tab strip
+            shares this row and grows from the left, and the runtime zone
+            varies per tab (CLI name, net switch), so only this spot is stable. */}
+        <span className="ml-2">
+          <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} onOpenDashboard={onOpenDashboard} />
+        </span>
 
         {/* Settings — visually separated as the final anchor */}
         <span className="w-px h-4 bg-[var(--tui-line)] mx-1" aria-hidden="true" />

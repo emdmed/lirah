@@ -210,6 +210,7 @@ export function FileTree({
           return (
             <SidebarMenuItem key={row.key} className={`${itemClass} flex items-center gap-1 px-1 select-none`} style={style}>
               <span className="engraved-label">pinned</span>
+              <span className="ml-auto pr-1 text-[10px] tabular-nums text-muted-foreground">{pinnedPaths.length}</span>
             </SidebarMenuItem>
           );
         }

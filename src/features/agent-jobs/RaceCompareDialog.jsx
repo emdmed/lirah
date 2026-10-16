@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ChevronLeft, ChevronRight, X, Swords } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { RetroSpinner } from '../../components/ui/RetroSpinner';
+import { Scanner } from '../../components/instrument/Scanner';
 import { DiffContent } from '../git/DiffContent';
 import { cn } from '../../lib/utils';
 
@@ -196,7 +196,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
           </div>
         ) : loading ? (
           <div className="flex items-center justify-center p-8">
-            <RetroSpinner size={24} lineWidth={2} />
+            <Scanner size="lg" />
           </div>
         ) : !filePath ? (
           <div className="p-8 text-center text-sm text-muted-foreground">

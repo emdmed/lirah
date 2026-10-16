@@ -3,6 +3,10 @@ import { PanelButton } from './instrument/PanelButton';
 import { CornerLeftUp, RefreshCw } from 'lucide-react';
 import { BookmarksDropdown } from '../features/bookmarks';
 import { Keycap } from './instrument/Keycap';
+import { Scanner } from './instrument/Scanner';
+
+// Sync button face while the tree reloads.
+const SyncBusy = () => <Scanner />;
 
 export function SidebarHeader({
   searchQuery,
@@ -86,10 +90,9 @@ export function SidebarHeader({
             git
           </PanelButton>
           <PanelButton
-            icon={RefreshCw}
+            icon={treeLoading ? SyncBusy : RefreshCw}
             onClick={onSyncTree}
             disabled={treeLoading}
-            className={treeLoading ? '[&_svg]:animate-spin' : undefined}
             title="Sync file tree"
             aria-label="Sync file tree"
           />

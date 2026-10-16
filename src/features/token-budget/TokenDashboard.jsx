@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Download, FileSpreadsheet, FileJson, FileText, BarChart3 } from 'lucide-react';
-import { RetroSpinner } from '@/components/ui/RetroSpinner';
+import { Scanner } from '@/components/instrument/Scanner';
 import { EmptyState } from '@/components/EmptyState';
 import { TokenLineChart } from './token-dashboard/TokenLineChart';
 import { SessionEfficiencyPanel } from './token-dashboard/SessionEfficiencyPanel';
@@ -177,7 +177,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
   const LoadingSpinner = () => (
     <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-mono">
-      <RetroSpinner size={14} lineWidth={2} className="mr-2" />
+      <Scanner size="md" className="mr-2" />
       Loading...
     </div>
   );
@@ -245,7 +245,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                 disabled={refreshing}
               >
                 {refreshing ? (
-                  <RetroSpinner size={12} lineWidth={1.5} />
+                  <Scanner />
                 ) : (
                   <span className="w-3 h-3" />
                 )}

@@ -3,8 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, X, Pin, PinOff, MessageSquarePlus, Send, Trash2, Loader2 } from 'lucide-react';
-import { RetroSpinner } from '../../components/ui/RetroSpinner';
+import { ChevronLeft, ChevronRight, X, Pin, PinOff, MessageSquarePlus, Send, Trash2 } from 'lucide-react';
+import { Scanner } from '../../components/instrument/Scanner';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 
@@ -266,7 +266,7 @@ export function GitDiffDialog({
       >
         {loading ? (
           <div className="flex items-center justify-center p-8">
-            <RetroSpinner size={24} lineWidth={2} />
+            <Scanner size="lg" />
           </div>
         ) : error ? (
           <div className="p-4 text-center text-destructive">
@@ -350,7 +350,7 @@ export function GitDiffDialog({
               title="Re-run the agent in this worktree with every note attached"
             >
               {sendingAnnotations ? (
-                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                <Scanner className="mr-1" />
               ) : (
                 <Send className="w-3 h-3 mr-1" />
               )}

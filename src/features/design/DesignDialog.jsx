@@ -7,13 +7,13 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Scanner } from '@/components/instrument/Scanner';
 import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
   History,
   LayoutGrid,
-  Loader2,
   Maximize2,
   Minus,
   Network,
@@ -983,7 +983,7 @@ export function DesignDialog({
               <div className="font-mono text-[11px] text-muted-foreground ml-auto flex items-center gap-3">
                 {expanding && (
                   <span className="flex items-center gap-1 text-[var(--ins-lamp)]">
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Scanner />
                     detailing {domainModel.groups.get(expanding)?.label || expanding}…
                   </span>
                 )}

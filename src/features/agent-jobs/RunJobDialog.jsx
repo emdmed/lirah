@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput, AlertTriangle } from 'lucide-react';
+import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,10 @@ import {
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
+import { PanelButton } from '../../components/instrument/PanelButton';
+import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
+import { Lamp } from '../../components/instrument/Lamp';
+import { KeyChord } from '../../components/instrument/Keycap';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,9 +42,9 @@ const CLI_OPTIONS = [
 const MAX_COPIES = 3;
 
 const SOURCE_META = {
-  selected: { label: 'tree', icon: ListTree },
-  pinned: { label: 'pinned', icon: Pin },
-  group: { label: 'group', icon: FolderInput },
+  selected: { label: 'tree', hint: 'select in the tree', icon: ListTree },
+  pinned: { label: 'pinned', hint: 'pin a file', icon: Pin },
+  group: { label: 'group', hint: 'add a group', icon: FolderInput },
 };
 
 // Turn a template + chosen files + free-text into a single headless prompt.
@@ -258,93 +262,112 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     onOpenChange(false);
   };
 
+  const isolationHint = !isGitRepo
+    ? 'Not a git repository — runs in place, no diff review.'
+    : useWorktree
+    ? 'Changes stay in a separate worktree until you apply them.'
+    : 'Edits your working tree directly.';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col overflow-hidden">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-sm">
-            <Bot className="h-4 w-4" />
-            Run background agent
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            Dispatch a headless CLI-agent run. Output streams to the Jobs panel; changes are
-            reviewed before they touch your working tree.
+      <DialogContent
+        className="sm:max-w-[520px] max-w-[95vw] max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canRun) {
+            e.preventDefault();
+            handleRun();
+          }
+        }}
+      >
+        <DialogHeader className="shrink-0 gap-0">
+          <DialogTitle>Run background agent</DialogTitle>
+          <DialogDescription className="text-xs leading-relaxed">
+            Runs a headless agent and streams its output to the Jobs panel. You review the changes
+            before they reach your working tree.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 py-1 flex-1 min-h-0 overflow-y-auto">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Optional — defaults to template / file count"
-              className="h-7 min-w-[150px] flex-1 rounded border edge-engraved bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Name" htmlFor="job-name">
+              <input
+                id="job-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={template?.title || 'Optional'}
+                className={WELL_INPUT}
+              />
+            </Field>
+            <Field label="Template">
+              <Picker
+                value={template?.title || 'None'}
+                items={[{ id: null, name: 'None' }, ...templates.map((t) => ({ id: t.id, name: t.title }))]}
+                selectedId={templateId}
+                onSelect={setTemplateId}
+              />
+            </Field>
           </div>
 
-          <Picker
-            label="Template"
-            value={template?.title || 'None'}
-            items={[{ id: null, name: 'None' }, ...templates.map((t) => ({ id: t.id, name: t.title }))]}
-            selectedId={templateId}
-            onSelect={setTemplateId}
-          />
-
           {/* Context files: tree selection + pinned, with groups as an add-in */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Context files ({checkedFiles.length})
-              </span>
-              {groups.length > 0 && (
+          <Field
+            label="Context files"
+            count={checkedFiles.length}
+            action={
+              groups.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-                    >
-                      <FolderInput className="h-3 w-3" />
-                      Add file group
-                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </button>
+                    <PanelButton icon={FolderInput}>
+                      Add group
+                      <ChevronDown aria-hidden="true" className="opacity-60" />
+                    </PanelButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
                     {groups.map((g) => (
                       <DropdownMenuItem
                         key={g.id}
                         onClick={() => addGroup(g)}
-                        className="text-[11px] py-1.5"
+                        className="flex justify-between gap-4 text-[11px] py-1.5"
                       >
-                        {g.name} ({g.files.length})
+                        <span className="truncate">{g.name}</span>
+                        <span className="tube-idle">{g.files.length}</span>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
-            </div>
-
-            <div className="max-h-40 overflow-auto rounded border edge-engraved">
+              )
+            }
+          >
+            <div className="ins-well max-h-40 overflow-auto py-1">
               {candidates.length === 0 ? (
-                <div className="px-2 py-3 text-center text-[11px] text-muted-foreground">
-                  No files selected. Pick files in the tree, pin files, or add a group.
+                <div className="flex flex-col items-center gap-1.5 px-3 py-4 text-center text-[11px] text-muted-foreground">
+                  <span className="text-foreground/80">No files in context</span>
+                  <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                    {Object.values(SOURCE_META).map(({ hint, icon: Icon }) => (
+                      <span key={hint} className="inline-flex items-center gap-1">
+                        <Icon className="h-3 w-3" aria-hidden="true" />
+                        {hint}
+                      </span>
+                    ))}
+                  </span>
                 </div>
               ) : (
                 candidates.map((f) => {
                   const meta = SOURCE_META[f.source] || SOURCE_META.selected;
                   const Icon = meta.icon;
+                  const isOn = checked.has(f.relativePath);
+                  const slash = f.relativePath.lastIndexOf('/');
                   return (
                     <label
                       key={f.relativePath}
-                      className="flex cursor-pointer items-center gap-2 px-2 py-1 hover:bg-muted/40"
+                      className="flex cursor-pointer items-center gap-2 px-2 py-[3px] hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]"
                     >
-                      <Checkbox
-                        checked={checked.has(f.relativePath)}
-                        onCheckedChange={() => toggleFile(f.relativePath)}
-                      />
-                      <span className="flex-1 truncate font-mono text-[11px]">{f.relativePath}</span>
-                      <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
-                        <Icon className="h-2.5 w-2.5" />
+                      <Checkbox checked={isOn} onCheckedChange={() => toggleFile(f.relativePath)} />
+                      <span className={cn('min-w-0 flex-1 truncate text-[11px]', !isOn && 'opacity-50')}>
+                        <span className="text-muted-foreground">{f.relativePath.slice(0, slash + 1)}</span>
+                        <span className="text-foreground">{f.relativePath.slice(slash + 1)}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground" title={`From ${meta.label}`}>
+                        <Icon className="h-2.5 w-2.5" aria-hidden="true" />
                         {meta.label}
                       </span>
                     </label>
@@ -352,57 +375,49 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                 })
               )}
             </div>
-          </div>
+          </Field>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Instructions {template ? '(optional)' : ''}
-            </span>
+          <Field label={template ? 'Instructions · optional' : 'Instructions'} htmlFor="job-instructions">
             <textarea
+              id="job-instructions"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               rows={3}
               placeholder="e.g. Write unit tests for these files following existing conventions."
-              className="w-full resize-none rounded border edge-engraved bg-background px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+              className={cn(WELL_INPUT, 'h-auto resize-none py-2 leading-relaxed')}
             />
-          </div>
+          </Field>
 
           {/* Agents: pick one, or several to race them against each other. */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Agents ({clis.size})
-              </span>
-              {canRace && (
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <span>runs each</span>
+          <Field
+            label={canRace ? 'Agents · pick several to race' : 'Agent'}
+            action={
+              canRace && (
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span className="mr-1">runs each</span>
                   {Array.from({ length: MAX_COPIES }, (_, i) => i + 1).map((n) => (
-                    <button
+                    <PanelButton
                       key={n}
-                      type="button"
+                      aria-pressed={copies === n}
                       onClick={() => setCopies(n)}
-                      className={cn(
-                        'h-4 w-4 rounded-sm border text-[11px] leading-none tabular-nums',
-                        copies === n
-                          ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
-                          : 'edge-engraved hover:bg-muted/50'
-                      )}
+                      className={cn('w-6 tabular-nums', copies === n && 'text-[var(--ins-lamp)]')}
+                      aria-label={`${n} run${n === 1 ? '' : 's'} per agent`}
                     >
-                      {n}
-                    </button>
+                      {n}×
+                    </PanelButton>
                   ))}
-                  <span>×</span>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1">
+                </span>
+              )
+            }
+          >
+            <div className="flex flex-wrap gap-1.5">
               {CLI_OPTIONS.map((o) => {
                 const missing = availableClis && !availableClis.has(o.value);
                 const on = clis.has(o.value);
                 return (
-                  <button
+                  <PanelButton
                     key={o.value}
-                    type="button"
+                    latched={on}
                     disabled={missing && !on}
                     onClick={() => toggleCli(o.value)}
                     title={
@@ -413,104 +428,132 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                         : 'Racing needs isolated worktrees; picking swaps the agent'
                     }
                     className={cn(
-                      'rounded-sm border px-1.5 py-0.5 text-[11px] transition-colors',
-                      on
-                        ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
-                        : 'edge-engraved text-muted-foreground hover:bg-muted/50',
-                      missing && !on && 'opacity-40 cursor-not-allowed line-through'
+                      on && 'text-foreground',
+                      missing && !on && 'cursor-not-allowed opacity-40 line-through'
                     )}
                   >
                     {o.label}
-                  </button>
+                  </PanelButton>
                 );
               })}
             </div>
-            {candidateCount > 1 && (
-              <span className="text-[11px] leading-snug text-muted-foreground/70">
-                Races {candidateCount} candidates on the same prompt, one worktree each. Compare the
-                diffs, keep one — the rest are discarded.
-              </span>
-            )}
+          </Field>
+
+          <div className="flex items-center gap-3 edge-engraved px-3 py-2.5">
+            <ToggleSwitch
+              checked={useWorktree}
+              onChange={(v) => isGitRepo && setUseWorktree(v)}
+              disabled={!isGitRepo}
+              tone="lamp"
+              label="Isolated worktree"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-xs text-foreground">
+                {useWorktree ? (
+                  <GitBranch className="h-3 w-3 text-[var(--ins-lamp)]" aria-hidden="true" />
+                ) : (
+                  <FolderGit2 className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                )}
+                {useWorktree ? 'Isolated worktree' : 'In place'}
+              </div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">{isolationHint}</div>
+            </div>
           </div>
 
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => isGitRepo && setUseWorktree((v) => !v)}
-              disabled={!isGitRepo}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-70"
-              title={
-                !isGitRepo
-                  ? 'Not a git repository — jobs run in-place with no diff review'
-                  : useWorktree
-                  ? 'Runs in an isolated git worktree — changes quarantined until you apply them to your working tree'
-                  : 'Runs in-place — edits your working tree directly'
-              }
-            >
-              {useWorktree ? <GitBranch className="h-3 w-3 text-[var(--ins-lamp)]" /> : <FolderGit2 className="h-3 w-3" />}
-              {!isGitRepo ? 'In-place (no git repo)' : useWorktree ? 'Isolated worktree' : 'In-place'}
-            </button>
-          </div>
+          {candidateCount > 1 && (
+            <div className="flex items-start gap-2 text-[11px] leading-snug text-muted-foreground">
+              <Lamp state="on" className="mt-[3px]" />
+              <span>
+                <span className="text-foreground">Race · {candidateCount} candidates</span> on the same
+                prompt, one worktree each. Compare the diffs and keep one; the rest are discarded.
+              </span>
+            </div>
+          )}
+
+          {overlaps.length > 0 && (
+            <div className="flex items-start gap-2.5 edge-engraved px-3 py-2.5 text-[11px] leading-snug" role="alert">
+              <Lamp state="warn" className="mt-[3px]" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[var(--ins-warn)]">
+                  Overlaps {plural(overlaps.length, 'pending job')}
+                </div>
+                <ul className="mt-1 flex flex-col gap-0.5 text-muted-foreground">
+                  {overlaps.map((o) => (
+                    <li key={o.id} className="truncate">
+                      <span className="text-foreground/80">{o.label}</span>{' '}
+                      <span className="opacity-70">({o.status})</span> — {o.files.join(', ')}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1 text-muted-foreground/80">
+                  Both jobs will edit these files and you'll have to reconcile them. Consider splitting
+                  the work by file.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {overlaps.length > 0 && (
-          <div className="shrink-0 rounded border border-[var(--color-status-warning)]/40 bg-[var(--color-status-warning)]/10 px-2.5 py-2 text-[11px] leading-snug">
-            <div className="flex items-center gap-1.5 font-medium text-[var(--color-status-warning)]">
-              <AlertTriangle className="h-3 w-3 shrink-0" />
-              Overlaps {overlaps.length} pending job{overlaps.length === 1 ? '' : 's'}
-            </div>
-            <div className="mt-1 flex flex-col gap-1 text-muted-foreground">
-              {overlaps.map((o) => (
-                <div key={o.id} className="truncate">
-                  <span className="text-foreground/80">{o.label}</span>{' '}
-                  <span className="opacity-70">({o.status})</span> — {o.files.join(', ')}
-                </div>
-              ))}
-            </div>
-            <div className="mt-1 text-muted-foreground/70">
-              Both jobs will edit these files; you'll have to reconcile them. Consider splitting the work by file instead.
-            </div>
+        <DialogFooter className="shrink-0 items-center sm:justify-between">
+          <KeyChord keys={['^', '↵']} label="run" size="sm" className="text-[11px]" />
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="px-3 text-xs">
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleRun} disabled={!canRun} className="min-w-[96px] px-3 text-xs">
+              <Bot className="h-3 w-3" />
+              {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
+            </Button>
           </div>
-        )}
-
-        <DialogFooter className="shrink-0">
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleRun} disabled={!canRun}>
-            <Bot className="h-3 w-3 mr-1" />
-            {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Picker({ label, value, items, selectedId, onSelect, disabled = false }) {
+const WELL_INPUT =
+  'ins-well h-7 w-full min-w-0 px-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1';
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// A labelled form block: printed legend (with an optional count and a
+// right-aligned action) above its control.
+function Field({ label, count, action, htmlFor, children }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={disabled}>
-          <Button variant="outline" size="sm" className="h-7 min-w-[150px] justify-between text-xs">
-            <span className="truncate">{value}</span>
-            <ChevronDown className="h-3 w-3 opacity-60" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
-          {items.map((item) => (
-            <DropdownMenuItem
-              key={String(item.id)}
-              onClick={() => onSelect(item.id)}
-              className="flex items-center justify-between text-[11px] py-1.5"
-            >
-              <span className="truncate pr-2">{item.name}</span>
-              {selectedId === item.id && <Check className="h-3 w-3 text-[var(--ins-lamp)] flex-shrink-0" />}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-h-5 items-center justify-between gap-2">
+        <label htmlFor={htmlFor} className="ins-legend text-[10px]">
+          {label}
+          {count !== undefined && <span className="tube-idle ml-1.5">{count}</span>}
+        </label>
+        {action}
+      </div>
+      {children}
     </div>
+  );
+}
+
+function Picker({ value, items, selectedId, onSelect, disabled = false }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild disabled={disabled}>
+        <Button variant="outline" size="sm" className="h-7 w-full min-w-0 justify-between px-2 text-xs">
+          <span className="truncate">{value}</span>
+          <ChevronDown className="h-3 w-3 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
+        {items.map((item) => (
+          <DropdownMenuItem
+            key={String(item.id)}
+            onClick={() => onSelect(item.id)}
+            className="flex items-center justify-between text-[11px] py-1.5"
+          >
+            <span className="truncate pr-2">{item.name}</span>
+            {selectedId === item.id && <Check className="h-3 w-3 text-[var(--ins-lamp)] flex-shrink-0" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

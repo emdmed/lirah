@@ -322,7 +322,7 @@ export function TextareaPanel({
   const partCount = promptPreview?.sections?.length ?? 0;
 
   const toolbarRow = (
-    <div className="flex items-center justify-end gap-2 flex-nowrap">
+    <div className="flex items-center gap-2 flex-nowrap">
       {/* Every control carries its own label, so the two banks (project,
           prompt) are split by a rule rather than named. */}
       {projectZone}

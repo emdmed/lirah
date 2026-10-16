@@ -1,110 +1,125 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { useRef } from 'react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
-import { RetroSpinner } from '../../components/ui/RetroSpinner';
+import { Lamp } from '../../components/instrument/Lamp';
+import { KeyChord } from '../../components/instrument/Keycap';
+import { Scanner } from '../../components/instrument/Scanner';
+import { cn } from '../../lib/utils';
 
-const STATUS_COLORS = {
-  modified: 'var(--color-status-warning)',
-  added: 'var(--color-status-success)',
-  deleted: 'var(--color-status-critical)',
-  renamed: 'var(--color-status-info)',
-  untracked: 'var(--color-muted-foreground)',
+// `git status -s` style: one letter per file, coloured by kind.
+const STATUS = {
+  modified: { code: 'M', color: 'var(--ins-warn)' },
+  added: { code: 'A', color: 'var(--ins-ok)' },
+  deleted: { code: 'D', color: 'var(--ins-fault)' },
+  renamed: { code: 'R', color: 'var(--color-status-info)' },
+  untracked: { code: '?', color: 'var(--color-muted-foreground)' },
 };
 
-const statusConfig = {
-  modified: {
-    icon: (
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-      </svg>
-    ),
-    color: STATUS_COLORS.modified,
-    label: 'modified',
-  },
-  added: {
-    icon: (
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-    ),
-    color: STATUS_COLORS.added,
-    label: 'added',
-  },
-  deleted: {
-    icon: (
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      </svg>
-    ),
-    color: STATUS_COLORS.deleted,
-    label: 'deleted',
-  },
-  renamed: {
-    icon: (
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <path d="M7 16V4h10l-4 4 4 4H7" />
-        <path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8" />
-      </svg>
-    ),
-    color: STATUS_COLORS.renamed,
-    label: 'renamed',
-  },
-  untracked: {
-    icon: (
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <path d="M12 2v20M2 12h20" />
-      </svg>
-    ),
-    color: STATUS_COLORS.untracked,
-    label: 'untracked',
-  },
-};
+const statusOf = (s) => STATUS[s] || STATUS.untracked;
 
-function FileStatusBadge({ status }) {
-  const config = statusConfig[status] || statusConfig.untracked;
+// The three steps the hook walks through, in order.
+const STEPS = [
+  { id: 'scan', label: 'Stage', stages: ['loading-files'] },
+  { id: 'message', label: 'Message', stages: ['generating-message', 'ready'] },
+  { id: 'commit', label: 'Commit', stages: ['committing', 'done'] },
+];
+
+const stepIndex = (stage) => STEPS.findIndex((s) => s.stages.includes(stage));
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function StepLine({ stage, failedAt }) {
+  const current = stage === 'error' ? failedAt : stepIndex(stage);
   return (
-    <div
-      className="flex items-center gap-1.5 px-2 py-0.5 border border-current/30 bg-transparent"
-      style={{ color: config.color }}
-    >
-      {config.icon}
-      <span className="text-[11px] uppercase tracking-wider font-semibold">{config.label}</span>
-    </div>
+    <ol className="flex items-center gap-2 text-[11px]">
+      {STEPS.map((step, i) => {
+        let lamp = 'off';
+        let blink = false;
+        if (i < current || stage === 'done') lamp = 'ok';
+        else if (i === current) {
+          if (stage === 'error') lamp = 'fault';
+          else if (stage === 'ready') lamp = 'on';
+          else { lamp = 'on'; blink = true; }
+        }
+        const active = i === current && stage !== 'done';
+        return (
+          <li key={step.id} className="flex items-center gap-2">
+            {i > 0 && <span aria-hidden="true" className="h-px w-5 bg-[var(--ins-edge-strong)]" />}
+            <span className="flex items-center gap-1.5">
+              <Lamp state={lamp} blink={blink} />
+              <span className={cn('ins-legend text-[10px]', active ? 'text-foreground' : 'text-muted-foreground')}>
+                {step.label}
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
-function FileList({ files, maxHeight = 'max-h-[40vh]' }) {
-  if (files.length === 0) return null;
-
+// Per-kind tallies for the list header: `12 M  2 A  1 D`.
+function StatusTally({ files }) {
+  const counts = {};
+  for (const f of files) {
+    const { code } = statusOf(f.status);
+    counts[code] = (counts[code] || 0) + 1;
+  }
   return (
-    <div className={`${maxHeight} overflow-y-auto space-y-0`}>
-      {files.map((f, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-3 px-2 py-1.5 border-b border-border/30 last:border-b-0 hover:bg-muted/30 transition-colors group"
-        >
-          <FileStatusBadge status={f.status} />
-          <span className="text-xs font-mono text-muted-foreground break-all min-w-0">{f.path}</span>
-        </div>
-      ))}
-    </div>
+    <span className="flex items-center gap-2.5 text-[11px] tabular-nums">
+      {Object.values(STATUS)
+        .filter(({ code }) => counts[code])
+        .map(({ code, color }) => (
+          <span key={code} className="text-muted-foreground">
+            {counts[code]} <span className="font-semibold" style={{ color }}>{code}</span>
+          </span>
+        ))}
+    </span>
   );
 }
 
-
+function FileList({ files, className }) {
+  return (
+    <ul className={cn('overflow-y-auto py-1', className)}>
+      {files.map((f) => {
+        const { code, color } = statusOf(f.status);
+        const slash = f.path.lastIndexOf('/');
+        const dir = slash >= 0 ? f.path.slice(0, slash + 1) : '';
+        const base = slash >= 0 ? f.path.slice(slash + 1) : f.path;
+        return (
+          <li
+            key={f.path}
+            className="flex items-baseline gap-3 px-3 py-[3px] text-xs hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]"
+            title={`${f.status} — ${f.path}`}
+          >
+            <span className="w-3 shrink-0 text-center font-semibold" style={{ color }}>{code}</span>
+            <span className="min-w-0 truncate">
+              <span className="text-muted-foreground">{dir}</span>
+              <span className="text-foreground">{base}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export function AutoCommitDialog({ autoCommit }) {
   const { stage, files, commitMessage, setCommitMessage, error, confirm, cancel } = autoCommit;
   const isOpen = stage !== 'idle';
-  const isLoading = stage === 'loading-files' || stage === 'generating-message' || stage === 'committing';
-  const showSuccess = stage === 'done';
+  const canCommit = stage === 'ready' && commitMessage.trim().length > 0;
+  const showWork = files.length > 0 && stage !== 'done';
+
+  // Remember the step we were on, so an error lights the lamp where it failed.
+  const lastStepRef = useRef(0);
+  if (stage !== 'error' && stage !== 'idle') lastStepRef.current = Math.max(0, stepIndex(stage));
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) cancel(); }}>
       <DialogContent
-        className="sm:max-w-[650px] max-w-[95vw] max-h-[85vh] p-0 gap-0 overflow-hidden rounded-none"
+        className="sm:max-w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col gap-4 overflow-hidden"
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && stage === 'ready' && commitMessage.trim()) {
+          if (e.key === 'Enter' && !e.shiftKey && canCommit) {
             e.preventDefault();
             confirm(commitMessage);
           } else if (e.key === 'Escape') {
@@ -113,166 +128,126 @@ export function AutoCommitDialog({ autoCommit }) {
           }
         }}
       >
-        {/* Header */}
-        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border">
-          <DialogTitle className="text-base font-semibold font-mono tracking-tight">
-            {stage === 'error' ? '[ERROR] Auto Commit' : 'Auto Commit'}
-          </DialogTitle>
-        </DialogHeader>
+        <DialogTitle>Auto commit</DialogTitle>
+        <DialogDescription className="sr-only">
+          Stage every change, generate a commit message, review it and commit.
+        </DialogDescription>
 
-        {/* Content */}
-        <div className="px-6 py-4 space-y-4 overflow-y-auto">
-          {/* Success State */}
-          {showSuccess && (
-            <div
-              className="flex items-center gap-3 p-4 border"
-              style={{ borderColor: 'color-mix(in srgb, var(--color-status-success) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-success) 5%, transparent)' }}
-            >
-              <div
-                className="flex items-center justify-center w-8 h-8 border"
-                style={{ borderColor: 'color-mix(in srgb, var(--color-status-success) 40%, transparent)' }}
-              >
-                <svg className="w-4 h-4" style={{ color: 'var(--color-status-success)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium font-mono" style={{ color: 'var(--color-status-success)' }}>[SUCCESS] Commit complete</p>
-                <p className="text-xs text-muted-foreground mt-0.5 font-mono">{files.length} file{files.length !== 1 ? 's' : ''} committed</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error State */}
-          {stage === 'error' && (
-            <div
-              className="flex items-start gap-3 p-4 border"
-              style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-status-critical) 5%, transparent)' }}
-            >
-              <div
-                className="flex items-center justify-center w-8 h-8 border shrink-0"
-                style={{ borderColor: 'color-mix(in srgb, var(--color-status-critical) 40%, transparent)' }}
-              >
-                <svg className="w-4 h-4" style={{ color: 'var(--color-status-critical)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium font-mono" style={{ color: 'var(--color-status-critical)' }}>[ERROR] Commit failed</p>
-                <p className="text-xs mt-1 break-words font-mono" style={{ color: 'color-mix(in srgb, var(--color-status-critical) 80%, transparent)' }}>{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Loading States */}
+        <div className="flex shrink-0 items-center justify-between gap-3 pt-1">
+          <StepLine stage={stage} failedAt={lastStepRef.current} />
           {stage === 'loading-files' && (
-            <div className="flex items-center gap-3 py-8">
-              <RetroSpinner size={13} />
-              <span className="text-sm text-muted-foreground font-mono">Scanning repository for changes...</span>
-            </div>
-          )}
-
-          {stage === 'generating-message' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <RetroSpinner size={13} />
-                <span className="text-sm text-muted-foreground font-mono">Analyzing changes and generating message...</span>
-              </div>
-              {files.length > 0 && (
-                <div className="border border-border overflow-hidden">
-                  <div className="px-3 py-2 bg-muted/30 border-b border-border">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
-                      {files.length} file{files.length !== 1 ? 's' : ''} changed
-                    </span>
-                  </div>
-                  <div className="p-0">
-                    <FileList files={files} maxHeight="max-h-[25vh]" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Ready / Committing State */}
-          {(stage === 'ready' || stage === 'committing') && (
-            <div className="space-y-4">
-              {/* File List */}
-              <div className="border border-border overflow-hidden">
-                <div className="px-3 py-2 bg-muted/30 border-b border-border flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
-                    Changes
-                  </span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {files.length} file{files.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="p-0">
-                  <FileList files={files} />
-                </div>
-              </div>
-
-              {/* Commit Message */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
-                    Commit Message
-                  </label>
-                  <span className="text-[11px] text-muted-foreground font-mono">
-                    {commitMessage.length} chars
-                  </span>
-                </div>
-                <textarea
-                  value={commitMessage}
-                  onChange={(e) => setCommitMessage(e.target.value)}
-                  placeholder="Describe the changes..."
-                  className="w-full h-24 text-sm font-mono bg-muted/30 border border-border p-3 resize-none focus:outline-none focus:border-[var(--ins-lamp)] transition-all"
-                  disabled={stage === 'committing'}
-                  autoFocus
-                />
-              </div>
-            </div>
+            <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Scanner label="Scanning" />
+              scanning repository
+            </span>
           )}
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20">
-          <div className="flex items-center justify-between w-full">
-            <span className="text-xs text-muted-foreground font-mono">
-              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[11px]">Enter</kbd>
-              {' '}to commit{' '}
-              <kbd className="px-1.5 py-0.5 bg-muted border border-border text-[11px] ml-1">Esc</kbd>
-              {' '}to cancel
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={cancel}
-                disabled={stage === 'committing'}
-                className="text-xs"
-              >
-                Cancel
+        {stage === 'done' && (
+          <div className="flex items-start gap-3 edge-engraved px-3 py-3" role="status">
+            <Lamp state="ok" className="mt-1" />
+            <div className="min-w-0">
+              <p className="text-sm text-foreground">Committed {plural(files.length, 'file')}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{commitMessage.split('\n')[0]}</p>
+            </div>
+          </div>
+        )}
+
+        {stage === 'error' && (
+          <div className="flex items-start gap-3 edge-engraved px-3 py-3" role="alert">
+            <Lamp state="fault" className="mt-1" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-[var(--ins-fault)]">
+                {files.length === 0 ? 'Nothing to commit' : 'Commit failed'}
+              </p>
+              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                {error}
+              </pre>
+            </div>
+          </div>
+        )}
+
+        {showWork && (
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <section className="flex min-h-0 flex-col edge-engraved">
+              <header className="flex items-center justify-between gap-3 px-3 py-2 edge-b-engraved">
+                <span className="ins-legend text-[10px]">Changes · {files.length}</span>
+                <StatusTally files={files} />
+              </header>
+              <FileList files={files} className="max-h-[28vh]" />
+            </section>
+
+            <section className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label htmlFor="autocommit-message" className="ins-legend text-[10px]">Commit message</label>
+                {stage !== 'generating-message' && (
+                  <span className="tube-idle text-[11px]">{commitMessage.length} chars</span>
+                )}
+              </div>
+              {stage === 'generating-message' ? (
+                <div className="ins-well flex h-24 items-center justify-center gap-2.5 text-xs text-muted-foreground">
+                  <Scanner size="md" label="Generating" />
+                  writing message from the diff…
+                </div>
+              ) : (
+                <textarea
+                  id="autocommit-message"
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  placeholder="Describe the changes..."
+                  className="ins-well h-24 w-full resize-none px-3 py-2 text-xs leading-relaxed text-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1 disabled:opacity-60"
+                  disabled={stage === 'committing'}
+                  autoFocus
+                />
+              )}
+            </section>
+          </div>
+        )}
+
+        <footer className="flex shrink-0 items-center justify-between gap-3 pt-1">
+          <span className="flex items-center gap-3 text-[11px]">
+            {(stage === 'ready' || stage === 'generating-message') && (
+              <>
+                <KeyChord keys={['↵']} label="commit" size="sm" />
+                <KeyChord keys={['⇧', '↵']} label="new line" size="sm" />
+              </>
+            )}
+          </span>
+          <div className="flex gap-2">
+            {stage === 'done' || stage === 'error' ? (
+              <Button variant="ghost" size="sm" onClick={cancel} className="px-3 text-xs">
+                Close
               </Button>
-              {(stage === 'ready' || stage === 'committing') && (
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancel}
+                  disabled={stage === 'committing'}
+                  className="px-3 text-xs"
+                >
+                  Cancel
+                </Button>
                 <Button
                   size="sm"
                   onClick={() => confirm(commitMessage)}
-                  disabled={stage === 'committing' || !commitMessage.trim()}
-                  className="text-xs min-w-[80px]"
+                  disabled={!canCommit}
+                  className="min-w-[96px] px-3 text-xs"
                 >
                   {stage === 'committing' ? (
-                    <span className="flex items-center gap-2">
-                      <RetroSpinner size={16} />
+                    <>
+                      <Scanner label="Committing" />
                       Committing
-                    </span>
+                    </>
                   ) : (
                     'Commit'
                   )}
                 </Button>
-              )}
-            </div>
+              </>
+            )}
           </div>
-        </DialogFooter>
+        </footer>
       </DialogContent>
     </Dialog>
   );

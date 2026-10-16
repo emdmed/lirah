@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/index.css"
+        ],
+        "createdAt": "2026-10-16T06:41:52.006Z",
+        "reason": "Claude triage: L977-978 are transparent border-left/right widths forming the CSS-triangle meter needle (.ins-meter-needle), not a coloured side accent"
+      }
+    ]
+  }
+}

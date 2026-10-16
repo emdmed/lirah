@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RetroSpinner } from '@/components/ui/RetroSpinner';
+import { Scanner } from '@/components/instrument/Scanner';
 import {
   CheckCircle2, AlertTriangle, XCircle, Download,
   FileText, Code, GitBranch, Shield, Puzzle
@@ -103,7 +103,7 @@ function WorkflowRow({ workflow, projectPath, orchestrationCheck, onRefresh, toa
           onClick={handleInstall}
           disabled={installing}
         >
-          {installing ? <RetroSpinner size={8} lineWidth={1} /> : <Download className="w-2.5 h-2.5" />}
+          {installing ? <Scanner /> : <Download className="w-2.5 h-2.5" />}
           Install
         </Button>
       ) : (
@@ -162,7 +162,7 @@ export function OrchestrationDashboard({
 
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2">
-            <RetroSpinner size={16} lineWidth={2} />
+            <Scanner size="md" />
             <span className="text-xs opacity-60">Loading status...</span>
           </div>
         ) : !isConfigured ? (
@@ -211,7 +211,7 @@ export function OrchestrationDashboard({
                 )
               ) : (
                 <div className="flex items-center gap-2">
-                  <RetroSpinner size={10} lineWidth={1} />
+                  <Scanner />
                   <span className="opacity-40">Loading workflows...</span>
                 </div>
               )}

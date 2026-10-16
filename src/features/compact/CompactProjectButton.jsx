@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RetroSpinner } from "@/components/ui/RetroSpinner";
+import { Scanner } from "@/components/instrument/Scanner";
 import { Scan, Zap, Sparkles, FileX, Layers } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -25,7 +25,7 @@ export function CompactProjectButton({ onClick, isCompacting, progress, disabled
       case 'parsing':
         return { Icon: Zap, iconClass: 'animate-pulse', text: progressText };
       case 'finishing':
-        return { Component: RetroSpinner, props: { size: 12, lineWidth: 1.5 }, text: 'Finishing...' };
+        return { Component: Scanner, props: {}, text: 'Finishing...' };
       case 'empty':
         return { Icon: FileX, iconClass: '', text: 'No files' };
       default:

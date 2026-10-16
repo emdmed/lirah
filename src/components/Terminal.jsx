@@ -61,7 +61,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       data-pane="2"
       data-title="[2] terminal"
       data-legend
-      className={`tui-pane px-2.5 pb-3 terminal-wrapper ${isFocused
+      className={`tui-pane px-1.5 pb-3 terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
         }`}

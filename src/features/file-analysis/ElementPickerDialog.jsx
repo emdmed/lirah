@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Search, ChevronDown, ChevronRight, Check } from "lucide-react";
-import { RetroSpinner } from "@/components/ui/RetroSpinner";
+import { Scanner } from "@/components/instrument/Scanner";
 import { invoke } from "@tauri-apps/api/core";
 import { isBabelParseable } from "./babelSupport";
 import { analyzeSkeleton as extractBabelSkeleton } from "./babelClient";
@@ -331,7 +331,7 @@ export function ElementPickerDialog({
         <div className="flex-1 overflow-y-auto min-h-0 py-2">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <RetroSpinner size={24} lineWidth={2} />
+              <Scanner size="lg" />
             </div>
           ) : error ? (
             <div className="text-center py-8 text-sm text-destructive">
