@@ -448,13 +448,12 @@ export function RightSidebar({ projectPath }) {
     >
       <PaneLegend
         index={4}
-        title={tab === 'tabs' ? 'Tabs' : tab === 'jobs' ? 'Jobs' : 'Agents'}
+        title="Workspace"
         status={
-          tab === 'tabs' ? `${openTabs.length} open`
-            : tab === 'jobs' ? (runningJobs > 0 ? `${runningJobs} running` : undefined)
-            : (totalActiveCount > 0 ? `${totalActiveCount} active` : undefined)
+          runningJobs > 0 ? `${runningJobs} running`
+            : totalActiveCount > 0 ? `${totalActiveCount} active` : undefined
         }
-        lamp={tab !== 'tabs' && (tab === 'jobs' ? runningJobs : totalActiveCount) > 0 ? 'on' : undefined}
+        lamp={runningJobs + totalActiveCount > 0 ? 'on' : undefined}
         trailing={
           <>
             <KeyChord keys={['alt', '4']} size="sm" />

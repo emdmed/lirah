@@ -127,7 +127,7 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
   const pct = max ? Math.round((value / max) * 100) : null;
   const heavy = !!ctx && ctx.used > HEAVY_CONTEXT_TOKENS;
   // Mirrors Meter's thresholds: the readout only lights once it means something.
-  const tone = pct >= 95 ? 'tube tube-overflow' : pct >= 80 || heavy ? 'tube text-[var(--ins-warn)]' : 'text-foreground';
+  const tone = pct >= 95 ? 'tube tube-overflow' : pct >= 80 || heavy ? 'text-[var(--ins-warn)]' : 'text-foreground';
 
   return (
     <Tooltip>
@@ -151,10 +151,12 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
             label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}
             className={max ? undefined : 'opacity-40'}
           />
-          <span className={cn('flex items-baseline gap-1.5 tabular-nums', pct == null ? 'tube-idle' : tone)}>
-            <span className="w-[5ch] text-right">{max ? fmt(value) : '--'}</span>
-            <span className="opacity-50">/</span>
-            <span className="w-[4ch]">{max ? fmt(max) : '--'}</span>
+          <span className={cn('flex items-baseline gap-2 tabular-nums', pct == null ? 'tube-idle' : tone)}>
+            <span className="flex items-baseline">
+              <span className="w-[6ch] text-right">{max ? fmt(value) : '--'}</span>
+              <span className="px-0.5 opacity-50">/</span>
+              <span className="w-[5ch]">{max ? fmt(max) : '--'}</span>
+            </span>
             <span className="w-[4ch] text-right">{pct == null ? '--' : `${pct}%`}</span>
           </span>
         </span>

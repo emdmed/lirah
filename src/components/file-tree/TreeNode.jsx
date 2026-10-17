@@ -1,7 +1,6 @@
 import React, { memo } from "react";
 import { FolderNode } from "./FolderNode";
 import { FileNode } from "./FileNode";
-import { GUIDE_INDENT } from "./constants";
 import { isDimmedEntry } from "./utils/lsColors";
 
 /**
@@ -27,7 +26,6 @@ export const TreeNode = memo(function TreeNode({
   onActivateFile,
   onTogglePin,
 }) {
-  const guide = depth > 0 ? GUIDE_INDENT.repeat(depth) : "";
   const isDimmed = isDimmedEntry(name);
 
   return (
@@ -36,7 +34,7 @@ export const TreeNode = memo(function TreeNode({
         <FolderNode
           path={path}
           name={name}
-          guide={guide}
+          depth={depth}
           isExpanded={isExpanded}
           isCurrentPath={isCurrentPath}
           isCursor={isCursor}
@@ -46,7 +44,7 @@ export const TreeNode = memo(function TreeNode({
         <FileNode
           path={path}
           name={name}
-          guide={guide}
+          depth={depth}
           isCurrentPath={isCurrentPath}
           isCursor={isCursor}
           isSelected={isSelected}

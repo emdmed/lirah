@@ -6,6 +6,8 @@ function formatCompact(n) {
   return String(Math.round(n));
 }
 
+const TICKS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
 // A meter for a quantity with a ceiling: ticks every 10%, a 3px fill that
 // turns warn at `warnAt` and fault at 95%, a hatched red zone, and a
 // lamp-coloured needle. Readout uses tabular numerals; `readout={false}`
@@ -30,7 +32,11 @@ export function Meter({ value, max, warnAt = 0.8, label, format = formatCompact,
       aria-valuemax={max}
     >
       <span className="ins-meter-scale" aria-hidden="true">
-        <span className="ins-meter-ticks" />
+        <span className="ins-meter-ticks">
+          {TICKS.map((t) => (
+            <span key={t} data-major={t % 50 === 0 || undefined} style={{ left: `${t}%` }} />
+          ))}
+        </span>
         <span className="ins-meter-track" />
         <span className="ins-meter-zone" style={{ left: `${warnAt * 100}%` }} />
         <span className="ins-meter-fill" style={{ width: pct }} />

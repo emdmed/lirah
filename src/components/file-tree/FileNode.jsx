@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { GitStatsBadge } from "../../features/git/GitStatsBadge";
-import { GUIDE_INDENT } from "./constants";
+import { TreeGuide } from "./TreeGuide";
 import { gitColorClass } from "./utils/lsColors";
 
 /**
@@ -10,7 +10,7 @@ import { gitColorClass } from "./utils/lsColors";
 export function FileNode({
   path,
   name,
-  guide,
+  depth,
   isCurrentPath,
   isCursor,
   isSelected,
@@ -45,16 +45,18 @@ export function FileNode({
       data-nav-row
       data-cursor={isCursor ? '' : undefined}
       data-selected={isSelected || undefined}
-      className={`group flex h-[18px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
+      className={`group flex h-[22px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
       <div
-        className={`flex items-center justify-start min-w-0 flex-1 gap-0.5 ${isDeleted ? 'cursor-default' : 'cursor-pointer'}`}
+        className={`flex items-center justify-start self-stretch min-w-0 flex-1 ${isDeleted ? 'cursor-default' : 'cursor-pointer'}`}
         onClick={handleFileClick}
         data-nav-activate
       >
-        <span className="tui-tree-guide shrink-0 whitespace-pre" style={{ fontSize: 'var(--font-lg)' }}>{guide}{GUIDE_INDENT}</span>
-        <span className={`truncate leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{name}</span>
+        <TreeGuide depth={depth} />
+        {/* Chevron-width slot so file names share a column with folder names */}
+        <span className="w-2.5 shrink-0" />
+        <span className={`truncate pl-1 leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{name}</span>
 
         {/* Git stats badge */}
         {hasGitChanges && (

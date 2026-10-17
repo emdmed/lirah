@@ -8,7 +8,7 @@ import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtil
 import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
 
-// Row pitch: an 18px row plus the 4px gap the (non-virtual) menu used to add.
+// Row pitch: rows fill it edge to edge so indent guides run unbroken.
 const ROW_HEIGHT = 22;
 const HEADER_HEIGHT = 18;
 const SEPARATOR_HEIGHT = 9;

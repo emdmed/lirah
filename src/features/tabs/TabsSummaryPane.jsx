@@ -73,8 +73,9 @@ export function TabsSummaryPane() {
             }}
             title={`${tab.projectPath}\n${activity.label}${activity.since ? ` · ${activity.since}` : ''}`}
             aria-current={active ? 'page' : undefined}
+            data-marker="top"
             className={cn(
-              'group flex flex-col gap-1.5 px-2.5 py-3 text-left text-[11px] cursor-pointer edge-b-engraved',
+              'group flex flex-col gap-1 px-2.5 py-2 text-left text-[11px] cursor-pointer edge-b-engraved',
               active ? 'ins-row-selected' : 'hover:bg-foreground/5',
             )}
           >
@@ -107,7 +108,7 @@ export function TabsSummaryPane() {
                 </span>
               )}
             </div>
-            <div className="flex pl-[18px] min-w-0">
+            <div className="flex pl-[13px] min-w-0">
               {info?.branch ? (
                 <span
                   role="button"
@@ -122,7 +123,7 @@ export function TabsSummaryPane() {
               )}
             </div>
             {info?.branch && (
-              <div className="flex items-center gap-1.5 pl-[18px] min-w-0 whitespace-nowrap text-muted-foreground">
+              <div className="flex items-center gap-1.5 pl-[13px] min-w-0 whitespace-nowrap text-muted-foreground">
                 {info.files === 0 ? (
                   <span>clean</span>
                 ) : (

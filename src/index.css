@@ -489,10 +489,19 @@ body {
   }
 }
 
-/* File tree indentation: blank columns that carry the cursor marker. */
+/* File tree indentation: an 8px lead column for the cursor marker, then a
+   14px step per depth with a hairline guide under the parent's chevron
+   (chevron 10px + name inset 4px = one step, so children sit under the
+   parent's name). */
 .tui-tree-guide {
-  font-family: var(--font-glyph);
-  color: var(--ins-edge);
+  --tree-lead: 8px;
+  --tree-step: 14px;
+  position: relative;
+  align-self: stretch;
+  flex-shrink: 0;
+  width: calc(var(--tree-lead) + var(--depth, 0) * var(--tree-step));
+  background: repeating-linear-gradient(to right, transparent 0 4.5px, var(--ins-edge) 4.5px 5.5px, transparent 5.5px var(--tree-step))
+    var(--tree-lead) 0 / calc(100% - var(--tree-lead)) 100% no-repeat;
   user-select: none;
 }
 
@@ -530,15 +539,14 @@ body {
 
 /* Tree rows draw the marker over the guide's trailing space; flat rows at
    the left edge. */
-[data-nav-row][data-cursor] .tui-tree-guide {
-  position: relative;
-}
-
 [data-nav-row][data-cursor] .tui-tree-guide::after {
   content: "›";
   position: absolute;
   right: 0;
-  width: 1ch;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--tree-lead);
+  line-height: 1;
   text-align: center;
   color: var(--ins-lamp);
 }
@@ -579,6 +587,13 @@ body {
   line-height: 1;
   color: var(--ins-lamp);
   pointer-events: none;
+}
+
+/* Multi-line rows (tab cards) pin the marker to their first line. */
+.ins-row-selected[data-marker="top"]::before {
+  top: 0.5rem;
+  transform: none;
+  line-height: 1rem;
 }
 
 /*
@@ -916,16 +931,25 @@ body {
     flex-shrink: 0;
   }
 
+  /* Ticks are positioned spans, so they round to the same pixels as the
+     fill and needle; majors at 0/50/100% run full height. */
   .ins-meter-ticks {
     position: absolute;
     inset: 0 0 4px 0;
-    background:
-      linear-gradient(to right, transparent calc(50% - 0.5px), var(--ins-edge-strong) calc(50% - 0.5px), var(--ins-edge-strong) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
-      repeating-linear-gradient(to right, var(--ins-edge-strong) 0 1px, transparent 1px 10%);
-    background-size: 100% 100%, 100% 50%;
-    background-position: 0 0, 0 100%;
-    background-repeat: no-repeat;
   }
+
+  .ins-meter-ticks > span {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    height: 50%;
+    margin-left: -0.5px;
+    background: var(--ins-edge-strong);
+  }
+
+  .ins-meter-ticks > span[data-major] { height: 100%; }
+  .ins-meter-ticks > span:first-child { margin-left: 0; }
+  .ins-meter-ticks > span:last-child { margin-left: -1px; }
 
   .ins-meter-zone {
     position: absolute;
@@ -946,6 +970,7 @@ body {
     bottom: 0;
     height: 3px;
     background: var(--ins-well);
+    box-shadow: inset 0 0 0 1px var(--ins-edge);
   }
 
   .ins-meter-fill {
