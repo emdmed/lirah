@@ -14,6 +14,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "../../hooks/useCwdMonitor";
 import { useBranchName } from "../git/useBranchName";
 import { registerTabSession } from "./terminalActivity";
+import { registerTabPrompt } from "./tabPrompts";
+import { useLinkedRepos } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
 import { lazyNamed } from "../../lib/lazyNamed";
@@ -143,6 +145,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const promptStore = usePromptStore();
   const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
+  const { linkedRepos, clearLinkedRepos } = useLinkedRepos(tabId);
   const [viewMode, setViewMode] = useState('flat');
 
   // Template state
@@ -496,6 +499,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     getPatternInstructions: patterns.getPatternInstructions,
     clearPatterns: patterns.clearPatterns,
     clearSelectedTemplate,
+    linkedRepos,
+    clearLinkedRepos,
   });
 
   // The composer's payload preview. Built with the same function the sender
@@ -516,11 +521,12 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     compactedProject: compact.compactedProject,
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
+    linkedRepos,
   }), [
     fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
     elementPicker.selectedElements, compact.compactedProject,
-    patterns.selectedPatterns, patterns.getPatternInstructions,
+    patterns.selectedPatterns, patterns.getPatternInstructions, linkedRepos,
   ]);
 
   const handleClearPromptSection = useCallback((sectionId) => {
@@ -529,7 +535,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     else if (sectionId === 'elements') elementPicker.clearSelectedElements();
     else if (sectionId === 'template') setSelectedTemplateId(null);
     else if (sectionId === 'patterns') patterns.clearPatterns();
-  }, [compact.setCompactedProject, fileSelection.clearFileSelection, elementPicker.clearSelectedElements, patterns.clearPatterns]);
+    else if (sectionId === 'repos') clearLinkedRepos();
+  }, [compact.setCompactedProject, fileSelection.clearFileSelection, elementPicker.clearSelectedElements, patterns.clearPatterns, clearLinkedRepos]);
 
   const [promptPreviewOpen, setPromptPreviewOpen] = useState(() => {
     try { return localStorage.getItem('lirah:promptPreviewOpen') === 'true'; } catch { return false; }
@@ -591,6 +598,20 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     if (!terminalSessionId || !tabId) return;
     return registerTabSession(tabId, terminalSessionId);
   }, [tabId, terminalSessionId]);
+
+  // Lets the tabs summary pane link other repos into this tab's prompt.
+  useEffect(() => {
+    if (!tabId) return;
+    return registerTabPrompt(tabId, {
+      open: () => {
+        setTextareaVisible(true);
+        requestAnimationFrame(() => textareaRef.current?.focus());
+      },
+    });
+  }, [tabId]);
+
+  // A closed tab's links go with it.
+  useEffect(() => () => clearLinkedRepos(), [clearLinkedRepos]);
 
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd, isActive);
@@ -851,6 +872,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               onUpdateCompactedProject={compact.setCompactedProject}
               selectedElements={elementPicker.selectedElements}
               onClearElements={elementPicker.clearSelectedElements}
+              linkedRepos={linkedRepos}
               atMentionActive={atMention.atMentionQuery !== null}
               atMentionQuery={atMention.atMentionQuery || ''}
               atMentionResults={atMention.atMentionDisplayedResults}

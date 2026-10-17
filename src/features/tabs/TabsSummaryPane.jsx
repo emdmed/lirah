@@ -1,4 +1,12 @@
+import { Link2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
 import { Lamp } from '../../components/instrument/Lamp';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { useBookmarks } from '../bookmarks';
@@ -6,6 +14,9 @@ import { useToast } from '../toast';
 import { useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
+import { getTabPrompt } from './tabPrompts';
+import { linkRepo, setLinkedRepoRole, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
+import { REPO_ROLES as ROLES, repoRoleLabel as roleLabel } from './repoRoles';
 
 // Output within this window counts as the terminal currently working.
 const ACTIVE_MS = 2500;
@@ -37,11 +48,12 @@ function tabActivity(tabId, cliName, now) {
 }
 
 export function TabsSummaryPane() {
-  const { tabs, activeTabId, switchTab, removeTab } = useTabManager();
+  const { tabs, activeTabId, switchTab, removeTab, setTabRole } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
   const { bookmarks } = useBookmarks();
   const toast = useToast();
+  const { linkedRepos } = useLinkedRepos(activeTabId);
 
   const copyBranch = async (e, branch) => {
     e.stopPropagation();
@@ -53,12 +65,30 @@ export function TabsSummaryPane() {
     }
   };
 
+  // Toggles another tab's repo in the active tab's prompt, so the agent knows
+  // the feature spans more than one repo.
+  const toggleLink = (e, tab, name, linked) => {
+    e.stopPropagation();
+    if (linked) {
+      unlinkRepo(activeTabId, tab.projectPath);
+      return;
+    }
+    linkRepo(activeTabId, { path: tab.projectPath, name, role: tab.role });
+    getTabPrompt(activeTabId)?.open();
+  };
+
+  const setRole = (tab, role) => {
+    setTabRole(tab.id, role);
+    setLinkedRepoRole(tab.projectPath, role || undefined);
+  };
+
   return (
     <div className="flex flex-col">
       {tabs.map((tab) => {
         const info = repo[tab.id];
         const activity = tabActivity(tab.id, cli[tab.id], now);
         const active = tab.id === activeTabId;
+        const linked = !active && linkedRepos.some((r) => r.path === tab.projectPath);
         const name =
           bookmarks.find((b) => b.path === tab.projectPath)?.name ?? tab.label;
         return (
@@ -75,7 +105,7 @@ export function TabsSummaryPane() {
             aria-current={active ? 'page' : undefined}
             data-marker="top"
             className={cn(
-              'group flex flex-col gap-1 px-2.5 py-2 text-left text-[11px] cursor-pointer edge-b-engraved',
+              'group flex flex-col gap-1.5 px-3 py-3 text-left text-[11px] cursor-pointer edge-b-engraved',
               active ? 'ins-row-selected' : 'hover:bg-foreground/5',
             )}
           >
@@ -89,6 +119,55 @@ export function TabsSummaryPane() {
               >
                 {name}
               </span>
+              {/* Portalled menu clicks still bubble through React to the row. */}
+              <span className="contents" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <span
+                      role="button"
+                      title="Tag repo role"
+                      className={cn(
+                        'ml-auto shrink-0 px-1 text-[10px] font-mono edge-engraved hover:text-[var(--ins-lamp)]',
+                        tab.role
+                          ? 'text-muted-foreground'
+                          : 'text-muted-foreground/60 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100',
+                      )}
+                    >
+                      {roleLabel(tab.role) ?? 'tag'}
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="text-xs">
+                    <DropdownMenuRadioGroup
+                      value={tab.role ?? ''}
+                      onValueChange={(v) => setRole(tab, v)}
+                    >
+                      {ROLES.map((r) => (
+                        <DropdownMenuRadioItem key={r.value} value={r.value}>
+                          {r.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                      <DropdownMenuRadioItem value="">None</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
+              {!active && (
+                <span
+                  role="button"
+                  aria-pressed={linked}
+                  aria-label={linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`}
+                  title={linked ? 'Linked to the current prompt — click to unlink' : 'Link this repo into the current prompt'}
+                  onClick={(e) => toggleLink(e, tab, name, linked)}
+                  className={cn(
+                    'inline-flex items-center justify-center w-4 h-4 shrink-0',
+                    linked
+                      ? 'text-[var(--ins-lamp)] hover:text-[var(--ins-fault)]'
+                      : 'text-muted-foreground hover:text-[var(--ins-lamp)] opacity-0 group-hover:opacity-100',
+                  )}
+                >
+                  <Link2 className="h-3 w-3" />
+                </span>
+              )}
               {closable && (
                 <span
                   role="button"
@@ -98,7 +177,7 @@ export function TabsSummaryPane() {
                     removeTab(tab.id);
                   }}
                   className={cn(
-                    'ml-auto inline-flex items-center justify-center w-4 h-4 shrink-0 text-muted-foreground hover:text-[var(--ins-fault)]',
+                    'inline-flex items-center justify-center w-4 h-4 shrink-0 text-muted-foreground hover:text-[var(--ins-fault)]',
                     active
                       ? 'opacity-60 group-hover:opacity-100'
                       : 'opacity-0 group-hover:opacity-100',
@@ -123,7 +202,7 @@ export function TabsSummaryPane() {
               )}
             </div>
             {info?.branch && (
-              <div className="flex items-center gap-1.5 pl-[13px] min-w-0 whitespace-nowrap text-muted-foreground">
+              <div className="flex items-center gap-1.5 pl-[13px] min-w-0 whitespace-nowrap text-[10px] text-muted-foreground">
                 {info.files === 0 ? (
                   <span>clean</span>
                 ) : (

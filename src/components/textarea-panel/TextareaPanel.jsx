@@ -10,6 +10,7 @@ import { withPromptText } from "../../hooks/buildPrompt";
 import { ProjectToolbar } from "./ProjectToolbar";
 import { PromptToolbar } from "./PromptToolbar";
 import { ElementsIndicator } from "./ElementsIndicator";
+import { LinkedReposIndicator } from "./LinkedReposIndicator";
 import { CompactedIndicator } from "./CompactedIndicator";
 import { TextareaArea } from "./TextareaArea";
 import { PatternsSelector } from "../../features/patterns";
@@ -54,6 +55,7 @@ export function TextareaPanel({
   onUpdateCompactedProject,
   selectedElements,
   onClearElements,
+  linkedRepos = [],
   atMentionActive = false,
   atMentionQuery = '',
   atMentionResults = null,
@@ -218,7 +220,7 @@ export function TextareaPanel({
 
   const handleSend = useCallback(() => { onSend(); }, [onSend]);
 
-  const isSendDisabled = disabled || budgetExhausted || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0);
+  const isSendDisabled = disabled || budgetExhausted || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0 && linkedRepos.length === 0);
 
   // Overflow is a visible mechanical event on this panel: a disabled control
   // states its reason rather than dimming to 50% with nothing said.
@@ -350,6 +352,7 @@ export function TextareaPanel({
           </Tooltip>
         </div>
       )}
+      <LinkedReposIndicator linkedRepos={linkedRepos} />
     </div>
   );
 

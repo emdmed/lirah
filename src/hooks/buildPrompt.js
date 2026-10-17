@@ -1,3 +1,4 @@
+import { repoRoleLabel } from "../features/tabs/repoRoles";
 import { LARGE_FILE_INSTRUCTION } from "../features/file-groups";
 import { escapeShellPath, getRelativePath } from "../utils/pathUtils";
 
@@ -96,6 +97,7 @@ export function buildPrompt({
   compactedProject,
   selectedPatterns,
   getPatternInstructions,
+  linkedRepos,
 }) {
   const files = selectedFiles || new Set();
   const elements = selectedElements || new Map();
@@ -126,6 +128,20 @@ export function buildPrompt({
       // Not clearable from here: the textarea below is already the control for
       // it, and a one-click wipe of typed prose is the wrong kind of undoable.
       clearable: false,
+    });
+  }
+
+  if (linkedRepos?.length > 0) {
+    const lines = linkedRepos.map((r) => {
+      const role = repoRoleLabel(r.role);
+      return `- ${escapeShellPath(r.path)}${role ? ` (${role})` : ''}`;
+    });
+    sections.push({
+      id: 'repos',
+      label: 'LINKED REPOS',
+      body: `This task also spans these repos (absolute paths); read and change them as needed:\n${lines.join('\n')}`,
+      clearable: true,
+      count: linkedRepos.length,
     });
   }
 

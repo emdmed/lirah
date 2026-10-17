@@ -105,13 +105,19 @@ export function TabProvider({ children }) {
     ));
   }, []);
 
+  // role tags a tab's repo (ui / api / db) for linking it into another prompt.
+  const setTabRole = useCallback((tabId, role) => {
+    setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, role: role || undefined } : t)));
+  }, []);
+
   const actions = useMemo(() => ({
     addTab,
     removeTab,
     switchTab,
     reorderTab,
     updateTabPath,
-  }), [addTab, removeTab, switchTab, reorderTab, updateTabPath]);
+    setTabRole,
+  }), [addTab, removeTab, switchTab, reorderTab, updateTabPath, setTabRole]);
 
   const value = useMemo(() => ({ tabs, activeTabId, ...actions }), [tabs, activeTabId, actions]);
 
