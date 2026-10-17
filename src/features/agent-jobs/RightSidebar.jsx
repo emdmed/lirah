@@ -476,7 +476,7 @@ export function RightSidebar({ projectPath }) {
       />
 
       {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
-      <div className="flex items-center gap-0.5 px-1.5 py-1 shrink-0 edge-b-engraved">
+      <div className="flex items-end gap-2 px-2 pt-2 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
         {(totalActiveCount > 0 || tab === 'agents') && (
@@ -669,7 +669,7 @@ function TabButton({ active, onClick, label, count }) {
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'ins-legend flex items-center gap-1 px-1.5 py-0.5 cursor-pointer border-b-2',
+        'ins-legend flex items-center gap-1.5 px-1.5 pt-0.5 pb-1.5 cursor-pointer border-b-2',
         active ? 'text-[var(--ins-lamp)] border-[var(--ins-lamp)]' : 'text-muted-foreground border-transparent hover:text-foreground'
       )}
     >
