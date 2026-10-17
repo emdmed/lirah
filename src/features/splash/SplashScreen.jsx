@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, FolderOpen, Terminal } from 'lucide-react';
 import { Scanner } from '../../components/instrument/Scanner.jsx';
+import { LirahLockup } from '../../components/LirahMark.jsx';
 
 const steps = [
   { id: 'navigate', label: 'Navigating to project', icon: FolderOpen },
@@ -77,9 +78,7 @@ export function SplashScreen({ visible, projectName, currentStep, onComplete }) 
       style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
     >
       {/* Branding */}
-      <div className="mb-8 opacity-80" style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
-        Lirah
-      </div>
+      <LirahLockup stacked size={60} className="mb-8 opacity-80" />
 
       <div className="flex flex-col items-center">
         {/* Project name label */}

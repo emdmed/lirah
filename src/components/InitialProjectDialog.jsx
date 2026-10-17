@@ -7,6 +7,7 @@ import {
 } from './ui/dialog';
 import { useBookmarks } from '../features/bookmarks';
 import { FolderOpen, Layers } from 'lucide-react';
+import { LirahLockup } from './LirahMark';
 
 export function InitialProjectDialog({ open, onOpenChange, onSelectProject, workspaces, onOpenWorkspace }) {
   const { bookmarks } = useBookmarks();
@@ -97,9 +98,7 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <div className="flex justify-center pb-2">
-          <span style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
-            Lirah
-          </span>
+          <LirahLockup size={40} wordmarkSize={36} />
         </div>
 
         <DialogHeader>

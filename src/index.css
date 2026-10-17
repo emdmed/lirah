@@ -123,6 +123,10 @@
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
   --ins-glow:        6px;
+  /* The Lirah mark's plate (LirahMark): face, engraved cut, and the lit lip. */
+  --ins-plate:       color-mix(in srgb, var(--color-foreground) 17%, var(--ins-raised));
+  --ins-plate-cut:   var(--ins-gutter);
+  --ins-plate-lip:   rgb(255 255 255 / .14);
   --font-legend: "Barlow Semi Condensed", var(--font-mono);
 
   /* Historical aliases, remapped so existing users pick up the material. */
@@ -142,6 +146,9 @@
   --ins-legend: color-mix(in srgb, var(--color-foreground) 92%, var(--color-background));
   --ins-well:   color-mix(in srgb, var(--color-background) 95%, var(--color-foreground));
   --ins-glow:   4px;
+  --ins-plate:     color-mix(in srgb, var(--color-foreground) 10%, var(--ins-raised));
+  --ins-plate-cut: color-mix(in srgb, var(--color-foreground) 70%, var(--color-background));
+  --ins-plate-lip: rgb(255 255 255 / .9);
 }
 
 html,

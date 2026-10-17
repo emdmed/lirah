@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 64 64">
+  <!-- Lirah app icon master: the Grenze Gotisch L engraved into a brushed-steel rack ear.
+       Mirrors src/components/LirahMark.jsx with a fixed steel finish. Regenerate the raster set:
+       rsvg-convert -w 1024 -h 1024 src-tauri/icons/icon.svg -o /tmp/lirah.png && npx tauri icon /tmp/lirah.png -o /tmp/lirah-icons
+       then copy only the files already in src-tauri/icons/. public/lirah.svg (favicon) is a copy of this file. -->
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a9aeb6"/><stop offset=".55" stop-color="#7d838b"/><stop offset="1" stop-color="#585d65"/>
+    </linearGradient>
+    <pattern id="brushed" width="64" height="1.6" patternUnits="userSpaceOnUse">
+      <rect width="64" height=".7" fill="#fff" fill-opacity=".07"/>
+    </pattern>
+    <path id="L" d="M203 559Q196 494 195.5 434.0Q195 374 196.5 320.0Q198 266 198 217Q198 186 191.5 166.5Q185 147 171.0 133.5Q157 120 135 107L137 101L442 84Q453 73 453 57L415 -14Q351 -6 304.0 0.0Q257 6 225.0 10.0Q193 14 173.0 15.5Q153 17 143 17Q129 17 107.0 14.0Q85 11 59.5 6.0Q34 1 9 -4L-2 3L6 64Q37 73 53.0 84.5Q69 96 75.0 115.5Q81 135 81 165Q81 185 79.0 214.0Q77 243 75.0 277.0Q73 311 70.5 344.5Q68 378 67.5 406.5Q67 435 68 454Q78 476 93.5 497.5Q109 519 130.0 540.5Q151 562 174 580ZM249 83V534Q249 544 256.0 567.5Q263 591 272 615L302 611V140Q302 134 296.0 118.5Q290 103 279 83ZM441 415H376L363 525Q353 528 339.0 531.5Q325 535 312.0 537.5Q299 540 288 540Q281 540 275.0 539.5Q269 539 264 538L272 615Q277 617 280.5 617.0Q284 617 288 617Q303 617 331.5 614.5Q360 612 392.5 609.0Q425 606 453 602Z"/>
+  </defs>
+  <rect x="11" y="2" width="42" height="60" fill="url(#steel)"/>
+  <rect x="11" y="2" width="42" height="60" fill="url(#brushed)"/>
+  <rect x="11.6" y="2.6" width="40.8" height="58.8" fill="none" stroke="#33373c" stroke-width="1.2"/>
+  <path d="M12.5 3.6H51.5" stroke="rgba(255,255,255,.45)" stroke-width="1"/>
+  <rect x="25.5" y="6" width="13" height="5.5" rx="2.75" fill="#16181b" stroke="#33373c" stroke-width=".8"/>
+  <path d="M27.5 11.6H36.5" stroke="rgba(255,255,255,.45)" stroke-width=".6"/>
+  <rect x="25.5" y="52.5" width="13" height="5.5" rx="2.75" fill="#16181b" stroke="#33373c" stroke-width=".8"/>
+  <path d="M27.5 58.1H36.5" stroke="rgba(255,255,255,.45)" stroke-width=".6"/>
+  <use href="#L" transform="translate(20.725 48) scale(.05 -.05)" fill="rgba(255,255,255,.45)"/>
+  <use href="#L" transform="translate(20.725 47) scale(.05 -.05)" fill="#1f2226"/>
+</svg>

@@ -10,6 +10,7 @@ import { Send } from 'lucide-react';
 import { FileText, RefreshCw } from 'lucide-react';
 import { PaneLegend } from '../components/instrument/PaneLegend';
 import { DiffBar } from '../components/instrument/DiffBar';
+import { LirahMark, LirahLockup } from '../components/LirahMark';
 
 // Component sheet for the Instrument TUI primitives (board 01b). Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -111,6 +112,14 @@ export function InstrumentKit() {
           <div className="flex flex-col gap-2 py-2">
             <div className="ins-glass ins-round h-16 p-2 text-[var(--color-foreground)]">$ cargo test</div>
             <div className="ins-well px-2 py-1.5"><span className="text-[var(--ins-lamp)]">❯</span> prompt well</div>
+          </div>
+        </section>
+
+        <section className="tui-pane px-3" data-legend>
+          <PaneLegend index={7} title="Mark" />
+          <div className="flex flex-wrap items-end gap-4 py-2">
+            {[96, 48, 32, 24, 16].map((size) => <LirahMark key={size} size={size} title={`Lirah ${size}px`} />)}
+            <LirahLockup size={40} wordmarkSize={36} />
           </div>
         </section>
       </div>

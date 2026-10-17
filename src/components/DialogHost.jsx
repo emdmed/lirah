@@ -7,6 +7,7 @@ import { SaveFileGroupDialog } from "../features/file-groups/SaveFileGroupDialog
 import { CliSelectionModal } from "../features/cli-selection/CliSelectionModal";
 import { TokenAlertBanner } from "../features/token-budget/TokenAlertBanner";
 import { WorkspaceProjectPicker } from "./WorkspaceProjectPicker";
+import { LirahLockup } from "./LirahMark";
 
 // Heavy or rarely opened dialogs load on first open and mount only while
 // open: closed dialogs cost nothing per render and stay out of the startup
@@ -82,9 +83,7 @@ export function DialogHost({
           className="fixed inset-0 z-40 flex items-center justify-center"
           style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
         >
-          <div style={{ fontFamily: "'Grenze Gotisch', serif", fontSize: '42px', lineHeight: 1 }}>
-            Lirah
-          </div>
+          <LirahLockup stacked size={60} />
         </div>
       )}
       <InitialProjectDialog
