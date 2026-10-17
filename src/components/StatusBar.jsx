@@ -30,6 +30,7 @@ import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, SCROLLBACK_WARN_THRES
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
 import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
+import { LirahMark } from './LirahMark';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
 
@@ -324,7 +325,7 @@ export const StatusBar = memo(({
       {/* LEFT: maker's legend, workspace + update. Project and branch live in
           the sidebar's TABS pane. The title bar carries the legend when shown. */}
       <div className="flex items-center gap-3 overflow-hidden min-w-0">
-        {!showTitleBar && <span className="ins-legend shrink-0 pl-1">Lirah</span>}
+        {!showTitleBar && <LirahMark size={18} title="Lirah" className="shrink-0 ml-1" />}
         <div className="flex items-center gap-1.5 min-w-0">
           {workspace && (
             <Tooltip>
