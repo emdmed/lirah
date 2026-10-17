@@ -80,7 +80,7 @@ function groupJobs(list) {
   return out;
 }
 
-export function RightSidebar({ projectPath }) {
+export function RightSidebar({ projectPath, onNewTab }) {
   const {
     jobs,
     cancelJob,
@@ -388,7 +388,7 @@ export function RightSidebar({ projectPath }) {
     // on a keycap instead of a rotated label.
     const railJobs = visibleJobs.slice(0, 8);
     return (
-      <div data-pane="4" className="flex flex-col items-center gap-2 py-2 my-1.5 mr-2 ml-1.5 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
+      <div data-pane="4" className="flex flex-col items-center gap-2 py-2 my-3 mx-3 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
         <button
           onClick={() => setCollapsedOverride(false)}
           className="flex flex-col items-center gap-2 px-0.5 py-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
@@ -444,7 +444,7 @@ export function RightSidebar({ projectPath }) {
       data-pane="4"
       data-title={`[4] ${tab}`}
       data-legend
-      className="tui-pane flex flex-col shrink-0 overflow-hidden my-1.5 mr-2 ml-1.5 text-sidebar-foreground outline-none"
+      className="tui-pane flex flex-col shrink-0 overflow-hidden pt-[16px] my-1.5 mx-3 text-sidebar-foreground outline-none"
     >
       <PaneLegend
         index={4}
@@ -476,11 +476,22 @@ export function RightSidebar({ projectPath }) {
       />
 
       {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
-      <div className="flex items-end gap-2 px-2 pt-2 shrink-0 edge-b-engraved">
+      {/* Same height as the files pane's control bank, so both header rules
+          sit on one line across the window. */}
+      <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
+        )}
+        {tab === 'tabs' && onNewTab && (
+          <PanelButton
+            icon={Plus}
+            onClick={onNewTab}
+            title="New tab (Ctrl+T)"
+            aria-label="New tab"
+            className="ml-auto self-center"
+          />
         )}
       </div>
 
@@ -674,7 +685,9 @@ function TabButton({ active, onClick, label, count }) {
       )}
     >
       {label}
-      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
+      {count != null && (
+        <span className={cn('tabular-nums', count > 0 ? 'text-foreground' : 'text-muted-foreground')}>{count}</span>
+      )}
     </button>
   );
 }

@@ -11,8 +11,8 @@ export function LinkedReposIndicator({ linkedRepos }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex items-center gap-1.5 shrink-0 px-1.5 text-[11px] font-mono text-[var(--ins-warn)] cursor-default">
-          <Lamp state="warn" />
+        <span className="inline-flex items-center gap-1.5 shrink-0 px-1.5 text-[11px] font-mono text-muted-foreground cursor-default">
+          <Lamp state="on" />
           {count} repo{count !== 1 ? 's' : ''} linked
         </span>
       </TooltipTrigger>

@@ -152,7 +152,7 @@ function App() {
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
-        <TabBar onAdd={handleNewTab} />
+        <TabBar />
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
@@ -167,7 +167,7 @@ function App() {
               </DevProfiler>
             ))}
           </div>
-          <RightSidebar projectPath={activeTab?.projectPath} />
+          <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
         </div>
 
         <KeyHintBar />

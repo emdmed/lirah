@@ -15,19 +15,11 @@ export function TabBarStatusSlot({ active, children }) {
   return createPortal(children, slot);
 }
 
-// Tabs themselves live in the sidebar's TABS pane; this rail only carries
-// the new-tab key and the active tab's status controls.
-export function TabBar({ onAdd }) {
+// Tabs themselves live in the sidebar's TABS pane (new tab is its [+] key);
+// this rail only carries the active tab's status controls.
+export function TabBar() {
   return (
     <div className="chassis-rail flex items-stretch h-8 edge-b-engraved select-none shrink-0">
-      <button
-        onClick={onAdd}
-        className="flex items-center justify-center w-8 shrink-0 text-sm text-muted-foreground hover:text-[var(--ins-lamp)] shadow-[inset_-1px_0_0_0_var(--tui-line)]"
-        title="New tab (Ctrl+T)"
-        aria-label="New tab"
-      >
-        +
-      </button>
       <div id={STATUS_SLOT_ID} className="flex-1 min-w-0" />
     </div>
   );

@@ -151,13 +151,11 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
             label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}
             className={max ? undefined : 'opacity-40'}
           />
-          <span className={cn('flex items-baseline gap-2 tabular-nums', pct == null ? 'tube-idle' : tone)}>
-            <span className="flex items-baseline">
-              <span className="w-[6ch] text-right">{max ? fmt(value) : '--'}</span>
-              <span className="px-0.5 opacity-50">/</span>
-              <span className="w-[5ch]">{max ? fmt(max) : '--'}</span>
-            </span>
-            <span className="w-[4ch] text-right">{pct == null ? '--' : `${pct}%`}</span>
+          {/* One figure: the fill already reads as a share; % is in the tooltip. */}
+          <span className={cn('flex items-baseline tabular-nums', pct == null ? 'tube-idle' : tone)}>
+            <span className="w-[6ch] text-right">{max ? fmt(value) : '--'}</span>
+            <span className="px-0.5 opacity-50">/</span>
+            <span className="w-[5ch]">{max ? fmt(max) : '--'}</span>
           </span>
         </span>
       </TooltipTrigger>
@@ -323,8 +321,10 @@ export const StatusBar = memo(({
     <div
       className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
     >
-      {/* LEFT: workspace + update. Project and branch live in the sidebar's TABS pane. */}
-      <div className="flex items-center gap-1 overflow-hidden min-w-0">
+      {/* LEFT: maker's legend, workspace + update. Project and branch live in
+          the sidebar's TABS pane. The title bar carries the legend when shown. */}
+      <div className="flex items-center gap-3 overflow-hidden min-w-0">
+        {!showTitleBar && <span className="ins-legend shrink-0 pl-1">Lirah</span>}
         <div className="flex items-center gap-1.5 min-w-0">
           {workspace && (
             <Tooltip>
@@ -407,8 +407,8 @@ export const StatusBar = memo(({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="px-1" aria-label="Open settings menu">
-                  menu
+                <Button variant="ghost" size="xs" className="px-1.5" aria-label="Open settings menu">
+                  <span className="ins-legend">Menu</span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>

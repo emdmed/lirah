@@ -116,6 +116,9 @@
   --ins-glass:       var(--color-terminal-bg, var(--color-background));
   --ins-edge:        color-mix(in srgb, var(--color-background) 84%, var(--color-foreground));
   --ins-edge-strong: color-mix(in srgb, var(--color-background) 70%, var(--color-foreground));
+  /* The focused pane's frame: edge-strong warmed toward the lamp, so focus
+     reads at a glance without flooding the pane. */
+  --ins-edge-focus:  color-mix(in srgb, var(--ins-lamp) 45%, var(--ins-edge-strong));
   --ins-legend:      color-mix(in srgb, var(--color-foreground) 85%, var(--color-background));
   --ins-lamp:        var(--color-lamp, var(--color-primary));
   --ins-lamp-off:    color-mix(in srgb, var(--color-foreground) 18%, var(--color-background));
@@ -454,7 +457,18 @@ body {
      light, and the frame steps up. No colour flood. */
   .tui-pane:focus-within::after,
   .tui-pane.terminal-live::after {
-    border-color: var(--ins-edge-strong);
+    border-color: var(--ins-edge-focus);
+  }
+
+  .tui-pane:focus-within > .ins-pane-legend .ins-legend,
+  .tui-pane.terminal-live > .ins-pane-legend .ins-legend {
+    color: var(--color-foreground);
+  }
+
+  /* A terminal pane: the glass fills the frame, so the hairline is the
+     screen's bezel rather than a second box around it. */
+  .tui-pane.tui-pane-screen {
+    padding: 7px 1px;
   }
 
   .tui-pane:focus-within::before,
@@ -490,17 +504,17 @@ body {
 }
 
 /* File tree indentation: an 8px lead column for the cursor marker, then a
-   14px step per depth with a hairline guide under the parent's chevron
-   (chevron 10px + name inset 4px = one step, so children sit under the
+   16px step per depth with a hairline guide under the parent's chevron
+   (chevron 12px + name inset 4px = one step, so children sit under the
    parent's name). */
 .tui-tree-guide {
   --tree-lead: 8px;
-  --tree-step: 14px;
+  --tree-step: 16px;
   position: relative;
   align-self: stretch;
   flex-shrink: 0;
   width: calc(var(--tree-lead) + var(--depth, 0) * var(--tree-step));
-  background: repeating-linear-gradient(to right, transparent 0 4.5px, var(--ins-edge) 4.5px 5.5px, transparent 5.5px var(--tree-step))
+  background: repeating-linear-gradient(to right, transparent 0 5.5px, var(--ins-edge) 5.5px 6.5px, transparent 6.5px var(--tree-step))
     var(--tree-lead) 0 / calc(100% - var(--tree-lead)) 100% no-repeat;
   user-select: none;
 }
@@ -983,6 +997,10 @@ body {
 
   .ins-meter[data-level="warn"] .ins-meter-fill { background: var(--ins-warn); }
   .ins-meter[data-level="fault"] .ins-meter-fill { background: var(--ins-fault); }
+  /* The needle takes the fill's colour once it leaves ok, so the gauge
+     reads as one hue instead of lamp-on-warn. */
+  .ins-meter[data-level="warn"] .ins-meter-needle { border-top-color: var(--ins-warn); }
+  .ins-meter[data-level="fault"] .ins-meter-needle { border-top-color: var(--ins-fault); }
 
   .ins-meter-needle {
     position: absolute;

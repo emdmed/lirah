@@ -47,6 +47,21 @@ function tabActivity(tabId, cliName, now) {
     : { label: 'idle', since, lamp: { state: 'off' } };
 }
 
+// Repo names share long prefixes (agentic-orchestration-…), so the end is what
+// tells them apart: the ellipsis goes in the middle and the tail always shows.
+const TAIL = 8;
+function MiddleTruncate({ text, className }) {
+  if (text.length <= TAIL * 2) {
+    return <span className={cn('min-w-0 truncate', className)}>{text}</span>;
+  }
+  return (
+    <span className={cn('flex min-w-0', className)}>
+      <span className="truncate">{text.slice(0, -TAIL)}</span>
+      <span className="shrink-0">{text.slice(-TAIL)}</span>
+    </span>
+  );
+}
+
 export function TabsSummaryPane() {
   const { tabs, activeTabId, switchTab, removeTab, setTabRole } = useTabManager();
   const closable = tabs.length > 1;
@@ -111,14 +126,7 @@ export function TabsSummaryPane() {
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <Lamp {...activity.lamp} label={activity.label} />
-              <span
-                className={cn(
-                  'min-w-0 truncate font-medium text-xs',
-                  active ? 'text-[var(--ins-lamp)]' : 'text-foreground',
-                )}
-              >
-                {name}
-              </span>
+              <MiddleTruncate text={name} className="font-medium text-xs text-foreground" />
               {/* Portalled menu clicks still bubble through React to the row. */}
               <span className="contents" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
@@ -202,7 +210,7 @@ export function TabsSummaryPane() {
               )}
             </div>
             {info?.branch && (
-              <div className="flex items-center gap-1.5 pl-[13px] min-w-0 whitespace-nowrap text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1.5 pl-[13px] min-w-0 whitespace-nowrap text-[11px] text-muted-foreground">
                 {info.files === 0 ? (
                   <span>clean</span>
                 ) : (

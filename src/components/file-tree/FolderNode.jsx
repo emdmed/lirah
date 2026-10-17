@@ -26,11 +26,11 @@ export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCur
       <div className="flex items-center w-full h-full whitespace-pre" style={{ fontSize: 'var(--font-lg)' }}>
         <TreeGuide depth={depth} />
         {isExpanded ? (
-          <ChevronDown className="w-2.5 h-2.5 shrink-0 text-muted-foreground" />
+          <ChevronDown className="w-3 h-3 shrink-0 text-foreground/70" />
         ) : (
-          <ChevronRight className="w-2.5 h-2.5 shrink-0 text-muted-foreground" />
+          <ChevronRight className="w-3 h-3 shrink-0 text-foreground/70" />
         )}
-        <span className="truncate pl-1 font-semibold text-foreground" title={name}>{name}</span>
+        <span className="truncate pl-1 font-medium text-foreground" title={name}>{name}</span>
       </div>
     </SidebarMenuButton>
   );

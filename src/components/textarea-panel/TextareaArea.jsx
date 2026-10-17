@@ -88,7 +88,6 @@ export function TextareaArea({
           <span id="textarea-instructions" className="sr-only">
             Press Ctrl+Enter to send.
           </span>
-          <KeyChord keys={["^", "↵"]} size="sm" className="mr-1" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -104,6 +103,8 @@ export function TextareaArea({
             </TooltipTrigger>
             <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
           </Tooltip>
+          {/* The key hint sits against the action it fires. */}
+          <KeyChord keys={["^", "↵"]} size="sm" className="ml-1" />
           <Tooltip>
             <TooltipTrigger asChild>
               {/* A disabled button swallows pointer events, so the reason would

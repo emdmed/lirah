@@ -55,7 +55,7 @@ export function FileNode({
       >
         <TreeGuide depth={depth} />
         {/* Chevron-width slot so file names share a column with folder names */}
-        <span className="w-2.5 shrink-0" />
+        <span className="w-3 shrink-0" />
         <span className={`truncate pl-1 leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{name}</span>
 
         {/* Git stats badge */}

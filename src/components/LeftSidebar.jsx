@@ -90,14 +90,14 @@ export function LeftSidebar({
             onNavigateBookmark={onNavigateBookmark}
             hasTerminalSession={hasTerminalSession}
           />
-          <SidebarGroup className="flex flex-col flex-1 min-h-0">
+          <SidebarGroup className="flex flex-col flex-1 min-h-0 pt-0">
             <SidebarGroupContent
               ref={rowsRef}
               tabIndex={0}
               data-pane-focus
               onKeyDown={onRowsKeyDown}
               onBlur={onRowsBlur}
-              className="p-1 overflow-y-auto flex-1 min-h-0 outline-none focus-visible:outline-none"
+              className="px-1 pt-1.5 pb-1 overflow-y-auto flex-1 min-h-0 outline-none focus-visible:outline-none"
             >
               {viewMode === 'flat' ? (
                 <FlatViewMenu folders={folders} currentPath={currentPath} onFolderClick={onFolderClick} cursorIndex={cursorIndex} registerList={registerList} />
@@ -169,7 +169,7 @@ export function LeftSidebar({
         </SidebarContent>
       </Sidebar>
       <div
-        className={`w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] transition-colors z-50 shrink-0 ${isResizing ? 'bg-[var(--ins-lamp)]' : ''}`}
+        className={`group/resize relative w-3 cursor-col-resize z-50 shrink-0 before:absolute before:inset-y-1.5 before:left-1/2 before:w-px before:-ml-px before:transition-colors hover:before:bg-[var(--ins-edge-strong)] ${isResizing ? 'before:bg-[var(--ins-lamp)]' : ''}`}
         onMouseDown={handleResizeStart}
       />
     </>

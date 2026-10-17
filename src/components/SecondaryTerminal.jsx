@@ -65,14 +65,14 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     <div
       data-title="terminal 2"
       data-legend
-      className={`tui-pane px-1.5 pb-3 terminal-wrapper ${isFocused
+      className={`tui-pane tui-pane-screen terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
         }`}
       style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}
     >
       <PaneLegend title="Terminal 2" lit={isFocused} />
-      <div className="ins-glass ins-round relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
+      <div className="ins-glass relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
         <div
           ref={terminalRef}
           style={{ width: '100%', height: '100%', overflow: 'hidden' }}

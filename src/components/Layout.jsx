@@ -2,10 +2,14 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar, secon
   return (
     <div className="p-0 flex flex-col w-full h-full bg-[var(--ins-gutter)]">
       {titleBar}
-      <div className="flex flex-1 min-h-0 gap-1.5 pl-2 pt-1.5 pb-1">
+      {/* One gutter everywhere: 12px between frames and at the window edge.
+          Frames are inset 6px top and bottom (.tui-pane), so vertical
+          spacing is 6px of padding plus that inset; the sidebar's resize
+          handle is the 12px gap to its right. */}
+      <div className="flex flex-1 min-h-0 pl-3 pt-1.5 pb-1.5">
         {sidebar}
-        <div className="flex-1 flex flex-row min-h-0 relative">
-          <div className="flex-1 flex flex-col gap-1.5 min-h-0 min-w-0 relative overflow-hidden">
+        <div className="flex-1 flex flex-row gap-3 min-h-0 relative">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
             {children}
             {textarea && (
               // The prompt grows upward over the terminal's last rows instead of

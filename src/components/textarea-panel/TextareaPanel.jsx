@@ -326,10 +326,9 @@ export function TextareaPanel({
   const toolbarRow = (
     <div className="flex items-center gap-2 flex-nowrap">
       {/* Every control carries its own label, so the two banks (project,
-          prompt) are split by a rule rather than named. */}
+          prompt) are split by space rather than a rule or a name. */}
       {projectZone}
-      <span className="text-[var(--ins-edge-strong)] shrink-0 select-none" aria-hidden="true">│</span>
-      {promptZone}
+      <div className="ml-2 flex items-center gap-2">{promptZone}</div>
       {onTogglePromptPreview && (
         <div className="flex items-center">
           <Tooltip>
@@ -337,13 +336,14 @@ export function TextareaPanel({
               <Button
                 variant="ghost"
                 size="xs"
-                className={`gap-1 px-1.5 ${promptPreviewOpen ? 'text-[var(--ins-lamp)]' : ''}`}
+                className="gap-1 px-1.5"
+                aria-pressed={promptPreviewOpen}
                 onClick={onTogglePromptPreview}
                 aria-expanded={promptPreviewOpen}
                 aria-label={promptPreviewOpen ? "Hide what will be sent" : "Show what will be sent"}
               >
                 <ScrollText className="h-3 w-3" />
-                preview{partCount > 0 && !promptPreviewOpen && <span className="tube">:{partCount}</span>}
+                preview{partCount > 0 && !promptPreviewOpen && <span className="tube ml-1">{partCount}</span>}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
