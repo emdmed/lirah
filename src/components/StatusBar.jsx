@@ -306,7 +306,6 @@ export const StatusBar = memo(({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
   onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
-  onToggleBranchTasks, branchTasksOpen,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
   availableUpdate, instrumentGlass, onToggleInstrumentGlass, tokenUsage
 }) => {
@@ -382,26 +381,10 @@ export const StatusBar = memo(({
           )}
         </div>
 
-        {/* Context actions: tasks + update (shown when relevant) */}
-        {(branchName && branchName !== 'main' && branchName !== 'master' || availableUpdate) && (
+        {/* Context actions: update (shown when relevant) */}
+        {availableUpdate && (
           <>
             <div className="flex items-center gap-0.5">
-              {branchName && branchName !== 'main' && branchName !== 'master' && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={onToggleBranchTasks}
-                      className={cn("px-1 h-5 text-muted-foreground")}
-                      data-lit={branchTasksOpen || undefined}
-                    >
-                      tasks
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Branch Tasks (Ctrl+Shift+T)</TooltipContent>
-                </Tooltip>
-              )}
               {availableUpdate && (
                 <Tooltip>
                   <TooltipTrigger asChild>

@@ -129,7 +129,6 @@ If you use CLI agents seriously, Lirah becomes the place you run them.
 - **Auto Commit** — Automatically stage and commit changes via your CLI agent with a configurable commit prompt.
 - **Auto Changelog** — Generates changelog entries automatically on commit triggers using your CLI agent.
 - **Branch Name Display** — Shows the current git branch in the status bar.
-- **Branch Tasks** — Tracks completed tasks per branch. View history in a dialog to see what was done on each branch.
 
 ### Token Budget & Analytics
 

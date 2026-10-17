@@ -22,7 +22,7 @@ export function useTabShortcuts({
   useEffect(() => { sidebarOpenRef.current = sidebarOpen; }, [sidebarOpen]);
 
   const { secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand } = secondary;
-  const { setBudgetDialogOpen, setDashboardOpen, setBranchTasksOpen } = dialogs;
+  const { setBudgetDialogOpen, setDashboardOpen } = dialogs;
 
   useEffect(() => {
     if (!isActive) return;
@@ -68,13 +68,9 @@ export function useTabShortcuts({
         e.preventDefault();
         onAutoCommit();
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
-        e.preventDefault();
-        setBranchTasksOpen(prev => !prev);
-      }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
-    searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, setBudgetDialogOpen, setDashboardOpen, setBranchTasksOpen]);
+    searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, setBudgetDialogOpen, setDashboardOpen]);
 }

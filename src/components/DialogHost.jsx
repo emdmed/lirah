@@ -35,7 +35,6 @@ export function DialogHost({
   elementPicker,
   fileSelection,
   branchName,
-  branchTasks,
   autoCommit,
   changelogStatus,
   tokenUsage,

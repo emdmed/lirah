@@ -16,7 +16,6 @@ import { useBranchName } from "../git/useBranchName";
 import { registerTabSession } from "./terminalActivity";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
-import { useBranchTasks } from "../git/useBranchTasks";
 import { lazyNamed } from "../../lib/lazyNamed";
 import { useFlatViewNavigation } from "../../hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "../../hooks/useViewModeShortcuts";
@@ -65,7 +64,6 @@ import { useAgentJobsActions } from "../agent-jobs/AgentJobsContext";
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import("../git/GitDiffDialog"), "GitDiffDialog");
 const MarkdownViewerDialog = lazyNamed(() => import("../markdown/MarkdownViewerDialog"), "MarkdownViewerDialog");
-const BranchCompletedTasksDialog = lazyNamed(() => import("../git/BranchCompletedTasksDialog"), "BranchCompletedTasksDialog");
 
 function isRealPath(p) {
   return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
@@ -227,7 +225,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   );
 
   const autoCommit = useAutoCommit(settings.autoCommitCli, settings.autoCommitCustomPrompt);
-  const branchTasks = useBranchTasks(settings.selectedCli);
 
   // Workspace state
   const workspaceHook = useWorkspace();
@@ -755,7 +752,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     atMention.setAtMentionQuery(null);
   }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery]);
   const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen,
-    setAutoChangelogDialogOpen, setAutoCommitConfigOpen, setBranchTasksOpen,
+    setAutoChangelogDialogOpen, setAutoCommitConfigOpen,
     setWorkspaceDialogOpen, setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
     setSaveFileGroupDialogOpen } = dialogs;
   const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [setShowHelp]);
@@ -767,7 +764,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const openBudgetSettings = useCallback(() => setBudgetDialogOpen(true), [setBudgetDialogOpen]);
   const openAutoChangelogDialog = useCallback(() => setAutoChangelogDialogOpen(true), [setAutoChangelogDialogOpen]);
   const openAutoCommitConfig = useCallback(() => setAutoCommitConfigOpen(true), [setAutoCommitConfigOpen]);
-  const toggleBranchTasks = useCallback(() => setBranchTasksOpen(prev => !prev), [setBranchTasksOpen]);
   const openWorkspaceDialog = useCallback(() => setWorkspaceDialogOpen(true), [setWorkspaceDialogOpen]);
   const openAddBookmark = useCallback(() => setAddBookmarkDialogOpen(true), [setAddBookmarkDialogOpen]);
   const openManageTemplates = useCallback(() => setManageTemplatesDialogOpen(true), [setManageTemplatesDialogOpen]);
@@ -908,8 +904,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             onOpenAutoCommitConfig={openAutoCommitConfig}
             onToggleSandbox={toggleSandbox}
             branchName={branchName}
-            onToggleBranchTasks={toggleBranchTasks}
-            branchTasksOpen={dialogs.branchTasksOpen}
             workspace={workspaceHook.workspace}
             onOpenWorkspaceDialog={openWorkspaceDialog}
             onCloseWorkspace={workspaceHook.closeWorkspace}
@@ -967,13 +961,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
           markdownFiles={markdownFiles}
           onFileChange={viewMarkdownFile}
         />}
-        {dialogs.branchTasksOpen && <BranchCompletedTasksDialog
-          open={dialogs.branchTasksOpen}
-          onOpenChange={dialogs.setBranchTasksOpen}
-          repoPath={currentPath}
-          branchTasks={branchTasks}
-          currentBranch={branchName}
-        />}
         </Suspense>
       </Layout>
 
@@ -988,7 +975,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         elementPicker={elementPicker}
         fileSelection={fileSelection}
         branchName={branchName}
-        branchTasks={branchTasks}
         autoCommit={autoCommit}
         changelogStatus={changelogStatus}
         tokenUsage={tokenUsage}

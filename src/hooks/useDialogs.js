@@ -10,7 +10,6 @@ export function useDialogs() {
   const [diffFilePath, setDiffFilePath] = useState(null);
   const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [branchTasksOpen, setBranchTasksOpen] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [autoChangelogDialogOpen, setAutoChangelogDialogOpen] = useState(false);
@@ -35,7 +34,6 @@ export function useDialogs() {
     diffFilePath, setDiffFilePath,
     cliSelectionModalOpen, setCliSelectionModalOpen,
     showHelp, setShowHelp,
-    branchTasksOpen, setBranchTasksOpen,
     budgetDialogOpen, setBudgetDialogOpen,
     dashboardOpen, setDashboardOpen,
     autoChangelogDialogOpen, setAutoChangelogDialogOpen,
@@ -50,7 +48,7 @@ export function useDialogs() {
   }), [
     addBookmarkDialogOpen, bookmarksPaletteOpen, initialProjectDialogOpen,
     manageTemplatesDialogOpen, saveFileGroupDialogOpen, diffDialogOpen, diffFilePath,
-    cliSelectionModalOpen, showHelp, branchTasksOpen, budgetDialogOpen, dashboardOpen,
+    cliSelectionModalOpen, showHelp, budgetDialogOpen, dashboardOpen,
     autoChangelogDialogOpen, autoCommitConfigOpen, workspaceDialogOpen, projectPickerOpen,
     projectPickerAction, orchestrationDashboardOpen, markdownViewerOpen, markdownFilePath,
   ]);

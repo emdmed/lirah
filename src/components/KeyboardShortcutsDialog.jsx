@@ -49,7 +49,6 @@ const shortcuts = [
     category: 'Git & Branch',
     icon: <GitBranch className='w-4 h-4' />,
     items: [
-      { keys: ['Ctrl', 'Shift', 'T'], description: 'Toggle Branch Tasks' },
     ],
   },
   {
