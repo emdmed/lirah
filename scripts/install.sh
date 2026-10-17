@@ -56,6 +56,15 @@ detect_distro() {
     else
         error "Cannot detect distribution (missing /etc/os-release)"
     fi
+    # Treat unlisted Arch derivatives (e.g. Omarchy, CachyOS) as Arch
+    case "$DISTRO_ID" in
+        arch|manjaro|endeavouros|garuda|artix) ;;
+        *)
+            case " $DISTRO_ID_LIKE " in
+                *" arch "*) DISTRO_ID="arch" ;;
+            esac
+            ;;
+    esac
     info "Detected distribution: $DISTRO_ID"
 }
 
@@ -218,7 +227,9 @@ install_from_source() {
     cp "$BINARY" "$INSTALL_DIR/${APP_NAME}-bin"
     chmod +x "$INSTALL_DIR/${APP_NAME}-bin"
 
-    # Create wrapper script so 'lirah' launches detached and terminal closes
+    # Create wrapper script so 'lirah' launches detached and terminal closes.
+    # Remove first: a leftover symlink from an older install would redirect the write.
+    rm -f "$INSTALL_DIR/$APP_NAME"
     cat > "$INSTALL_DIR/$APP_NAME" << WRAPPER
 #!/bin/bash
 nohup "$INSTALL_DIR/${APP_NAME}-bin" "\$@" >/dev/null 2>&1 &
@@ -296,7 +307,9 @@ Categories=Development;Utility;
 StartupWMClass=$APP_NAME
 EOF
 
-    # Create wrapper script so 'lirah' launches detached and terminal closes
+    # Create wrapper script so 'lirah' launches detached and terminal closes.
+    # Remove first: a leftover symlink from an older install would redirect the write.
+    rm -f "$INSTALL_DIR/$APP_NAME"
     cat > "$INSTALL_DIR/$APP_NAME" << WRAPPER
 #!/bin/bash
 nohup "$APPIMAGE_PATH" "\$@" >/dev/null 2>&1 &
