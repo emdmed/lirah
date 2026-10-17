@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Palette } from 'lucide-react';
 import {
@@ -28,11 +28,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
 import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, SCROLLBACK_WARN_THRESHOLD, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
-import { getContextFill } from '../config/models';
+import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
-import { useToast } from '../features/toast';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -100,11 +99,12 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
   );
 }
 
-// Token gauge: context-window fill (or, before context data arrives, the
-// daily budget) plus the session's billable count, idle when neither a
-// ceiling nor billable usage is known. Every slot has a fixed width and an
-// idle placeholder so the centred gauge never shifts between tabs. Click
-// opens the token dashboard.
+// Token gauge, centred in the top row: context-window fill (or, before context
+// data arrives, the daily budget) with used / max and %. Past
+// HEAVY_CONTEXT_TOKENS the fill and readout go amber; billable and cache
+// figures live in the tooltip. Every slot has a fixed width and an idle
+// placeholder so the gauge never shifts between tabs. Click opens the token
+// dashboard.
 function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
   const { getBudget, currentUsage, formatTokenCount } = useTokenBudget();
   const ctx = getContextFill(tokenUsage);
@@ -125,8 +125,9 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
     legend = 'Budget'; value = currentUsage.total; max = dailyLimit;
   }
   const pct = max ? Math.round((value / max) * 100) : null;
-  // Mirrors Meter's thresholds: the % only lights once it means something.
-  const pctTone = pct >= 95 ? 'tube tube-overflow' : pct >= 80 ? 'tube text-[var(--ins-warn)]' : 'tube-idle';
+  const heavy = !!ctx && ctx.used > HEAVY_CONTEXT_TOKENS;
+  // Mirrors Meter's thresholds: the readout only lights once it means something.
+  const tone = pct >= 95 ? 'tube tube-overflow' : pct >= 80 || heavy ? 'tube text-[var(--ins-warn)]' : 'text-foreground';
 
   return (
     <Tooltip>
@@ -138,27 +139,23 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
           onKeyDown={(e) => {
             if (onOpenDashboard && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpenDashboard(); }
           }}
-          className={cn('flex items-center gap-3 px-1 focus-ring', onOpenDashboard ? 'cursor-pointer' : 'cursor-default')}
+          className={cn('flex items-center gap-2 px-1 focus-ring', onOpenDashboard ? 'cursor-pointer' : 'cursor-default')}
         >
-          <span className="flex items-center gap-2">
-            <span className="ins-legend w-[7ch] shrink-0 text-right">{legend}</span>
-            <Meter
-              value={value}
-              max={max || 1}
-              size="lg"
-              readout={false}
-              label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}
-              className={max ? undefined : 'opacity-40'}
-            />
-            <span className={cn('w-[4ch] text-right', pct == null ? 'tube-idle' : pctTone)}>
-              {pct == null ? '--' : `${pct}%`}
-            </span>
-          </span>
-          <span className="flex items-baseline gap-1.5">
-            <span className={cn('w-[6ch] text-right', billable ? 'tabular-nums' : 'tube-idle')}>
-              {billable ? fmt(billable) : '--'}
-            </span>
-            <span className="engraved-label">billable</span>
+          <span className="ins-legend shrink-0">{legend}</span>
+          <Meter
+            value={value}
+            max={max || 1}
+            size="lg"
+            readout={false}
+            caution={heavy}
+            label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}
+            className={max ? undefined : 'opacity-40'}
+          />
+          <span className={cn('flex items-baseline gap-1.5 tabular-nums', pct == null ? 'tube-idle' : tone)}>
+            <span className="w-[5ch] text-right">{max ? fmt(value) : '--'}</span>
+            <span className="opacity-50">/</span>
+            <span className="w-[4ch]">{max ? fmt(max) : '--'}</span>
+            <span className="w-[4ch] text-right">{pct == null ? '--' : `${pct}%`}</span>
           </span>
         </span>
       </TooltipTrigger>
@@ -169,6 +166,7 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
               <span>context</span>
               <span className="text-right">{num(ctx.used)} / {num(ctx.max)}</span>
               <span className="text-right">{pct}%</span>
+              {heavy && <span className="col-span-3 text-[var(--ins-warn)]">over {num(HEAVY_CONTEXT_TOKENS)} tokens: consider clearing</span>}
             </>
           )}
           {dailyLimit ? (
@@ -202,45 +200,6 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
           {onOpenDashboard && <span className="col-span-3 mt-1 opacity-70">click for token metrics</span>}
         </div>
       </TooltipContent>
-    </Tooltip>
-  );
-}
-
-// Always shown so the row doesn't reflow between repos and plain dirs.
-// Click copies the branch name (without the dirty marker).
-function BranchBadge({ branchName }) {
-  const toast = useToast();
-  const branch = branchName ? branchName.replace(/\*$/, '') : null;
-  const dirty = !!branchName?.endsWith('*');
-
-  const handleCopy = useCallback(async () => {
-    if (!branch) return;
-    try {
-      await navigator.clipboard.writeText(branch);
-      toast.success(`Copied ${branch}`);
-    } catch {
-      toast.error('Could not copy branch name');
-    }
-  }, [branch, toast]);
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={handleCopy}
-          disabled={!branch}
-          className="gap-1 px-1.5 h-5 shrink-0 max-w-[220px] before:content-none after:content-none"
-        >
-          <span className="text-muted-foreground">±</span>
-          <span className={cn('truncate', branch ? 'text-foreground' : 'text-muted-foreground')}>
-            {branch || 'no git'}
-          </span>
-          {dirty && <span className="text-[var(--ins-warn)]">*</span>}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{branch ? `${branch}${dirty ? ' (uncommitted changes)' : ''} — click to copy` : 'Not a git repository'}</TooltipContent>
     </Tooltip>
   );
 }
@@ -305,7 +264,7 @@ export const StatusBar = memo(({
   onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
-  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, branchName,
+  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
   availableUpdate, instrumentGlass, onToggleInstrumentGlass, tokenUsage
 }) => {
@@ -360,12 +319,11 @@ export const StatusBar = memo(({
   return (
     <>
     <div
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
+      className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
     >
-      {/* LEFT: branch + workspace + context. The tab itself names the project. */}
+      {/* LEFT: workspace + update. Project and branch live in the sidebar's TABS pane. */}
       <div className="flex items-center gap-1 overflow-hidden min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <BranchBadge branchName={branchName} />
           {workspace && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -410,6 +368,10 @@ export const StatusBar = memo(({
         )}
       </div>
 
+      {/* CENTRE: the context gauge, alone so it reads at a glance. The side
+          columns share the remaining width equally, keeping it centred. */}
+      <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} onOpenDashboard={onOpenDashboard} />
+
       {/* RIGHT: Runtime status + Settings */}
       <div className="flex items-center justify-end gap-1.5 min-w-0">
         {/* Transient status (changelog) — only visible when active */}
@@ -436,13 +398,6 @@ export const StatusBar = memo(({
             <NetworkSwitch isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
           )}
         </div>
-
-        {/* Token gauge, pinned against the fixed-width menu: the tab strip
-            shares this row and grows from the left, and the runtime zone
-            varies per tab (CLI name, net switch), so only this spot is stable. */}
-        <span className="ml-2">
-          <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} onOpenDashboard={onOpenDashboard} />
-        </span>
 
         {/* Settings — visually separated as the final anchor */}
         <span className="w-px h-4 bg-[var(--tui-line)] mx-1" aria-hidden="true" />

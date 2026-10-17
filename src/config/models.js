@@ -1,5 +1,7 @@
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
 export const EXTENDED_CONTEXT_WINDOW = 1_000_000;
+// Past this many context tokens a session is heavy regardless of window size.
+export const HEAVY_CONTEXT_TOKENS = 300_000;
 
 // Keyed by model id prefix; first matching prefix wins, so the 200K
 // generations (Claude 3.x, Opus/Sonnet 4.0-4.5, Haiku) come before the

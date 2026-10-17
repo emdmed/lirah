@@ -903,7 +903,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             autoCommitCli={settings.autoCommitCli}
             onOpenAutoCommitConfig={openAutoCommitConfig}
             onToggleSandbox={toggleSandbox}
-            branchName={branchName}
             workspace={workspaceHook.workspace}
             onOpenWorkspaceDialog={openWorkspaceDialog}
             onCloseWorkspace={workspaceHook.closeWorkspace}

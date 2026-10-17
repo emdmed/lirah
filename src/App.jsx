@@ -13,7 +13,7 @@ import { useUpdateChecker } from "./hooks/useUpdateChecker";
 import { DevProfiler } from "./components/DevProfiler";
 
 function App() {
-  const { tabs, activeTabId, addTab, removeTab, switchTab, reorderTab } = useTabManager();
+  const { tabs, activeTabId, addTab, removeTab, switchTab } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
@@ -152,14 +152,7 @@ function App() {
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
-        <TabBar
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSwitch={switchTab}
-          onClose={removeTab}
-          onAdd={handleNewTab}
-          onReorder={reorderTab}
-        />
+        <TabBar onAdd={handleNewTab} />
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
