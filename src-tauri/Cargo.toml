@@ -1,6 +1,6 @@
 [package]
 name = "lirah"
-version = "0.3.28"
+version = "0.3.29"
 description = "A terminal emulator built with Tauri"
 authors = ["you"]
 edition = "2021"
