@@ -1097,6 +1097,15 @@ body {
   50% { opacity: 0.25; }
 }
 
+/* Soft breathing for busy placeholders and working-state icons. */
+.ins-pulse {
+  animation: ins-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ins-pulse {
+  50% { opacity: 0.4; }
+}
+
 @keyframes ins-scan {
   0% {
     background: var(--ins-lamp);
@@ -1114,6 +1123,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .ins-lamp[data-blink] { animation: none; }
+  .ins-pulse { animation: none; }
   /* Still reads as "busy": every segment held half-lit. */
   .ins-scan > i {
     animation: none;

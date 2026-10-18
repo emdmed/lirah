@@ -1,4 +1,13 @@
-import { Link2 } from 'lucide-react';
+import {
+  AudioWaveform,
+  CircleCheck,
+  GitBranch,
+  Link2,
+  MessageSquareMore,
+  Moon,
+  ShieldAlert,
+  SquareTerminal,
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
 import {
   DropdownMenu,
@@ -7,8 +16,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { Lamp } from '../../components/instrument/Lamp';
-import { DiffBar } from '../../components/instrument/DiffBar';
 import { useBookmarks } from '../bookmarks';
 import { useToast } from '../toast';
 import { useTabManager } from './TabContext';
@@ -32,22 +39,33 @@ function formatAgo(ms) {
   return `${Math.floor(hrs / 24)}d`;
 }
 
+// What each activity looks like: an icon that names the state and its colour.
+// `pulse` marks work in progress. How long it has held is in the row tooltip.
+const ACTIVITY = {
+  working: { icon: AudioWaveform, color: 'text-[var(--ins-lamp)]', pulse: true },
+  permission: { icon: ShieldAlert, color: 'text-[var(--ins-fault)]', pulse: true },
+  done: { icon: CircleCheck, color: 'text-[var(--ins-ok)]' },
+  waiting: { icon: MessageSquareMore, color: 'text-[var(--ins-warn)]' },
+  running: { icon: SquareTerminal, color: 'text-[var(--ins-lamp)]', pulse: true },
+  idle: { icon: Moon, color: 'text-muted-foreground' },
+};
+
 // What the agent's own hooks said, when it has them (see agentHookState.js).
 function hookActivity(cliName, hook, now) {
   const since = formatAgo(now - hook.at);
   switch (hook.state) {
     case 'working':
-      return { label: `${cliName} working`, since, lamp: { state: 'on', blink: true } };
+      return { kind: 'working', label: `${cliName} working`, since };
     case 'permission':
       return {
+        kind: 'permission',
         label: hook.message ? `${cliName} needs permission: ${hook.message}` : `${cliName} needs permission`,
         since,
-        lamp: { state: 'fault', blink: true },
       };
     case 'done':
-      return { label: `${cliName} done, your turn`, since, lamp: { state: 'ok' } };
+      return { kind: 'done', label: `${cliName} done, your turn`, since };
     default:
-      return { label: `${cliName} waiting`, since, lamp: { state: 'warn' } };
+      return { kind: 'waiting', label: `${cliName} waiting`, since };
   }
 }
 
@@ -63,12 +81,25 @@ function tabActivity(tabId, cliName, now) {
   const since = out ? formatAgo(quiet) : null;
   if (cliName) {
     return quiet < ACTIVE_MS
-      ? { label: `${cliName} working`, lamp: { state: 'on', blink: true } }
-      : { label: `${cliName} waiting`, since, lamp: { state: 'warn' } };
+      ? { kind: 'working', label: `${cliName} working` }
+      : { kind: 'waiting', label: `${cliName} waiting`, since };
   }
   return quiet < ACTIVE_MS
-    ? { label: 'running', lamp: { state: 'on' } }
-    : { label: 'idle', since, lamp: { state: 'off' } };
+    ? { kind: 'running', label: 'running' }
+    : { kind: 'idle', label: 'idle', since };
+}
+
+function ActivityIcon({ kind, label }) {
+  const { icon: Icon, color, pulse } = ACTIVITY[kind];
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className={cn('inline-flex h-4 w-4 shrink-0 items-center justify-center', color, pulse && 'ins-pulse')}
+    >
+      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+    </span>
+  );
 }
 
 // Repo names share long prefixes (agentic-orchestration-…), so the end is what
@@ -121,6 +152,25 @@ export function TabsSummaryPane() {
     setLinkedRepoRole(tab.projectPath, role || undefined);
   };
 
+  const roleMenu = (tab, trigger) => (
+    // Portalled menu clicks still bubble through React to the row.
+    <span className="contents" onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="text-xs">
+          <DropdownMenuRadioGroup value={tab.role ?? ''} onValueChange={(v) => setRole(tab, v)}>
+            {ROLES.map((r) => (
+              <DropdownMenuRadioItem key={r.value} value={r.value}>
+                {r.label}
+              </DropdownMenuRadioItem>
+            ))}
+            <DropdownMenuRadioItem value="">None</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
+  );
+
   return (
     <div className="flex flex-col">
       {tabs.map((tab) => {
@@ -130,6 +180,7 @@ export function TabsSummaryPane() {
         const linked = !active && linkedRepos.some((r) => r.path === tab.projectPath);
         const name =
           bookmarks.find((b) => b.path === tab.projectPath)?.name ?? tab.label;
+        const linkLabel = linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`;
         return (
           <button
             key={tab.id}
@@ -144,117 +195,115 @@ export function TabsSummaryPane() {
             aria-current={active ? 'page' : undefined}
             data-marker="top"
             className={cn(
-              'group flex flex-col gap-1.5 px-3 py-3 text-left text-[11px] cursor-pointer edge-b-engraved',
-              active ? 'ins-row-selected' : 'hover:bg-foreground/5',
+              'group flex flex-col gap-1 py-2.5 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved',
+              active ? 'ins-row-selected before:!top-3' : 'hover:bg-foreground/5',
             )}
           >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Lamp {...activity.lamp} label={activity.label} />
-              <MiddleTruncate text={name} className="font-medium text-xs text-foreground" />
-              {/* Portalled menu clicks still bubble through React to the row. */}
-              <span className="contents" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <span
-                      role="button"
-                      title="Tag repo role"
-                      className={cn(
-                        'ml-auto shrink-0 px-1 text-[10px] font-mono edge-engraved hover:text-[var(--ins-lamp)]',
-                        tab.role
-                          ? 'text-muted-foreground'
-                          : 'text-muted-foreground/60 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100',
-                      )}
-                    >
-                      {roleLabel(tab.role) ?? 'tag'}
-                    </span>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="text-xs">
-                    <DropdownMenuRadioGroup
-                      value={tab.role ?? ''}
-                      onValueChange={(v) => setRole(tab, v)}
-                    >
-                      {ROLES.map((r) => (
-                        <DropdownMenuRadioItem key={r.value} value={r.value}>
-                          {r.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                      <DropdownMenuRadioItem value="">None</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </span>
-              {!active && (
+            {/* Tier 1: what it is and what it is doing. */}
+            <div className="flex h-5 min-w-0 items-center gap-2">
+              <ActivityIcon kind={activity.kind} label={activity.label} />
+              <MiddleTruncate
+                text={name}
+                className={cn('text-xs', active ? 'font-semibold text-foreground' : 'font-medium text-foreground/80')}
+              />
+              {tab.role &&
+                roleMenu(
+                  tab,
+                  <span
+                    role="button"
+                    title="Change repo role"
+                    className="shrink-0 px-1 text-[10px] font-mono text-muted-foreground edge-engraved hover:text-[var(--ins-lamp)]"
+                  >
+                    {roleLabel(tab.role)}
+                  </span>,
+                )}
+              {linked && (
                 <span
                   role="button"
-                  aria-pressed={linked}
-                  aria-label={linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`}
-                  title={linked ? 'Linked to the current prompt — click to unlink' : 'Link this repo into the current prompt'}
+                  aria-pressed="true"
+                  aria-label={linkLabel}
+                  title="Linked to the current prompt — click to unlink"
                   onClick={(e) => toggleLink(e, tab, name, linked)}
-                  className={cn(
-                    'inline-flex items-center justify-center w-4 h-4 shrink-0',
-                    linked
-                      ? 'text-[var(--ins-lamp)] hover:text-[var(--ins-fault)]'
-                      : 'text-muted-foreground hover:text-[var(--ins-lamp)] opacity-0 group-hover:opacity-100',
-                  )}
+                  className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[var(--ins-lamp)] hover:text-[var(--ins-fault)]"
                 >
                   <Link2 className="h-3 w-3" />
                 </span>
               )}
-              {closable && (
-                <span
-                  role="button"
-                  aria-label={`Close ${name}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeTab(tab.id);
-                  }}
-                  className={cn(
-                    'inline-flex items-center justify-center w-4 h-4 shrink-0 text-muted-foreground hover:text-[var(--ins-fault)]',
-                    active
-                      ? 'opacity-60 group-hover:opacity-100'
-                      : 'opacity-0 group-hover:opacity-100',
+
+              {info?.branch && (
+                <span className="ml-auto shrink-0 whitespace-nowrap font-mono tabular-nums text-muted-foreground group-hover:hidden group-has-[[data-state=open]]:hidden">
+                  {info.files === 0 ? (
+                    'clean'
+                  ) : (
+                    <span title={`${info.files} file${info.files === 1 ? '' : 's'} changed`}>
+                      <span className="text-git-added">+{info.added}</span>{' '}
+                      <span className="text-git-deleted">−{info.deleted}</span>
+                    </span>
                   )}
-                >
-                  ×
                 </span>
               )}
+              <span className="ml-auto hidden shrink-0 items-center gap-0.5 group-hover:flex group-has-[[data-state=open]]:flex">
+                {!tab.role &&
+                  roleMenu(
+                    tab,
+                    <span
+                      role="button"
+                      title="Tag repo role"
+                      className="px-1 text-[10px] font-mono text-muted-foreground edge-engraved hover:text-[var(--ins-lamp)]"
+                    >
+                      tag
+                    </span>,
+                  )}
+                {!active && !linked && (
+                  <span
+                    role="button"
+                    aria-pressed="false"
+                    aria-label={linkLabel}
+                    title="Link this repo into the current prompt"
+                    onClick={(e) => toggleLink(e, tab, name, linked)}
+                    className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </span>
+                )}
+                {closable && (
+                  <span
+                    role="button"
+                    aria-label={`Close ${name}`}
+                    title="Close tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeTab(tab.id);
+                    }}
+                    className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-fault)]"
+                  >
+                    ×
+                  </span>
+                )}
+              </span>
             </div>
-            <div className="flex pl-[13px] min-w-0">
+
+            {/* Tier 2: the branch, in full; long names wrap rather than clip. */}
+            <div
+              className={cn(
+                'flex min-w-0 pl-6 text-[11px]',
+                active ? 'text-muted-foreground' : 'text-muted-foreground/75',
+              )}
+            >
               {info?.branch ? (
                 <span
                   role="button"
                   onClick={(e) => copyBranch(e, info.branch)}
                   title="Copy branch name"
-                  className="min-w-0 truncate font-mono text-muted-foreground hover:text-[var(--ins-lamp)]"
+                  className="flex min-w-0 items-start gap-1 font-mono hover:text-[var(--ins-lamp)]"
                 >
-                  {info.branch}
+                  <GitBranch className="mt-[2px] h-3 w-3 shrink-0" />
+                  <span className="min-w-0 break-all">{info.branch}</span>
                 </span>
               ) : (
-                <span className="text-muted-foreground">no repo</span>
+                <span>no repo</span>
               )}
             </div>
-            {info?.branch && (
-              <div className="flex items-center gap-1.5 pl-[13px] min-w-0 whitespace-nowrap text-[11px] text-muted-foreground">
-                {info.files === 0 ? (
-                  <span>clean</span>
-                ) : (
-                  <>
-                    <span className="font-mono tabular-nums">
-                      <span className="text-git-added">+{info.added}</span>{' '}
-                      <span className="text-git-deleted">−{info.deleted}</span>
-                    </span>
-                    <DiffBar
-                      added={info.added}
-                      removed={info.deleted}
-                      width={28}
-                    />
-                    <span className="ml-auto tabular-nums">
-                      {info.files} file{info.files === 1 ? '' : 's'}
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
           </button>
         );
       })}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Input } from './ui/input';
 import { PanelButton } from './instrument/PanelButton';
 import { ChevronsDownUp, CornerLeftUp, RefreshCw } from 'lucide-react';
@@ -28,9 +29,16 @@ export function SidebarHeader({
   onNavigateParent,
   currentPath,
 }) {
+  // While the search is focused it takes the whole row; the control bank hides.
+  const [searchFocused, setSearchFocused] = useState(false);
   const dirName = currentPath ? currentPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || currentPath : '';
   const searchWell = showSearch && (
-    <div className="ins-well relative flex-1 min-w-0 flex items-center focus-within:outline focus-within:outline-1 focus-within:outline-[var(--ins-lamp)] focus-within:-outline-offset-1">
+    <div className="ins-well relative flex-1 min-w-0 flex items-center focus-within:outline focus-within:outline-1 focus-within:outline-[var(--ins-lamp)] focus-within:-outline-offset-1"
+      onFocus={() => setSearchFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setSearchFocused(false);
+      }}
+    >
       <Keycap size="sm" className="absolute left-1.5 top-1/2 -translate-y-1/2 pointer-events-none">/</Keycap>
       <Input
         ref={searchInputRef}
@@ -73,7 +81,7 @@ export function SidebarHeader({
         </div>
       )}
       {searchWell}
-      {showSearch && (
+      {showSearch && !searchFocused && (
         <>
           <PanelButton
             latched={showMarkdownOnly}
@@ -105,10 +113,12 @@ export function SidebarHeader({
           />
         </>
       )}
-      <BookmarksDropdown
-        onNavigate={onNavigateBookmark}
-        onAdd={hasTerminalSession ? onAddBookmark : undefined}
-      />
+      {!searchFocused && (
+        <BookmarksDropdown
+          onNavigate={onNavigateBookmark}
+          onAdd={hasTerminalSession ? onAddBookmark : undefined}
+        />
+      )}
     </div>
   );
 }
