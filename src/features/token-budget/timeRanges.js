@@ -1,47 +1,4 @@
-import { format, startOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from 'date-fns';
-
-export function getLast30Days() {
-  const dates = [];
-  for (let i = 29; i >= 0; i--) {
-    dates.push(subDays(startOfDay(new Date()), i));
-  }
-  return dates;
-}
-
-export function getLast12Weeks() {
-  const weeks = [];
-  for (let i = 11; i >= 0; i--) {
-    const end = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 0 });
-    const start = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 0 });
-    weeks.push({ start, end });
-  }
-  return weeks;
-}
-
-export function getLast12Months() {
-  const months = [];
-  for (let i = 11; i >= 0; i--) {
-    const date = subMonths(new Date(), i);
-    months.push({
-      year: date.getFullYear(),
-      month: date.getMonth(),
-      start: startOfMonth(date),
-      end: endOfMonth(date),
-    });
-  }
-  return months;
-}
-
-export function formatDate(date, granularity = 'daily') {
-  if (granularity === 'daily') {
-    return format(date, 'MMM dd');
-  } else if (granularity === 'weekly') {
-    return `Week of ${format(date, 'MMM dd')}`;
-  } else if (granularity === 'monthly') {
-    return format(date, 'MMM yyyy');
-  }
-  return format(date, 'MMM dd');
-}
+import { format, startOfDay, startOfWeek, startOfMonth } from 'date-fns';
 
 export function groupByDay(data) {
   const grouped = {};

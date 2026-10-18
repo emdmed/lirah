@@ -1,5 +1,4 @@
 // Components
-export { CompactConfirmDialog } from './CompactConfirmDialog';
 export { CompactProjectButton } from './CompactProjectButton';
 export { CompactSectionsDialog } from './CompactSectionsDialog';
 
