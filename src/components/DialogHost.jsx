@@ -21,6 +21,7 @@ const TokenDashboard = lazyNamed(() => import("../features/token-budget/TokenDas
 const AutoChangelogDialog = lazyNamed(() => import("../features/git/AutoChangelogDialog"), "AutoChangelogDialog");
 const AutoCommitDialog = lazyNamed(() => import("../features/git/AutoCommitDialog"), "AutoCommitDialog");
 const AutoCommitConfigDialog = lazyNamed(() => import("../features/git/AutoCommitConfigDialog"), "AutoCommitConfigDialog");
+const AutoMergeDialog = lazyNamed(() => import("../features/git/AutoMergeDialog"), "AutoMergeDialog");
 const OrchestrationDashboard = lazyNamed(() => import("./OrchestrationDashboard"), "OrchestrationDashboard");
 const WorkspaceDialog = lazyNamed(() => import("./WorkspaceDialog"), "WorkspaceDialog");
 
@@ -37,6 +38,7 @@ export function DialogHost({
   fileSelection,
   branchName,
   autoCommit,
+  autoMerge,
   changelogStatus,
   tokenUsage,
   projectStats,
@@ -158,6 +160,9 @@ export function DialogHost({
       <WhenOpen open={autoCommit.stage !== 'idle'}>
         <AutoCommitDialog autoCommit={autoCommit} />
       </WhenOpen>
+      <WhenOpen open={autoMerge.stage !== 'idle'}>
+        <AutoMergeDialog autoMerge={autoMerge} />
+      </WhenOpen>
       <WhenOpen open={dialogs.workspaceDialogOpen}>
         <WorkspaceDialog
           open={dialogs.workspaceDialogOpen}
@@ -178,6 +183,8 @@ export function DialogHost({
               secondary.openWithCommand('lazygit', path);
             } else if (dialogs.projectPickerAction === 'autocommit') {
               autoCommit.trigger(path);
+            } else if (dialogs.projectPickerAction === 'automerge') {
+              autoMerge.trigger(path);
             }
             dialogs.setProjectPickerAction(null);
           }}

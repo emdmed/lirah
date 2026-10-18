@@ -13,6 +13,7 @@ export function useTabCommands({
   changeTheme,
   onCompactProject,
   onAutoCommit,
+  onAutoMerge,
   toggleSandbox,
   toggleNetwork,
   onToggleGitFilter,
@@ -29,6 +30,7 @@ export function useTabCommands({
     return [
       { id: 'compact', hint: 'compact the project for the prompt', run: () => onCompactProject() },
       { id: 'commit', hint: 'auto commit (^⇧space)', run: () => onAutoCommit() },
+      { id: 'merge', hint: 'merge this branch into a base branch (alt+M)', run: () => onAutoMerge() },
       { id: 'theme', hint: 'switch theme', options: () => Object.keys(themes), run: (name) => {
         if (!name) return;
         if (!themes[name]) throw new Error(`no theme "${name}"`);
@@ -58,7 +60,7 @@ export function useTabCommands({
       { id: 'titlebar', hint: 'show or hide the title bar', run: () => setShowTitleBar(prev => !prev) },
       { id: 'help', aliases: ['keys'], hint: 'keyboard shortcuts (^H)', run: () => setShowHelp(true) },
     ];
-  }, [onCompactProject, onAutoCommit, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
+  }, [onCompactProject, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
     toggleSandbox, toggleNetwork, onToggleGitFilter, onToggleMarkdownFilter, setSidebarOpen, setTextareaVisible,
     setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen, setAutoChangelogDialogOpen,
     setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setWorkspaceDialogOpen, setShowHelp]);

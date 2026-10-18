@@ -15,6 +15,7 @@ export function useTabShortcuts({
   onCompactProject,
   onOpenLazygit,
   onAutoCommit,
+  onAutoMerge,
 }) {
   const viewModeRef = useRef(viewMode);
   const sidebarOpenRef = useRef(sidebarOpen);
@@ -39,6 +40,12 @@ export function useTabShortcuts({
         e.preventDefault();
         e.stopPropagation();
         onOpenLazygit();
+        return;
+      }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'm') {
+        e.preventDefault();
+        e.stopPropagation();
+        onAutoMerge();
         return;
       }
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'n') {
@@ -72,5 +79,5 @@ export function useTabShortcuts({
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
-    searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, setBudgetDialogOpen, setDashboardOpen]);
+    searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, onAutoMerge, setBudgetDialogOpen, setDashboardOpen]);
 }

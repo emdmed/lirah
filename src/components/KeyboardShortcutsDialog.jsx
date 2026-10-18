@@ -49,6 +49,9 @@ const shortcuts = [
     category: 'Git & Branch',
     icon: <GitBranch className='w-4 h-4' />,
     items: [
+      { keys: ['Ctrl', 'Shift', 'Space'], description: 'Auto Commit' },
+      { keys: ['Alt', 'M'], description: 'Merge Branch Into Base' },
+      { keys: ['Alt', 'L'], description: 'Open Lazygit' },
     ],
   },
   {

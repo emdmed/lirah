@@ -18,6 +18,7 @@ import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
+import { useAutoMerge } from "../git/useAutoMerge";
 import { lazyNamed } from "../../lib/lazyNamed";
 import { useFlatViewNavigation } from "../../hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "../../hooks/useViewModeShortcuts";
@@ -228,6 +229,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   );
 
   const autoCommit = useAutoCommit(settings.autoCommitCli, settings.autoCommitCustomPrompt);
+  const autoMerge = useAutoMerge();
 
   // Workspace state
   const workspaceHook = useWorkspace();
@@ -688,6 +690,16 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     } else autoCommit.trigger(currentPathRef.current);
   }, [autoCommit.quickCommit, autoCommit.trigger, setProjectPickerAction, setProjectPickerOpen]);
 
+  const autoMergeStageRef = useRef(autoMerge.stage);
+  useEffect(() => { autoMergeStageRef.current = autoMerge.stage; }, [autoMerge.stage]);
+  const handleAutoMerge = useCallback(() => {
+    if (autoMergeStageRef.current !== 'idle') return;
+    if (workspaceRef.current?.projects?.length) {
+      setProjectPickerAction('automerge');
+      setProjectPickerOpen(true);
+    } else autoMerge.trigger(currentPathRef.current);
+  }, [autoMerge.trigger, setProjectPickerAction, setProjectPickerOpen]);
+
   const handleOpenLazygit = useCallback(() => {
     if (workspaceRef.current?.projects?.length) {
       setProjectPickerAction('lazygit');
@@ -707,6 +719,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     onCompactProject: compact.handleCompactProject,
     onOpenLazygit: handleOpenLazygit,
     onAutoCommit: handleAutoCommit,
+    onAutoMerge: handleAutoMerge,
   });
 
   const handleClearContext = useCallback(async () => {
@@ -802,6 +815,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     changeTheme,
     onCompactProject: compact.handleCompactProject,
     onAutoCommit: handleAutoCommit,
+    onAutoMerge: handleAutoMerge,
     toggleSandbox,
     toggleNetwork,
     onToggleGitFilter: treeView.handleToggleGitFilter,
@@ -998,6 +1012,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         fileSelection={fileSelection}
         branchName={branchName}
         autoCommit={autoCommit}
+        autoMerge={autoMerge}
         changelogStatus={changelogStatus}
         tokenUsage={tokenUsage}
         projectStats={projectStats}
