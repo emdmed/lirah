@@ -1,8 +1,8 @@
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Button } from "../ui/button";
-import { X, Map } from "lucide-react";
+import { X } from "lucide-react";
 
-export function CompactedIndicator({ compactedProject, onClearCompactedProject, onOpenSections, onOpenFlowchart }) {
+export function CompactedIndicator({ compactedProject, onClearCompactedProject, onOpenSections }) {
   if (!compactedProject) return null;
 
   return (
@@ -47,20 +47,6 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
         </TooltipContent>
       </Tooltip>
       <div className="flex items-center gap-0.5 border-l border-border/30 pl-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onOpenFlowchart}
-              className="p-0.5 h-auto text-muted-foreground hover:text-[var(--ins-lamp)]"
-              aria-label="View flowchart"
-            >
-              <Map className="w-3 h-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Flowchart</TooltipContent>
-        </Tooltip>
         <Button
           variant="ghost"
           size="xs"

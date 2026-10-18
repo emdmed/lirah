@@ -12,7 +12,6 @@
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "benchmark:tokens": "node scripts/benchmark-tokens.js",
-    "check:design": "node scripts/check-design.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:async-commands": "node scripts/check-async-commands.mjs",
     "check:bundle": "node scripts/check-bundle-size.mjs"

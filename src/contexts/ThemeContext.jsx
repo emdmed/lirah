@@ -18,7 +18,7 @@ export function ThemeProvider({ children }) {
     const root = document.documentElement;
     const { ui, terminal } = theme;
 
-    // Apply all UI color variables (objects such as `flowchart` are read in JS)
+    // Apply all UI color variables (non-string entries are skipped)
     Object.entries(ui).forEach(([key, value]) => {
       if (typeof value !== 'string') return;
       // Convert camelCase to kebab-case for CSS variables

@@ -1,6 +1,4 @@
 import { useRef, useMemo, useState, useCallback, useEffect, Suspense } from "react";
-import { buildGraphData } from "../../features/compact/generateFlowchart";
-import { useDesignExtraction } from "../../features/design/useDesignExtraction";
 import { useTokenBudget } from "../../features/token-budget/TokenBudgetContext";
 import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
 import { lazyNamed } from "../../lib/lazyNamed";
@@ -23,11 +21,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 
-// Loaded on first open. The compact dialogs mount only while open;
-// DesignDialog (a large hook tree) mounts on first open and then stays.
+// Loaded on first open, and mounted only while open.
 const CompactSectionsDialog = lazyNamed(() => import("../../features/compact/CompactSectionsDialog"), "CompactSectionsDialog");
-const FlowchartDialog = lazyNamed(() => import("../../features/compact/FlowchartDialog"), "FlowchartDialog");
-const DesignDialog = lazyNamed(() => import("../../features/design/DesignDialog"), "DesignDialog");
 
 export function TextareaPanel({
   promptStore,
@@ -120,53 +115,6 @@ export function TextareaPanel({
   const fileArray = useMemo(() => Array.from(selectedFiles || new Set()), [selectedFiles]);
 
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
-  const [flowchartOpen, setFlowchartOpen] = useState(false);
-  const [designOpen, setDesignOpen] = useState(false);
-  // DesignDialog holds view state (drill-down, hidden layers, last source)
-  // that must survive a close, so once opened it stays mounted.
-  const [designMounted, setDesignMounted] = useState(false);
-  if (designOpen && !designMounted) setDesignMounted(true);
-
-  // Lives above the dialog on purpose: closing the dialog must not cancel a
-  // running extraction, and reopening should show the finished diagram.
-  const designExtraction = useDesignExtraction();
-
-  // Clicking a file in the design panel pulls it into the prompt context —
-  // the diagram doubles as a way to select what you want to work on next.
-  const handleOpenDesignFile = useCallback(
-    (relPath) => {
-      if (!projectPath || !onToggleFile) return;
-      onToggleFile(relPath.startsWith('/') ? relPath : `${projectPath}/${relPath}`);
-    },
-    [projectPath, onToggleFile]
-  );
-
-  // Asking about a selection in the diagram continues the conversation here:
-  // the composed question lands in the prompt box (appended, never replacing
-  // what was already typed) and the parts' files come with it as context.
-  const handleDesignAsk = useCallback(
-    (prompt, { files = [] } = {}) => {
-      if (projectPath && onToggleFile) {
-        for (const file of files) {
-          const abs = file.startsWith('/') ? file : `${projectPath}/${file}`;
-          // onToggleFile toggles — re-adding an already selected file would
-          // silently drop it from the context.
-          if (!(selectedFiles instanceof Set) || !selectedFiles.has(abs)) onToggleFile(abs);
-        }
-      }
-      const existing = value?.trim() ? `${value.trimEnd()}\n\n` : '';
-      onChange(`${existing}${prompt}\n`);
-      requestAnimationFrame(() => textareaRef?.current?.focus());
-    },
-    [projectPath, onToggleFile, selectedFiles, value, onChange, textareaRef]
-  );
-
-  const graphData = useMemo(() => {
-    if (!compactedProject) return null;
-    const fullOutput = compactedProject.fullOutput || compactedProject.output;
-    return buildGraphData(fullOutput);
-  }, [compactedProject]);
-
   const sortedAtMentionResults = atMentionResults || [];
 
   const handleKeyDown = useCallback((e) => {
@@ -246,7 +194,6 @@ export function TextareaPanel({
       compactedProject={compactedProject}
       onClearCompactedProject={onClearCompactedProject}
       onOpenSections={() => setCompactDialogOpen(true)}
-      onOpenFlowchart={() => setFlowchartOpen(true)}
     />
   );
 
@@ -260,9 +207,6 @@ export function TextareaPanel({
       onLoadGroup={onLoadGroup}
       onSaveGroup={onSaveGroup}
       fileCount={fileArray.length}
-      onOpenDesign={() => setDesignOpen(true)}
-      designRunning={designExtraction.isRunning}
-      designHasSpec={!!designExtraction.spec}
     />
   );
 
@@ -299,23 +243,6 @@ export function TextareaPanel({
           onOpenChange={setCompactDialogOpen}
           compactedProject={compactedProject}
           onUpdateCompactedProject={onUpdateCompactedProject}
-        />
-      )}
-      {compactedProject && graphData && flowchartOpen && (
-        <FlowchartDialog
-          open={flowchartOpen}
-          onOpenChange={setFlowchartOpen}
-          graphData={graphData}
-        />
-      )}
-      {designMounted && (
-        <DesignDialog
-          open={designOpen}
-          onOpenChange={setDesignOpen}
-          extraction={designExtraction}
-          projectPath={projectPath || currentPath}
-          onOpenFile={handleOpenDesignFile}
-          onAsk={handleDesignAsk}
         />
       )}
     </Suspense>

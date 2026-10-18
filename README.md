@@ -110,7 +110,6 @@ If you use CLI agents seriously, Lirah becomes the place you run them.
 
 - **Project Compact** — Compresses your entire project into a token-efficient summary: imports, exports, function signatures, component props, and hook usage. Achieves ~95% token reduction.
 - **Compact Sections Dialog** — View and toggle individual sections of the compacted output. Disable irrelevant files to save more tokens.
-- **Flowchart Visualization** — Interactive dependency graph rendered from compacted output. Shows how components connect through imports with expandable nodes.
 
 ### Templates & File Groups
 

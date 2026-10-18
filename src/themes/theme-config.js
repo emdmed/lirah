@@ -71,24 +71,6 @@ export const themes = {
       gitAdded: '145 80% 77%',          // Catppuccin green for +lines
       gitDeleted: '346 77% 78%',         // Catppuccin red for -lines
       treeGuide: '226 64% 88% / 0.1',    // Text with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#7dd3fc',
-        componentBg: 'rgba(125,211,252,0.15)',
-        function: '#fbbf24',
-        functionBg: 'rgba(251,191,36,0.15)',
-        hook: '#a78bfa',
-        hookBg: 'rgba(167,139,250,0.15)',
-        constant: '#94a3b8',
-        constantBg: 'rgba(148,163,184,0.12)',
-        props: '#4ade80',
-        propsBg: 'rgba(74,222,128,0.15)',
-        propsStroke: 'rgba(74,222,128,0.4)',
-        edge: 'rgba(148,163,184,0.4)',
-        highlight: '#7dd3fc',
-        text: '#e2e8f0',
-        mutedText: '#64748b',
-      },
     },
   },
 
@@ -161,24 +143,6 @@ export const themes = {
       gitAdded: '75 25% 67%',           // Omarchy green for +lines
       gitDeleted: '0 55% 68%',          // Omarchy red for -lines
       treeGuide: '30 15% 81% / 0.1',    // Latte with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#e6c384',
-        componentBg: 'rgba(230,195,132,0.15)',
-        function: '#dca561',
-        functionBg: 'rgba(220,165,97,0.15)',
-        hook: '#a48ec7',
-        hookBg: 'rgba(164,142,199,0.15)',
-        constant: '#c5b8a5',
-        constantBg: 'rgba(197,184,165,0.12)',
-        props: '#98bb6c',
-        propsBg: 'rgba(152,187,108,0.15)',
-        propsStroke: 'rgba(152,187,108,0.4)',
-        edge: 'rgba(197,184,165,0.4)',
-        highlight: '#e6c384',
-        text: '#d4c4b0',
-        mutedText: '#8a7f72',
-      },
     },
   },
 
@@ -256,24 +220,6 @@ export const themes = {
       gitAdded: '95 40% 56%',         // Spring Green for +lines
       gitDeleted: '359 50% 51%',      // Samurai Red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#7aa2f7',
-        componentBg: 'rgba(122,162,247,0.15)',
-        function: '#ff9e64',
-        functionBg: 'rgba(255,158,100,0.15)',
-        hook: '#bb9af7',
-        hookBg: 'rgba(187,154,247,0.15)',
-        constant: '#9aa5ce',
-        constantBg: 'rgba(154,165,206,0.12)',
-        props: '#73daca',
-        propsBg: 'rgba(115,218,202,0.15)',
-        propsStroke: 'rgba(115,218,202,0.4)',
-        edge: 'rgba(154,165,206,0.4)',
-        highlight: '#7aa2f7',
-        text: '#c0caf5',
-        mutedText: '#565f89',
-      },
     },
   },
 
@@ -343,24 +289,6 @@ export const themes = {
       gitAdded: '80 76% 53%',         // Monokai green for +lines
       gitDeleted: '338 95% 56%',      // Monokai pink/red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#a6e22e',
-        componentBg: 'rgba(166,226,46,0.15)',
-        function: '#e6db74',
-        functionBg: 'rgba(230,219,116,0.15)',
-        hook: '#ae81ff',
-        hookBg: 'rgba(174,129,255,0.15)',
-        constant: '#f8f8f2',
-        constantBg: 'rgba(248,248,242,0.12)',
-        props: '#66d9ef',
-        propsBg: 'rgba(102,217,239,0.15)',
-        propsStroke: 'rgba(102,217,239,0.4)',
-        edge: 'rgba(248,248,242,0.4)',
-        highlight: '#a6e22e',
-        text: '#f8f8f2',
-        mutedText: '#75715e',
-      },
     },
   },
 
@@ -429,24 +357,6 @@ export const themes = {
       gitAdded: '156 72% 67%',        // Emerald for +lines
       gitDeleted: '156 72% 47%',      // Darker emerald for -lines
       treeGuide: '156 72% 67% / 0.15', // Emerald with opacity for tree guide lines
-      // Flowchart colors (monochrome emerald)
-      flowchart: {
-        component: '#34d399',
-        componentBg: 'rgba(52,211,153,0.15)',
-        function: '#34d399',
-        functionBg: 'rgba(52,211,153,0.15)',
-        hook: '#34d399',
-        hookBg: 'rgba(52,211,153,0.15)',
-        constant: '#34d399',
-        constantBg: 'rgba(52,211,153,0.12)',
-        props: '#34d399',
-        propsBg: 'rgba(52,211,153,0.15)',
-        propsStroke: 'rgba(52,211,153,0.4)',
-        edge: 'rgba(52,211,153,0.4)',
-        highlight: '#34d399',
-        text: '#34d399',
-        mutedText: '#10b981',
-      },
     },
   },
 
@@ -517,24 +427,6 @@ export const themes = {
       gitAdded: '61 66% 44%',         // Gruvbox bright green for +lines
       gitDeleted: '0 100% 60%',       // Gruvbox bright red for -lines
       treeGuide: '0 0% 100% / 0.1',   // White with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#fabd2f',
-        componentBg: 'rgba(250,189,47,0.15)',
-        function: '#fe8019',
-        functionBg: 'rgba(254,128,25,0.15)',
-        hook: '#d3869b',
-        hookBg: 'rgba(211,134,155,0.15)',
-        constant: '#bdae93',
-        constantBg: 'rgba(189,174,147,0.12)',
-        props: '#b8bb26',
-        propsBg: 'rgba(184,187,38,0.15)',
-        propsStroke: 'rgba(184,187,38,0.4)',
-        edge: 'rgba(189,174,147,0.4)',
-        highlight: '#fabd2f',
-        text: '#ebdbb2',
-        mutedText: '#928374',
-      },
     },
   },
   retro: {
@@ -605,24 +497,6 @@ export const themes = {
       gitAdded: '117 36% 74%',                 // Celadon for +lines
       gitDeleted: '349 92% 55%',                // Red for -lines
       treeGuide: '117 36% 74% / 0.15',         // Celadon with opacity
-      // Flowchart colors
-      flowchart: {
-        component: '#F4F7A3',
-        componentBg: 'rgba(244,247,163,0.15)',
-        function: '#D5FF8C',
-        functionBg: 'rgba(213,255,140,0.15)',
-        hook: '#E0A8E3',
-        hookBg: 'rgba(224,168,227,0.15)',
-        constant: '#FEFFC7',
-        constantBg: 'rgba(254,255,199,0.12)',
-        props: '#7EE8D7',
-        propsBg: 'rgba(126,232,215,0.15)',
-        propsStroke: 'rgba(126,232,215,0.4)',
-        edge: 'rgba(254,255,199,0.4)',
-        highlight: '#F4F7A3',
-        text: '#FEFFC7',
-        mutedText: '#A8D5A6',
-      },
     },
   },
 
@@ -693,24 +567,6 @@ export const themes = {
       gitAdded: '84 62% 67%',            // Tokyo Night green for +lines
       gitDeleted: '351 95% 72%',         // Tokyo Night red for -lines
       treeGuide: '229 34% 75% / 0.1',    // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#7aa2f7',
-        componentBg: 'rgba(122,162,247,0.15)',
-        function: '#ff9e64',
-        functionBg: 'rgba(255,158,100,0.15)',
-        hook: '#bb9af7',
-        hookBg: 'rgba(187,154,247,0.15)',
-        constant: '#a9b1d6',
-        constantBg: 'rgba(169,177,214,0.12)',
-        props: '#9ece6a',
-        propsBg: 'rgba(158,206,106,0.15)',
-        propsStroke: 'rgba(158,206,106,0.4)',
-        edge: 'rgba(169,177,214,0.4)',
-        highlight: '#7aa2f7',
-        text: '#c0caf5',
-        mutedText: '#565f89',
-      },
     },
   },
 
@@ -782,24 +638,6 @@ export const themes = {
       gitAdded: '78 36% 62%',            // Everforest green for +lines
       gitDeleted: '1 56% 70%',           // Everforest red for -lines
       treeGuide: '40 26% 77% / 0.1',     // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#7fbbb3',
-        componentBg: 'rgba(127,187,179,0.15)',
-        function: '#dbbc7f',
-        functionBg: 'rgba(219,188,127,0.15)',
-        hook: '#d699b6',
-        hookBg: 'rgba(214,153,182,0.15)',
-        constant: '#d3c6aa',
-        constantBg: 'rgba(211,198,170,0.12)',
-        props: '#a7c080',
-        propsBg: 'rgba(167,192,128,0.15)',
-        propsStroke: 'rgba(167,192,128,0.4)',
-        edge: 'rgba(211,198,170,0.4)',
-        highlight: '#7fbbb3',
-        text: '#d3c6aa',
-        mutedText: '#859289',
-      },
     },
   },
 
@@ -870,24 +708,6 @@ export const themes = {
       gitAdded: '92 28% 65%',            // Nord green for +lines
       gitDeleted: '354 42% 56%',         // Nord red for -lines
       treeGuide: '218 27% 90% / 0.1',    // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#88c0d0',
-        componentBg: 'rgba(136,192,208,0.15)',
-        function: '#ebcb8b',
-        functionBg: 'rgba(235,203,139,0.15)',
-        hook: '#b48ead',
-        hookBg: 'rgba(180,142,173,0.15)',
-        constant: '#d8dee9',
-        constantBg: 'rgba(216,222,233,0.12)',
-        props: '#a3be8c',
-        propsBg: 'rgba(163,190,140,0.15)',
-        propsStroke: 'rgba(163,190,140,0.4)',
-        edge: 'rgba(216,222,233,0.4)',
-        highlight: '#88c0d0',
-        text: '#eceff4',
-        mutedText: '#4c566a',
-      },
     },
   },
 
@@ -958,24 +778,6 @@ export const themes = {
       gitAdded: '197 49% 38%',           // Rose Pine pine for +lines
       gitDeleted: '343 76% 68%',         // Rose Pine love for -lines
       treeGuide: '245 50% 91% / 0.1',    // Text with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#9ccfd8',
-        componentBg: 'rgba(156,207,216,0.15)',
-        function: '#f6c177',
-        functionBg: 'rgba(246,193,119,0.15)',
-        hook: '#c4a7e7',
-        hookBg: 'rgba(196,167,231,0.15)',
-        constant: '#e0def4',
-        constantBg: 'rgba(224,222,244,0.12)',
-        props: '#31748f',
-        propsBg: 'rgba(49,116,143,0.15)',
-        propsStroke: 'rgba(49,116,143,0.4)',
-        edge: 'rgba(224,222,244,0.4)',
-        highlight: '#9ccfd8',
-        text: '#e0def4',
-        mutedText: '#6e6a86',
-      },
     },
   },
 
@@ -1048,24 +850,6 @@ export const themes = {
       gitAdded: '151 100% 50%',          // Matte Black green for +lines
       gitDeleted: '0 100% 71%',          // Matte Black red for -lines
       treeGuide: '0 0% 96% / 0.1',       // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#4db8ff',
-        componentBg: 'rgba(77,184,255,0.15)',
-        function: '#ffd93d',
-        functionBg: 'rgba(255,217,61,0.15)',
-        hook: '#ff79c6',
-        hookBg: 'rgba(255,121,198,0.15)',
-        constant: '#f5f5f5',
-        constantBg: 'rgba(245,245,245,0.12)',
-        props: '#00ff87',
-        propsBg: 'rgba(0,255,135,0.15)',
-        propsStroke: 'rgba(0,255,135,0.4)',
-        edge: 'rgba(245,245,245,0.4)',
-        highlight: '#4db8ff',
-        text: '#f5f5f5',
-        mutedText: '#808080',
-      },
     },
   },
 
@@ -1138,24 +922,6 @@ export const themes = {
       gitAdded: '120 100% 50%',          // Hackerman green for +lines
       gitDeleted: '0 100% 50%',          // Red for -lines
       treeGuide: '120 100% 50% / 0.15',  // Green with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#00ff00',
-        componentBg: 'rgba(0,255,0,0.15)',
-        function: '#33ff33',
-        functionBg: 'rgba(51,255,51,0.15)',
-        hook: '#00ff99',
-        hookBg: 'rgba(0,255,153,0.15)',
-        constant: '#ccffcc',
-        constantBg: 'rgba(204,255,204,0.12)',
-        props: '#66ff00',
-        propsBg: 'rgba(102,255,0,0.15)',
-        propsStroke: 'rgba(102,255,0,0.4)',
-        edge: 'rgba(204,255,204,0.4)',
-        highlight: '#00ff00',
-        text: '#00ff00',
-        mutedText: '#00cc00',
-      },
     },
   },
 
@@ -1226,24 +992,6 @@ export const themes = {
       gitAdded: '145 30% 47%',           // Osaka Jade green for +lines
       gitDeleted: '5 100% 64%',          // Osaka Jade red for -lines
       treeGuide: '68 35% 67% / 0.1',     // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#509475',
-        componentBg: 'rgba(80,148,117,0.15)',
-        function: '#E5C736',
-        functionBg: 'rgba(229,199,54,0.15)',
-        hook: '#D2689C',
-        hookBg: 'rgba(210,104,156,0.15)',
-        constant: '#C1C497',
-        constantBg: 'rgba(193,196,151,0.12)',
-        props: '#549e6a',
-        propsBg: 'rgba(84,158,106,0.15)',
-        propsStroke: 'rgba(84,158,106,0.4)',
-        edge: 'rgba(193,196,151,0.4)',
-        highlight: '#509475',
-        text: '#C1C497',
-        mutedText: '#53685B',
-      },
     },
   },
 
@@ -1314,24 +1062,6 @@ export const themes = {
       gitAdded: '120 35% 74%',           // Ethereal green for +lines
       gitDeleted: '0 45% 72%',           // Ethereal red for -lines
       treeGuide: '0 0% 83% / 0.1',       // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#a0d7d9',
-        componentBg: 'rgba(160,215,217,0.15)',
-        function: '#fbe7a3',
-        functionBg: 'rgba(251,231,163,0.15)',
-        hook: '#e2a3b4',
-        hookBg: 'rgba(226,163,180,0.15)',
-        constant: '#d4d4d4',
-        constantBg: 'rgba(212,212,212,0.12)',
-        props: '#a0d9a0',
-        propsBg: 'rgba(160,217,160,0.15)',
-        propsStroke: 'rgba(160,217,160,0.4)',
-        edge: 'rgba(212,212,212,0.4)',
-        highlight: '#a0d7d9',
-        text: '#d4d4d4',
-        mutedText: '#6e6a86',
-      },
     },
   },
 
@@ -1403,24 +1133,6 @@ export const themes = {
       gitAdded: '72 75% 29%',            // Flexoki green for +lines
       gitDeleted: '4 60% 43%',           // Flexoki red for -lines
       treeGuide: '15 5% 6% / 0.1',       // Foreground with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#205ea6',
-        componentBg: 'rgba(32,94,166,0.15)',
-        function: '#ad8301',
-        functionBg: 'rgba(173,131,1,0.15)',
-        hook: '#a02f6f',
-        hookBg: 'rgba(160,47,111,0.15)',
-        constant: '#100f0f',
-        constantBg: 'rgba(16,15,15,0.08)',
-        props: '#66800b',
-        propsBg: 'rgba(102,128,11,0.15)',
-        propsStroke: 'rgba(102,128,11,0.4)',
-        edge: 'rgba(16,15,15,0.3)',
-        highlight: '#205ea6',
-        text: '#100f0f',
-        mutedText: '#6f6e69',
-      },
     },
   },
 
@@ -1492,24 +1204,6 @@ export const themes = {
       gitAdded: '100 54% 40%',           // Catppuccin green for +lines
       gitDeleted: '347 87% 44%',         // Catppuccin red for -lines
       treeGuide: '234 16% 35% / 0.1',    // Text with opacity for tree guide lines
-      // Flowchart colors
-      flowchart: {
-        component: '#1e66f5',
-        componentBg: 'rgba(30,102,245,0.15)',
-        function: '#df8e1d',
-        functionBg: 'rgba(223,142,29,0.15)',
-        hook: '#ea76cb',
-        hookBg: 'rgba(234,118,203,0.15)',
-        constant: '#4c4f69',
-        constantBg: 'rgba(76,79,105,0.08)',
-        props: '#40a02b',
-        propsBg: 'rgba(64,160,43,0.15)',
-        propsStroke: 'rgba(64,160,43,0.4)',
-        edge: 'rgba(76,79,105,0.3)',
-        highlight: '#1e66f5',
-        text: '#4c4f69',
-        mutedText: '#6c6f85',
-      },
     },
   },
 };
@@ -1542,14 +1236,4 @@ export function saveTheme(themeName) {
   } catch (error) {
     console.warn('Failed to save theme from localStorage:', error);
   }
-}
-
-/**
- * Get flowchart colors for the current theme
- * @returns {Object} Flowchart color configuration
- */
-export function getFlowchartColors() {
-  const themeName = loadTheme();
-  const theme = themes[themeName] || themes[defaultTheme];
-  return theme.ui.flowchart || themes[defaultTheme].ui.flowchart;
 }

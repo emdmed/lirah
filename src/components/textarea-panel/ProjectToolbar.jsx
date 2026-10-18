@@ -1,4 +1,4 @@
-import { ChevronDown, FolderOpen, Layers, Network } from "lucide-react";
+import { ChevronDown, FolderOpen, Layers } from "lucide-react";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -10,13 +10,12 @@ import {
   DropdownMenuSubTrigger,
 } from "../ui/dropdown-menu";
 import { CompactProjectButton } from "../../features/compact";
-import { DesignButton } from "../../features/design/DesignButton";
 import { FileGroupsMenuItems } from "../../features/file-groups";
 import { KeyChord } from "../instrument/Keycap";
 
-// Project-wide actions behind one menu. A running compact or design run
-// surfaces as a live badge beside it, since that state must stay visible.
-export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileCount, onOpenDesign, designRunning, designHasSpec }) {
+// Project-wide actions behind one menu. A running compact surfaces as a live
+// badge beside it, since that state must stay visible.
+export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileCount }) {
   return (
     <div className="flex items-center gap-0.5">
       <DropdownMenu>
@@ -35,14 +34,6 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
             <Layers className="h-3 w-3 mr-1.5" />
             Compact project
             <KeyChord keys={["^", "⇧", "P"]} size="sm" className="ml-auto" />
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={onOpenDesign}
-            disabled={disabled || !projectPath}
-            className="text-[11px] py-1.5 cursor-pointer"
-          >
-            <Network className="h-3 w-3 mr-1.5" />
-            {designHasSpec ? 'Open design diagram' : 'Diagram this conversation'}
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="text-[11px] py-1.5">
@@ -63,7 +54,6 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
       {isCompacting && (
         <CompactProjectButton onClick={onCompactProject} isCompacting progress={compactProgress} disabled={disabled} />
       )}
-      {designRunning && <DesignButton onClick={onOpenDesign} isRunning />}
     </div>
   );
 }
