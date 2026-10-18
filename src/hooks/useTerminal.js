@@ -43,6 +43,20 @@ const WEBGL_IDLE_DISPOSE_MS = 30_000;
 // renderer for good.
 const WEBGL_RETRY_RESET_MS = 60_000;
 
+// Every live WebGL renderer in this window. xterm shares one texture atlas
+// between all terminals with the same font, theme and pixel ratio — the Claude
+// terminal and a lazygit secondary included — but clearTextureAtlas() only
+// resets the *calling* renderer's cell model. Every other terminal keeps its
+// cached glyph coordinates into pages that are now being refilled with other
+// glyphs, and paints the right colours in the wrong shapes until each of those
+// cells changes. So a clear has to reach all of them (see repaintAll).
+const liveWebglRenderers = new Set();
+
+function disposeWebgl(webgl) {
+  liveWebglRenderers.delete(webgl);
+  webgl.dispose();
+}
+
 export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true, reattachKey = null) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
@@ -88,10 +102,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // already gone.
         if (webglRef.current !== webgl) return;
         webglRef.current = null;
-        webgl.dispose();
+        disposeWebgl(webgl);
         setRendererLost(true);
       });
       term.loadAddon(webgl);
+      liveWebglRenderers.add(webgl);
       webglRef.current = webgl;
       return webgl;
     } catch (e) {
@@ -165,7 +180,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     return () => {
       const webgl = webglRef.current;
       webglRef.current = null;
-      webgl?.dispose();
+      if (webgl) disposeWebgl(webgl);
       terminalInstRef.current = null;
       term.dispose();
     };
@@ -370,13 +385,17 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   // the renderer against the *existing* atlas, so glyphs smeared when the canvas
   // was reallocated during a resize (WebKitGTK does this on window maximize) get
   // painted right back. Clearing the atlas first forces them to be re-rasterized.
+  // The atlas is shared, so every other live renderer is told too; only the
+  // first clear does any work; the rest find it empty and just drop their models.
   const repaintAll = useCallback(() => {
     const term = terminalInstRef.current;
     if (!term) return;
-    try {
-      webglRef.current?.clearTextureAtlas();
-    } catch (e) {
-      console.debug('Texture atlas clear skipped:', e?.message);
+    for (const webgl of liveWebglRenderers) {
+      try {
+        webgl.clearTextureAtlas();
+      } catch (e) {
+        console.debug('Texture atlas clear skipped:', e?.message);
+      }
     }
     try {
       term.refresh(0, term.rows - 1);
@@ -633,7 +652,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       if (!webgl) return;
       webglRef.current = null;
       webglSuspendedRef.current = true;
-      webgl.dispose();
+      disposeWebgl(webgl);
     }, WEBGL_IDLE_DISPOSE_MS);
     return () => clearTimeout(timer);
   }, [terminal, isActive, attachWebgl, repaintAll]);
