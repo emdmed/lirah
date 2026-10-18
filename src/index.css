@@ -104,9 +104,8 @@
 
 /*
   Instrument material. Chrome is flat: a hairline in a dimmed foreground,
-  zero radius, no shadow. Three exceptions carry meaning and nothing else
-  does: one glass screen (the terminal), lamps for live state, and keycaps
-  for keys. Every value derives from the active theme.
+  zero radius, no shadow. Two exceptions carry meaning and nothing else
+  does: lamps for live state, and keycaps for keys. Every value derives from the active theme.
 */
 :root {
   --ins-gutter:      color-mix(in srgb, var(--color-background) 78%, #000);
@@ -231,8 +230,8 @@ body {
   }
 }
 
-/* No rounded corners anywhere except true dots and the opted-in glass and
-   keycaps (.ins-round). */
+/* No rounded corners anywhere except true dots and the opted-in keycaps
+   (.ins-round). */
 *:not(.rounded-full):not(.ins-round) {
   border-radius: 0 !important;
 }
@@ -465,7 +464,7 @@ body {
     color: var(--color-foreground);
   }
 
-  /* A terminal pane: the glass fills the frame, so the hairline is the
+  /* A terminal pane: the screen fills the frame, so the hairline is the
      screen's bezel rather than a second box around it. */
   .tui-pane.tui-pane-screen {
     padding: 7px 1px;
@@ -898,31 +897,13 @@ body {
     box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.45);
   }
 
-  /* The one glass screen. Pair with .ins-round. */
+  /* The terminal screen: a flat fill matching the xterm canvas. */
   .ins-glass {
     background: var(--ins-glass);
-    border-radius: 6px;
-    box-shadow:
-      inset 0 0 0 1px rgb(0 0 0 / 0.5),
-      inset 0 10px 28px rgb(0 0 0 / 0.45),
-      0 1px 0 rgb(255 255 255 / 0.04);
-  }
-
-  :root[data-theme="light"] .ins-glass {
-    box-shadow:
-      inset 0 0 0 1px rgb(0 0 0 / 0.18),
-      inset 0 6px 18px rgb(0 0 0 / 0.12);
   }
 
   :root[data-theme="light"] .ins-well {
     box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
-  }
-
-  /* Glass preference off: a flat screen with square corners. */
-  .ins-glass.ins-glass-flat,
-  :root[data-glass="flat"] .ins-glass {
-    border-radius: 0;
-    box-shadow: none;
   }
 
   /* Raised face for cards and overlays. */

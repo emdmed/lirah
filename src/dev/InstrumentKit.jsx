@@ -108,9 +108,9 @@ export function InstrumentKit() {
         </section>
 
         <section className="tui-pane px-3" data-legend>
-          <PaneLegend index={6} title="Glass + well" />
+          <PaneLegend index={6} title="Screen + well" />
           <div className="flex flex-col gap-2 py-2">
-            <div className="ins-glass ins-round h-16 p-2 text-[var(--color-foreground)]">$ cargo test</div>
+            <div className="ins-glass h-16 p-2 text-[var(--color-foreground)]">$ cargo test</div>
             <div className="ins-well px-2 py-1.5"><span className="text-[var(--ins-lamp)]">❯</span> prompt well</div>
           </div>
         </section>

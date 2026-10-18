@@ -75,7 +75,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       }}
     >
       <PaneLegend index={2} title="Terminal" lit={isFocused} />
-      {/* The glass carries the inset; the ref div stays unpadded so FitAddon
+      {/* The screen carries the inset; the ref div stays unpadded so FitAddon
           measures exactly the cell area. */}
       <div className="ins-glass relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
         <div

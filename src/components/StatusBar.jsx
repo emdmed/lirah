@@ -4,7 +4,7 @@ import { Palette } from 'lucide-react';
 import {
   Keyboard, Eye, EyeOff, Bot, Terminal,
   PanelTop, PanelTopClose, Coins, BarChart3, FileText, FileX, Check, AlertCircle,
-  Layers, X, Monitor
+  Layers, X, GitMerge
 } from 'lucide-react';
 import { Scanner } from './instrument/Scanner';
 import { useWatcher } from '../features/watcher';
@@ -265,9 +265,9 @@ export const StatusBar = memo(({
   onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
-  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig,
+  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, onAutoMerge,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
-  availableUpdate, instrumentGlass, onToggleInstrumentGlass, tokenUsage
+  availableUpdate, tokenUsage
 }) => {
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
@@ -444,6 +444,11 @@ export const StatusBar = memo(({
                 <span className="ml-2">Auto Commit...</span>
                 <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onAutoMerge} className="cursor-pointer py-1">
+                <GitMerge className="mr-2 w-3 h-3" />
+                Auto Merge...
+                <DropdownMenuShortcut>Alt+M</DropdownMenuShortcut>
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Preferences</DropdownMenuLabel>
@@ -468,10 +473,6 @@ export const StatusBar = memo(({
               <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
                 {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
                 Title Bar: {showTitleBar ? 'ON' : 'OFF'}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onToggleInstrumentGlass} className="cursor-pointer py-1">
-                <Monitor className="mr-2 w-3 h-3" style={instrumentGlass ? undefined : { color: STATUS_COLORS.critical }} />
-                Glass: {instrumentGlass ? 'ON' : 'OFF'}
               </DropdownMenuItem>
               <ScrollbackMenuItem />
             </DropdownMenuGroup>

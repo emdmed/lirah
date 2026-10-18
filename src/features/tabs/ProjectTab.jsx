@@ -162,13 +162,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const settings = useTerminalSettings();
   const dialogs = useDialogs();
 
-  // The Glass preference is global; the active tab owns the root attribute.
-  useEffect(() => {
-    if (!isActive) return;
-    if (settings.instrumentGlass) document.documentElement.removeAttribute('data-glass');
-    else document.documentElement.setAttribute('data-glass', 'flat');
-  }, [isActive, settings.instrumentGlass]);
-
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
 
   // Set currentPath from projectPath prop on mount
@@ -791,7 +784,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     setSaveFileGroupDialogOpen } = dialogs;
   const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [setShowHelp]);
   const openCliSettings = useCallback(() => setCliSelectionModalOpen(true), [setCliSelectionModalOpen]);
-  const toggleInstrumentGlass = useCallback(() => settings.setInstrumentGlass(prev => !prev), [settings.setInstrumentGlass]);
   const toggleTitleBar = useCallback(() => settings.setShowTitleBar(prev => !prev), [settings.setShowTitleBar]);
   const toggleAutoLaunchCli = useCallback(() => settings.setAutoLaunchCli(prev => !prev), [settings.setAutoLaunchCli]);
   const openDashboard = useCallback(() => setDashboardOpen(true), [setDashboardOpen]);
@@ -920,8 +912,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             selectedCli={settings.selectedCli}
             onOpenCliSettings={openCliSettings}
             showTitleBar={settings.showTitleBar}
-            instrumentGlass={settings.instrumentGlass}
-            onToggleInstrumentGlass={toggleInstrumentGlass}
             tokenUsage={tokenUsage}
             onToggleTitleBar={toggleTitleBar}
             autoLaunchCli={settings.autoLaunchCli}
@@ -938,6 +928,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             onOpenAutoChangelogDialog={openAutoChangelogDialog}
             autoCommitCli={settings.autoCommitCli}
             onOpenAutoCommitConfig={openAutoCommitConfig}
+            onAutoMerge={handleAutoMerge}
             onToggleSandbox={toggleSandbox}
             workspace={workspaceHook.workspace}
             onOpenWorkspaceDialog={openWorkspaceDialog}

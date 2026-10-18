@@ -25,8 +25,6 @@ export function useTerminalSettings() {
   const [networkIsolation, setNetworkIsolation] = useLocalStorageState('nevo-terminal:network-isolation', false);
   const [showTitleBar, setShowTitleBar] = useLocalStorageState('nevo-terminal:show-title-bar', true);
   const [keepFilesAfterSend, setKeepFilesAfterSend] = useLocalStorageState('nevo-terminal:keep-files-after-send', false);
-  // Rounded, inset-shaded terminal glass. Off draws a flat square screen.
-  const [instrumentGlass, setInstrumentGlass] = useLocalStorageState('nevo-terminal:instrument-glass', true);
   // Launch the CLI automatically when a starred (bookmarked) repo is opened.
   // Never applies to tabs restored at startup — that isn't a deliberate act.
   const [autoLaunchCli, setAutoLaunchCli] = useLocalStorageState('nevo-terminal:auto-launch-cli', true);
@@ -57,7 +55,6 @@ export function useTerminalSettings() {
     networkIsolation, setNetworkIsolation,
     showTitleBar, setShowTitleBar,
     keepFilesAfterSend, setKeepFilesAfterSend,
-    instrumentGlass, setInstrumentGlass,
     autoLaunchCli, setAutoLaunchCli,
     selectedCli, setSelectedCli,
     autoChangelogEnabled, setAutoChangelogEnabled,

@@ -29,7 +29,7 @@ export function ThemeProvider({ children }) {
     // Apply theme type (light/dark) as data attribute
     root.setAttribute('data-theme', theme.type);
 
-    // Instrument material: the glass matches the xterm canvas, lamps and
+    // Instrument material: the screen matches the xterm canvas, lamps and
     // status colours come from the theme's ANSI palette.
     root.style.setProperty('--color-terminal-bg', terminal.background);
     root.style.setProperty('--color-lamp', ui.lamp ?? terminal.brightYellow);
