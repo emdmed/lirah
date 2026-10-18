@@ -54,13 +54,17 @@ export function LeftSidebar({
   // Destructure only needed fields from grouped props (fix #2: explicit dependencies)
   const { sidebarWidth, sidebarRef, isResizing, handleResizeStart } = sidebar;
   const { searchQuery, handleSearchClear } = search;
-  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, treeTruncated, displayedTreeData, expandedFolders, toggleFolder, loadTreeData } = treeView;
+  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, treeTruncated, displayedTreeData, expandedFolders, toggleFolder, collapseAllFolders, loadTreeData } = treeView;
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, setFileViewMode, VIEW_MODES } = fileSymbols;
 
   const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
   const { containerRef: rowsRef, registerList, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
-    useRowCursor({ onSearch: focusSearch, onParent: viewMode === 'flat' ? onNavigateParent : undefined });
+    useRowCursor({
+      onSearch: focusSearch,
+      onParent: viewMode === 'flat' ? onNavigateParent : undefined,
+      onCollapseAll: viewMode === 'tree' ? collapseAllFolders : undefined,
+    });
 
   return (
     <>
@@ -80,6 +84,7 @@ export function LeftSidebar({
             showSearch={viewMode === 'tree'}
             searchInputRef={searchInputRef}
             onSyncTree={loadTreeData}
+            onCollapseAll={collapseAllFolders}
             treeLoading={treeLoading}
             showGitChangesOnly={showGitChangesOnly}
             onToggleGitFilter={handleToggleGitFilter}

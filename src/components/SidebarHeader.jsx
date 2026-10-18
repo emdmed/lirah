@@ -1,6 +1,6 @@
 import { Input } from './ui/input';
 import { PanelButton } from './instrument/PanelButton';
-import { CornerLeftUp, RefreshCw } from 'lucide-react';
+import { ChevronsDownUp, CornerLeftUp, RefreshCw } from 'lucide-react';
 import { BookmarksDropdown } from '../features/bookmarks';
 import { Keycap } from './instrument/Keycap';
 import { Scanner } from './instrument/Scanner';
@@ -23,6 +23,7 @@ export function SidebarHeader({
   onNavigateBookmark,
   hasTerminalSession,
   onSyncTree,
+  onCollapseAll,
   treeLoading,
   onNavigateParent,
   currentPath,
@@ -89,6 +90,12 @@ export function SidebarHeader({
           >
             git
           </PanelButton>
+          <PanelButton
+            icon={ChevronsDownUp}
+            onClick={onCollapseAll}
+            title="Collapse all folders (X)"
+            aria-label="Collapse all folders"
+          />
           <PanelButton
             icon={treeLoading ? SyncBusy : RefreshCw}
             onClick={onSyncTree}

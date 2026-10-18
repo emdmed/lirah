@@ -282,13 +282,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     return info;
   }, [workspaceHook.openWorkspace, navigateToWorkspace]);
 
-  // Auto-expand search results when they change
-  useEffect(() => {
-    if (sidebarSearch.searchResults && sidebarSearch.searchResults.length > 0) {
-      treeView.expandSearchResults(sidebarSearch.searchResults);
-    }
-  }, [sidebarSearch.searchResults]);
-
   const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
   const compact = useCompact({
@@ -574,7 +567,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // Clear folder expansion when sidebar closes
   useEffect(() => {
     if (!sidebar.sidebarOpen) {
-      treeView.setExpandedFolders(new Set());
+      treeView.collapseAllFolders();
     }
   }, [sidebar.sidebarOpen]);
 

@@ -65,6 +65,32 @@ function makeFileEntry({ path, is_dir }) {
   };
 }
 
+/** Paths of every folder in the tree. */
+function collectFolderPaths(nodes, into = new Set()) {
+  for (const node of nodes) {
+    if (!node.is_dir) continue;
+    into.add(node.path);
+    if (node.children) collectFolderPaths(node.children, into);
+  }
+  return into;
+}
+
+/** Ancestor folders of each search result, plus matching folders themselves. */
+function searchResultFolderPaths(results) {
+  const paths = new Set();
+  for (const result of results) {
+    let current = result.path;
+    while (current && current !== '/') {
+      const lastSlash = lastSepIndex(current);
+      if (lastSlash <= 0) break;
+      current = current.substring(0, lastSlash);
+      paths.add(current);
+    }
+    if (result.is_dir) paths.add(result.path);
+  }
+  return paths;
+}
+
 /** True when `path` or one of its ancestors is in `pathSet`. */
 function isSelfOrDescendantOf(path, pathSet) {
   let current = path;
@@ -81,7 +107,13 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   const [treeData, setTreeData] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeTruncated, setTreeTruncated] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState(new Set());
+  // Folders the user opened. While search or a filter is active the tree shows
+  // a separate, throwaway expansion instead, so the user's layout comes back
+  // untouched when it is turned off.
+  const [userExpandedFolders, setUserExpandedFolders] = useState(() => new Set());
+  const [transientExpandedFolders, setTransientExpandedFolders] = useState(null);
+  const expandedFolders = transientExpandedFolders ?? userExpandedFolders;
+  const transientActive = transientExpandedFolders !== null;
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
   const [showMarkdownOnly, setShowMarkdownOnly] = useState(false);
   const [allFiles, setAllFiles] = useState([]);
@@ -268,12 +300,18 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   }, [loadTreeData]);
 
   const toggleFolder = useCallback((folderPath) => {
-    setExpandedFolders(prev => {
+    const setActive = transientActive ? setTransientExpandedFolders : setUserExpandedFolders;
+    setActive(prev => {
       const next = new Set(prev);
       if (next.has(folderPath)) next.delete(folderPath);
       else next.add(folderPath);
       return next;
     });
+  }, [transientActive]);
+
+  const collapseAllFolders = useCallback(() => {
+    setUserExpandedFolders(new Set());
+    setTransientExpandedFolders(prev => (prev ? new Set() : prev));
   }, []);
 
   const filterTreeBySearch = useCallback((nodes, matchingPaths) => {
@@ -306,58 +344,35 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     return filterNodes(nodes);
   }, []);
 
-  const expandSearchResults = useCallback((results) => {
-    const pathsToExpand = new Set();
-    results.forEach(result => {
-      let current = result.path;
-      while (current && current !== '/') {
-        const lastSlash = lastSepIndex(current);
-        if (lastSlash <= 0) break;
-        current = current.substring(0, lastSlash);
-        pathsToExpand.add(current);
-      }
-      if (result.is_dir) pathsToExpand.add(result.path);
-    });
-    setExpandedFolders(pathsToExpand);
-  }, []);
-
-  const expandAllFolders = useCallback(() => {
-    if (treeData.length > 0) {
-      const allFolderPaths = new Set();
-      const collectFolders = (nodes) => {
-        nodes.forEach(node => {
-          if (node.is_dir) {
-            allFolderPaths.add(node.path);
-            if (node.children) collectFolders(node.children);
-          }
-        });
-      };
-      collectFolders(treeData);
-      setExpandedFolders(allFolderPaths);
-    }
-  }, [treeData]);
-
   const handleToggleGitFilter = useCallback(() => {
-    setShowGitChangesOnly(prev => {
-      const newValue = !prev;
-      if (newValue) {
-        setShowMarkdownOnly(false);
-        expandAllFolders();
-      }
-      return newValue;
-    });
-  }, [expandAllFolders]);
+    const next = !showGitChangesOnly;
+    setShowGitChangesOnly(next);
+    if (next) setShowMarkdownOnly(false);
+  }, [showGitChangesOnly]);
 
   const handleToggleMarkdownFilter = useCallback(() => {
-    setShowMarkdownOnly(prev => {
-      const newValue = !prev;
-      if (newValue) {
-        setShowGitChangesOnly(false);
-        expandAllFolders();
-      }
-      return newValue;
-    });
-  }, [expandAllFolders]);
+    const next = !showMarkdownOnly;
+    setShowMarkdownOnly(next);
+    if (next) setShowGitChangesOnly(false);
+  }, [showMarkdownOnly]);
+
+  // Search opens the folders holding its results; a filter opens everything
+  // (the filtered tree only keeps folders with matches). Re-run only when the
+  // mode changes, or the tree first arrives, so folding inside a filtered view
+  // survives fs updates.
+  const treeDataRef = useRef(treeData);
+  treeDataRef.current = treeData;
+  const treeLoaded = treeData.length > 0;
+  const filterActive = showGitChangesOnly || showMarkdownOnly;
+  useEffect(() => {
+    if (searchResults && searchResults.length > 0) {
+      setTransientExpandedFolders(searchResultFolderPaths(searchResults));
+    } else if (filterActive) {
+      setTransientExpandedFolders(collectFolderPaths(treeDataRef.current));
+    } else {
+      setTransientExpandedFolders(null);
+    }
+  }, [searchResults, filterActive, showGitChangesOnly, treeLoaded]);
 
   const displayedTreeData = useMemo(() => {
     let filtered = treeData;
@@ -373,7 +388,8 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     treeData, setTreeData,
     treeLoading,
     treeTruncated,
-    expandedFolders, setExpandedFolders,
+    expandedFolders,
+    collapseAllFolders,
     showGitChangesOnly,
     showMarkdownOnly,
     allFiles,
@@ -382,13 +398,12 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     handleGitChanges,
     toggleFolder,
     filterTreeBySearch,
-    expandSearchResults,
     handleToggleGitFilter,
     handleToggleMarkdownFilter,
     displayedTreeData,
   }), [
     treeData, treeLoading, treeTruncated, expandedFolders, showGitChangesOnly, showMarkdownOnly, allFiles,
-    loadTreeData, handleIncrementalUpdate, handleGitChanges, toggleFolder,
-    filterTreeBySearch, expandSearchResults, handleToggleGitFilter, handleToggleMarkdownFilter, displayedTreeData,
+    loadTreeData, handleIncrementalUpdate, handleGitChanges, toggleFolder, collapseAllFolders,
+    filterTreeBySearch, handleToggleGitFilter, handleToggleMarkdownFilter, displayedTreeData,
   ]);
 }

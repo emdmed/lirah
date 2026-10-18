@@ -2,14 +2,17 @@ import { useCallback, useRef, useState } from 'react';
 
 /**
  * Vim-style cursor over the rows of a list (j/k, g/G, Enter, p, /; with
- * `onParent`, Backspace / h / - go up a directory, as in ranger and netrw).
+ * `onParent`, Backspace / h / - go up a directory, as in ranger and netrw;
+ * with `onCollapseAll`, X folds every folder).
  *
  * The cursor is an index into the list's navigable rows. The list (which may
  * be virtualized, so most rows have no DOM node) registers itself through
  * `registerList({ count, activate(i), pin(i), scrollToIndex(i) })` and marks
- * the row at `cursorIndex` with `data-cursor`, styled as a lamp marker.
+ * the row at `cursorIndex` with `data-cursor`, styled as a lamp marker. Tree
+ * lists also pass `expand(i)` / `collapse(i)` for Right / l and Left, which
+ * return the row to move the cursor to, if any.
  */
-export function useRowCursor({ onSearch, onParent } = {}) {
+export function useRowCursor({ onSearch, onParent, onCollapseAll } = {}) {
   const containerRef = useRef(null);
   const listRef = useRef(null);
   const [index, setIndexState] = useState(null);
@@ -66,6 +69,24 @@ export function useRowCursor({ onSearch, onParent } = {}) {
         if (!list || current < 0 || current >= list.count) return;
         list.activate(current);
         break;
+      case 'ArrowRight':
+      case 'l': {
+        if (!list?.expand || current < 0 || current >= list.count) return;
+        const next = list.expand(current);
+        if (next != null) move(next);
+        break;
+      }
+      case 'ArrowLeft': {
+        if (!list?.collapse || current < 0 || current >= list.count) return;
+        const next = list.collapse(current);
+        if (next != null) move(next);
+        break;
+      }
+      case 'X':
+        if (!onCollapseAll) return;
+        onCollapseAll();
+        if (list?.count) move(0);
+        break;
       case 'p':
         if (list && current >= 0 && current < list.count) list.pin?.(current);
         break;
@@ -88,7 +109,7 @@ export function useRowCursor({ onSearch, onParent } = {}) {
     }
     e.preventDefault();
     e.stopPropagation();
-  }, [move, onSearch, onParent, setIndex]);
+  }, [move, onSearch, onParent, onCollapseAll, setIndex]);
 
   // Leaving the pane drops the cursor, so a stale highlight never lingers.
   const onBlur = useCallback((e) => {

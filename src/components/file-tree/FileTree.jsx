@@ -178,12 +178,37 @@ export function FileTree({
         if (node.is_deleted || gitStats?.get(node.path)?.status === 'deleted') return;
         onTogglePin(node.path);
       },
+      // Right: open a folder, or step into an open one. Returns the new cursor.
+      expand: (i) => {
+        const row = allRows[navRowIndices[i]];
+        if (!row?.node.is_dir) return undefined;
+        if (!expandedFolders.has(row.node.path)) {
+          onToggle(row.node.path);
+          return undefined;
+        }
+        const child = allRows[navRowIndices[i + 1]];
+        return child && child.depth > row.depth ? i + 1 : undefined;
+      },
+      // Left: close an open folder, otherwise jump to the parent folder.
+      collapse: (i) => {
+        const row = allRows[navRowIndices[i]];
+        if (!row) return undefined;
+        if (row.node.is_dir && expandedFolders.has(row.node.path) && !row.key.startsWith('pinned:')) {
+          onToggle(row.node.path);
+          return undefined;
+        }
+        for (let j = i - 1; j >= 0; j--) {
+          const prev = allRows[navRowIndices[j]];
+          if (prev.depth < row.depth) return j;
+        }
+        return undefined;
+      },
       scrollToIndex: (i) => {
         const rowIndex = navRowIndices[i];
         if (rowIndex != null) virtualizer.scrollToIndex(rowIndex, { align: 'auto' });
       },
     });
-  }, [registerList, allRows, navRowIndices, onToggle, handleActivateFile, onTogglePin, gitStats, virtualizer]);
+  }, [registerList, allRows, navRowIndices, expandedFolders, onToggle, handleActivateFile, onTogglePin, gitStats, virtualizer]);
   useEffect(() => (registerList ? () => registerList(null) : undefined), [registerList]);
 
   if (!showList) {
