@@ -6,6 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { invoke, Channel } from '@tauri-apps/api/core';
+import { getTerminalSession, rememberTerminalSession, forgetTerminalSession } from '../lib/terminalSessions';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
@@ -42,7 +43,7 @@ const WEBGL_IDLE_DISPOSE_MS = 30_000;
 // renderer for good.
 const WEBGL_RETRY_RESET_MS = 60_000;
 
-export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true) {
+export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true, reattachKey = null) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -256,14 +257,25 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         const rows = terminal.rows;
         const cols = terminal.cols;
 
-        // Spawn terminal backend
-        const result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, output });
+        // After a webview reload the shell is still running: claim it back
+        // (its recent output is replayed on `output`) instead of spawning.
+        const storedId = reattachKey ? getTerminalSession(reattachKey) : null;
+        let result = storedId
+          ? await invoke('attach_terminal', { sessionId: storedId, output }).catch(() => null)
+          : null;
+        const reattached = !!result;
+        if (!result) {
+          result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, output });
+        }
         id = result.session_id;
-        // Unmounted while spawning: the cleanup had no id to close yet.
         if (cancelled) {
-          invoke('close_terminal', { sessionId: id }).catch(() => {});
+          // Unmounted while spawning: the cleanup had no id to close yet. A
+          // reattached session is left alone — under StrictMode the remount
+          // claims it again.
+          if (!reattached) invoke('close_terminal', { sessionId: id }).catch(() => {});
           return;
         }
+        if (reattachKey) rememberTerminalSession(reattachKey, id);
         sessionIdRef.current = id;
         setSessionId(id);
 
@@ -312,7 +324,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         }
 
         // Send initial command if provided (for secondary terminal)
-        if (initialCommand) {
+        if (initialCommand && !reattached) {
           setTimeout(() => {
             invoke('write_to_terminal', { sessionId: id, data: initialCommand + '\n' }).catch((error) => {
               console.error('Failed to send initial command:', error);
@@ -346,6 +358,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       const id = sessionIdRef.current;
       if (id) {
         sessionIdRef.current = null;
+        if (reattachKey) forgetTerminalSession(reattachKey, id);
         invoke('close_terminal', { sessionId: id }).catch((error) => {
           console.error('Failed to close terminal:', error);
         });

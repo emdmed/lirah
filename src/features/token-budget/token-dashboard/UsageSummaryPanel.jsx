@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatTokenCount, formatCost } from '../tokenCalculations';
+import { calculateCost, DEFAULT_MODEL } from '../../../config/pricing';
 import { Clock, MessageSquare, Zap, Database, Coins, Layers } from 'lucide-react';
 
 function StatRow({ icon: Icon, label, value, color }) {
@@ -24,8 +25,8 @@ export function UsageSummaryPanel({ sessionData, tokenUsage, colors = {} }) {
   const inputTokens = tokenUsage?.billable_input_tokens || sessionData?.inputTokens || 0;
   const outputTokens = tokenUsage?.billable_output_tokens || sessionData?.outputTokens || 0;
   const cacheReads = sessionData?.cacheReads || 0;
-  const totalCost = tokenUsage?.totalCost || (inputTokens + outputTokens) * 0.000003 || 0;
-  const model = sessionData?.model || tokenUsage?.model || 'claude-sonnet-4-5';
+  const model = sessionData?.model || tokenUsage?.model || DEFAULT_MODEL;
+  const totalCost = tokenUsage?.totalCost || calculateCost({ inputTokens, outputTokens, cacheReadInputTokens: cacheReads }, model);
 
   const modelDisplay = model.toLowerCase().includes('opus') ? 'Opus' : model.toLowerCase().includes('sonnet') ? 'Sonnet' : model;
 

@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useCallback, useMemo, useEf
 import { getStartOfDay, getStartOfWeek, formatTokenCount, formatCost, computeCostFromUsage } from './tokenCalculations';
 import { prepareChartData, prepareModelBreakdown, calculateEfficiencyMetrics } from './dashboardData';
 import { exportToCSV, exportToJSON } from './exportData';
+import { DEFAULT_MODEL } from '../../config/pricing';
 
 const STORAGE_KEY = 'lirah:token-budgets:v1';
-const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
 
 const TokenBudgetContext = createContext(null);
 

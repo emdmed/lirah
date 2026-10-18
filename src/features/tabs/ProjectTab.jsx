@@ -966,6 +966,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
           networkIsolation={settings.networkIsolation}
           projectDir={resolvedProjectDir}
           onSandboxFailed={handleSandboxFailed}
+          reattachKey={tabId}
         />
         <Suspense fallback={null}>
         {dialogs.diffDialogOpen && <GitDiffDialog

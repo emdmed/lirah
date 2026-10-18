@@ -58,13 +58,20 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
 
       let command;
       if (cliExists) {
-        command = cliConfig.command + '\r';
+        command = cliConfig.command;
       } else if (cliConfig.fallback) {
-        command = cliConfig.fallback + '\r';
+        command = cliConfig.fallback;
       } else {
         console.error(`${selectedCli} is not available and has no fallback`);
         return;
       }
+      // Claude Code reports its state (working, needs permission, done) to
+      // the tab through Lirah's hook plugin, loaded for this session only.
+      if (selectedCli === 'claude-code') {
+        const pluginDir = await invoke('get_agent_hook_plugin_dir').catch(() => null);
+        if (pluginDir) command += ` --plugin-dir '${pluginDir.replace(/'/g, "'\\''")}'`;
+      }
+      command += '\r';
 
       console.log('Launching CLI with command:', command.trim());
 

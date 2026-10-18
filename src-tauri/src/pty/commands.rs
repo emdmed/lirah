@@ -8,7 +8,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::ipc::{Channel, InvokeResponseBody};
+use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
@@ -36,11 +36,6 @@ fn get_session(state: &AppState, session_id: &str) -> Result<Arc<SessionHandle>,
         .ok_or_else(|| format!("Session not found: {}", session_id))
 }
 
-fn send_output(out: &Channel, data: Vec<u8>) {
-    // Fails only once the webview is gone; nothing left to deliver to.
-    let _ = out.send(InvokeResponseBody::Raw(data));
-}
-
 /// Coalesce PTY output before it crosses the Rust→JS IPC boundary.
 ///
 /// A naive reader sends one IPC message per read (~8 KB). Under heavy output
@@ -59,13 +54,13 @@ fn send_output(out: &Channel, data: Vec<u8>) {
 /// When nothing is buffered we block on `recv()` (no timeout): an idle terminal
 /// must cost zero wakeups, which matters when many tabs each hold a quiet
 /// nvim/lazygit.
-fn batch_emit_loop(rx: Receiver<Vec<u8>>, out: Channel) {
+fn batch_emit_loop(rx: Receiver<Vec<u8>>, session: &SessionHandle) {
     let mut pending: Vec<u8> = Vec::new();
     // Some(_) once data is buffered: the instant by which we must flush.
     let mut deadline: Option<Instant> = None;
     let mut last_flush: Option<Instant> = None;
     let flush = |pending: &mut Vec<u8>, deadline: &mut Option<Instant>, last_flush: &mut Option<Instant>| {
-        send_output(&out, std::mem::take(pending));
+        session.output.emit(std::mem::take(pending));
         *deadline = None;
         *last_flush = Some(Instant::now());
     };
@@ -134,16 +129,17 @@ fn pump_output(
     }
 }
 
-/// Reader thread for an interactive terminal: raw bytes go to the frontend over
-/// `out` (xterm decodes UTF-8 itself, including sequences split across reads).
-fn spawn_output_reader(session: Arc<SessionHandle>, mut reader: Box<dyn Read + Send>, out: Channel) {
+/// Reader thread for an interactive terminal: raw bytes go to the session's
+/// output sink, and from there to whichever frontend is attached (xterm decodes
+/// UTF-8 itself, including sequences split across reads).
+fn spawn_output_reader(session: Arc<SessionHandle>, mut reader: Box<dyn Read + Send>) {
     thread::spawn(move || {
         // Batch on a dedicated emitter thread: the reader stays tight on the
         // PTY while sends are coalesced (see batch_emit_loop).
         let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
         let emitter = {
-            let out = out.clone();
-            thread::spawn(move || batch_emit_loop(rx, out))
+            let session = session.clone();
+            thread::spawn(move || batch_emit_loop(rx, &session))
         };
 
         let exited = pump_output(&session, &mut reader, |chunk| tx.send(chunk.to_vec()).is_ok());
@@ -153,7 +149,7 @@ fn spawn_output_reader(session: Arc<SessionHandle>, mut reader: Box<dyn Read + S
         drop(tx);
         let _ = emitter.join();
         if exited {
-            send_output(&out, PROCESS_EXITED_NOTICE.to_vec());
+            session.output.emit(PROCESS_EXITED_NOTICE.to_vec());
         }
     });
 }
@@ -171,13 +167,16 @@ pub async fn spawn_terminal(
     output: Channel,
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
+    // The id exists before the shell does: the shell's env carries it, so
+    // agent hooks running inside can say which terminal they belong to.
+    let session_id = Uuid::new_v4().to_string();
+    let env = crate::agent_hooks::session_env(&session_id);
     let (session, reader) = tauri::async_runtime::spawn_blocking(move || {
-        manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir)
+        manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir, env)
     })
     .await
     .map_err(join_error)??;
 
-    let session_id = Uuid::new_v4().to_string();
     let session = Arc::new(session);
     let sandboxed = session.sandboxed;
 
@@ -187,12 +186,78 @@ pub async fn spawn_terminal(
         .pty_sessions
         .insert(session_id.clone(), session.clone());
 
-    spawn_output_reader(session, reader, output);
+    session.output.attach(output, false);
+    spawn_output_reader(session, reader);
 
     Ok(serde_json::json!({
         "session_id": session_id,
         "sandboxed": sandboxed,
     }))
+}
+
+/// Reconnect a frontend to a session that outlived its webview (a reload). The
+/// session's recent output is replayed on `output` before live output resumes.
+/// Fails when the session is gone, and the caller spawns a fresh one.
+#[tauri::command]
+pub fn attach_terminal(
+    session_id: String,
+    output: Channel,
+    state: tauri::State<AppState>,
+) -> Result<serde_json::Value, String> {
+    let session = get_session(&state, &session_id)?;
+    session.output.attach(output, true);
+    session.nudge_redraw();
+    Ok(serde_json::json!({
+        "session_id": session_id,
+        "sandboxed": session.sandboxed,
+    }))
+}
+
+/// A page load drops every frontend channel. Mark the sessions detached and
+/// unpark any reader the old frontend had paused, since nobody is left to
+/// resume it.
+pub fn detach_all_terminals(state: &AppState) {
+    let sessions: Vec<Arc<SessionHandle>> = match state.lock() {
+        Ok(st) => st.pty_sessions.values().cloned().collect(),
+        Err(_) => return,
+    };
+    for session in sessions {
+        session.output.detach();
+        session.gate.resume();
+    }
+}
+
+/// Close the detached sessions the reloaded frontend won't reattach: ones whose
+/// tabs were closed before the reload. `keep` lists the sessions it will claim.
+#[tauri::command]
+pub async fn reap_detached_terminals(
+    keep: Vec<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<usize, String> {
+    let orphans: Vec<(String, Arc<SessionHandle>)> = {
+        let mut st = state
+            .lock()
+            .map_err(|e| format!("Failed to lock state: {}", e))?;
+        let ids: Vec<String> = st
+            .pty_sessions
+            .iter()
+            .filter(|(id, s)| s.output.is_detached() && !keep.contains(id))
+            .map(|(id, _)| id.clone())
+            .collect();
+        ids.into_iter()
+            .filter_map(|id| st.pty_sessions.remove(&id).map(|s| (id, s)))
+            .collect()
+    };
+    let count = orphans.len();
+    tauri::async_runtime::spawn_blocking(move || {
+        for (id, session) in orphans {
+            session.terminate();
+            crate::agent_hooks::remove_session_log(&id);
+        }
+    })
+    .await
+    .map_err(join_error)?;
+    Ok(count)
 }
 
 // write/resize/pause/resume stay synchronous on purpose: each is a map lookup
@@ -251,6 +316,7 @@ pub async fn close_terminal(
         tauri::async_runtime::spawn_blocking(move || session.terminate())
             .await
             .map_err(join_error)?;
+        crate::agent_hooks::remove_session_log(&session_id);
 
         let _ = app.emit(
             "terminal-closed",

@@ -8,13 +8,19 @@
 //! Input goes through a dedicated writer thread fed by an mpsc channel, so
 //! `write_to_terminal` never blocks on a child that has stopped reading (a big
 //! paste into a busy TUI) and keystrokes keep their order.
+//!
+//! Output goes through an `OutputSink`, which keeps the tail of everything the
+//! shell printed. A webview reload drops the frontend's channel but not the
+//! session; the fresh frontend reattaches and the tail is replayed into it.
 
 use portable_pty::{Child, ExitStatus, MasterPty, PtySize};
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Condvar, Mutex, MutexGuard};
 use std::thread;
+use tauri::ipc::{Channel, InvokeResponseBody};
 
 fn lock<T: ?Sized>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     // A panic while holding one of these locks leaves nothing half-updated
@@ -77,6 +83,87 @@ impl ReaderGate {
     }
 }
 
+/// How much output a session keeps for replay on reattach. About the default
+/// 10k-line scrollback of ordinary shell output.
+const REPLAY_LIMIT: usize = 1024 * 1024;
+/// After trimming the replay buffer from the front, skip at most this far to
+/// the next newline so the replay doesn't start inside an escape sequence or a
+/// UTF-8 character.
+const REPLAY_RESYNC_WINDOW: usize = 4096;
+
+struct SinkState {
+    /// The frontend currently attached, if any. `None` while the webview is
+    /// reloading: output keeps landing in `replay` until someone reattaches.
+    channel: Option<Channel>,
+    replay: VecDeque<u8>,
+    detached: bool,
+}
+
+/// Where a session's output goes: the attached frontend, plus a bounded
+/// replay buffer. Sends happen under the lock so a reattach can't interleave
+/// its replay with live output.
+pub struct OutputSink {
+    state: Mutex<SinkState>,
+}
+
+impl OutputSink {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(SinkState {
+                channel: None,
+                replay: VecDeque::new(),
+                detached: false,
+            }),
+        }
+    }
+
+    pub fn emit(&self, data: Vec<u8>) {
+        let mut st = lock(&self.state);
+        st.replay.extend(data.iter().copied());
+        if st.replay.len() > REPLAY_LIMIT {
+            let excess = st.replay.len() - REPLAY_LIMIT;
+            st.replay.drain(..excess);
+            let resync = st
+                .replay
+                .iter()
+                .take(REPLAY_RESYNC_WINDOW)
+                .position(|b| *b == b'\n')
+                .map_or(0, |i| i + 1);
+            st.replay.drain(..resync);
+        }
+        if let Some(channel) = &st.channel {
+            // Fails only once the webview is gone; the replay still has it.
+            let _ = channel.send(InvokeResponseBody::Raw(data));
+        }
+    }
+
+    /// Route output to `channel`, first replaying what the session has printed.
+    pub fn attach(&self, channel: Channel, replay: bool) {
+        let mut st = lock(&self.state);
+        if replay && !st.replay.is_empty() {
+            let (a, b) = st.replay.as_slices();
+            let _ = channel.send(InvokeResponseBody::Raw([a, b].concat()));
+        }
+        st.channel = Some(channel);
+        st.detached = false;
+    }
+
+    /// The frontend went away without closing the session (a reload). A sink
+    /// that never had a frontend (a hidden terminal) isn't detachable, so the
+    /// reap after a reload leaves it running.
+    pub fn detach(&self) {
+        let mut st = lock(&self.state);
+        if st.channel.take().is_none() {
+            return;
+        }
+        st.detached = true;
+    }
+
+    pub fn is_detached(&self) -> bool {
+        lock(&self.state).detached
+    }
+}
+
 /// The child process, with its PID cached so callers can read it without
 /// taking the lock that `kill`/`wait` need.
 pub struct ChildHandle {
@@ -111,6 +198,7 @@ pub struct SessionHandle {
     pub child: ChildHandle,
     input: Sender<Vec<u8>>,
     pub gate: ReaderGate,
+    pub output: OutputSink,
     pub sandboxed: bool,
 }
 
@@ -140,6 +228,7 @@ impl SessionHandle {
                 child: ChildHandle::new(child),
                 input,
                 gate: ReaderGate::new(),
+                output: OutputSink::new(),
                 sandboxed,
             },
             reader,
@@ -164,6 +253,20 @@ impl SessionHandle {
             .map_err(|e| format!("Failed to resize PTY: {}", e))
     }
 
+    /// Make a full-screen app (nvim, lazygit, an agent TUI) repaint after a
+    /// reattach. The replay alone can leave it half-drawn when its start was
+    /// trimmed, and resizing to the same size sends no SIGWINCH, so step one
+    /// column narrower and back.
+    pub fn nudge_redraw(&self) {
+        let master = lock(&self.master);
+        let Ok(size) = master.get_size() else { return };
+        if size.cols < 2 {
+            return;
+        }
+        let _ = master.resize(PtySize { cols: size.cols - 1, ..size });
+        let _ = master.resize(size);
+    }
+
     /// Stop the session: unpark the reader, then kill and reap the child.
     /// Blocks on `wait`, so call it from a blocking thread.
     pub fn terminate(&self) {
@@ -184,5 +287,40 @@ fn writer_loop(mut writer: Box<dyn Write + Send>, rx: mpsc::Receiver<Vec<u8>>) {
             eprintln!("Failed to write to PTY: {}", e);
             return;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn replay(sink: &OutputSink) -> Vec<u8> {
+        lock(&sink.state).replay.iter().copied().collect()
+    }
+
+    #[test]
+    fn replay_keeps_the_tail_from_a_line_start() {
+        let sink = OutputSink::new();
+        sink.emit(b"first line\n".to_vec());
+        assert_eq!(replay(&sink), b"first line\n");
+
+        // Overflow with ordinary lines: wherever the cut lands, the replay
+        // skips to the next line start instead of starting inside one.
+        // 13-byte lines, so the limit falls inside one.
+        let lines: String = (0..REPLAY_LIMIT / 13 + 2).map(|n| format!("line {:07}\n", n)).collect();
+        sink.emit(lines.into_bytes());
+        sink.emit(b"last\n".to_vec());
+        let kept = replay(&sink);
+        assert!(kept.len() <= REPLAY_LIMIT);
+        assert!(kept.starts_with(b"line "), "replay starts mid-line");
+        assert!(kept.ends_with(b"\nlast\n"));
+    }
+
+    #[test]
+    fn detach_needs_an_attached_frontend() {
+        let sink = OutputSink::new();
+        // A hidden terminal never had a channel, so it never counts as detached.
+        sink.detach();
+        assert!(!sink.is_detached());
     }
 }

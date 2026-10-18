@@ -11,12 +11,20 @@ import { KeyHintBar } from "./components/KeyHintBar";
 import { ToastContainer, useToast } from "./features/toast";
 import { useUpdateChecker } from "./hooks/useUpdateChecker";
 import { DevProfiler } from "./components/DevProfiler";
+import { reapOrphanedTerminals } from "./lib/terminalSessions";
+import { startAgentHookListener } from "./features/tabs/agentHookState";
 
 function App() {
   const { tabs, activeTabId, addTab, removeTab, switchTab } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
+
+  // Terminals from before a reload that no tab will reattach.
+  useEffect(() => { reapOrphanedTerminals(); }, []);
+
+  // Agent state reported by Claude Code / opencode hooks, for the tab lamps.
+  useEffect(() => { startAgentHookListener(); }, []);
 
   // One update check for the whole app (it hits GitHub's unauthenticated API).
   const availableUpdate = useUpdateChecker();

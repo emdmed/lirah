@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useTokenBudget } from './TokenBudgetContext';
-import { estimatePromptCost } from '../../config/pricing';
+import { estimatePromptCost, DEFAULT_MODEL } from '../../config/pricing';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
 
 export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath }) {
   const { checkBudgetStatus, getBudget, currentUsage } = useTokenBudget();

@@ -1,3 +1,5 @@
+import { clearAgentHookState } from './agentHookState';
+
 // Last PTY output per terminal session, plus which session is each tab's main
 // terminal. Plain module state with no React: the terminal writes on every chunk
 // and only the tabs summary pane reads it, on its own tick.
@@ -26,6 +28,7 @@ export function registerTabSession(tabId, sessionId) {
     if (tabSessions.get(tabId) === sessionId) tabSessions.delete(tabId);
     lastOutputAt.delete(sessionId);
     lastInputAt.delete(sessionId);
+    clearAgentHookState(sessionId);
   };
 }
 

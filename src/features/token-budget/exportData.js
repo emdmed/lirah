@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { DEFAULT_MODEL } from '../../config/pricing';
 
 export function exportToCSV(data, timeRange) {
   const headers = ['date', 'project', 'model', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens', 'total_cost'];
@@ -6,7 +7,7 @@ export function exportToCSV(data, timeRange) {
   const rows = data.map(item => [
     item.date,
     item.project || 'lirah',
-    item.model || 'claude-sonnet-4-5-20250929',
+    item.model || DEFAULT_MODEL,
     item.input || 0,
     item.output || 0,
     item.cacheRead || 0,
@@ -39,7 +40,7 @@ export function exportToJSON(data, timeRange, metadata = {}) {
     data: data.map(item => ({
       date: item.date,
       project: item.project || 'lirah',
-      model: item.model || 'claude-sonnet-4-5-20250929',
+      model: item.model || DEFAULT_MODEL,
       inputTokens: item.input || 0,
       outputTokens: item.output || 0,
       cacheReadTokens: item.cacheRead || 0,

@@ -427,9 +427,10 @@ export function AgentJobsProvider({ children }) {
   useEffect(() => {
     let unlistenOutput = null;
     let unlistenDone = null;
+    let unlistenIdle = null;
     let cancelled = false;
 
-    const finalizeJob = async (job, exitCode, success) => {
+    const finalizeJob = async (job, exitCode, success, timedOut = false) => {
       // A cancelled (or otherwise no-longer-running) job can still emit a backend
       // 'done' event when its process finally exits. Don't let that resurrect it
       // to 'done' or fire a spurious report + notification.
@@ -460,6 +461,10 @@ export function AgentJobsProvider({ children }) {
         diffStat,
         endedAt,
         reportPath,
+        idleSecs: 0,
+        ...(timedOut && {
+          error: 'Stopped after 15 min with no output or CPU work. The agent was probably waiting on an approval it can\'t get in a headless run.',
+        }),
       });
       // A race would otherwise pop one notification per candidate and none for
       // the thing you actually wait on — all candidates being ready to compare.
@@ -499,23 +504,32 @@ export function AgentJobsProvider({ children }) {
         }));
       });
       const ud = await listen('agent-job://done', (event) => {
-        const { jobId, exitCode, success } = event.payload;
+        const { jobId, exitCode, success, timedOut } = event.payload;
         const job = jobsRef.current.find((j) => j.id === jobId);
-        if (job) finalizeJob(job, exitCode, success);
+        if (job) finalizeJob(job, exitCode, success, timedOut);
+      });
+      // The backend watchdog: how long a running job has gone without output
+      // or CPU work (0 when it picks up again).
+      const ui = await listen('agent-job://idle', (event) => {
+        const { jobId, idleSecs } = event.payload;
+        patchJob(jobId, (j) => (j.status === 'running' ? { idleSecs } : {}));
       });
       if (cancelled) {
         uo();
         ud();
+        ui();
         return;
       }
       unlistenOutput = uo;
       unlistenDone = ud;
+      unlistenIdle = ui;
     })();
 
     return () => {
       cancelled = true;
       if (unlistenOutput) unlistenOutput();
       if (unlistenDone) unlistenDone();
+      if (unlistenIdle) unlistenIdle();
     };
   }, [patchJob]);
 

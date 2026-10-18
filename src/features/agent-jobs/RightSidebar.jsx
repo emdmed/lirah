@@ -799,6 +799,16 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
           </span>
         )}
         {showStatusChip && <span style={{ color: meta.color }}>{meta.label}</span>}
+        {isRunning && job.idleSecs > 0 && (
+          <span
+            className="inline-flex items-center gap-0.5"
+            style={{ color: 'var(--color-status-warning)' }}
+            title="No output or CPU work. The agent may be waiting on an approval it can't get in a headless run. It is stopped after 15 min idle."
+          >
+            <AlertTriangle className="h-2.5 w-2.5" />
+            idle {Math.floor(job.idleSecs / 60)}m
+          </span>
+        )}
         {tcChecking && (
           <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
             <Scanner />

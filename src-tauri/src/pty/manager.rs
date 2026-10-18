@@ -37,17 +37,19 @@ fn spawner() -> &'static Sender<SpawnJob> {
 /// Spawn the user's shell on a new PTY. Returns the session and the reader for
 /// its output, which the caller drains on its own thread. Blocks until the
 /// spawner thread has forked the child, so call it from a blocking thread.
-pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> SpawnResult {
+///
+/// `env` is set on the shell inside the sandbox too (bwrap clears the rest).
+pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>, env: Vec<(String, String)>) -> SpawnResult {
     let (tx, rx) = mpsc::channel();
     spawner()
         .send(Box::new(move || {
-            let _ = tx.send(spawn_pty_here(rows, cols, sandbox, sandbox_no_net, project_dir));
+            let _ = tx.send(spawn_pty_here(rows, cols, sandbox, sandbox_no_net, project_dir, env));
         }))
         .map_err(|_| "PTY spawner thread is gone".to_string())?;
     rx.recv().map_err(|_| "PTY spawn panicked".to_string())?
 }
 
-fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>) -> SpawnResult {
+fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>, env: Vec<(String, String)>) -> SpawnResult {
     let pty_system = NativePtySystem::default();
 
     // Create a new PTY with the specified size
@@ -158,6 +160,9 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
                 c.args(&["--setenv", var, &val]);
             }
         }
+        for (key, val) in &env {
+            c.args(&["--setenv", key, val]);
+        }
         c.args(&["--", &shell, "-l"]);
         c
     } else {
@@ -188,6 +193,9 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
 
     // Set TERM so the shell knows terminal capabilities (line wrapping, cursor movement, etc.)
     cmd.env("TERM", "xterm-256color");
+    for (key, val) in &env {
+        cmd.env(key, val);
+    }
 
     let start_dir = project_dir
         .as_ref()
@@ -214,6 +222,9 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
                 let mut fallback = CommandBuilder::new(&shell);
                 fallback.arg("-l");
                 fallback.env("TERM", "xterm-256color");
+                for (key, val) in &env {
+                    fallback.env(key, val);
+                }
                 fallback.cwd(&start_dir);
                 let child = pty_pair.slave.spawn_command(fallback)
                     .map_err(|e| format!("Failed to spawn shell: {}", e))?;

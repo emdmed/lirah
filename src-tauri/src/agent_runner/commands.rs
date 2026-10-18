@@ -5,6 +5,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -95,6 +96,148 @@ struct JobDone {
     #[serde(rename = "exitCode")]
     exit_code: i32,
     success: bool,
+    /// The watchdog killed it after it sat idle too long.
+    #[serde(rename = "timedOut")]
+    timed_out: bool,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct JobIdle {
+    #[serde(rename = "jobId")]
+    job_id: String,
+    /// Seconds without output or CPU work; 0 once it is active again.
+    #[serde(rename = "idleSecs")]
+    idle_secs: u64,
+}
+
+/// How often the watchdog looks at a running job.
+const WATCHDOG_INTERVAL: Duration = Duration::from_secs(15);
+/// Report a job as idle after this long with no output and no CPU work.
+const IDLE_NOTICE_AFTER: Duration = Duration::from_secs(3 * 60);
+/// Kill a job idle this long. Only enforced where CPU time can be sampled:
+/// output alone can't tell a stuck job from `claude -p`, which prints nothing
+/// until it finishes.
+const IDLE_KILL_AFTER: Duration = Duration::from_secs(15 * 60);
+/// CPU time (clock ticks, usually 10 ms each) a job must burn per watchdog
+/// interval to count as working. An agent streaming a response stays well
+/// above this; one blocked on a prompt nobody will answer stays below it.
+const ACTIVE_CPU_TICKS: u64 = 5;
+
+/// Total user+system CPU ticks of every process in process group `pgid`.
+#[cfg(target_os = "linux")]
+fn process_group_cpu_ticks(pgid: u32) -> Option<u64> {
+    let entries = std::fs::read_dir("/proc").ok()?;
+    let mut total = 0u64;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(pid) = name.to_str() else { continue };
+        if !pid.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        let Ok(stat) = std::fs::read_to_string(format!("/proc/{}/stat", pid)) else {
+            continue;
+        };
+        // The command name is parenthesised and may contain spaces; the fixed
+        // fields start after the last ')'. Relative to that: [2] pgrp,
+        // [11] utime, [12] stime.
+        let Some(rest) = stat.rfind(')').map(|i| &stat[i + 1..]) else {
+            continue;
+        };
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        if fields.get(2).and_then(|g| g.parse::<u32>().ok()) != Some(pgid) {
+            continue;
+        }
+        let utime: u64 = fields.get(11).and_then(|v| v.parse().ok()).unwrap_or(0);
+        let stime: u64 = fields.get(12).and_then(|v| v.parse().ok()).unwrap_or(0);
+        total += utime + stime;
+    }
+    Some(total)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn process_group_cpu_ticks(_pgid: u32) -> Option<u64> {
+    None
+}
+
+/// SIGTERM a job's process group, then SIGKILL it if it is still there after
+/// a few seconds.
+fn kill_process_group(pid: u32) -> bool {
+    let killed = Command::new("kill")
+        .args(["-TERM", &format!("-{}", pid)])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(3));
+        let _ = Command::new("kill")
+            .args(["-KILL", &format!("-{}", pid)])
+            .status();
+    });
+    killed
+}
+
+/// Watch a running job for the case its spinner can't show: no output and no
+/// CPU work, typically an agent blocked on an approval no one can give.
+/// Reports idle spells as `agent-job://idle` and kills a job idle for
+/// IDLE_KILL_AFTER. Returns when `stop` is dropped or signalled.
+fn watch_job(
+    app: AppHandle,
+    job_id: String,
+    pgid: u32,
+    started: Instant,
+    last_output_ms: Arc<AtomicU64>,
+    timed_out: Arc<AtomicBool>,
+    stop: Receiver<()>,
+) {
+    let mut last_ticks = process_group_cpu_ticks(pgid);
+    let can_kill = last_ticks.is_some();
+    let mut last_active = Instant::now();
+    let mut reported_idle = false;
+    let mut seen_output_ms = 0;
+    loop {
+        match stop.recv_timeout(WATCHDOG_INTERVAL) {
+            Err(RecvTimeoutError::Timeout) => {}
+            _ => return,
+        }
+        let output_ms = last_output_ms.load(Ordering::Relaxed);
+        let ticks = process_group_cpu_ticks(pgid);
+        let busy = match (last_ticks, ticks) {
+            (Some(before), Some(now)) => now.saturating_sub(before) >= ACTIVE_CPU_TICKS,
+            _ => false,
+        };
+        last_ticks = ticks;
+        if output_ms != seen_output_ms || busy {
+            seen_output_ms = output_ms;
+            last_active = Instant::now();
+            if reported_idle {
+                reported_idle = false;
+                let _ = app.emit(
+                    "agent-job://idle",
+                    JobIdle { job_id: job_id.clone(), idle_secs: 0 },
+                );
+            }
+            continue;
+        }
+        let idle = last_active.elapsed();
+        if idle >= IDLE_NOTICE_AFTER {
+            reported_idle = true;
+            let _ = app.emit(
+                "agent-job://idle",
+                JobIdle { job_id: job_id.clone(), idle_secs: idle.as_secs() },
+            );
+        }
+        if can_kill && idle >= IDLE_KILL_AFTER {
+            eprintln!(
+                "[agent-job] {} idle for {}s after {}s, killing",
+                job_id,
+                idle.as_secs(),
+                started.elapsed().as_secs()
+            );
+            timed_out.store(true, Ordering::SeqCst);
+            kill_process_group(pgid);
+            return;
+        }
+    }
 }
 
 /// Steers headless jobs to run without a human in the loop. Kept free of single
@@ -277,6 +420,9 @@ pub fn run_agent_job(
     // Both readers feed one channel; a batcher thread turns it into coalesced
     // events. Every sender must be dropped for the batcher to finish, so the
     // original `tx` is moved into the last reader (or dropped outright below).
+    let started = Instant::now();
+    // Milliseconds since `started` of the last output line, for the watchdog.
+    let last_output_ms = Arc::new(AtomicU64::new(0));
     let (tx, rx) = std::sync::mpsc::channel::<JobLine>();
     let batcher = {
         let app = app_handle.clone();
@@ -288,9 +434,11 @@ pub fn run_agent_job(
     let stdout_reader = child.stdout.take().map(|stdout| {
         let log = log_file.clone();
         let tx = tx.clone();
+        let last_output_ms = last_output_ms.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().map_while(Result::ok) {
+                last_output_ms.store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
                 append_log(&log, &line);
                 let _ = tx.send(JobLine {
                     stream: "stdout".to_string(),
@@ -304,9 +452,11 @@ pub fn run_agent_job(
     let stderr_reader = child.stderr.take().map(|stderr| {
         let log = log_file.clone();
         let tx = tx.clone();
+        let last_output_ms = last_output_ms.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().map_while(Result::ok) {
+                last_output_ms.store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
                 append_log(&log, &line);
                 let _ = tx.send(JobLine {
                     stream: "stderr".to_string(),
@@ -316,6 +466,18 @@ pub fn run_agent_job(
         })
     });
     drop(tx);
+
+    let timed_out = Arc::new(AtomicBool::new(false));
+    // Dropping `stop_watchdog` (when the job exits) ends the watchdog.
+    let (stop_watchdog, stop_rx) = std::sync::mpsc::channel::<()>();
+    {
+        let app = app_handle.clone();
+        let id = job_id.clone();
+        let timed_out = timed_out.clone();
+        std::thread::spawn(move || {
+            watch_job(app, id, pid, started, last_output_ms, timed_out, stop_rx)
+        });
+    }
 
     // Wait for completion in a background thread, then emit done + clean up.
     // The readers and the batcher are joined first: a process can exit while its
@@ -329,6 +491,7 @@ pub fn run_agent_job(
             Ok(status) => status.code().unwrap_or(-1),
             Err(_) => -1,
         };
+        drop(stop_watchdog);
         if let Some(handle) = stdout_reader {
             let _ = handle.join();
         }
@@ -345,6 +508,7 @@ pub fn run_agent_job(
                 job_id: id,
                 exit_code,
                 success: exit_code == 0,
+                timed_out: timed_out.load(Ordering::SeqCst),
             },
         );
     });
@@ -370,21 +534,10 @@ pub fn cancel_agent_job(
         return Ok(false);
     };
 
-    // Negative pid targets the whole process group (see process_group(0) above).
-    let killed = Command::new("kill")
-        .args(["-TERM", &format!("-{}", pid)])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-
-    // Escalate to SIGKILL for an agent that ignores SIGTERM, so a job can never
-    // get stuck in a half-cancelled state. Harmless if the group already exited.
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(3));
-        let _ = Command::new("kill")
-            .args(["-KILL", &format!("-{}", pid)])
-            .status();
-    });
+    // Negative pid targets the whole process group (see process_group(0)
+    // above); SIGKILL follows for an agent that ignores SIGTERM, so a job can
+    // never get stuck half-cancelled.
+    let killed = kill_process_group(pid);
 
     if let Ok(mut jobs) = store.jobs.lock() {
         jobs.remove(&job_id);

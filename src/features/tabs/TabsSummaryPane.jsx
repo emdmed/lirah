@@ -14,6 +14,7 @@ import { useToast } from '../toast';
 import { useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
+import { getAgentHookState } from './agentHookState';
 import { getTabPrompt } from './tabPrompts';
 import { linkRepo, setLinkedRepoRole, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
 import { REPO_ROLES as ROLES, repoRoleLabel as roleLabel } from './repoRoles';
@@ -31,10 +32,33 @@ function formatAgo(ms) {
   return `${Math.floor(hrs / 24)}d`;
 }
 
-// A running CLI that has gone quiet is waiting on you; a plain shell that has
-// gone quiet is idle.
+// What the agent's own hooks said, when it has them (see agentHookState.js).
+function hookActivity(cliName, hook, now) {
+  const since = formatAgo(now - hook.at);
+  switch (hook.state) {
+    case 'working':
+      return { label: `${cliName} working`, since, lamp: { state: 'on', blink: true } };
+    case 'permission':
+      return {
+        label: hook.message ? `${cliName} needs permission: ${hook.message}` : `${cliName} needs permission`,
+        since,
+        lamp: { state: 'fault', blink: true },
+      };
+    case 'done':
+      return { label: `${cliName} done, your turn`, since, lamp: { state: 'ok' } };
+    default:
+      return { label: `${cliName} waiting`, since, lamp: { state: 'warn' } };
+  }
+}
+
+// Agents with hooks report their state; otherwise guess from output: a running
+// CLI that has gone quiet is waiting on you, a plain shell that has gone quiet
+// is idle.
 function tabActivity(tabId, cliName, now) {
-  const out = getLastOutputAt(getTabSession(tabId));
+  const sessionId = getTabSession(tabId);
+  const hook = getAgentHookState(sessionId);
+  if (hook && cliName) return hookActivity(cliName, hook, now);
+  const out = getLastOutputAt(sessionId);
   const quiet = out ? now - out : Infinity;
   const since = out ? formatAgo(quiet) : null;
   if (cliName) {

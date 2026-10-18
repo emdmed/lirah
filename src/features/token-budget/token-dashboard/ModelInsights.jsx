@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import { formatCost, formatTokenCount } from '../tokenCalculations';
 import { computeCost } from '../dashboardData';
+
+// What a short Opus session would have cost on the current Sonnet.
+const SONNET_MODEL = 'claude-sonnet-5';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 function getPieColors(colors) {
@@ -43,9 +46,9 @@ export function ModelInsights({ sessions, projects, colors }) {
     if (overkillSessions.length > 0) {
       const savings = overkillSessions.reduce((sum, s) => {
         const opusCost = s.cost || 0;
-        const sonnetCost = computeCost(s.inputTokens || 0, 'claude-sonnet-4-5-20250929', 'input') +
-                          computeCost(s.outputTokens || 0, 'claude-sonnet-4-5-20250929', 'output') +
-                          computeCost(s.cacheReadTokens || 0, 'claude-sonnet-4-5-20250929', 'cacheRead');
+        const sonnetCost = computeCost(s.inputTokens || 0, SONNET_MODEL, 'input') +
+                          computeCost(s.outputTokens || 0, SONNET_MODEL, 'output') +
+                          computeCost(s.cacheReadTokens || 0, SONNET_MODEL, 'cacheRead');
         return sum + (opusCost - sonnetCost);
       }, 0);
 

@@ -22,6 +22,7 @@ import { UsageSummaryPanel } from './token-dashboard/UsageSummaryPanel';
 import { prepareChartData, calculateEfficiencyMetrics, prepareModelBreakdown, computeCost } from './dashboardData';
 import { exportToCSV, exportToJSON } from './exportData';
 import { formatCost } from './tokenCalculations';
+import { DEFAULT_MODEL } from '../../config/pricing';
 import { scanAllProjects, getAllSessions } from '../../utils/projectScanner';
 
 const ProjectComparison = lazy(() => import('./token-dashboard/ProjectComparison').then(m => ({ default: m.ProjectComparison })));
@@ -133,7 +134,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
       inputTokens: sessions.reduce((sum, s) => sum + (s.input_tokens || 0), 0),
       outputTokens: sessions.reduce((sum, s) => sum + (s.output_tokens || 0), 0),
       cacheReads: sessions.reduce((sum, s) => sum + (s.cache_read_input_tokens || 0), 0),
-      model: latestSession.model || 'claude-sonnet-4-5-20250929',
+      model: latestSession.model || DEFAULT_MODEL,
     };
   }, [projectStats, selectedModel]);
 
@@ -166,13 +167,13 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
   const formatModelName = (model) => {
     if (!model) return 'Unknown';
-    const m = model.toLowerCase();
-    if (m.includes('opus-4-6') || m.includes('opus-4.6')) return 'Opus 4.6';
-    if (m.includes('opus-4-5') || m.includes('opus-4.5')) return 'Opus 4.5';
-    if (m.includes('opus')) return 'Opus';
-    if (m.includes('sonnet-4-5') || m.includes('sonnet-4.5')) return 'Sonnet 4.5';
-    if (m.includes('sonnet')) return 'Sonnet';
-    return model;
+    // claude-<family>-<major>[-<minor>][-<yyyymmdd>]: a minor version is one
+    // or two digits, so a date suffix never reads as one.
+    const match = model.toLowerCase().match(/claude-([a-z]+)-(\d+)(?:-(\d{1,2})(?!\d))?/);
+    if (!match) return model;
+    const [, family, major, minor] = match;
+    const name = family[0].toUpperCase() + family.slice(1);
+    return minor ? `${name} ${major}.${minor}` : `${name} ${major}`;
   };
 
   const LoadingSpinner = () => (

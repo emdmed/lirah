@@ -1,23 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { format } from 'date-fns';
 import { groupByDay, groupByWeek, groupByMonth } from './timeRanges';
+import { getModelPricing, DEFAULT_MODEL } from '../../config/pricing';
 
-const MODEL_PRICING = {
-  'claude-opus-4-6': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
-  'claude-opus-4-6-20250820': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
-  'claude-opus-4-5': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
-  'claude-opus-4-5-20251101': { input: 15, output: 75, cacheRead: 1.88, cacheWrite: 18.75 },
-  'claude-sonnet-4-5': { input: 3, output: 15, cacheRead: 0.375, cacheWrite: 3.75 },
-  'claude-sonnet-4-5-20250929': { input: 3, output: 15, cacheRead: 0.375, cacheWrite: 3.75 },
-  'default': { input: 3, output: 15, cacheRead: 0.375, cacheWrite: 3.75 },
-};
-
-export function getModelPricing(modelName) {
-  if (!modelName) return MODEL_PRICING.default;
-  const lowerModel = modelName.toLowerCase();
-  const key = Object.keys(MODEL_PRICING).find(k => lowerModel.includes(k.toLowerCase()));
-  return key ? MODEL_PRICING[key] : MODEL_PRICING.default;
-}
+export { getModelPricing };
 
 export function computeCost(tokens, model, type = 'input') {
   const pricing = getModelPricing(model);
@@ -31,7 +17,7 @@ export function prepareChartData(statsCache, timeRange = 'daily') {
   }
 
   const data = statsCache.dailyActivity.map(day => {
-    const model = day.model || 'claude-sonnet-4-5-20250929';
+    const model = day.model || DEFAULT_MODEL;
     const inputTokens = (day.billable_input_tokens || day.input_tokens || 0);
     const outputTokens = (day.billable_output_tokens || day.output_tokens || 0);
     const cacheRead = (day.cache_read_input_tokens || day.cacheRead || 0);
@@ -69,7 +55,7 @@ export function prepareModelBreakdown(statsCache) {
 
   const modelStats = {};
   statsCache.dailyActivity.forEach(day => {
-    const model = day.model || 'claude-sonnet-4-5-20250929';
+    const model = day.model || DEFAULT_MODEL;
     if (!modelStats[model]) {
       modelStats[model] = { model, tokens: 0, cost: 0 };
     }
@@ -166,7 +152,7 @@ export async function getCurrentSessionData(sessionFilePath) {
       inputTokens: data.totalInputTokens || 0,
       outputTokens: data.totalOutputTokens || 0,
       cacheReads: data.totalCacheReadTokens || 0,
-      model: data.model || 'claude-sonnet-4-5-20250929',
+      model: data.model || DEFAULT_MODEL,
     };
   } catch (error) {
     console.error('Failed to load session data:', error);
