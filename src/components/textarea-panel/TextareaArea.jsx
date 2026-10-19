@@ -35,7 +35,7 @@ export function TextareaArea({
   const sortedAtMentionResults = atMentionResults || [];
   // One line until there is more to show, at any pane width.
   useAutoGrow(textareaRef, value, { maxLines: 8 });
-  const { caret } = useBlockCaret(textareaRef, value);
+  const { caretRef } = useBlockCaret(textareaRef, value);
 
   return (
     <div className="relative flex flex-col gap-1">
@@ -54,13 +54,7 @@ export function TextareaArea({
       >
         <div className="relative flex flex-1 min-h-0 self-start py-0.5">
           <span className="absolute left-0 top-[5px] text-[var(--ins-lamp)] select-none pointer-events-none" aria-hidden="true">❯</span>
-          {caret && (
-            <span
-              className="tui-caret"
-              aria-hidden="true"
-              style={{ left: caret.left, top: caret.top, width: caret.width, height: caret.height }}
-            />
-          )}
+          <span ref={caretRef} className="tui-caret" aria-hidden="true" hidden />
           <Textarea
             ref={textareaRef}
             value={value}

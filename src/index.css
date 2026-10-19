@@ -521,11 +521,17 @@ body {
 /* Block cursor drawn over the prompt input (see useBlockCaret). */
 .tui-caret {
   position: absolute;
+  left: 0;
+  top: 0;
   pointer-events: none;
+  will-change: transform;
   background: var(--ins-lamp);
   opacity: 0.7;
   animation: tui-blink 1.06s steps(1) infinite;
 }
+
+/* Solid while the caret is moving, as in a terminal. */
+.tui-caret[data-busy] { animation: none; }
 
 @keyframes tui-blink {
   50% { opacity: 0; }

@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useCallback, useEffect, Suspense } from "react";
+import { useRef, useMemo, useState, useCallback, useEffect, useDeferredValue, Suspense } from "react";
 import { useTokenBudget } from "../../features/token-budget/TokenBudgetContext";
 import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
 import { lazyNamed } from "../../lib/lazyNamed";
@@ -20,6 +20,10 @@ import { ScrollText } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
+const NO_RESULTS = [];
+const NO_REPOS = [];
+const NO_PATTERN_FILES = [];
+const NO_PATTERNS = new Set();
 
 // Loaded on first open, and mounted only while open.
 const CompactSectionsDialog = lazyNamed(() => import("../../features/compact/CompactSectionsDialog"), "CompactSectionsDialog");
@@ -50,7 +54,7 @@ export function TextareaPanel({
   onUpdateCompactedProject,
   selectedElements,
   onClearElements,
-  linkedRepos = [],
+  linkedRepos = NO_REPOS,
   atMentionActive = false,
   atMentionQuery = '',
   atMentionResults = null,
@@ -63,8 +67,8 @@ export function TextareaPanel({
   onToggleFile,
   onClearContext,
   sessionId,
-  patternFiles = [],
-  selectedPatterns = new Set(),
+  patternFiles = NO_PATTERN_FILES,
+  selectedPatterns = NO_PATTERNS,
   onTogglePattern,
   promptPreview: promptPreviewBase,
   promptPreviewOpen = false,
@@ -74,10 +78,14 @@ export function TextareaPanel({
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
   const value = usePromptText(promptStore);
+  // Splicing the text in joins every section's body, so it runs only while the
+  // preview is open, and on a deferred value so it never holds up a keystroke.
+  const previewValue = useDeferredValue(promptPreviewOpen ? value : '');
   const promptPreview = useMemo(
-    () => (promptPreviewBase ? withPromptText(promptPreviewBase, value) : promptPreviewBase),
-    [promptPreviewBase, value]
+    () => (promptPreviewBase && promptPreviewOpen ? withPromptText(promptPreviewBase, previewValue) : promptPreviewBase),
+    [promptPreviewBase, promptPreviewOpen, previewValue]
   );
+  const hasText = !!value?.trim();
 
   useEffect(() => {
     const el = containerRef.current;
@@ -115,7 +123,7 @@ export function TextareaPanel({
   const fileArray = useMemo(() => Array.from(selectedFiles || new Set()), [selectedFiles]);
 
   const [compactDialogOpen, setCompactDialogOpen] = useState(false);
-  const sortedAtMentionResults = atMentionResults || [];
+  const sortedAtMentionResults = atMentionResults || NO_RESULTS;
 
   const handleKeyDown = useCallback((e) => {
     if (atMentionActive && sortedAtMentionResults.length > 0) {
@@ -168,7 +176,7 @@ export function TextareaPanel({
 
   const handleSend = useCallback(() => { onSend(); }, [onSend]);
 
-  const isSendDisabled = disabled || budgetExhausted || (!value?.trim() && fileArray.length === 0 && !selectedTemplateId && elementCount === 0 && linkedRepos.length === 0);
+  const isSendDisabled = disabled || budgetExhausted || (!hasText && fileArray.length === 0 && !selectedTemplateId && elementCount === 0 && linkedRepos.length === 0);
 
   // Overflow is a visible mechanical event on this panel: a disabled control
   // states its reason rather than dimming to 50% with nothing said.
@@ -180,24 +188,26 @@ export function TextareaPanel({
         ? 'Nothing to send'
         : null;
 
-  const elementsIndicator = (
+  // Everything below that does not read the text is memoized, so a keystroke
+  // re-renders the input and the token estimate, not the toolbars and tooltips.
+  const elementsIndicator = useMemo(() => (
     <ElementsIndicator
       selectedElements={selectedElements}
       currentPath={currentPath}
       elementCount={elementCount}
       onClearElements={onClearElements}
     />
-  );
+  ), [selectedElements, currentPath, elementCount, onClearElements]);
 
-  const compactedIndicator = (
+  const compactedIndicator = useMemo(() => (
     <CompactedIndicator
       compactedProject={compactedProject}
       onClearCompactedProject={onClearCompactedProject}
       onOpenSections={() => setCompactDialogOpen(true)}
     />
-  );
+  ), [compactedProject, onClearCompactedProject]);
 
-  const projectZone = (
+  const projectZone = useMemo(() => (
     <ProjectToolbar
       onCompactProject={onCompactProject}
       isCompacting={isCompacting}
@@ -208,9 +218,9 @@ export function TextareaPanel({
       onSaveGroup={onSaveGroup}
       fileCount={fileArray.length}
     />
-  );
+  ), [onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileArray.length]);
 
-  const promptZone = (
+  const promptZone = useMemo(() => (
     <div className="flex items-center gap-1">
       <PromptToolbar
         selectedTemplateId={selectedTemplateId}
@@ -225,7 +235,10 @@ export function TextareaPanel({
         onTogglePattern={onTogglePattern}
       />
     </div>
-  );
+  ), [
+    selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange,
+    patternFiles, selectedPatterns, onTogglePattern,
+  ]);
 
   const footerInfo = (
     <TokenCostEstimate
@@ -235,7 +248,7 @@ export function TextareaPanel({
     />
   );
 
-  const dialogs = (
+  const dialogs = useMemo(() => (
     <Suspense fallback={null}>
       {compactedProject && compactDialogOpen && (
         <CompactSectionsDialog
@@ -246,11 +259,12 @@ export function TextareaPanel({
         />
       )}
     </Suspense>
-  );
+  ), [compactedProject, compactDialogOpen, onUpdateCompactedProject]);
 
-  const partCount = promptPreview?.sections?.length ?? 0;
+  // The typed text adds one part, so the count is known without building the preview.
+  const partCount = (promptPreviewBase?.sections?.length ?? 0) + (hasText ? 1 : 0);
 
-  const toolbarRow = (
+  const toolbarRow = useMemo(() => (
     <div className="flex items-center gap-2 flex-nowrap">
       {/* Every control carries its own label, so the two banks (project,
           prompt) are split by space rather than a rule or a name. */}
@@ -281,7 +295,7 @@ export function TextareaPanel({
       )}
       <LinkedReposIndicator linkedRepos={linkedRepos} />
     </div>
-  );
+  ), [projectZone, promptZone, onTogglePromptPreview, promptPreviewOpen, partCount, linkedRepos]);
 
   const textareaArea = (
     <TextareaArea
