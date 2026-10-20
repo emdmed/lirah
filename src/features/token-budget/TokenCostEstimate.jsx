@@ -49,19 +49,18 @@ export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath 
       ? { color: 'var(--color-status-warning)', textShadow: 'none' }
       : undefined;
 
+  // Sits in the pane's bottom border (PaneInfo), a 12px strip: the readout
+  // keeps the strip's size so it stays on the line instead of spilling over it.
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-baseline gap-1.5 font-mono cursor-default">
-          <span
-            className="tube tube-change leading-none"
-            style={{ fontSize: 'var(--font-xl)', ...valueStyle }}
-          >
+        <span className="inline-flex items-baseline gap-1.5 font-mono cursor-default">
+          <span className="tube tube-change" style={valueStyle}>
             ~{estimate.toLocaleString()}
           </span>
-          <span className="engraved-label">est tokens</span>
-          <span className="tube tube-change leading-none" style={valueStyle}>
-            ${cost.toFixed(2)}
+          <span>tok</span>
+          <span style={valueStyle}>
+            {cost < 0.01 ? '<$0.01' : `$${cost.toFixed(2)}`}
           </span>
         </span>
       </TooltipTrigger>

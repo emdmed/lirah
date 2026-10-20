@@ -45,6 +45,23 @@ export function FileSelectionProvider({ children }) {
     });
   }, [symbolCallbacks]);
 
+  // Selects every path not already selected; never deselects.
+  const addFiles = useCallback((filePaths) => {
+    setSelectedFiles(prev => {
+      const added = filePaths.filter(p => !prev.has(p));
+      if (added.length === 0) return prev;
+      setFileStates(prevStates => {
+        const nextStates = new Map(prevStates);
+        added.forEach(p => nextStates.set(p, 'modify'));
+        return nextStates;
+      });
+      added.forEach(p => {
+        if (symbolCallbacks?.isBabelParseable(p)) symbolCallbacks.extractFileSymbols(p);
+      });
+      return new Set([...prev, ...added]);
+    });
+  }, [symbolCallbacks]);
+
   const removeFileFromSelection = useCallback((filePath) => {
     setSelectedFiles(prev => {
       const next = new Set(prev);
@@ -106,6 +123,7 @@ export function FileSelectionProvider({ children }) {
     selectedFiles,
     fileStates,
     toggleFileSelection,
+    addFiles,
     removeFileFromSelection,
     clearFileSelection,
     setFileState,
@@ -115,7 +133,7 @@ export function FileSelectionProvider({ children }) {
     registerSymbolCallbacks,
     registerCurrentPath,
   }), [
-    selectedFiles, fileStates, toggleFileSelection, removeFileFromSelection,
+    selectedFiles, fileStates, toggleFileSelection, addFiles, removeFileFromSelection,
     clearFileSelection, setFileState, filesWithRelativePaths, filesForGroup,
     handleLoadFileGroup, registerSymbolCallbacks, registerCurrentPath,
   ]);

@@ -11,6 +11,7 @@ const shortcuts = [
       { keys: ['Ctrl', 'K'], description: 'Launch CLI / Toggle Claude Mode' },
       { keys: ['Ctrl', 'Shift', 'L'], description: 'Clear CLI Context' },
       { keys: ['Ctrl', 'P'], description: 'Open Bookmarks Palette' },
+      { keys: ['Alt', 'A'], description: 'Jump to Agent Waiting on You', note: 'repeat for the next' },
     ],
   },
   {

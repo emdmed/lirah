@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   AudioWaveform,
   Bot,
@@ -6,6 +7,7 @@ import {
   Link2,
   MessageSquareMore,
   Moon,
+  Paperclip,
   ShieldAlert,
   SquareTerminal,
 } from 'lucide-react';
@@ -22,7 +24,8 @@ import { useToast } from '../toast';
 import { useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
-import { getAgentHookState, getAgentTouches } from './agentHookState';
+import { EDIT_TOOLS, getAgentHookState, getAgentTouches, getLastTurn } from './agentHookState';
+import { useAttentionQueue } from './useAgentAttention';
 import { getTabPrompt } from './tabPrompts';
 import { linkRepo, setLinkedRepoRole, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
 import { REPO_ROLES as ROLES, repoRoleLabel as roleLabel } from './repoRoles';
@@ -32,7 +35,6 @@ const ACTIVE_MS = 2500;
 // How long a tool call in another tab's repo keeps that tab marked, while the
 // agent's turn is still going.
 const REMOTE_MS = 2 * 60 * 1000;
-const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 // A tab's own activity that outranks another agent working in its repo.
 const OWN_BUSY = new Set(['working', 'permission', 'running']);
 
@@ -145,6 +147,27 @@ function remoteLabel(work, fromName) {
   return `${work.cliName} from ${fromName} ${doing}`;
 }
 
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+// The newest turn of this tab's agent in a few words, or null when its tools
+// haven't done anything worth listing.
+function turnSummary(turn, now) {
+  if (!turn) return null;
+  const parts = [];
+  if (turn.edited.size) parts.push(`edited ${turn.edited.size}`);
+  if (turn.read.size) parts.push(`read ${turn.read.size}`);
+  if (turn.commands) parts.push(`ran ${turn.commands}`);
+  if (parts.length === 0) return null;
+  parts.push(formatAgo((turn.endedAt ?? now) - turn.startedAt));
+  return { text: parts.join(' · '), running: !turn.endedAt };
+}
+
+function relativeTo(path, root) {
+  return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
+}
+
 function ActivityIcon({ kind, label }) {
   const { icon: Icon, color, pulse } = ACTIVITY[kind];
   return (
@@ -182,6 +205,8 @@ export function TabsSummaryPane() {
   const { linkedRepos } = useLinkedRepos(activeTabId);
   const tabName = (tab) => bookmarks.find((b) => b.path === tab.projectPath)?.name ?? tab.label;
   const remote = remoteWork(tabs, cli, now);
+  const queue = useAttentionQueue(tabs);
+  const [openTrail, setOpenTrail] = useState(null); // tab id whose last turn is expanded
 
   const copyBranch = async (e, branch) => {
     e.stopPropagation();
@@ -203,6 +228,17 @@ export function TabsSummaryPane() {
     }
     linkRepo(activeTabId, { path: tab.projectPath, name, role: tab.role });
     getTabPrompt(activeTabId)?.open();
+  };
+
+  // Puts the files another (or this) tab's agent edited last turn into the
+  // current prompt, e.g. to have a second agent review them.
+  const attachEdits = (e, files) => {
+    e.stopPropagation();
+    const prompt = getTabPrompt(activeTabId);
+    if (!prompt?.addFiles) return;
+    prompt.addFiles(files);
+    prompt.open();
+    toast.success(`Attached ${plural(files.length, 'file')} to the prompt`);
   };
 
   const setRole = (tab, role) => {
@@ -241,6 +277,11 @@ export function TabsSummaryPane() {
         const active = tab.id === activeTabId;
         const linked = !active && linkedRepos.some((r) => r.path === tab.projectPath);
         const name = tabName(tab);
+        const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
+        const turn = cli[tab.id] ? getLastTurn(getTabSession(tab.id)) : null;
+        const summary = turnSummary(turn, now);
+        const trailOpen = summary && openTrail === tab.id;
+        const root = tab.projectPath.replace(/\/+$/, '');
         const linkLabel = linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`;
         return (
           <button
@@ -265,6 +306,14 @@ export function TabsSummaryPane() {
             {/* Tier 1: what it is and what it is doing. */}
             <div className="flex h-5 min-w-0 items-center gap-2">
               <ActivityIcon kind={activity.kind} label={activity.label} />
+              {queuePos >= 0 && (
+                <span
+                  title={`Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A`}
+                  className="shrink-0 font-mono text-[10px] tabular-nums text-[var(--ins-warn)]"
+                >
+                  {queuePos + 1}
+                </span>
+              )}
               <MiddleTruncate
                 text={name}
                 className={cn('text-xs', active ? 'font-semibold text-foreground' : 'font-medium text-foreground/80')}
@@ -368,7 +417,47 @@ export function TabsSummaryPane() {
               )}
             </div>
 
-            {/* Tier 3: another tab's agent working in this repo. */}
+            {/* Tier 3: what its agent did in the latest turn; click for the files. */}
+            {summary && (
+              <div className="flex min-w-0 flex-col pl-6 text-[11px] text-muted-foreground">
+                <span
+                  role="button"
+                  aria-expanded={!!trailOpen}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenTrail(trailOpen ? null : tab.id);
+                  }}
+                  title={trailOpen ? 'Hide files' : 'Show the files it edited'}
+                  className="min-w-0 truncate font-mono tabular-nums hover:text-[var(--ins-lamp)]"
+                >
+                  {summary.running ? 'this turn' : 'last turn'}: {summary.text}
+                </span>
+                {trailOpen && (
+                  <div className="flex min-w-0 flex-col gap-0.5 pt-1">
+                    {[...turn.edited].map((f) => (
+                      <span key={f} title={f} className="min-w-0 truncate font-mono text-foreground/80">
+                        {relativeTo(f, root)}
+                      </span>
+                    ))}
+                    {turn.edited.size > 0 ? (
+                      <span
+                        role="button"
+                        onClick={(e) => attachEdits(e, [...turn.edited])}
+                        title="Add these files to the current tab's prompt"
+                        className="flex items-center gap-1 self-start pt-0.5 hover:text-[var(--ins-lamp)]"
+                      >
+                        <Paperclip className="h-3 w-3" />
+                        attach {plural(turn.edited.size, 'file')} to prompt
+                      </span>
+                    ) : (
+                      <span>no files edited</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tier 4: another tab's agent working in this repo. */}
             {workLabel && (
               <div className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-[var(--ins-lamp)]">
                 <Bot className="h-3 w-3 shrink-0" />

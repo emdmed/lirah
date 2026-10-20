@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { notify } from '../../lib/notify';
 
 // Split so consumers subscribe only to what they read: streamed job output
 // changes `jobs` many times a second, and ProjectTab — which only registers its
@@ -282,20 +283,6 @@ async function gcOrphanWorktrees(home, liveJobs) {
   return removed;
 }
 
-async function fireNotification(title, body) {
-  try {
-    if (typeof Notification === 'undefined') return;
-    if (Notification.permission === 'granted') {
-      new Notification(title, { body });
-    } else if (Notification.permission !== 'denied') {
-      const perm = await Notification.requestPermission();
-      if (perm === 'granted') new Notification(title, { body });
-    }
-  } catch {
-    // Notifications are best-effort.
-  }
-}
-
 export function AgentJobsProvider({ children }) {
   const [jobs, setJobs] = useState([]);
   // Files selected in the active tab's file tree, bridged up from ProjectTab
@@ -479,13 +466,13 @@ export function AgentJobsProvider({ children }) {
         if (!pending) {
           const all = [...others.map((j) => j.changedFiles.length), changedFiles.length];
           const withChanges = all.filter((n) => n > 0).length;
-          fireNotification(
+          notify(
             'Race ready',
             `${all.length} candidates finished — ${withChanges} with changes. Compare and keep one.`
           );
         }
       } else {
-        fireNotification(
+        notify(
           success ? 'Agent job finished' : 'Agent job failed',
           `${job.label} — ${changedFiles.length} file(s) changed`
         );

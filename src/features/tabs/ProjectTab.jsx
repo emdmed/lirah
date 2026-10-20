@@ -587,7 +587,10 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     return registerTabSession(tabId, terminalSessionId);
   }, [tabId, terminalSessionId]);
 
-  // Lets the tabs summary pane link other repos into this tab's prompt.
+  // Lets the tabs summary pane link other repos and attach files to this
+  // tab's prompt.
+  const addFilesRef = useRef(fileSelection.addFiles);
+  addFilesRef.current = fileSelection.addFiles;
   useEffect(() => {
     if (!tabId) return;
     return registerTabPrompt(tabId, {
@@ -595,6 +598,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         setTextareaVisible(true);
         requestAnimationFrame(() => textareaRef.current?.focus());
       },
+      addFiles: (paths) => addFilesRef.current(paths),
     });
   }, [tabId]);
 

@@ -13,6 +13,7 @@ import { useUpdateChecker } from "./hooks/useUpdateChecker";
 import { DevProfiler } from "./components/DevProfiler";
 import { reapOrphanedTerminals } from "./lib/terminalSessions";
 import { startAgentHookListener } from "./features/tabs/agentHookState";
+import { useAgentAttention } from "./features/tabs/useAgentAttention";
 
 function App() {
   const { tabs, activeTabId, addTab, removeTab, switchTab } = useTabManager();
@@ -25,6 +26,8 @@ function App() {
 
   // Agent state reported by Claude Code / opencode hooks, for the tab lamps.
   useEffect(() => { startAgentHookListener(); }, []);
+  // Tabs whose agent is waiting on you: notifications and Alt+A to jump there.
+  const { jumpToNext } = useAgentAttention({ tabs, activeTabId, switchTab });
 
   // One update check for the whole app (it hits GitHub's unauthenticated API).
   const availableUpdate = useUpdateChecker();
@@ -126,6 +129,13 @@ function App() {
         }
         return;
       }
+      // Alt+A: next tab whose agent is waiting on you
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyA') {
+        e.preventDefault();
+        e.stopPropagation();
+        jumpToNext();
+        return;
+      }
       // Ctrl+T: new tab
       if ((e.ctrlKey || e.metaKey) && e.key === 't' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
@@ -143,7 +153,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, activeTabId, switchTab, removeTab, handleNewTab]);
+  }, [tabs, activeTabId, switchTab, removeTab, handleNewTab, jumpToNext]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProjectForNewTab = useCallback((bookmark) => {

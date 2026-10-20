@@ -36,15 +36,23 @@ const HOOK_SCRIPT: &str = r#"#!/bin/sh
 [ -n "$LIRAH_PTY_SESSION" ] && [ -n "$LIRAH_AGENT_EVENTS" ] || exit 0
 payload=$(cat | tr -d '\n')
 [ -n "$payload" ] || exit 0
+# Drop PostToolUse's tool_response (file contents, command output): Lirah only
+# needs the tool and its input. Escaped inside strings, the bare key is only
+# ever the real one.
+key=',"tool_response"'
+case $payload in *"$key"*) payload="${payload%%"$key"*}}" ;; esac
 printf '%s\n' "$payload" >> "$LIRAH_AGENT_EVENTS/$LIRAH_PTY_SESSION.jsonl"
 exit 0
 "#;
 
-/// Claude Code hook events that change what a tab should show.
+/// Claude Code hook events that change what a tab should show. PostToolUse
+/// feeds the per-turn record of what the agent edited, read and ran.
 const CLAUDE_EVENTS: &[&str] = &[
     "SessionStart",
     "UserPromptSubmit",
     "PreToolUse",
+    "PostToolUse",
+    "PermissionRequest",
     "Notification",
     "Stop",
     "SessionEnd",
@@ -58,6 +66,17 @@ import { appendFileSync } from "node:fs";
 const session = process.env.LIRAH_PTY_SESSION;
 const dir = process.env.LIRAH_AGENT_EVENTS;
 
+// opencode tool names and args, as Claude Code's, so Lirah reads both alike.
+const TOOL_NAMES = { edit: "Edit", write: "Write", multiedit: "MultiEdit", patch: "Edit", read: "Read", bash: "Bash" };
+function toolPayload(tool, args) {
+  return {
+    tool_name: TOOL_NAMES[tool] || tool,
+    tool_input: { file_path: args?.filePath, command: args?.command },
+  };
+}
+// Args by call id: the after-hook doesn't carry them.
+const calls = new Map();
+
 function send(hook_event_name, extra = {}) {
   try {
     appendFileSync(
@@ -70,6 +89,15 @@ function send(hook_event_name, extra = {}) {
 export const LirahAgentState = async () => {
   if (!session || !dir) return {};
   return {
+    "tool.execute.before": async (input, output) => {
+      calls.set(input.callID, output?.args);
+      send("PreToolUse", toolPayload(input.tool, output?.args));
+    },
+    "tool.execute.after": async (input) => {
+      const args = calls.get(input.callID);
+      calls.delete(input.callID);
+      send("PostToolUse", toolPayload(input.tool, args));
+    },
     event: async ({ event }) => {
       switch (event.type) {
         case "session.status": {

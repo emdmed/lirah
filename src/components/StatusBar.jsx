@@ -33,6 +33,8 @@ import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
+import { useTabManager } from '../features/tabs/TabContext';
+import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAgentAttention';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -235,6 +237,32 @@ function ConfirmToggleDialog({ open, onOpenChange, title, description, onConfirm
   );
 }
 
+// Agents in other tabs waiting on you. Click (or Alt+A) jumps to the next one.
+function AttentionIndicator() {
+  const { tabs } = useTabManager();
+  const queue = useAttentionQueue(tabs);
+  if (queue.length === 0) return null;
+  const blocked = queue.filter((q) => q.state === 'permission').length;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={requestAttentionJump}
+          className="gap-1.5 px-1 h-5 before:content-none after:content-none"
+        >
+          <Lamp state={blocked ? 'fault' : 'warn'} blink={blocked > 0} />
+          <span className="text-muted-foreground">[{queue.length} waiting]</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {blocked ? `${blocked} blocked on permission · ` : ''}Jump to the next one (Alt+A)
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function ThemeSwitcherMenuItem() {
   const { currentTheme, themes, changeTheme } = useTheme();
   return (
@@ -341,6 +369,8 @@ export const StatusBar = memo(({
             </Tooltip>
           )}
         </div>
+
+        <AttentionIndicator />
 
         {/* Context actions: update (shown when relevant) */}
         {availableUpdate && (
