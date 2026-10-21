@@ -317,11 +317,27 @@ pub async fn get_current_branch(repo_path: String) -> Result<Option<String>, Str
 }
 
 #[tauri::command]
-pub async fn get_git_diff(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
-    crate::ipc::blocking("get_git_diff", move || git_diff_blocking(file_path, repo_path)).await
+pub async fn get_git_diff(
+    file_path: String,
+    repo_path: String,
+    base_ref: Option<String>,
+    head_ref: Option<String>,
+) -> Result<GitDiffResult, String> {
+    crate::ipc::blocking("get_git_diff", move || {
+        git_diff_blocking(file_path, repo_path, base_ref, head_ref)
+    })
+    .await
 }
 
-fn git_diff_blocking(file_path: String, repo_path: String) -> Result<GitDiffResult, String> {
+/// Diff of one file between `base_ref` (default HEAD) and `head_ref`, or the
+/// working tree when there is no `head_ref`.
+fn git_diff_blocking(
+    file_path: String,
+    repo_path: String,
+    base_ref: Option<String>,
+    head_ref: Option<String>,
+) -> Result<GitDiffResult, String> {
+    let base = base_ref.unwrap_or_else(|| "HEAD".to_string());
     let repo = PathBuf::from(&repo_path);
     let file = PathBuf::from(&file_path);
 
@@ -340,10 +356,10 @@ fn git_diff_blocking(file_path: String, repo_path: String) -> Result<GitDiffResu
         file_path.clone()
     };
 
-    // Get old content from git (HEAD version)
+    // Get old content from git (the base version)
     let old_output = Command::new("git")
         .arg("show")
-        .arg(format!("HEAD:{}", relative_path))
+        .arg(format!("{}:{}", base, relative_path))
         .current_dir(&repo)
         .output()
         .map_err(|e| format!("Failed to execute git show: {}", e))?;
@@ -355,19 +371,37 @@ fn git_diff_blocking(file_path: String, repo_path: String) -> Result<GitDiffResu
         String::from_utf8_lossy(&old_output.stdout).to_string()
     };
 
-    // Get new content from disk (current working tree)
-    let new_content = if file.exists() {
-        fs::read_to_string(&file).map_err(|e| format!("Failed to read file: {}", e))?
-    } else {
-        String::new()
+    // New content: that commit's version, or the file on disk
+    let (new_content, new_exists) = match &head_ref {
+        Some(head) => {
+            let out = Command::new("git")
+                .arg("show")
+                .arg(format!("{}:{}", head, relative_path))
+                .current_dir(&repo)
+                .output()
+                .map_err(|e| format!("Failed to execute git show: {}", e))?;
+            if out.status.success() {
+                (String::from_utf8_lossy(&out.stdout).to_string(), true)
+            } else {
+                (String::new(), false)
+            }
+        }
+        None if file.exists() => (
+            fs::read_to_string(&file).map_err(|e| format!("Failed to read file: {}", e))?,
+            true,
+        ),
+        None => (String::new(), false),
     };
 
-    let is_deleted_file = !file.exists() && !is_new_file;
+    let is_deleted_file = !new_exists && !is_new_file;
 
     // Count changes using git diff --numstat
-    let numstat_output = Command::new("git")
-        .arg("diff")
-        .arg("HEAD")
+    let mut numstat_cmd = Command::new("git");
+    numstat_cmd.arg("diff").arg(&base);
+    if let Some(head) = &head_ref {
+        numstat_cmd.arg(head);
+    }
+    let numstat_output = numstat_cmd
         .arg("--numstat")
         .arg("--")
         .arg(&relative_path)

@@ -9,6 +9,7 @@ import { FileGroupsProvider } from "./features/file-groups";
 import { PinnedFilesProvider } from "./features/pinned-files";
 import { AgentJobsProvider } from "./features/agent-jobs/AgentJobsContext";
 import { TabProvider } from "./features/tabs";
+import { PlansProvider } from "./features/plans/PlansContext";
 import { ToastProvider } from "./features/toast";
 import { ConfirmProvider } from "./features/confirm/ConfirmContext";
 import { InstrumentKit } from "./dev/InstrumentKit";
@@ -35,7 +36,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <PinnedFilesProvider>
                   <AgentJobsProvider>
                     <TabProvider>
-                      <App />
+                      <PlansProvider>
+                        <App />
+                      </PlansProvider>
                     </TabProvider>
                   </AgentJobsProvider>
                 </PinnedFilesProvider>

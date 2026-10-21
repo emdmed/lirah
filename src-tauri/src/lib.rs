@@ -14,6 +14,7 @@ mod agent_runner;
 mod ipc;
 mod watch_registry;
 mod agent_hooks;
+mod plans;
 
 use tauri::Manager;
 
@@ -118,7 +119,9 @@ pub fn run(initial_path: Option<String>) {
             cancel_agent_job,
             list_running_agent_jobs,
             get_initial_path,
-            agent_hooks::get_agent_hook_plugin_dir
+            agent_hooks::get_agent_hook_plugin_dir,
+            plans::split_plan,
+            plans::delete_plan_file
         ]))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

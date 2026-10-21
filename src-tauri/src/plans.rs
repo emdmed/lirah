@@ -1,0 +1,69 @@
+use std::io::Write;
+use std::path::Path;
+use std::process::{Command, Stdio};
+
+/// Ask Claude to split a plan into implementation chunks. The prompt (built by
+/// the frontend, see src/features/plans/planPrompts.js) goes in on stdin since
+/// plans are long, and only read-only tools are allowed: the splitter may look
+/// at the code to size the chunks but never touches it. Returns raw stdout;
+/// the frontend extracts and validates the JSON.
+#[tauri::command]
+pub async fn split_plan(project_dir: String, prompt: String) -> Result<String, String> {
+    crate::ipc::blocking("split_plan", move || {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+        let mut child = Command::new(&shell)
+            .args([
+                "-lc",
+                "claude --print --model sonnet --allowedTools Read Grep Glob",
+            ])
+            .current_dir(&project_dir)
+            .env("TERM", "xterm-256color")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start claude: {}", e))?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(prompt.as_bytes())
+                .map_err(|e| format!("Failed to send the plan to claude: {}", e))?;
+        }
+
+        let output = child
+            .wait_with_output()
+            .map_err(|e| format!("claude failed: {}", e))?;
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        if output.status.success() {
+            return Ok(stdout);
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!(
+            "claude failed: {}",
+            if stderr.trim().is_empty() { stdout } else { stderr }
+        ))
+    })
+    .await
+}
+
+/// Delete a plan file that was imported out of a repo. Only a `.md` file
+/// directly inside `repo_root` qualifies, so a bad path can't reach anything else.
+#[tauri::command]
+pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), String> {
+    crate::ipc::blocking("delete_plan_file", move || {
+        let file = Path::new(&path)
+            .canonicalize()
+            .map_err(|e| format!("Plan file not found: {}", e))?;
+        let root = Path::new(&repo_root)
+            .canonicalize()
+            .map_err(|e| format!("Repo not found: {}", e))?;
+        let is_md = file
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
+        if !is_md || file.parent() != Some(root.as_path()) || !file.is_file() {
+            return Err("Only a .md file at the repo root can be removed".to_string());
+        }
+        std::fs::remove_file(&file).map_err(|e| format!("Failed to delete plan file: {}", e))
+    })
+    .await
+}

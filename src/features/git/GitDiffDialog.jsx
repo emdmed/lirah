@@ -14,6 +14,8 @@ import { usePinnedFiles } from '../pinned-files';
  * @param {function} onOpenChange - Callback when open state changes
  * @param {string} filePath - Absolute path to the file
  * @param {string} repoPath - Path to the git repository root
+ * @param {string} baseRef - Optional ref for the old side (default HEAD)
+ * @param {string} headRef - Optional ref for the new side (default: the working tree)
  * @param {Array} changedFiles - Optional list of all changed files for navigation
  * @param {function} onFileChange - Optional callback when navigating to a different file
  * @param {Array} annotations - Review notes already pinned to this diff (all files)
@@ -27,6 +29,8 @@ export function GitDiffDialog({
   onOpenChange,
   filePath,
   repoPath,
+  baseRef,
+  headRef,
   changedFiles = [],
   onFileChange,
   annotations = [],
@@ -77,7 +81,7 @@ export function GitDiffDialog({
       setDiffResult(null);
       setError(null);
     }
-  }, [open, filePath, repoPath]);
+  }, [open, filePath, repoPath, baseRef, headRef]);
 
   const fetchDiff = async () => {
     setLoading(true);
@@ -87,6 +91,8 @@ export function GitDiffDialog({
       const result = await invoke('get_git_diff', {
         filePath,
         repoPath,
+        baseRef: baseRef || null,
+        headRef: headRef || null,
       });
       setDiffResult(result);
     } catch (err) {

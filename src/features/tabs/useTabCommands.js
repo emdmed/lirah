@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { requestJobsPane } from '../agent-jobs/jobsPane';
+import { requestPlansPane } from '../plans/plansPane';
 import { useWatcher } from '../watcher';
 import { useTabActions } from './TabContext';
 import { requestAttentionJump } from './useAgentAttention';
@@ -92,6 +93,7 @@ export function useTabCommands({
       { id: 'files', hint: 'toggle the files pane', run: () => setSidebarOpen(prev => !prev) },
       { id: 'prompt', hint: 'toggle the prompt pane', run: () => setTextareaVisible(prev => !prev) },
       { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle') },
+      { id: 'plans', hint: 'plans: split, implement, review, roll back', run: () => requestPlansPane('toggle') },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },
       { id: 'workspace', hint: 'workspaces', run: () => setWorkspaceDialogOpen(true) },
 

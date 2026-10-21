@@ -18,6 +18,7 @@ import { useAgentJobs } from './AgentJobsContext';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { MAX_TABS, useTabManager } from '../tabs/TabContext';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
+import { PlansPane } from '../plans/PlansPane';
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -124,12 +125,15 @@ export function RightSidebar({ projectPath, onNewTab }) {
 
   useEffect(() => {
     const onRequest = (e) => {
-      if (e.detail?.action === 'toggle') setCollapsedOverride(!collapsed);
+      const target = e.detail?.tab;
+      // Toggling a pane that isn't showing switches to it instead of folding away.
+      if (e.detail?.action === 'toggle' && (!target || target === tab || collapsed)) setCollapsedOverride(!collapsed);
       else setCollapsedOverride(false);
+      if (target) setTab(target);
     };
     window.addEventListener(JOBS_PANE_EVENT, onRequest);
     return () => window.removeEventListener(JOBS_PANE_EVENT, onRequest);
-  }, [collapsed]);
+  }, [collapsed, tab]);
 
   // User-resizable panel width — persisted so it survives reloads. A narrow
   // fixed panel is what made the cards feel squashed.
@@ -547,6 +551,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
       <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
+        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
@@ -593,6 +598,8 @@ export function RightSidebar({ projectPath, onNewTab }) {
           <TabsSummaryPane />
         ) : tab === 'agents' ? (
           <SubagentList />
+        ) : tab === 'plans' ? (
+          <PlansPane projectPath={projectPath} />
         ) : (
           <>
             {visibleJobs.length === 0 ? (

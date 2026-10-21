@@ -16,7 +16,7 @@ import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "../../hooks/useCwdMonitor";
 import { useBranchName } from "../git/useBranchName";
-import { registerTabSession } from "./terminalActivity";
+import { registerTabSession, getTabSession } from "./terminalActivity";
 import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
@@ -607,6 +607,14 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         requestAnimationFrame(() => textareaRef.current?.focus());
       },
       addFiles: (paths) => addFilesRef.current(paths),
+      // Types `text` into the terminal and submits it, like the prompt's send.
+      send: async (text) => {
+        const sessionId = getTabSession(tabId);
+        if (!sessionId) throw new Error('This tab has no terminal yet');
+        await invoke('write_to_terminal', { sessionId, data: text });
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await invoke('write_to_terminal', { sessionId, data: '\r' });
+      },
     });
   }, [tabId]);
 
