@@ -61,7 +61,7 @@ export function SelectedFileItem({
           <span className="engraved-label">{viewModeLabel}</span>
           <span className="tube-idle">{lineCount}L</span>
           {showKeyboardHints && isSelected && (
-            <span className="text-muted-foreground/40">V</span>
+            <span className="text-faint">V</span>
           )}
         </button>
       ) : lineCount != null ? (

@@ -106,7 +106,7 @@ function AgentCard({ agent, onDismiss, now }) {
       </div>
 
       {/* Row 2: metadata — tool, turns, elapsed */}
-      <div className="flex items-center gap-1.5 mt-1 ml-3 text-[11px] text-muted-foreground/60">
+      <div className="flex items-center gap-1.5 mt-1 ml-3 text-[11px] text-muted-foreground">
         {agent.last_tool && (
           <span className="inline-block px-1 py-px font-mono shadow-[inset_0_0_0_1px_var(--ins-edge)] text-foreground/80">
             {agent.last_tool}
@@ -125,7 +125,7 @@ function AgentCard({ agent, onDismiss, now }) {
 
       {/* Expanded: full task label */}
       {expanded && label && label !== summary && (
-        <div className="mt-1.5 ml-3 text-[11px] text-muted-foreground/60 break-words leading-relaxed">
+        <div className="mt-1.5 ml-3 text-[11px] text-muted-foreground break-words leading-relaxed">
           {label}
         </div>
       )}
@@ -138,7 +138,7 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
 
   return (
     <div className="mb-1">
-      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground/60">
+      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground">
         <span className="truncate">{tabLabel}</span>
         <span className="shrink-0 ml-1 tabular-nums">
           {runningCount > 0 ? (
@@ -199,9 +199,9 @@ export function SubagentList() {
   if (visibleSubagents.length === 0) {
     return (
       <div className="px-3 py-6 text-center">
-        <Bot size={16} className="mx-auto mb-2 text-muted-foreground/30" />
-        <div className="text-[11px] text-muted-foreground/50">No agents running</div>
-        <div className="mt-1 text-[11px] text-muted-foreground/30">
+        <Bot size={16} className="mx-auto mb-2 text-faint" />
+        <div className="text-[11px] text-muted-foreground">No agents running</div>
+        <div className="mt-1 text-[11px] text-muted-foreground">
           Agents appear here when spawned during tool use
         </div>
       </div>
@@ -331,11 +331,11 @@ export function AgentSidebar() {
       <div className="flex-1 overflow-y-auto min-h-0 py-1">
         {visibleSubagents.length === 0 ? (
           <div className="px-3 py-6 text-center">
-            <Bot size={16} className="mx-auto mb-2 text-muted-foreground/30" />
-            <div className="text-[11px] text-muted-foreground/50">
+            <Bot size={16} className="mx-auto mb-2 text-faint" />
+            <div className="text-[11px] text-muted-foreground">
               No agents running
             </div>
-            <div className="mt-1 text-[11px] text-muted-foreground/30">
+            <div className="mt-1 text-[11px] text-muted-foreground">
               Agents appear here when spawned during tool use
             </div>
           </div>

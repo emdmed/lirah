@@ -13,7 +13,7 @@ export function CompactedIndicator({ compactedProject, onClearCompactedProject, 
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={onOpenSections}
           >
-            <span className="text-muted-foreground/70 uppercase text-[11px] tracking-wider border-r border-border/30 pr-2">Compacted</span>
+            <span className="text-muted-foreground uppercase text-[11px] tracking-wider border-r border-border/30 pr-2">Compacted</span>
             <div className="flex items-center gap-1.5">
               <span className="text-[var(--ins-lamp)] font-medium">{compactedProject.fileCount}</span>
               <span className="text-muted-foreground">files</span>

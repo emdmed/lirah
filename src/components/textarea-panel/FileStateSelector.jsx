@@ -83,7 +83,7 @@ export function FileStateSelector({ value, onValueChange, className, showKeyboar
               "font-mono font-semibold leading-none tracking-[0.08em] transition-colors",
               isActive
                 ? MODE_TOKENS[state.value]
-                : "text-muted-foreground/45 hover:text-muted-foreground"
+                : "text-faint hover:text-muted-foreground"
             )}
           >
             {state.label}

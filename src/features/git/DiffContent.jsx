@@ -748,7 +748,7 @@ const DiffLine = memo(function DiffLine({
         {gutterSymbol}
       </div>
       {/* Line number */}
-      <div className="w-10 flex-shrink-0 text-right pr-2 text-muted-foreground/70 select-none border-r edge-engraved">
+      <div className="w-10 flex-shrink-0 text-right pr-2 text-muted-foreground select-none border-r edge-engraved">
         {lineNum || ''}
       </div>
       {/* Content */}

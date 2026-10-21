@@ -76,7 +76,7 @@ export function AutoCommitConfigDialog({ open, onOpenChange, cli, customPrompt, 
             <label className="text-sm text-muted-foreground">
               Additional prompt instructions
             </label>
-            <p className="text-xs text-muted-foreground/70">
+            <p className="text-xs text-muted-foreground">
               Appended to the default commit message generation prompt. Leave empty for default behavior.
             </p>
             <textarea

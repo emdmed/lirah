@@ -9,14 +9,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Every variant but `link` is a push button (.ins-key, see index.css):
-        // raised, travels on press, stays down while pressed/open.
+        // Every variant but `link` is a printed key (.ins-key, see index.css):
+        // no box, brightens on hover, tinted while pressed/open.
         default: "ins-key ins-key-primary ins-round",
         destructive: "ins-key ins-key-danger ins-round",
         outline: "ins-key ins-round",
         secondary: "ins-key ins-round text-muted-foreground",
         ghost: "ins-key ins-round",
-        link: "text-primary underline underline-offset-4 hover:bg-primary hover:text-primary-foreground hover:no-underline",
+        link: "ins-link text-primary",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

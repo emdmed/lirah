@@ -30,7 +30,7 @@ export function PromptPreview({ sections, text, onClearSection, itemsBySection }
       </div>
 
       {isEmpty ? (
-        <p className="px-2 py-2 text-[11px] text-muted-foreground/70">
+        <p className="px-2 py-2 text-[11px] text-muted-foreground">
           Nothing yet. Type a prompt, select files, or pick a template.
         </p>
       ) : (
@@ -41,7 +41,7 @@ export function PromptPreview({ sections, text, onClearSection, itemsBySection }
                 <span className="text-[11px] font-mono font-semibold text-foreground/70 truncate">
                   {section.label}
                   {section.count != null && (
-                    <span className="ml-1 text-muted-foreground/70 font-normal">({section.count})</span>
+                    <span className="ml-1 text-muted-foreground font-normal">({section.count})</span>
                   )}
                 </span>
                 {section.clearable && onClearSection && !(itemsBySection?.[section.id]?.length > 0) && (

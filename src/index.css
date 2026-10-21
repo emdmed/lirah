@@ -28,6 +28,16 @@
   font-display: swap;
 }
 
+/* Voice face (OFL, bundled): the serif italic for the app's few human
+   sentences (prompt placeholder, empty states), set against the mono UI. */
+@font-face {
+  font-family: 'Crimson Pro';
+  src: url('/fonts/CrimsonPro-Italic.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -121,6 +131,10 @@
   --ins-legend:      color-mix(in srgb, var(--color-foreground) 85%, var(--color-background));
   --ins-lamp:        var(--color-lamp, var(--color-primary));
   --ins-lamp-off:    color-mix(in srgb, var(--color-foreground) 18%, var(--color-background));
+  /* Text comes in three tiers: foreground, the theme's muted-foreground
+     (tuned per theme to stay >= 4.5:1), and faint, for marks that carry no
+     reading load (separators, ordinals, empty-state glyphs, an unlit option). */
+  --ins-faint:       color-mix(in srgb, var(--color-foreground) 40%, var(--color-background));
   --ins-ok:          var(--color-ok, #98BB6C);
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
@@ -130,6 +144,9 @@
   --ins-plate-cut:   var(--ins-gutter);
   --ins-plate-lip:   rgb(255 255 255 / .14);
   --font-legend: "Barlow Semi Condensed", var(--font-mono);
+  --font-voice: "Crimson Pro", Georgia, serif;
+  /* Slow, even easing for colour changes on hover and focus. */
+  --ins-ease: cubic-bezier(0.333, 0, 0.667, 1);
 
   /* Historical aliases, remapped so existing users pick up the material. */
   --tui-line: var(--ins-edge);
@@ -180,6 +197,7 @@ body {
 }
 
 @theme inline {
+  --color-faint: var(--ins-faint);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -421,13 +439,16 @@ body {
     background: linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat;
   }
 
+  /* Only the focused pane draws its frame. A resting pane is set apart by its
+     face against the gutter and its legend; the line fades in with focus. */
   .tui-pane::after {
     content: "";
     position: absolute;
     inset: 6px 0 6px 0;
-    border: 1px solid var(--ins-edge);
+    border: 1px solid transparent;
     pointer-events: none;
     z-index: 5;
+    transition: border-color 200ms var(--ins-ease);
   }
 
   .tui-pane::before {
@@ -446,6 +467,12 @@ body {
     background: var(--pane-bg);
     pointer-events: none;
     z-index: 6;
+  }
+
+  /* A pane floating over the app (palette suggestions) always keeps its
+     frame; it has no gutter around it to set it apart. */
+  .tui-pane[data-float]::after {
+    border-color: var(--ins-edge-strong);
   }
 
   .tui-pane[data-legend]::before {
@@ -741,34 +768,32 @@ body {
   }
 
   /* Push button material, shared by ui/button, ui/toggle and PanelButton.
-     Same material as a keycap: raised face, a 2px bottom edge that collapses
-     as the key travels 1px down. A latched key (on, pressed, menu open)
-     stays down in a recessed face. Size comes from the user of the class;
-     .ins-key-panel is the 20px chassis size. Pair with .ins-round. */
+     Printed, not raised: a key is its legend on the panel, with no box. It
+     brightens on hover; a latched key (on, pressed, menu open) sits on a
+     faint tint. Only the primary key draws a frame (one hairline in the
+     lamp colour). The border stays, transparent, so sizes don't shift.
+     Size comes from the user of the class; .ins-key-panel is the 20px
+     chassis size. Pair with .ins-round. */
   .ins-key {
     box-sizing: border-box;
-    border: 1px solid var(--ins-edge-strong);
-    border-bottom-width: 2px;
+    border: 1px solid transparent;
     border-radius: 2px;
-    background: linear-gradient(color-mix(in srgb, var(--color-foreground) 5%, var(--ins-raised)), var(--ins-raised));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 1px rgb(0 0 0 / 0.35);
+    background: transparent;
+    box-shadow: none;
     color: var(--ins-legend);
     font-family: var(--font-mono);
     cursor: pointer;
-    transition: transform 60ms ease-out, border-color 120ms, color 120ms;
+    transition: background-color 200ms var(--ins-ease), border-color 200ms var(--ins-ease), color 200ms var(--ins-ease);
   }
 
   .ins-key:hover {
-    border-color: var(--ins-legend);
+    background: color-mix(in srgb, var(--color-foreground) 6%, transparent);
     color: var(--color-foreground);
   }
 
   .ins-key:active,
   .ins-key:is([data-latched], [data-lit], [aria-pressed="true"], [data-state="on"], [data-state="open"]) {
-    transform: translateY(1px);
-    border-bottom-width: 1px;
-    background: var(--ins-well);
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.45);
+    background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
   }
 
   .ins-key:is([data-latched], [data-lit], [aria-pressed="true"], [data-state="on"]) {
@@ -789,6 +814,7 @@ body {
 
   .ins-key-primary:hover {
     border-color: var(--ins-lamp);
+    background: color-mix(in srgb, var(--ins-lamp) 8%, transparent);
     color: var(--ins-lamp);
   }
 
@@ -797,7 +823,7 @@ body {
   }
 
   .ins-key-danger:hover {
-    border-color: var(--ins-fault);
+    background: color-mix(in srgb, var(--ins-fault) 10%, transparent);
     color: var(--ins-fault);
   }
 
@@ -809,7 +835,6 @@ body {
   .ins-key:disabled {
     cursor: default;
     opacity: 0.5;
-    transform: none;
   }
 
   .ins-key-panel {
@@ -834,14 +859,6 @@ body {
   .ins-key-panel[data-icon-only] {
     width: 20px;
     padding: 0;
-  }
-
-  :root[data-theme="light"] .ins-key {
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), 0 1px 1px rgb(0 0 0 / 0.12);
-  }
-
-  :root[data-theme="light"] .ins-key:is(:active, [data-latched], [data-lit], [aria-pressed="true"], [data-state="on"], [data-state="open"]) {
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
   }
 
   /* Lamp. Off is a dark lens; lit states glow in their own colour. */
@@ -1097,6 +1114,34 @@ body {
     line-height: 1;
     color: var(--color-muted-foreground);
   }
+}
+
+/*
+  The voice: a serif italic for the app's few human sentences, set larger
+  than the 12px mono so its x-height matches. Never for labels, data or
+  controls. .ins-voice-placeholder gives an input's placeholder the voice
+  while typed text stays mono.
+*/
+.ins-voice,
+.ins-voice-placeholder::placeholder {
+  font-family: var(--font-voice);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+/* Links: a fine dotted underline that clears on hover. */
+.ins-link {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: color 200ms var(--ins-ease);
+}
+
+.ins-link:hover {
+  text-decoration-line: none;
 }
 
 @keyframes ins-blink {

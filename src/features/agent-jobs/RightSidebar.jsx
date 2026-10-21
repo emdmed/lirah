@@ -614,7 +614,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
               Clear
             </button>
           </div>
-          <span className="text-[11px] leading-snug text-muted-foreground/70">
+          <span className="text-[11px] leading-snug text-muted-foreground">
             An agent merges them in an isolated worktree and verifies the build. Review before applying.
           </span>
         </div>
@@ -671,7 +671,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
               <div className="mt-2 border-t border-t-sidebar-border/60 pt-1">
                 <button
                   onClick={() => setShowArchived((v) => !v)}
-                  className="flex w-full items-center gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground/70 hover:text-sidebar-foreground cursor-pointer transition-colors"
+                  className="flex w-full items-center gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
                 >
                   {showArchived ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   <Archive className="h-3 w-3" />
@@ -766,7 +766,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
         </div>
       )}
       {!settled && (
-        <div className="px-2 pt-2.5 pb-1 text-[11px] leading-snug text-muted-foreground/70">
+        <div className="px-2 pt-2.5 pb-1 text-[11px] leading-snug text-muted-foreground">
           Same prompt, separate worktrees. Keeping one applies it and discards the rest.
         </div>
       )}
@@ -907,7 +907,7 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
           </span>
         )}
         {tcChecking && (
-          <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
+          <span className="inline-flex items-center gap-0.5 text-muted-foreground">
             <Scanner />
             typecheck
           </span>
@@ -940,19 +940,19 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
               : 'Merge conflicts on apply'}
           </div>
           {job.overlaps?.length > 0 && (
-            <div className="mt-1 flex flex-col gap-0.5 font-mono text-muted-foreground/80">
+            <div className="mt-1 flex flex-col gap-0.5 font-mono text-muted-foreground">
               {job.overlaps.slice(0, 6).map((o) => (
                 <div key={o.path} className="truncate" title={`${o.path} — ${o.labels.join(', ')}`}>
                   {o.path}
                 </div>
               ))}
               {job.overlaps.length > 6 && (
-                <div className="text-muted-foreground/60">+{job.overlaps.length - 6} more</div>
+                <div className="text-muted-foreground">+{job.overlaps.length - 6} more</div>
               )}
             </div>
           )}
           {job.conflictLabels?.length > 0 && (
-            <div className="mt-1 text-muted-foreground/70">
+            <div className="mt-1 text-muted-foreground">
               Textual conflict from: {job.conflictLabels.join(', ')}
             </div>
           )}
@@ -974,7 +974,7 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
             className="mx-2.5 max-h-56 overflow-auto ins-well p-2 font-mono text-[11px] leading-relaxed [content-visibility:auto] [contain-intrinsic-size:auto_14rem]"
           >
             {job.output.length === 0 ? (
-              <div className="text-muted-foreground/50">No output yet.</div>
+              <div className="text-muted-foreground">No output yet.</div>
             ) : (
               <pre className="m-0 [font:inherit] whitespace-pre-wrap break-words">
                 {outputRuns(job.output).map((run, i) =>

@@ -64,7 +64,7 @@ export function TextareaArea({
             aria-label="Multi-line command input"
             aria-describedby="textarea-instructions"
             rows={1}
-            className="w-full flex-1 resize-none shadow-none! pl-5 pr-0 py-1 min-h-0 max-h-none caret-transparent focus-visible:outline-none"
+            className="ins-voice-placeholder w-full flex-1 resize-none shadow-none! pl-5 pr-0 py-1 min-h-0 max-h-none caret-transparent focus-visible:outline-none"
             style={{ backgroundColor: 'transparent' }}
           />
         </div>

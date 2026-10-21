@@ -52,11 +52,11 @@ function StepLine({ stage, failedAt }) {
               )}
             />
             <span className="flex items-center gap-1.5 text-[10px]">
-              <span className="tabular-nums text-muted-foreground/70">0{i + 1}</span>
+              <span className="tabular-nums text-faint">0{i + 1}</span>
               <span
                 className={cn(
                   'ins-legend text-[10px]',
-                  state === 'pending' ? 'text-muted-foreground/70' : 'text-foreground',
+                  state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
                   state === 'fault' && 'text-[var(--ins-fault)]',
                 )}
               >

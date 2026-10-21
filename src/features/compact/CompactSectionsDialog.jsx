@@ -204,7 +204,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                     <span className="text-xs text-muted-foreground font-mono hover:text-foreground transition-colors">
                       {dirPath}
                     </span>
-                    <span className="text-muted-foreground/50 font-mono" style={{ fontSize: '9px' }}>
+                    <span className="text-muted-foreground font-mono" style={{ fontSize: '9px' }}>
                       {enabledInDir}/{filePaths.length}
                     </span>
                   </div>

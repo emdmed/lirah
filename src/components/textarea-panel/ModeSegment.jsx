@@ -58,5 +58,5 @@ export function ModeClear({ onClick, label }) {
 
 // The `·` between segments.
 export function ModeSep() {
-  return <span className="text-[10px] text-muted-foreground/50 select-none" aria-hidden="true">·</span>;
+  return <span className="text-[10px] text-faint select-none" aria-hidden="true">·</span>;
 }

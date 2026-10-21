@@ -498,7 +498,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-1 text-muted-foreground/80">
+                <div className="mt-1 text-muted-foreground">
                   Both jobs will edit these files and you'll have to reconcile them. Consider splitting
                   the work by file.
                 </div>

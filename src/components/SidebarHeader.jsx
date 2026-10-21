@@ -33,7 +33,7 @@ export function SidebarHeader({
   const [searchFocused, setSearchFocused] = useState(false);
   const dirName = currentPath ? currentPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || currentPath : '';
   const searchWell = showSearch && (
-    <div className="ins-well relative flex-1 min-w-0 flex items-center focus-within:outline focus-within:outline-1 focus-within:outline-[var(--ins-lamp)] focus-within:-outline-offset-1"
+    <div className="ins-well relative flex-1 min-w-24 flex items-center focus-within:outline focus-within:outline-1 focus-within:outline-[var(--ins-lamp)] focus-within:-outline-offset-1"
       onFocus={() => setSearchFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setSearchFocused(false);
@@ -46,7 +46,7 @@ export function SidebarHeader({
         placeholder="search"
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        className="h-6 pl-7 pr-6 py-0 leading-6 bg-transparent border-0 shadow-none focus-visible:outline-none focus-visible:ring-0"
+        className={`h-6 pl-7 ${searchQuery ? 'pr-6' : 'pr-1.5'} py-0 leading-6 bg-transparent border-0 shadow-none focus-visible:outline-none focus-visible:ring-0`}
         style={{ fontSize: 'var(--font-xs)', backgroundColor: 'transparent', boxShadow: 'none' }}
       />
       {searchQuery && (
@@ -66,7 +66,7 @@ export function SidebarHeader({
   // control bank on the right. Filters are latching switches; adding a
   // bookmark lives in the bookmarks menu.
   return (
-    <div className="px-1.5 pt-1 pb-2 edge-b-engraved flex items-center gap-1.5 h-9 text-xs flex-shrink-0">
+    <div className="px-1.5 pt-1 pb-2 edge-b-engraved flex items-center gap-1 h-9 text-xs flex-shrink-0">
       {onNavigateParent && (
         <div className="mr-auto flex items-center gap-2 min-w-0 pr-2">
           <PanelButton
@@ -98,8 +98,11 @@ export function SidebarHeader({
           >
             git
           </PanelButton>
+          {/* Printed keys have no box, so a wider step sets the icon group
+              apart from the md/git filters. */}
           <PanelButton
             icon={ChevronsDownUp}
+            className="ml-1.5"
             onClick={onCollapseAll}
             title="Collapse all folders (X)"
             aria-label="Collapse all folders"

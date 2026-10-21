@@ -122,7 +122,7 @@ export function CommandPalette({ open, onClose, commands }) {
   return (
     <div className="fixed left-0 right-0 bottom-0 z-[110] flex flex-col font-mono text-xs">
       {suggestions.length > 0 && (
-        <div className="tui-pane mx-1 px-1 max-w-xl" data-title="commands">
+        <div className="tui-pane mx-1 px-1 max-w-xl" data-title="commands" data-float>
           <ul role="listbox">
             {suggestions.map((s, i) => (
               <li

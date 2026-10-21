@@ -109,7 +109,7 @@ export function SidebarFileSelection({
             variant="ghost"
             size="sm"
             onClick={onClearAllFiles}
-            className="h-5 px-1.5 text-[11px] font-mono text-muted-foreground/70 hover:text-destructive"
+            className="h-5 px-1.5 text-[11px] font-mono text-muted-foreground hover:text-destructive"
           >
             <X className="w-3 h-3 mr-0.5" />
             clear

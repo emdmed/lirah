@@ -82,7 +82,7 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
       <button
         type="button"
         onClick={onChangeCli}
-        className="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+        className="ins-link text-muted-foreground hover:text-foreground"
       >
         change
       </button>
