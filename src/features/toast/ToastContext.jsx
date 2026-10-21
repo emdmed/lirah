@@ -54,11 +54,13 @@ export function ToastProvider({ children }) {
       return updated;
     });
 
-    // Auto-dismiss timer
-    const timer = setTimeout(() => {
-      removeToast(id);
-    }, newToast.duration);
-    timers.current.set(id, timer);
+    // Auto-dismiss timer; a duration of 0 stays until dismissed.
+    if (newToast.duration > 0) {
+      const timer = setTimeout(() => {
+        removeToast(id);
+      }, newToast.duration);
+      timers.current.set(id, timer);
+    }
 
     return id;
   }, [removeToast]);

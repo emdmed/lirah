@@ -117,19 +117,22 @@ export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
     .join('\n\n');
 }
 
-/** Review notes on an implemented chunk → a prompt to fix them in a new commit. */
-export function buildFixPrompt(plan, chunk, notes) {
-  const lines = notes.map((n) => {
+function noteLines(notes) {
+  return notes.map((n) => {
     const range = n.toLine && n.toLine !== n.fromLine ? `${n.fromLine}-${n.toLine}` : `${n.fromLine}`;
     const snippet = n.snippet
       ? `\n${n.snippet.split('\n').map((l) => `   > ${l}`).join('\n')}`
       : '';
     return `- ${n.relPath}:${range} — ${n.note}${snippet}`;
-  });
+  }).join('\n');
+}
+
+/** Review notes on an implemented chunk → a prompt to fix them in a new commit. */
+export function buildFixPrompt(plan, chunk, notes) {
   return [
     `Review notes on chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}", which is already committed.`,
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
-    `Review notes (${notes.length}):\n${lines.join('\n')}`,
+    `Review notes (${notes.length}):\n${noteLines(notes)}`,
     `Address every note. Don't revert unrelated work. ${commitInstruction(plan, chunk)}`,
   ].join('\n\n');
 }
@@ -151,4 +154,15 @@ export function parseStatusMarker(text) {
     if (m) return { kind: m[1].toLowerCase(), message: m[2].replace(/[`*]+$/, '').trim() };
   }
   return null;
+}
+
+/** Review notes on the whole plan's diff → a prompt to fix them in one commit. */
+export function buildPlanFixPrompt(plan, notes) {
+  const message = `plan(${plan.slug}): review fixes`;
+  return [
+    `Review notes on the plan "${plan.title}", which is fully implemented and committed.`,
+    plan.summary && `Plan summary: ${plan.summary}`,
+    `Review notes (${notes.length}):\n${noteLines(notes)}`,
+    `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}"`,
+  ].filter(Boolean).join('\n\n');
 }

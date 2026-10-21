@@ -1,13 +1,19 @@
 // Desktop notification through the webview's Notification API. Best-effort:
 // asks for permission once, and stays quiet when it is denied or unavailable.
-export async function notify(title, body) {
+// `onClick` runs (after focusing the window) when the notification is clicked,
+// where the platform reports clicks.
+export async function notify(title, body, { onClick } = {}) {
   try {
     if (typeof Notification === 'undefined') return;
-    if (Notification.permission === 'granted') {
-      new Notification(title, { body });
-    } else if (Notification.permission !== 'denied') {
-      const perm = await Notification.requestPermission();
-      if (perm === 'granted') new Notification(title, { body });
+    let perm = Notification.permission;
+    if (perm !== 'granted' && perm !== 'denied') perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+    const n = new Notification(title, { body });
+    if (onClick) {
+      n.onclick = () => {
+        window.focus();
+        onClick();
+      };
     }
   } catch {
     // Notifications are best-effort.

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { notify } from '../../lib/notify';
+import { formatDuration } from '../../lib/formatDuration';
 import { focusPane } from '../../hooks/usePaneShortcuts';
 import { useBookmarks } from '../bookmarks';
 import { getTabSession } from './terminalActivity';
@@ -24,13 +25,6 @@ export const ATTENTION_JUMP_EVENT = 'lirah:attention-jump';
 
 export function requestAttentionJump() {
   window.dispatchEvent(new CustomEvent(ATTENTION_JUMP_EVENT));
-}
-
-function formatDuration(ms) {
-  const secs = Math.round(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  return secs % 60 ? `${mins}m ${secs % 60}s` : `${mins}m`;
 }
 
 function cliLabel(source) {

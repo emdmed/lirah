@@ -1,15 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { notify } from '../../lib/notify';
+import { formatDuration } from '../../lib/formatDuration';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
 import { getTabPrompt } from '../tabs/tabPrompts';
+import { requestPlanFocus } from './plansPaneEvents';
 import {
   buildChunkPrompt,
   buildFixPrompt,
   buildNudgePrompt,
+  buildPlanFixPrompt,
   buildSplitPrompt,
   chunkCommitMessage,
   chunkTrailer,
@@ -77,6 +80,12 @@ export function nextChunkId(plan) {
 // on: you answered its question or approved the prompt in the terminal.
 const AUTO_RESUME = new Set(['needs-input', 'no-commit', 'permission']);
 
+// A PermissionRequest carries the tool name; a Notification, a sentence.
+function permissionMessage(message) {
+  if (!message) return 'Waiting on a permission prompt in the terminal.';
+  return /\s/.test(message.trim()) ? message : `Waiting on permission to use ${message}.`;
+}
+
 /** The last line or so of an agent's reply, for a notification. */
 function excerpt(text, max = 160) {
   const line = String(text || '').trim().split('\n').filter((l) => l.trim()).pop() || '';
@@ -112,7 +121,7 @@ export function PlansProvider({ children }) {
   const saveTimer = useRef(null);
   const checkingRef = useRef(new Set()); // chunk ids being checked
   const toast = useToast();
-  const { tabs } = useTabManager();
+  const { tabs, switchTab } = useTabManager();
 
   const getHome = useCallback(async () => {
     if (!homeRef.current) homeRef.current = await invoke('get_home_dir');
@@ -358,6 +367,13 @@ export function PlansProvider({ children }) {
     updateChunk(repoRoot, planId, chunkId, { awaitingFix: true, tabId });
   }, [findChunk, sendToTab, updateChunk]);
 
+  // Review notes on the whole plan's diff: one fix commit, not tied to a chunk.
+  const sendPlanFix = useCallback(async (repoRoot, planId, notes, tabId) => {
+    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    if (!plan || notes.length === 0) return;
+    await sendToTab(tabId, buildPlanFixPrompt(plan, notes));
+  }, [sendToTab]);
+
   // Fallback when the agent didn't commit: commit everything as this chunk.
   const commitChunk = useCallback(async (repoRoot, planId, chunkId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
@@ -394,6 +410,8 @@ export function PlansProvider({ children }) {
 
   const toastRef = useRef(toast);
   toastRef.current = toast;
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
 
   const findPlan = useCallback((repoRoot, planId) => stateRef.current[repoRoot]?.find((p) => p.id === planId), []);
 
@@ -403,19 +421,31 @@ export function PlansProvider({ children }) {
     }));
   }, [updatePlan]);
 
-  // Desktop notification plus a toast, for the three outcomes you asked to hear about.
-  const announce = useCallback((plan, kind, body) => {
+  // Bring the run into view: its tab, and the plan open in the plans pane.
+  const revealRun = useCallback((repoRoot, planId) => {
+    const tabId = findPlan(repoRoot, planId)?.autopilot?.tabId;
+    if (tabId && tabsRef.current.some((t) => t.id === tabId)) switchTab(tabId);
+    requestPlanFocus(planId);
+  }, [findPlan, switchTab]);
+
+  // Desktop notification plus a toast, for the three outcomes you asked to
+  // hear about. Both lead back to the run; the ones that need you stay up.
+  const announce = useCallback((repoRoot, plan, kind, body) => {
     const name = plan.title || 'Untitled plan';
     const title = {
       done: `✓ ${name} · plan complete`,
       paused: `${name} · needs you`,
-      failed: `${name} · auto-pilot stopped`,
+      failed: `${name} · auto-pilot error`,
     }[kind];
-    notify(title, body);
+    const reveal = () => revealRun(repoRoot, plan.id);
+    notify(title, body, { onClick: reveal });
     const t = toastRef.current;
     const show = kind === 'done' ? t.success : kind === 'paused' ? t.warning : t.error;
-    show(`${title}${body ? ` — ${body}` : ''}`);
-  }, []);
+    show(`${title}${body ? ` — ${body}` : ''}`, {
+      action: { label: 'show', onClick: reveal },
+      ...(kind === 'done' ? {} : { duration: 0 }),
+    });
+  }, [revealRun]);
 
   // Stop the run, notifying when it was running (not again for every later event).
   const halt = useCallback((repoRoot, planId, status, reason, message) => {
@@ -424,7 +454,7 @@ export function PlansProvider({ children }) {
     const wasRunning = plan.autopilot.status === 'running';
     setAutopilot(repoRoot, planId, { status, reason, message });
     // Permission prompts already get a desktop alert from useAgentAttention.
-    if (wasRunning && reason !== 'permission') announce(plan, status, message);
+    if (wasRunning && reason !== 'permission') announce(repoRoot, plan, status, message);
   }, [findPlan, setAutopilot, announce]);
 
   // Send the next chunk, or finish.
@@ -436,13 +466,16 @@ export function PlansProvider({ children }) {
     if (!nextId) {
       const { done } = planProgress(plan);
       const commits = plan.chunks.reduce((n, c) => n + (c.status === 'implemented' ? c.commits.length : 0), 0);
-      setAutopilot(repoRoot, planId, { status: 'done', chunkId: null, reason: null, message: null });
-      announce(plan, 'done', `${done} chunk${done === 1 ? '' : 's'}, ${commits} commit${commits === 1 ? '' : 's'}.`);
+      setAutopilot(repoRoot, planId, { status: 'done', chunkId: null, reason: null, message: null, endedAt: Date.now() });
+      const took = ap.startedAt ? ` in ${formatDuration(Date.now() - ap.startedAt)}` : '';
+      announce(repoRoot, plan, 'done',
+        `${done} chunk${done === 1 ? '' : 's'}, ${commits} commit${commits === 1 ? '' : 's'}${took}.`);
       return;
     }
+    // Recorded first, so a failed send points at the chunk it was for.
+    setAutopilot(repoRoot, planId, { chunkId: nextId, nudged: false });
     try {
       await implementChunk(repoRoot, planId, nextId, ap.tabId, { autopilot: true });
-      setAutopilot(repoRoot, planId, { chunkId: nextId, nudged: false });
     } catch (e) {
       halt(repoRoot, planId, 'failed', 'send-failed', String(e?.message || e));
     }
@@ -475,7 +508,7 @@ export function PlansProvider({ children }) {
     const inFlight = plan.chunks.find((c) => c.status === 'in-progress');
     setAutopilot(repoRoot, planId, {
       status: 'running', tabId, chunkId: inFlight?.id ?? null, nudged: false, reason: null, message: null,
-      startedAt: Date.now(),
+      startedAt: Date.now(), endedAt: null,
     });
     return kick(repoRoot, planId);
   }, [findPlan, setAutopilot, kick]);
@@ -488,7 +521,18 @@ export function PlansProvider({ children }) {
     return kick(repoRoot, planId);
   }, [findPlan, setAutopilot, kick]);
 
-  const stopAutopilot = useCallback((repoRoot, planId) => setAutopilot(repoRoot, planId, null), [setAutopilot]);
+  // Turned off by hand: keeps a note of where it stopped until dismissed.
+  const stopAutopilot = useCallback((repoRoot, planId) => {
+    const plan = findPlan(repoRoot, planId);
+    const chunk = plan?.chunks.find((c) => c.id === plan.autopilot?.chunkId);
+    setAutopilot(repoRoot, planId, {
+      status: 'off',
+      reason: 'stopped',
+      message: chunk ? `Turned off during chunk ${chunk.n}. The agent wasn't interrupted.` : 'Turned off.',
+    });
+  }, [findPlan, setAutopilot]);
+
+  const dismissAutopilot = useCallback((repoRoot, planId) => setAutopilot(repoRoot, planId, null), [setAutopilot]);
 
   // The agent's turn ended while auto-pilot was on its chunk.
   const onAutopilotStop = useCallback(async (repoRoot, planId, sessionId, error) => {
@@ -540,7 +584,7 @@ export function PlansProvider({ children }) {
           if (next === null) {
             halt(repoRoot, plan.id, 'paused', 'session-ended', 'The agent exited. Relaunch it in the tab and resume.');
           } else if (next?.state === 'permission' && ap.status === 'running') {
-            halt(repoRoot, plan.id, 'paused', 'permission', next.message || 'Waiting on a permission prompt.');
+            halt(repoRoot, plan.id, 'paused', 'permission', permissionMessage(next.message));
           } else if (next?.state === 'working' && ap.status === 'paused' && AUTO_RESUME.has(ap.reason)) {
             // You answered or approved in the terminal: the run carries on.
             setAutopilot(repoRoot, plan.id, {
@@ -597,11 +641,15 @@ export function PlansProvider({ children }) {
     commitChunk,
     rollbackChunk,
     sendFix,
+    sendPlanFix,
     startAutopilot,
     resumeAutopilot,
     stopAutopilot,
+    dismissAutopilot,
+    revealRun,
   }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk,
-    implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot]);
+    implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
+    dismissAutopilot, revealRun, sendPlanFix]);
 
   return (
     <PlansActionsContext.Provider value={actions}>
@@ -626,4 +674,21 @@ export function usePlans(repoRoot) {
   }, [repoRoot, loadRepo]);
   const plans = (repoRoot && plansByRepo?.[repoRoot]) || null;
   return { plans, loaded: !!plans, ...actions };
+}
+
+const LIVE = new Set(['running', 'paused', 'failed']);
+const URGENCY = { failed: 0, paused: 1, running: 2 };
+
+/** Auto-pilot runs that need watching, across loaded repos, most urgent first. */
+export function useAutopilotRuns() {
+  const plansByRepo = useContext(PlansStateContext);
+  return useMemo(() => {
+    const runs = [];
+    for (const [repoRoot, plans] of Object.entries(plansByRepo || {})) {
+      for (const plan of plans) {
+        if (LIVE.has(plan.autopilot?.status)) runs.push({ repoRoot, plan });
+      }
+    }
+    return runs.sort((a, b) => URGENCY[a.plan.autopilot.status] - URGENCY[b.plan.autopilot.status]);
+  }, [plansByRepo]);
 }

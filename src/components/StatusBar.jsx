@@ -28,6 +28,7 @@ import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
 import { useTabManager } from '../features/tabs/TabContext';
 import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAgentAttention';
+import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -318,6 +319,7 @@ export const StatusBar = memo(({
         </div>
 
         <AttentionIndicator />
+        <AutopilotIndicator />
 
         {/* Context actions: update (shown when relevant) */}
         {availableUpdate && (
