@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
+import { useTick } from '../../hooks/useTick';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -801,11 +802,7 @@ function TabButton({ active, onClick, label, count }) {
 // Live elapsed time for a running job. Owns its ticker so only this text
 // re-renders each second, not the pane or the card.
 function Elapsed({ startedAt }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  const now = useTick();
   return jobDuration(startedAt, now);
 }
 

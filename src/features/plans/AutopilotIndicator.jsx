@@ -3,12 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/too
 import { Lamp } from '../../components/instrument/Lamp';
 import { useAutopilotRuns, usePlansActions } from './PlansContext';
 import { AUTOPILOT_STATUS, planProgress, UNTITLED_PLAN } from './planModel';
-
-const LAMP = {
-  [AUTOPILOT_STATUS.RUNNING]: { state: 'on', blink: true },
-  [AUTOPILOT_STATUS.PAUSED]: { state: 'warn' },
-  [AUTOPILOT_STATUS.FAILED]: { state: 'fault' },
-};
+import { AUTOPILOT_LAMP } from './parts';
 
 /**
  * Status-bar readout of auto-pilot runs, whichever tab is showing: the most
@@ -22,7 +17,7 @@ export function AutopilotIndicator() {
   const ap = plan.autopilot;
   const { done, total } = planProgress(plan);
   const label = ap.status === AUTOPILOT_STATUS.RUNNING ? `${done}/${total}` : ap.status === AUTOPILOT_STATUS.PAUSED ? 'needs you' : 'error';
-  const lamp = LAMP[ap.status];
+  const lamp = AUTOPILOT_LAMP[ap.status];
   return (
     <Tooltip>
       <TooltipTrigger asChild>
