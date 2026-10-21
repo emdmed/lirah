@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { invoke } from '@tauri-apps/api/core';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
+import { currentBranch, git, repoTop } from '../../lib/git';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../tabs/agentHookState';
@@ -9,8 +10,7 @@ import { getTabSession } from '../tabs/terminalActivity';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
 import {
-  basename, chunkBases, chunkCommitsByRepo, cleanupGit, currentBranch, defaultBranch, planGit, prepareGit, repoTop,
-  workPath,
+  basename, chunkBases, chunkCommitsByRepo, cleanupGit, defaultBranch, planGit, prepareGit, workPath,
 } from './planGit';
 import {
   buildChunkPrompt,
@@ -63,10 +63,6 @@ export function hash8(text) {
 function storePath(home, repoRoot) {
   const name = repoRoot.replace(/\/+$/, '').split('/').pop() || 'repo';
   return `${home}/.lirah/plans/${name}-${hash8(repoRoot)}/plans.json`;
-}
-
-function git(repoRoot, args) {
-  return invoke('run_git_command', { repoPath: repoRoot, args });
 }
 
 /** Chunks that count toward progress (skipped ones don't), and how many are in. */
@@ -331,7 +327,7 @@ export function PlansProvider({ children }) {
       git: {
         worktrees: false,
         branch: defaultBranch(slug),
-        repos: [{ root: repoRoot, base: await currentBranch(repoRoot), workPath: null, prepared: false }],
+        repos: [{ root: repoRoot, base: await currentBranch(repoRoot).catch(() => ''), workPath: null, prepared: false }],
         workDir: null,
         preparedAt: null,
       },
@@ -352,9 +348,9 @@ export function PlansProvider({ children }) {
   // Its worktrees go with it (uncommitted work in them too); branches stay.
   const deletePlan = useCallback(async (repoRoot, planId) => {
     const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
-    if (plan) await cleanupGit(await getHome(), plan).catch((e) => toast.error(`Worktrees not removed: ${e?.message || e}`));
+    if (plan) await cleanupGit(plan).catch((e) => toast.error(`Worktrees not removed: ${e?.message || e}`));
     mutate(repoRoot, (plans) => plans.filter((p) => p.id !== planId));
-  }, [mutate, getHome, toast]);
+  }, [mutate, toast]);
 
   // --- Git settings ---
 
@@ -368,9 +364,9 @@ export function PlansProvider({ children }) {
   }, [updatePlan]);
 
   const addPlanRepo = useCallback(async (repoRoot, planId, path) => {
-    const root = await repoTop(path);
+    const root = await repoTop(path).catch(() => null);
     if (!root) throw new Error(`${basename(path)} is not a git repository`);
-    const base = await currentBranch(root);
+    const base = await currentBranch(root).catch(() => '');
     setGitConfig(repoRoot, planId, (cfg) => (cfg.repos.some((r) => r.root === root) ? {} : {
       repos: [...cfg.repos, { root, base, workPath: null, prepared: false }],
     }));
@@ -394,9 +390,9 @@ export function PlansProvider({ children }) {
   const removeWorktrees = useCallback(async (repoRoot, planId) => {
     const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
     if (!plan) return;
-    await cleanupGit(await getHome(), plan);
+    await cleanupGit(plan);
     updatePlan(repoRoot, planId, (p) => ({ git: { ...planGit(p), removedAt: Date.now() } }));
-  }, [getHome, updatePlan]);
+  }, [updatePlan]);
 
   const moveChunk = useCallback((repoRoot, planId, chunkId, delta) => {
     updatePlan(repoRoot, planId, (p) => {

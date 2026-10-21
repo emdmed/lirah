@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { currentBranch, dirtyCount, git, gitLines, repoTop } from "../../lib/git";
 
 // Deterministic "finish this feature branch": switch to a base branch and merge
 // the feature into it. Fast-forward when possible, else a --no-ff merge commit.
@@ -13,21 +13,18 @@ import { invoke } from "@tauri-apps/api/core";
 const PREFERRED_BASES = ['main', 'master', 'develop', 'dev'];
 const LAST_BASE_KEY = 'lirah:auto-merge:last-base';
 
-const git = (repoPath, ...args) => invoke('run_git_command', { repoPath, args });
-const lines = (out) => out.split('\n').map(l => l.trim()).filter(Boolean);
-const count = async (repoPath, range) => parseInt((await git(repoPath, 'rev-list', '--count', range)).trim(), 10) || 0;
+const count = async (repoPath, range) => parseInt((await git(repoPath, ['rev-list', '--count', range])).trim(), 10) || 0;
 
 // Tracked changes only — untracked files are left alone, and git itself refuses
 // a switch that would overwrite one.
-const isDirty = async (repoPath) => lines(await git(repoPath, 'status', '--porcelain', '--untracked-files=no')).length > 0;
-const mergeInProgress = async (repoPath) => (await git(repoPath, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')).trim() !== '';
-const currentBranch = async (repoPath) => (await git(repoPath, 'rev-parse', '--abbrev-ref', 'HEAD')).trim();
+const isDirty = async (repoPath) => (await dirtyCount(repoPath, { untracked: false })) > 0;
+const mergeInProgress = async (repoPath) => (await git(repoPath, ['rev-parse', '-q', '--verify', 'MERGE_HEAD'])).trim() !== '';
 
 // branch name -> worktree path, from `git worktree list --porcelain`.
 async function worktreesByBranch(repoPath) {
   const map = {};
   let path = null;
-  for (const line of lines(await git(repoPath, 'worktree', 'list', '--porcelain'))) {
+  for (const line of await gitLines(repoPath, ['worktree', 'list', '--porcelain'])) {
     if (line.startsWith('worktree ')) path = line.slice(9);
     else if (line.startsWith('branch refs/heads/') && path) map[line.slice(18)] = path;
   }
@@ -76,8 +73,8 @@ export function useAutoMerge() {
     const { repoPath, worktrees } = ctxRef.current;
     const seq = ++planSeqRef.current;
     const [commits, files, behind] = await Promise.all([
-      git(repoPath, 'log', '--oneline', '--no-decorate', `${baseName}..${featureName}`),
-      git(repoPath, 'diff', '--name-status', `${baseName}...${featureName}`),
+      gitLines(repoPath, ['log', '--oneline', '--no-decorate', `${baseName}..${featureName}`]),
+      gitLines(repoPath, ['diff', '--name-status', `${baseName}...${featureName}`]),
       count(repoPath, `${featureName}..${baseName}`),
     ]);
     if (seq !== planSeqRef.current) return;
@@ -91,8 +88,8 @@ export function useAutoMerge() {
       : null;
 
     setPlan({
-      commits: lines(commits),
-      files: lines(files).map(l => {
+      commits,
+      files: files.map(l => {
         const [status, ...rest] = l.split('\t');
         return { status: status[0], path: rest[rest.length - 1] };
       }),
@@ -109,10 +106,10 @@ export function useAutoMerge() {
     reset();
     setStage('checking');
     try {
-      const repoPath = (await git(currentPath, 'rev-parse', '--show-toplevel')).trim();
+      const repoPath = await repoTop(currentPath);
       if (!repoPath) return fail('Not a git repository');
       // The main worktree, so the remembered base is shared across worktrees.
-      const commonDir = (await git(repoPath, 'rev-parse', '--path-format=absolute', '--git-common-dir')).trim();
+      const commonDir = (await git(repoPath, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim();
       const repoRoot = commonDir.replace(/\/\.git\/?$/, '');
 
       const featureName = await currentBranch(repoPath);
@@ -122,7 +119,7 @@ export function useAutoMerge() {
       if (await mergeInProgress(repoPath)) return fail('A merge is already in progress here — finish or abort it first');
       if (await isDirty(repoPath)) return fail('Working tree has uncommitted changes — commit or stash them first');
 
-      const all = lines(await git(repoPath, 'for-each-ref', '--format=%(refname:short)', 'refs/heads'))
+      const all = (await gitLines(repoPath, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']))
         .filter(b => b !== featureName);
       if (all.length === 0) return fail('No other local branch to merge into');
       const ordered = [
@@ -158,9 +155,9 @@ export function useAutoMerge() {
     // Put things back the way they were, then report.
     const rollback = async (msg) => {
       if (await mergeInProgress(mergeDir).catch(() => false)) {
-        await git(mergeDir, 'merge', '--abort').catch(() => {});
+        await git(mergeDir, ['merge', '--abort']).catch(() => {});
       }
-      if (switched) await git(repoPath, 'switch', feature).catch(() => {});
+      if (switched) await git(repoPath, ['switch', feature]).catch(() => {});
       fail(msg);
     };
 
@@ -174,7 +171,7 @@ export function useAutoMerge() {
 
       // 1. Switch to the base branch.
       if (switchNeeded) {
-        await git(repoPath, 'switch', base);
+        await git(repoPath, ['switch', base]);
         switched = true;
         if (await currentBranch(repoPath) !== base) return rollback(`Could not switch to ${base}`);
       } else if (await currentBranch(mergeDir) !== base) {
@@ -184,10 +181,10 @@ export function useAutoMerge() {
       // 2. Merge.
       const ff = (await count(mergeDir, `${feature}..${base}`)) === 0;
       const output = ff
-        ? await git(mergeDir, 'merge', '--ff-only', feature)
-        : await git(mergeDir, 'merge', '--no-ff', '--no-edit', '-m', `Merge branch '${feature}' into ${base}`, feature);
+        ? await git(mergeDir, ['merge', '--ff-only', feature])
+        : await git(mergeDir, ['merge', '--no-ff', '--no-edit', '-m', `Merge branch '${feature}' into ${base}`, feature]);
 
-      const conflicted = lines(await git(mergeDir, 'diff', '--name-only', '--diff-filter=U'));
+      const conflicted = await gitLines(mergeDir, ['diff', '--name-only', '--diff-filter=U']);
       if (conflicted.length > 0 || await mergeInProgress(mergeDir)) {
         return rollback(`Merge conflict — aborted, nothing changed. Resolve in lazygit.\n\n${conflicted.join('\n') || output}`);
       }
@@ -202,7 +199,7 @@ export function useAutoMerge() {
       const notes = [];
       if (featureWorktree) {
         try {
-          await git(mergeDir, 'worktree', 'remove', featureWorktree);
+          await git(mergeDir, ['worktree', 'remove', featureWorktree]);
           notes.push(`Removed worktree ${featureWorktree}`);
         } catch (err) {
           notes.push(`Kept worktree ${featureWorktree}: ${err.toString().trim()}`);

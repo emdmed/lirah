@@ -5,6 +5,7 @@ import {
   RefreshCw, RotateCcw, SkipForward, Square, SquareTerminal, Trash2, Undo2,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { dirtyCount, gitLines, repoTop } from '../../lib/git';
 import { cn } from '../../lib/utils';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -48,8 +49,8 @@ const GIT_SETUP = 'git-setup';
 async function reviewOf(ranges) {
   const files = [];
   for (const r of ranges) {
-    const out = await invoke('run_git_command', { repoPath: r.path, args: ['show', '--name-only', '--format=', ...r.commits] });
-    for (const rel of new Set(out.split('\n').map((l) => l.trim()).filter(Boolean))) files.push(`${r.path}/${rel}`);
+    const rels = await gitLines(r.path, ['show', '--name-only', '--format=', ...r.commits]);
+    for (const rel of new Set(rels)) files.push(`${r.path}/${rel}`);
   }
   return { files, filePath: files[0], ranges };
 }
@@ -94,8 +95,7 @@ async function resolveRepoRoot(projectPath) {
   const home = await invoke('get_home_dir').catch(() => null);
   const owner = home ? await planWorktreeOwner(home, projectPath) : null;
   if (owner) return owner;
-  const out = await invoke('run_git_command', { repoPath: projectPath, args: ['rev-parse', '--show-toplevel'] });
-  return out.trim() || null;
+  return repoTop(projectPath);
 }
 
 function useRepoRoot(projectPath) {
@@ -251,9 +251,7 @@ export function PlansPane({ projectPath }) {
     // Changes already in the tree would be swept into the first chunk's commit.
     let dirty = 0;
     for (const repo of planGit(plan).repos) {
-      dirty += await invoke('run_git_command', { repoPath: workPath(repo), args: ['status', '--porcelain'] })
-        .then((out) => out.split('\n').filter((l) => l.trim()).length)
-        .catch(() => 0);
+      dirty += await dirtyCount(workPath(repo)).catch(() => 0);
     }
     const firstRun = !readFlag(AUTOPILOT_TIP_KEY);
     const ok = await confirm({

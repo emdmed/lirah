@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { currentBranch, dirtyCount, git, gitLines, worktreeAdd, worktreeRemove } from '../../lib/git';
 
 // How a plan handles git (plan.git): which repos it touches, the base branch
 // of each, one branch name for all of them, and whether it runs in worktrees
@@ -8,10 +9,6 @@ import { invoke } from '@tauri-apps/api/core';
 // Not under ~/.lirah/worktrees: agent jobs garbage-collect everything there.
 export const WORKTREES_DIR = '.lirah/plan-worktrees';
 const MARKER = '.lirah-plan.json';
-
-function git(repoPath, args) {
-  return invoke('run_git_command', { repoPath, args });
-}
 
 export const basename = (path) => path.replace(/\/+$/, '').split('/').pop() || path;
 
@@ -46,28 +43,13 @@ export function chunkCommitsByRepo(plan, chunk) {
   return chunk.commits?.length ? { [plan.repoRoot]: chunk.commits } : {};
 }
 
-export async function currentBranch(root) {
-  return (await git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim();
-}
-
-export async function listBranches(root) {
-  const out = await git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']);
-  return out.split('\n').map((l) => l.trim()).filter(Boolean);
-}
-
-/** The top of the git repo `path` is in, or null. */
-export async function repoTop(path) {
-  return (await git(path, ['rev-parse', '--show-toplevel']).catch(() => '')).trim() || null;
+export function listBranches(root) {
+  return gitLines(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']);
 }
 
 async function branchExists(root, branch) {
   // --quiet: a missing branch exits 1 with nothing on stderr, which comes back as ''.
   return !!(await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim();
-}
-
-async function dirtyCount(path) {
-  const out = await git(path, ['status', '--porcelain']);
-  return out.split('\n').filter((l) => l.trim()).length;
 }
 
 /** Folder of the plan's worktrees. */
@@ -123,10 +105,8 @@ export async function prepareGit(home, plan, save) {
       if (repo.prepared) continue;
       const path = `${dir}/${names[i]}`;
       try {
-        const args = (await branchExists(repo.root, branch))
-          ? ['worktree', 'add', path, branch]
-          : ['worktree', 'add', '-b', branch, path, repo.base || 'HEAD'];
-        await git(repo.root, args);
+        const create = !(await branchExists(repo.root, branch));
+        await worktreeAdd(repo.root, { path, branch, create, base: repo.base || 'HEAD' });
       } catch (e) {
         throw fail(repo, e);
       }
@@ -147,7 +127,7 @@ export async function prepareGit(home, plan, save) {
     if (repo.prepared) continue;
     if (branch) {
       try {
-        if ((await currentBranch(repo.root)) !== branch) {
+        if ((await currentBranch(repo.root).catch(() => '')) !== branch) {
           const dirty = await dirtyCount(repo.root);
           if (dirty) throw new Error(`${dirty} uncommitted change${dirty === 1 ? '' : 's'}; commit or stash them before switching to ${branch}`);
           const args = (await branchExists(repo.root, branch))
@@ -166,16 +146,15 @@ export async function prepareGit(home, plan, save) {
 }
 
 /** Remove the plan's worktrees and their folder. The branches stay. */
-export async function cleanupGit(home, plan) {
+export async function cleanupGit(plan) {
   const cfg = planGit(plan);
   // A setup that failed part-way may still have made some worktrees.
   if (!cfg.worktrees || !cfg.worktreesDir || cfg.removedAt) return;
   for (const repo of cfg.repos) {
     if (!repo.workPath || repo.workPath === repo.root) continue;
-    await git(repo.root, ['worktree', 'remove', '--force', repo.workPath]).catch(() => {});
-    await git(repo.root, ['worktree', 'prune']).catch(() => {});
+    await worktreeRemove(repo.root, repo.workPath).catch(() => {});
   }
-  await invoke('remove_plan_workdir', { path: cfg.worktreesDir || planWorktreesDir(home, plan) });
+  await invoke('remove_plan_workdir', { path: cfg.worktreesDir });
 }
 
 /** The repo whose plans a folder inside a plan's worktrees belongs to, or null. */
