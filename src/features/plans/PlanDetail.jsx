@@ -6,23 +6,25 @@ import { PanelButton } from '../../components/instrument/PanelButton';
 import { PlanGitSection } from './PlanGitSection';
 import { ProgressReadout, Prose } from './parts';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
+  AUTOPILOT_STATUS, CHUNK_STATUS, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import { AutopilotStrip } from './AutopilotStrip';
 import { ChunkRow } from './ChunkRow';
+import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
+import { usePlansActions } from './PlansContext';
+import { planGit } from './planGit';
+import { useTabManager } from '../tabs/TabContext';
 
-// The `busy` id while the whole plan's diff is being gathered.
-export const REVIEW_ALL = 'review-all';
-// The `busy` id while the git settings are being changed.
-export const GIT_SETUP = 'git-setup';
-
-export function PlanDetail({
-  plan, busy, onBack, onResplit, onDelete, onGitChange, onAddRepo, onRemoveRepo, onOpenWorkTab, onRemoveWorktrees, autopilotTabOpen, onAutopilot, onResumeAutopilot, onStopAutopilot,
-  onDismissAutopilot, onGoToTab, onReviewAll, onImplement, onCheck, onCommit, onReview, onRollback, onPatchChunk, onMoveChunk, onDeleteChunk,
-}) {
+export function PlanDetail({ plan }) {
+  const pane = usePlanPane();
+  const { repoRoot } = pane;
+  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot } = usePlansActions();
+  const { tabs, switchTab, addTab } = useTabManager();
+  const reviewingAll = useBusy(BUSY.REVIEW_ALL);
+  const settingUpGit = useBusy(BUSY.GIT_SETUP);
+  const resplit = () => runSplit(repoRoot, plan.id);
   const { done, total } = planProgress(plan);
   const nextId = nextChunkId(plan);
-  const piloted = isAutopilotLive(plan.autopilot);
   // Start offered when there is work left and no run to resume.
   const canPilot = plan.split === SPLIT_STATUS.DONE && (!plan.autopilot || plan.autopilot.status === AUTOPILOT_STATUS.DONE || plan.autopilot.status === AUTOPILOT_STATUS.OFF)
     && (!!nextId || plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS));
@@ -45,35 +47,35 @@ export function PlanDetail({
     <div className="flex flex-col">
       <div className="flex flex-col gap-2 px-3 pt-2 pb-2.5 edge-b-engraved">
         <div className="flex flex-wrap items-center gap-1.5">
-          <PanelButton icon={ChevronLeft} onClick={onBack} title="Back to all plans">plans</PanelButton>
+          <PanelButton icon={ChevronLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
           <PanelButton icon={FileText} latched={showSource} onClick={() => setShowSource((v) => !v)} title="Show the plan as it was pasted">
             source
           </PanelButton>
           {!started && plan.split !== SPLIT_STATUS.RUNNING && (
-            <PanelButton icon={RefreshCw} onClick={onResplit} title="Split the plan again (nothing has started yet)">
+            <PanelButton icon={RefreshCw} onClick={resplit} title="Split the plan again (nothing has started yet)">
               re-split
             </PanelButton>
           )}
-          <PanelButton icon={Trash2} onClick={onDelete} title="Delete this plan" aria-label="Delete this plan" className="ml-auto" />
+          <PanelButton icon={Trash2} onClick={() => pane.deletePlan(plan)} title="Delete this plan" aria-label="Delete this plan" className="ml-auto" />
         </div>
         <h3 className="text-xs font-medium leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
         {plan.autopilot && (
           <AutopilotStrip
             plan={plan}
-            tabOpen={autopilotTabOpen}
-            busy={busy === REVIEW_ALL}
-            onResume={onResumeAutopilot}
-            onStop={onStopAutopilot}
-            onDismiss={onDismissAutopilot}
-            onGoToTab={onGoToTab}
-            onReviewAll={onReviewAll}
+            tabOpen={tabs.some((t) => t.id === plan.autopilot?.tabId)}
+            busy={reviewingAll}
+            onResume={() => pane.resume(plan)}
+            onStop={() => stopAutopilot(repoRoot, plan.id)}
+            onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
+            onGoToTab={() => switchTab(plan.autopilot.tabId)}
+            onReviewAll={() => pane.reviewAll(plan)}
           />
         )}
         {canPilot && (
           <PanelButton
             icon={Plane}
-            onClick={onAutopilot}
+            onClick={() => pane.autopilot(plan)}
             className="self-start"
             title="Implement the remaining chunks one after another, unattended"
           >
@@ -83,12 +85,12 @@ export function PlanDetail({
         {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
         <PlanGitSection
           plan={plan}
-          busy={busy === GIT_SETUP}
-          onChange={onGitChange}
-          onAddRepo={onAddRepo}
-          onRemoveRepo={onRemoveRepo}
-          onOpenTab={onOpenWorkTab}
-          onRemoveWorktrees={onRemoveWorktrees}
+          busy={settingUpGit}
+          onChange={(patch) => setGitConfig(repoRoot, plan.id, patch)}
+          onAddRepo={(path) => pane.addRepo(plan, path)}
+          onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
+          onOpenTab={() => addTab(planGit(plan).workDir)}
+          onRemoveWorktrees={() => pane.removeWorktrees(plan)}
         />
       </div>
 
@@ -108,32 +110,12 @@ export function PlanDetail({
         <div className="flex flex-col items-start gap-1.5 px-3 py-2.5 text-[11px]">
           <span className="flex items-center gap-2 text-foreground"><Lamp state="fault" /> split failed</span>
           <span className="break-words text-[10px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
-          <PanelButton icon={RefreshCw} onClick={onResplit}>re-split</PanelButton>
+          <PanelButton icon={RefreshCw} onClick={resplit}>re-split</PanelButton>
         </div>
       )}
 
-      {plan.chunks.map((chunk, i) => (
-        <ChunkRow
-          key={chunk.id}
-          chunk={chunk}
-          isNext={chunk.id === nextId}
-          first={i === 0}
-          last={i === plan.chunks.length - 1}
-          open={open.has(chunk.id)}
-          busy={busy === chunk.id}
-          piloted={piloted}
-          pilotChunk={piloted && chunk.id === plan.autopilot.chunkId}
-          nudged={!!plan.autopilot?.nudged}
-          onToggle={() => toggle(chunk.id)}
-          onImplement={() => onImplement(chunk)}
-          onCheck={() => onCheck(chunk)}
-          onCommit={() => onCommit(chunk)}
-          onReview={() => onReview(chunk)}
-          onRollback={() => onRollback(chunk)}
-          onPatch={(patch) => onPatchChunk(chunk, patch)}
-          onMove={(delta) => onMoveChunk(chunk, delta)}
-          onDelete={() => onDeleteChunk(chunk)}
-        />
+      {plan.chunks.map((chunk) => (
+        <ChunkRow key={chunk.id} plan={plan} chunk={chunk} open={open.has(chunk.id)} onToggle={() => toggle(chunk.id)} />
       ))}
     </div>
   );

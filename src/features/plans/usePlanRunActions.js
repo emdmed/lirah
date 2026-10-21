@@ -7,6 +7,7 @@ import {
 } from './planModel';
 import { inWorkDir, planGit, workPath } from './planGit';
 import { subscribeAutopilotToggle, takeAutopilotToggle } from './plansPaneEvents';
+import { BUSY } from './PlanPaneContext';
 
 const AUTOPILOT_TIP_KEY = 'lirah:autopilot-tip-seen';
 
@@ -79,9 +80,9 @@ export function usePlanRunActions({
   }, [ensureGit, repoRoot, tabs, activeTabId, confirm, addTab, toast]);
 
   const handleImplement = useCallback(async (plan, chunk) => {
-    if (!(await withBusy(chunk.id, () => prepareFor(plan)))) return;
+    if (!(await withBusy(BUSY.chunk(chunk.id), () => prepareFor(plan)))) return;
     if (!(await confirmSend(plan, chunk))) return;
-    await withBusy(chunk.id, () => implementChunk(repoRoot, plan.id, chunk.id, activeTabId));
+    await withBusy(BUSY.chunk(chunk.id), () => implementChunk(repoRoot, plan.id, chunk.id, activeTabId));
   }, [activeTabId, confirmSend, prepareFor, withBusy, implementChunk, repoRoot]);
 
   const handleAutopilot = useCallback(async (plan) => {

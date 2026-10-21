@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { chunkReviewRanges, planReviewRanges, reviewOf } from './planGitOps';
 import { isMultiRepo } from './planGit';
-import { REVIEW_ALL } from './PlanDetail';
+import { BUSY } from './PlanPaneContext';
 
 // The repo and refs to diff the review's current file against.
 function reviewRange(review) {
@@ -20,7 +20,7 @@ export function usePlanReview({ repoRoot, plans, withBusy, prepareFor, sendFix, 
   const [notes, setNotes] = useState([]);
   const [sendingNotes, setSendingNotes] = useState(false);
 
-  const handleReview = useCallback((plan, chunk) => withBusy(chunk.id, async () => {
+  const handleReview = useCallback((plan, chunk) => withBusy(BUSY.chunk(chunk.id), async () => {
     const review = await reviewOf(chunkReviewRanges(plan, chunk));
     if (review.files.length === 0) throw new Error('That commit changed no files');
     setNotes([]);
@@ -29,7 +29,7 @@ export function usePlanReview({ repoRoot, plans, withBusy, prepareFor, sendFix, 
 
   // Everything the plan's chunks committed, as one diff: from before the first
   // chunk started to the last chunk's last commit, limited to their files.
-  const handleReviewAll = useCallback((plan) => withBusy(REVIEW_ALL, async () => {
+  const handleReviewAll = useCallback((plan) => withBusy(BUSY.REVIEW_ALL, async () => {
     const ranges = planReviewRanges(plan);
     if (ranges.length === 0) throw new Error('No committed chunks to review');
     const review = await reviewOf(ranges);

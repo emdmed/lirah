@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { errorMessage } from '../../lib/errorMessage';
 import { Plus } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
@@ -15,7 +15,8 @@ import { EmptyLine } from './parts';
 import { runRank, UNTITLED_PLAN } from './planModel';
 import { planGit, planWorktreeOwner } from './planGit';
 import { subscribePlanFocus, takePlanFocus } from './plansPaneEvents';
-import { GIT_SETUP, PlanDetail } from './PlanDetail';
+import { PlanDetail } from './PlanDetail';
+import { BUSY, PlanPaneProvider } from './PlanPaneContext';
 import { PlanRow } from './PlanRow';
 import { usePlanRunActions } from './usePlanRunActions';
 import { usePlanReview } from './usePlanReview';
@@ -53,18 +54,17 @@ function useRepoRoot(projectPath) {
 export function PlansPane({ projectPath }) {
   const { repoRoot, checked } = useRepoRoot(projectPath);
   const {
-    plans, createPlan, replaceSource, runSplit, deletePlan, updateChunk, moveChunk, deleteChunk, implementChunk,
-    checkChunk, commitChunk, rollbackChunk, sendFix, sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot,
-    dismissAutopilot, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees,
+    plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix,
+    sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees,
   } = usePlans(repoRoot);
   const { files, importFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
-  const { tabs, activeTabId, switchTab, addTab } = useTabManager();
+  const { tabs, activeTabId, addTab } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
 
   const [openPlanId, setOpenPlanId] = useState(null);
   const [newOpen, setNewOpen] = useState(false);
-  const [busy, setBusy] = useState(null); // chunk id (or REVIEW_ALL) with an action in flight
+  const [busy, setBusy] = useState(null); // the BUSY key of the action in flight
 
   const openPlan = plans?.find((p) => p.id === openPlanId) || null;
   useEffect(() => setOpenPlanId(null), [repoRoot]);
@@ -78,8 +78,8 @@ export function PlansPane({ projectPath }) {
     if (id) setOpenPlanId(id);
   }, [plans, focusSeq]);
 
-  const withBusy = useCallback(async (chunkId, fn) => {
-    setBusy(chunkId);
+  const withBusy = useCallback(async (key, fn) => {
+    setBusy(key);
     try {
       return await fn();
     } catch (e) {
@@ -106,7 +106,7 @@ export function PlansPane({ projectPath }) {
     }
   }, [createPlan, repoRoot, toast]);
 
-  const handleCheck = useCallback((plan, chunk) => withBusy(chunk.id, async () => {
+  const handleCheck = useCallback((plan, chunk) => withBusy(BUSY.chunk(chunk.id), async () => {
     const res = await checkChunk(repoRoot, plan.id, chunk.id);
     if (res.error) throw new Error(res.error);
     if (!res.found) toast.info(`No commit for chunk ${chunk.n} yet`);
@@ -120,7 +120,7 @@ export function PlansPane({ projectPath }) {
       destructive: false,
     });
     if (!ok) return;
-    await withBusy(chunk.id, async () => {
+    await withBusy(BUSY.chunk(chunk.id), async () => {
       const res = await commitChunk(repoRoot, plan.id, chunk.id);
       if (!res.found) throw new Error('Nothing was committed — are there any changes?');
     });
@@ -134,7 +134,7 @@ export function PlansPane({ projectPath }) {
       confirmLabel: 'Roll back',
     });
     if (!ok) return;
-    await withBusy(chunk.id, async () => {
+    await withBusy(BUSY.chunk(chunk.id), async () => {
       await rollbackChunk(repoRoot, plan.id, chunk.id);
       toast.success(`Chunk ${chunk.n} rolled back`);
     });
@@ -155,7 +155,7 @@ export function PlansPane({ projectPath }) {
     await deletePlan(repoRoot, plan.id);
   }, [confirm, deletePlan, repoRoot]);
 
-  const handleAddRepo = useCallback((plan, path) => withBusy(GIT_SETUP, () => addPlanRepo(repoRoot, plan.id, path)),
+  const handleAddRepo = useCallback((plan, path) => withBusy(BUSY.GIT_SETUP, () => addPlanRepo(repoRoot, plan.id, path)),
     [withBusy, addPlanRepo, repoRoot]);
 
   const handleRemoveWorktrees = useCallback(async (plan) => {
@@ -165,8 +165,26 @@ export function PlansPane({ projectPath }) {
       confirmLabel: 'Remove worktrees',
     });
     if (!ok) return;
-    await withBusy(GIT_SETUP, () => removeWorktrees(repoRoot, plan.id));
+    await withBusy(BUSY.GIT_SETUP, () => removeWorktrees(repoRoot, plan.id));
   }, [confirm, withBusy, removeWorktrees, repoRoot]);
+
+  const closePlan = useCallback(() => setOpenPlanId(null), []);
+  const paneActions = useMemo(() => ({
+    repoRoot,
+    closePlan,
+    implement: handleImplement,
+    check: handleCheck,
+    commit: handleCommit,
+    review: handleReview,
+    rollback: handleRollback,
+    autopilot: handleAutopilot,
+    resume: handleResume,
+    reviewAll: handleReviewAll,
+    deletePlan: handleDeletePlan,
+    addRepo: handleAddRepo,
+    removeWorktrees: handleRemoveWorktrees,
+  }), [repoRoot, closePlan, handleImplement, handleCheck, handleCommit, handleReview, handleRollback, handleAutopilot,
+    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees]);
 
   if (!projectPath || (checked && !repoRoot)) {
     return <EmptyLine hint="plans track commits, so they need a git repository">not a git repo</EmptyLine>;
@@ -178,33 +196,9 @@ export function PlansPane({ projectPath }) {
   return (
     <>
       {openPlan ? (
-        <PlanDetail
-          plan={openPlan}
-          busy={busy}
-          onBack={() => setOpenPlanId(null)}
-          onResplit={() => runSplit(repoRoot, openPlan.id)}
-          onDelete={() => handleDeletePlan(openPlan)}
-          onGitChange={(patch) => setGitConfig(repoRoot, openPlan.id, patch)}
-          onAddRepo={(path) => handleAddRepo(openPlan, path)}
-          onRemoveRepo={(root) => removePlanRepo(repoRoot, openPlan.id, root)}
-          onOpenWorkTab={() => addTab(planGit(openPlan).workDir)}
-          onRemoveWorktrees={() => handleRemoveWorktrees(openPlan)}
-          autopilotTabOpen={tabs.some((t) => t.id === openPlan.autopilot?.tabId)}
-          onAutopilot={() => handleAutopilot(openPlan)}
-          onResumeAutopilot={() => handleResume(openPlan)}
-          onStopAutopilot={() => stopAutopilot(repoRoot, openPlan.id)}
-          onDismissAutopilot={() => dismissAutopilot(repoRoot, openPlan.id)}
-          onReviewAll={() => handleReviewAll(openPlan)}
-          onGoToTab={() => switchTab(openPlan.autopilot.tabId)}
-          onImplement={(c) => handleImplement(openPlan, c)}
-          onCheck={(c) => handleCheck(openPlan, c)}
-          onCommit={(c) => handleCommit(openPlan, c)}
-          onReview={(c) => handleReview(openPlan, c)}
-          onRollback={(c) => handleRollback(openPlan, c)}
-          onPatchChunk={(c, patch) => updateChunk(repoRoot, openPlan.id, c.id, patch)}
-          onMoveChunk={(c, delta) => moveChunk(repoRoot, openPlan.id, c.id, delta)}
-          onDeleteChunk={(c) => deleteChunk(repoRoot, openPlan.id, c.id)}
-        />
+        <PlanPaneProvider busy={busy} actions={paneActions}>
+          <PlanDetail plan={openPlan} />
+        </PlanPaneProvider>
       ) : (
         <>
           <FoundPlansSection files={files} importFile={importFile} />

@@ -9,7 +9,9 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Field, Prose } from './parts';
-import { CHUNK_STATE, CHUNK_STATUS, effectiveChunkState } from './planModel';
+import { CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
+import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
+import { usePlansActions } from './PlansContext';
 
 const CHUNK_LAMP = {
   [CHUNK_STATE.NO_COMMIT]: { state: 'warn' },
@@ -40,10 +42,19 @@ const STATUS_NOTE = {
 };
 const statusNote = (chunk) => STATUS_NOTE[effectiveChunkState(chunk)] ?? null;
 
-export function ChunkRow({
-  chunk, isNext, first, last, open, busy, piloted, pilotChunk, nudged, onToggle, onImplement, onCheck, onCommit, onReview, onRollback, onPatch,
-  onMove, onDelete,
-}) {
+export function ChunkRow({ plan, chunk, open, onToggle }) {
+  const pane = usePlanPane();
+  const { repoRoot } = pane;
+  const { updateChunk, moveChunk, deleteChunk } = usePlansActions();
+  const busy = useBusy(BUSY.chunk(chunk.id));
+  const isNext = chunk.id === nextChunkId(plan);
+  const first = plan.chunks[0]?.id === chunk.id;
+  const last = plan.chunks.at(-1)?.id === chunk.id;
+  const piloted = isAutopilotLive(plan.autopilot);
+  const pilotChunk = piloted && chunk.id === plan.autopilot.chunkId;
+  const nudged = !!plan.autopilot?.nudged;
+  const onPatch = (patch) => updateChunk(repoRoot, plan.id, chunk.id, patch);
+  const onMove = (delta) => moveChunk(repoRoot, plan.id, chunk.id, delta);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: chunk.title, details: chunk.details });
   const lamp = chunkLamp(chunk);
@@ -172,14 +183,14 @@ export function ChunkRow({
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               {/* Auto-pilot does the sending, checking and committing while it runs. */}
               {startable && !piloted && (
-                <PanelButton icon={Play} onClick={onImplement} disabled={busy} title="Send this chunk to the tab's agent">
+                <PanelButton icon={Play} onClick={() => pane.implement(plan, chunk)} disabled={busy} title="Send this chunk to the tab's agent">
                   implement
                 </PanelButton>
               )}
               {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && (
                 <>
-                  <PanelButton icon={RefreshCw} onClick={onCheck} disabled={busy} title="Look for the chunk's commit">check</PanelButton>
-                  <PanelButton icon={GitCommit} onClick={onCommit} disabled={busy} title="Commit all changes as this chunk">
+                  <PanelButton icon={RefreshCw} onClick={() => pane.check(plan, chunk)} disabled={busy} title="Look for the chunk's commit">check</PanelButton>
+                  <PanelButton icon={GitCommit} onClick={() => pane.commit(plan, chunk)} disabled={busy} title="Commit all changes as this chunk">
                     commit
                   </PanelButton>
                   <PanelButton icon={Undo2} onClick={() => onPatch({ status: CHUNK_STATUS.PENDING, needsCommit: false })} disabled={busy} title="Back to pending (changes are kept)">
@@ -189,10 +200,10 @@ export function ChunkRow({
               )}
               {chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.commits?.length > 0 && (
                 <>
-                  <PanelButton icon={Eye} onClick={onReview} disabled={busy} title="Review the chunk's diff; notes go back to the agent">
+                  <PanelButton icon={Eye} onClick={() => pane.review(plan, chunk)} disabled={busy} title="Review the chunk's diff; notes go back to the agent">
                     review
                   </PanelButton>
-                  <PanelButton icon={RotateCcw} onClick={onRollback} disabled={busy} title="git revert the chunk's commits">
+                  <PanelButton icon={RotateCcw} onClick={() => pane.rollback(plan, chunk)} disabled={busy} title="git revert the chunk's commits">
                     roll back
                   </PanelButton>
                 </>
@@ -212,7 +223,7 @@ export function ChunkRow({
                   <PanelButton icon={Pencil} onClick={startEdit} title="Edit chunk" aria-label="Edit chunk" />
                   <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" />
                   <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" />
-                  <PanelButton icon={Trash2} onClick={onDelete} title="Delete chunk" aria-label="Delete chunk" />
+                  <PanelButton icon={Trash2} onClick={() => deleteChunk(repoRoot, plan.id, chunk.id)} title="Delete chunk" aria-label="Delete chunk" />
                 </span>
               )}
             </div>
