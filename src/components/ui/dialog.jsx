@@ -38,7 +38,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60",
+        "fixed inset-0 z-50 bg-black/60",
         className
       )}
       {...props} />
@@ -54,10 +54,11 @@ function DialogContent({
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay className={instant ? "!animate-none !duration-0" : overlayClassName} />
+      <DialogOverlay className={instant ? "!animate-none" : overlayClassName} />
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <DialogPrimitive.Content
           data-slot="dialog-content"
+          data-instant={instant || undefined}
           className={cn(
             "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono",
             className

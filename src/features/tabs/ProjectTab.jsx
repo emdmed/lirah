@@ -121,7 +121,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   if (isActive && !booted) setBooted(true);
 
   return (
-    <div style={style} aria-hidden={!isActive}>
+    <div style={style} aria-hidden={!isActive} data-tab-pane data-tab-active={isActive || undefined}>
       {booted && (
         <FileSelectionProvider>
           <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} availableUpdate={availableUpdate} />
@@ -928,7 +928,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               onCreatePatterns={patterns.createPatterns}
               promptPreview={promptPreview}
               promptPreviewOpen={promptPreviewOpen}
-              onTogglePromptPreview={togglePromptPreview}
               onClearPromptSection={handleClearPromptSection}
               onRemoveFile={fileSelection.removeFileFromSelection}
               onRemoveElement={elementPicker.removeElement}

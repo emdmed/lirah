@@ -30,11 +30,11 @@ export function ToastContainer() {
 
   return (
     <div
-      className="fixed left-0 right-0 bottom-0 z-[100] flex items-center gap-2 h-8 px-2 text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
+      className="ins-line-enter fixed left-0 right-0 bottom-0 z-[100] flex items-center gap-2 h-8 px-2 text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
       role="alert"
     >
       <span className="shrink-0" style={{ color }}>{MARKS[toast.type] || MARKS.info}</span>
-      <span className="truncate min-w-0" style={toast.type === 'error' ? { color } : undefined}>
+      <span key={toast.id} className="ins-text-swap truncate min-w-0" style={toast.type === 'error' ? { color } : undefined}>
         {toast.message}
       </span>
       {queued > 0 && <span className="shrink-0 text-muted-foreground">+{queued}</span>}

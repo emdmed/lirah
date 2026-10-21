@@ -4,21 +4,23 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { CompactProjectButton } from "../../features/compact";
 import { FileGroupsMenuItems } from "../../features/file-groups";
 import { KeyChord } from "../instrument/Keycap";
 
-// Project-wide actions behind one menu, and the project's context sets
-// (saved context) behind another. A running compact surfaces as a live
-// badge beside them, since that state must stay visible.
+// Project-wide actions and the project's context sets (saved context) behind
+// one menu. A running compact surfaces as a live badge beside it, since that
+// state must stay visible.
 export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileCount }) {
   return (
     <div className="flex items-center gap-0.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="xs" className="gap-1 px-1.5" aria-label="Project actions">
+          <Button variant="ghost" size="xs" className="gap-1 px-1.5" aria-label="Project actions and context sets">
             project
             <ChevronDown className="h-3 w-3" />
           </Button>
@@ -33,22 +35,13 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
             Compact project
             <KeyChord keys={["^", "⇧", "P"]} size="sm" className="ml-auto" />
           </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="gap-1 px-1.5"
-            aria-label="Context sets"
-            title="Context sets: saved context for this project. Replace or add to the current context."
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel
+            className="text-[10px] font-normal uppercase tracking-wider text-muted-foreground"
+            title="Saved context for this project. Replace or add to the current context."
           >
-            sets
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" className="w-56 text-xs">
+            Context sets
+          </DropdownMenuLabel>
           <FileGroupsMenuItems
             projectPath={projectPath}
             onLoadGroup={onLoadGroup}

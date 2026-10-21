@@ -12,7 +12,10 @@ const SEGMENT = "h-4 px-1 gap-1 text-[10px] font-mono font-normal before:content
  * its lamp: the state it names is live in the next send.
  */
 export function ModeSegment({ as, lit = false, lamp, pressed, label, onClick, className, children, ...rest }) {
-  const lampEl = <Lamp state={lamp ?? (lit ? 'on' : 'off')} />;
+  // Only a lit lamp is drawn: on a line of text, a row of dark lenses is
+  // noise, and the dimmed label already says "off".
+  const lampState = lamp ?? (lit ? 'on' : 'off');
+  const lampEl = lampState === 'off' ? null : <Lamp state={lampState} />;
   const tone = lit ? "text-foreground" : "text-muted-foreground";
   if (as === 'span' || !onClick) {
     return (

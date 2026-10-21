@@ -17,7 +17,7 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar, secon
               // repaints its whole UI. useAutoGrow sets --grow-overlay.
               <div
                 data-grow-overlay
-                className="flex-shrink-0 relative z-10 bg-[var(--ins-gutter)] mt-[calc(var(--grow-overlay,0px)*-1)]"
+                className="ins-pane-enter flex-shrink-0 relative z-10 bg-[var(--ins-gutter)] mt-[calc(var(--grow-overlay,0px)*-1)]"
               >
                 {textarea}
               </div>

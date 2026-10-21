@@ -139,6 +139,19 @@
   --legend-tracking: 0.04em;
   /* Slow, even easing for colour changes on hover and focus. */
   --ins-ease: cubic-bezier(0.333, 0, 0.667, 1);
+  /* Motion. Arrivals decelerate hard (an exponential ease-out) and leave
+     faster than they came. Lit state follows a filament: it warms up quickly
+     and cools down slowly, so focus and status changes read as one physics. */
+  --ins-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ins-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ins-dur-quick: 120ms;
+  --ins-dur-base: 180ms;
+  --ins-dur-enter: 240ms;
+  --ins-warm: 140ms;
+  --ins-cool: 360ms;
+  /* How far floating surfaces travel on entry; reduced motion zeroes it. */
+  --ins-shift: 6px;
+  --ins-settle: 0.985;
 
   /* Historical aliases, remapped so existing users pick up the material. */
   --tui-line: var(--ins-edge);
@@ -445,7 +458,7 @@ body {
     border: 1px solid transparent;
     pointer-events: none;
     z-index: 5;
-    transition: border-color 200ms var(--ins-ease);
+    transition: border-color var(--ins-cool) var(--ins-ease);
   }
 
   .tui-pane::before {
@@ -481,6 +494,16 @@ body {
   .tui-pane:focus-within::after,
   .tui-pane.terminal-live::after {
     border-color: var(--ins-edge-focus);
+    transition-duration: var(--ins-warm);
+  }
+
+  /* The legend follows the frame: warms with focus, cools after it. */
+  .tui-pane > .ins-pane-legend :is(.ins-legend, .ins-cap) {
+    transition: color var(--ins-cool) var(--ins-ease), border-color var(--ins-cool) var(--ins-ease);
+  }
+
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-legend, .ins-cap) {
+    transition-duration: var(--ins-warm);
   }
 
   .tui-pane:focus-within > .ins-pane-legend .ins-legend,
@@ -510,6 +533,7 @@ body {
     --lamp-c: var(--ins-lamp);
     background: var(--lamp-c);
     box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 70%, transparent);
+    transition-duration: var(--ins-warm);
   }
 
   .tui-pane-info {
@@ -886,6 +910,8 @@ body {
     border-radius: 9999px;
     background: var(--ins-lamp-off);
     box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
+    /* Cooling: the glow lingers a moment after the lamp goes out. */
+    transition: background-color var(--ins-cool) var(--ins-ease-out), box-shadow var(--ins-cool) var(--ins-ease-out);
   }
 
   .ins-lamp[data-state="on"]    { --lamp-c: var(--ins-lamp); }
@@ -896,6 +922,7 @@ body {
   .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]) {
     background: var(--lamp-c);
     box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 70%, transparent);
+    transition-duration: var(--ins-warm);
   }
 
   :root[data-theme="light"] .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]) {
@@ -1026,6 +1053,9 @@ body {
     bottom: 0;
     height: 3px;
     background: var(--color-foreground);
+    /* Width is safe here: the fill is absolutely positioned, so nothing
+       around it reflows; it glides in step with the needle. */
+    transition: width var(--ins-dur-enter) var(--ins-ease-out), background-color var(--ins-dur-base) var(--ins-ease);
   }
 
   .ins-meter[data-level="warn"] .ins-meter-fill { background: var(--ins-warn); }
@@ -1044,7 +1074,7 @@ body {
     border-left: 3px solid transparent;
     border-right: 3px solid transparent;
     border-top: 4px solid var(--ins-lamp);
-    transition: left 120ms ease-out;
+    transition: left var(--ins-dur-enter) var(--ins-ease-out), border-top-color var(--ins-dur-base) var(--ins-ease);
   }
 
   .ins-meter[data-size="lg"] { gap: 8px; }
@@ -1105,7 +1135,7 @@ body {
     border-radius: 9999px;
     background: var(--ins-lamp-off);
     box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
-    transition: left 100ms ease-out, background-color 100ms ease-out;
+    transition: left var(--ins-dur-base) var(--ins-ease-out), background-color var(--ins-dur-base) var(--ins-ease), box-shadow var(--ins-dur-base) var(--ins-ease);
   }
 
   .ins-switch[aria-checked="true"] .ins-switch-knob {
@@ -1200,7 +1230,120 @@ body {
     background: color-mix(in srgb, var(--ins-lamp) 55%, var(--ins-lamp-off));
   }
   .ins-meter-needle,
+  .ins-meter-fill,
   .ins-meter-zone,
   .ins-switch-knob,
   .ins-key { transition: none; }
+}
+
+/*
+  Surfaces in motion. Everything that floats over the app arrives from where
+  it is anchored, decelerating, and leaves faster than it came. Radix holds
+  closing content until its exit animation ends, so exits are real; surfaces
+  React simply unmounts leave at once, which a keyboard tool wants anyway.
+  Only opacity and transform move, so nothing here touches layout or makes the
+  terminal resize.
+*/
+@keyframes ins-fade-in  { from { opacity: 0; } }
+@keyframes ins-fade-out { to   { opacity: 0; } }
+
+/* Rise into place from just below, settling the last pixel slowly. */
+@keyframes ins-rise-in {
+  from { opacity: 0; transform: translateY(var(--ins-shift)) scale(var(--ins-settle)); }
+}
+@keyframes ins-rise-out {
+  to { opacity: 0; transform: translateY(calc(var(--ins-shift) / 2)); }
+}
+
+/* Pop out of an anchor: --pop-x/--pop-y point back at the trigger. */
+@keyframes ins-pop-in {
+  from { opacity: 0; transform: translate(var(--pop-x, 0), var(--pop-y, 0)); }
+}
+
+/* A status line sliding up out of the window's bottom edge. */
+@keyframes ins-line-in {
+  from { opacity: 0; transform: translateY(100%); }
+}
+
+/* Sheets slide in from their edge. */
+@keyframes ins-sheet-in {
+  from { opacity: 0; transform: translate(var(--sheet-x, 0), var(--sheet-y, 0)); }
+}
+@keyframes ins-sheet-out {
+  to { opacity: 0; transform: translate(var(--sheet-x, 0), var(--sheet-y, 0)); }
+}
+
+/* Dialogs: the scrim fades, the pane rises. */
+[data-slot="dialog-overlay"][data-state="open"],
+[data-slot="sheet-overlay"][data-state="open"] {
+  animation: ins-fade-in var(--ins-dur-base) var(--ins-ease-out);
+}
+[data-slot="dialog-overlay"][data-state="closed"],
+[data-slot="sheet-overlay"][data-state="closed"] {
+  animation: ins-fade-out var(--ins-dur-quick) var(--ins-ease-exit);
+}
+[data-slot="dialog-content"][data-state="open"]:not([data-instant]) {
+  animation: ins-rise-in var(--ins-dur-enter) var(--ins-ease-out);
+}
+[data-slot="dialog-content"][data-state="closed"]:not([data-instant]) {
+  animation: ins-rise-out var(--ins-dur-quick) var(--ins-ease-exit);
+}
+
+/* Menus and tooltips pop from their trigger. A tooltip that opens instantly
+   (the pointer sliding along a toolbar) just appears, so a row of hints never
+   strobes. */
+.ins-pop[data-side="bottom"] { --pop-y: calc(var(--ins-shift) * -1); }
+.ins-pop[data-side="top"]    { --pop-y: var(--ins-shift); }
+.ins-pop[data-side="right"]  { --pop-x: calc(var(--ins-shift) * -1); }
+.ins-pop[data-side="left"]   { --pop-x: var(--ins-shift); }
+
+.ins-pop:is([data-state="open"], [data-state="delayed-open"]) {
+  animation: ins-pop-in var(--ins-dur-base) var(--ins-ease-out);
+}
+.ins-pop[data-state="closed"] {
+  animation: ins-fade-out var(--ins-dur-quick) var(--ins-ease-exit);
+}
+
+[data-slot="sheet-content"][data-side="right"]  { --sheet-x: 24px; }
+[data-slot="sheet-content"][data-side="left"]   { --sheet-x: -24px; }
+[data-slot="sheet-content"][data-side="top"]    { --sheet-y: -24px; }
+[data-slot="sheet-content"][data-side="bottom"] { --sheet-y: 24px; }
+[data-slot="sheet-content"][data-state="open"] {
+  animation: ins-sheet-in var(--ins-dur-enter) var(--ins-ease-out);
+}
+[data-slot="sheet-content"][data-state="closed"] {
+  animation: ins-sheet-out var(--ins-dur-base) var(--ins-ease-exit);
+}
+
+/* Bottom lines (message line, command line) rise out of the window edge;
+   a new message replacing the current one cross-fades its text only. */
+.ins-line-enter {
+  animation: ins-line-in var(--ins-dur-base) var(--ins-ease-out);
+}
+.ins-text-swap {
+  animation: ins-fade-in var(--ins-dur-base) var(--ins-ease-out);
+}
+
+/* A floating pane above a line (palette suggestions) rises after it. */
+.ins-rise-enter {
+  animation: ins-rise-in var(--ins-dur-base) var(--ins-ease-out);
+}
+
+/* Panes that mount into the workspace (the prompt, a second terminal) fade
+   in place; the space they take is claimed at once, so the terminal resizes
+   a single time. */
+.ins-pane-enter {
+  animation: ins-fade-in var(--ins-dur-enter) var(--ins-ease-out);
+}
+
+/* Switching tabs: the incoming workspace fades up over the gutter. */
+[data-tab-pane][data-tab-active] {
+  animation: ins-fade-in var(--ins-dur-base) var(--ins-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Fewer, gentler: nothing travels, but fades that confirm a change stay. */
+  :root { --ins-shift: 0px; --ins-settle: 1; }
+  [data-slot="sheet-content"] { --sheet-x: 0px; --sheet-y: 0px; }
+  .ins-line-enter { animation-name: ins-fade-in; }
 }

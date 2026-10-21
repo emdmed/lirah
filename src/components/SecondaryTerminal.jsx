@@ -65,7 +65,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     <div
       data-title="terminal 2"
       data-legend
-      className={`tui-pane tui-pane-screen terminal-wrapper ${isFocused
+      className={`ins-pane-enter tui-pane tui-pane-screen terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
         }`}

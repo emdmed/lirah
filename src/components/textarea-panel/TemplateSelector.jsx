@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Check, Settings, X, ScrollText } from "lucide-react";
+import { Check, Settings, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -85,13 +85,13 @@ export function TemplateSelector({
       <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button
-            variant={selectedTemplateId ? "default" : "ghost"}
+            variant="ghost"
             size="xs"
+            data-lit={activeParts.length > 0 || undefined}
             aria-label={`Instructions (Alt+Alt)${activeParts.length ? `: ${activeParts.join(', ')}` : ''}`}
             title={triggerTitle}
-            className={`gap-1 px-1.5 ${patternCount > 0 && !selectedTemplateId ? 'text-[var(--ins-lamp)]' : ''}`}
+            className="px-1.5"
           >
-            <ScrollText className="h-3 w-3" />
             instructions{patternCount > 0 && <span className="tube">:{patternCount}</span>}
           </Button>
         </DropdownMenuTrigger>

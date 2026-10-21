@@ -4,17 +4,16 @@ import { LinkedReposIndicator } from "./LinkedReposIndicator";
 import { ElementsTooltipContent } from "./ElementsTooltipContent";
 
 /**
- * One row naming everything the next send carries besides the typed text:
- * `ctx 3 · instr Review +2 · elements 4 × · repos 1 × · compacted × · keep`.
- * Each segment is the control for its own state.
+ * The context half of the line under the prompt: everything the next send
+ * carries besides the typed text and its instructions:
+ * `ctx 3 · elements 4 × · repos 1 × · compacted × · keep`.
+ * Each segment is the control for its own state. Instructions have their own
+ * key beside this line, so they are not repeated here.
  */
 export function PromptModeLine({
   fileCount = 0,
   chipsOpen = false,
   onToggleChips,
-  templateTitle = null,
-  patternCount = 0,
-  onOpenInstructions,
   elementCount = 0,
   selectedElements,
   currentPath,
@@ -27,11 +26,6 @@ export function PromptModeLine({
   keepFilesAfterSend = false,
   onToggleKeepFiles,
 }) {
-  const hasInstructions = !!templateTitle || patternCount > 0;
-  const instrText = templateTitle
-    ? `${templateTitle}${patternCount > 0 ? ` +${patternCount}` : ''}`
-    : patternCount > 0 ? `${patternCount} pattern${patternCount !== 1 ? 's' : ''}` : 'none';
-
   return (
     <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 min-w-0" role="group" aria-label="Prompt context">
       <ModeSegment
@@ -44,15 +38,6 @@ export function PromptModeLine({
         ctx <span className={fileCount > 0 ? 'tube' : 'tube-idle'}>{fileCount}</span>
       </ModeSegment>
 
-      <ModeSep />
-      <ModeSegment
-        lit={hasInstructions}
-        onClick={onOpenInstructions}
-        label={`Instructions: ${instrText}${onOpenInstructions ? '. Change' : ''}`}
-        title={patternCount > 0 && templateTitle ? `${templateTitle} plus ${patternCount} pattern${patternCount !== 1 ? 's' : ''}` : undefined}
-      >
-        instr <span className="max-w-[16ch] truncate">{instrText}</span>
-      </ModeSegment>
 
       {elementCount > 0 && (
         <>

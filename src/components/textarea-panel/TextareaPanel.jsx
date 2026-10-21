@@ -13,11 +13,8 @@ import { basename } from "../../utils/pathUtils";
 import { CompactedIndicator } from "./CompactedIndicator";
 import { TextareaArea } from "./TextareaArea";
 import { PromptPreview } from "./PromptPreview";
-import { Button } from "../ui/button";
 import { PaneInfo } from "../PaneInfo";
 import { PaneLegend } from "../instrument/PaneLegend";
-import { ScrollText } from "lucide-react";
-import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { useSeededSetting } from "../../features/settings/settingsStore";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
@@ -74,13 +71,11 @@ export function TextareaPanel({
   onCreatePatterns,
   promptPreview: promptPreviewBase,
   promptPreviewOpen = false,
-  onTogglePromptPreview,
   onClearPromptSection,
   onRemoveFile,
   onRemoveElement,
   keepFilesAfterSend = false,
   onToggleKeepFiles,
-  onOpenInstructions,
 }) {
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
@@ -198,16 +193,6 @@ export function TextareaPanel({
     setChipsOpen((prev) => !prev);
   }, [setChipsOpen]);
 
-  const templateTitle = useMemo(() => {
-    const section = promptPreviewBase?.sections?.find((s) => s.id === 'template');
-    return section ? section.label.replace(/^TEMPLATE · /, '') : null;
-  }, [promptPreviewBase]);
-
-  const openInstructions = useMemo(() => (
-    onOpenInstructions
-      || (onTemplateDropdownOpenChange ? () => onTemplateDropdownOpenChange(true) : undefined)
-  ), [onOpenInstructions, onTemplateDropdownOpenChange]);
-
   const clearElements = useCallback(() => onClearPromptSection?.('elements'), [onClearPromptSection]);
   const clearRepos = useCallback(() => onClearPromptSection?.('repos'), [onClearPromptSection]);
   const openCompacted = useCallback(() => setCompactDialogOpen(true), []);
@@ -219,9 +204,6 @@ export function TextareaPanel({
       fileCount={fileArray.length}
       chipsOpen={chipsOpen}
       onToggleChips={toggleChips}
-      templateTitle={templateTitle}
-      patternCount={selectedPatterns?.size ?? 0}
-      onOpenInstructions={openInstructions}
       elementCount={elementCount}
       selectedElements={selectedElements}
       currentPath={currentPath}
@@ -235,7 +217,7 @@ export function TextareaPanel({
       onToggleKeepFiles={onToggleKeepFiles}
     />
   ), [
-    fileArray.length, chipsOpen, toggleChips, templateTitle, selectedPatterns, openInstructions,
+    fileArray.length, chipsOpen, toggleChips,
     elementCount, selectedElements, currentPath, onClearPromptSection, clearElements, onClearElements,
     linkedRepos, clearRepos, compactedProject, openCompacted, onClearCompactedProject,
     keepFilesAfterSend, onToggleKeepFiles,
@@ -338,40 +320,20 @@ export function TextareaPanel({
     </Suspense>
   ), [compactedProject, compactDialogOpen, onUpdateCompactedProject]);
 
-  // The typed text adds one part, so the count is known without building the preview.
-  const partCount = (promptPreviewBase?.sections?.length ?? 0) + (hasText ? 1 : 0);
 
+  // One line under the input: what the send carries (context, instructions)
+  // on the left, then the project menu. Send sits on the right edge
+  // (TextareaArea). It wraps rather than clipping in a narrow pane. The
+  // payload preview has no button: Ctrl+Shift+E or the `preview` command.
   const toolbarRow = useMemo(() => (
-    <div className="flex items-center gap-2 flex-nowrap">
-      {/* Every control carries its own label, so the two banks (project,
-          prompt) are split by space rather than a rule or a name. */}
-      {projectZone}
-      <div className="ml-2 flex items-center gap-2">{promptZone}</div>
-      {onTogglePromptPreview && (
-        <div className="flex items-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="gap-1 px-1.5"
-                aria-pressed={promptPreviewOpen}
-                onClick={onTogglePromptPreview}
-                aria-expanded={promptPreviewOpen}
-                aria-label={promptPreviewOpen ? "Hide what will be sent" : "Show what will be sent"}
-              >
-                <ScrollText className="h-3 w-3" />
-                preview{partCount > 0 && !promptPreviewOpen && <span className="tube ml-1">{partCount}</span>}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {promptPreviewOpen ? 'Hide' : 'Show'} what will be sent (Ctrl+Shift+E)
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      )}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {modeLine}
+      <div className="flex items-center gap-1">
+        {promptZone}
+        {projectZone}
+      </div>
     </div>
-  ), [projectZone, promptZone, onTogglePromptPreview, promptPreviewOpen, partCount]);
+  ), [modeLine, projectZone, promptZone]);
 
   const textareaArea = (
     <TextareaArea
@@ -411,7 +373,6 @@ export function TextareaPanel({
           itemsBySection={previewItems}
         />
       )}
-      {modeLine}
       {contextChips}
       {textareaArea}
       <PaneInfo>
