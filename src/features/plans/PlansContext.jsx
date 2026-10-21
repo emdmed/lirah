@@ -9,6 +9,10 @@ import { getTabSession } from '../tabs/terminalActivity';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
 import {
+  basename, chunkBases, chunkCommitsByRepo, cleanupGit, currentBranch, defaultBranch, planGit, prepareGit, repoTop,
+  workPath,
+} from './planGit';
+import {
   buildChunkPrompt,
   buildFixPrompt,
   buildNudgePrompt,
@@ -26,6 +30,10 @@ import {
 // never inside the repo itself. Chunks are implemented by the tab's live agent,
 // one commit each (found again by its Plan-Chunk trailer), so review is that
 // commit's diff and rollback is `git revert`.
+//
+// A plan's git settings (plan.git, see planGit.js) can add more repos, a
+// branch for the plan and worktrees; chunks are then checked, committed and
+// rolled back in every repo, each keyed by its root.
 //
 // Auto-pilot (plan.autopilot) chains the chunks in one tab: each Stop with the
 // chunk's commit sends the next one. It stops to notify you when the plan is
@@ -99,8 +107,10 @@ function newChunks(chunks) {
     ...c,
     status: 'pending',
     tabId: null,
-    baseSha: null,
-    commits: [],
+    baseSha: null, // the primary repo's; baseShas has every repo's
+    baseShas: {},
+    commits: [], // every repo's, in order; commitsByRepo splits them by repo root
+    commitsByRepo: {},
     revertShas: [],
     needsCommit: false,
     awaitingFix: false,
@@ -194,17 +204,26 @@ export function PlansProvider({ children }) {
   // not found while in progress → the agent stopped without committing.
   const checkChunk = useCallback(async (repoRoot, planId, chunkId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
-    if (!plan || !chunk?.baseSha || checkingRef.current.has(chunkId)) return { found: false };
+    const bases = plan && chunk ? chunkBases(plan, chunk) : {};
+    if (!plan || Object.keys(bases).length === 0 || checkingRef.current.has(chunkId)) return { found: false };
     checkingRef.current.add(chunkId);
     try {
-      const out = await git(repoRoot, [
-        'log', `${chunk.baseSha}..HEAD`, '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
-      ]);
-      const commits = out.split('\n').map((l) => l.trim()).filter(Boolean).reverse();
+      const commitsByRepo = {};
+      for (const repo of planGit(plan).repos) {
+        const base = bases[repo.root];
+        if (!base) continue;
+        const out = await git(workPath(repo), [
+          'log', `${base}..HEAD`, '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
+        ]);
+        const shas = out.split('\n').map((l) => l.trim()).filter(Boolean).reverse();
+        if (shas.length > 0) commitsByRepo[repo.root] = shas;
+      }
+      const commits = Object.values(commitsByRepo).flat();
       if (commits.length > 0) {
         updateChunk(repoRoot, planId, chunkId, {
           status: 'implemented',
           commits,
+          commitsByRepo,
           needsCommit: false,
           awaitingFix: false,
           doneAt: chunk.status === 'implemented' ? chunk.doneAt : Date.now(),
@@ -233,9 +252,14 @@ export function PlansProvider({ children }) {
       const result = parseSplitResult(out);
       updatePlan(repoRoot, planId, (p) => {
         const title = p.title || result.title || 'Untitled plan';
+        const slug = slugify(title);
+        // The branch follows the title until you name it yourself.
+        const gitCfg = p.git && !p.git.preparedAt && p.git.branch === defaultBranch(p.slug)
+          ? { ...p.git, branch: defaultBranch(slug) } : p.git;
         return {
           title,
-          slug: slugify(title),
+          slug,
+          git: gitCfg,
           summary: result.summary,
           chunks: newChunks(result.chunks),
           split: 'done',
@@ -292,9 +316,10 @@ export function PlansProvider({ children }) {
   const createPlan = useCallback(async (repoRoot, { source, importedFrom = null }) => {
     await loadRepo(repoRoot);
     const title = markdownTitle(source);
+    const slug = slugify(title);
     const plan = {
       id: shortId('p'),
-      slug: slugify(title),
+      slug,
       title: title || '',
       summary: '',
       repoRoot,
@@ -303,6 +328,13 @@ export function PlansProvider({ children }) {
       split: 'running',
       splitError: null,
       chunks: [],
+      git: {
+        worktrees: false,
+        branch: defaultBranch(slug),
+        repos: [{ root: repoRoot, base: await currentBranch(repoRoot), workPath: null, prepared: false }],
+        workDir: null,
+        preparedAt: null,
+      },
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -317,9 +349,54 @@ export function PlansProvider({ children }) {
     runSplit(repoRoot, planId);
   }, [updatePlan, runSplit]);
 
-  const deletePlan = useCallback((repoRoot, planId) => {
+  // Its worktrees go with it (uncommitted work in them too); branches stay.
+  const deletePlan = useCallback(async (repoRoot, planId) => {
+    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    if (plan) await cleanupGit(await getHome(), plan).catch((e) => toast.error(`Worktrees not removed: ${e?.message || e}`));
     mutate(repoRoot, (plans) => plans.filter((p) => p.id !== planId));
-  }, [mutate]);
+  }, [mutate, getHome, toast]);
+
+  // --- Git settings ---
+
+  // Editable until the first chunk is sent.
+  const setGitConfig = useCallback((repoRoot, planId, patch) => {
+    updatePlan(repoRoot, planId, (p) => {
+      const cfg = planGit(p);
+      if (cfg.preparedAt) return {};
+      return { git: { ...cfg, ...(typeof patch === 'function' ? patch(cfg) : patch) } };
+    });
+  }, [updatePlan]);
+
+  const addPlanRepo = useCallback(async (repoRoot, planId, path) => {
+    const root = await repoTop(path);
+    if (!root) throw new Error(`${basename(path)} is not a git repository`);
+    const base = await currentBranch(root);
+    setGitConfig(repoRoot, planId, (cfg) => (cfg.repos.some((r) => r.root === root) ? {} : {
+      repos: [...cfg.repos, { root, base, workPath: null, prepared: false }],
+    }));
+  }, [setGitConfig]);
+
+  const removePlanRepo = useCallback((repoRoot, planId, root) => {
+    if (root === repoRoot) return; // The primary repo holds the plan.
+    setGitConfig(repoRoot, planId, (cfg) => ({ repos: cfg.repos.filter((r) => r.root !== root) }));
+  }, [setGitConfig]);
+
+  // Branches and worktrees, made once before the first chunk goes out.
+  const ensureGit = useCallback(async (repoRoot, planId) => {
+    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    if (!plan) throw new Error('Plan not found');
+    const cfg = planGit(plan);
+    if (cfg.preparedAt) return cfg;
+    const save = (git) => updatePlan(repoRoot, planId, { git });
+    return prepareGit(await getHome(), plan, save);
+  }, [updatePlan, getHome]);
+
+  const removeWorktrees = useCallback(async (repoRoot, planId) => {
+    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    if (!plan) return;
+    await cleanupGit(await getHome(), plan);
+    updatePlan(repoRoot, planId, (p) => ({ git: { ...planGit(p), removedAt: Date.now() } }));
+  }, [getHome, updatePlan]);
 
   const moveChunk = useCallback((repoRoot, planId, chunkId, delta) => {
     updatePlan(repoRoot, planId, (p) => {
@@ -343,22 +420,30 @@ export function PlansProvider({ children }) {
   }, []);
 
   const implementChunk = useCallback(async (repoRoot, planId, chunkId, tabId, { autopilot = false } = {}) => {
+    if (!findChunk(repoRoot, planId, chunkId).chunk) throw new Error('Chunk not found');
+    const cfg = await ensureGit(repoRoot, planId);
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
-    if (!chunk) throw new Error('Chunk not found');
-    const baseSha = (await git(repoRoot, ['rev-parse', 'HEAD'])).trim();
-    if (!baseSha) throw new Error('This repo has no commits yet');
+    if (cfg.removedAt) throw new Error('The plan\'s worktrees were removed');
+    const baseShas = {};
+    for (const repo of cfg.repos) {
+      const sha = (await git(workPath(repo), ['rev-parse', 'HEAD']).catch(() => '')).trim();
+      if (!sha) throw new Error(`${basename(repo.root)} has no commits yet`);
+      baseShas[repo.root] = sha;
+    }
     await sendToTab(tabId, buildChunkPrompt(plan, chunk, { autopilot }));
     updateChunk(repoRoot, planId, chunkId, {
       status: 'in-progress',
       tabId,
-      baseSha,
+      baseSha: baseShas[repoRoot] ?? null,
+      baseShas,
       commits: [],
+      commitsByRepo: {},
       needsCommit: false,
       awaitingFix: false,
       startedAt: Date.now(),
       doneAt: null,
     });
-  }, [findChunk, sendToTab, updateChunk]);
+  }, [findChunk, ensureGit, sendToTab, updateChunk]);
 
   const sendFix = useCallback(async (repoRoot, planId, chunkId, notes, tabId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
@@ -378,28 +463,45 @@ export function PlansProvider({ children }) {
   const commitChunk = useCallback(async (repoRoot, planId, chunkId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (!chunk) return { found: false };
-    await git(repoRoot, ['add', '-A']);
-    await git(repoRoot, ['commit', '-m', chunkCommitMessage(plan, chunk), '-m', chunkTrailer(plan, chunk)]);
+    for (const repo of planGit(plan).repos) {
+      const path = workPath(repo);
+      if (!(await git(path, ['status', '--porcelain'])).trim()) continue;
+      await git(path, ['add', '-A']);
+      await git(path, ['commit', '-m', chunkCommitMessage(plan, chunk), '-m', chunkTrailer(plan, chunk)]);
+    }
     return checkChunk(repoRoot, planId, chunkId);
   }, [findChunk, checkChunk]);
 
   const rollbackChunk = useCallback(async (repoRoot, planId, chunkId) => {
-    const { chunk } = findChunk(repoRoot, planId, chunkId);
+    const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (!chunk?.commits?.length) throw new Error('This chunk has no commits to roll back');
-    const before = (await git(repoRoot, ['rev-parse', 'HEAD'])).trim();
-    try {
-      await git(repoRoot, ['revert', '--no-edit', ...[...chunk.commits].reverse()]);
-    } catch (e) {
-      await git(repoRoot, ['revert', '--abort']).catch(() => {});
-      throw new Error(String(e?.message || e).trim() || 'git revert failed');
+    const byRepo = chunkCommitsByRepo(plan, chunk);
+    const revertShas = [];
+    const reverted = [];
+    for (const repo of planGit(plan).repos) {
+      const commits = byRepo[repo.root];
+      if (!commits?.length) continue;
+      const path = workPath(repo);
+      const before = (await git(path, ['rev-parse', 'HEAD'])).trim();
+      try {
+        await git(path, ['revert', '--no-edit', ...[...commits].reverse()]);
+      } catch (e) {
+        await git(path, ['revert', '--abort']).catch(() => {});
+        const msg = String(e?.message || e).trim() || 'git revert failed';
+        throw new Error(reverted.length
+          ? `${basename(repo.root)}: ${msg} (already reverted in ${reverted.join(', ')})`
+          : `${basename(repo.root)}: ${msg}`);
+      }
+      revertShas.push(...(await git(path, ['rev-list', `${before}..HEAD`]))
+        .split('\n').map((l) => l.trim()).filter(Boolean));
+      reverted.push(basename(repo.root));
     }
-    const revertShas = (await git(repoRoot, ['rev-list', `${before}..HEAD`]))
-      .split('\n').map((l) => l.trim()).filter(Boolean);
     if (revertShas.length === 0) throw new Error('git revert made no commit');
     updateChunk(repoRoot, planId, chunkId, {
       status: 'rolled-back',
       revertShas,
       commits: [],
+      commitsByRepo: {},
       needsCommit: false,
       awaitingFix: false,
       doneAt: null,
@@ -647,9 +749,14 @@ export function PlansProvider({ children }) {
     stopAutopilot,
     dismissAutopilot,
     revealRun,
+    setGitConfig,
+    addPlanRepo,
+    removePlanRepo,
+    ensureGit,
+    removeWorktrees,
   }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk,
     implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
-    dismissAutopilot, revealRun, sendPlanFix]);
+    dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees]);
 
   return (
     <PlansActionsContext.Provider value={actions}>

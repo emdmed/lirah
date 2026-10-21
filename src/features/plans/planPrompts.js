@@ -1,5 +1,7 @@
 // Prompts the plans feature sends to an agent, and parsing of what comes back.
 
+import { planGit, workPath } from './planGit';
+
 // Each chunk's commits carry this trailer, so they can be found in the log no
 // matter what else lands on the branch meanwhile.
 export function chunkTrailer(plan, chunk) {
@@ -87,6 +89,15 @@ function chunkBody(chunk) {
     .join('\n\n');
 }
 
+// Where the work goes when the plan spans several repos; nothing for one repo.
+function reposBlock(plan) {
+  const cfg = planGit(plan);
+  if (cfg.repos.length < 2) return null;
+  const branch = cfg.branch ? ` on branch ${cfg.branch}` : '';
+  const rows = cfg.repos.map((r) => `- ${workPath(r)}${branch}`);
+  return `This plan spans ${cfg.repos.length} git repositories:\n${rows.join('\n')}\nWork in these folders only. Commit separately in each repository you change, each commit with the message and trailer below.`;
+}
+
 function commitInstruction(plan, chunk) {
   return `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
 git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chunkTrailer(plan, chunk)}"`;
@@ -109,6 +120,7 @@ export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
     plan.summary && `Plan summary: ${plan.summary}`,
     done.length > 0 && `Already implemented:\n${list(done)}`,
     later.length > 0 && `Coming later (don't do these now):\n${list(later)}`,
+    reposBlock(plan),
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
     `Only do this chunk. ${commitInstruction(plan, chunk)}`,
     autopilot && STATUS_INSTRUCTION,
@@ -132,18 +144,20 @@ export function buildFixPrompt(plan, chunk, notes) {
   return [
     `Review notes on chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}", which is already committed.`,
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
+    reposBlock(plan),
     `Review notes (${notes.length}):\n${noteLines(notes)}`,
     `Address every note. Don't revert unrelated work. ${commitInstruction(plan, chunk)}`,
-  ].join('\n\n');
+  ].filter(Boolean).join('\n\n');
 }
 
 /** Auto-pilot's one follow-up when the agent stopped without committing. */
 export function buildNudgePrompt(plan, chunk) {
   return [
     `Chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}" isn't committed yet. Finish it if anything is left.`,
+    reposBlock(plan),
     commitInstruction(plan, chunk),
     STATUS_INSTRUCTION,
-  ].join('\n\n');
+  ].filter(Boolean).join('\n\n');
 }
 
 /** The last `PLAN-STATUS:` line of an agent's reply → { kind, message }, or null. */
@@ -162,6 +176,7 @@ export function buildPlanFixPrompt(plan, notes) {
   return [
     `Review notes on the plan "${plan.title}", which is fully implemented and committed.`,
     plan.summary && `Plan summary: ${plan.summary}`,
+    reposBlock(plan),
     `Review notes (${notes.length}):\n${noteLines(notes)}`,
     `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}"`,
   ].filter(Boolean).join('\n\n');

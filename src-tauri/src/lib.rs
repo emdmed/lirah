@@ -122,6 +122,7 @@ pub fn run(initial_path: Option<String>) {
             agent_hooks::get_agent_hook_plugin_dir,
             plans::split_plan,
             plans::delete_plan_file,
+            plans::remove_plan_workdir,
             plans::last_assistant_text
         ]))
         .run(tauri::generate_context!())

@@ -68,6 +68,28 @@ pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), Str
     .await
 }
 
+/// Remove a plan's worktree folder (~/.lirah/plan-worktrees/<dir>) once its
+/// git worktrees are gone. Anything outside that folder is refused.
+#[tauri::command]
+pub async fn remove_plan_workdir(path: String) -> Result<(), String> {
+    crate::ipc::blocking("remove_plan_workdir", move || {
+        let base = dirs::home_dir()
+            .ok_or_else(|| "No home directory".to_string())?
+            .join(".lirah")
+            .join("plan-worktrees");
+        let dir = match Path::new(&path).canonicalize() {
+            Ok(dir) => dir,
+            Err(_) => return Ok(()), // Already gone.
+        };
+        let base = base.canonicalize().map_err(|e| format!("No plan worktrees: {}", e))?;
+        if dir.parent() != Some(base.as_path()) || !dir.is_dir() {
+            return Err("Only a plan worktree folder can be removed".to_string());
+        }
+        std::fs::remove_dir_all(&dir).map_err(|e| format!("Failed to remove the plan folder: {}", e))
+    })
+    .await
+}
+
 /// How much of a transcript's tail to scan for the last assistant message.
 const TRANSCRIPT_TAIL: u64 = 512 * 1024;
 

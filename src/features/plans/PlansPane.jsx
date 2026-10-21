@@ -18,6 +18,10 @@ import { getAgentHookState } from '../tabs/agentHookState';
 import { usePlans, nextChunkId, planProgress, planStarted } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
+import { PlanGitSection } from './PlanGitSection';
+import {
+  basename, chunkBases, chunkCommitsByRepo, inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
+} from './planGit';
 import {
   subscribeAutopilotToggle, subscribePlanFocus, takeAutopilotToggle, takePlanFocus,
 } from './plansPaneEvents';
@@ -35,6 +39,26 @@ function chunkLamp(chunk) {
 const AUTOPILOT_TIP_KEY = 'lirah:autopilot-tip-seen';
 // The `busy` id while the whole plan's diff is being gathered.
 const REVIEW_ALL = 'review-all';
+// The `busy` id while the git settings are being changed.
+const GIT_SETUP = 'git-setup';
+
+// The files that commit ranges touched, one range per repo, for one review.
+// Only files the commits themselves touched: unrelated commits can land
+// between a chunk and its fix.
+async function reviewOf(ranges) {
+  const files = [];
+  for (const r of ranges) {
+    const out = await invoke('run_git_command', { repoPath: r.path, args: ['show', '--name-only', '--format=', ...r.commits] });
+    for (const rel of new Set(out.split('\n').map((l) => l.trim()).filter(Boolean))) files.push(`${r.path}/${rel}`);
+  }
+  return { files, filePath: files[0], ranges };
+}
+
+// The repo and refs to diff the review's current file against.
+function reviewRange(review) {
+  const r = review.ranges.find((x) => review.filePath?.startsWith(`${x.path}/`)) || review.ranges[0];
+  return { repoPath: r.path, baseRef: r.baseRef, headRef: r.headRef };
+}
 
 function readFlag(key) {
   try { return localStorage.getItem(key) === '1'; } catch { return false; }
@@ -65,6 +89,15 @@ const STATUS_LABEL = {
   skipped: 'skipped',
 };
 
+// A tab inside a plan's worktrees shows the plans of the repo that owns them.
+async function resolveRepoRoot(projectPath) {
+  const home = await invoke('get_home_dir').catch(() => null);
+  const owner = home ? await planWorktreeOwner(home, projectPath) : null;
+  if (owner) return owner;
+  const out = await invoke('run_git_command', { repoPath: projectPath, args: ['rev-parse', '--show-toplevel'] });
+  return out.trim() || null;
+}
+
 function useRepoRoot(projectPath) {
   const [repoRoot, setRepoRoot] = useState(null);
   const [checked, setChecked] = useState(false);
@@ -72,8 +105,8 @@ function useRepoRoot(projectPath) {
     let cancelled = false;
     setChecked(false);
     if (!projectPath) return;
-    invoke('run_git_command', { repoPath: projectPath, args: ['rev-parse', '--show-toplevel'] })
-      .then((out) => !cancelled && setRepoRoot(out.trim() || null))
+    resolveRepoRoot(projectPath)
+      .then((root) => !cancelled && setRepoRoot(root))
       .catch(() => !cancelled && setRepoRoot(null))
       .finally(() => !cancelled && setChecked(true));
     return () => {
@@ -102,10 +135,10 @@ export function PlansPane({ projectPath }) {
   const {
     plans, createPlan, replaceSource, runSplit, deletePlan, updateChunk, moveChunk, deleteChunk, implementChunk,
     checkChunk, commitChunk, rollbackChunk, sendFix, sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot,
-    dismissAutopilot,
+    dismissAutopilot, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees,
   } = usePlans(repoRoot);
   const { files, importFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
-  const { tabs, activeTabId, switchTab } = useTabManager();
+  const { tabs, activeTabId, switchTab, addTab } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -175,10 +208,37 @@ export function PlansPane({ projectPath }) {
     return true;
   }, [activeTabId, confirm]);
 
+  // Set up the plan's branch and worktrees, then make sure the active tab
+  // works where the plan does. False: don't send (a tab was offered instead).
+  const prepareFor = useCallback(async (plan) => {
+    let cfg;
+    try {
+      cfg = await ensureGit(repoRoot, plan.id);
+    } catch (e) {
+      toast.error(`Git setup failed — ${e?.message || e}`);
+      return false;
+    }
+    if (cfg.removedAt) {
+      toast.error('This plan\'s worktrees were removed');
+      return false;
+    }
+    const tabPath = tabs.find((t) => t.id === activeTabId)?.projectPath;
+    if (!cfg.worktrees || inWorkDir({ git: cfg }, tabPath)) return true;
+    const ok = await confirm({
+      title: 'This plan runs in its worktrees',
+      description: `Chunks go to an agent working in ${cfg.workDir}. Open a tab there, launch Claude (Ctrl+K), then send from that tab.`,
+      confirmLabel: 'Open tab there',
+      destructive: false,
+    });
+    if (ok) addTab(cfg.workDir);
+    return false;
+  }, [ensureGit, repoRoot, tabs, activeTabId, confirm, addTab, toast]);
+
   const handleImplement = useCallback(async (plan, chunk) => {
+    if (!(await withBusy(chunk.id, () => prepareFor(plan)))) return;
     if (!(await confirmSend(plan, chunk))) return;
     await withBusy(chunk.id, () => implementChunk(repoRoot, plan.id, chunk.id, activeTabId));
-  }, [activeTabId, confirmSend, withBusy, implementChunk, repoRoot]);
+  }, [activeTabId, confirmSend, prepareFor, withBusy, implementChunk, repoRoot]);
 
   const handleAutopilot = useCallback(async (plan) => {
     const clash = plans.find((p) => p.id !== plan.id && autopilotActive(p) && p.autopilot.tabId === activeTabId);
@@ -186,11 +246,15 @@ export function PlansPane({ projectPath }) {
       toast.error(`"${clash.title || 'Untitled plan'}" is already on auto-pilot in this tab`);
       return;
     }
+    if (!(await prepareFor(plan))) return;
     if (!(await confirmSend(plan, null))) return;
     // Changes already in the tree would be swept into the first chunk's commit.
-    const dirty = await invoke('run_git_command', { repoPath: repoRoot, args: ['status', '--porcelain'] })
-      .then((out) => out.split('\n').filter((l) => l.trim()).length)
-      .catch(() => 0);
+    let dirty = 0;
+    for (const repo of planGit(plan).repos) {
+      dirty += await invoke('run_git_command', { repoPath: workPath(repo), args: ['status', '--porcelain'] })
+        .then((out) => out.split('\n').filter((l) => l.trim()).length)
+        .catch(() => 0);
+    }
     const firstRun = !readFlag(AUTOPILOT_TIP_KEY);
     const ok = await confirm({
       title: dirty ? `${dirty} uncommitted change${dirty === 1 ? '' : 's'} in the repo` : 'Run the plan on auto-pilot?',
@@ -209,17 +273,18 @@ export function PlansPane({ projectPath }) {
     } catch (e) {
       toast.error(`Auto-pilot didn't start: ${e?.message || e}`);
     }
-  }, [plans, activeTabId, confirm, confirmSend, startAutopilot, repoRoot, toast]);
+  }, [plans, activeTabId, confirm, confirmSend, prepareFor, startAutopilot, repoRoot, toast]);
 
   const handleResume = useCallback(async (plan) => {
     // The run's own tab if it is still open, else this one.
     const tabId = tabs.some((t) => t.id === plan.autopilot.tabId) ? plan.autopilot.tabId : activeTabId;
+    if (tabId === activeTabId && !(await prepareFor(plan))) return;
     try {
       await resumeAutopilot(repoRoot, plan.id, tabId);
     } catch (e) {
       toast.error(`Auto-pilot didn't resume: ${e?.message || e}`);
     }
-  }, [tabs, activeTabId, resumeAutopilot, repoRoot, toast]);
+  }, [tabs, activeTabId, prepareFor, resumeAutopilot, repoRoot, toast]);
 
   // `:autopilot` from the command palette: the open plan, else the only plan
   // with a run going, else the only one with work left.
@@ -283,43 +348,52 @@ export function PlansPane({ projectPath }) {
   }, [confirm, withBusy, rollbackChunk, repoRoot, toast]);
 
   const handleReview = useCallback((plan, chunk) => withBusy(chunk.id, async () => {
-    const baseRef = `${chunk.commits[0]}^`;
-    const headRef = chunk.commits.at(-1);
-    // Only files the chunk's own commits touched: unrelated commits can land
-    // between a chunk and its fix.
-    const out = await invoke('run_git_command', {
-      repoPath: repoRoot, args: ['show', '--name-only', '--format=', ...chunk.commits],
-    });
-    const changed = [...new Set(out.split('\n').map((l) => l.trim()).filter(Boolean))].map((rel) => `${repoRoot}/${rel}`);
-    if (changed.length === 0) throw new Error('That commit changed no files');
+    const byRepo = chunkCommitsByRepo(plan, chunk);
+    const ranges = planGit(plan).repos
+      .filter((r) => byRepo[r.root]?.length)
+      .map((r) => ({ path: workPath(r), commits: byRepo[r.root], baseRef: `${byRepo[r.root][0]}^`, headRef: byRepo[r.root].at(-1) }));
+    const review = await reviewOf(ranges);
+    if (review.files.length === 0) throw new Error('That commit changed no files');
     setNotes([]);
-    setReview({ planId: plan.id, chunkId: chunk.id, files: changed, filePath: changed[0], baseRef, headRef });
-  }), [withBusy, repoRoot]);
+    setReview({ planId: plan.id, chunkId: chunk.id, ...review });
+  }), [withBusy]);
 
   // Everything the plan's chunks committed, as one diff: from before the first
   // chunk started to the last chunk's last commit, limited to their files.
   const handleReviewAll = useCallback((plan) => withBusy(REVIEW_ALL, async () => {
-    const chunks = plan.chunks.filter((c) => c.status === 'implemented' && c.commits?.length > 0 && c.baseSha);
-    if (chunks.length === 0) throw new Error('No committed chunks to review');
-    const first = chunks.reduce((a, c) => ((c.startedAt ?? 0) < (a.startedAt ?? 0) ? c : a));
-    const last = chunks.reduce((a, c) => ((c.doneAt ?? 0) > (a.doneAt ?? 0) ? c : a));
-    const out = await invoke('run_git_command', {
-      repoPath: repoRoot, args: ['show', '--name-only', '--format=', ...chunks.flatMap((c) => c.commits)],
-    });
-    const changed = [...new Set(out.split('\n').map((l) => l.trim()).filter(Boolean))].map((rel) => `${repoRoot}/${rel}`);
-    if (changed.length === 0) throw new Error('The plan\'s commits changed no files');
+    const chunks = plan.chunks.filter((c) => c.status === 'implemented' && c.commits?.length > 0);
+    // Per repo: from before the first chunk that committed there to the last
+    // chunk's last commit there.
+    const ranges = [];
+    for (const repo of planGit(plan).repos) {
+      const mine = chunks.filter((c) => chunkCommitsByRepo(plan, c)[repo.root]?.length && chunkBases(plan, c)[repo.root]);
+      if (mine.length === 0) continue;
+      const first = mine.reduce((a, c) => ((c.startedAt ?? 0) < (a.startedAt ?? 0) ? c : a));
+      const last = mine.reduce((a, c) => ((c.doneAt ?? 0) > (a.doneAt ?? 0) ? c : a));
+      ranges.push({
+        path: workPath(repo),
+        commits: mine.flatMap((c) => chunkCommitsByRepo(plan, c)[repo.root]),
+        baseRef: chunkBases(plan, first)[repo.root],
+        headRef: chunkCommitsByRepo(plan, last)[repo.root].at(-1),
+      });
+    }
+    if (ranges.length === 0) throw new Error('No committed chunks to review');
+    const review = await reviewOf(ranges);
+    if (review.files.length === 0) throw new Error('The plan\'s commits changed no files');
     setNotes([]);
-    setReview({
-      planId: plan.id, chunkId: null, files: changed, filePath: changed[0], baseRef: first.baseSha, headRef: last.commits.at(-1),
-    });
-  }), [withBusy, repoRoot]);
+    setReview({ planId: plan.id, chunkId: null, ...review });
+  }), [withBusy]);
 
   const handleSendNotes = useCallback(async () => {
     if (!review || notes.length === 0) return;
+    const plan = plans?.find((p) => p.id === review.planId);
+    if (plan && !(await prepareFor(plan))) return;
+    // Paths within one repo are ambiguous once the plan spans several.
+    const sent = plan && isMultiRepo(plan) ? notes.map((n) => ({ ...n, relPath: n.filePath })) : notes;
     setSendingNotes(true);
     try {
-      if (review.chunkId) await sendFix(repoRoot, review.planId, review.chunkId, notes, activeTabId);
-      else await sendPlanFix(repoRoot, review.planId, notes, activeTabId);
+      if (review.chunkId) await sendFix(repoRoot, review.planId, review.chunkId, sent, activeTabId);
+      else await sendPlanFix(repoRoot, review.planId, sent, activeTabId);
       setReview(null);
       setNotes([]);
       toast.success('Review notes sent to the agent');
@@ -328,18 +402,35 @@ export function PlansPane({ projectPath }) {
     } finally {
       setSendingNotes(false);
     }
-  }, [review, notes, sendFix, sendPlanFix, repoRoot, activeTabId, toast]);
+  }, [review, notes, plans, prepareFor, sendFix, sendPlanFix, repoRoot, activeTabId, toast]);
 
   const handleDeletePlan = useCallback(async (plan) => {
+    const cfg = planGit(plan);
+    const worktrees = cfg.worktrees && cfg.worktreesDir && !cfg.removedAt;
     const ok = await confirm({
       title: `Delete the plan "${plan.title || 'Untitled plan'}"?`,
-      description: 'Its chunks and progress are removed from ~/.lirah/plans. Commits stay in the repo.',
+      description: worktrees
+        ? 'Its chunks and progress are removed from ~/.lirah/plans, and its worktrees are removed with any uncommitted work in them. Commits and branches stay.'
+        : 'Its chunks and progress are removed from ~/.lirah/plans. Commits stay in the repo.',
       confirmLabel: 'Delete plan',
     });
     if (!ok) return;
-    deletePlan(repoRoot, plan.id);
     setOpenPlanId(null);
+    await deletePlan(repoRoot, plan.id);
   }, [confirm, deletePlan, repoRoot]);
+
+  const handleAddRepo = useCallback((plan, path) => withBusy(GIT_SETUP, () => addPlanRepo(repoRoot, plan.id, path)),
+    [withBusy, addPlanRepo, repoRoot]);
+
+  const handleRemoveWorktrees = useCallback(async (plan) => {
+    const ok = await confirm({
+      title: 'Remove the plan\'s worktrees?',
+      description: 'Uncommitted work in them is lost. The branches and their commits stay, and the plan can no longer send chunks.',
+      confirmLabel: 'Remove worktrees',
+    });
+    if (!ok) return;
+    await withBusy(GIT_SETUP, () => removeWorktrees(repoRoot, plan.id));
+  }, [confirm, withBusy, removeWorktrees, repoRoot]);
 
   if (!projectPath || (checked && !repoRoot)) {
     return <EmptyLine hint="plans track commits, so they need a git repository">not a git repo</EmptyLine>;
@@ -357,6 +448,11 @@ export function PlansPane({ projectPath }) {
           onBack={() => setOpenPlanId(null)}
           onResplit={() => runSplit(repoRoot, openPlan.id)}
           onDelete={() => handleDeletePlan(openPlan)}
+          onGitChange={(patch) => setGitConfig(repoRoot, openPlan.id, patch)}
+          onAddRepo={(path) => handleAddRepo(openPlan, path)}
+          onRemoveRepo={(root) => removePlanRepo(repoRoot, openPlan.id, root)}
+          onOpenWorkTab={() => addTab(planGit(openPlan).workDir)}
+          onRemoveWorktrees={() => handleRemoveWorktrees(openPlan)}
           autopilotTabOpen={tabs.some((t) => t.id === openPlan.autopilot?.tabId)}
           onAutopilot={() => handleAutopilot(openPlan)}
           onResumeAutopilot={() => handleResume(openPlan)}
@@ -405,9 +501,7 @@ export function PlansPane({ projectPath }) {
               open
               onOpenChange={(o) => !o && setReview(null)}
               filePath={review.filePath}
-              repoPath={repoRoot}
-              baseRef={review.baseRef}
-              headRef={review.headRef}
+              {...reviewRange(review)}
               changedFiles={review.files}
               onFileChange={(filePath) => setReview((r) => ({ ...r, filePath }))}
               annotations={notes}
@@ -630,7 +724,7 @@ function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismiss, onGo
 }
 
 function PlanDetail({
-  plan, busy, onBack, onResplit, onDelete, autopilotTabOpen, onAutopilot, onResumeAutopilot, onStopAutopilot,
+  plan, busy, onBack, onResplit, onDelete, onGitChange, onAddRepo, onRemoveRepo, onOpenWorkTab, onRemoveWorktrees, autopilotTabOpen, onAutopilot, onResumeAutopilot, onStopAutopilot,
   onDismissAutopilot, onGoToTab, onReviewAll, onImplement, onCheck, onCommit, onReview, onRollback, onPatchChunk, onMoveChunk, onDeleteChunk,
 }) {
   const { done, total } = planProgress(plan);
@@ -694,6 +788,15 @@ function PlanDetail({
           </PanelButton>
         )}
         {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
+        <PlanGitSection
+          plan={plan}
+          busy={busy === GIT_SETUP}
+          onChange={onGitChange}
+          onAddRepo={onAddRepo}
+          onRemoveRepo={onRemoveRepo}
+          onOpenTab={onOpenWorkTab}
+          onRemoveWorktrees={onRemoveWorktrees}
+        />
       </div>
 
       {showSource && (
