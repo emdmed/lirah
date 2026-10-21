@@ -7,6 +7,9 @@ import { formatDuration } from '../../lib/formatDuration';
 import { currentBranch, git, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import { lirahDir } from '../../lib/lirahPaths';
+import {
+  AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, SPLIT_STATUS, UNTITLED_PLAN,
+} from './planModel';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../tabs/agentHookState';
@@ -57,22 +60,18 @@ function storePath(home, repoRoot) {
 
 /** Chunks that count toward progress (skipped ones don't), and how many are in. */
 export function planProgress(plan) {
-  const active = plan.chunks.filter((c) => c.status !== 'skipped');
-  return { done: active.filter((c) => c.status === 'implemented').length, total: active.length };
+  const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
+  return { done: active.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED).length, total: active.length };
 }
 
 export function planStarted(plan) {
-  return plan.chunks.some((c) => c.status !== 'pending' && c.status !== 'skipped');
+  return plan.chunks.some((c) => c.status !== CHUNK_STATUS.PENDING && c.status !== CHUNK_STATUS.SKIPPED);
 }
 
 // The chunk to do next: the first one not yet implemented or skipped.
 export function nextChunkId(plan) {
-  return plan.chunks.find((c) => c.status === 'pending' || c.status === 'rolled-back')?.id ?? null;
+  return plan.chunks.find((c) => c.status === CHUNK_STATUS.PENDING || c.status === CHUNK_STATUS.ROLLED_BACK)?.id ?? null;
 }
-
-// Paused for these, auto-pilot picks up again on its own once the agent works
-// on: you answered its question or approved the prompt in the terminal.
-const AUTO_RESUME = new Set(['needs-input', 'no-commit', 'permission']);
 
 // A PermissionRequest carries the tool name; a Notification, a sentence.
 function permissionMessage(message) {
@@ -81,7 +80,7 @@ function permissionMessage(message) {
 }
 
 /** The last line or so of an agent's reply, for a notification. */
-function excerpt(text, max = 160) {
+function excerpt(text, max = EXCERPT_MAX) {
   const line = String(text || '').trim().split('\n').filter((l) => l.trim()).pop() || '';
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
@@ -91,7 +90,7 @@ function newChunks(chunks) {
     id: shortId('c'),
     n: i + 1,
     ...c,
-    status: 'pending',
+    status: CHUNK_STATUS.PENDING,
     tabId: null,
     baseSha: null, // the primary repo's; baseShas has every repo's
     baseShas: {},
@@ -207,17 +206,17 @@ export function PlansProvider({ children }) {
       const commits = Object.values(commitsByRepo).flat();
       if (commits.length > 0) {
         updateChunk(repoRoot, planId, chunkId, {
-          status: 'implemented',
+          status: CHUNK_STATUS.IMPLEMENTED,
           commits,
           commitsByRepo,
           needsCommit: false,
           awaitingFix: false,
-          doneAt: chunk.status === 'implemented' ? chunk.doneAt : Date.now(),
+          doneAt: chunk.status === CHUNK_STATUS.IMPLEMENTED ? chunk.doneAt : Date.now(),
         });
         return { found: true, commits };
       }
       updateChunk(repoRoot, planId, chunkId, {
-        needsCommit: chunk.status === 'in-progress',
+        needsCommit: chunk.status === CHUNK_STATUS.IN_PROGRESS,
         awaitingFix: false,
       });
       return { found: false };
@@ -232,12 +231,12 @@ export function PlansProvider({ children }) {
   const runSplit = useCallback(async (repoRoot, planId) => {
     const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
     if (!plan) return;
-    updatePlan(repoRoot, planId, { split: 'running', splitError: null });
+    updatePlan(repoRoot, planId, { split: SPLIT_STATUS.RUNNING, splitError: null });
     try {
       const out = await invoke('split_plan', { projectDir: repoRoot, prompt: buildSplitPrompt(plan.source) });
       const result = parseSplitResult(out);
       updatePlan(repoRoot, planId, (p) => {
-        const title = p.title || result.title || 'Untitled plan';
+        const title = p.title || result.title || UNTITLED_PLAN;
         const slug = slugify(title);
         // The branch follows the title until you name it yourself.
         const gitCfg = p.git && !p.git.preparedAt && p.git.branch === defaultBranch(p.slug)
@@ -248,12 +247,12 @@ export function PlansProvider({ children }) {
           git: gitCfg,
           summary: result.summary,
           chunks: newChunks(result.chunks),
-          split: 'done',
+          split: SPLIT_STATUS.DONE,
           splitError: null,
         };
       });
     } catch (e) {
-      updatePlan(repoRoot, planId, { split: 'failed', splitError: errorMessage(e) });
+      updatePlan(repoRoot, planId, { split: SPLIT_STATUS.FAILED, splitError: errorMessage(e) });
     }
   }, [updatePlan]);
 
@@ -272,14 +271,14 @@ export function PlansProvider({ children }) {
       }
       // A split can't survive a restart, and auto-pilot's tab is gone.
       plans = plans.map((p) => {
-        let next = p.split === 'running' ? { ...p, split: 'failed', splitError: 'Interrupted — the app was closed.' } : p;
-        if (p.autopilot?.status === 'running' || p.autopilot?.status === 'paused') {
+        let next = p.split === SPLIT_STATUS.RUNNING ? { ...p, split: SPLIT_STATUS.FAILED, splitError: 'Interrupted — the app was closed.' } : p;
+        if (isAutopilotLive(p.autopilot)) {
           next = {
             ...next,
             autopilot: {
               ...p.autopilot,
-              status: 'paused',
-              reason: 'app-restarted',
+              status: AUTOPILOT_STATUS.PAUSED,
+              reason: HALT_REASON.APP_RESTARTED,
               message: 'The app was closed during the run. Resume it from a tab with an agent.',
             },
           };
@@ -291,7 +290,7 @@ export function PlansProvider({ children }) {
       // Chunks that finished while the app was closed.
       for (const plan of plans) {
         for (const chunk of plan.chunks) {
-          if (chunk.status === 'in-progress' || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
+          if (chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
         }
       }
     })().finally(() => loadingRef.current.delete(repoRoot));
@@ -311,7 +310,7 @@ export function PlansProvider({ children }) {
       repoRoot,
       source,
       importedFrom,
-      split: 'running',
+      split: SPLIT_STATUS.RUNNING,
       splitError: null,
       chunks: [],
       git: {
@@ -418,7 +417,7 @@ export function PlansProvider({ children }) {
     }
     await sendToTab(tabId, buildChunkPrompt(plan, chunk, { autopilot }));
     updateChunk(repoRoot, planId, chunkId, {
-      status: 'in-progress',
+      status: CHUNK_STATUS.IN_PROGRESS,
       tabId,
       baseSha: baseShas[repoRoot] ?? null,
       baseShas,
@@ -484,7 +483,7 @@ export function PlansProvider({ children }) {
     }
     if (revertShas.length === 0) throw new Error('git revert made no commit');
     updateChunk(repoRoot, planId, chunkId, {
-      status: 'rolled-back',
+      status: CHUNK_STATUS.ROLLED_BACK,
       revertShas,
       commits: [],
       commitsByRepo: {},
@@ -519,19 +518,19 @@ export function PlansProvider({ children }) {
   // Desktop notification plus a toast, for the three outcomes you asked to
   // hear about. Both lead back to the run; the ones that need you stay up.
   const announce = useCallback((repoRoot, plan, kind, body) => {
-    const name = plan.title || 'Untitled plan';
+    const name = plan.title || UNTITLED_PLAN;
     const title = {
-      done: `✓ ${name} · plan complete`,
-      paused: `${name} · needs you`,
-      failed: `${name} · auto-pilot error`,
+      [AUTOPILOT_STATUS.DONE]: `✓ ${name} · plan complete`,
+      [AUTOPILOT_STATUS.PAUSED]: `${name} · needs you`,
+      [AUTOPILOT_STATUS.FAILED]: `${name} · auto-pilot error`,
     }[kind];
     const reveal = () => revealRun(repoRoot, plan.id);
     notify(title, body, { onClick: reveal });
     const t = toastRef.current;
-    const show = kind === 'done' ? t.success : kind === 'paused' ? t.warning : t.error;
+    const show = kind === AUTOPILOT_STATUS.DONE ? t.success : kind === AUTOPILOT_STATUS.PAUSED ? t.warning : t.error;
     show(`${title}${body ? ` — ${body}` : ''}`, {
       action: { label: 'show', onClick: reveal },
-      ...(kind === 'done' ? {} : { duration: 0 }),
+      ...(kind === AUTOPILOT_STATUS.DONE ? {} : { duration: 0 }),
     });
   }, [revealRun]);
 
@@ -539,24 +538,24 @@ export function PlansProvider({ children }) {
   const halt = useCallback((repoRoot, planId, status, reason, message) => {
     const plan = findPlan(repoRoot, planId);
     if (!plan?.autopilot) return;
-    const wasRunning = plan.autopilot.status === 'running';
+    const wasRunning = plan.autopilot.status === AUTOPILOT_STATUS.RUNNING;
     setAutopilot(repoRoot, planId, { status, reason, message });
     // Permission prompts already get a desktop alert from useAgentAttention.
-    if (wasRunning && reason !== 'permission') announce(repoRoot, plan, status, message);
+    if (wasRunning && reason !== HALT_REASON.PERMISSION) announce(repoRoot, plan, status, message);
   }, [findPlan, setAutopilot, announce]);
 
   // Send the next chunk, or finish.
   const advance = useCallback(async (repoRoot, planId) => {
     const plan = findPlan(repoRoot, planId);
     const ap = plan?.autopilot;
-    if (ap?.status !== 'running') return;
+    if (ap?.status !== AUTOPILOT_STATUS.RUNNING) return;
     const nextId = nextChunkId(plan);
     if (!nextId) {
       const { done } = planProgress(plan);
-      const commits = plan.chunks.reduce((n, c) => n + (c.status === 'implemented' ? c.commits.length : 0), 0);
-      setAutopilot(repoRoot, planId, { status: 'done', chunkId: null, reason: null, message: null, endedAt: Date.now() });
+      const commits = plan.chunks.reduce((n, c) => n + (c.status === CHUNK_STATUS.IMPLEMENTED ? c.commits.length : 0), 0);
+      setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.DONE, chunkId: null, reason: null, message: null, endedAt: Date.now() });
       const took = ap.startedAt ? ` in ${formatDuration(Date.now() - ap.startedAt)}` : '';
-      announce(repoRoot, plan, 'done',
+      announce(repoRoot, plan, AUTOPILOT_STATUS.DONE,
         `${done} chunk${done === 1 ? '' : 's'}, ${commits} commit${commits === 1 ? '' : 's'}${took}.`);
       return;
     }
@@ -565,7 +564,7 @@ export function PlansProvider({ children }) {
     try {
       await implementChunk(repoRoot, planId, nextId, ap.tabId, { autopilot: true });
     } catch (e) {
-      halt(repoRoot, planId, 'failed', 'send-failed', errorMessage(e));
+      halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.SEND_FAILED, errorMessage(e));
     }
   }, [findPlan, setAutopilot, announce, implementChunk, halt]);
 
@@ -574,18 +573,18 @@ export function PlansProvider({ children }) {
   const kick = useCallback(async (repoRoot, planId) => {
     const plan = findPlan(repoRoot, planId);
     const ap = plan?.autopilot;
-    if (ap?.status !== 'running') return;
-    const current = plan.chunks.find((c) => c.id === ap.chunkId && c.status === 'in-progress');
+    if (ap?.status !== AUTOPILOT_STATUS.RUNNING) return;
+    const current = plan.chunks.find((c) => c.id === ap.chunkId && c.status === CHUNK_STATUS.IN_PROGRESS);
     if (!current) return advance(repoRoot, planId);
     const res = await checkChunk(repoRoot, planId, current.id);
-    if (res.error) return halt(repoRoot, planId, 'failed', 'git-error', res.error);
+    if (res.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, res.error);
     if (res.found) return advance(repoRoot, planId);
     if (getAgentHookState(getTabSession(ap.tabId))?.state === 'working') return; // Its Stop will come.
     try {
       await sendToTab(ap.tabId, buildNudgePrompt(plan, current));
       setAutopilot(repoRoot, planId, { nudged: true });
     } catch (e) {
-      halt(repoRoot, planId, 'failed', 'send-failed', errorMessage(e));
+      halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.SEND_FAILED, errorMessage(e));
     }
   }, [findPlan, advance, checkChunk, halt, sendToTab, setAutopilot]);
 
@@ -593,9 +592,9 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     if (!plan) return;
     // A chunk already sent by hand is adopted rather than sent again.
-    const inFlight = plan.chunks.find((c) => c.status === 'in-progress');
+    const inFlight = plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS);
     setAutopilot(repoRoot, planId, {
-      status: 'running', tabId, chunkId: inFlight?.id ?? null, nudged: false, reason: null, message: null,
+      status: AUTOPILOT_STATUS.RUNNING, tabId, chunkId: inFlight?.id ?? null, nudged: false, reason: null, message: null,
       startedAt: Date.now(), endedAt: null,
     });
     return kick(repoRoot, planId);
@@ -604,7 +603,7 @@ export function PlansProvider({ children }) {
   const resumeAutopilot = useCallback((repoRoot, planId, tabId) => {
     const ap = findPlan(repoRoot, planId)?.autopilot;
     setAutopilot(repoRoot, planId, {
-      status: 'running', tabId: tabId || ap?.tabId, nudged: false, reason: null, message: null,
+      status: AUTOPILOT_STATUS.RUNNING, tabId: tabId || ap?.tabId, nudged: false, reason: null, message: null,
     });
     return kick(repoRoot, planId);
   }, [findPlan, setAutopilot, kick]);
@@ -614,8 +613,8 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     const chunk = plan?.chunks.find((c) => c.id === plan.autopilot?.chunkId);
     setAutopilot(repoRoot, planId, {
-      status: 'off',
-      reason: 'stopped',
+      status: AUTOPILOT_STATUS.OFF,
+      reason: HALT_REASON.STOPPED,
       message: chunk ? `Turned off during chunk ${chunk.n}. The agent wasn't interrupted.` : 'Turned off.',
     });
   }, [findPlan, setAutopilot]);
@@ -627,13 +626,13 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     const ap = plan?.autopilot;
     if (!ap) return;
-    if (error) return halt(repoRoot, planId, 'failed', 'agent-error', 'The agent stopped with an error.');
+    if (error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.AGENT_ERROR, 'The agent stopped with an error.');
     const current = plan.chunks.find((c) => c.id === ap.chunkId);
-    if (current?.status !== 'in-progress') return ap.status === 'running' ? advance(repoRoot, planId) : undefined;
+    if (current?.status !== CHUNK_STATUS.IN_PROGRESS) return ap.status === AUTOPILOT_STATUS.RUNNING ? advance(repoRoot, planId) : undefined;
     const res = await checkChunk(repoRoot, planId, current.id);
-    if (res.error) return halt(repoRoot, planId, 'failed', 'git-error', res.error);
+    if (res.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, res.error);
     if (res.found) {
-      setAutopilot(repoRoot, planId, { status: 'running', nudged: false, reason: null, message: null });
+      setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.RUNNING, nudged: false, reason: null, message: null });
       return advance(repoRoot, planId);
     }
     const transcriptPath = getAgentTranscript(sessionId);
@@ -641,23 +640,23 @@ export function PlansProvider({ children }) {
       ? await invoke('last_assistant_text', { transcriptPath }).catch(() => null)
       : null;
     const marker = parseStatusMarker(text);
-    if (marker?.kind === 'blocked') {
-      return halt(repoRoot, planId, 'failed', 'blocked', marker.message || `Chunk ${current.n}: the agent is blocked.`);
+    if (marker?.kind === HALT_REASON.BLOCKED) {
+      return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.BLOCKED, marker.message || `Chunk ${current.n}: the agent is blocked.`);
     }
-    if (marker?.kind === 'needs-input') {
-      return halt(repoRoot, planId, 'paused', 'needs-input', marker.message || `Chunk ${current.n}: the agent has a question.`);
+    if (marker?.kind === HALT_REASON.NEEDS_INPUT) {
+      return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.NEEDS_INPUT, marker.message || `Chunk ${current.n}: the agent has a question.`);
     }
-    if (ap.status === 'running' && !ap.nudged) {
+    if (ap.status === AUTOPILOT_STATUS.RUNNING && !ap.nudged) {
       try {
         await sendToTab(ap.tabId, buildNudgePrompt(plan, current));
         setAutopilot(repoRoot, planId, { nudged: true });
       } catch (e) {
-        halt(repoRoot, planId, 'failed', 'send-failed', errorMessage(e));
+        halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.SEND_FAILED, errorMessage(e));
       }
       return;
     }
     const said = excerpt(text);
-    halt(repoRoot, planId, 'paused', 'no-commit',
+    halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.NO_COMMIT,
       `Chunk ${current.n} stopped without committing.${said ? ` Last said: "${said}"` : ''}`);
   }, [findPlan, halt, advance, checkChunk, setAutopilot, sendToTab]);
 
@@ -667,18 +666,18 @@ export function PlansProvider({ children }) {
     for (const [repoRoot, plans] of Object.entries(stateRef.current)) {
       for (const plan of plans) {
         const ap = plan.autopilot;
-        const piloted = (ap?.status === 'running' || ap?.status === 'paused') && getTabSession(ap.tabId) === sessionId;
+        const piloted = isAutopilotLive(ap) && getTabSession(ap.tabId) === sessionId;
         if (piloted) {
           if (next === null) {
-            halt(repoRoot, plan.id, 'paused', 'session-ended', 'The agent exited. Relaunch it in the tab and resume.');
-          } else if (next?.state === 'permission' && ap.status === 'running') {
-            halt(repoRoot, plan.id, 'paused', 'permission', permissionMessage(next.message));
-          } else if (next?.state === 'working' && ap.status === 'paused' && AUTO_RESUME.has(ap.reason)) {
+            halt(repoRoot, plan.id, AUTOPILOT_STATUS.PAUSED, HALT_REASON.SESSION_ENDED, 'The agent exited. Relaunch it in the tab and resume.');
+          } else if (next?.state === 'permission' && ap.status === AUTOPILOT_STATUS.RUNNING) {
+            halt(repoRoot, plan.id, AUTOPILOT_STATUS.PAUSED, HALT_REASON.PERMISSION, permissionMessage(next.message));
+          } else if (next?.state === 'working' && ap.status === AUTOPILOT_STATUS.PAUSED && AUTO_RESUME_REASONS.has(ap.reason)) {
             // You answered or approved in the terminal: the run carries on.
             setAutopilot(repoRoot, plan.id, {
-              status: 'running', reason: null, message: null, nudged: ap.reason === 'permission' ? ap.nudged : false,
+              status: AUTOPILOT_STATUS.RUNNING, reason: null, message: null, nudged: ap.reason === HALT_REASON.PERMISSION ? ap.nudged : false,
             });
-          } else if (turnEnded && (ap.status === 'running' || AUTO_RESUME.has(ap.reason))) {
+          } else if (turnEnded && (ap.status === AUTOPILOT_STATUS.RUNNING || AUTO_RESUME_REASONS.has(ap.reason))) {
             onAutopilotStop(repoRoot, plan.id, sessionId, next.error);
           }
           // Auto-pilot checks its own chunk; checking it here too would race.
@@ -693,7 +692,7 @@ export function PlansProvider({ children }) {
         }
         if (!turnEnded) continue;
         for (const chunk of plan.chunks) {
-          if ((chunk.status === 'in-progress' || chunk.awaitingFix) && getTabSession(chunk.tabId) === sessionId) {
+          if ((chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) && getTabSession(chunk.tabId) === sessionId) {
             checkChunk(repoRoot, plan.id, chunk.id);
           }
         }
@@ -707,8 +706,8 @@ export function PlansProvider({ children }) {
     for (const [repoRoot, plans] of Object.entries(stateRef.current)) {
       for (const plan of plans) {
         const ap = plan.autopilot;
-        if ((ap?.status === 'running' || ap?.status === 'paused') && ap.reason !== 'app-restarted' && !open.has(ap.tabId)) {
-          halt(repoRoot, plan.id, 'failed', 'tab-closed', 'The tab running the plan was closed.');
+        if (isAutopilotLive(ap) && ap.reason !== HALT_REASON.APP_RESTARTED && !open.has(ap.tabId)) {
+          halt(repoRoot, plan.id, AUTOPILOT_STATUS.FAILED, HALT_REASON.TAB_CLOSED, 'The tab running the plan was closed.');
         }
       }
     }
@@ -769,8 +768,8 @@ export function usePlans(repoRoot) {
   return { plans, loaded: !!plans, ...actions };
 }
 
-const LIVE = new Set(['running', 'paused', 'failed']);
-const URGENCY = { failed: 0, paused: 1, running: 2 };
+const LIVE = new Set([AUTOPILOT_STATUS.RUNNING, AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED]);
+const URGENCY = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1, [AUTOPILOT_STATUS.RUNNING]: 2 };
 
 /** Auto-pilot runs that need watching, across loaded repos, most urgent first. */
 export function useAutopilotRuns() {

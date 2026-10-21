@@ -2,11 +2,12 @@ import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { Lamp } from '../../components/instrument/Lamp';
 import { planProgress, useAutopilotRuns, usePlansActions } from './PlansContext';
+import { AUTOPILOT_STATUS, UNTITLED_PLAN } from './planModel';
 
 const LAMP = {
-  running: { state: 'on', blink: true },
-  paused: { state: 'warn' },
-  failed: { state: 'fault' },
+  [AUTOPILOT_STATUS.RUNNING]: { state: 'on', blink: true },
+  [AUTOPILOT_STATUS.PAUSED]: { state: 'warn' },
+  [AUTOPILOT_STATUS.FAILED]: { state: 'fault' },
 };
 
 /**
@@ -20,7 +21,7 @@ export function AutopilotIndicator() {
   const { repoRoot, plan } = runs[0];
   const ap = plan.autopilot;
   const { done, total } = planProgress(plan);
-  const label = ap.status === 'running' ? `${done}/${total}` : ap.status === 'paused' ? 'needs you' : 'error';
+  const label = ap.status === AUTOPILOT_STATUS.RUNNING ? `${done}/${total}` : ap.status === AUTOPILOT_STATUS.PAUSED ? 'needs you' : 'error';
   const lamp = LAMP[ap.status];
   return (
     <Tooltip>
@@ -38,7 +39,7 @@ export function AutopilotIndicator() {
         </Button>
       </TooltipTrigger>
       <TooltipContent className="max-w-80">
-        {plan.title || 'Untitled plan'}
+        {plan.title || UNTITLED_PLAN}
         {ap.message ? ` · ${ap.message}` : ''} · click to show
       </TooltipContent>
     </Tooltip>

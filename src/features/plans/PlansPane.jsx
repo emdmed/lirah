@@ -23,6 +23,10 @@ import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
 import { PlanGitSection } from './PlanGitSection';
 import {
+  AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, SPLIT_STATUS,
+  UNTITLED_PLAN,
+} from './planModel';
+import {
   chunkBases, chunkCommitsByRepo, inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
 } from './planGit';
 import {
@@ -32,12 +36,14 @@ import {
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
 const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog');
 
-function chunkLamp(chunk) {
-  if (chunk.status === 'in-progress') return chunk.needsCommit ? { state: 'warn' } : { state: 'on', blink: true };
-  if (chunk.status === 'implemented') return chunk.awaitingFix ? { state: 'on', blink: true } : { state: 'ok' };
-  if (chunk.status === 'rolled-back') return { state: 'warn' };
-  return { state: 'off' };
-}
+const CHUNK_LAMP = {
+  [CHUNK_STATE.NO_COMMIT]: { state: 'warn' },
+  [CHUNK_STATE.IN_PROGRESS]: { state: 'on', blink: true },
+  [CHUNK_STATE.FIXING]: { state: 'on', blink: true },
+  [CHUNK_STATE.IMPLEMENTED]: { state: 'ok' },
+  [CHUNK_STATE.ROLLED_BACK]: { state: 'warn' },
+};
+const chunkLamp = (chunk) => CHUNK_LAMP[effectiveChunkState(chunk)] || { state: 'off' };
 
 const AUTOPILOT_TIP_KEY = 'lirah:autopilot-tip-seen';
 // The `busy` id while the whole plan's diff is being gathered.
@@ -73,23 +79,23 @@ function writeFlag(key) {
 
 /** The auto-pilot chunk's place among the chunks that count (skipped ones don't). */
 function pilotPosition(plan) {
-  const active = plan.chunks.filter((c) => c.status !== 'skipped');
+  const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
   const chunk = active.find((c) => c.id === plan.autopilot?.chunkId);
   return chunk ? { chunk, index: active.indexOf(chunk) + 1, total: active.length } : null;
 }
 
 // Plans with a live run first: those are the ones to watch.
-const RUN_ORDER = { failed: 0, paused: 1, running: 2 };
+const RUN_ORDER = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1, [AUTOPILOT_STATUS.RUNNING]: 2 };
 const runRank = (plan) => RUN_ORDER[plan.autopilot?.status] ?? 3;
 
-const autopilotActive = (plan) => plan.autopilot?.status === 'running' || plan.autopilot?.status === 'paused';
-
 const STATUS_LABEL = {
-  pending: 'pending',
-  'in-progress': 'in progress',
-  implemented: 'implemented',
-  'rolled-back': 'rolled back',
-  skipped: 'skipped',
+  [CHUNK_STATE.PENDING]: 'pending',
+  [CHUNK_STATE.IN_PROGRESS]: 'in progress',
+  [CHUNK_STATE.IMPLEMENTED]: 'implemented',
+  [CHUNK_STATE.ROLLED_BACK]: 'rolled back',
+  [CHUNK_STATE.SKIPPED]: 'skipped',
+  [CHUNK_STATE.NO_COMMIT]: 'no commit',
+  [CHUNK_STATE.FIXING]: 'fixing',
 };
 
 // A tab inside a plan's worktrees shows the plans of the repo that owns them.
@@ -188,7 +194,7 @@ export function PlansPane({ projectPath }) {
   // `chunk` is the one about to be sent; auto-pilot adopts a chunk in flight.
   const confirmSend = useCallback(async (plan, chunk) => {
     const agent = getAgentHookState(getTabSession(activeTabId));
-    const other = chunk && plan.chunks.find((c) => c.status === 'in-progress' && c.id !== chunk.id);
+    const other = chunk && plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS && c.id !== chunk.id);
     if (!agent) {
       return confirm({
         title: 'No agent detected in this tab',
@@ -243,9 +249,9 @@ export function PlansPane({ projectPath }) {
   }, [activeTabId, confirmSend, prepareFor, withBusy, implementChunk, repoRoot]);
 
   const handleAutopilot = useCallback(async (plan) => {
-    const clash = plans.find((p) => p.id !== plan.id && autopilotActive(p) && p.autopilot.tabId === activeTabId);
+    const clash = plans.find((p) => p.id !== plan.id && isAutopilotLive(p.autopilot) && p.autopilot.tabId === activeTabId);
     if (clash) {
-      toast.error(`"${clash.title || 'Untitled plan'}" is already on auto-pilot in this tab`);
+      toast.error(`"${clash.title || UNTITLED_PLAN}" is already on auto-pilot in this tab`);
       return;
     }
     if (!(await prepareFor(plan))) return;
@@ -294,17 +300,17 @@ export function PlansPane({ projectPath }) {
     if (!plans || !takeAutopilotToggle()) return;
     const only = (list) => (list.length === 1 ? list[0] : null);
     const target = openPlan
-      || only(plans.filter(autopilotActive))
-      || only(plans.filter((p) => p.split === 'done' && nextChunkId(p)));
+      || only(plans.filter((p) => isAutopilotLive(p.autopilot)))
+      || only(plans.filter((p) => p.split === SPLIT_STATUS.DONE && nextChunkId(p)));
     if (!target) {
       toast.info('Open a plan, then run :autopilot');
       return;
     }
     setOpenPlanId(target.id);
-    if (target.autopilot?.status === 'running') {
+    if (target.autopilot?.status === AUTOPILOT_STATUS.RUNNING) {
       stopAutopilot(repoRoot, target.id);
       toast.info('Auto-pilot off');
-    } else if (target.autopilot?.status === 'paused' || target.autopilot?.status === 'failed') {
+    } else if (target.autopilot?.status === AUTOPILOT_STATUS.PAUSED || target.autopilot?.status === AUTOPILOT_STATUS.FAILED) {
       handleResume(target);
     } else {
       handleAutopilot(target);
@@ -361,7 +367,7 @@ export function PlansPane({ projectPath }) {
   // Everything the plan's chunks committed, as one diff: from before the first
   // chunk started to the last chunk's last commit, limited to their files.
   const handleReviewAll = useCallback((plan) => withBusy(REVIEW_ALL, async () => {
-    const chunks = plan.chunks.filter((c) => c.status === 'implemented' && c.commits?.length > 0);
+    const chunks = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED && c.commits?.length > 0);
     // Per repo: from before the first chunk that committed there to the last
     // chunk's last commit there.
     const ranges = [];
@@ -408,7 +414,7 @@ export function PlansPane({ projectPath }) {
     const cfg = planGit(plan);
     const worktrees = cfg.worktrees && cfg.worktreesDir && !cfg.removedAt;
     const ok = await confirm({
-      title: `Delete the plan "${plan.title || 'Untitled plan'}"?`,
+      title: `Delete the plan "${plan.title || UNTITLED_PLAN}"?`,
       description: worktrees
         ? 'Its chunks and progress are removed from ~/.lirah/plans, and its worktrees are removed with any uncommitted work in them. Commits and branches stay.'
         : 'Its chunks and progress are removed from ~/.lirah/plans. Commits stay in the repo.',
@@ -562,11 +568,11 @@ function Field({ label, children }) {
 // plan stands: what's in, what's in flight, what was rolled back. (Meter would
 // read a finished plan as a fault.)
 const CELL = {
-  implemented: 'bg-[var(--ins-ok)]',
-  'in-progress': 'bg-[var(--ins-lamp)]',
-  'rolled-back': 'bg-[var(--ins-warn)]',
-  pending: 'bg-[var(--ins-lamp-off)]',
-  skipped: 'shadow-[inset_0_0_0_1px_var(--ins-edge)]',
+  [CHUNK_STATUS.IMPLEMENTED]: 'bg-[var(--ins-ok)]',
+  [CHUNK_STATUS.IN_PROGRESS]: 'bg-[var(--ins-lamp)]',
+  [CHUNK_STATUS.ROLLED_BACK]: 'bg-[var(--ins-warn)]',
+  [CHUNK_STATUS.PENDING]: 'bg-[var(--ins-lamp-off)]',
+  [CHUNK_STATUS.SKIPPED]: 'shadow-[inset_0_0_0_1px_var(--ins-edge)]',
 };
 
 function ProgressReadout({ plan, done, total }) {
@@ -574,7 +580,7 @@ function ProgressReadout({ plan, done, total }) {
     <div className="flex items-center gap-2" role="img" aria-label={`${done} of ${total} chunks implemented`}>
       <div className="flex h-1.5 min-w-0 flex-1 gap-px">
         {plan.chunks.map((c) => (
-          <span key={c.id} className={cn('min-w-px max-w-6 flex-1', CELL[c.status] || CELL.pending)} />
+          <span key={c.id} className={cn('min-w-px max-w-6 flex-1', CELL[c.status] || CELL[CHUNK_STATUS.PENDING])} />
         ))}
       </div>
       <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
@@ -586,12 +592,12 @@ function ProgressReadout({ plan, done, total }) {
 
 function PlanRow({ plan, onOpen }) {
   const { done, total } = planProgress(plan);
-  const running = plan.chunks.some((c) => c.status === 'in-progress' || c.awaitingFix);
+  const running = plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
   const ap = plan.autopilot;
   const tag = AUTOPILOT_TAG[ap?.status];
   const pos = tag ? pilotPosition(plan) : null;
-  const lampState = plan.split === 'failed' || ap?.status === 'failed' ? 'fault'
-    : ap?.status === 'paused' ? 'warn'
+  const lampState = plan.split === SPLIT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.FAILED ? 'fault'
+    : ap?.status === AUTOPILOT_STATUS.PAUSED ? 'warn'
       : running ? 'on' : total > 0 && done === total ? 'ok' : 'off';
   return (
     <button
@@ -600,50 +606,51 @@ function PlanRow({ plan, onOpen }) {
     >
       <div className="flex min-w-0 items-start gap-2">
         <span className="flex h-4 shrink-0 items-center">
-          {plan.split === 'running' ? (
+          {plan.split === SPLIT_STATUS.RUNNING ? (
             <Scanner />
           ) : (
             <Lamp
               state={lampState}
               blink={running}
-              label={plan.split === 'failed' ? 'split failed' : tag || (lampState === 'ok' ? 'complete' : running ? 'in progress' : 'idle')}
+              label={plan.split === SPLIT_STATUS.FAILED ? 'split failed' : tag || (lampState === 'ok' ? 'complete' : running ? 'in progress' : 'idle')}
             />
           )}
         </span>
-        <span className="line-clamp-2 leading-4 text-foreground">{plan.title || 'Untitled plan'}</span>
-        {plan.split === 'done' && tag && (
+        <span className="line-clamp-2 leading-4 text-foreground">{plan.title || UNTITLED_PLAN}</span>
+        {plan.split === SPLIT_STATUS.DONE && tag && (
           <span
             className={cn(
               'ml-auto shrink-0 text-[10px] leading-4 tabular-nums',
-              ap.status === 'running' ? 'text-[var(--ins-lamp)]' : 'text-[var(--ins-warn)]',
+              ap.status === AUTOPILOT_STATUS.RUNNING ? 'text-[var(--ins-lamp)]' : 'text-[var(--ins-warn)]',
             )}
           >
             {tag}{pos && <span className="text-muted-foreground"> · chunk {pos.index}</span>}
           </span>
         )}
-        {plan.split !== 'done' && (
+        {plan.split !== SPLIT_STATUS.DONE && (
           <span className="ml-auto shrink-0 text-[10px] leading-4 text-muted-foreground">
-            {plan.split === 'running' ? 'splitting' : 'split failed'}
+            {plan.split === SPLIT_STATUS.RUNNING ? 'splitting' : 'split failed'}
           </span>
         )}
       </div>
-      {plan.split === 'done' && total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
+      {plan.split === SPLIT_STATUS.DONE && total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
     </button>
   );
 }
 
-const AUTOPILOT_TAG = { running: 'auto-pilot', paused: 'needs you', failed: 'error' };
-
-const AUTOPILOT_LAMP = {
-  running: { state: 'on', blink: true },
-  paused: { state: 'warn' },
-  failed: { state: 'fault' },
-  done: { state: 'ok' },
-  off: { state: 'off' },
+const AUTOPILOT_TAG = {
+  [AUTOPILOT_STATUS.RUNNING]: 'auto-pilot',
+  [AUTOPILOT_STATUS.PAUSED]: 'needs you',
+  [AUTOPILOT_STATUS.FAILED]: 'error',
 };
 
-// Reasons the run picks up again by itself once you deal with it in the terminal.
-const RESUMES_ITSELF = new Set(['needs-input', 'no-commit', 'permission']);
+const AUTOPILOT_LAMP = {
+  [AUTOPILOT_STATUS.RUNNING]: { state: 'on', blink: true },
+  [AUTOPILOT_STATUS.PAUSED]: { state: 'warn' },
+  [AUTOPILOT_STATUS.FAILED]: { state: 'fault' },
+  [AUTOPILOT_STATUS.DONE]: { state: 'ok' },
+  [AUTOPILOT_STATUS.OFF]: { state: 'off' },
+};
 
 /** Re-renders every second while `on`, for a running clock. */
 function useTick(on) {
@@ -664,23 +671,23 @@ function useTick(on) {
 /** Where the auto-pilot run stands, and what you can do about it. */
 function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismiss, onGoToTab, onReviewAll }) {
   const ap = plan.autopilot;
-  const running = ap.status === 'running';
+  const running = ap.status === AUTOPILOT_STATUS.RUNNING;
   const now = useTick(running);
   // Counted like the progress readout: skipped chunks are left out.
   const pos = pilotPosition(plan);
   const chunk = pos?.chunk;
   const at = pos ? `chunk ${pos.index} of ${pos.total}` : null;
-  const elapsed = running && chunk?.status === 'in-progress' && chunk.startedAt ? formatDuration(now - chunk.startedAt) : null;
+  const elapsed = running && chunk?.status === CHUNK_STATUS.IN_PROGRESS && chunk.startedAt ? formatDuration(now - chunk.startedAt) : null;
   const took = ap.startedAt && ap.endedAt ? formatDuration(ap.endedAt - ap.startedAt) : null;
   const headline = {
-    running: at ? [at, elapsed, ap.nudged && 'nudged to commit'].filter(Boolean).join(' · ') : 'starting',
-    paused: ['needs you', at].filter(Boolean).join(' · '),
-    failed: ['error', at].filter(Boolean).join(' · '),
-    done: ['plan complete', took && `in ${took}`].filter(Boolean).join(' '),
-    off: 'off',
+    [AUTOPILOT_STATUS.RUNNING]: at ? [at, elapsed, ap.nudged && 'nudged to commit'].filter(Boolean).join(' · ') : 'starting',
+    [AUTOPILOT_STATUS.PAUSED]: ['needs you', at].filter(Boolean).join(' · '),
+    [AUTOPILOT_STATUS.FAILED]: ['error', at].filter(Boolean).join(' · '),
+    [AUTOPILOT_STATUS.DONE]: ['plan complete', took && `in ${took}`].filter(Boolean).join(' '),
+    [AUTOPILOT_STATUS.OFF]: 'off',
   }[ap.status] || ap.status;
-  const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP.paused;
-  const live = running || ap.status === 'paused' || ap.status === 'failed';
+  const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
+  const live = running || ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
   return (
     <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]">
       <div className="flex min-w-0 items-center gap-2">
@@ -689,7 +696,7 @@ function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismiss, onGo
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
       </div>
       {ap.message && <Prose text={ap.message} clamp={3} className="text-[10px] leading-relaxed text-muted-foreground" />}
-      {ap.status === 'paused' && RESUMES_ITSELF.has(ap.reason) && (
+      {ap.status === AUTOPILOT_STATUS.PAUSED && AUTO_RESUME_REASONS.has(ap.reason) && (
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           Answer in the terminal and the run carries on by itself, or resume to nudge the agent.
         </p>
@@ -703,12 +710,12 @@ function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismiss, onGo
         {live && tabOpen && (
           <PanelButton icon={SquareTerminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
         )}
-        {(ap.status === 'paused' || ap.status === 'failed') && (
+        {(ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED) && (
           <PanelButton icon={Play} onClick={onResume} title={tabOpen ? 'Carry on in the same tab' : 'Carry on in this tab'}>
             resume
           </PanelButton>
         )}
-        {ap.status === 'done' && (
+        {ap.status === AUTOPILOT_STATUS.DONE && (
           <PanelButton icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
             review all
           </PanelButton>
@@ -729,13 +736,13 @@ function PlanDetail({
 }) {
   const { done, total } = planProgress(plan);
   const nextId = nextChunkId(plan);
-  const piloted = autopilotActive(plan);
+  const piloted = isAutopilotLive(plan.autopilot);
   // Start offered when there is work left and no run to resume.
-  const canPilot = plan.split === 'done' && (!plan.autopilot || plan.autopilot.status === 'done' || plan.autopilot.status === 'off')
-    && (!!nextId || plan.chunks.some((c) => c.status === 'in-progress'));
+  const canPilot = plan.split === SPLIT_STATUS.DONE && (!plan.autopilot || plan.autopilot.status === AUTOPILOT_STATUS.DONE || plan.autopilot.status === AUTOPILOT_STATUS.OFF)
+    && (!!nextId || plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS));
   // Until you fold or unfold something, the chunks in flight and the next one
   // are open: that's where the work is.
-  const auto = new Set(plan.chunks.filter((c) => c.status === 'in-progress' || c.awaitingFix).map((c) => c.id));
+  const auto = new Set(plan.chunks.filter((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix).map((c) => c.id));
   if (nextId) auto.add(nextId);
   const [expanded, setExpanded] = useState(null);
   const open = expanded ?? auto;
@@ -756,14 +763,14 @@ function PlanDetail({
           <PanelButton icon={FileText} latched={showSource} onClick={() => setShowSource((v) => !v)} title="Show the plan as it was pasted">
             source
           </PanelButton>
-          {!started && plan.split !== 'running' && (
+          {!started && plan.split !== SPLIT_STATUS.RUNNING && (
             <PanelButton icon={RefreshCw} onClick={onResplit} title="Split the plan again (nothing has started yet)">
               re-split
             </PanelButton>
           )}
           <PanelButton icon={Trash2} onClick={onDelete} title="Delete this plan" aria-label="Delete this plan" className="ml-auto" />
         </div>
-        <h3 className="text-xs font-medium leading-snug text-foreground wrap-anywhere">{plan.title || 'Untitled plan'}</h3>
+        <h3 className="text-xs font-medium leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
         {plan.autopilot && (
           <AutopilotStrip
@@ -805,13 +812,13 @@ function PlanDetail({
         </pre>
       )}
 
-      {plan.split === 'running' && (
+      {plan.split === SPLIT_STATUS.RUNNING && (
         <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
           <Scanner size="md" />
           splitting into chunks…
         </div>
       )}
-      {plan.split === 'failed' && (
+      {plan.split === SPLIT_STATUS.FAILED && (
         <div className="flex flex-col items-start gap-1.5 px-3 py-2.5 text-[11px]">
           <span className="flex items-center gap-2 text-foreground"><Lamp state="fault" /> split failed</span>
           <span className="break-words text-[10px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
@@ -848,13 +855,13 @@ function PlanDetail({
 
 // What the state means and what you can do about it, for the states that
 // need a word. Pending needs none.
-function statusNote(chunk) {
-  if (chunk.needsCommit) return 'The agent finished without committing. Check again, commit all changes as this chunk, or reset it.';
-  if (chunk.awaitingFix) return 'Review notes sent. Waiting for the fix commit.';
-  if (chunk.status === 'in-progress') return 'Sent to the agent. Marked implemented when its commit lands.';
-  if (chunk.status === 'rolled-back') return 'Reverted. Implement it again or skip it.';
-  return null;
-}
+const STATUS_NOTE = {
+  [CHUNK_STATE.NO_COMMIT]: 'The agent finished without committing. Check again, commit all changes as this chunk, or reset it.',
+  [CHUNK_STATE.FIXING]: 'Review notes sent. Waiting for the fix commit.',
+  [CHUNK_STATE.IN_PROGRESS]: 'Sent to the agent. Marked implemented when its commit lands.',
+  [CHUNK_STATE.ROLLED_BACK]: 'Reverted. Implement it again or skip it.',
+};
+const statusNote = (chunk) => STATUS_NOTE[effectiveChunkState(chunk)] ?? null;
 
 function ChunkRow({
   chunk, isNext, first, last, open, busy, piloted, pilotChunk, nudged, onToggle, onImplement, onCheck, onCommit, onReview, onRollback, onPatch,
@@ -863,12 +870,12 @@ function ChunkRow({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: chunk.title, details: chunk.details });
   const lamp = chunkLamp(chunk);
-  const skipped = chunk.status === 'skipped';
-  const startable = chunk.status === 'pending' || chunk.status === 'rolled-back';
-  const status = chunk.needsCommit ? 'no commit' : chunk.awaitingFix ? 'fixing' : STATUS_LABEL[chunk.status];
-  const took = chunk.status === 'implemented' && chunk.startedAt && chunk.doneAt
+  const skipped = chunk.status === CHUNK_STATUS.SKIPPED;
+  const startable = chunk.status === CHUNK_STATUS.PENDING || chunk.status === CHUNK_STATUS.ROLLED_BACK;
+  const status = STATUS_LABEL[effectiveChunkState(chunk)];
+  const took = chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.startedAt && chunk.doneAt
     ? formatDuration(chunk.doneAt - chunk.startedAt) : null;
-  const note = pilotChunk && chunk.status === 'in-progress'
+  const note = pilotChunk && chunk.status === CHUNK_STATUS.IN_PROGRESS
     ? 'Auto-pilot sent this chunk. It moves on to the next one when the commit lands.'
     : statusNote(chunk);
 
@@ -915,7 +922,7 @@ function ChunkRow({
               {nudged ? 'nudged' : 'auto'}
             </span>
           )}
-          {busy ? <Scanner /> : chunk.status !== 'pending' && (
+          {busy ? <Scanner /> : chunk.status !== CHUNK_STATUS.PENDING && (
             <span className="tabular-nums" title={took ? `Took ${took} from sending to commit` : undefined}>
               {status}{took && ` · ${took}`}
             </span>
@@ -992,18 +999,18 @@ function ChunkRow({
                   implement
                 </PanelButton>
               )}
-              {chunk.status === 'in-progress' && !piloted && (
+              {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && (
                 <>
                   <PanelButton icon={RefreshCw} onClick={onCheck} disabled={busy} title="Look for the chunk's commit">check</PanelButton>
                   <PanelButton icon={GitCommit} onClick={onCommit} disabled={busy} title="Commit all changes as this chunk">
                     commit
                   </PanelButton>
-                  <PanelButton icon={Undo2} onClick={() => onPatch({ status: 'pending', needsCommit: false })} disabled={busy} title="Back to pending (changes are kept)">
+                  <PanelButton icon={Undo2} onClick={() => onPatch({ status: CHUNK_STATUS.PENDING, needsCommit: false })} disabled={busy} title="Back to pending (changes are kept)">
                     reset
                   </PanelButton>
                 </>
               )}
-              {chunk.status === 'implemented' && chunk.commits?.length > 0 && (
+              {chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.commits?.length > 0 && (
                 <>
                   <PanelButton icon={Eye} onClick={onReview} disabled={busy} title="Review the chunk's diff; notes go back to the agent">
                     review
@@ -1013,17 +1020,17 @@ function ChunkRow({
                   </PanelButton>
                 </>
               )}
-              {(chunk.status === 'pending' || skipped) && (
+              {(chunk.status === CHUNK_STATUS.PENDING || skipped) && (
                 <PanelButton
                   icon={SkipForward}
                   latched={skipped}
-                  onClick={() => onPatch({ status: skipped ? 'pending' : 'skipped' })}
+                  onClick={() => onPatch({ status: skipped ? CHUNK_STATUS.PENDING : CHUNK_STATUS.SKIPPED })}
                   title="Skipped chunks don't count toward progress"
                 >
                   skip
                 </PanelButton>
               )}
-              {chunk.status === 'pending' && (
+              {chunk.status === CHUNK_STATUS.PENDING && (
                 <span className="ml-auto flex gap-1">
                   <PanelButton icon={Pencil} onClick={startEdit} title="Edit chunk" aria-label="Edit chunk" />
                   <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" />

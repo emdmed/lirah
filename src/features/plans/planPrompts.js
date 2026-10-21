@@ -1,6 +1,7 @@
 // Prompts the plans feature sends to an agent, and parsing of what comes back.
 
 import { planGit, workPath } from './planGit';
+import { CHUNK_STATUS } from './planModel';
 
 // Each chunk's commits carry this trailer, so they can be found in the log no
 // matter what else lands on the branch meanwhile.
@@ -111,9 +112,9 @@ If you can't proceed (a failure you can't fix, something missing), end your repl
 PLAN-STATUS: blocked — <reason>`;
 
 export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
-  const active = plan.chunks.filter((c) => c.status !== 'skipped');
-  const done = active.filter((c) => c.status === 'implemented');
-  const later = active.filter((c) => c.n > chunk.n && c.status !== 'implemented');
+  const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
+  const done = active.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
+  const later = active.filter((c) => c.n > chunk.n && c.status !== CHUNK_STATUS.IMPLEMENTED);
   const list = (cs) => cs.map((c) => `  ${c.n}. ${c.title}`).join('\n');
   return [
     `Implement chunk ${chunk.n} of ${plan.chunks.length} of the plan "${plan.title}".`,
