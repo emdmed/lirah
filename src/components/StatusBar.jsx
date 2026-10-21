@@ -140,8 +140,9 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
           {/* One figure: the fill already reads as a share; % is in the tooltip. */}
           <span className={cn('flex items-baseline tabular-nums', pct == null ? 'tube-idle' : tone)}>
             <span className="w-[6ch] text-right">{max ? fmt(value) : '--'}</span>
-            <span className="px-0.5 opacity-50">/</span>
-            <span className="w-[5ch]">{max ? fmt(max) : '--'}</span>
+            {/* The ceiling recedes so the live value leads. */}
+            <span className="px-0.5 text-faint">/</span>
+            <span className="w-[5ch] text-faint">{max ? fmt(max) : '--'}</span>
           </span>
         </span>
       </TooltipTrigger>

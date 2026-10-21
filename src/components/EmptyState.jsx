@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from './ui/button';
 
-// A sentence in the serif voice, then a comment and a bracketed action in mono.
+// Reads like command output: a status line, a comment, and a bracketed action.
 // `icon` is accepted for existing callers but not drawn.
 export function EmptyState({
   icon: _icon,
@@ -12,7 +12,9 @@ export function EmptyState({
 }) {
   return (
     <div className={`flex flex-col items-start gap-1 px-2 py-3 text-xs ${className}`}>
-      <p className="ins-voice text-foreground">{title}</p>
+      <p className="text-foreground">
+        <span className="text-muted-foreground">-- </span>{title}<span className="text-muted-foreground"> --</span>
+      </p>
       {description && (
         <p className="text-muted-foreground"># {description}</p>
       )}

@@ -2,7 +2,9 @@ import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Lamp } from "../instrument/Lamp";
 
-const SEGMENT = "h-4 px-1 gap-1 text-[10px] font-mono font-normal before:content-none after:content-none";
+// A readout line, not a key bank: an open/pressed segment reads in full
+// foreground rather than sitting on the key's latched tint.
+const SEGMENT = "h-4 px-1 gap-1 text-[10px] font-mono font-normal before:content-none after:content-none aria-pressed:bg-transparent aria-pressed:text-foreground";
 
 /**
  * One segment of the prompt mode line. A button (a key that stays down while

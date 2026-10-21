@@ -29,16 +29,6 @@
   font-display: swap;
 }
 
-/* Voice face (OFL, bundled): the serif italic for the app's few human
-   sentences (prompt placeholder, empty states), set against the mono UI. */
-@font-face {
-  font-family: 'Crimson Pro';
-  src: url('/fonts/CrimsonPro-Italic.woff2') format('woff2');
-  font-weight: 200 900;
-  font-style: italic;
-  font-display: swap;
-}
-
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -147,7 +137,6 @@
   --font-legend: "Departure Mono", var(--font-mono);
   --legend-weight: 400;
   --legend-tracking: 0.04em;
-  --font-voice: "Crimson Pro", Georgia, serif;
   /* Slow, even easing for colour changes on hover and focus. */
   --ins-ease: cubic-bezier(0.333, 0, 0.667, 1);
 
@@ -1002,10 +991,10 @@ body {
     width: 1px;
     height: 50%;
     margin-left: -0.5px;
-    background: var(--ins-edge-strong);
+    background: var(--ins-edge);
   }
 
-  .ins-meter-ticks > span[data-major] { height: 100%; }
+  .ins-meter-ticks > span[data-major] { height: 100%; background: var(--ins-edge-strong); }
   .ins-meter-ticks > span:first-child { margin-left: 0; }
   .ins-meter-ticks > span:last-child { margin-left: -1px; }
 
@@ -1018,8 +1007,8 @@ body {
     transition: opacity 200ms ease-out;
   }
 
-  /* Far from the zone, keep it a faint hint rather than an alarm. */
-  .ins-meter[data-calm] .ins-meter-zone { opacity: 0.3; }
+  /* Far from the zone it is hidden; it fades in as usage approaches it. */
+  .ins-meter[data-calm] .ins-meter-zone { opacity: 0; }
 
   .ins-meter-track {
     position: absolute;
@@ -1077,6 +1066,11 @@ body {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
     white-space: nowrap;
+  }
+
+  /* The ceiling recedes so the live value leads. */
+  .ins-meter-max {
+    color: var(--ins-faint);
   }
 
   /* Toggle switch: a framed well track with a knob. Off, the knob is an
@@ -1154,21 +1148,6 @@ body {
     line-height: 1;
     color: var(--color-muted-foreground);
   }
-}
-
-/*
-  The voice: a serif italic for the app's few human sentences, set larger
-  than the 12px mono so its x-height matches. Never for labels, data or
-  controls. .ins-voice-placeholder gives an input's placeholder the voice
-  while typed text stays mono.
-*/
-.ins-voice,
-.ins-voice-placeholder::placeholder {
-  font-family: var(--font-voice);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 15px;
-  letter-spacing: 0.01em;
 }
 
 /* Links: a fine dotted underline that clears on hover. */

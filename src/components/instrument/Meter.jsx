@@ -44,7 +44,7 @@ export function Meter({ value, max, warnAt = 0.8, label, format = formatCompact,
       </span>
       {readout && (
         <span className="ins-meter-readout">
-          {format(value)}/{format(max)}
+          {format(value)}<span className="ins-meter-max">/{format(max)}</span>
         </span>
       )}
     </span>
