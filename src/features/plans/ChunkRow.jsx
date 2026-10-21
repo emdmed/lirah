@@ -61,7 +61,8 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
   const skipped = chunk.status === CHUNK_STATUS.SKIPPED;
   const startable = chunk.status === CHUNK_STATUS.PENDING || chunk.status === CHUNK_STATUS.ROLLED_BACK;
   const status = STATUS_LABEL[effectiveChunkState(chunk)];
-  const took = chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.startedAt && chunk.doneAt
+  const implemented = chunk.status === CHUNK_STATUS.IMPLEMENTED;
+  const took = implemented && chunk.startedAt && chunk.doneAt
     ? formatDuration(chunk.doneAt - chunk.startedAt) : null;
   const note = pilotChunk && chunk.status === CHUNK_STATUS.IN_PROGRESS
     ? 'Auto-pilot sent this chunk. It moves on to the next one when the commit lands.'
@@ -80,7 +81,7 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
     <div className="flex flex-col edge-b-engraved">
       <button
         onClick={onToggle}
-        className="flex min-w-0 items-start gap-2 px-3 py-2 text-left text-[11px] cursor-pointer hover:bg-foreground/5 outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
+        className="group flex min-w-0 items-start gap-2 px-3 py-2 text-left text-[11px] cursor-pointer hover:bg-foreground/5 outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
         aria-expanded={open}
         title={isNext ? 'Next chunk' : undefined}
       >
@@ -90,7 +91,7 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
         <span
           className={cn(
             'w-4 shrink-0 text-right font-mono text-[10px] leading-4 tabular-nums',
-            isNext ? 'text-[var(--ins-lamp)]' : 'text-muted-foreground',
+            isNext ? 'text-[var(--ins-lamp)]' : 'text-faint',
           )}
         >
           {chunk.n}
@@ -99,7 +100,7 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
           className={cn(
             'min-w-0 flex-1 leading-4',
             open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
-            skipped ? 'text-muted-foreground line-through' : 'text-foreground',
+            skipped ? 'text-muted-foreground line-through' : implemented && !open ? 'text-muted-foreground' : 'text-foreground',
           )}
         >
           {chunk.title}
@@ -110,12 +111,15 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
               {nudged ? 'nudged' : 'auto'}
             </span>
           )}
-          {busy ? <Scanner /> : chunk.status !== CHUNK_STATUS.PENDING && (
-            <span className="tabular-nums" title={took ? `Took ${took} from sending to commit` : undefined}>
-              {status}{took && ` · ${took}`}
-            </span>
+          {/* Implemented is the lamp's job; the row only says how long it took. */}
+          {busy ? <Scanner /> : implemented ? took && (
+            <span className="tabular-nums text-faint" title={`${status}; took ${took} from sending to commit`}>{took}</span>
+          ) : chunk.status !== CHUNK_STATUS.PENDING && (
+            <span className="tabular-nums">{status}</span>
           )}
-          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          <span className="text-faint transition-colors group-hover:text-muted-foreground group-focus-visible:text-muted-foreground">
+            {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </span>
         </span>
       </button>
 
@@ -231,5 +235,34 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** A run of implemented chunks folded into one row; click to list them. */
+export function DoneRun({ chunks, onUnfold }) {
+  const first = chunks[0].n;
+  const last = chunks.at(-1).n;
+  const ms = chunks.reduce((sum, c) => sum + (c.startedAt && c.doneAt ? c.doneAt - c.startedAt : 0), 0);
+  return (
+    <button
+      onClick={onUnfold}
+      className="group flex min-w-0 items-center gap-2 px-3 py-2 text-left text-[11px] cursor-pointer edge-b-engraved hover:bg-foreground/5 outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
+      title={`Show chunks ${first}–${last}`}
+    >
+      <span className="flex h-4 shrink-0 items-center">
+        <Lamp state="ok" label="implemented" />
+      </span>
+      <span className="w-4 shrink-0" />
+      <span className="min-w-0 flex-1 leading-4 text-muted-foreground">
+        <span className="tabular-nums">{first}–{last}</span> implemented
+        <span className="text-faint"> · {chunks.length} chunks</span>
+      </span>
+      <span className="flex h-4 shrink-0 items-center gap-1.5 text-[10px]">
+        {ms > 0 && <span className="tabular-nums text-faint">{formatDuration(ms)}</span>}
+        <span className="text-faint transition-colors group-hover:text-muted-foreground group-focus-visible:text-muted-foreground">
+          <ChevronRight className="h-3 w-3" />
+        </span>
+      </span>
+    </button>
   );
 }

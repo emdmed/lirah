@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { basename } from '../../utils/pathUtils';
+import { cn } from '../../lib/utils';
 import { FolderX, SquareTerminal, X } from 'lucide-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -49,11 +50,12 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
     : 'set up when the first chunk is sent';
 
   return (
-    <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]">
+    // Settled config is a metadata line; only the editable form gets a well.
+    <div className={cn('flex min-w-0 flex-col gap-1.5 text-[11px]', !locked && 'ins-well px-2 py-1.5')}>
       <div className="flex min-w-0 items-center gap-2">
-        <Lamp state={removed ? 'off' : locked ? 'ok' : 'off'} label={locked ? 'git set up' : 'git not set up yet'} />
+        {!locked && <Lamp state="off" label="git not set up yet" />}
         <span className="engraved-label shrink-0">git</span>
-        <span className="min-w-0 truncate text-foreground" title={headline}>{headline}</span>
+        <span className={cn('min-w-0 truncate', locked ? 'text-muted-foreground' : 'text-foreground')} title={headline}>{headline}</span>
       </div>
 
       {!locked && (
@@ -88,14 +90,17 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         {cfg.repos.map((repo, i) => (
           <div key={repo.root} className="flex min-w-0 flex-col gap-0.5">
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-foreground" title={repo.root}>
+              <span className={cn('min-w-0 flex-1 truncate font-mono text-[10px]', locked ? 'text-muted-foreground' : 'text-foreground')} title={repo.root}>
                 {basename(repo.root)}
-                {i === 0 && <span className="text-muted-foreground"> · primary</span>}
+                {i === 0 && <span className="text-faint"> · primary</span>}
               </span>
               {locked ? (
-                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                  {cfg.branch ? `${cfg.branch} ← ${repo.base || 'HEAD'}` : repo.base || 'current branch'}
-                </span>
+                // With no branch the headline already says "current branch".
+                (cfg.branch || repo.base) && (
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {cfg.branch ? `${cfg.branch} ← ${repo.base || 'HEAD'}` : repo.base}
+                  </span>
+                )
               ) : (
                 <>
                   {cfg.branch.trim() && (

@@ -26,6 +26,27 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
   }[ap.status] || ap.status;
   const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
   const live = running || ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
+  // A settled run is a line, not a box: only a live one should pull the eye.
+  if (!live) {
+    return (
+      <div className="flex min-w-0 flex-col gap-1 text-[11px]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <Lamp state={lamp.state} blink={lamp.blink} label={headline} />
+          <span className="engraved-label shrink-0">auto-pilot</span>
+          <span className="min-w-0 truncate tabular-nums text-muted-foreground" role="status">{headline}</span>
+          <span className="ml-auto flex items-center gap-1.5">
+            {ap.status === AUTOPILOT_STATUS.DONE && (
+              <PanelButton icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
+                review all
+              </PanelButton>
+            )}
+            <PanelButton icon={Check} onClick={onDismiss} title="Clear the status">dismiss</PanelButton>
+          </span>
+        </div>
+        {ap.message && <Prose text={ap.message} clamp={3} className="text-[10px] leading-relaxed text-muted-foreground" />}
+      </div>
+    );
+  }
   return (
     <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]">
       <div className="flex min-w-0 items-center gap-2">
@@ -45,7 +66,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
         </p>
       )}
       <div className="flex flex-wrap items-center gap-1.5">
-        {live && tabOpen && (
+        {tabOpen && (
           <PanelButton icon={SquareTerminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
         )}
         {(ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED) && (
@@ -53,16 +74,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
             resume
           </PanelButton>
         )}
-        {ap.status === AUTOPILOT_STATUS.DONE && (
-          <PanelButton icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
-            review all
-          </PanelButton>
-        )}
-        {live ? (
-          <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
-        ) : (
-          <PanelButton icon={Check} onClick={onDismiss} title="Clear the status">dismiss</PanelButton>
-        )}
+        <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
       </div>
     </div>
   );

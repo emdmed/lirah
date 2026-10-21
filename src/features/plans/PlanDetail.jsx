@@ -9,11 +9,32 @@ import {
   AUTOPILOT_STATUS, CHUNK_STATUS, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import { AutopilotStrip } from './AutopilotStrip';
-import { ChunkRow } from './ChunkRow';
+import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { planGit } from './planGit';
 import { useTabManager } from '../tabs/TabContext';
+
+// Consecutive implemented chunks fold into one row, so finished work recedes
+// and the list leads with what's left. A chunk you've opened stays its own row.
+function chunkSegments(chunks, open) {
+  const segs = [];
+  let run = [];
+  const flush = () => {
+    if (run.length >= 2) segs.push({ key: `run:${run[0].id}`, run });
+    else run.forEach((chunk) => segs.push({ key: chunk.id, chunk }));
+    run = [];
+  };
+  for (const chunk of chunks) {
+    if (chunk.status === CHUNK_STATUS.IMPLEMENTED && !open.has(chunk.id)) run.push(chunk);
+    else {
+      flush();
+      segs.push({ key: chunk.id, chunk });
+    }
+  }
+  flush();
+  return segs;
+}
 
 export function PlanDetail({ plan }) {
   const pane = usePlanPane();
@@ -35,6 +56,8 @@ export function PlanDetail({ plan }) {
   const [expanded, setExpanded] = useState(null);
   const open = expanded ?? auto;
   const [showSource, setShowSource] = useState(false);
+  // Folded runs of finished chunks you've opened back up, by first chunk id.
+  const [unfolded, setUnfolded] = useState(() => new Set());
   const started = planStarted(plan);
   const toggle = (id) => setExpanded((s) => {
     const next = new Set(s ?? auto);
@@ -48,17 +71,23 @@ export function PlanDetail({ plan }) {
       <div className="flex flex-col gap-2 px-3 pt-2 pb-2.5 edge-b-engraved">
         <div className="flex flex-wrap items-center gap-1.5">
           <PanelButton icon={ChevronLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
-          <PanelButton icon={FileText} latched={showSource} onClick={() => setShowSource((v) => !v)} title="Show the plan as it was pasted">
-            source
-          </PanelButton>
-          {!started && plan.split !== SPLIT_STATUS.RUNNING && (
-            <PanelButton icon={RefreshCw} onClick={resplit} title="Split the plan again (nothing has started yet)">
-              re-split
+          <span className="ml-auto flex items-center gap-1.5">
+            <PanelButton icon={FileText} latched={showSource} onClick={() => setShowSource((v) => !v)} title="Show the plan as it was pasted">
+              source
             </PanelButton>
-          )}
-          <PanelButton icon={Trash2} onClick={() => pane.deletePlan(plan)} title="Delete this plan" aria-label="Delete this plan" className="ml-auto" />
+            {!started && plan.split !== SPLIT_STATUS.RUNNING && (
+              <PanelButton icon={RefreshCw} onClick={resplit} title="Split the plan again (nothing has started yet)">
+                re-split
+              </PanelButton>
+            )}
+            <PanelButton icon={Trash2} onClick={() => pane.deletePlan(plan)} title="Delete this plan" aria-label="Delete this plan" />
+          </span>
         </div>
-        <h3 className="text-xs font-medium leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
+        {/* Identity first: the title, and what the plan is for. */}
+        <div className="flex flex-col gap-1 pt-1">
+          <h3 className="text-[13px] font-medium leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
+          {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
+        </div>
         {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
         {plan.autopilot && (
           <AutopilotStrip
@@ -82,7 +111,6 @@ export function PlanDetail({ plan }) {
             run on auto-pilot
           </PanelButton>
         )}
-        {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
         <PlanGitSection
           plan={plan}
           busy={settingUpGit}
@@ -114,9 +142,18 @@ export function PlanDetail({ plan }) {
         </div>
       )}
 
-      {plan.chunks.map((chunk) => (
+      {total > 0 && (
+        <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 edge-b-engraved">
+          <span className="engraved-label">chunks</span>
+          <span className="font-mono text-[10px] tabular-nums text-faint">{done}/{total}</span>
+        </div>
+      )}
+
+      {chunkSegments(plan.chunks, open).map((seg) => (seg.run && !unfolded.has(seg.key) ? (
+        <DoneRun key={seg.key} chunks={seg.run} onUnfold={() => setUnfolded((s) => new Set(s).add(seg.key))} />
+      ) : (seg.run ?? [seg.chunk]).map((chunk) => (
         <ChunkRow key={chunk.id} plan={plan} chunk={chunk} open={open.has(chunk.id)} onToggle={() => toggle(chunk.id)} />
-      ))}
+      ))))}
     </div>
   );
 }
