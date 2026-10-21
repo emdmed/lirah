@@ -15,10 +15,6 @@ const PLAN_FILE = /(^|[_-])plan\.md$/i;
  */
 export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
   const [files, setFiles] = useState([]);
-  const [scanTick, setScanTick] = useState(0);
-
-  const rescan = useCallback(() => setScanTick((t) => t + 1), []);
-
   // Rescan only when what was imported changes, not on every chunk update.
   const plansRef = useRef(plans);
   plansRef.current = plans;
@@ -65,7 +61,7 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
     return () => {
       cancelled = true;
     };
-  }, [repoRoot, importedKey, scanTick]);
+  }, [repoRoot, importedKey]);
 
   const importFile = useCallback(async (file, { deleteOriginal = false } = {}) => {
     const importedFrom = { path: file.path, hash: file.hash };
@@ -79,5 +75,5 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
     if (deleteOriginal) await invoke('delete_plan_file', { path: file.path, repoRoot });
   }, [repoRoot, plans, createPlan, replaceSource]);
 
-  return { files, importFile, rescan };
+  return { files, importFile };
 }
