@@ -20,8 +20,8 @@ mod util;
 use tauri::Manager;
 
 use state::create_state;
-use pty::commands::{spawn_terminal, attach_terminal, reap_detached_terminals, detach_all_terminals, write_to_terminal, resize_terminal, close_terminal, pty_pause, pty_resume, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, get_committable_files, run_git_command, generate_commit_message, check_pty_child_process, kill_pty_child_process};
-use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_home_dir, set_file_executable, path_exists};
+use pty::commands::{spawn_terminal, attach_terminal, reap_detached_terminals, detach_all_terminals, write_to_terminal, resize_terminal, close_terminal, pty_pause, pty_resume, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, check_pty_child_process, kill_pty_child_process};
+use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_session_token_usage, get_project_stats, get_all_projects_stats, get_home_dir, set_file_executable, path_exists, get_committable_files, run_git_command, generate_commit_message};
 use typecheck::{check_file_types, check_project_types};
 use python_parser::parse_python_skeleton;
 use claude::{get_active_claude_session, get_project_subagents, watch_project_subagents, stop_project_subagents_watcher, SubagentWatcherStore};

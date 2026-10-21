@@ -68,13 +68,21 @@ pub(crate) fn read_current_branch(work_tree: &Path) -> Option<String> {
     branch_from_head(&head)
 }
 
+/// A git command run in `dir`. Every git process the backend starts goes
+/// through here.
+pub(crate) fn git_command(dir: &Path) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(dir);
+    cmd
+}
+
 /// Run git in `dir` without taking optional locks: a background status must not
 /// rewrite .git/index, or the watcher would see the write and ask for stats again.
+/// Its stdout when it succeeds, None when it fails.
 fn git_output(dir: &Path, args: &[&str]) -> Result<Option<Vec<u8>>, String> {
-    let output = Command::new("git")
+    let output = git_command(dir)
         .arg("--no-optional-locks")
         .args(args)
-        .current_dir(dir)
         .output()
         .map_err(|e| format!("Failed to execute git {}: {}", args.first().unwrap_or(&""), e))?;
     Ok(output.status.success().then_some(output.stdout))
@@ -357,35 +365,16 @@ fn git_diff_blocking(
     };
 
     // Get old content from git (the base version)
-    let old_output = Command::new("git")
-        .arg("show")
-        .arg(format!("{}:{}", base, relative_path))
-        .current_dir(&repo)
-        .output()
-        .map_err(|e| format!("Failed to execute git show: {}", e))?;
-
-    let is_new_file = !old_output.status.success();
-    let old_content = if is_new_file {
-        String::new()
-    } else {
-        String::from_utf8_lossy(&old_output.stdout).to_string()
-    };
+    let old = git_output(&repo, &["show", &format!("{}:{}", base, relative_path)])?;
+    let is_new_file = old.is_none();
+    let old_content = old.map(|out| String::from_utf8_lossy(&out).to_string()).unwrap_or_default();
 
     // New content: that commit's version, or the file on disk
     let (new_content, new_exists) = match &head_ref {
-        Some(head) => {
-            let out = Command::new("git")
-                .arg("show")
-                .arg(format!("{}:{}", head, relative_path))
-                .current_dir(&repo)
-                .output()
-                .map_err(|e| format!("Failed to execute git show: {}", e))?;
-            if out.status.success() {
-                (String::from_utf8_lossy(&out.stdout).to_string(), true)
-            } else {
-                (String::new(), false)
-            }
-        }
+        Some(head) => match git_output(&repo, &["show", &format!("{}:{}", head, relative_path)])? {
+            Some(out) => (String::from_utf8_lossy(&out).to_string(), true),
+            None => (String::new(), false),
+        },
         None if file.exists() => (
             fs::read_to_string(&file).map_err(|e| format!("Failed to read file: {}", e))?,
             true,
@@ -396,20 +385,13 @@ fn git_diff_blocking(
     let is_deleted_file = !new_exists && !is_new_file;
 
     // Count changes using git diff --numstat
-    let mut numstat_cmd = Command::new("git");
-    numstat_cmd.arg("diff").arg(&base);
+    let mut numstat_args = vec!["diff", base.as_str()];
     if let Some(head) = &head_ref {
-        numstat_cmd.arg(head);
+        numstat_args.push(head);
     }
-    let numstat_output = numstat_cmd
-        .arg("--numstat")
-        .arg("--")
-        .arg(&relative_path)
-        .current_dir(&repo)
-        .output()
-        .map_err(|e| format!("Failed to execute git diff: {}", e))?;
-
-    let numstat = String::from_utf8_lossy(&numstat_output.stdout);
+    numstat_args.extend(["--numstat", "--", relative_path.as_str()]);
+    let numstat_output = git_output(&repo, &numstat_args)?.unwrap_or_default();
+    let numstat = String::from_utf8_lossy(&numstat_output);
     let (added_lines, deleted_lines) = numstat
         .lines()
         .next()
