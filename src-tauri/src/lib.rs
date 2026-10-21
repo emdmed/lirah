@@ -20,15 +20,8 @@ mod util;
 use tauri::Manager;
 
 use state::create_state;
-use pty::commands::{spawn_terminal, attach_terminal, reap_detached_terminals, detach_all_terminals, write_to_terminal, resize_terminal, close_terminal, pty_pause, pty_resume, spawn_hidden_terminal, start_commit_watcher, stop_commit_watcher, check_pty_child_process, kill_pty_child_process};
-use fs::{read_directory, get_terminal_cwd, read_file_content, write_file_content, read_directory_recursive, get_git_stats, get_current_branch, enable_file_watchers, disable_file_watchers, get_file_watchers_status, check_command_exists, get_git_diff, get_home_dir, set_file_executable, path_exists, get_committable_files, run_git_command, generate_commit_message};
-use typecheck::{check_file_types, check_project_types};
-use python_parser::parse_python_skeleton;
-use claude::{get_active_claude_session, get_project_subagents, watch_project_subagents, stop_project_subagents_watcher, SubagentWatcherStore, get_session_token_usage, get_project_stats, get_all_projects_stats};
-use workspace::{create_workspace, delete_workspace, list_workspaces, open_workspace, close_workspace};
-use fs_watcher::{start_fs_watcher, stop_fs_watcher, FsWatcherStore};
-use agent_runner::{create_agent_job_store};
-use agent_runner::commands::{run_agent_job, cancel_agent_job, list_running_agent_jobs};
+use claude::SubagentWatcherStore;
+use fs_watcher::FsWatcherStore;
 
 pub struct InitialPath(pub Option<String>);
 
@@ -51,7 +44,7 @@ pub fn run(initial_path: Option<String>) {
         .manage(commit_watcher::create_commit_watcher_store())
         .manage(std::sync::Arc::new(FsWatcherStore::new()))
         .manage(std::sync::Arc::new(SubagentWatcherStore::new()))
-        .manage(create_agent_job_store())
+        .manage(agent_runner::create_agent_job_store())
         .manage(InitialPath(initial_path))
         .setup(|app| {
             agent_hooks::start(app.handle().clone());
@@ -63,68 +56,76 @@ pub fn run(initial_path: Option<String>) {
         .on_page_load(|webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Started {
                 if let Some(state) = webview.try_state::<state::AppState>() {
-                    detach_all_terminals(&state);
+                    pty::commands::detach_all_terminals(&state);
                 }
             }
         })
         .invoke_handler(ipc::wrap(tauri::generate_handler![
-            spawn_terminal,
-            attach_terminal,
-            reap_detached_terminals,
-            write_to_terminal,
-            resize_terminal,
-            close_terminal,
-            pty_pause,
-            pty_resume,
-            read_directory,
-            get_terminal_cwd,
-            read_file_content,
-            write_file_content,
-            read_directory_recursive,
-            get_git_stats,
-            check_file_types,
-            check_project_types,
-            enable_file_watchers,
-            disable_file_watchers,
-            get_file_watchers_status,
-            check_command_exists,
-            get_git_diff,
-            get_current_branch,
-            get_session_token_usage,
-            get_project_stats,
-            parse_python_skeleton,
-            get_all_projects_stats,
-            spawn_hidden_terminal,
-            start_commit_watcher,
-            stop_commit_watcher,
-            get_committable_files,
-            run_git_command,
-            generate_commit_message,
-            get_active_claude_session,
-            get_project_subagents,
-            watch_project_subagents,
-            stop_project_subagents_watcher,
-            create_workspace,
-            delete_workspace,
-            list_workspaces,
-            open_workspace,
-            close_workspace,
-            get_home_dir,
-            set_file_executable,
-            path_exists,
-            check_pty_child_process,
-            kill_pty_child_process,
-            start_fs_watcher,
-            stop_fs_watcher,
-            run_agent_job,
-            cancel_agent_job,
-            list_running_agent_jobs,
+            // Terminals
+            pty::commands::spawn_terminal,
+            pty::commands::attach_terminal,
+            pty::commands::reap_detached_terminals,
+            pty::commands::write_to_terminal,
+            pty::commands::resize_terminal,
+            pty::commands::close_terminal,
+            pty::commands::pty_pause,
+            pty::commands::pty_resume,
+            pty::commands::spawn_hidden_terminal,
+            pty::commands::check_pty_child_process,
+            pty::commands::kill_pty_child_process,
+            fs::cwd::get_terminal_cwd,
             get_initial_path,
+            // Files
+            fs::directory::read_directory,
+            fs::directory::read_file_content,
+            fs::directory::write_file_content,
+            fs::directory::read_directory_recursive,
+            fs::commands::get_home_dir,
+            fs::commands::set_file_executable,
+            fs::commands::path_exists,
+            fs::commands::check_command_exists,
+            fs::git::enable_file_watchers,
+            fs::git::disable_file_watchers,
+            fs::git::get_file_watchers_status,
+            fs_watcher::start_fs_watcher,
+            fs_watcher::stop_fs_watcher,
+            // Code
+            typecheck::check_file_types,
+            typecheck::check_project_types,
+            python_parser::parse_python_skeleton,
+            // Git
+            fs::git::get_git_stats,
+            fs::git::get_git_diff,
+            fs::git::get_current_branch,
+            fs::git_commands::get_committable_files,
+            fs::git_commands::run_git_command,
+            fs::git_commands::generate_commit_message,
+            pty::commands::start_commit_watcher,
+            pty::commands::stop_commit_watcher,
+            // Claude sessions and tokens
+            claude::commands::get_active_claude_session,
+            claude::commands::get_project_subagents,
+            claude::commands::watch_project_subagents,
+            claude::commands::stop_project_subagents_watcher,
+            claude::tokens::get_session_token_usage,
+            claude::tokens::get_project_stats,
+            claude::tokens::get_all_projects_stats,
             agent_hooks::get_agent_hook_plugin_dir,
+            // Workspaces
+            workspace::create_workspace,
+            workspace::delete_workspace,
+            workspace::list_workspaces,
+            workspace::open_workspace,
+            workspace::close_workspace,
+            // Agent jobs
+            agent_runner::commands::run_agent_job,
+            agent_runner::commands::cancel_agent_job,
+            agent_runner::commands::list_running_agent_jobs,
+            // Plans
             plans::split_plan,
             plans::delete_plan_file,
             plans::remove_plan_workdir,
-            plans::last_assistant_text
+            plans::last_assistant_text,
         ]))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

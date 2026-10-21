@@ -473,13 +473,12 @@ pub async fn get_active_claude_session(
 ) -> Result<Option<ClaudeSessionEntry>, String> {
     // The scan is blocking and slow, so it goes to the blocking pool rather than
     // occupying an async worker for a second.
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::ipc::blocking("get_active_claude_session", move || {
         let page = get_claude_sessions(project_path, Some(1), Some(0))?;
         // Return the first (most recent) non-sidechain session
         Ok(page.sessions.into_iter().find(|s| !s.is_sidechain))
     })
     .await
-    .map_err(|e| format!("Session scan failed: {}", e))?
 }
 
 /// Encode a project path for the Claude directory structure

@@ -21,10 +21,6 @@ const PTY_FLUSH_SIZE: usize = 32 * 1024;
 
 const PROCESS_EXITED_NOTICE: &[u8] = b"\r\n[Process exited]\r\n";
 
-fn join_error(e: impl std::fmt::Display) -> String {
-    format!("Task join error: {}", e)
-}
-
 /// Clone a session's handle out of the map and release the global lock at once.
 fn get_session(state: &AppState, session_id: &str) -> Result<Arc<SessionHandle>, String> {
     state
@@ -171,11 +167,10 @@ pub async fn spawn_terminal(
     // agent hooks running inside can say which terminal they belong to.
     let session_id = Uuid::new_v4().to_string();
     let env = crate::agent_hooks::session_env(&session_id);
-    let (session, reader) = tauri::async_runtime::spawn_blocking(move || {
+    let (session, reader) = crate::ipc::blocking("spawn_terminal", move || {
         manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir, env)
     })
-    .await
-    .map_err(join_error)??;
+    .await?;
 
     let session = Arc::new(session);
     let sandboxed = session.sandboxed;
@@ -249,14 +244,14 @@ pub async fn reap_detached_terminals(
             .collect()
     };
     let count = orphans.len();
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::ipc::blocking("reap_detached_terminals", move || {
         for (id, session) in orphans {
             session.terminate();
             crate::agent_hooks::remove_session_log(&id);
         }
+        Ok(())
     })
-    .await
-    .map_err(join_error)?;
+    .await?;
     Ok(count)
 }
 
@@ -313,9 +308,11 @@ pub async fn close_terminal(
 
     if let Some(session) = session {
         // Kill, then wait so the child is reaped rather than left a zombie.
-        tauri::async_runtime::spawn_blocking(move || session.terminate())
-            .await
-            .map_err(join_error)?;
+        crate::ipc::blocking("close_terminal", move || {
+            session.terminate();
+            Ok(())
+        })
+        .await?;
         crate::agent_hooks::remove_session_log(&session_id);
 
         let _ = app.emit(
@@ -341,7 +338,7 @@ pub async fn spawn_hidden_terminal(
     let session_id = Uuid::new_v4().to_string();
     eprintln!("[hidden-terminal] Spawning: {} in {}", command, project_dir);
 
-    let (session, mut reader) = tauri::async_runtime::spawn_blocking(move || {
+    let (session, mut reader) = crate::ipc::blocking("spawn_hidden_terminal", move || {
         let pty_system = NativePtySystem::default();
         let pty_pair = pty_system
             .openpty(PtySize {
@@ -365,8 +362,7 @@ pub async fn spawn_hidden_terminal(
 
         SessionHandle::new(pty_pair.master, child, false)
     })
-    .await
-    .map_err(join_error)??;
+    .await?;
 
     let session = Arc::new(session);
     let state_inner = state.inner().clone();
@@ -553,9 +549,7 @@ pub async fn check_pty_child_process(
 ) -> Result<bool, String> {
     let shell_pid = session_pid(&state, &session_id)?;
     let target = process_name.to_lowercase();
-    tauri::async_runtime::spawn_blocking(move || find_descendant(shell_pid, &target).is_some())
-        .await
-        .map_err(join_error)
+    crate::ipc::blocking("check_pty_child_process", move || Ok(find_descendant(shell_pid, &target).is_some())).await
 }
 
 /// Kill a named child process running under the PTY session (e.g. claude, opencode).
@@ -570,17 +564,16 @@ pub async fn kill_pty_child_process(
 
     let shell_pid = session_pid(&state, &session_id)?;
     let target = process_name.to_lowercase();
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::ipc::blocking("kill_pty_child_process", move || {
         let Some(pid) = find_descendant(shell_pid, &target).map(Pid::from_u32) else {
-            return false;
+            return Ok(false);
         };
         let mut sys = System::new();
         sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
         if let Some(process) = sys.process(pid) {
             process.kill();
         }
-        true
+        Ok(true)
     })
     .await
-    .map_err(join_error)
 }

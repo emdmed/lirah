@@ -240,9 +240,8 @@ pub async fn get_session_token_usage(
         let guard = state.lock().ok()?;
         guard.pty_sessions.get(&id)?.child.process_id()
     });
-    tauri::async_runtime::spawn_blocking(move || get_session_token_usage_internal(&project_path, pty_pid))
+    crate::ipc::blocking("get_session_token_usage", move || get_session_token_usage_internal(&project_path, pty_pid))
         .await
-        .map_err(|e| format!("Task join error: {}", e))?
 }
 
 fn get_session_token_usage_internal(project_path: &str, pty_pid: Option<u32>) -> Result<TokenUsage, String> {
@@ -310,9 +309,7 @@ fn add_subagent_usage(info: &mut SessionInfo, session_file: &PathBuf) {
 
 #[tauri::command]
 pub async fn get_project_stats(project_path: String) -> Result<ProjectStats, String> {
-    tauri::async_runtime::spawn_blocking(move || get_project_stats_internal(&project_path))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
+    crate::ipc::blocking("get_project_stats", move || get_project_stats_internal(&project_path)).await
 }
 
 fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String> {
@@ -441,9 +438,7 @@ pub struct AllProjectsTotals {
 
 #[tauri::command]
 pub async fn get_all_projects_stats() -> Result<AllProjectsStats, String> {
-    tauri::async_runtime::spawn_blocking(move || get_all_projects_stats_internal())
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
+    crate::ipc::blocking("get_all_projects_stats", get_all_projects_stats_internal).await
 }
 
 fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {

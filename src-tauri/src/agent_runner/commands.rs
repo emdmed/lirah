@@ -326,10 +326,10 @@ fn append_log(log: &Option<Arc<Mutex<File>>>, line: &str) {
 /// Spawn a background agent job. Returns immediately; output is streamed to the
 /// frontend via `agent-job://output` events and completion via `agent-job://done`.
 /// The job runs headless in `cwd` (typically an isolated git worktree).
-#[tauri::command(async)]
-pub fn run_agent_job(
+#[tauri::command]
+pub async fn run_agent_job(
     app_handle: AppHandle,
-    store: tauri::State<Arc<AgentJobStore>>,
+    store: tauri::State<'_, Arc<AgentJobStore>>,
     job_id: String,
     cli: String,
     prompt: String,
@@ -337,211 +337,219 @@ pub fn run_agent_job(
     log_path: Option<String>,
     stream_json: Option<bool>,
 ) -> Result<(), String> {
-    let agent = agent_cli(&cli);
-    let mut command = match agent.system_prompt_flag {
-        Some(flag) => format!("{} {} '{}'", agent.command, flag, AUTONOMY_PROMPT),
-        None => agent.command.to_string(),
-    };
-    // Plain `claude -p` prints nothing until the run finishes, which leaves a
-    // caller with no idea whether a four-minute job is working or wedged.
-    // stream-json emits one NDJSON event per message, tool call and hook, so the
-    // frontend can show live activity. `--verbose` is required alongside it in
-    // headless mode. CLIs without an equivalent keep plain output.
-    if stream_json.unwrap_or(false) && agent.stream_json {
-        command.push_str(" --output-format stream-json --verbose");
-    }
-
-    // Persist the full output stream to disk so it survives the in-memory ring
-    // buffer cap and a webview reload — the run report and reattach both read it.
-    let log_file = log_path.as_deref().and_then(|p| {
-        if let Some(parent) = Path::new(p).parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(p)
-            .ok()
-            .map(|f| Arc::new(Mutex::new(f)))
-    });
-
-    // CLIs without a system-prompt flag get the autonomy rules folded into the
-    // prompt itself; the rest already carry them on the command line above.
-    let prompt = if agent.system_prompt_flag.is_none() {
-        format!("{}\n\n{}", AUTONOMY_PROMPT, prompt)
-    } else {
-        prompt
-    };
-
-    let mut cmd = crate::util::login_shell_command(&command);
-    cmd.current_dir(&cwd)
-        .env("TERM", "xterm-256color")
-        // No human is attached to this job, so make sure nothing the agent runs
-        // can block waiting for interactive input. These stop the most common
-        // culprits: git credential/host prompts, interactive pagers, and tools
-        // that only go non-interactive when they detect a CI environment.
-        .env("GIT_TERMINAL_PROMPT", "0") // git never prompts for username/password
-        .env("GIT_ASKPASS", "true")      // no credential-helper GUI/tty popup
-        .env("SSH_ASKPASS", "true")      // ssh won't pop a passphrase prompt
-        .env("GIT_PAGER", "cat")         // git output isn't piped into a pager
-        .env("PAGER", "cat")             // ditto for anything else that pages
-        .env("CI", "1")                  // many CLIs suppress prompts when CI is set
-        .env("DEBIAN_FRONTEND", "noninteractive")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    // Own process group so cancel_agent_job can kill the whole tree. Unix only:
-    // `process_group` comes from the unix CommandExt, and the group-kill in
-    // cancel_agent_job is likewise POSIX. On Windows this is a no-op.
-    #[cfg(unix)]
-    cmd.process_group(0);
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Failed to spawn agent job: {}", e))?;
-
-    // Feed the prompt via stdin, then close it so the CLI starts working.
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(prompt.as_bytes())
-            .map_err(|e| format!("Failed to write prompt to stdin: {}", e))?;
-        // Dropping stdin (end of scope) sends EOF.
-        let _ = stdin.flush();
-    }
-
-    let pid = child.id();
-    store
-        .jobs
-        .lock()
-        .map_err(|e| format!("Failed to lock job store: {}", e))?
-        .insert(job_id.clone(), pid);
-
-    // Both readers feed one channel; a batcher thread turns it into coalesced
-    // events. Every sender must be dropped for the batcher to finish, so the
-    // original `tx` is moved into the last reader (or dropped outright below).
-    let started = Instant::now();
-    // Milliseconds since `started` of the last output line, for the watchdog.
-    let last_output_ms = Arc::new(AtomicU64::new(0));
-    let (tx, rx) = std::sync::mpsc::channel::<JobLine>();
-    let batcher = {
-        let app = app_handle.clone();
-        let id = job_id.clone();
-        std::thread::spawn(move || batch_job_output(rx, app, id))
-    };
-
-    // Stream stdout line-by-line into the batcher.
-    let stdout_reader = child.stdout.take().map(|stdout| {
-        let log = log_file.clone();
-        let tx = tx.clone();
-        let last_output_ms = last_output_ms.clone();
-        std::thread::spawn(move || {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines().map_while(Result::ok) {
-                last_output_ms.store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
-                append_log(&log, &line);
-                let _ = tx.send(JobLine {
-                    stream: "stdout".to_string(),
-                    chunk: line,
-                });
-            }
-        })
-    });
-
-    // Stream stderr line-by-line into the same batcher.
-    let stderr_reader = child.stderr.take().map(|stderr| {
-        let log = log_file.clone();
-        let tx = tx.clone();
-        let last_output_ms = last_output_ms.clone();
-        std::thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                last_output_ms.store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
-                append_log(&log, &line);
-                let _ = tx.send(JobLine {
-                    stream: "stderr".to_string(),
-                    chunk: line,
-                });
-            }
-        })
-    });
-    drop(tx);
-
-    let timed_out = Arc::new(AtomicBool::new(false));
-    // Dropping `stop_watchdog` (when the job exits) ends the watchdog.
-    let (stop_watchdog, stop_rx) = std::sync::mpsc::channel::<()>();
-    {
-        let app = app_handle.clone();
-        let id = job_id.clone();
-        let timed_out = timed_out.clone();
-        std::thread::spawn(move || {
-            watch_job(app, id, pid, started, last_output_ms, timed_out, stop_rx)
-        });
-    }
-
-    // Wait for completion in a background thread, then emit done + clean up.
-    // The readers and the batcher are joined first: a process can exit while its
-    // pipes still hold buffered output, and batching widens that window, so
-    // without this the frontend could finalize a job before its last lines land.
-    let app = app_handle.clone();
-    let store_inner = store.inner().clone();
-    let id = job_id.clone();
-    std::thread::spawn(move || {
-        let exit_code = match child.wait() {
-            Ok(status) => status.code().unwrap_or(-1),
-            Err(_) => -1,
+    let store = store.inner().clone();
+    crate::ipc::blocking("run_agent_job", move || {
+        let agent = agent_cli(&cli);
+        let mut command = match agent.system_prompt_flag {
+            Some(flag) => format!("{} {} '{}'", agent.command, flag, AUTONOMY_PROMPT),
+            None => agent.command.to_string(),
         };
-        drop(stop_watchdog);
-        if let Some(handle) = stdout_reader {
-            let _ = handle.join();
+        // Plain `claude -p` prints nothing until the run finishes, which leaves a
+        // caller with no idea whether a four-minute job is working or wedged.
+        // stream-json emits one NDJSON event per message, tool call and hook, so the
+        // frontend can show live activity. `--verbose` is required alongside it in
+        // headless mode. CLIs without an equivalent keep plain output.
+        if stream_json.unwrap_or(false) && agent.stream_json {
+            command.push_str(" --output-format stream-json --verbose");
         }
-        if let Some(handle) = stderr_reader {
-            let _ = handle.join();
-        }
-        let _ = batcher.join();
-        if let Ok(mut jobs) = store_inner.jobs.lock() {
-            jobs.remove(&id);
-        }
-        let _ = app.emit(
-            "agent-job://done",
-            JobDone {
-                job_id: id,
-                exit_code,
-                success: exit_code == 0,
-                timed_out: timed_out.load(Ordering::SeqCst),
-            },
-        );
-    });
 
-    Ok(())
+        // Persist the full output stream to disk so it survives the in-memory ring
+        // buffer cap and a webview reload — the run report and reattach both read it.
+        let log_file = log_path.as_deref().and_then(|p| {
+            if let Some(parent) = Path::new(p).parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(p)
+                .ok()
+                .map(|f| Arc::new(Mutex::new(f)))
+        });
+
+        // CLIs without a system-prompt flag get the autonomy rules folded into the
+        // prompt itself; the rest already carry them on the command line above.
+        let prompt = if agent.system_prompt_flag.is_none() {
+            format!("{}\n\n{}", AUTONOMY_PROMPT, prompt)
+        } else {
+            prompt
+        };
+
+        let mut cmd = crate::util::login_shell_command(&command);
+        cmd.current_dir(&cwd)
+            .env("TERM", "xterm-256color")
+            // No human is attached to this job, so make sure nothing the agent runs
+            // can block waiting for interactive input. These stop the most common
+            // culprits: git credential/host prompts, interactive pagers, and tools
+            // that only go non-interactive when they detect a CI environment.
+            .env("GIT_TERMINAL_PROMPT", "0") // git never prompts for username/password
+            .env("GIT_ASKPASS", "true")      // no credential-helper GUI/tty popup
+            .env("SSH_ASKPASS", "true")      // ssh won't pop a passphrase prompt
+            .env("GIT_PAGER", "cat")         // git output isn't piped into a pager
+            .env("PAGER", "cat")             // ditto for anything else that pages
+            .env("CI", "1")                  // many CLIs suppress prompts when CI is set
+            .env("DEBIAN_FRONTEND", "noninteractive")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        // Own process group so cancel_agent_job can kill the whole tree. Unix only:
+        // `process_group` comes from the unix CommandExt, and the group-kill in
+        // cancel_agent_job is likewise POSIX. On Windows this is a no-op.
+        #[cfg(unix)]
+        cmd.process_group(0);
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn agent job: {}", e))?;
+
+        // Feed the prompt via stdin, then close it so the CLI starts working.
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(prompt.as_bytes())
+                .map_err(|e| format!("Failed to write prompt to stdin: {}", e))?;
+            // Dropping stdin (end of scope) sends EOF.
+            let _ = stdin.flush();
+        }
+
+        let pid = child.id();
+        store
+            .jobs
+            .lock()
+            .map_err(|e| format!("Failed to lock job store: {}", e))?
+            .insert(job_id.clone(), pid);
+
+        // Both readers feed one channel; a batcher thread turns it into coalesced
+        // events. Every sender must be dropped for the batcher to finish, so the
+        // original `tx` is moved into the last reader (or dropped outright below).
+        let started = Instant::now();
+        // Milliseconds since `started` of the last output line, for the watchdog.
+        let last_output_ms = Arc::new(AtomicU64::new(0));
+        let (tx, rx) = std::sync::mpsc::channel::<JobLine>();
+        let batcher = {
+            let app = app_handle.clone();
+            let id = job_id.clone();
+            std::thread::spawn(move || batch_job_output(rx, app, id))
+        };
+
+        // Stream stdout line-by-line into the batcher.
+        let stdout_reader = child.stdout.take().map(|stdout| {
+            let log = log_file.clone();
+            let tx = tx.clone();
+            let last_output_ms = last_output_ms.clone();
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().map_while(Result::ok) {
+                    last_output_ms.store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
+                    append_log(&log, &line);
+                    let _ = tx.send(JobLine {
+                        stream: "stdout".to_string(),
+                        chunk: line,
+                    });
+                }
+            })
+        });
+
+        // Stream stderr line-by-line into the same batcher.
+        let stderr_reader = child.stderr.take().map(|stderr| {
+            let log = log_file.clone();
+            let tx = tx.clone();
+            let last_output_ms = last_output_ms.clone();
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines().map_while(Result::ok) {
+                    last_output_ms.store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
+                    append_log(&log, &line);
+                    let _ = tx.send(JobLine {
+                        stream: "stderr".to_string(),
+                        chunk: line,
+                    });
+                }
+            })
+        });
+        drop(tx);
+
+        let timed_out = Arc::new(AtomicBool::new(false));
+        // Dropping `stop_watchdog` (when the job exits) ends the watchdog.
+        let (stop_watchdog, stop_rx) = std::sync::mpsc::channel::<()>();
+        {
+            let app = app_handle.clone();
+            let id = job_id.clone();
+            let timed_out = timed_out.clone();
+            std::thread::spawn(move || {
+                watch_job(app, id, pid, started, last_output_ms, timed_out, stop_rx)
+            });
+        }
+
+        // Wait for completion in a background thread, then emit done + clean up.
+        // The readers and the batcher are joined first: a process can exit while its
+        // pipes still hold buffered output, and batching widens that window, so
+        // without this the frontend could finalize a job before its last lines land.
+        let app = app_handle.clone();
+        let store_inner = store.clone();
+        let id = job_id.clone();
+        std::thread::spawn(move || {
+            let exit_code = match child.wait() {
+                Ok(status) => status.code().unwrap_or(-1),
+                Err(_) => -1,
+            };
+            drop(stop_watchdog);
+            if let Some(handle) = stdout_reader {
+                let _ = handle.join();
+            }
+            if let Some(handle) = stderr_reader {
+                let _ = handle.join();
+            }
+            let _ = batcher.join();
+            if let Ok(mut jobs) = store_inner.jobs.lock() {
+                jobs.remove(&id);
+            }
+            let _ = app.emit(
+                "agent-job://done",
+                JobDone {
+                    job_id: id,
+                    exit_code,
+                    success: exit_code == 0,
+                    timed_out: timed_out.load(Ordering::SeqCst),
+                },
+            );
+        });
+
+        Ok(())
+    })
+    .await
 }
 
 /// Cancel a running agent job by killing its process group (SIGTERM).
-#[tauri::command(async)]
-pub fn cancel_agent_job(
-    store: tauri::State<Arc<AgentJobStore>>,
+#[tauri::command]
+pub async fn cancel_agent_job(
+    store: tauri::State<'_, Arc<AgentJobStore>>,
     job_id: String,
 ) -> Result<bool, String> {
-    let pid = {
-        let jobs = store
-            .jobs
-            .lock()
-            .map_err(|e| format!("Failed to lock job store: {}", e))?;
-        jobs.get(&job_id).copied()
-    };
+    let store = store.inner().clone();
+    crate::ipc::blocking("cancel_agent_job", move || {
+        let pid = {
+            let jobs = store
+                .jobs
+                .lock()
+                .map_err(|e| format!("Failed to lock job store: {}", e))?;
+            jobs.get(&job_id).copied()
+        };
 
-    let Some(pid) = pid else {
-        return Ok(false);
-    };
+        let Some(pid) = pid else {
+            return Ok(false);
+        };
 
-    // Negative pid targets the whole process group (see process_group(0)
-    // above); SIGKILL follows for an agent that ignores SIGTERM, so a job can
-    // never get stuck half-cancelled.
-    let killed = kill_process_group(pid);
+        // Negative pid targets the whole process group (see process_group(0)
+        // above); SIGKILL follows for an agent that ignores SIGTERM, so a job can
+        // never get stuck half-cancelled.
+        let killed = kill_process_group(pid);
 
-    if let Ok(mut jobs) = store.jobs.lock() {
-        jobs.remove(&job_id);
-    }
+        if let Ok(mut jobs) = store.jobs.lock() {
+            jobs.remove(&job_id);
+        }
 
-    Ok(killed)
+        Ok(killed)
+    })
+    .await
 }
 
 /// Return the ids of jobs still tracked as running in this process. The frontend
