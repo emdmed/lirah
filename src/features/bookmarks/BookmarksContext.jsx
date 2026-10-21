@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { loadJson, saveJson } from '../../lib/storage';
 
 const BookmarksContext = createContext(undefined);
 
@@ -19,23 +20,11 @@ function validateBookmarks(bookmarks) {
 }
 
 function loadBookmarks() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === null) return [];
-    const parsed = JSON.parse(saved);
-    return validateBookmarks(parsed);
-  } catch (error) {
-    console.warn('Failed to load bookmarks from localStorage:', error);
-    return [];
-  }
+  return validateBookmarks(loadJson(STORAGE_KEY, []));
 }
 
 function saveBookmarks(bookmarks) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
-  } catch (error) {
-    console.warn('Failed to save bookmarks to localStorage:', error);
-  }
+  saveJson(STORAGE_KEY, bookmarks);
 }
 
 export function BookmarksProvider({ children }) {

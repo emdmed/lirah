@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { loadJson, saveJson } from '../../lib/storage';
 
 const PromptTemplatesContext = createContext(undefined);
 
@@ -21,23 +22,11 @@ function validateTemplates(templates) {
 }
 
 function loadTemplates() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === null) return [];
-    const parsed = JSON.parse(saved);
-    return validateTemplates(parsed);
-  } catch (error) {
-    console.warn('Failed to load prompt templates from localStorage:', error);
-    return [];
-  }
+  return validateTemplates(loadJson(STORAGE_KEY, []));
 }
 
 function saveTemplates(templates) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-  } catch (error) {
-    console.warn('Failed to save prompt templates to localStorage:', error);
-  }
+  saveJson(STORAGE_KEY, templates);
 }
 
 export function PromptTemplatesProvider({ children }) {

@@ -1,26 +1,17 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { loadJson, saveJson } from '../../lib/storage';
 
 const WatcherContext = createContext(undefined);
 
 const STORAGE_KEY = 'nevo-terminal:file-watching-enabled';
 
 function loadWatcherState() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === null ? true : JSON.parse(saved);
-  } catch (error) {
-    console.warn('Failed to load watcher state from localStorage:', error);
-    return true; // Default: enabled
-  }
+  return loadJson(STORAGE_KEY, true); // Default: enabled
 }
 
 function saveWatcherState(enabled) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(enabled));
-  } catch (error) {
-    console.warn('Failed to save watcher state to localStorage:', error);
-  }
+  saveJson(STORAGE_KEY, enabled);
 }
 
 export function WatcherProvider({ children }) {

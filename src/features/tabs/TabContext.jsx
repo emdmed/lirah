@@ -3,6 +3,7 @@ import { useToast } from "../toast";
 import { useConfirm } from "../confirm/ConfirmContext";
 import { getAgentHookState } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
+import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -33,23 +34,13 @@ export function TabProvider({ children }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [tabs, setTabs] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch { /* ignore */ }
-    return [];
+    const parsed = loadJson(STORAGE_KEY, null);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [];
   });
 
   const [activeTabId, setActiveTabId] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY + ':active');
-      if (stored && tabs.find(t => t.id === stored)) return stored;
-    } catch { /* ignore */ }
+    const stored = loadText(STORAGE_KEY + ':active');
+    if (stored && tabs.find(t => t.id === stored)) return stored;
     return tabs[0]?.id || null;
   });
 
@@ -58,10 +49,8 @@ export function TabProvider({ children }) {
   // appWindow.close() immediately, destroying the webview before a deferred
   // write can flush — so tab edits made right before quitting never persist.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
-      localStorage.setItem(STORAGE_KEY + ':active', activeTabId || '');
-    } catch { /* ignore */ }
+    saveJson(STORAGE_KEY, tabs);
+    saveText(STORAGE_KEY + ':active', activeTabId || '');
   }, [tabs, activeTabId]);
 
   // Latest values for the actions below, so they can stay referentially stable.

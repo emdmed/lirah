@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { loadJson, saveJson } from '../../lib/storage';
 
 // User-facing name: "context sets" — saved, named context (file
 // selections) per project. Storage key and shape stay "file groups".
@@ -26,23 +27,11 @@ function validateGroups(groups) {
 }
 
 function loadGroups() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === null) return [];
-    const parsed = JSON.parse(saved);
-    return validateGroups(parsed);
-  } catch (error) {
-    console.warn('Failed to load file groups from localStorage:', error);
-    return [];
-  }
+  return validateGroups(loadJson(STORAGE_KEY, []));
 }
 
 function saveGroups(groups) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
-  } catch (error) {
-    console.warn('Failed to save file groups to localStorage:', error);
-  }
+  saveJson(STORAGE_KEY, groups);
 }
 
 export function FileGroupsProvider({ children }) {

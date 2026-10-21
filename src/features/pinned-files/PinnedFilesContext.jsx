@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { loadJson, saveJson } from '../../lib/storage';
 
 const PinnedFilesContext = createContext(undefined);
 
@@ -27,22 +28,11 @@ function validatePins(pins) {
 }
 
 function loadPins() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === null) return [];
-    return validatePins(JSON.parse(saved));
-  } catch (error) {
-    console.warn('Failed to load pinned files from localStorage:', error);
-    return [];
-  }
+  return validatePins(loadJson(STORAGE_KEY, []));
 }
 
 function savePins(pins) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
-  } catch (error) {
-    console.warn('Failed to save pinned files to localStorage:', error);
-  }
+  saveJson(STORAGE_KEY, pins);
 }
 
 export function PinnedFilesProvider({ children }) {

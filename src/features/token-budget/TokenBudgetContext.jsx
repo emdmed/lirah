@@ -3,25 +3,19 @@ import { getStartOfDay, getStartOfWeek, formatTokenCount, formatCost, computeCos
 import { prepareChartData, prepareModelBreakdown, calculateEfficiencyMetrics } from './dashboardData';
 import { exportToCSV, exportToJSON } from './exportData';
 import { DEFAULT_MODEL } from '../../config/pricing';
+import { loadJson, saveJson } from '../../lib/storage';
 
 const STORAGE_KEY = 'lirah:token-budgets:v1';
 
 const TokenBudgetContext = createContext(null);
 
 function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { version: 1, budgets: {}, alertStates: {} };
-    const data = JSON.parse(raw);
-    if (data.version !== 1) return { version: 1, budgets: {}, alertStates: {} };
-    return data;
-  } catch {
-    return { version: 1, budgets: {}, alertStates: {} };
-  }
+  const data = loadJson(STORAGE_KEY, null);
+  return data?.version === 1 ? data : { version: 1, budgets: {}, alertStates: {} };
 }
 
 function saveToStorage(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  saveJson(STORAGE_KEY, data);
 }
 
 export function TokenBudgetProvider({ children, tokenUsage, projectStats, projectPath }) {
