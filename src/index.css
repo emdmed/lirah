@@ -19,11 +19,12 @@
   font-display: swap;
 }
 
-/* Panel legend face (OFL, bundled: the app runs offline). */
+/* Panel legend face (MIT, bundled: the app runs offline). A pixel face drawn
+   on an 11px grid, so legends stay at 11px and its single weight. */
 @font-face {
-  font-family: 'Barlow Semi Condensed';
-  src: url('/fonts/BarlowSemiCondensed-SemiBold.woff2') format('woff2');
-  font-weight: 600;
+  font-family: 'Departure Mono';
+  src: url('/fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -143,7 +144,9 @@
   --ins-plate:       color-mix(in srgb, var(--color-foreground) 17%, var(--ins-raised));
   --ins-plate-cut:   var(--ins-gutter);
   --ins-plate-lip:   rgb(255 255 255 / .14);
-  --font-legend: "Barlow Semi Condensed", var(--font-mono);
+  --font-legend: "Departure Mono", var(--font-mono);
+  --legend-weight: 400;
+  --legend-tracking: 0.04em;
   --font-voice: "Crimson Pro", Georgia, serif;
   /* Slow, even easing for colour changes on hover and focus. */
   --ins-ease: cubic-bezier(0.333, 0, 0.667, 1);
@@ -276,9 +279,14 @@ body {
   @apply focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1;
 }
 
-/* Theme transition for smooth color changes */
-.theme-transition {
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+/* Theme switch: ThemeProvider sets .theme-transition on <html> for the
+   length of the fade, so every surface eases into the new palette together.
+   (The terminal canvas repaints at once; xterm draws outside CSS.) */
+:root.theme-transition,
+:root.theme-transition *,
+:root.theme-transition *::before,
+:root.theme-transition *::after {
+  transition: color 450ms var(--ins-ease), background-color 450ms var(--ins-ease), border-color 450ms var(--ins-ease), box-shadow 450ms var(--ins-ease) !important;
 }
 
 /* Custom scrollbar */
@@ -353,13 +361,13 @@ body {
   background-color: var(--tui-bar);
 }
 
-/* Panel legends: printed caps (the 10px variant of .ins-legend). */
+/* Panel legends: printed caps, for inline use (.ins-legend's twin). */
 .engraved-label {
   font-family: var(--font-legend);
-  font-weight: 600;
-  font-size: 10px;
+  font-weight: var(--legend-weight);
+  font-size: 11px;
   line-height: 1;
-  letter-spacing: 0.16em;
+  letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
   color: var(--ins-legend);
 }
@@ -458,10 +466,10 @@ body {
     left: 10px;
     padding: 0 5px;
     font-family: var(--font-legend);
-    font-weight: 600;
+    font-weight: var(--legend-weight);
     font-size: var(--font-xs);
     line-height: 12px;
-    letter-spacing: 0.16em;
+    letter-spacing: var(--legend-tracking);
     text-transform: uppercase;
     color: var(--ins-legend);
     background: var(--pane-bg);
@@ -678,10 +686,10 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-legend);
-  font-weight: 600;
+  font-weight: var(--legend-weight);
   font-size: var(--font-xs);
   line-height: 12px;
-  letter-spacing: 0.16em;
+  letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
   background: var(--pane-bg);
   z-index: 6;
@@ -707,10 +715,10 @@ body {
   /* Printed panel legend. */
   .ins-legend {
     font-family: var(--font-legend);
-    font-weight: 600;
+    font-weight: var(--legend-weight);
     font-size: 11px;
     line-height: 1;
-    letter-spacing: 0.16em;
+    letter-spacing: var(--legend-tracking);
     text-transform: uppercase;
     color: var(--ins-legend);
   }
@@ -927,6 +935,20 @@ body {
 
   :root[data-theme="light"] .ins-well {
     box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
+  }
+
+  /* Veil: a translucent, blurred face for surfaces that float over the
+     app (menus, the launch bar), so what is behind
+     stays faintly present. Edge is a faint foreground hairline. */
+  .ins-veil {
+    background: color-mix(in srgb, var(--ins-raised) 78%, transparent);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-foreground) 15%, transparent);
+  }
+
+  :root[data-theme="light"] .ins-veil {
+    background: color-mix(in srgb, var(--ins-raised) 85%, transparent);
   }
 
   /* Raised face for cards and overlays. */

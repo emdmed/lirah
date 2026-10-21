@@ -72,7 +72,7 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
 
   return (
     <div
-      className="absolute top-3 right-5 z-10 flex items-center gap-2 h-7 pl-1 pr-1.5 text-xs bg-[var(--ins-raised)] edge-engraved"
+      className="absolute top-3 right-5 z-10 flex items-center gap-2 h-7 pl-1 pr-1.5 text-xs ins-veil"
       role="region"
       aria-label="Launch agent"
     >

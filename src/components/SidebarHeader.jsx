@@ -33,7 +33,7 @@ export function SidebarHeader({
   const [searchFocused, setSearchFocused] = useState(false);
   const dirName = currentPath ? currentPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || currentPath : '';
   const searchWell = showSearch && (
-    <div className="ins-well relative flex-1 min-w-24 flex items-center focus-within:outline focus-within:outline-1 focus-within:outline-[var(--ins-lamp)] focus-within:-outline-offset-1"
+    <div className="ins-well relative flex-1 min-w-16 flex items-center focus-within:outline focus-within:outline-1 focus-within:outline-[var(--ins-lamp)] focus-within:-outline-offset-1"
       onFocus={() => setSearchFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setSearchFocused(false);

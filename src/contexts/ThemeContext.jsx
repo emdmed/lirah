@@ -1,10 +1,12 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { themes, defaultTheme, loadTheme, saveTheme } from '../themes/theme-config';
 
 const ThemeContext = createContext(undefined);
 
 export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState(() => loadTheme());
+  // The first application is the startup palette, not a switch: no fade.
+  const appliedOnce = useRef(false);
 
   // Apply theme to CSS variables whenever theme changes
   useEffect(() => {
@@ -17,6 +19,15 @@ export function ThemeProvider({ children }) {
 
     const root = document.documentElement;
     const { ui, terminal } = theme;
+
+    // A switch eases into the new palette (see .theme-transition).
+    let fadeTimer;
+    const fade = appliedOnce.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    appliedOnce.current = true;
+    if (fade) {
+      root.classList.add('theme-transition');
+      fadeTimer = setTimeout(() => root.classList.remove('theme-transition'), 500);
+    }
 
     // Apply all UI color variables (non-string entries are skipped)
     Object.entries(ui).forEach(([key, value]) => {
@@ -39,6 +50,11 @@ export function ThemeProvider({ children }) {
 
     // Save theme preference
     saveTheme(currentTheme);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      root.classList.remove('theme-transition');
+    };
   }, [currentTheme]);
 
   const changeTheme = (themeName) => {
