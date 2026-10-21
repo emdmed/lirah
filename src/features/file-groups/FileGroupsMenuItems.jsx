@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { plural } from '../../lib/plural';
 import { Pencil, Plus, RefreshCw, Replace, Save, Trash2 } from 'lucide-react';
 import {
   DropdownMenuItem,
@@ -14,7 +15,6 @@ import { useFileGroups } from './FileGroupsContext';
 import { useFileSelection } from './FileSelectionContext';
 
 const ITEM = 'text-[11px] py-1.5 cursor-pointer';
-const plural = (n) => `${n} file${n === 1 ? '' : 's'}`;
 
 // Inline rename field. Keys are kept away from the menu so typing doesn't
 // trigger typeahead or close it; Enter saves, Escape cancels.
@@ -64,7 +64,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
   const handleUpdate = useCallback((group) => {
     try {
       updateGroup(group.id, { files: filesForGroup });
-      toast.success(`Updated "${group.name}" · ${plural(filesForGroup.length)}`);
+      toast.success(`Updated "${group.name}" · ${plural(filesForGroup.length, 'file')}`);
     } catch (err) {
       toast.error(err.message);
     }
@@ -84,7 +84,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
   const handleDelete = useCallback(async (group) => {
     const ok = await confirm({
       title: `Delete context set "${group.name}"?`,
-      description: `The saved set of ${plural(group.files.length)} is removed. Your current context and the files themselves are untouched.`,
+      description: `The saved set of ${plural(group.files.length, 'file')} is removed. Your current context and the files themselves are untouched.`,
       confirmLabel: 'Delete set',
       destructive: true,
     });
@@ -119,7 +119,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
                   <DropdownMenuItem onClick={() => onLoadGroup(group, 'replace')} className={ITEM}>
                     <Replace className="h-3 w-3 mr-1.5" />
                     Replace context
-                    <span className="ml-auto text-muted-foreground">{plural(group.files.length)}</span>
+                    <span className="ml-auto text-muted-foreground">{plural(group.files.length, 'file')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onLoadGroup(group, 'add')} className={ITEM}>
                     <Plus className="h-3 w-3 mr-1.5" />
@@ -130,7 +130,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
                     onClick={() => handleUpdate(group)}
                     disabled={currentCount === 0}
                     className={ITEM}
-                    title={`Overwrite this set with the ${plural(currentCount)} in the current context`}
+                    title={`Overwrite this set with the ${plural(currentCount, 'file')} in the current context`}
                   >
                     <RefreshCw className="h-3 w-3 mr-1.5" />
                     <span className="truncate">Update «{group.name}» with current context</span>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { plural } from '../../lib/plural';
 import {
   AudioWaveform,
   Bot,
@@ -147,9 +148,6 @@ function remoteLabel(work, fromName) {
   return `${work.cliName} from ${fromName} ${doing}`;
 }
 
-function plural(n, word) {
-  return `${n} ${word}${n === 1 ? '' : 's'}`;
-}
 
 // The newest turn of this tab's agent in a few words, or null when its tools
 // haven't done anything worth listing.
@@ -478,7 +476,7 @@ export function TabsSummaryPane() {
                   {info.files === 0 ? (
                     'clean'
                   ) : (
-                    <span title={`${info.files} file${info.files === 1 ? '' : 's'} changed`}>
+                    <span title={`${plural(info.files, 'file')} changed`}>
                       <span className="text-git-added">+{info.added}</span>{' '}
                       <span className="text-git-deleted">−{info.deleted}</span>
                     </span>

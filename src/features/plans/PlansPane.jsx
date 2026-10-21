@@ -1,4 +1,6 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { errorMessage } from '../../lib/errorMessage';
+import { basename } from '../../utils/pathUtils';
 import { formatDuration } from '../../lib/formatDuration';
 import {
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, FileText, GitCommit, Pencil, Plane, Play, Plus,
@@ -21,7 +23,7 @@ import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
 import { PlanGitSection } from './PlanGitSection';
 import {
-  basename, chunkBases, chunkCommitsByRepo, inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
+  chunkBases, chunkCommitsByRepo, inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
 } from './planGit';
 import {
   subscribeAutopilotToggle, subscribePlanFocus, takeAutopilotToggle, takePlanFocus,
@@ -167,7 +169,7 @@ export function PlansPane({ projectPath }) {
     try {
       return await fn();
     } catch (e) {
-      toast.error(String(e?.message || e));
+      toast.error(errorMessage(e));
     } finally {
       setBusy(null);
     }

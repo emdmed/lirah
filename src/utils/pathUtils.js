@@ -4,8 +4,9 @@ export function normalizePath(p) {
   return p ? p.replace(/\\/g, '/').replace(/\/+$/, '') : p;
 }
 
-export function basename(p) {
-  return p.split(/[/\\]/).pop();
+/** Last path segment, ignoring trailing slashes; `fallback` when there is none (e.g. '/'). */
+export function basename(p, fallback = '') {
+  return p.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || fallback;
 }
 
 export function lastSepIndex(p) {

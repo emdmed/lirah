@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { git, repoTop, worktreeAdd, worktreeRemove } from '../../lib/git';
 import { jobWorktreesDir, lirahDir } from '../../lib/lirahPaths';
@@ -22,11 +23,6 @@ const PERSIST_MAX_STALENESS = 3000;
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-function basename(p) {
-  const parts = p.replace(/\/+$/, '').split('/');
-  return parts[parts.length - 1] || 'repo';
 }
 
 // Parse `git status --porcelain` into absolute paths of changed files.
@@ -72,7 +68,7 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
     const home = await invoke('get_home_dir');
     const stamp = new Date(endedAt).toISOString().replace(/[:.]/g, '-');
     const safeLabel = (job.label || 'job').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 40);
-    const repoName = job.repoPath.replace(/\/+$/, '').split('/').pop() || 'repo';
+    const repoName = basename(job.repoPath, 'repo');
     const path = `${lirahDir(home)}/jobs/${repoName}/${stamp}-${safeLabel}.md`;
 
     const rel = (p) => (job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p);
@@ -569,7 +565,7 @@ export function AgentJobsProvider({ children }) {
     } else if (useWorktree) {
       try {
         if (!home) throw new Error('home directory unavailable');
-        worktreePath = `${jobWorktreesDir(home)}/${basename(repoRoot)}-${id}`;
+        worktreePath = `${jobWorktreesDir(home)}/${basename(repoRoot, 'repo')}-${id}`;
         await worktreeAdd(repoRoot, { path: worktreePath, detach: true });
         cwd = worktreePath;
       } catch (e) {
@@ -776,7 +772,7 @@ export function AgentJobsProvider({ children }) {
     if (!home) return { started: false, error: 'Home directory unavailable.' };
 
     const id = makeId();
-    const intPath = `${jobWorktreesDir(home)}/reconcile-${basename(repoRoot)}-${id}`;
+    const intPath = `${jobWorktreesDir(home)}/reconcile-${basename(repoRoot, 'repo')}-${id}`;
     try {
       await worktreeAdd(repoRoot, { path: intPath, detach: true });
     } catch (e) {

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { basename } from '../../utils/pathUtils';
 import { FolderX, SquareTerminal, X } from 'lucide-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
-import { basename, listBranches, planGit } from './planGit';
+import { listBranches, planGit } from './planGit';
 
 const SELECT = 'ins-well h-6 min-w-0 px-1 text-[10px] text-foreground outline-none';
 

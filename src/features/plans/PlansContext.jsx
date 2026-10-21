@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { errorMessage } from '../../lib/errorMessage';
+import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
@@ -12,7 +14,7 @@ import { getTabSession } from '../tabs/terminalActivity';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
 import {
-  basename, chunkBases, chunkCommitsByRepo, cleanupGit, defaultBranch, planGit, prepareGit, workPath,
+  chunkBases, chunkCommitsByRepo, cleanupGit, defaultBranch, planGit, prepareGit, workPath,
 } from './planGit';
 import {
   buildChunkPrompt,
@@ -49,7 +51,7 @@ const PlansStateContext = createContext(null);
 const PERSIST_DEBOUNCE = 400;
 
 function storePath(home, repoRoot) {
-  const name = repoRoot.replace(/\/+$/, '').split('/').pop() || 'repo';
+  const name = basename(repoRoot, 'repo');
   return `${lirahDir(home)}/plans/${name}-${hash8(repoRoot)}/plans.json`;
 }
 
@@ -251,7 +253,7 @@ export function PlansProvider({ children }) {
         };
       });
     } catch (e) {
-      updatePlan(repoRoot, planId, { split: 'failed', splitError: String(e?.message || e) });
+      updatePlan(repoRoot, planId, { split: 'failed', splitError: errorMessage(e) });
     }
   }, [updatePlan]);
 
@@ -471,7 +473,7 @@ export function PlansProvider({ children }) {
         await git(path, ['revert', '--no-edit', ...[...commits].reverse()]);
       } catch (e) {
         await git(path, ['revert', '--abort']).catch(() => {});
-        const msg = String(e?.message || e).trim() || 'git revert failed';
+        const msg = errorMessage(e).trim() || 'git revert failed';
         throw new Error(reverted.length
           ? `${basename(repo.root)}: ${msg} (already reverted in ${reverted.join(', ')})`
           : `${basename(repo.root)}: ${msg}`);
@@ -563,7 +565,7 @@ export function PlansProvider({ children }) {
     try {
       await implementChunk(repoRoot, planId, nextId, ap.tabId, { autopilot: true });
     } catch (e) {
-      halt(repoRoot, planId, 'failed', 'send-failed', String(e?.message || e));
+      halt(repoRoot, planId, 'failed', 'send-failed', errorMessage(e));
     }
   }, [findPlan, setAutopilot, announce, implementChunk, halt]);
 
@@ -583,7 +585,7 @@ export function PlansProvider({ children }) {
       await sendToTab(ap.tabId, buildNudgePrompt(plan, current));
       setAutopilot(repoRoot, planId, { nudged: true });
     } catch (e) {
-      halt(repoRoot, planId, 'failed', 'send-failed', String(e?.message || e));
+      halt(repoRoot, planId, 'failed', 'send-failed', errorMessage(e));
     }
   }, [findPlan, advance, checkChunk, halt, sendToTab, setAutopilot]);
 
@@ -650,7 +652,7 @@ export function PlansProvider({ children }) {
         await sendToTab(ap.tabId, buildNudgePrompt(plan, current));
         setAutopilot(repoRoot, planId, { nudged: true });
       } catch (e) {
-        halt(repoRoot, planId, 'failed', 'send-failed', String(e?.message || e));
+        halt(repoRoot, planId, 'failed', 'send-failed', errorMessage(e));
       }
       return;
     }

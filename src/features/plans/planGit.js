@@ -1,4 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
+import { basename } from '../../utils/pathUtils';
+import { errorMessage } from '../../lib/errorMessage';
 import { currentBranch, dirtyCount, git, gitLines, worktreeAdd, worktreeRemove } from '../../lib/git';
 import { planWorktreesDir, planWorktreesRoot } from '../../lib/lirahPaths';
 
@@ -9,8 +11,6 @@ import { planWorktreesDir, planWorktreesRoot } from '../../lib/lirahPaths';
 //
 // Not under ~/.lirah/worktrees: agent jobs garbage-collect everything there.
 const MARKER = '.lirah-plan.json';
-
-export const basename = (path) => path.replace(/\/+$/, '').split('/').pop() || path;
 
 export function defaultBranch(slug) {
   return `plan/${slug}`;
@@ -73,7 +73,7 @@ ${rows.join('\n')}
 `;
 }
 
-const fail = (repo, e) => new Error(`${basename(repo.root)}: ${String(e?.message || e).trim()}`);
+const fail = (repo, e) => new Error(`${basename(repo.root)}: ${errorMessage(e).trim()}`);
 
 /**
  * Set up the plan's branch (and worktrees) in every repo not yet prepared.

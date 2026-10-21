@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
+import { basename } from '../../utils/pathUtils';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -930,7 +931,7 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
           <span
             className="inline-flex items-center gap-0.5"
             style={{ color: 'var(--color-destructive)' }}
-            title={tc.failed.map((f) => `${f.path.split('/').pop()}: ${f.errorCount}`).join('\n')}
+            title={tc.failed.map((f) => `${basename(f.path)}: ${f.errorCount}`).join('\n')}
           >
             <AlertTriangle className="h-2.5 w-2.5" />
             {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}

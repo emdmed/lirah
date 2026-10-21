@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { plural } from '../../lib/plural';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -26,7 +27,6 @@ const STEPS = [
 
 const stepIndex = (stage) => STEPS.findIndex((s) => s.stages.includes(stage));
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function StepLine({ stage, failedAt }) {
   const current = stage === 'error' ? failedAt : stepIndex(stage);

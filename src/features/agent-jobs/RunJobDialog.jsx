@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { plural } from '../../lib/plural';
 import { invoke } from '@tauri-apps/api/core';
 import { git } from '../../lib/git';
 import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
@@ -536,7 +537,6 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
 const WELL_INPUT =
   'ins-well h-7 w-full min-w-0 px-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1';
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // A labelled form block: printed legend (with an optional count and a
 // right-aligned action) above its control.

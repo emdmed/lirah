@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { basename } from "../../utils/pathUtils";
 import { invoke } from "@tauri-apps/api/core";
 import { useProjectCompact, estimateTokens, formatTokenCount } from "./useProjectCompact";
 
@@ -26,7 +27,7 @@ export function useCompact({ currentPath, allFiles, setTextareaVisible }) {
       
       // Save compacted output to .orchestration/tools/
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const projectName = currentPath.split('/').pop() || 'project';
+      const projectName = basename(currentPath, 'project');
       const fileName = `compacted_${projectName}_${timestamp}.md`;
       const filePath = `${currentPath}/.orchestration/tools/${fileName}`;
       

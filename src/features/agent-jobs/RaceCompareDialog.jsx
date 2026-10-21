@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { ChevronLeft, ChevronRight, X, Swords } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -177,7 +178,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
                   : 'edge-engraved text-muted-foreground hover:bg-muted/40'
               )}
             >
-              {f.path.split('/').pop()}
+              {basename(f.path)}
               {!(inA && inB) && (
                 <span className="text-[11px] uppercase text-muted-foreground/70">
                   {inA ? 'A' : 'B'}

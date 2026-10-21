@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { basename } from '../utils/pathUtils';
 import {
   Dialog,
   DialogContent,
@@ -154,7 +155,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                             {isSelected ? '✓' : ''}
                           </span>
                           <span className="truncate">{bookmark.name}</span>
-                          <span className="text-xs opacity-40 truncate ml-auto">{bookmark.path.split('/').pop()}</span>
+                          <span className="text-xs opacity-40 truncate ml-auto">{basename(bookmark.path)}</span>
                         </button>
                       );
                     })
