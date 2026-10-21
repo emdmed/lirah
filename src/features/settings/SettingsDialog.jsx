@@ -1,9 +1,6 @@
-import {
-  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore,
-} from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
-import { Textarea } from '../../components/ui/textarea';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Keycap, KeyChord } from '../../components/instrument/Keycap';
@@ -18,6 +15,10 @@ import {
   SCROLLBACK_OPTIONS, SCROLLBACK_WARN_THRESHOLD,
 } from '../../lib/terminalPrefs';
 import { TAB_CLIS } from '../../lib/agentClis';
+import { FilterContext, SECTIONS } from './settingsSections';
+import { Choice, DraftField, Row, Section } from './parts';
+import { AppearanceSection } from './AppearanceSection';
+import { useSettingsNav } from './useSettingsNav';
 
 const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
 
@@ -26,207 +27,8 @@ const TRIGGER_OPTIONS = [
   { value: 'merge', label: 'Merge to main' },
 ];
 
-// Section index: the rail, the 1–6 keys and the filter all read from this.
-// `rows` maps a row id to the words it should match (its label plus synonyms).
-const SECTIONS = [
-  {
-    id: 'agent', title: 'Agent', blurb: 'Which CLI starts, and what a prompt keeps after sending.',
-    rows: {
-      'default-cli': 'default cli claude code opencode agent new tabs',
-      'auto-launch': 'auto-launch launch starred projects start cli',
-      'keep-context': 'keep context after send files elements repos',
-    },
-  },
-  {
-    id: 'appearance', title: 'Appearance', blurb: 'Theme and window chrome.',
-    rows: {
-      theme: 'theme colors dark light palette',
-      'title-bar': 'title bar window chrome',
-    },
-  },
-  {
-    id: 'terminal', title: 'Terminal', blurb: 'Terminal memory and the files pane.',
-    rows: {
-      scrollback: 'scrollback lines history memory buffer',
-      'file-watching': 'file watching watch refresh files pane disk',
-    },
-  },
-  {
-    id: 'git', title: 'Git', blurb: 'Agent-written commit messages and changelog entries.',
-    rows: {
-      'auto-commit': 'auto commit cli message agent',
-      'commit-prompt': 'extra commit instructions prompt message',
-      changelog: 'auto changelog trigger target file cli',
-    },
-  },
-  {
-    id: 'budget', title: 'Budget', blurb: 'Token limits for this project.',
-    rows: { budget: 'token budget daily weekly limit cost' },
-  },
-  {
-    id: 'sandbox', title: 'Sandbox', blurb: 'Run this tab\'s terminal in a bubblewrap jail.',
-    rows: {
-      sandbox: 'sandbox bubblewrap jail isolation security',
-      network: 'network isolation offline block internet',
-    },
-  },
-];
-
-// Where the dialog reopens: the last section viewed this session.
-let lastSectionId = SECTIONS[0].id;
-
-const FilterContext = createContext({ query: '', filtering: false });
-
-function rowMatches(words, query) {
-  return query.split(/\s+/).every((term) => words.includes(term));
-}
-
 function useScrollback() {
   return useSyncExternalStore(subscribeTerminalPrefs, getScrollback);
-}
-
-// A section's rows. While filtering, every section with a match is shown at
-// once, each under its own legend; otherwise only the active one.
-function Section({ section, active, children }) {
-  const { query, filtering } = useContext(FilterContext);
-  const hasMatch = filtering && Object.values(section.rows).some((w) => rowMatches(w, query));
-  if (filtering ? !hasMatch : !active) return null;
-  return (
-    <section
-      id={`settings-panel-${section.id}`}
-      role={filtering ? undefined : 'tabpanel'}
-      aria-labelledby={filtering ? undefined : `settings-tab-${section.id}`}
-      className="flex flex-col"
-    >
-      <header className="mb-4 flex flex-col gap-1">
-        <h3 className="ins-legend text-[11px] text-foreground">{section.title}</h3>
-        {!filtering && <p className="text-[11px] text-muted-foreground">{section.blurb}</p>}
-      </header>
-      <div className="flex flex-col gap-4">{children}</div>
-    </section>
-  );
-}
-
-// One setting. Label and inline control share a line joined by a dotted
-// leader, like a spec sheet; the hint sits under the label; wide controls
-// (choices, fields, lists) take the full width below.
-function Row({ id, sectionId, label, hint, control, children, htmlFor }) {
-  const { query, filtering } = useContext(FilterContext);
-  if (filtering) {
-    const words = SECTIONS.find((s) => s.id === sectionId)?.rows[id] ?? '';
-    if (!rowMatches(words, query)) return null;
-  }
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
-        <label htmlFor={htmlFor} className="shrink-0 text-xs text-foreground">{label}</label>
-        {control && (
-          <>
-            <span aria-hidden="true" className="h-px flex-1 translate-y-[3px] border-b border-dotted border-[var(--ins-edge-strong)]" />
-            <span className="flex shrink-0 items-center gap-2">{control}</span>
-          </>
-        )}
-      </div>
-      {hint && <div className="text-[11px] leading-snug text-muted-foreground">{hint}</div>}
-      {children && <div className="pt-1">{children}</div>}
-    </div>
-  );
-}
-
-// Latching buttons for a one-of-n choice.
-function Choice({ value, options, onChange, label }) {
-  return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <PanelButton
-          key={o.value}
-          role="radio"
-          aria-checked={value === o.value}
-          aria-pressed={undefined}
-          latched={value === o.value}
-          onClick={() => onChange(o.value)}
-          className="text-xs"
-        >
-          {o.label}
-        </PanelButton>
-      ))}
-    </div>
-  );
-}
-
-// A text field that writes to the store on blur, not per keystroke: every
-// write re-renders each open tab.
-function DraftField({ id, value, onCommit, multiline, fallback = '', ...props }) {
-  const [draft, setDraft] = useState(value);
-  useEffect(() => setDraft(value), [value]);
-  const commit = useCallback(() => {
-    const next = draft.trim() ? draft : fallback;
-    if (next !== draft) setDraft(next);
-    if (next !== value) onCommit(next);
-  }, [draft, fallback, value, onCommit]);
-  const Field = multiline ? Textarea : Input;
-  return (
-    <Field
-      id={id}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      className={multiline ? 'min-h-[64px] text-xs' : 'h-7 text-xs'}
-      {...props}
-    />
-  );
-}
-
-// The theme's own terminal palette, so each row previews what it looks like.
-function ThemeSwatch({ terminal }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-3.5 w-9 shrink-0 items-end gap-px p-[2px] edge-engraved"
-      style={{ background: terminal.background }}
-    >
-      {[terminal.red, terminal.green, terminal.yellow, terminal.blue].map((c, i) => (
-        <span key={i} className="h-full flex-1" style={{ background: c }} />
-      ))}
-    </span>
-  );
-}
-
-function ThemeList({ themes, value, onChange }) {
-  const groups = useMemo(() => {
-    const entries = Object.entries(themes);
-    return [
-      { label: 'Dark', items: entries.filter(([, t]) => t.type !== 'light') },
-      { label: 'Light', items: entries.filter(([, t]) => t.type === 'light') },
-    ].filter((g) => g.items.length);
-  }, [themes]);
-  return (
-    <div role="radiogroup" aria-label="Theme" className="flex flex-col gap-3">
-      {groups.map((g) => (
-        <div key={g.label} className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{g.label}</span>
-          <div className="grid grid-cols-2 gap-x-2">
-            {g.items.map(([id, t]) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={value === id}
-                onClick={() => onChange(id)}
-                className={cn(
-                  'flex h-6 items-center gap-2 pl-4 pr-2 text-left text-xs text-muted-foreground hover:text-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1',
-                  value === id && 'ins-row-selected text-foreground',
-                )}
-              >
-                <ThemeSwatch terminal={t.terminal} />
-                <span className="truncate">{t.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // What the sandbox does, as facts rather than a paragraph.
@@ -240,7 +42,7 @@ const SANDBOX_SPEC = [
 export function SettingsDialog({
   open, onOpenChange, settings, sessionId, onToggleSandbox, onToggleNetwork, onOpenBudget,
 }) {
-  const { currentTheme, themes, changeTheme } = useTheme();
+  const { currentTheme, themes } = useTheme();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const confirm = useConfirm();
   const scrollback = useScrollback();
@@ -261,99 +63,32 @@ export function SettingsDialog({
     sandboxEnabled, sandboxFailed, networkIsolation,
   } = settings;
 
-  const [activeId, setActiveId] = useState(lastSectionId);
-  const [query, setQuery] = useState('');
-  const filterRef = useRef(null);
-  const tabRefs = useRef({});
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const filtering = normalizedQuery.length > 0;
-  const filterValue = useMemo(() => ({ query: normalizedQuery, filtering }), [normalizedQuery, filtering]);
-
-  const matchCounts = useMemo(() => {
-    if (!filtering) return null;
-    return Object.fromEntries(SECTIONS.map((s) => [
-      s.id, Object.values(s.rows).filter((w) => rowMatches(w, normalizedQuery)).length,
-    ]));
-  }, [filtering, normalizedQuery]);
-  const totalMatches = matchCounts ? Object.values(matchCounts).reduce((a, b) => a + b, 0) : 0;
-
-  const selectSection = useCallback((id, { focus = false } = {}) => {
-    lastSectionId = id;
-    setActiveId(id);
-    setQuery('');
-    if (focus) tabRefs.current[id]?.focus();
-  }, []);
+  const {
+    activeId, query, setQuery, filtering, filterValue, matchCounts, totalMatches, filterRef, tabRefs,
+    selectSection, handleOpenAutoFocus, handleEscape, handleKeyDown, handleRailKeyDown,
+  } = useSettingsNav();
 
   // Both restart this tab's terminal, so ask first while a session is live.
-  const toggleSandbox = useCallback(async () => {
+  // `what` names the setting in the explanation.
+  const confirmRestart = useCallback(async (title, what, toggle) => {
     if (sessionId && !(await confirm({
-      title: 'Restart terminal with sandbox ' + (sandboxEnabled ? 'off' : 'on') + '?',
-      description: 'The sandbox is applied when the terminal starts, so this tab\'s terminal restarts and any running process in it is stopped.',
+      title,
+      description: `${what} is applied when the terminal starts, so this tab's terminal restarts and any running process in it is stopped.`,
       confirmLabel: 'Restart',
     }))) return;
-    onToggleSandbox();
-  }, [sessionId, sandboxEnabled, confirm, onToggleSandbox]);
-
-  const toggleNetwork = useCallback(async () => {
-    if (sessionId && !(await confirm({
-      title: (networkIsolation ? 'Allow' : 'Block') + ' network and restart terminal?',
-      description: 'Network isolation is applied when the terminal starts, so this tab\'s terminal restarts and any running process in it is stopped.',
-      confirmLabel: 'Restart',
-    }))) return;
-    onToggleNetwork();
-  }, [sessionId, networkIsolation, confirm, onToggleNetwork]);
+    toggle();
+  }, [sessionId, confirm]);
+  const toggleSandbox = () => confirmRestart(
+    'Restart terminal with sandbox ' + (sandboxEnabled ? 'off' : 'on') + '?', 'The sandbox', onToggleSandbox,
+  );
+  const toggleNetwork = () => confirmRestart(
+    (networkIsolation ? 'Allow' : 'Block') + ' network and restart terminal?', 'Network isolation', onToggleNetwork,
+  );
 
   const openBudget = useCallback(() => {
     onOpenChange(false);
     onOpenBudget();
   }, [onOpenChange, onOpenBudget]);
-
-  // Open on the active section's rail key, so arrows and 1–6 work at once.
-  const handleOpenAutoFocus = useCallback((e) => {
-    e.preventDefault();
-    tabRefs.current[activeId]?.focus();
-  }, [activeId]);
-
-  // Esc clears an active filter before it closes the dialog.
-  const handleEscape = useCallback((e) => {
-    if (!query) return;
-    e.preventDefault();
-    setQuery('');
-    tabRefs.current[activeId]?.focus();
-  }, [query, activeId]);
-
-  // `/` filters and 1–6 jump to a section, unless the user is typing.
-  const handleKeyDown = useCallback((e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const t = e.target;
-    const typing = t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName);
-    if (typing) return;
-    if (e.key === '/') {
-      e.preventDefault();
-      filterRef.current?.focus();
-      return;
-    }
-    const n = Number(e.key);
-    if (n >= 1 && n <= SECTIONS.length) {
-      e.preventDefault();
-      selectSection(SECTIONS[n - 1].id, { focus: true });
-    }
-  }, [selectSection]);
-
-  // Vertical tablist: arrows, Home and End move and select.
-  const handleRailKeyDown = useCallback((e) => {
-    const i = SECTIONS.findIndex((s) => s.id === activeId);
-    const next = {
-      ArrowDown: (i + 1) % SECTIONS.length,
-      ArrowUp: (i - 1 + SECTIONS.length) % SECTIONS.length,
-      Home: 0,
-      End: SECTIONS.length - 1,
-    }[e.key];
-    if (next === undefined) return;
-    e.preventDefault();
-    selectSection(SECTIONS[next].id, { focus: true });
-  }, [activeId, selectSection]);
 
   const scrollbackShort = scrollback >= 1000 ? `${scrollback / 1000}k` : String(scrollback);
   const readouts = {
@@ -461,17 +196,11 @@ export function SettingsDialog({
                   />
                 </Section>
 
-                <Section section={section('appearance')} active={activeId === 'appearance'}>
-                  <Row id="theme" sectionId="appearance" label="Theme">
-                    <ThemeList themes={themes} value={currentTheme} onChange={changeTheme} />
-                  </Row>
-                  <Row
-                    id="title-bar" sectionId="appearance"
-                    label="Title bar"
-                    hint="Window title bar above the panes."
-                    control={<ToggleSwitch checked={showTitleBar} onChange={setShowTitleBar} label="Title bar" />}
-                  />
-                </Section>
+                <AppearanceSection
+                  active={activeId === 'appearance'}
+                  showTitleBar={showTitleBar}
+                  onShowTitleBarChange={setShowTitleBar}
+                />
 
                 <Section section={section('terminal')} active={activeId === 'terminal'}>
                   <Row
