@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { matches } from '../lib/shortcuts';
 import { requestJobsPane } from '../features/agent-jobs/jobsPane';
 
 // Panes are numbered like lazygit's: [1] files, [2] terminal, [3] prompt, [4] jobs.
@@ -46,12 +47,10 @@ function focusPane4Content() {
 export function usePaneShortcuts() {
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      const match = /^Digit([1-4])$/.exec(e.code);
-      if (!match) return;
+      if (!matches('pane-focus', e)) return;
       e.preventDefault();
       e.stopPropagation();
-      focusPane(Number(match[1]));
+      focusPane(Number(e.code.slice(-1))); // Digit1…Digit4
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);

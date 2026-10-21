@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useConfirm } from '../features/confirm/ConfirmContext';
+import { matches } from '../lib/shortcuts';
 import { getAgentHookState } from '../features/tabs/agentHookState';
 import { getLastOutputAt } from '../features/tabs/terminalActivity';
 
@@ -37,7 +38,7 @@ export function useViewModeShortcuts({
 
     const handleKeyDown = async (e) => {
       if (secondaryTerminalFocused) return;
-      if (e.ctrlKey && e.key === 's') {
+      if (matches('nav-mode', e)) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -80,14 +81,14 @@ export function useViewModeShortcuts({
         onLoadFlatView();
       }
 
-      if (e.ctrlKey && e.key === 'm') {
+      if (matches('md-filter', e)) {
         e.preventDefault();
         e.stopPropagation();
         if (onToggleMarkdownFilter) onToggleMarkdownFilter();
         return;
       }
 
-      if (e.ctrlKey && e.key === 'k') {
+      if (matches('cli', e)) {
         e.preventDefault();
         e.stopPropagation();
 

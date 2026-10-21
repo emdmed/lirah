@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { matches } from '../../lib/shortcuts';
 
 /**
  * The tab's global keyboard shortcuts. Registered only while the tab is
@@ -17,6 +18,7 @@ export function useTabShortcuts({
   onAutoCommit,
   onAutoMerge,
   onClearContext,
+  onTogglePromptPreview,
 }) {
   const viewModeRef = useRef(viewMode);
   const sidebarOpenRef = useRef(sidebarOpen);
@@ -30,53 +32,53 @@ export function useTabShortcuts({
     if (!isActive) return;
 
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+      if (matches('secondary', e)) {
         e.preventDefault();
         e.stopPropagation();
         if (secondaryVisible) closeSecondaryTerminal();
         else setSecondaryVisible(true);
         return;
       }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'l') {
+      if (matches('lazygit', e)) {
         e.preventDefault();
         e.stopPropagation();
         onOpenLazygit();
         return;
       }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'm') {
+      if (matches('merge', e)) {
         e.preventDefault();
         e.stopPropagation();
         onAutoMerge();
         return;
       }
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'n') {
+      if (matches('nvim', e)) {
         e.preventDefault();
         e.stopPropagation();
         openWithCommand('nvim');
         return;
       }
       if (secondaryFocused) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && viewModeRef.current === 'tree' && sidebarOpenRef.current) {
+      if (matches('file-search', e) && viewModeRef.current === 'tree' && sidebarOpenRef.current) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+      if (matches('compact', e)) {
         e.preventDefault();
         onCompactProject();
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+      if (matches('budget', e)) {
         e.preventDefault();
         setBudgetDialogOpen(true);
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+      if (matches('tokens', e)) {
         e.preventDefault();
         setDashboardOpen(true);
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === ' ') {
+      if (matches('commit', e)) {
         e.preventDefault();
         onAutoCommit();
       }
-      if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+      if (matches('clear-context', e)) {
         e.preventDefault();
         e.stopPropagation();
         onClearContext?.();
@@ -86,4 +88,21 @@ export function useTabShortcuts({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
     searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, onAutoMerge, onClearContext, setBudgetDialogOpen, setDashboardOpen]);
+
+  // Ctrl+Shift+E toggles the payload preview from anywhere, including while
+  // the terminal has focus. Shifted so it never shadows readline's Ctrl+E.
+  // Its own listener: unlike the ones above it also works from the secondary
+  // terminal.
+  useEffect(() => {
+    if (isActive === false || !onTogglePromptPreview) return;
+    const handleKeyDown = (e) => {
+      if (matches('prompt-preview', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        onTogglePromptPreview();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isActive, onTogglePromptPreview]);
 }

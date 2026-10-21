@@ -540,21 +540,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     setPromptPreviewOpen((prev) => !prev);
   }, [setPromptPreviewOpen]);
 
-  // Ctrl+Shift+E toggles the payload preview from anywhere, including while
-  // the terminal has focus. Shifted so it never shadows readline's Ctrl+E.
-  useEffect(() => {
-    if (isActive === false) return;
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'e') {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePromptPreview();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isActive, togglePromptPreview]);
-
   // Keyboard shortcut hooks
   useViewModeShortcuts({
     sidebarOpen: sidebar.sidebarOpen, setSidebarOpen: sidebar.setSidebarOpen,
@@ -754,6 +739,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     onAutoCommit: handleAutoCommit,
     onAutoMerge: handleAutoMerge,
     onClearContext: handleClearContext,
+    onTogglePromptPreview: togglePromptPreview,
   });
 
   // Cleanup on unmount: close the terminal. The fs watcher is not stopped

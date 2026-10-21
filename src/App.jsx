@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { matches } from "./lib/shortcuts";
 import { useTabManager } from "./features/tabs";
 import { ProjectTab } from "./features/tabs/ProjectTab";
 import { TabBar } from "./features/tabs/TabBar";
@@ -110,26 +111,17 @@ function App() {
   // Global keyboard shortcuts for tab management
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl+Tab: next tab
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab' && !e.shiftKey) {
+      // Ctrl+Tab: next tab; Ctrl+Shift+Tab: previous tab
+      if (matches('tab-next', e)) {
         if (tabs.length === 0) return;
         e.preventDefault();
         const idx = tabs.findIndex(t => t.id === activeTabId);
-        const nextIdx = (idx + 1) % tabs.length;
-        switchTab(tabs[nextIdx].id);
-        return;
-      }
-      // Ctrl+Shift+Tab: previous tab
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab' && e.shiftKey) {
-        if (tabs.length === 0) return;
-        e.preventDefault();
-        const idx = tabs.findIndex(t => t.id === activeTabId);
-        const prevIdx = (idx - 1 + tabs.length) % tabs.length;
-        switchTab(tabs[prevIdx].id);
+        const step = e.shiftKey ? tabs.length - 1 : 1;
+        switchTab(tabs[(idx + step) % tabs.length].id);
         return;
       }
       // Ctrl+1-9: switch to tab N
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9') {
+      if (matches('tab-goto', e)) {
         const tabIdx = parseInt(e.key, 10) - 1;
         if (tabIdx < tabs.length) {
           e.preventDefault();
@@ -138,7 +130,7 @@ function App() {
         return;
       }
       // Alt+A: next tab whose agent is waiting on you
-      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'KeyA') {
+      if (matches('attention-jump', e)) {
         e.preventDefault();
         e.stopPropagation();
         jumpToNext();
@@ -147,7 +139,7 @@ function App() {
       // Ctrl+T: new tab. Stopped here so no tab-level listener (document
       // capture, which runs after this) also acts on it. The new tab's
       // terminal takes focus once it's ready (ProjectTab's activation effect).
-      if ((e.ctrlKey || e.metaKey) && e.key === 't' && !e.shiftKey && !e.altKey) {
+      if (matches('tab-new', e)) {
         e.preventDefault();
         e.stopPropagation();
         handleNewTab();
@@ -155,7 +147,7 @@ function App() {
       }
       // Ctrl+W: close active tab. With one tab it falls through to the
       // terminal (readline delete-word, nvim window commands).
-      if ((e.ctrlKey || e.metaKey) && e.key === 'w' && !e.shiftKey && !e.altKey && tabs.length > 1) {
+      if (matches('tab-close', e) && tabs.length > 1) {
         e.preventDefault();
         e.stopPropagation();
         requestCloseTab(activeTabId);
