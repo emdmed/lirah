@@ -5,6 +5,7 @@ import { formatDuration } from '../../lib/formatDuration';
 import { focusPane } from '../../hooks/usePaneShortcuts';
 import { useBookmarks } from '../bookmarks';
 import { getTabSession } from './terminalActivity';
+import { tabDisplayName } from './TabContext';
 import {
   acknowledgeAgent,
   getAgentHookState,
@@ -98,7 +99,7 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
     const tabName = (sessionId) => {
       const tab = tabsRef.current.find((t) => getTabSession(t.id) === sessionId);
       if (!tab) return null;
-      return tab.customLabel || (bookmarksRef.current.find((b) => b.path === tab.projectPath)?.name ?? tab.label);
+      return tabDisplayName(tab, bookmarksRef.current);
     };
     const flush = () => {
       timer = null;
