@@ -1,10 +1,11 @@
 use std::fs;
 use std::path::PathBuf;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::io::BufRead;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 use crate::state::AppState;
+use super::transcript::is_jsonl;
 
 #[derive(Serialize, Default, Clone)]
 pub struct TokenUsage {
@@ -271,7 +272,7 @@ fn get_session_token_usage_internal(project_path: &str, pty_pid: Option<u32>) ->
     let latest = fs::read_dir(&sessions_dir)
         .map_err(|e| format!("Failed to read sessions directory: {}", e))?
         .flatten()
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+        .filter(|e| is_jsonl(&e.path()))
         .max_by_key(|e| e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
 
     match latest {
@@ -292,7 +293,7 @@ fn add_subagent_usage(info: &mut SessionInfo, session_file: &PathBuf) {
     let Ok(entries) = fs::read_dir(&subagents_dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map_or(true, |ext| ext != "jsonl") {
+        if !is_jsonl(&path) {
             continue;
         }
         if let Ok(sub) = parse_session_file(&path) {
@@ -329,7 +330,7 @@ fn get_project_stats_internal(project_path: &str) -> Result<ProjectStats, String
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "jsonl") {
+        if is_jsonl(&path) {
             if let Ok(mut session_info) = parse_session_file(&path) {
                 add_subagent_usage(&mut session_info, &path);
                 let model = session_info.model.clone();
@@ -502,7 +503,7 @@ fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
 
         for se in session_entries.flatten() {
             let sp = se.path();
-            if sp.extension().map_or(false, |ext| ext == "jsonl") {
+            if is_jsonl(&sp) {
                 if let Ok(mut session_info) = parse_session_file(&sp) {
                     add_subagent_usage(&mut session_info, &sp);
                     let model = session_info.model.clone();
@@ -773,14 +774,8 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
         }
     };
 
-    let file = fs::File::open(path)
+    let mut reader = super::transcript::open_at(path, start_offset)
         .map_err(|e| format!("Failed to open session file: {}", e))?;
-    let mut reader = BufReader::new(file);
-    if start_offset > 0 {
-        reader
-            .seek(SeekFrom::Start(start_offset))
-            .map_err(|e| format!("Failed to seek session file: {}", e))?;
-    }
     let consumed = merge_session_lines(&mut reader, &mut state);
     state.len = start_offset + consumed;
 

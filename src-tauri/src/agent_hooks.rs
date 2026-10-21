@@ -15,8 +15,7 @@
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{Read, Seek, SeekFrom};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
@@ -240,25 +239,10 @@ struct AgentHookEvent {
 
 /// Read whatever complete lines were appended to `path` since `offset`.
 fn read_new_lines(path: &Path, offset: &mut u64) -> Vec<serde_json::Value> {
-    let Ok(mut file) = File::open(path) else { return Vec::new() };
-    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
-    if len < *offset {
-        *offset = 0; // Truncated or replaced.
-    }
-    if len == *offset || file.seek(SeekFrom::Start(*offset)).is_err() {
-        return Vec::new();
-    }
-    let mut buf = Vec::new();
-    if file.take(len - *offset).read_to_end(&mut buf).is_err() {
-        return Vec::new();
-    }
-    // Leave a partial last line for the next read.
-    let Some(end) = buf.iter().rposition(|b| *b == b'\n') else { return Vec::new() };
-    *offset += end as u64 + 1;
-    buf[..end]
-        .split(|b| *b == b'\n')
-        .filter(|line| !line.is_empty() && line.len() <= MAX_LINE)
-        .filter_map(|line| serde_json::from_slice(line).ok())
+    crate::claude::transcript::read_lines_from(path, offset)
+        .into_iter()
+        .filter(|line| line.len() <= MAX_LINE)
+        .filter_map(|line| serde_json::from_slice(&line).ok())
         .collect()
 }
 
@@ -336,6 +320,7 @@ pub fn get_agent_hook_plugin_dir() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
     use std::io::Write;
 
     #[test]

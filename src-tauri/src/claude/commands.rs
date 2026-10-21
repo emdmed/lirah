@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -286,17 +286,15 @@ fn get_claude_sessions(
     if let Ok(entries) = fs::read_dir(&project_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if let Some(ext) = path.extension() {
-                if ext == "jsonl" {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                        let sid = stem.to_string();
-                        if !indexed_ids.contains(&sid) {
-                            // Build a minimal entry from the file
-                            if let Ok(entry) =
-                                build_session_entry_from_file(&path, &sid, &project_path)
-                            {
-                                sessions.push(entry);
-                            }
+            if super::transcript::is_jsonl(&path) {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    let sid = stem.to_string();
+                    if !indexed_ids.contains(&sid) {
+                        // Build a minimal entry from the file
+                        if let Ok(entry) =
+                            build_session_entry_from_file(&path, &sid, &project_path)
+                        {
+                            sessions.push(entry);
                         }
                     }
                 }
@@ -487,7 +485,7 @@ pub async fn get_active_claude_session(
 /// Encode a project path for the Claude directory structure
 /// So /home/enrique/projects/nevo-terminal becomes -home-enrique-projects-nevo-terminal
 fn encode_project_path(path: &str) -> String {
-    crate::fs::claude_project_dir_name(path)
+    super::tokens::claude_project_dir_name(path)
 }
 
 /// Store for the subagent filesystem watchers, ref-counted per project path.
@@ -662,12 +660,9 @@ fn load_subagent(
     };
 
     if state.file_len != file_len || state.mtime != mtime || state.consumed == 0 {
-        if let Ok(file) = fs::File::open(path) {
-            let mut reader = BufReader::new(file);
-            if reader.seek(SeekFrom::Start(state.consumed)).is_ok() {
-                let consumed = merge_subagent_lines(&mut reader, &mut state);
-                state.consumed += consumed;
-            }
+        if let Ok(mut reader) = super::transcript::open_at(path, state.consumed) {
+            let consumed = merge_subagent_lines(&mut reader, &mut state);
+            state.consumed += consumed;
         }
         state.file_len = file_len;
         state.mtime = mtime;
