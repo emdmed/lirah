@@ -1,15 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { errorMessage } from '../../lib/errorMessage';
 import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
 import { currentBranch, repoTop } from '../../lib/git';
-import { hash8, shortId } from '../../lib/ids';
-import { lirahDir } from '../../lib/lirahPaths';
+import { shortId } from '../../lib/ids';
 import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, EXCERPT_MAX, HALT_REASON, isAutopilotLive, newChunks,
-  nextChunkId, normalizeLoadedPlan, planProgress, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress, toRolledBack,
+  nextChunkId, planProgress, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress, toRolledBack,
   UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
@@ -18,6 +17,7 @@ import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../t
 import { getTabSession } from '../tabs/terminalActivity';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
+import { usePlanStore } from './usePlanStore';
 import {
   captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, rollbackChunk as revertChunk,
 } from './planGitOps';
@@ -54,13 +54,6 @@ import {
 const PlansActionsContext = createContext(null);
 const PlansStateContext = createContext(null);
 
-const PERSIST_DEBOUNCE = 400;
-
-function storePath(home, repoRoot) {
-  const name = basename(repoRoot, 'repo');
-  return `${lirahDir(home)}/plans/${name}-${hash8(repoRoot)}/plans.json`;
-}
-
 // A PermissionRequest carries the tool name; a Notification, a sentence.
 function permissionMessage(message) {
   if (!message) return 'Waiting on a permission prompt in the terminal.';
@@ -74,83 +67,21 @@ function excerpt(text, max = EXCERPT_MAX) {
 }
 
 export function PlansProvider({ children }) {
-  const [plansByRepo, setPlansByRepo] = useState({}); // repoRoot -> plan[]
-  const stateRef = useRef(plansByRepo);
-  stateRef.current = plansByRepo;
-  const homeRef = useRef(null);
-  const loadingRef = useRef(new Map()); // repoRoot -> Promise
-  const dirtyRef = useRef(new Set());
-  const saveTimer = useRef(null);
+  const {
+    plansByRepo, stateRef, getHome, loadRepo, mutate, updatePlan, updateChunk, findPlan, findChunk,
+  } = usePlanStore({
+    // Chunks that finished while the app was closed.
+    onLoad: (repoRoot, plans) => {
+      for (const plan of plans) {
+        for (const chunk of plan.chunks) {
+          if (chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
+        }
+      }
+    },
+  });
   const checkingRef = useRef(new Set()); // chunk ids being checked
   const toast = useToast();
   const { tabs, switchTab } = useTabManager();
-
-  const getHome = useCallback(async () => {
-    if (!homeRef.current) homeRef.current = await invoke('get_home_dir');
-    return homeRef.current;
-  }, []);
-
-  const flush = useCallback(async () => {
-    saveTimer.current = null;
-    const repos = [...dirtyRef.current];
-    dirtyRef.current.clear();
-    const home = await getHome();
-    for (const repoRoot of repos) {
-      const plans = stateRef.current[repoRoot];
-      if (!plans) continue;
-      try {
-        await invoke('write_file_content', {
-          path: storePath(home, repoRoot),
-          content: JSON.stringify({ version: 1, repoRoot, plans }, null, 2),
-        });
-      } catch (e) {
-        console.error('Failed to save plans:', e);
-      }
-    }
-  }, [getHome]);
-
-  // Writes are debounced, after the render that holds the new state.
-  useEffect(() => {
-    if (dirtyRef.current.size === 0 || saveTimer.current) return;
-    saveTimer.current = setTimeout(flush, PERSIST_DEBOUNCE);
-  }, [plansByRepo, flush]);
-
-  useEffect(() => () => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-      flush();
-    }
-  }, [flush]);
-
-  // The ref is updated at once, not on the next render, so a chain of awaits
-  // (auto-pilot: check a chunk, then pick the next) reads its own writes.
-  const mutate = useCallback((repoRoot, fn) => {
-    dirtyRef.current.add(repoRoot);
-    const next = { ...stateRef.current, [repoRoot]: fn(stateRef.current[repoRoot] || []) };
-    stateRef.current = next;
-    setPlansByRepo(next);
-  }, []);
-
-  const updatePlan = useCallback((repoRoot, planId, patch) => {
-    mutate(repoRoot, (plans) =>
-      plans.map((p) => {
-        if (p.id !== planId) return p;
-        const next = typeof patch === 'function' ? patch(p) : patch;
-        return { ...p, ...next, updatedAt: Date.now() };
-      })
-    );
-  }, [mutate]);
-
-  const updateChunk = useCallback((repoRoot, planId, chunkId, patch) => {
-    updatePlan(repoRoot, planId, (p) => ({
-      chunks: p.chunks.map((c) => (c.id === chunkId ? { ...c, ...patch } : c)),
-    }));
-  }, [updatePlan]);
-
-  const findChunk = useCallback((repoRoot, planId, chunkId) => {
-    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
-    return { plan, chunk: plan?.chunks.find((c) => c.id === chunkId) };
-  }, []);
 
   // Look for the chunk's commits since it was started. Found → implemented;
   // not found while in progress → the agent stopped without committing.
@@ -180,7 +111,7 @@ export function PlansProvider({ children }) {
   }, [findChunk, updateChunk]);
 
   const runSplit = useCallback(async (repoRoot, planId) => {
-    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    const plan = findPlan(repoRoot, planId);
     if (!plan) return;
     updatePlan(repoRoot, planId, { split: SPLIT_STATUS.RUNNING, splitError: null });
     try {
@@ -205,34 +136,7 @@ export function PlansProvider({ children }) {
     } catch (e) {
       updatePlan(repoRoot, planId, { split: SPLIT_STATUS.FAILED, splitError: errorMessage(e) });
     }
-  }, [updatePlan]);
-
-  const loadRepo = useCallback((repoRoot) => {
-    if (!repoRoot) return Promise.resolve();
-    if (stateRef.current[repoRoot]) return Promise.resolve();
-    const pending = loadingRef.current.get(repoRoot);
-    if (pending) return pending;
-    const promise = (async () => {
-      let plans = [];
-      try {
-        const raw = await invoke('read_file_content', { path: storePath(await getHome(), repoRoot) });
-        plans = JSON.parse(raw)?.plans || [];
-      } catch {
-        // No plans for this repo yet.
-      }
-      plans = plans.map(normalizeLoadedPlan);
-      setPlansByRepo((prev) => (prev[repoRoot] ? prev : { ...prev, [repoRoot]: plans }));
-      stateRef.current = { ...stateRef.current, [repoRoot]: stateRef.current[repoRoot] || plans };
-      // Chunks that finished while the app was closed.
-      for (const plan of plans) {
-        for (const chunk of plan.chunks) {
-          if (chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
-        }
-      }
-    })().finally(() => loadingRef.current.delete(repoRoot));
-    loadingRef.current.set(repoRoot, promise);
-    return promise;
-  }, [getHome, checkChunk]);
+  }, [findPlan, updatePlan]);
 
   const createPlan = useCallback(async (repoRoot, { source, importedFrom = null }) => {
     await loadRepo(repoRoot);
@@ -266,10 +170,10 @@ export function PlansProvider({ children }) {
 
   // Its worktrees go with it (uncommitted work in them too); branches stay.
   const deletePlan = useCallback(async (repoRoot, planId) => {
-    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    const plan = findPlan(repoRoot, planId);
     if (plan) await cleanupGit(plan).catch((e) => toast.error(`Worktrees not removed: ${e?.message || e}`));
     mutate(repoRoot, (plans) => plans.filter((p) => p.id !== planId));
-  }, [mutate, toast]);
+  }, [findPlan, mutate, toast]);
 
   // --- Git settings ---
 
@@ -298,20 +202,20 @@ export function PlansProvider({ children }) {
 
   // Branches and worktrees, made once before the first chunk goes out.
   const ensureGit = useCallback(async (repoRoot, planId) => {
-    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    const plan = findPlan(repoRoot, planId);
     if (!plan) throw new Error('Plan not found');
     const cfg = planGit(plan);
     if (cfg.preparedAt) return cfg;
     const save = (git) => updatePlan(repoRoot, planId, { git });
     return prepareGit(await getHome(), plan, save);
-  }, [updatePlan, getHome]);
+  }, [findPlan, updatePlan, getHome]);
 
   const removeWorktrees = useCallback(async (repoRoot, planId) => {
-    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    const plan = findPlan(repoRoot, planId);
     if (!plan) return;
     await cleanupGit(plan);
     updatePlan(repoRoot, planId, (p) => ({ git: { ...planGit(p), removedAt: Date.now() } }));
-  }, [updatePlan]);
+  }, [findPlan, updatePlan]);
 
   const moveChunk = useCallback((repoRoot, planId, chunkId, delta) => {
     updatePlan(repoRoot, planId, (p) => {
@@ -353,10 +257,10 @@ export function PlansProvider({ children }) {
 
   // Review notes on the whole plan's diff: one fix commit, not tied to a chunk.
   const sendPlanFix = useCallback(async (repoRoot, planId, notes, tabId) => {
-    const plan = stateRef.current[repoRoot]?.find((p) => p.id === planId);
+    const plan = findPlan(repoRoot, planId);
     if (!plan || notes.length === 0) return;
     await sendToTab(tabId, buildPlanFixPrompt(plan, notes));
-  }, [sendToTab]);
+  }, [findPlan, sendToTab]);
 
   // Fallback when the agent didn't commit: commit everything as this chunk.
   const commitChunk = useCallback(async (repoRoot, planId, chunkId) => {
@@ -380,7 +284,6 @@ export function PlansProvider({ children }) {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  const findPlan = useCallback((repoRoot, planId) => stateRef.current[repoRoot]?.find((p) => p.id === planId), []);
 
   const setAutopilot = useCallback((repoRoot, planId, patch) => {
     updatePlan(repoRoot, planId, (p) => ({
