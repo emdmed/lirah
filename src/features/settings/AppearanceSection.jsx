@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
-import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Row, Section } from './parts';
-import { SECTIONS } from './settingsSections';
+import { Row, Section, ToggleRow } from './parts';
+import { SECTIONS, SETTINGS_ROW } from './settingsSections';
 
 // The theme's own terminal palette, so each row previews what it looks like.
 function ThemeSwatch({ terminal }) {
@@ -62,15 +61,10 @@ export function AppearanceSection({ active, showTitleBar, onShowTitleBarChange }
   const { currentTheme, themes, changeTheme } = useTheme();
   return (
     <Section section={SECTIONS.find((s) => s.id === 'appearance')} active={active}>
-      <Row id="theme" sectionId="appearance" label="Theme">
+      <Row id="theme" sectionId="appearance" label={SETTINGS_ROW.theme.label}>
         <ThemeList themes={themes} value={currentTheme} onChange={changeTheme} />
       </Row>
-      <Row
-        id="title-bar" sectionId="appearance"
-        label="Title bar"
-        hint="Window title bar above the panes."
-        control={<ToggleSwitch checked={showTitleBar} onChange={onShowTitleBarChange} label="Title bar" />}
-      />
+      <ToggleRow row={SETTINGS_ROW['title-bar']} value={showTitleBar} onChange={onShowTitleBarChange} />
     </Section>
   );
 }

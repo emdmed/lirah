@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { PanelButton } from '../../components/instrument/PanelButton';
+import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { FilterContext, rowMatches, SECTIONS } from './settingsSections';
 
 // A section's rows. While filtering, every section with a match is shown at
@@ -93,5 +94,29 @@ export function DraftField({ id, value, onCommit, multiline, fallback = '', ...p
       className={multiline ? 'min-h-[64px] text-xs' : 'h-7 text-xs'}
       {...props}
     />
+  );
+}
+
+/** A SETTINGS_ROWS toggle row. `hint` overrides the config's; children sit below. */
+export function ToggleRow({ row, value, onChange, hint = row.hint, disabled, tone, children }) {
+  return (
+    <Row
+      id={row.id}
+      sectionId={row.section}
+      label={row.label}
+      hint={hint}
+      control={<ToggleSwitch checked={value} onChange={onChange} disabled={disabled} tone={tone} label={row.label} />}
+    >
+      {children}
+    </Row>
+  );
+}
+
+/** A SETTINGS_ROWS one-of-n row. `hint` overrides the config's. */
+export function ChoiceRow({ row, value, options, onChange, hint = row.hint }) {
+  return (
+    <Row id={row.id} sectionId={row.section} label={row.label} hint={hint}>
+      <Choice label={row.choiceLabel ?? row.label} value={value} options={options} onChange={onChange} />
+    </Row>
   );
 }

@@ -1,50 +1,87 @@
 import { createContext } from 'react';
 
-// Section index: the rail, the 1–6 keys and the filter all read from this.
-// `rows` maps a row id to the words it should match (its label plus synonyms).
-export const SECTIONS = [
+// Every row of the dialog. Toggle and choice rows render from this through
+// ToggleRow and ChoiceRow; custom rows are drawn by hand and only use the
+// label/words here. `words` is what the filter matches (label plus synonyms),
+// so the search index can't drift from what is shown. `key` names the value
+// the row edits; string hints are the default, the dialog passes the dynamic ones.
+export const SETTINGS_ROWS = [
   {
-    id: 'agent', title: 'Agent', blurb: 'Which CLI starts, and what a prompt keeps after sending.',
-    rows: {
-      'default-cli': 'default cli claude code opencode agent new tabs',
-      'auto-launch': 'auto-launch launch starred projects start cli',
-      'keep-context': 'keep context after send files elements repos',
-    },
+    id: 'default-cli', section: 'agent', kind: 'choice', key: 'selectedCli',
+    label: 'Default CLI', hint: 'New tabs start with it. Switch this tab\'s CLI from the status bar.',
+    words: 'default cli claude code opencode agent new tabs',
   },
   {
-    id: 'appearance', title: 'Appearance', blurb: 'Theme and window chrome.',
-    rows: {
-      theme: 'theme colors dark light palette',
-      'title-bar': 'title bar window chrome',
-    },
+    id: 'auto-launch', section: 'agent', kind: 'toggle', key: 'autoLaunchCli',
+    label: 'Auto-launch on starred projects',
+    hint: 'Start the CLI when you open a starred project. Tabs restored at startup are left alone.',
+    words: 'auto-launch launch starred projects start cli',
   },
   {
-    id: 'terminal', title: 'Terminal', blurb: 'Terminal memory and the files pane.',
-    rows: {
-      scrollback: 'scrollback lines history memory buffer',
-      'file-watching': 'file watching watch refresh files pane disk',
-    },
+    id: 'keep-context', section: 'agent', kind: 'toggle', key: 'keepFilesAfterSend',
+    label: 'Keep context after send', hint: 'Attached files, elements and linked repos stay for the next prompt.',
+    words: 'keep context after send files elements repos',
+  },
+  { id: 'theme', section: 'appearance', kind: 'custom', label: 'Theme', words: 'theme colors dark light palette' },
+  {
+    id: 'title-bar', section: 'appearance', kind: 'toggle', key: 'showTitleBar',
+    label: 'Title bar', hint: 'Window title bar above the panes.',
+    words: 'title bar window chrome',
   },
   {
-    id: 'git', title: 'Git', blurb: 'Agent-written commit messages and changelog entries.',
-    rows: {
-      'auto-commit': 'auto commit cli message agent',
-      'commit-prompt': 'extra commit instructions prompt message',
-      changelog: 'auto changelog trigger target file cli',
-    },
+    id: 'scrollback', section: 'terminal', kind: 'choice', key: 'scrollback',
+    label: 'Scrollback', hint: 'Lines kept per terminal.',
+    words: 'scrollback lines history memory buffer',
   },
   {
-    id: 'budget', title: 'Budget', blurb: 'Token limits for this project.',
-    rows: { budget: 'token budget daily weekly limit cost' },
+    id: 'file-watching', section: 'terminal', kind: 'toggle', key: 'fileWatchingEnabled',
+    label: 'File watching',
+    words: 'file watching watch refresh files pane disk',
   },
   {
-    id: 'sandbox', title: 'Sandbox', blurb: 'Run this tab\'s terminal in a bubblewrap jail.',
-    rows: {
-      sandbox: 'sandbox bubblewrap jail isolation security',
-      network: 'network isolation offline block internet',
-    },
+    id: 'auto-commit', section: 'git', kind: 'choice', key: 'autoCommitCli',
+    label: 'Auto commit', choiceLabel: 'Auto commit CLI',
+    words: 'auto commit cli message agent',
+  },
+  {
+    id: 'commit-prompt', section: 'git', kind: 'custom', label: 'Extra commit instructions',
+    words: 'extra commit instructions prompt message',
+  },
+  {
+    id: 'changelog', section: 'git', kind: 'toggle', key: 'autoChangelogEnabled',
+    label: 'Auto changelog', hint: 'An agent updates a changelog file after commits or merges.',
+    words: 'auto changelog trigger target file cli',
+  },
+  { id: 'budget', section: 'budget', kind: 'custom', label: 'Token budget', words: 'token budget daily weekly limit cost' },
+  {
+    id: 'sandbox', section: 'sandbox', kind: 'toggle', key: 'sandboxEnabled',
+    label: 'Sandbox', hint: 'Applies to this tab. Turning it on or off restarts the terminal.',
+    words: 'sandbox bubblewrap jail isolation security',
+  },
+  {
+    id: 'network', section: 'sandbox', kind: 'toggle', key: 'networkIsolation',
+    label: 'Network isolation',
+    words: 'network isolation offline block internet',
   },
 ];
+
+/** A row's config by id. */
+export const SETTINGS_ROW = Object.fromEntries(SETTINGS_ROWS.map((r) => [r.id, r]));
+
+// Section index: the rail, the 1–6 keys and the filter all read from this.
+// `rows` maps a row id to the words it should match, from SETTINGS_ROWS.
+const rowsOf = (section) => Object.fromEntries(
+  SETTINGS_ROWS.filter((r) => r.section === section).map((r) => [r.id, r.words]),
+);
+
+export const SECTIONS = [
+  { id: 'agent', title: 'Agent', blurb: 'Which CLI starts, and what a prompt keeps after sending.' },
+  { id: 'appearance', title: 'Appearance', blurb: 'Theme and window chrome.' },
+  { id: 'terminal', title: 'Terminal', blurb: 'Terminal memory and the files pane.' },
+  { id: 'git', title: 'Git', blurb: 'Agent-written commit messages and changelog entries.' },
+  { id: 'budget', title: 'Budget', blurb: 'Token limits for this project.' },
+  { id: 'sandbox', title: 'Sandbox', blurb: 'Run this tab\'s terminal in a bubblewrap jail.' },
+].map((s) => ({ ...s, rows: rowsOf(s.id) }));
 
 // The settings filter, for the rows to hide themselves.
 export const FilterContext = createContext({ query: '', filtering: false });
