@@ -1,58 +1,35 @@
 // Lets the command palette open the plans pane without sharing RightSidebar's
 // state. Reuses the jobs pane event: RightSidebar switches to `tab` when given.
-import { JOBS_PANE_EVENT } from '../agent-jobs/jobsPane';
+import { APP_EVENTS, createRequest } from '../../lib/appEvents';
+import { jobsPaneRequest } from '../agent-jobs/jobsPane';
 
 /** @param {'open' | 'toggle'} action */
 export function requestPlansPane(action = 'open') {
-  window.dispatchEvent(new CustomEvent(JOBS_PANE_EVENT, { detail: { action, tab: 'plans' } }));
+  jobsPaneRequest.request({ action, tab: 'plans' });
 }
 
 // A plan to open in the pane, e.g. from a notification or the status bar. Kept
 // until the pane has that plan's repo loaded: the pane may not be mounted yet,
 // or still showing another tab's repo.
-const PLAN_FOCUS_EVENT = 'lirah:plans-focus';
-let pendingPlanId = null;
+const planFocus = createRequest(APP_EVENTS.plansFocus, { pending: true, before: () => requestPlansPane('open') });
 
-export function requestPlanFocus(planId) {
-  pendingPlanId = planId;
-  requestPlansPane('open');
-  window.dispatchEvent(new CustomEvent(PLAN_FOCUS_EVENT));
-}
-
-export function subscribePlanFocus(fn) {
-  window.addEventListener(PLAN_FOCUS_EVENT, fn);
-  return () => window.removeEventListener(PLAN_FOCUS_EVENT, fn);
-}
+export const requestPlanFocus = (planId) => planFocus.request(planId);
+export const subscribePlanFocus = planFocus.subscribe;
 
 /** The pending plan id if it is one of `plans` (and clears it), else null. */
-export function takePlanFocus(plans) {
-  if (!pendingPlanId || !plans?.some((p) => p.id === pendingPlanId)) return null;
-  const id = pendingPlanId;
-  pendingPlanId = null;
-  return id;
-}
+export const takePlanFocus = (plans) => planFocus.take((id) => !!plans?.some((p) => p.id === id));
 
 // The command palette's `autopilot`: start or stop auto-pilot on the plan the
 // pane shows. Pending like a focus request, but only briefly, so a request the
 // pane can't serve (not a git repo) doesn't fire much later by surprise.
-const AUTOPILOT_TOGGLE_EVENT = 'lirah:plans-autopilot-toggle';
-const TOGGLE_TTL = 5000;
-let toggleRequestedAt = 0;
+const autopilotToggle = createRequest(APP_EVENTS.plansAutopilotToggle, {
+  pending: true,
+  ttl: 5000,
+  before: () => requestPlansPane('open'),
+});
 
-export function requestAutopilotToggle() {
-  toggleRequestedAt = Date.now();
-  requestPlansPane('open');
-  window.dispatchEvent(new CustomEvent(AUTOPILOT_TOGGLE_EVENT));
-}
-
-export function subscribeAutopilotToggle(fn) {
-  window.addEventListener(AUTOPILOT_TOGGLE_EVENT, fn);
-  return () => window.removeEventListener(AUTOPILOT_TOGGLE_EVENT, fn);
-}
+export const requestAutopilotToggle = () => autopilotToggle.request();
+export const subscribeAutopilotToggle = autopilotToggle.subscribe;
 
 /** Whether a toggle is pending (and clears it). */
-export function takeAutopilotToggle() {
-  const pending = Date.now() - toggleRequestedAt < TOGGLE_TTL;
-  toggleRequestedAt = 0;
-  return pending;
-}
+export const takeAutopilotToggle = () => autopilotToggle.take() !== null;

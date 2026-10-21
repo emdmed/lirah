@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { APP_EVENTS, createRequest } from '../../lib/appEvents';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
 import { focusPane } from '../../hooks/usePaneShortcuts';
@@ -21,10 +22,10 @@ const NOTIFY_BATCH_MS = 1500;
 
 // Lets the status bar and the workspace pane jump to the next waiting tab
 // without sharing App's state.
-export const ATTENTION_JUMP_EVENT = 'lirah:attention-jump';
+const attentionJump = createRequest(APP_EVENTS.attentionJump);
 
 export function requestAttentionJump() {
-  window.dispatchEvent(new CustomEvent(ATTENTION_JUMP_EVENT));
+  attentionJump.request();
 }
 
 function cliLabel(source) {
@@ -148,8 +149,7 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
 
   useEffect(() => {
     const onRequest = () => jumpToNext();
-    window.addEventListener(ATTENTION_JUMP_EVENT, onRequest);
-    return () => window.removeEventListener(ATTENTION_JUMP_EVENT, onRequest);
+    return attentionJump.subscribe(onRequest);
   }, [jumpToNext]);
 
   return { queue, jumpToNext };

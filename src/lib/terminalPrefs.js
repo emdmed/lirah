@@ -5,8 +5,10 @@
 // that happen to re-render. These helpers keep the value in localStorage and
 // announce changes on a custom event, which each useTerminal subscribes to.
 
+import { APP_EVENTS, emitAppEvent } from './appEvents';
+
 const SCROLLBACK_KEY = 'nevo-terminal:scrollback';
-const PREFS_EVENT = 'lirah:terminal-prefs';
+const PREFS_EVENT = APP_EVENTS.terminalPrefs;
 
 // xterm defaults to 1000 lines, which one long build log or agent turn blows
 // straight through. 10k is roughly a session's worth without a real memory cost.
@@ -39,7 +41,7 @@ export function setScrollback(lines) {
   } catch {
     // Private mode / quota — the in-session dispatch below still applies it.
   }
-  window.dispatchEvent(new CustomEvent(PREFS_EVENT));
+  emitAppEvent(PREFS_EVENT);
 }
 
 // Fires on same-window changes (custom event) and on changes made by another

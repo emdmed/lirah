@@ -15,7 +15,7 @@ import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
 import { Keycap, KeyChord } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
-import { JOBS_PANE_EVENT } from './jobsPane';
+import { jobsPaneRequest } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { MAX_TABS, useTabManager } from '../tabs/TabContext';
@@ -133,8 +133,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
       else setCollapsedOverride(false);
       if (target) setTab(target);
     };
-    window.addEventListener(JOBS_PANE_EVENT, onRequest);
-    return () => window.removeEventListener(JOBS_PANE_EVENT, onRequest);
+    return jobsPaneRequest.subscribe(onRequest);
   }, [collapsed, tab]);
 
   // User-resizable panel width — persisted so it survives reloads. A narrow
