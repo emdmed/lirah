@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { git } from '../../lib/git';
 import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
 import {
   Dialog,
@@ -103,7 +104,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   useEffect(() => {
     if (!open || !projectPath) return;
     let cancelled = false;
-    invoke('run_git_command', { repoPath: projectPath, args: ['rev-parse', '--is-inside-work-tree'] })
+    git(projectPath, ['rev-parse', '--is-inside-work-tree'])
       .then(() => {
         if (!cancelled) setIsGitRepo(true);
       })

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { git } from "../../lib/git";
 import { listen } from "@tauri-apps/api/event";
 import { useToast } from "../toast/ToastContext";
 
@@ -80,7 +81,7 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
       const undo = async () => {
         try {
           if (before === null) {
-            await invoke("run_git_command", { repoPath: repo_path, args: ["clean", "-f", "--", effectiveFile] });
+            await git(repo_path, ["clean", "-f", "--", effectiveFile]);
             // clean skips ignored, staged or committed files; don't claim success then.
             if (await invoke("path_exists", { path: filePath })) {
               toastError(`Couldn't remove ${effectiveFile} (it's ignored or already staged) — delete it manually.`);

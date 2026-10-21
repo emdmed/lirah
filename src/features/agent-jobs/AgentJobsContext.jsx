@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { git, repoTop, worktreeAdd, worktreeRemove } from '../../lib/git';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../../lib/notify';
 import { useConfirm } from '../confirm/ConfirmContext';
@@ -33,7 +34,7 @@ function basename(p) {
 // when the job writes the same path. Null when the status can't be read.
 async function workingTreeConflicts(job, dest) {
   try {
-    const out = await invoke('run_git_command', { repoPath: dest, args: ['status', '--porcelain'] });
+    const out = await git(dest, ['status', '--porcelain']);
     const entries = out.split('\n').filter((l) => l.trim()).map((line) => {
       const rest = line.slice(3);
       const path = (rest.includes(' -> ') ? rest.split(' -> ')[1] : rest).replace(/^"|"$/g, '');
@@ -126,8 +127,8 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
 // Only safe to call on an isolated worktree — never the user's real working tree.
 async function computeDiffStat(cwd) {
   try {
-    await invoke('run_git_command', { repoPath: cwd, args: ['add', '-N', '.'] });
-    const out = await invoke('run_git_command', { repoPath: cwd, args: ['diff', '--numstat'] });
+    await git(cwd, ['add', '-N', '.']);
+    const out = await git(cwd, ['diff', '--numstat']);
     let added = 0;
     let removed = 0;
     for (const line of out.split('\n')) {
@@ -278,26 +279,16 @@ async function gcOrphanWorktrees(home, liveJobs) {
       // worktree registration.
       let repoRoot = null;
       try {
-        const common = await invoke('run_git_command', {
-          repoPath: entry.path,
-          args: ['rev-parse', '--path-format=absolute', '--git-common-dir'],
-        });
+        const common = await git(entry.path, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
         repoRoot = common.trim().replace(/\/\.git\/?$/, '') || null;
       } catch {
         // --path-format needs git 2.31+. The first entry of `worktree list` is
         // always the main worktree, which is the repo we need.
-        const list = await invoke('run_git_command', {
-          repoPath: entry.path,
-          args: ['worktree', 'list', '--porcelain'],
-        });
+        const list = await git(entry.path, ['worktree', 'list', '--porcelain']);
         repoRoot = list.split('\n')[0]?.replace(/^worktree\s+/, '').trim() || null;
       }
       if (!repoRoot) continue;
-      await invoke('run_git_command', {
-        repoPath: repoRoot,
-        args: ['worktree', 'remove', '--force', entry.path],
-      });
-      await invoke('run_git_command', { repoPath: repoRoot, args: ['worktree', 'prune'] });
+      await worktreeRemove(repoRoot, entry.path);
       removed += 1;
     } catch {
       // Not a worktree, repo gone, or removal refused — leave it alone.
@@ -367,10 +358,7 @@ export function AgentJobsProvider({ children }) {
             // Recover any changes from the worktree so review/discard still work.
             let changedFiles = [];
             try {
-              const status = await invoke('run_git_command', {
-                repoPath: job.cwd,
-                args: ['status', '--porcelain'],
-              });
+              const status = await git(job.cwd, ['status', '--porcelain']);
               changedFiles = parsePorcelain(status, job.cwd);
             } catch {
               // Non-git cwd or the worktree is gone.
@@ -450,10 +438,7 @@ export function AgentJobsProvider({ children }) {
       finalizedRef.current.add(job.id);
       let changedFiles = [];
       try {
-        const status = await invoke('run_git_command', {
-          repoPath: job.cwd,
-          args: ['status', '--porcelain'],
-        });
+        const status = await git(job.cwd, ['status', '--porcelain']);
         changedFiles = parsePorcelain(status, job.cwd);
       } catch {
         // Non-git cwd or command failed — leave changedFiles empty.
@@ -567,11 +552,7 @@ export function AgentJobsProvider({ children }) {
     // Null means repoPath is not inside a git repo.
     let repoRoot = null;
     try {
-      const top = await invoke('run_git_command', {
-        repoPath,
-        args: ['rev-parse', '--show-toplevel'],
-      });
-      repoRoot = top.trim() || null;
+      repoRoot = await repoTop(repoPath);
     } catch {
       repoRoot = null;
     }
@@ -588,10 +569,7 @@ export function AgentJobsProvider({ children }) {
       try {
         if (!home) throw new Error('home directory unavailable');
         worktreePath = `${home}/.lirah/worktrees/${basename(repoRoot)}-${id}`;
-        await invoke('run_git_command', {
-          repoPath: repoRoot,
-          args: ['worktree', 'add', '--detach', worktreePath],
-        });
+        await worktreeAdd(repoRoot, { path: worktreePath, detach: true });
         cwd = worktreePath;
       } catch (e) {
         // Fall back to running in-place if worktree creation fails.
@@ -680,11 +658,8 @@ export function AgentJobsProvider({ children }) {
   const applyJobPatch = useCallback(async (job, { threeWay = false, targetRepo } = {}) => {
     const dest = targetRepo || job.repoPath;
     // Stage everything (incl. new files) and produce a full binary patch.
-    await invoke('run_git_command', { repoPath: job.cwd, args: ['add', '-A'] });
-    const patch = await invoke('run_git_command', {
-      repoPath: job.cwd,
-      args: ['diff', '--cached', '--binary'],
-    });
+    await git(job.cwd, ['add', '-A']);
+    const patch = await git(job.cwd, ['diff', '--cached', '--binary']);
     if (!patch.trim()) return;
     const home = await invoke('get_home_dir');
     const patchFile = `${home}/.lirah/patches/job-${job.id}.patch`;
@@ -692,7 +667,7 @@ export function AgentJobsProvider({ children }) {
     const applyArgs = ['apply', '--whitespace=nowarn'];
     if (threeWay) applyArgs.push('--3way');
     applyArgs.push(patchFile);
-    await invoke('run_git_command', { repoPath: dest, args: applyArgs });
+    await git(dest, applyArgs);
   }, []);
 
   // Apply a single job's worktree changes back onto the main repo working tree.
@@ -735,10 +710,7 @@ export function AgentJobsProvider({ children }) {
         }
       }
       await applyJobPatch(job);
-      await invoke('run_git_command', {
-        repoPath: job.repoPath,
-        args: ['worktree', 'remove', '--force', job.worktreePath],
-      });
+      await git(job.repoPath, ['worktree', 'remove', '--force', job.worktreePath]);
       patchJob(id, { status: 'applied', worktreePath: null });
       // A reconcile job supersedes its sources — tear their worktrees down and
       // drop them so their (now-integrated) changes can't be applied a second time.
@@ -747,10 +719,7 @@ export function AgentJobsProvider({ children }) {
           const src = jobsRef.current.find((j) => j.id === srcId);
           if (src?.worktreePath) {
             try {
-              await invoke('run_git_command', {
-                repoPath: src.repoPath,
-                args: ['worktree', 'remove', '--force', src.worktreePath],
-              });
+              await git(src.repoPath, ['worktree', 'remove', '--force', src.worktreePath]);
             } catch {
               // Worktree already gone.
             }
@@ -808,7 +777,7 @@ export function AgentJobsProvider({ children }) {
     const id = makeId();
     const intPath = `${home}/.lirah/worktrees/reconcile-${basename(repoRoot)}-${id}`;
     try {
-      await invoke('run_git_command', { repoPath: repoRoot, args: ['worktree', 'add', '--detach', intPath] });
+      await worktreeAdd(repoRoot, { path: intPath, detach: true });
     } catch (e) {
       return { started: false, error: `Could not create integration worktree: ${e}` };
     }
@@ -906,10 +875,7 @@ export function AgentJobsProvider({ children }) {
     const job = jobsRef.current.find((j) => j.id === id);
     if (job?.worktreePath) {
       try {
-        await invoke('run_git_command', {
-          repoPath: job.repoPath,
-          args: ['worktree', 'remove', '--force', job.worktreePath],
-        });
+        await git(job.repoPath, ['worktree', 'remove', '--force', job.worktreePath]);
       } catch {
         // Worktree may already be gone.
       }

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { git } from "../../lib/git";
 
 export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const [stage, setStage] = useState('idle'); // idle | loading-files | generating-message | ready | committing | done | error
@@ -40,11 +41,11 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       const deleted = committableFiles.filter(f => f.status === 'deleted').map(f => f.path);
       const other = committableFiles.filter(f => f.status !== 'deleted').map(f => f.path);
       if (other.length > 0) {
-        await invoke('run_git_command', { repoPath: currentPath, args: ['add', '--', ...other] });
+        await git(currentPath, ['add', '--', ...other]);
         if (cancelledRef.current) return;
       }
       if (deleted.length > 0) {
-        await invoke('run_git_command', { repoPath: currentPath, args: ['rm', '--cached', '--', ...deleted] });
+        await git(currentPath, ['rm', '--cached', '--', ...deleted]);
         if (cancelledRef.current) return;
       }
 
@@ -73,7 +74,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     if (!repoPath) return;
     setStage('committing');
     try {
-      await invoke('run_git_command', { repoPath, args: ['commit', '-m', editedMessage] });
+      await git(repoPath, ['commit', '-m', editedMessage]);
       setStage('done');
       setTimeout(reset, 2000);
     } catch (err) {
@@ -87,7 +88,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     const repoPath = currentPathRef.current;
     if (repoPath && (stage === 'ready' || stage === 'generating-message')) {
       try {
-        await invoke('run_git_command', { repoPath, args: ['reset', 'HEAD'] });
+        await git(repoPath, ['reset', 'HEAD']);
       } catch {}
     }
     reset();
