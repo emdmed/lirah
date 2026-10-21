@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
 import { basename } from '../../utils/pathUtils';
+import { formatTimer } from '../../lib/formatDuration';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -38,15 +39,9 @@ const WIDE_KEY = 'agentJobsSidebarWide';
 const halfWindow = () => Math.round(window.innerWidth / 2);
 const maxWidth = () => Math.max(MAX_WIDTH, halfWindow());
 
-// Compact human duration between two epoch-ms timestamps (endedAt || now).
-function formatDuration(startedAt, endedAt) {
-  if (!startedAt) return null;
-  const secs = Math.max(0, Math.floor(((endedAt || Date.now()) - startedAt) / 1000));
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ${secs % 60}s`;
-  const hrs = Math.floor(mins / 60);
-  return `${hrs}h ${mins % 60}m`;
+// Time between two epoch-ms timestamps (endedAt || now), or null before it started.
+function jobDuration(startedAt, endedAt) {
+  return startedAt ? formatTimer((endedAt || Date.now()) - startedAt) : null;
 }
 
 const STATUS_META = {
@@ -812,7 +807,7 @@ function Elapsed({ startedAt }) {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  return formatDuration(startedAt, now);
+  return jobDuration(startedAt, now);
 }
 
 // Consecutive lines from the same stream joined into one string, so the log
@@ -841,7 +836,7 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
     job.status === 'failed' ||
     job.status === 'conflict' ||
     job.status === 'interrupted';
-  const duration = isRunning ? null : formatDuration(job.startedAt, job.endedAt);
+  const duration = isRunning ? null : jobDuration(job.startedAt, job.endedAt);
   // A race candidate is applied by winning, which also clears the others.
   const isRace = !!job.raceId;
   const stat = job.diffStat;

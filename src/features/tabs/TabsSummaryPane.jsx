@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatAgo } from '../../lib/formatDuration';
 import { plural } from '../../lib/plural';
 import {
   AudioWaveform,
@@ -38,16 +39,6 @@ const ACTIVE_MS = 2500;
 const REMOTE_MS = 2 * 60 * 1000;
 // A tab's own activity that outranks another agent working in its repo.
 const OWN_BUSY = new Set(['working', 'permission', 'running']);
-
-function formatAgo(ms) {
-  const secs = Math.max(0, Math.floor(ms / 1000));
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
 
 // What each activity looks like: an icon that names the state and its colour.
 // `pulse` marks work in progress. How long it has held is in the row tooltip.
