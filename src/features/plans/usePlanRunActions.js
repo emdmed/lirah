@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dirtyCount } from '../../lib/git';
+import { getSettings, setSetting } from '../settings/settingsStore';
 import { getTabSession } from '../tabs/terminalActivity';
 import { getAgentHookState } from '../tabs/agentHookState';
 import {
@@ -8,16 +9,6 @@ import {
 import { inWorkDir, planGit, workPath } from './planGit';
 import { subscribeAutopilotToggle, takeAutopilotToggle } from './plansPaneEvents';
 import { BUSY } from './PlanPaneContext';
-
-const AUTOPILOT_TIP_KEY = 'lirah:autopilot-tip-seen';
-
-function readFlag(key) {
-  try { return localStorage.getItem(key) === '1'; } catch { return false; }
-}
-
-function writeFlag(key) {
-  try { localStorage.setItem(key, '1'); } catch { /* per-viewer nicety only */ }
-}
 
 /**
  * Sending chunks to the active tab's agent: the checks before a send, a single
@@ -98,7 +89,7 @@ export function usePlanRunActions({
     for (const repo of planGit(plan).repos) {
       dirty += await dirtyCount(workPath(repo)).catch(() => 0);
     }
-    const firstRun = !readFlag(AUTOPILOT_TIP_KEY);
+    const firstRun = !getSettings().autopilotTipSeen;
     const ok = await confirm({
       title: dirty ? `${dirty} uncommitted change${dirty === 1 ? '' : 's'} in the repo` : 'Run the plan on auto-pilot?',
       description: [
@@ -110,7 +101,7 @@ export function usePlanRunActions({
       destructive: false,
     });
     if (!ok) return;
-    writeFlag(AUTOPILOT_TIP_KEY);
+    setSetting('autopilotTipSeen', true);
     try {
       await startAutopilot(repoRoot, plan.id, activeTabId);
     } catch (e) {

@@ -534,17 +534,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     else if (sectionId === 'repos') clearLinkedRepos();
   }, [compact.setCompactedProject, fileSelection.clearFileSelection, elementPicker.clearSelectedElements, patterns.clearPatterns, clearLinkedRepos]);
 
-  const [promptPreviewOpen, setPromptPreviewOpen] = useState(() => {
-    try { return localStorage.getItem('lirah:promptPreviewOpen') === 'true'; } catch { return false; }
-  });
+  const [promptPreviewOpen, setPromptPreviewOpen] = useSeededSetting('promptPreviewOpen');
 
   const togglePromptPreview = useCallback(() => {
-    setPromptPreviewOpen((prev) => {
-      const next = !prev;
-      try { localStorage.setItem('lirah:promptPreviewOpen', String(next)); } catch { /* storage unavailable */ }
-      return next;
-    });
-  }, []);
+    setPromptPreviewOpen((prev) => !prev);
+  }, [setPromptPreviewOpen]);
 
   // Ctrl+Shift+E toggles the payload preview from anywhere, including while
   // the terminal has focus. Shifted so it never shadows readline's Ctrl+E.

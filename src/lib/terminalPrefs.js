@@ -2,17 +2,14 @@
 //
 // The terminal is mounted once per tab and its xterm instance is long-lived, so
 // a preference change has to reach every existing instance — not just the ones
-// that happen to re-render. These helpers keep the value in localStorage and
-// announce changes on a custom event, which each useTerminal subscribes to.
+// that happen to re-render. The value lives in settingsStore (which migrated
+// the old nevo-terminal:scrollback key), and each useTerminal subscribes to it.
 
-import { APP_EVENTS, emitAppEvent } from './appEvents';
-
-const SCROLLBACK_KEY = 'nevo-terminal:scrollback';
-const PREFS_EVENT = APP_EVENTS.terminalPrefs;
+import { getSettings, setSetting, SETTINGS_DEFAULTS, subscribeSettings } from '../features/settings/settingsStore';
 
 // xterm defaults to 1000 lines, which one long build log or agent turn blows
 // straight through. 10k is roughly a session's worth without a real memory cost.
-export const SCROLLBACK_DEFAULT = 10000;
+export const SCROLLBACK_DEFAULT = SETTINGS_DEFAULTS.scrollback;
 
 // Past this, scrollback gets expensive: each line costs memory per column (a
 // 200-column terminal at 200k lines is hundreds of MB), and every resize
@@ -27,33 +24,16 @@ export const SCROLLBACK_OPTIONS = [
 ];
 
 export function getScrollback() {
-  try {
-    const raw = parseInt(localStorage.getItem(SCROLLBACK_KEY), 10);
-    return Number.isFinite(raw) && raw > 0 ? raw : SCROLLBACK_DEFAULT;
-  } catch {
-    return SCROLLBACK_DEFAULT;
-  }
+  const lines = getSettings().scrollback;
+  return Number.isFinite(lines) && lines > 0 ? lines : SCROLLBACK_DEFAULT;
 }
 
 export function setScrollback(lines) {
-  try {
-    localStorage.setItem(SCROLLBACK_KEY, String(lines));
-  } catch {
-    // Private mode / quota — the in-session dispatch below still applies it.
-  }
-  emitAppEvent(PREFS_EVENT);
+  setSetting('scrollback', lines);
 }
 
-// Fires on same-window changes (custom event) and on changes made by another
-// window of the app (storage event). Returns an unsubscribe function.
+// Fires on any settings change, in this window or another one; the handler
+// reads the value again. Returns an unsubscribe function.
 export function subscribeTerminalPrefs(handler) {
-  const onStorage = (e) => {
-    if (!e.key || e.key === SCROLLBACK_KEY) handler();
-  };
-  window.addEventListener(PREFS_EVENT, handler);
-  window.addEventListener('storage', onStorage);
-  return () => {
-    window.removeEventListener(PREFS_EVENT, handler);
-    window.removeEventListener('storage', onStorage);
-  };
+  return subscribeSettings(handler);
 }

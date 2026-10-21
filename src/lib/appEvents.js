@@ -10,8 +10,6 @@ export const APP_EVENTS = {
   plansAutopilotToggle: 'lirah:plans-autopilot-toggle',
   // Jump to the next tab whose agent is waiting on you.
   attentionJump: 'lirah:attention-jump',
-  // A terminal preference changed.
-  terminalPrefs: 'lirah:terminal-prefs',
 };
 
 export function emitAppEvent(name, detail) {

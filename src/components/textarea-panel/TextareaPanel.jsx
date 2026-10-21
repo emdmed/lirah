@@ -18,6 +18,7 @@ import { PaneInfo } from "../PaneInfo";
 import { PaneLegend } from "../instrument/PaneLegend";
 import { ScrollText } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import { useSeededSetting } from "../../features/settings/settingsStore";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 const NO_RESULTS = [];
@@ -192,16 +193,10 @@ export function TextareaPanel({
         : null;
 
   // The context list folds away; the choice outlives the pane.
-  const [chipsOpen, setChipsOpen] = useState(() => {
-    try { return localStorage.getItem('lirah:contextChipsOpen') !== 'false'; } catch { return true; }
-  });
+  const [chipsOpen, setChipsOpen] = useSeededSetting('contextChipsOpen');
   const toggleChips = useCallback(() => {
-    setChipsOpen((prev) => {
-      const next = !prev;
-      try { localStorage.setItem('lirah:contextChipsOpen', String(next)); } catch { /* storage unavailable */ }
-      return next;
-    });
-  }, []);
+    setChipsOpen((prev) => !prev);
+  }, [setChipsOpen]);
 
   const templateTitle = useMemo(() => {
     const section = promptPreviewBase?.sections?.find((s) => s.id === 'template');

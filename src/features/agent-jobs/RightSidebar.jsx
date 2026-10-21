@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
+import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -32,8 +33,6 @@ const RaceCompareDialog = lazyNamed(() => import('./RaceCompareDialog'), 'RaceCo
 const MIN_WIDTH = 224;
 const MAX_WIDTH = 560;
 const DEFAULT_WIDTH = 256;
-const WIDTH_KEY = 'agentJobsSidebarWidth';
-const WIDE_KEY = 'agentJobsSidebarWide';
 
 // Widened, the pane takes half the window for reading plans and reports;
 // dragging can also reach that far.
@@ -140,16 +139,14 @@ export function RightSidebar({ projectPath, onNewTab }) {
   // User-resizable panel width — persisted so it survives reloads. A narrow
   // fixed panel is what made the cards feel squashed.
   const [width, setWidth] = useState(() => {
-    const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10);
-    return Number.isFinite(saved) ? Math.min(maxWidth(), Math.max(MIN_WIDTH, saved)) : DEFAULT_WIDTH;
+    const saved = getSettings().jobsSidebarWidth;
+    return saved ? Math.min(maxWidth(), Math.max(MIN_WIDTH, saved)) : DEFAULT_WIDTH;
   });
   const paneRef = useRef(null);
 
   // Half-window toggle, kept apart from the dragged width so un-widening
   // restores it. Tracks the window while widened.
-  const [wide, setWide] = useState(() => {
-    try { return localStorage.getItem(WIDE_KEY) === '1'; } catch { return false; }
-  });
+  const [wide, setWide] = useSeededSetting('jobsSidebarWide');
   const [half, setHalf] = useState(halfWindow);
   useEffect(() => {
     if (!wide) return;
@@ -158,10 +155,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [wide]);
-  const toggleWide = () => setWide((w) => {
-    try { localStorage.setItem(WIDE_KEY, w ? '0' : '1'); } catch { /* storage unavailable */ }
-    return !w;
-  });
+  const toggleWide = () => setWide((w) => !w);
   const paneWidth = wide ? Math.max(width, half) : width;
 
   // A drag writes the width straight onto the pane once per frame; state and
@@ -191,7 +185,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
       if (pending == null) return;
       apply();
       setWidth(pending);
-      localStorage.setItem(WIDTH_KEY, String(pending));
+      setSetting('jobsSidebarWidth', pending);
       // A drag sets the width by hand, which ends the half-window mode.
       if (wide) toggleWide();
     };

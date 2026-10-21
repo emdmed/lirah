@@ -32,6 +32,16 @@ export const SETTINGS_DEFAULTS = {
   sidebarOpen: true,
   sidebarWidth: 280,
   viewMode: 'flat',
+  // Terminal scrollback in lines (see lib/terminalPrefs.js).
+  scrollback: 10000,
+  // Per tab, seeded: the prompt's payload preview and its context list.
+  promptPreviewOpen: false,
+  contextChipsOpen: true,
+  // The right sidebar: its dragged width (0 until dragged) and half-window mode.
+  jobsSidebarWidth: 0,
+  jobsSidebarWide: false,
+  // The auto-pilot confirm has shown its first-run tip.
+  autopilotTipSeen: false,
 };
 
 // Pre-v1 keys, one per preference. Read once on first load to migrate; never
@@ -51,6 +61,38 @@ const LEGACY_KEYS = {
 };
 // Stored as a bare string, not JSON.
 const LEGACY_SELECTED_CLI_KEY = 'nevo-terminal:selected-cli';
+
+// Kept in keys of their own until after v1 shipped, so they are read whenever
+// the blob doesn't have them yet, not only on the first load. Each parses the
+// old raw string; undefined keeps the default.
+const LATER_KEYS = {
+  scrollback: ['nevo-terminal:scrollback', (raw) => {
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }],
+  promptPreviewOpen: ['lirah:promptPreviewOpen', (raw) => raw === 'true'],
+  contextChipsOpen: ['lirah:contextChipsOpen', (raw) => raw !== 'false'],
+  jobsSidebarWidth: ['agentJobsSidebarWidth', (raw) => {
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : undefined;
+  }],
+  jobsSidebarWide: ['agentJobsSidebarWide', (raw) => raw === '1'],
+  autopilotTipSeen: ['lirah:autopilot-tip-seen', (raw) => raw === '1'],
+};
+
+// The later keys `raw` (a saved blob, or {}) is missing, from their old keys.
+function readLater(raw) {
+  const found = {};
+  for (const [key, [legacyKey, parse]] of Object.entries(LATER_KEYS)) {
+    if (raw && key in raw) continue;
+    try {
+      const saved = localStorage.getItem(legacyKey);
+      const value = saved === null ? undefined : parse(saved);
+      if (value !== undefined) found[key] = value;
+    } catch { /* storage unavailable: keep the default */ }
+  }
+  return found;
+}
 
 // Keep only known keys whose type matches the default, so a corrupt or
 // hand-edited blob can't put a string where a boolean belongs.
@@ -89,9 +131,15 @@ function persist(next) {
 function load() {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
-    if (saved !== null) return sanitize(JSON.parse(saved));
+    if (saved !== null) {
+      const raw = JSON.parse(saved);
+      const later = readLater(raw);
+      const loaded = sanitize({ ...raw, ...later });
+      if (Object.keys(later).length) persist(loaded);
+      return loaded;
+    }
   } catch { /* corrupt blob or storage unavailable: fall through */ }
-  const migrated = sanitize(readLegacy());
+  const migrated = sanitize({ ...readLegacy(), ...readLater({}) });
   persist(migrated);
   return migrated;
 }
