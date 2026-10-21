@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 /// Ask Claude to split a plan into implementation chunks. The prompt (built by
 /// the frontend, see src/features/plans/planPrompts.js) goes in on stdin since
@@ -10,12 +10,7 @@ use std::process::{Command, Stdio};
 #[tauri::command]
 pub async fn split_plan(project_dir: String, prompt: String) -> Result<String, String> {
     crate::ipc::blocking("split_plan", move || {
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-        let mut child = Command::new(&shell)
-            .args([
-                "-lc",
-                "claude --print --model sonnet --allowedTools Read Grep Glob",
-            ])
+        let mut child = crate::util::login_shell_command("claude --print --model sonnet --allowedTools Read Grep Glob")
             .current_dir(&project_dir)
             .env("TERM", "xterm-256color")
             .stdin(Stdio::piped())
@@ -73,9 +68,8 @@ pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), Str
 #[tauri::command]
 pub async fn remove_plan_workdir(path: String) -> Result<(), String> {
     crate::ipc::blocking("remove_plan_workdir", move || {
-        let base = dirs::home_dir()
+        let base = crate::util::lirah_dir()
             .ok_or_else(|| "No home directory".to_string())?
-            .join(".lirah")
             .join("plan-worktrees");
         let dir = match Path::new(&path).canonicalize() {
             Ok(dir) => dir,

@@ -18,8 +18,7 @@ pub fn check_command_exists(command: String) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn get_home_dir() -> Result<String, String> {
-    dirs::home_dir()
-        .map(|p| p.to_string_lossy().to_string())
+    crate::util::home_dir_string()
         .ok_or_else(|| "Could not determine home directory".into())
 }
 

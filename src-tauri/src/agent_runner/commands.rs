@@ -364,7 +364,6 @@ pub fn run_agent_job(
             .ok()
             .map(|f| Arc::new(Mutex::new(f)))
     });
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
 
     // CLIs without a system-prompt flag get the autonomy rules folded into the
     // prompt itself; the rest already carry them on the command line above.
@@ -374,9 +373,8 @@ pub fn run_agent_job(
         prompt
     };
 
-    let mut cmd = Command::new(&shell);
-    cmd.args(["-lc", &command])
-        .current_dir(&cwd)
+    let mut cmd = crate::util::login_shell_command(&command);
+    cmd.current_dir(&cwd)
         .env("TERM", "xterm-256color")
         // No human is attached to this job, so make sure nothing the agent runs
         // can block waiting for interactive input. These stop the most common

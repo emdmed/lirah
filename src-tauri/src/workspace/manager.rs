@@ -27,9 +27,8 @@ pub struct WorkspaceInfo {
 }
 
 fn workspaces_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(".lirah")
+    crate::util::lirah_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp").join(".lirah"))
         .join("workspaces")
 }
 

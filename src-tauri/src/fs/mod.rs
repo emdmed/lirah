@@ -10,10 +10,3 @@ pub use git::{GitStats, get_git_stats, get_git_diff, get_current_branch, enable_
 pub(crate) use git::{resolve_git_dir, read_current_branch};
 pub use tokens::{get_session_token_usage, get_project_stats, get_all_projects_stats, claude_project_dir_name};
 pub use commands::{check_command_exists, get_home_dir, set_file_executable, path_exists};
-
-fn home_dir() -> Option<String> {
-    #[cfg(unix)]
-    { std::env::var("HOME").ok() }
-    #[cfg(windows)]
-    { std::env::var("USERPROFILE").ok() }
-}

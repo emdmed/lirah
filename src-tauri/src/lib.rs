@@ -15,6 +15,7 @@ mod ipc;
 mod watch_registry;
 mod agent_hooks;
 mod plans;
+mod util;
 
 use tauri::Manager;
 

@@ -57,7 +57,7 @@ fn discover_claude_data_dir() -> Option<PathBuf> {
     }
 
     // 2. Get home directory
-    let home_dir = dirs::home_dir()?;
+    let home_dir = crate::util::home_dir()?;
 
     // 3. Try each location in priority order
     for location in CLAUDE_DATA_LOCATIONS {

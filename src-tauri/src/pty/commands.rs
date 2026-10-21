@@ -353,8 +353,7 @@ pub async fn spawn_hidden_terminal(
             .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
         // Parse the command: run via shell -c
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-        let mut cmd = CommandBuilder::new(&shell);
+        let mut cmd = CommandBuilder::new(crate::util::user_shell());
         cmd.args(["-lc", &command]);
         cmd.env("TERM", "xterm-256color");
         cmd.cwd(&project_dir);
@@ -551,47 +550,23 @@ pub fn generate_commit_message(
         ),
     };
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+    let run = |script: &str| {
+        crate::util::run_capture(
+            crate::util::login_shell_command(script)
+                .current_dir(&project_dir)
+                .env("TERM", "xterm-256color"),
+        )
+        .map(|out| out.trim().to_string())
+        .map_err(|e| format!("LLM command failed: {}", e))
+    };
 
-    // First attempt with free model
-    let output = std::process::Command::new(&shell)
-        .args(&["-lc", &command])
-        .current_dir(&project_dir)
-        .env("TERM", "xterm-256color")
-        .output()
-        .map_err(|e| format!("Failed to run LLM command: {}", e))?;
-
-    if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    // First attempt with the free model; if it fails and there is a fallback
+    // (paid model), try that silently and report its error instead.
+    match (run(&command), fallback_command) {
+        (Ok(out), _) => Ok(out),
+        (Err(_), Some(fallback)) => run(&fallback),
+        (Err(e), None) => Err(e),
     }
-
-    // If free model failed and we have a fallback (paid model), try it silently
-    if let Some(fallback) = fallback_command {
-        let fallback_output = std::process::Command::new(&shell)
-            .args(&["-lc", &fallback])
-            .current_dir(&project_dir)
-            .env("TERM", "xterm-256color")
-            .output()
-            .map_err(|e| format!("Failed to run LLM command: {}", e))?;
-
-        if fallback_output.status.success() {
-            return Ok(String::from_utf8_lossy(&fallback_output.stdout)
-                .trim()
-                .to_string());
-        }
-
-        // Both failed - return error from paid model attempt
-        let stdout = String::from_utf8_lossy(&fallback_output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&fallback_output.stderr).to_string();
-        let error_msg = if !stdout.is_empty() { stdout } else { stderr };
-        return Err(format!("LLM command failed: {}", error_msg));
-    }
-
-    // No fallback available, return original error
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let error_msg = if !stdout.is_empty() { stdout } else { stderr };
-    Err(format!("LLM command failed: {}", error_msg))
 }
 
 /// How deep below the shell to look (bwrap → shell → wrapper → cli …).

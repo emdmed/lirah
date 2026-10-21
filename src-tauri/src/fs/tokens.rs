@@ -123,7 +123,7 @@ pub fn claude_project_dir_name(project_path: &str) -> String {
 }
 
 fn claude_sessions_dir(project_path: &str) -> Option<PathBuf> {
-    let home = super::home_dir()?;
+    let home = crate::util::home_dir()?;
     Some(
         PathBuf::from(home)
             .join(".claude")
@@ -190,7 +190,7 @@ fn proc_start_time(stat: &str) -> Option<&str> {
 
 /// Find the Claude session of a `claude` process running under the given PTY.
 fn live_session_for_pty(pty_pid: u32) -> Option<LiveClaudeSession> {
-    let home = super::home_dir()?;
+    let home = crate::util::home_dir()?;
     let registry = PathBuf::from(home).join(".claude").join("sessions");
     descendant_pids(pty_pid).into_iter().find_map(|pid| {
         let status = fs::read_to_string(format!("/proc/{}/status", pid)).ok()?;
@@ -446,7 +446,7 @@ pub async fn get_all_projects_stats() -> Result<AllProjectsStats, String> {
 }
 
 fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
-    let home = super::home_dir().ok_or("Could not get home directory")?;
+    let home = crate::util::home_dir().ok_or("Could not get home directory")?;
     let projects_dir = PathBuf::from(&home).join(".claude").join("projects");
 
     if !projects_dir.exists() {

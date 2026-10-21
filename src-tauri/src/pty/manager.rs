@@ -63,7 +63,7 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
     // Determine the shell to use based on the platform
-    let shell = get_shell();
+    let shell = crate::util::user_shell();
 
     // Create command: wrap in bwrap sandbox on Unix if requested
     #[cfg(target_os = "linux")]
@@ -77,7 +77,7 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
             "--tmpfs", "/tmp",
         ]);
         // Home directory: writable by default, with sensitive paths read-only
-        if let Some(ref home) = home_dir() {
+        if let Some(ref home) = crate::util::home_dir_string() {
             c.args(&["--bind", home, home]);
 
             // Sensitive paths that should be read-only inside the sandbox
@@ -201,7 +201,7 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
         .as_ref()
         .filter(|p| std::path::Path::new(p).is_dir())
         .cloned()
-        .unwrap_or_else(|| home_dir().unwrap_or_else(|| {
+        .unwrap_or_else(|| crate::util::home_dir_string().unwrap_or_else(|| {
             #[cfg(unix)]
             { "/".to_string() }
             #[cfg(windows)]
@@ -306,20 +306,3 @@ profile bwrap /usr/bin/bwrap flags=(unconfined) {
     });
 }
 
-fn home_dir() -> Option<String> {
-    #[cfg(unix)]
-    { std::env::var("HOME").ok() }
-    #[cfg(windows)]
-    { std::env::var("USERPROFILE").ok() }
-}
-
-#[cfg(unix)]
-fn get_shell() -> String {
-    // Use the user's configured shell, fall back to /bin/bash
-    std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
-}
-
-#[cfg(windows)]
-fn get_shell() -> String {
-    "powershell.exe".to_string()
-}

@@ -128,16 +128,12 @@ export const LirahAgentState = async () => {
 };
 "#;
 
-fn lirah_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".lirah"))
-}
-
 pub fn events_dir() -> Option<PathBuf> {
-    lirah_dir().map(|d| d.join("agent-events"))
+    crate::util::lirah_dir().map(|d| d.join("agent-events"))
 }
 
 fn claude_plugin_dir() -> Option<PathBuf> {
-    lirah_dir().map(|d| d.join("claude-plugin"))
+    crate::util::lirah_dir().map(|d| d.join("claude-plugin"))
 }
 
 /// Env vars that tie a terminal's agent hooks to its session.
@@ -191,7 +187,7 @@ fn prune_stale_logs(events: &Path) {
 /// opencode plugin. Not a wipe of the events directory: another Lirah instance
 /// may be using it.
 fn install() -> Result<(), String> {
-    let lirah = lirah_dir().ok_or("No home directory")?;
+    let lirah = crate::util::lirah_dir().ok_or("No home directory")?;
     let events = lirah.join("agent-events");
     fs::create_dir_all(&events).map_err(|e| e.to_string())?;
     prune_stale_logs(&events);
@@ -226,7 +222,7 @@ fn install() -> Result<(), String> {
 
     // opencode loads every file in its global plugins directory. Only for
     // users who have opencode set up.
-    if let Some(config) = dirs::home_dir().map(|h| h.join(".config").join("opencode")) {
+    if let Some(config) = crate::util::home_dir().map(|h| h.join(".config").join("opencode")) {
         if config.is_dir() {
             let plugin = config.join("plugins").join("lirah-agent-state.js");
             write_if_changed(&plugin, OPENCODE_PLUGIN).map_err(|e| e.to_string())?;
