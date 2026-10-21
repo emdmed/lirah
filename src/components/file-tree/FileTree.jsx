@@ -9,7 +9,7 @@ import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
 
 // Row pitch: rows fill it edge to edge so indent guides run unbroken.
-const ROW_HEIGHT = 22;
+const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 18;
 const SEPARATOR_HEIGHT = 9;
 

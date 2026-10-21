@@ -19,3 +19,25 @@ export function gitColorClass(stats) {
   if (stats.status || stats.added > 0 || stats.deleted > 0) return 'text-[var(--color-status-warning)]';
   return '';
 }
+
+/**
+ * Tree order: what you edit first, what recedes last. Visible folders, then
+ * visible files, then dimmed entries (dotfiles, build output) in the same
+ * folders-then-files order; case-insensitive by name within each group.
+ */
+export function compareTreeEntries(a, b) {
+  const dimA = isDimmedEntry(a.name);
+  if (dimA !== isDimmedEntry(b.name)) return dimA ? 1 : -1;
+  if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+  return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+}
+
+/**
+ * Split a file name into base and extension for display (`CHANGELOG`, `.md`).
+ * A leading dot is part of the base (`.gitignore` has no extension).
+ */
+export function splitExtension(name) {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return [name, ''];
+  return [name.slice(0, dot), name.slice(dot)];
+}

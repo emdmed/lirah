@@ -553,6 +553,24 @@ body {
   user-select: none;
 }
 
+/* Folder disclosure: a muted text glyph in the chevron column (12px), from
+   the glyph face, since the OCR face lacks the triangles. */
+.tui-tree-disclosure {
+  width: 12px;
+  flex-shrink: 0;
+  text-align: center;
+  font-family: var(--font-glyph);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--color-muted-foreground);
+  transition: color 200ms var(--ins-ease);
+}
+
+[data-nav-row]:hover .tui-tree-disclosure,
+[data-nav-row][data-cursor] .tui-tree-disclosure {
+  color: var(--color-foreground);
+}
+
 /* Block cursor drawn over the prompt input (see useBlockCaret). */
 .tui-caret {
   position: absolute;

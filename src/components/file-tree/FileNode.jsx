@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { TreeGuide } from "./TreeGuide";
-import { gitColorClass } from "./utils/lsColors";
+import { gitColorClass, splitExtension } from "./utils/lsColors";
 
 /**
  * Renders a file node in the tree with action buttons
@@ -13,6 +13,7 @@ export function FileNode({
   depth,
   isCurrentPath,
   isCursor,
+  isDimmed,
   isSelected,
   isPinned,
   isDeleted: isDeletedEntry,
@@ -31,6 +32,12 @@ export function FileNode({
   );
   const hasGitChanges = !!stats;
   const isDeleted = isDeletedEntry || gitStatus === 'deleted';
+  // The base name carries the row; the extension recedes. A git colour, when
+  // present, tints both, with the extension a step dimmer.
+  const gitClass = gitColorClass(stats);
+  const [base, ext] = splitExtension(name);
+  const baseClass = gitClass || (isDimmed ? 'text-faint' : 'text-foreground');
+  const extClass = gitClass ? `${gitClass} opacity-60` : 'text-faint';
 
   // Deleted files ignore clicks (handled by onActivateFile)
   const handleFileClick = () => onActivateFile(path, isDeleted);
@@ -45,7 +52,7 @@ export function FileNode({
       data-nav-row
       data-cursor={isCursor ? '' : undefined}
       data-selected={isSelected || undefined}
-      className={`group flex h-[22px] items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
+      className={`group flex h-6 items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
       <div
@@ -56,7 +63,11 @@ export function FileNode({
         <TreeGuide depth={depth} />
         {/* Chevron-width slot so file names share a column with folder names */}
         <span className="w-3 shrink-0" />
-        <span className={`truncate pl-1 leading-normal ${gitColorClass(stats) || 'text-foreground/80'} ${isDeleted ? 'line-through' : ''}`} style={{ fontSize: 'var(--font-lg)' }}>{name}</span>
+        {/* A long name loses the end of its base, never its extension. */}
+        <span className="flex min-w-0 pl-1 leading-normal" style={{ fontSize: 'var(--font-lg)' }} title={name}>
+          <span className={`truncate ${baseClass} ${isDeleted ? 'line-through' : ''}`}>{base}</span>
+          {ext && <span className={`shrink-0 ${extClass} ${isDeleted ? 'line-through' : ''}`}>{ext}</span>}
+        </span>
 
         {/* Git stats badge */}
         {hasGitChanges && (

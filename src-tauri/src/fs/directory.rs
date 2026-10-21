@@ -69,10 +69,22 @@ fn skip_windows_dir(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Directories first, then case-insensitive by name. The key is computed once
-/// per entry instead of lowercasing both names on every comparison.
+/// Build output and dependency folders that recede in the file panes, like
+/// dotfiles. Keep in step with `DIMMED_DIRS` in `file-tree/utils/lsColors.js`.
+const DIMMED_DIRS: &[&str] = &[
+    "node_modules", "dist", "build", "target", "out", "coverage", ".git", ".next", ".cache", "__pycache__",
+];
+
+fn is_dimmed(name: &str) -> bool {
+    name.starts_with('.') || DIMMED_DIRS.contains(&name)
+}
+
+/// Dimmed entries (dotfiles, build output) last; within each group directories
+/// first, then case-insensitive by name. Matches `compareTreeEntries` in the
+/// frontend. The key is computed once per entry instead of lowercasing both
+/// names on every comparison.
 fn sort_entries<T>(entries: &mut [T], is_dir: impl Fn(&T) -> bool, name: impl Fn(&T) -> &str) {
-    entries.sort_by_cached_key(|e| (!is_dir(e), name(e).to_lowercase()));
+    entries.sort_by_cached_key(|e| (is_dimmed(name(e)), !is_dir(e), name(e).to_lowercase()));
 }
 
 fn resolve_dir(path: Option<String>) -> Result<PathBuf, String> {
@@ -297,6 +309,17 @@ pub async fn read_directory_recursive(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sort_puts_dimmed_entries_last() {
+        let mut v = vec![
+            (".claude", true), ("README.md", false), ("src", true),
+            (".gitignore", false), ("node_modules", true), ("apps", true),
+        ];
+        sort_entries(&mut v, |e| e.1, |e| e.0);
+        let names: Vec<_> = v.iter().map(|e| e.0).collect();
+        assert_eq!(names, ["apps", "src", "README.md", ".claude", "node_modules", ".gitignore"]);
+    }
 
     #[test]
     fn breadth_first_truncation_keeps_shallow_entries() {

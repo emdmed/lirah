@@ -3,6 +3,7 @@
  */
 
 import { normalizePath } from './pathUtils';
+import { compareTreeEntries } from '../components/file-tree/utils/lsColors';
 
 export function buildTreeFromFlatList(flatList, rootPath) {
   const normalizedRoot = normalizePath(rootPath);
@@ -43,7 +44,8 @@ export function buildTreeFromFlatList(flatList, rootPath) {
 }
 
 /**
- * Sort tree nodes recursively: folders first, then alphabetically.
+ * Sort tree nodes recursively (see compareTreeEntries: folders first,
+ * dimmed entries last).
  */
 export function sortChildren(nodes) {
   nodes.forEach(node => {
@@ -51,10 +53,7 @@ export function sortChildren(nodes) {
       sortChildren(node.children);
     }
   });
-  nodes.sort((a, b) => {
-    if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-  });
+  nodes.sort(compareTreeEntries);
 }
 
 /**
@@ -80,10 +79,7 @@ function addChildToParent(nodes, parentPath, childNode) {
       }
       if (!newNode.children.some(child => child.path === childNode.path)) {
         newNode.children.push(childNode);
-        newNode.children.sort((a, b) => {
-          if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-          return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-        });
+        newNode.children.sort(compareTreeEntries);
       }
       return newNode;
     } else if (node.children) {
@@ -127,10 +123,7 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
     if (parentPath === normalizedRoot) {
       newNode.depth = 0;
       newData = [...newData, newNode];
-      newData.sort((a, b) => {
-        if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-      });
+      newData.sort(compareTreeEntries);
       return;
     }
 

@@ -29,7 +29,7 @@ export const TreeNode = memo(function TreeNode({
   const isDimmed = isDimmedEntry(name);
 
   return (
-    <div className="w-full" style={isDimmed ? { opacity: 0.45 } : undefined}>
+    <div className="w-full">
       {isDir ? (
         <FolderNode
           path={path}
@@ -38,6 +38,7 @@ export const TreeNode = memo(function TreeNode({
           isExpanded={isExpanded}
           isCurrentPath={isCurrentPath}
           isCursor={isCursor}
+          isDimmed={isDimmed}
           onToggle={onToggle}
         />
       ) : (
@@ -47,6 +48,7 @@ export const TreeNode = memo(function TreeNode({
           depth={depth}
           isCurrentPath={isCurrentPath}
           isCursor={isCursor}
+          isDimmed={isDimmed}
           isSelected={isSelected}
           isPinned={isPinned}
           isDeleted={isDeleted}
