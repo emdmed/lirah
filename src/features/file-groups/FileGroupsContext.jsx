@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
+// User-facing name: "context sets" — saved, named context (file
+// selections) per project. Storage key and shape stay "file groups".
 const FileGroupsContext = createContext(undefined);
 
 const STORAGE_KEY = 'nevo-terminal:file-groups';
@@ -50,17 +52,17 @@ export function FileGroupsProvider({ children }) {
     saveGroups(groups);
   }, [groups]);
 
-  const getGroupsForProject = (projectPath) => {
+  const getGroupsForProject = useCallback((projectPath) => {
     return groups.filter(g => g.projectPath === projectPath);
-  };
+  }, [groups]);
 
-  const addGroup = (name, projectPath, files) => {
+  const addGroup = useCallback((name, projectPath, files) => {
     if (groups.length >= MAX_GROUPS) {
-      throw new Error(`Maximum ${MAX_GROUPS} file groups reached`);
+      throw new Error(`Maximum ${MAX_GROUPS} context sets reached`);
     }
 
     if (!name || name.trim() === '') {
-      throw new Error('Group name cannot be empty');
+      throw new Error('Name cannot be empty');
     }
 
     if (!projectPath || projectPath.trim() === '') {
@@ -68,7 +70,7 @@ export function FileGroupsProvider({ children }) {
     }
 
     if (!files || files.length === 0) {
-      throw new Error('Group must have at least one file');
+      throw new Error('A context set needs at least one file');
     }
 
     const newGroup = {
@@ -85,25 +87,35 @@ export function FileGroupsProvider({ children }) {
 
     setGroups(prev => [...prev, newGroup]);
     return newGroup;
-  };
+  }, [groups.length]);
 
-  const removeGroup = (id) => {
+  const removeGroup = useCallback((id) => {
     setGroups(prev => prev.filter(g => g.id !== id));
-  };
+  }, []);
 
-  const updateGroup = (id, updates) => {
+  // `updates` may carry `name` and/or `files` ([{ relativePath, state }]).
+  const updateGroup = useCallback((id, updates) => {
+    const clean = {};
+    if (typeof updates.name === 'string') {
+      if (updates.name.trim() === '') throw new Error('Name cannot be empty');
+      clean.name = updates.name.trim();
+    }
+    if (Array.isArray(updates.files)) {
+      if (updates.files.length === 0) throw new Error('A context set needs at least one file');
+      clean.files = updates.files.map(f => ({ relativePath: f.relativePath, state: f.state }));
+    }
     setGroups(prev =>
-      prev.map(g => (g.id === id ? { ...g, ...updates, updatedAt: Date.now() } : g))
+      prev.map(g => (g.id === id ? { ...g, ...clean, updatedAt: Date.now() } : g))
     );
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     groups,
     getGroupsForProject,
     addGroup,
     removeGroup,
     updateGroup,
-  };
+  }), [groups, getGroupsForProject, addGroup, removeGroup, updateGroup]);
 
   return <FileGroupsContext.Provider value={value}>{children}</FileGroupsContext.Provider>;
 }

@@ -20,10 +20,10 @@ const TokenBudgetDialog = lazyNamed(() => import("../features/token-budget/Token
 const TokenDashboard = lazyNamed(() => import("../features/token-budget/TokenDashboard"), "TokenDashboard");
 const AutoChangelogDialog = lazyNamed(() => import("../features/git/AutoChangelogDialog"), "AutoChangelogDialog");
 const AutoCommitDialog = lazyNamed(() => import("../features/git/AutoCommitDialog"), "AutoCommitDialog");
-const AutoCommitConfigDialog = lazyNamed(() => import("../features/git/AutoCommitConfigDialog"), "AutoCommitConfigDialog");
 const AutoMergeDialog = lazyNamed(() => import("../features/git/AutoMergeDialog"), "AutoMergeDialog");
 const OrchestrationDashboard = lazyNamed(() => import("./OrchestrationDashboard"), "OrchestrationDashboard");
 const WorkspaceDialog = lazyNamed(() => import("./WorkspaceDialog"), "WorkspaceDialog");
+const SettingsDialog = lazyNamed(() => import("../features/settings/SettingsDialog"), "SettingsDialog");
 
 function WhenOpen({ open, children }) {
   return open ? <Suspense fallback={null}>{children}</Suspense> : null;
@@ -33,6 +33,9 @@ export function DialogHost({
   dialogs,
   currentPath,
   settings,
+  sessionId,
+  toggleSandbox,
+  toggleNetwork,
   cliAvailability,
   elementPicker,
   fileSelection,
@@ -123,6 +126,17 @@ export function DialogHost({
         projectPath={currentPath}
         onOpenBudgetSettings={() => dialogs.setBudgetDialogOpen(true)}
       />
+      <WhenOpen open={dialogs.settingsOpen}>
+        <SettingsDialog
+          open={dialogs.settingsOpen}
+          onOpenChange={dialogs.setSettingsOpen}
+          settings={settings}
+          sessionId={sessionId}
+          onToggleSandbox={toggleSandbox}
+          onToggleNetwork={toggleNetwork}
+          onOpenBudget={() => dialogs.setBudgetDialogOpen(true)}
+        />
+      </WhenOpen>
       <WhenOpen open={dialogs.budgetDialogOpen}>
         <TokenBudgetDialog
           open={dialogs.budgetDialogOpen}
@@ -194,18 +208,6 @@ export function DialogHost({
           }}
         />
       )}
-      <WhenOpen open={dialogs.autoCommitConfigOpen}>
-        <AutoCommitConfigDialog
-          open={dialogs.autoCommitConfigOpen}
-          onOpenChange={dialogs.setAutoCommitConfigOpen}
-          cli={settings.autoCommitCli}
-          customPrompt={settings.autoCommitCustomPrompt}
-          onSave={({ cli, customPrompt }) => {
-            settings.setAutoCommitCli(cli);
-            settings.setAutoCommitCustomPrompt(customPrompt);
-          }}
-        />
-      </WhenOpen>
       <WhenOpen open={dialogs.orchestrationDashboardOpen}>
         <OrchestrationDashboard
           open={dialogs.orchestrationDashboardOpen}

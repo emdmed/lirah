@@ -460,6 +460,27 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             </div>
           </div>
 
+          {/* Jobs are spawned with each CLI's auto-approve flag (agent_runner
+              commands.rs), so nothing stops a tool call. Say so before Run. */}
+          <div
+            className="flex items-start gap-2.5 edge-engraved px-3 py-2 text-[11px] leading-snug"
+            role={useWorktree ? 'note' : 'alert'}
+          >
+            <Lamp state={useWorktree ? 'off' : 'warn'} className="mt-[3px]" />
+            <span className={useWorktree ? 'text-muted-foreground' : 'text-foreground'}>
+              Jobs run unattended with auto-approve: no permission prompts, and they are not
+              sandboxed.{' '}
+              {useWorktree ? (
+                'The isolated worktree keeps edits out of your working tree until you apply them.'
+              ) : (
+                <span className="text-[var(--ins-warn)]">
+                  In place, the agent edits your working tree directly and can run any command.
+                  Isolated worktree recommended.
+                </span>
+              )}
+            </span>
+          </div>
+
           {candidateCount > 1 && (
             <div className="flex items-start gap-2 text-[11px] leading-snug text-muted-foreground">
               <Lamp state="on" className="mt-[3px]" />

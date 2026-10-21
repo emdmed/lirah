@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useToast } from "../toast/ToastContext";
 
 // Every tab open on the same repo receives the same commit-detected event.
 // The first to claim a commit runs the changelog CLI; the rest skip it, so one
@@ -13,6 +14,7 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
   // Track per-commit "hidden-terminal-closed" listeners so they can't leak if
   // the close event never arrives or the component unmounts while pending.
   const closeListenersRef = useRef(new Set());
+  const { success: toastSuccess, error: toastError } = useToast();
 
   // Start/stop commit watcher when path or enabled changes
   useEffect(() => {
@@ -64,6 +66,35 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
 
       const prompt = `Check the latest commit with git diff HEAD~1 HEAD and git log -1. Update ${effectiveFile} at the project root: add an entry under today's date with a concise summary of what changed. Create the file if it doesn't exist. Use Keep a Changelog format. Do not include the full diff in the changelog, just a human-readable summary.`;
 
+      // The agent edits the file unseen, so keep what was there to offer Undo.
+      // null = the file didn't exist (undo removes the one the agent created).
+      const filePath = `${repo_path.replace(/\/+$/, "")}/${effectiveFile}`;
+      let before = null;
+      try {
+        if (await invoke("path_exists", { path: filePath })) {
+          before = await invoke("read_file_content", { path: filePath });
+        }
+      } catch {
+        before = undefined; // Unknown: no undo offered.
+      }
+      const undo = async () => {
+        try {
+          if (before === null) {
+            await invoke("run_git_command", { repoPath: repo_path, args: ["clean", "-f", "--", effectiveFile] });
+            // clean skips ignored, staged or committed files; don't claim success then.
+            if (await invoke("path_exists", { path: filePath })) {
+              toastError(`Couldn't remove ${effectiveFile} (it's ignored or already staged) — delete it manually.`);
+              return;
+            }
+          } else {
+            await invoke("write_file_content", { path: filePath, content: before });
+          }
+          toastSuccess(`Changelog change undone: ${effectiveFile}`);
+        } catch (err) {
+          toastError(`Couldn't undo the changelog change: ${err?.message || err}`);
+        }
+      };
+
       try {
         // Use claude -p (headless mode that can use tools/write files), NOT --print (stdout only)
         // Use single quotes to avoid shell escaping issues with the prompt
@@ -79,8 +110,23 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
         // Listen for this hidden terminal to close
         const unlistenClose = await listen("hidden-terminal-closed", (closeEvent) => {
           if (closeEvent.payload.session_id === sessionId) {
-            setStatus(closeEvent.payload.error ? "error" : "done");
+            const failed = !!closeEvent.payload.error;
+            setStatus(failed ? "error" : "done");
             dismissTimer.current = setTimeout(() => setStatus(null), 4000);
+            if (failed) {
+              toastError(`Auto-changelog failed to update ${effectiveFile}.`);
+            } else {
+              invoke("read_file_content", { path: filePath })
+                .catch(() => null)
+                .then((after) => {
+                  if (after === null) return; // Nothing written (or unreadable).
+                  if (after === before) return; // Agent left it unchanged.
+                  toastSuccess(`Changelog updated: ${effectiveFile}`, {
+                    duration: 15000,
+                    action: before === undefined ? undefined : { label: "Undo", onClick: undo },
+                  });
+                });
+            }
             unlistenClose();
             closeListenersRef.current.delete(unlistenClose);
           }
@@ -88,6 +134,7 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
         closeListenersRef.current.add(unlistenClose);
       } catch (err) {
         console.error("Failed to spawn hidden terminal for changelog:", err);
+        toastError(`Auto-changelog couldn't start: ${err?.message || err}`);
         setStatus("error");
         dismissTimer.current = setTimeout(() => setStatus(null), 4000);
       }
@@ -96,7 +143,7 @@ export function useAutoChangelog(currentPath, enabled, targetFile = "CHANGELOG.m
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [enabled, currentPath, targetFile, trigger, cli]);
+  }, [enabled, currentPath, targetFile, trigger, cli, toastSuccess, toastError]);
 
   // Cleanup timer and any pending close-listeners on unmount
   useEffect(() => {

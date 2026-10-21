@@ -1,2 +1,2 @@
 export { usePatterns } from "./usePatterns";
-export { PatternsSelector } from "./PatternsSelector";
+export { PatternsMenuItems } from "./PatternsSelector";

@@ -14,9 +14,10 @@ import { DevProfiler } from "./components/DevProfiler";
 import { reapOrphanedTerminals } from "./lib/terminalSessions";
 import { startAgentHookListener } from "./features/tabs/agentHookState";
 import { useAgentAttention } from "./features/tabs/useAgentAttention";
+import { markFirstRun } from "./features/tabs/firstRun";
 
 function App() {
-  const { tabs, activeTabId, addTab, removeTab, switchTab } = useTabManager();
+  const { tabs, activeTabId, addTab, requestCloseTab, switchTab } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
@@ -74,7 +75,9 @@ function App() {
         setInitialProjectDir(path);
         addTab(path);
       } else {
-        // No CLI path — use home dir as fallback
+        // No CLI path — use home dir as fallback, and let the tab offer the
+        // project picker once its terminal is up.
+        markFirstRun();
         try {
           const home = await invoke('get_home_dir');
           const fallback = home || '/';
@@ -91,13 +94,18 @@ function App() {
     });
   }, []);
 
-  // New tab handler — opens at home dir
+  // New tab handler — opens where the active tab is now, else at home dir
+  const activeProjectPath = activeTab?.projectPath;
   const handleNewTab = useCallback(async () => {
+    if (activeProjectPath) {
+      addTab(activeProjectPath);
+      return;
+    }
     try {
       const home = await invoke('get_home_dir');
       if (home) addTab(home);
     } catch { /* ignore */ }
-  }, [addTab]);
+  }, [addTab, activeProjectPath]);
 
   // Global keyboard shortcuts for tab management
   useEffect(() => {
@@ -136,24 +144,27 @@ function App() {
         jumpToNext();
         return;
       }
-      // Ctrl+T: new tab
+      // Ctrl+T: new tab. Stopped here so no tab-level listener (document
+      // capture, which runs after this) also acts on it. The new tab's
+      // terminal takes focus once it's ready (ProjectTab's activation effect).
       if ((e.ctrlKey || e.metaKey) && e.key === 't' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
+        e.stopPropagation();
         handleNewTab();
         return;
       }
-      // Ctrl+W: close active tab (if >1 tab)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'w' && !e.shiftKey && !e.altKey) {
-        if (tabs.length > 1) {
-          e.preventDefault();
-          removeTab(activeTabId);
-        }
+      // Ctrl+W: close active tab. With one tab it falls through to the
+      // terminal (readline delete-word, nvim window commands).
+      if ((e.ctrlKey || e.metaKey) && e.key === 'w' && !e.shiftKey && !e.altKey && tabs.length > 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        requestCloseTab(activeTabId);
         return;
       }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, activeTabId, switchTab, removeTab, handleNewTab, jumpToNext]);
+  }, [tabs, activeTabId, switchTab, requestCloseTab, handleNewTab, jumpToNext]);
 
   // Handle project selection from initial dialog (with splash screen)
   const handleSelectProjectForNewTab = useCallback((bookmark) => {

@@ -72,8 +72,8 @@ export function FileNode({
           type="button"
           onClick={handleTogglePin}
           data-nav-pin
-          title={isPinned ? 'Unpin file' : 'Pin file to top'}
-          aria-label={isPinned ? 'Unpin file' : 'Pin file to top'}
+          title={isPinned ? 'Unpin: stop keeping this file at the top of the file list' : 'Pin: keep this file at the top of the file list (adds nothing to the prompt)'}
+          aria-label={isPinned ? 'Unpin file' : 'Pin file to the top of the file list'}
           aria-pressed={!!isPinned}
           className={`group/pin shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 hover:bg-foreground hover:text-background text-muted-foreground ${
             isPinned ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'

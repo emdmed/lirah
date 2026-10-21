@@ -27,8 +27,9 @@ export function SidebarFileSelection({
   VIEW_MODES,
   keepFilesAfterSend = false,
   onToggleKeepFiles,
-  pinnedFiles,
-  onTogglePin,
+  // Pinning lives in the file tree (it only orders that list). Context rows
+  // don't offer it, so a pin here can't be mistaken for "attach"; the props
+  // are still accepted from LeftSidebar but unused.
 }) {
 
   const cycleViewMode = useCallback((filePath) => {
@@ -142,8 +143,6 @@ export function SidebarFileSelection({
                 isSelected={selectedIndex === index}
                 itemRef={(el) => (fileRefs.current[index] = el)}
                 showKeyboardHints={true}
-                isPinned={pinnedFiles?.has(file.absolute)}
-                onTogglePin={onTogglePin}
                 lineCount={lineCount}
                 viewModeLabel={getViewModeLabel?.(file.absolute) ?? null}
                 onCycleViewMode={cycleViewMode}

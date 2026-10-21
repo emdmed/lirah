@@ -234,7 +234,7 @@ export function FileTree({
         if (row.kind === 'pinned-header') {
           return (
             <SidebarMenuItem key={row.key} className={`${itemClass} flex items-center gap-1 px-1 select-none`} style={style}>
-              <span className="engraved-label">pinned</span>
+              <span className="engraved-label" title="Pinned files stay at the top of the file list. Pinning adds nothing to the prompt.">pinned</span>
               <span className="ml-auto pr-1 text-[10px] tabular-nums text-muted-foreground">{pinnedPaths.length}</span>
             </SidebarMenuItem>
           );

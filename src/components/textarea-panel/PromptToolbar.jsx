@@ -1,6 +1,10 @@
 import { TemplateSelector } from "./TemplateSelector";
 
-export function PromptToolbar({ selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange }) {
+// Prompt-level controls: the instructions picker (templates + patterns).
+export function PromptToolbar({
+  selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange,
+  patternFiles, selectedPatterns, onTogglePattern, onCreatePatterns,
+}) {
   return (
     <div className="flex items-center gap-0.5">
       <TemplateSelector
@@ -9,6 +13,10 @@ export function PromptToolbar({ selectedTemplateId, onSelectTemplate, onManageTe
         onManageTemplates={onManageTemplates}
         open={templateDropdownOpen}
         onOpenChange={onTemplateDropdownOpenChange}
+        patternFiles={patternFiles}
+        selectedPatterns={selectedPatterns}
+        onTogglePattern={onTogglePattern}
+        onCreatePatterns={onCreatePatterns}
       />
     </div>
   );

@@ -1,19 +1,13 @@
-import { useState, useEffect, useMemo, memo } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
-import { Palette } from 'lucide-react';
+import { useState, useMemo, memo } from 'react';
 import {
-  Keyboard, Eye, EyeOff, Bot, Terminal,
-  PanelTop, PanelTopClose, Coins, BarChart3, FileText, FileX, Check, AlertCircle,
+  Keyboard, Bot, Terminal, BarChart3, AlertCircle, Settings, GitCommitHorizontal,
   Layers, X, GitMerge
 } from 'lucide-react';
 import { Scanner } from './instrument/Scanner';
-import { useWatcher } from '../features/watcher';
-import { useWatcherShortcut } from '../features/watcher';
 import { Button } from './ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
-  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
   DropdownMenuLabel, DropdownMenuGroup,
 } from './ui/dropdown-menu';
 import {
@@ -26,7 +20,6 @@ import {
 } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
-import { getScrollback, setScrollback, SCROLLBACK_OPTIONS, SCROLLBACK_WARN_THRESHOLD, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
 import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
@@ -40,17 +33,6 @@ const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
   'opencode': { name: 'opencode', icon: Terminal }
 };
-
-const STATUS_COLORS = {
-  critical: 'var(--color-status-critical, #E82424)',
-  warning: 'var(--color-status-warning, #FF9E3B)',
-  success: 'var(--color-status-success, #76946A)'
-};
-
-function CliIcon({ cli }) {
-  const Icon = CLI_DISPLAY[cli]?.icon || Terminal;
-  return <Icon className="w-3 h-3" />;
-}
 
 
 function ChangelogStatus({ status }) {
@@ -263,59 +245,24 @@ function AttentionIndicator() {
   );
 }
 
-function ThemeSwitcherMenuItem() {
-  const { currentTheme, themes, changeTheme } = useTheme();
-  return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger className="cursor-pointer py-1 text-xs">
-        <Palette className="mr-2 w-3 h-3" />
-        Theme: {themes[currentTheme]?.name || 'Theme'}
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="text-xs">
-        {Object.entries(themes).map(([key, t]) => (
-          <DropdownMenuItem key={key} onClick={() => changeTheme(key)} className="cursor-pointer py-1">
-            {t.name}
-            {currentTheme === key && <Check className="ml-auto w-3 h-3" />}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
-  );
-}
-
 // Memoized: StatusBar's props are all primitives/callbacks, so with stable
 // callbacks (see ProjectTab call site) it skips re-render on every keystroke
 // in the prompt textarea and on the 5s token/branch polls.
 export const StatusBar = memo(({
   viewMode, currentPath, sessionId, onToggleHelp,
   selectedCli, onOpenCliSettings, showTitleBar,
-  autoLaunchCli, onToggleAutoLaunchCli,
-  onToggleTitleBar, sandboxEnabled, sandboxFailed, networkIsolation,
+  sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
-  onOpenBudgetSettings, onOpenDashboard, autoChangelogEnabled, changelogStatus,
-  onOpenAutoChangelogDialog, autoCommitCli, onOpenAutoCommitConfig, onAutoMerge,
+  onOpenDashboard, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
   availableUpdate, tokenUsage
 }) => {
-  const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
   const [showNetworkConfirm, setShowNetworkConfirm] = useState(false);
 
-  useWatcherShortcut({ onToggle: toggleWatchers, secondaryTerminalFocused });
-
-  // Ctrl+Shift+L: Clear CLI context
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (secondaryTerminalFocused) return;
-      if (e.ctrlKey && e.shiftKey && e.key === 'L') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (onClearContext) onClearContext();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [secondaryTerminalFocused, onClearContext]);
+  // File watching has no shortcut (Ctrl+W closes the tab): it's in Settings
+  // and the `:watch` command. Ctrl+Shift+L lives in useTabShortcuts,
+  // where only the active tab listens.
 
   const cliName = CLI_DISPLAY[selectedCli]?.name || selectedCli;
 
@@ -438,80 +385,49 @@ export const StatusBar = memo(({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="px-1.5" aria-label="Open settings menu">
-                  <span className="ins-legend">Menu</span>
+                <Button variant="ghost" size="xs" className="px-1.5" aria-label="Settings and actions">
+                  <span className="ins-legend">Settings</span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>Settings</TooltipContent>
+            <TooltipContent>Settings and quick actions</TooltipContent>
           </Tooltip>
+          {/* Preferences live in the Settings dialog; this menu keeps actions. */}
           <DropdownMenuContent align="end" className="w-56 text-xs">
-            <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Analytics</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onOpenSettings} className="cursor-pointer py-1">
+              <Settings className="mr-2 w-3 h-3" />
+              Settings…
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Actions</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
                 <BarChart3 className="mr-2 w-3 h-3" />
                 Token Metrics
                 <DropdownMenuShortcut>Ctrl+Shift+D</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenBudgetSettings} className="cursor-pointer py-1">
-                <Coins className="mr-2 w-3 h-3" />
-                Token Budget
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Automation</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onOpenAutoChangelogDialog} className="cursor-pointer py-1">
-                {autoChangelogEnabled ? (
-                  <FileText className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.success }} />
-                ) : (
-                  <FileX className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />
-                )}
-                Auto Changelog...
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenAutoCommitConfig} className="cursor-pointer py-1">
-                <CliIcon cli={autoCommitCli} />
-                <span className="ml-2">Auto Commit...</span>
+              <DropdownMenuItem onClick={onAutoCommit} className="cursor-pointer py-1">
+                <GitCommitHorizontal className="mr-2 w-3 h-3" />
+                Auto Commit…
                 <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoMerge} className="cursor-pointer py-1">
                 <GitMerge className="mr-2 w-3 h-3" />
-                Auto Merge...
+                Auto Merge…
                 <DropdownMenuShortcut>Alt+M</DropdownMenuShortcut>
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Preferences</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <ThemeSwitcherMenuItem />
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
                 <Keyboard className="mr-2 w-3 h-3" />
                 Keyboard Shortcuts
                 <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleWatchers} className="cursor-pointer py-1">
-                {fileWatchingEnabled ? <Eye className="mr-2 w-3 h-3" /> : <EyeOff className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-                File Watching: {fileWatchingEnabled ? 'ON' : 'OFF'}
-                <DropdownMenuShortcut>Ctrl+W</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onToggleAutoLaunchCli} className="cursor-pointer py-1">
-                {autoLaunchCli
-                  ? <Bot className="mr-2 w-3 h-3" />
-                  : <Bot className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-                Auto-launch on starred: {autoLaunchCli ? 'ON' : 'OFF'}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onToggleTitleBar} className="cursor-pointer py-1">
-                {showTitleBar ? <PanelTop className="mr-2 w-3 h-3" /> : <PanelTopClose className="mr-2 w-3 h-3" style={{ color: STATUS_COLORS.critical }} />}
-                Title Bar: {showTitleBar ? 'ON' : 'OFF'}
-              </DropdownMenuItem>
-              <ScrollbackMenuItem />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Workspaces</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenWorkspaceDialog} className="cursor-pointer py-1">
                 <Layers className="mr-2 w-3 h-3" />
-                {workspace ? `Workspace: ${workspace.name}` : 'Workspaces...'}
+                {workspace ? `Workspace: ${workspace.name}` : 'Workspaces…'}
               </DropdownMenuItem>
               {workspace && (
                 <DropdownMenuItem onClick={onCloseWorkspace} className="cursor-pointer py-1">
@@ -544,43 +460,3 @@ export const StatusBar = memo(({
   );
 });
 
-
-// Terminal scrollback depth. Applies live to every open terminal (including
-// other windows) through the terminalPrefs subscription.
-function ScrollbackMenuItem() {
-  const [value, setValue] = useState(() => getScrollback());
-
-  useEffect(() => subscribeTerminalPrefs(() => setValue(getScrollback())), []);
-
-  const current = SCROLLBACK_OPTIONS.find((o) => o.value === value);
-
-  return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger className="py-1">
-        <Terminal className="mr-2 w-3 h-3" />
-        Scrollback: {current ? current.label.replace(' lines', '') : value.toLocaleString()}
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="text-xs">
-        {SCROLLBACK_OPTIONS.map((o) => (
-          <DropdownMenuItem
-            key={o.value}
-            onClick={() => setScrollback(o.value)}
-            className="cursor-pointer py-1"
-          >
-            {o.value === value && <Check className="mr-2 w-3 h-3" />}
-            <span className={o.value === value ? '' : 'ml-5'}>{o.label}</span>
-            {o.value > SCROLLBACK_WARN_THRESHOLD && (
-              <span
-                className="ml-auto flex items-center gap-1 pl-3 text-[10px] text-destructive/80"
-                title="Uses a lot of memory per terminal and slows down resizing"
-              >
-                <AlertCircle className="w-3 h-3" />
-                heavy
-              </span>
-            )}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
-  );
-}

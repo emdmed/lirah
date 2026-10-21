@@ -1,5 +1,4 @@
 import React from "react";
-import { Pin, PinOff } from "lucide-react";
 import { FileStateSelector } from "./FileStateSelector";
 import { cn } from "@/lib/utils";
 
@@ -15,8 +14,6 @@ export function SelectedFileItem({
   isSelected = false,
   itemRef,
   showKeyboardHints = false,
-  isPinned = false,
-  onTogglePin,
   lineCount,
   viewModeLabel,
   onCycleViewMode,
@@ -75,22 +72,6 @@ export function SelectedFileItem({
           {lineCount}L
         </span>
       ) : null}
-      {onTogglePin && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onTogglePin(file.absolute); }}
-          title={isPinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
-          aria-label={isPinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
-          aria-pressed={isPinned}
-          className={cn(
-            "ml-auto flex-shrink-0 flex items-center justify-center h-3.5 w-3.5 rounded-sm hover:bg-foreground/10 transition-opacity bg-transparent border-0 p-0 cursor-pointer",
-            isPinned
-              ? "opacity-80 text-[var(--ins-lamp)]"
-              : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {isPinned ? <PinOff className="w-2.5 h-2.5" /> : <Pin className="w-2.5 h-2.5" />}
-        </button>
-      )}
     </div>
   );
 }

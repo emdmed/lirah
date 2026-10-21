@@ -164,7 +164,7 @@ export function SubagentProvider({ tabs, children }) {
         result.push({
           ...agent,
           tabId: tab.id,
-          tabLabel: tab.label,
+          tabLabel: tab.customLabel || tab.label,
           projectPath: tab.projectPath,
         });
       }

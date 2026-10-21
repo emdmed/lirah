@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../toast';
+import { KeyChord } from '../../components/instrument/Keycap';
+import { shortcutForCommand } from '../../lib/shortcuts';
 
 const MAX_SUGGESTIONS = 8;
 
@@ -7,7 +9,8 @@ const MAX_SUGGESTIONS = 8;
  * Vim-style command line. `commands` is a list of
  *   { id, aliases?, hint, options?: string[] | () => string[], run(arg) }
  * A command with `options` takes one argument, which the line completes from
- * that list (`:theme gru` → `:theme gruvbox`).
+ * that list (`:theme gru` → `:theme gruvbox`). A command with a keyboard
+ * shortcut in src/lib/shortcuts.js shows its keys at the end of its row.
  */
 export function CommandPalette({ open, onClose, commands }) {
   const toast = useToast();
@@ -136,6 +139,7 @@ export function CommandPalette({ open, onClose, commands }) {
               >
                 <span className="shrink-0 w-24">{s.arg != null ? `${s.command.id} ${s.label}` : s.label}</span>
                 <span className={`truncate min-w-0 ${i === selected ? '' : 'text-muted-foreground'}`}>{s.hint}</span>
+                {s.keys && <KeyChord keys={s.keys} size="sm" className="ml-auto shrink-0 pl-3" />}
               </li>
             ))}
           </ul>

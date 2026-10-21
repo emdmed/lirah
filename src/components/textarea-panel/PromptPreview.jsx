@@ -6,8 +6,11 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
  *
  * This is the product's claim made visible: the string shown here is the same
  * string `usePromptSender` writes to the terminal, built by the same function.
+ *
+ * `itemsBySection` lists the removable parts of a section (one per file or
+ * element), so a single item can be dropped instead of the whole section.
  */
-export function PromptPreview({ sections, text, onClearSection }) {
+export function PromptPreview({ sections, text, onClearSection, itemsBySection }) {
   const isEmpty = sections.length === 0;
 
   return (
@@ -41,7 +44,7 @@ export function PromptPreview({ sections, text, onClearSection }) {
                     <span className="ml-1 text-muted-foreground/70 font-normal">({section.count})</span>
                   )}
                 </span>
-                {section.clearable && onClearSection && (
+                {section.clearable && onClearSection && !(itemsBySection?.[section.id]?.length > 0) && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
@@ -57,6 +60,23 @@ export function PromptPreview({ sections, text, onClearSection }) {
                   </Tooltip>
                 )}
               </div>
+              {itemsBySection?.[section.id]?.length > 0 && (
+                <ul className="flex flex-wrap gap-1 px-2 pb-1" aria-label={`${section.label} items`}>
+                  {itemsBySection[section.id].map((item) => (
+                    <li key={item.key} title={item.title} className="inline-flex items-center h-4 max-w-full edge-engraved text-[10px] font-mono leading-none">
+                      <span className="px-1 truncate text-foreground/70">{item.label}</span>
+                      <button
+                        type="button"
+                        onClick={item.onRemove}
+                        aria-label={`Remove ${item.label} from the prompt`}
+                        className="flex items-center justify-center h-4 w-4 shrink-0 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <pre className="px-2 pb-1.5 text-[11px] leading-[1.45] font-mono text-foreground/60 whitespace-pre-wrap break-words">
                 {section.body}
               </pre>

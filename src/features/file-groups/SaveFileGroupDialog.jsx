@@ -51,25 +51,25 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Save File Group</DialogTitle>
+          <DialogTitle>Save Context Set</DialogTitle>
           <DialogDescription>
-            Save the current file selection as a named group for quick reuse.
+            Save the files in the current context as a named set for this project. Load it later to replace or add to a prompt's context.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <label htmlFor="files-count" className="text-sm font-medium opacity-70">
-              Files
+              Context
             </label>
             <div className="text-sm opacity-60">
-              {files?.length || 0} file{files?.length !== 1 ? 's' : ''} selected
+              {files?.length || 0} file{files?.length !== 1 ? 's' : ''} attached
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
             <label htmlFor="group-name" className="text-sm font-medium opacity-70">
-              Group Name
+              Set name
             </label>
             <Input
               id="group-name"
@@ -89,7 +89,7 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
               Cancel
             </Button>
             <Button type="submit" disabled={!files?.length}>
-              Save Group
+              Save Set
             </Button>
           </DialogFooter>
         </form>

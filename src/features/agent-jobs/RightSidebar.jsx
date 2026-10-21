@@ -7,6 +7,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
+import { useConfirm } from '../confirm/ConfirmContext';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
@@ -15,7 +16,7 @@ import { DiffBar } from '../../components/instrument/DiffBar';
 import { JOBS_PANE_EVENT } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
 import { lazyNamed } from '../../lib/lazyNamed';
-import { useTabManager } from '../tabs/TabContext';
+import { MAX_TABS, useTabManager } from '../tabs/TabContext';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 
 // Loaded on first open, mounted only while open.
@@ -96,9 +97,10 @@ export function RightSidebar({ projectPath, onNewTab }) {
   const { totalActiveCount } = useSubagentContext();
   const { tabs: openTabs } = useTabManager();
   const toast = useToast();
+  const confirm = useConfirm();
 
-  // null = automatic: the pane folds away while there is nothing to show.
-  // An explicit true/false is the user's choice and wins until a new job starts.
+  // null = automatic: open, since the pane is where the tabs live. Only the
+  // user folds it away (» or Alt+4); the rail keeps a new-tab key.
   const [collapsedOverride, setCollapsedOverride] = useState(null);
   const [tab, setTab] = useState('tabs');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,9 +118,9 @@ export function RightSidebar({ projectPath, onNewTab }) {
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
   const visibleJobs = jobs.filter((j) => !j.archived);
   const archivedJobs = jobs.filter((j) => j.archived);
-  // With several tabs open the tabs summary always has something to show.
-  const isEmpty = visibleJobs.length === 0 && totalActiveCount === 0 && openTabs.length < 2;
-  const collapsed = collapsedOverride ?? isEmpty;
+  const collapsed = collapsedOverride ?? false;
+  const atTabLimit = openTabs.length >= MAX_TABS;
+  const newTabTitle = atTabLimit ? `Tab limit reached (${MAX_TABS}) — close a tab first` : 'New tab (Ctrl+T)';
 
   useEffect(() => {
     const onRequest = (e) => {
@@ -244,10 +246,45 @@ export function RightSidebar({ projectPath, onNewTab }) {
     }
   };
 
+  // Discarding deletes the job's worktree, so its changes are gone for good.
+  const handleDiscard = async (id) => {
+    const job = jobs.find((j) => j.id === id);
+    if (!job) return;
+    const count = job.changedFiles?.length ?? 0;
+    if (job.worktreePath || count > 0) {
+      const ok = await confirm({
+        title: `Discard ${job.label || 'this job'}?`,
+        description: job.worktreePath
+          ? `Its worktree is deleted${count ? ` along with ${count} changed file${count === 1 ? '' : 's'}` : ''}. This can't be undone.`
+          : 'The job is removed from the list.',
+        confirmLabel: 'Discard',
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    if (job.status === 'running') await cancelJob(id);
+    await discardJob(id);
+  };
+
   // Settle a race: apply this candidate, throw the others away.
   const handlePickWinner = async (id, force = false) => {
     const job = jobs.find((j) => j.id === id);
     const count = job?.changedFiles.length ?? 0;
+    const others = job?.raceId ? jobs.filter((j) => j.raceId === job.raceId && j.id !== id) : [];
+    if (others.length > 0) {
+      const running = others.filter((j) => j.status === 'running').length;
+      const ok = await confirm({
+        title: `Keep ${job?.cli || 'this candidate'}?`,
+        description: `Its changes are applied to your working tree. The other ${others.length} candidate${
+          others.length === 1 ? '' : 's'
+        } ${others.length === 1 ? 'is' : 'are'} discarded and ${others.length === 1 ? 'its worktree' : 'their worktrees'} deleted${
+          running ? ` (${running} still running will be stopped)` : ''
+        }. This can't be undone.`,
+        confirmLabel: 'Keep this',
+        destructive: true,
+      });
+      if (!ok) return;
+    }
     const result = await pickRaceWinner(id, { force });
     if (result?.blocked) {
       const n = result.typecheck?.errorCount ?? 0;
@@ -353,7 +390,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
       approve: handleApprove,
       pickWinner: handlePickWinner,
       rerun: handleRerun,
-      discard: discardJob,
+      discard: handleDiscard,
       archive: archiveJob,
       unarchive: unarchiveJob,
       review: openReview,
@@ -413,18 +450,47 @@ export function RightSidebar({ projectPath, onNewTab }) {
             {totalActiveCount}
           </span>
         )}
-        <button
-          onClick={() => {
-            setCollapsedOverride(false);
-            setTab('jobs');
-            setDialogOpen(true);
-          }}
-          className="mt-auto text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
-          title="New background job"
-          aria-label="New background job"
-        >
-          +
-        </button>
+        {/* Two labelled keys: the tab key opens a tab here, the job key a
+            headless background run. */}
+        <div className="mt-auto flex flex-col items-center gap-2">
+          <button
+            onClick={() => {
+              setCollapsedOverride(false);
+              setTab('tabs');
+            }}
+            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Show tabs"
+            aria-label={`Show tabs (${openTabs.length} open)`}
+          >
+            <span className="text-[11px] font-bold tabular-nums">{openTabs.length}</span>
+            <span className="ins-legend text-[9px] leading-none">tabs</span>
+          </button>
+          {onNewTab && (
+            <button
+              onClick={onNewTab}
+              disabled={atTabLimit}
+              className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground"
+              title={newTabTitle}
+              aria-label={atTabLimit ? newTabTitle : 'New tab'}
+            >
+              <span className="text-[11px] leading-none">+</span>
+              <span className="ins-legend text-[9px] leading-none">tab</span>
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setCollapsedOverride(false);
+              setTab('jobs');
+              setDialogOpen(true);
+            }}
+            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="New background job"
+            aria-label="New background job"
+          >
+            <span className="text-[11px] leading-none">+</span>
+            <span className="ins-legend text-[9px] leading-none">job</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -488,8 +554,9 @@ export function RightSidebar({ projectPath, onNewTab }) {
           <PanelButton
             icon={Plus}
             onClick={onNewTab}
-            title="New tab (Ctrl+T)"
-            aria-label="New tab"
+            disabled={atTabLimit}
+            title={newTabTitle}
+            aria-label={atTabLimit ? newTabTitle : 'New tab'}
             className="ml-auto self-center"
           />
         )}

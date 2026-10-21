@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AudioWaveform,
   Bot,
@@ -21,7 +21,7 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { useBookmarks } from '../bookmarks';
 import { useToast } from '../toast';
-import { useTabManager } from './TabContext';
+import { tabDisplayName, useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
 import { EDIT_TOOLS, getAgentHookState, getAgentTouches, getLastTurn } from './agentHookState';
@@ -196,17 +196,99 @@ function MiddleTruncate({ text, className }) {
   );
 }
 
+// Inline rename: Enter commits, Escape cancels, blur commits. An empty name
+// (or the automatic one) goes back to automatic naming.
+function RenameField({ initial, onCommit, onCancel }) {
+  const ref = useRef(null);
+  const done = useRef(false);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+  const finish = (commit) => {
+    if (done.current) return;
+    done.current = true;
+    if (commit) onCommit(ref.current?.value ?? '');
+    else onCancel();
+  };
+  return (
+    <input
+      ref={ref}
+      defaultValue={initial}
+      aria-label="Tab name"
+      spellCheck={false}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          finish(false);
+        }
+      }}
+      onBlur={() => finish(true)}
+      className="ins-well h-5 min-w-0 flex-1 px-1 text-xs text-foreground outline-none"
+    />
+  );
+}
+
 export function TabsSummaryPane() {
-  const { tabs, activeTabId, switchTab, removeTab, setTabRole } = useTabManager();
+  const { tabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab, setTabRole } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
   const { bookmarks } = useBookmarks();
   const toast = useToast();
   const { linkedRepos } = useLinkedRepos(activeTabId);
-  const tabName = (tab) => bookmarks.find((b) => b.path === tab.projectPath)?.name ?? tab.label;
+  const tabName = (tab) => tabDisplayName(tab, bookmarks);
   const remote = remoteWork(tabs, cli, now);
   const queue = useAttentionQueue(tabs);
   const [openTrail, setOpenTrail] = useState(null); // tab id whose last turn is expanded
+  const [renamingId, setRenamingId] = useState(null);
+  // Drag-to-reorder: the row being dragged and where it would land.
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dropAt, setDropAt] = useState(null); // { index, after }
+
+  const commitRename = useCallback((tab, value) => {
+    const name = value.trim();
+    const automatic = tabDisplayName({ ...tab, customLabel: undefined }, bookmarks);
+    renameTab(tab.id, name === automatic ? '' : name);
+    setRenamingId(null);
+  }, [bookmarks, renameTab]);
+  const cancelRename = useCallback(() => setRenamingId(null), []);
+
+  const onDragStart = useCallback((e, index) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+    setDragIndex(index);
+  }, []);
+
+  const onDragOver = useCallback((e, index) => {
+    if (dragIndex === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    setDropAt((prev) => (prev?.index === index && prev.after === after ? prev : { index, after }));
+  }, [dragIndex]);
+
+  const endDrag = useCallback(() => {
+    setDragIndex(null);
+    setDropAt(null);
+  }, []);
+
+  const onDrop = useCallback((e) => {
+    e.preventDefault();
+    if (dragIndex !== null && dropAt) {
+      let to = dropAt.after ? dropAt.index + 1 : dropAt.index;
+      if (dragIndex < to) to -= 1;
+      reorderTab(dragIndex, to);
+    }
+    endDrag();
+  }, [dragIndex, dropAt, reorderTab, endDrag]);
 
   const copyBranch = async (e, branch) => {
     e.stopPropagation();
@@ -267,7 +349,7 @@ export function TabsSummaryPane() {
 
   return (
     <div className="flex flex-col">
-      {tabs.map((tab) => {
+      {tabs.map((tab, index) => {
         const info = repo[tab.id];
         const work = remote[tab.id];
         const workFrom = work && tabs.find((t) => t.id === work.fromTabId);
@@ -283,26 +365,59 @@ export function TabsSummaryPane() {
         const trailOpen = summary && openTrail === tab.id;
         const root = tab.projectPath.replace(/\/+$/, '');
         const linkLabel = linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`;
+        const renaming = renamingId === tab.id;
+        // The slot the drop would fill; the two slots beside the dragged row are no-ops.
+        const dropSlot = dropAt?.index === index ? (dropAt.after ? index + 1 : index) : null;
+        const dropLine = dragIndex !== null && dropSlot !== null && dropSlot !== dragIndex && dropSlot !== dragIndex + 1;
         return (
-          <button
+          // A div, not a <button>: it holds the rename input and other controls.
+          <div
             key={tab.id}
+            role="button"
+            tabIndex={0}
+            draggable={closable && !renaming}
+            onDragStart={(e) => onDragStart(e, index)}
+            onDragOver={(e) => onDragOver(e, index)}
+            onDrop={onDrop}
+            onDragEnd={endDrag}
             onClick={() => switchTab(tab.id)}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                switchTab(tab.id);
+              } else if (e.key === 'F2') {
+                e.preventDefault();
+                setRenamingId(tab.id);
+              }
+            }}
             onMouseDown={(e) => {
               if (e.button === 1 && closable) {
                 e.preventDefault();
-                removeTab(tab.id);
+                requestCloseTab(tab.id);
               }
             }}
             title={`${tab.projectPath}\n${activity.label}${activity.since ? ` · ${activity.since}` : ''}${
               workLabel && activity.kind !== 'remote' ? `\n${workLabel}` : ''
-            }`}
+            }\nDouble-click or F2 to rename${closable ? ' · drag to reorder' : ''}`}
             aria-current={active ? 'page' : undefined}
             data-marker="top"
             className={cn(
-              'group flex flex-col gap-1 py-2.5 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved',
+              'group relative flex flex-col gap-1 py-2.5 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
               active ? 'ins-row-selected before:!top-3' : 'hover:bg-foreground/5',
+              dragIndex === index && 'opacity-50',
             )}
           >
+            {/* Where the dragged tab will land: a lamp-lit hairline on the edge. */}
+            {dropLine && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'pointer-events-none absolute inset-x-0 z-10 h-px bg-[var(--ins-lamp)]',
+                  dropAt.after ? 'bottom-0' : 'top-0',
+                )}
+              />
+            )}
             {/* Tier 1: what it is and what it is doing. */}
             <div className="flex h-5 min-w-0 items-center gap-2">
               <ActivityIcon kind={activity.kind} label={activity.label} />
@@ -314,10 +429,26 @@ export function TabsSummaryPane() {
                   {queuePos + 1}
                 </span>
               )}
-              <MiddleTruncate
-                text={name}
-                className={cn('text-xs', active ? 'font-semibold text-foreground' : 'font-medium text-foreground/80')}
-              />
+              {renaming ? (
+                <RenameField
+                  initial={name}
+                  onCommit={(value) => commitRename(tab, value)}
+                  onCancel={cancelRename}
+                />
+              ) : (
+                <span
+                  className="flex min-w-0"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setRenamingId(tab.id);
+                  }}
+                >
+                  <MiddleTruncate
+                    text={name}
+                    className={cn('text-xs', active ? 'font-semibold text-foreground' : 'font-medium text-foreground/80')}
+                  />
+                </span>
+              )}
               {tab.role &&
                 roleMenu(
                   tab,
@@ -385,7 +516,7 @@ export function TabsSummaryPane() {
                     title="Close tab"
                     onClick={(e) => {
                       e.stopPropagation();
-                      removeTab(tab.id);
+                      requestCloseTab(tab.id);
                     }}
                     className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-fault)]"
                   >
@@ -464,7 +595,7 @@ export function TabsSummaryPane() {
                 <span className="min-w-0 truncate">{workLabel}</span>
               </div>
             )}
-          </button>
+          </div>
         );
       })}
     </div>

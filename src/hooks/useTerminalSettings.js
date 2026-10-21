@@ -1,53 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useSetting, useSeededSetting } from "../features/settings/settingsStore";
 
-function useLocalStorageState(key, defaultValue) {
-  const [value, setValue] = useState(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      return saved !== null ? JSON.parse(saved) : defaultValue;
-    } catch { return defaultValue; }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.warn(`Failed to save ${key} to localStorage:`, error);
-    }
-  }, [key, value]);
-
-  return [value, setValue];
-}
-
+// Preferences live in the shared settings store (src/features/settings), so a
+// change in one tab shows up in every open tab at once.
+//
+// Sandbox, network isolation and the CLI are seeded instead: they are applied
+// when the tab's terminal spawns, so each tab keeps its own live value (the
+// last one set becomes the default for new tabs). Sharing them would make
+// other tabs report a sandbox or CLI their running process doesn't have.
 export function useTerminalSettings() {
-  const [sandboxEnabled, setSandboxEnabled] = useLocalStorageState('nevo-terminal:sandbox-enabled', false);
+  const [sandboxEnabled, setSandboxEnabled] = useSeededSetting('sandboxEnabled');
   const [sandboxFailed, setSandboxFailed] = useState(false);
-  const [networkIsolation, setNetworkIsolation] = useLocalStorageState('nevo-terminal:network-isolation', false);
-  const [showTitleBar, setShowTitleBar] = useLocalStorageState('nevo-terminal:show-title-bar', true);
-  const [keepFilesAfterSend, setKeepFilesAfterSend] = useLocalStorageState('nevo-terminal:keep-files-after-send', false);
-  // Launch the CLI automatically when a starred (bookmarked) repo is opened.
-  // Never applies to tabs restored at startup — that isn't a deliberate act.
-  const [autoLaunchCli, setAutoLaunchCli] = useLocalStorageState('nevo-terminal:auto-launch-cli', true);
-  const [autoChangelogEnabled, setAutoChangelogEnabled] = useLocalStorageState('nevo-terminal:auto-changelog-enabled', false);
-  const [autoChangelogTarget, setAutoChangelogTarget] = useLocalStorageState('nevo-terminal:auto-changelog-target', 'CHANGELOG.md');
-  const [autoChangelogTrigger, setAutoChangelogTrigger] = useLocalStorageState('nevo-terminal:auto-changelog-trigger', 'commit');
-  const [autoChangelogCli, setAutoChangelogCli] = useLocalStorageState('nevo-terminal:auto-changelog-cli', 'claude-code');
-  const [autoCommitCli, setAutoCommitCli] = useLocalStorageState('nevo-terminal:auto-commit-cli', 'claude-code');
-  const [autoCommitCustomPrompt, setAutoCommitCustomPrompt] = useLocalStorageState('nevo-terminal:auto-commit-custom-prompt', '');
-
-  const [selectedCli, setSelectedCli] = useState(() => {
-    try {
-      return localStorage.getItem('nevo-terminal:selected-cli') || 'claude-code';
-    } catch { return 'claude-code'; }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('nevo-terminal:selected-cli', selectedCli);
-    } catch (error) {
-      console.warn('Failed to save CLI preference to localStorage:', error);
-    }
-  }, [selectedCli]);
+  const [networkIsolation, setNetworkIsolation] = useSeededSetting('networkIsolation');
+  const [selectedCli, setSelectedCli] = useSeededSetting('selectedCli');
+  const [showTitleBar, setShowTitleBar] = useSetting('showTitleBar');
+  const [keepFilesAfterSend, setKeepFilesAfterSend] = useSetting('keepFilesAfterSend');
+  const [autoLaunchCli, setAutoLaunchCli] = useSetting('autoLaunchCli');
+  const [autoChangelogEnabled, setAutoChangelogEnabled] = useSetting('autoChangelogEnabled');
+  const [autoChangelogTarget, setAutoChangelogTarget] = useSetting('autoChangelogTarget');
+  const [autoChangelogTrigger, setAutoChangelogTrigger] = useSetting('autoChangelogTrigger');
+  const [autoChangelogCli, setAutoChangelogCli] = useSetting('autoChangelogCli');
+  const [autoCommitCli, setAutoCommitCli] = useSetting('autoCommitCli');
+  const [autoCommitCustomPrompt, setAutoCommitCustomPrompt] = useSetting('autoCommitCustomPrompt');
 
   return {
     sandboxEnabled, setSandboxEnabled,

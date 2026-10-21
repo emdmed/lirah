@@ -1,5 +1,21 @@
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useConfirm } from '../features/confirm/ConfirmContext';
+import { getAgentHookState } from '../features/tabs/agentHookState';
+import { getLastOutputAt } from '../features/tabs/terminalActivity';
+
+// Output this recent from a terminal with no agent hooks counts as running.
+const RECENT_OUTPUT_MS = 2000;
+
+// Whether Ctrl+S's double ^C would interrupt something. Agent hooks say so
+// directly; without them (hooks not installed, a plain shell job), fall back
+// to the terminal having printed something just now.
+function isTerminalBusy(sessionId) {
+  const hook = getAgentHookState(sessionId);
+  if (hook) return hook.state === 'working' || hook.state === 'permission';
+  const lastOutput = getLastOutputAt(sessionId);
+  return !!lastOutput && Date.now() - lastOutput < RECENT_OUTPUT_MS;
+}
 
 export function useViewModeShortcuts({
   sidebarOpen,
@@ -14,6 +30,8 @@ export function useViewModeShortcuts({
   onToggleMarkdownFilter,
   isActive,
 }) {
+  const confirm = useConfirm();
+
   useEffect(() => {
     if (isActive === false) return;
 
@@ -23,7 +41,16 @@ export function useViewModeShortcuts({
         e.preventDefault();
         e.stopPropagation();
 
-        // Send Ctrl+C twice to terminal to stop any running process
+        // Send Ctrl+C twice to terminal to stop any running process — but
+        // ask first when an agent is mid-turn, since that kills its work.
+        if (terminalSessionId && isTerminalBusy(terminalSessionId)) {
+          const ok = await confirm({
+            title: 'Stop the agent and switch to navigation mode?',
+            description: 'Ctrl+S sends Ctrl+C twice to the terminal, which interrupts the agent that is working in it.',
+            confirmLabel: 'Stop and switch',
+          });
+          if (!ok) return;
+        }
         if (terminalSessionId) {
           try {
             // Send Ctrl+C twice with small delay
@@ -89,5 +116,5 @@ export function useViewModeShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude, terminalSessionId, secondaryTerminalFocused, onToggleMarkdownFilter, isActive]);
+  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude, terminalSessionId, secondaryTerminalFocused, onToggleMarkdownFilter, isActive, confirm]);
 }

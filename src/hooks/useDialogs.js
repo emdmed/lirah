@@ -11,6 +11,7 @@ export function useDialogs() {
   const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [autoChangelogDialogOpen, setAutoChangelogDialogOpen] = useState(false);
   const [autoCommitConfigOpen, setAutoCommitConfigOpen] = useState(false);
@@ -35,6 +36,7 @@ export function useDialogs() {
     cliSelectionModalOpen, setCliSelectionModalOpen,
     showHelp, setShowHelp,
     budgetDialogOpen, setBudgetDialogOpen,
+    settingsOpen, setSettingsOpen,
     dashboardOpen, setDashboardOpen,
     autoChangelogDialogOpen, setAutoChangelogDialogOpen,
     autoCommitConfigOpen, setAutoCommitConfigOpen,
@@ -48,7 +50,7 @@ export function useDialogs() {
   }), [
     addBookmarkDialogOpen, bookmarksPaletteOpen, initialProjectDialogOpen,
     manageTemplatesDialogOpen, saveFileGroupDialogOpen, diffDialogOpen, diffFilePath,
-    cliSelectionModalOpen, showHelp, budgetDialogOpen, dashboardOpen,
+    cliSelectionModalOpen, showHelp, budgetDialogOpen, settingsOpen, dashboardOpen,
     autoChangelogDialogOpen, autoCommitConfigOpen, workspaceDialogOpen, projectPickerOpen,
     projectPickerAction, orchestrationDashboardOpen, markdownViewerOpen, markdownFilePath,
   ]);

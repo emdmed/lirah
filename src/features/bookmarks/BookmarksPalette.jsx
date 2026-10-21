@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../components/u
 import { Input } from '../../components/ui/input';
 import { useBookmarks } from './BookmarksContext';
 import { EmptyState } from '../../components/EmptyState';
-import { Search, Star, Bookmark } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 
 export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
   const { bookmarks } = useBookmarks();
@@ -88,7 +88,7 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[50vh]">
         <SheetHeader>
-          <SheetTitle>Project Bookmarks</SheetTitle>
+          <SheetTitle>Starred projects</SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 h-full">
@@ -98,7 +98,7 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
             <Input
               ref={searchInputRef}
               type="text"
-              placeholder="Search bookmarks..."
+              placeholder="Search starred projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -110,15 +110,15 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
             {filteredBookmarks.length === 0 ? (
               bookmarks.length === 0 ? (
                 <EmptyState
-                  icon={Bookmark}
-                  title="No bookmarks yet"
-                  description="Save frequently used directories for quick access. Open the sidebar (Ctrl+S) and click the star icon to add one."
+                  icon={Star}
+                  title="No starred projects yet"
+                  description="Star a project to jump back to it here. Open the project, then use the star button in the files pane header and choose Star this project."
                 />
               ) : (
                 <EmptyState
                   icon={Search}
-                  title="No bookmarks match your search"
-                  description="Try a different search term or clear the search to see all bookmarks"
+                  title="No starred projects match your search"
+                  description="Try a different search term or clear the search to see all starred projects"
                 />
               )
             ) : (

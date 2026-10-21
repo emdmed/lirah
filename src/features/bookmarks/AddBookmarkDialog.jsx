@@ -54,9 +54,9 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Bookmark Current Directory</DialogTitle>
+          <DialogTitle>Star Project</DialogTitle>
           <DialogDescription>
-            Add a bookmark to quickly navigate to this directory later.
+            Starred projects are listed when Lirah starts and in the projects palette (Ctrl+P).
           </DialogDescription>
         </DialogHeader>
 
@@ -96,7 +96,7 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
               Cancel
             </Button>
             <Button type="submit">
-              Add Bookmark
+              Star Project
             </Button>
           </DialogFooter>
         </form>

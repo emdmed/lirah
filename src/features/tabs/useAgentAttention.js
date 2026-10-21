@@ -103,7 +103,7 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
     const tabName = (sessionId) => {
       const tab = tabsRef.current.find((t) => getTabSession(t.id) === sessionId);
       if (!tab) return null;
-      return bookmarksRef.current.find((b) => b.path === tab.projectPath)?.name ?? tab.label;
+      return tab.customLabel || (bookmarksRef.current.find((b) => b.path === tab.projectPath)?.name ?? tab.label);
     };
     const flush = () => {
       timer = null;

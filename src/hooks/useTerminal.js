@@ -90,7 +90,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   // coalesce to one per frame.
   const repaintRafRef = useRef(0);
   const isActiveRef = useRef(isActive);
-  const { error, warning } = useToast();
+  const { error } = useToast();
 
   // Load a fresh WebGL renderer. Must be called after open(). If the context
   // can't be created (headless, driver issues) we stay on the DOM renderer.
@@ -294,19 +294,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         sessionIdRef.current = id;
         setSessionId(id);
 
-        // Check if sandbox was requested but failed
+        // Sandbox was requested but didn't come up. The owner (ProjectTab, via
+        // Terminal's onSandboxFailed) shows the warning with a working
+        // "Retry without sandbox" action, since only it can restart the shell.
         if (sandboxEnabled && !result.sandboxed) {
           setSandboxFailed(true);
-          warning('Sandbox failed to initialize. Terminal running without sandbox.', {
-            duration: 8000,
-            action: {
-              label: 'Retry without sandbox',
-              onClick: () => {
-                // User can toggle sandbox off and restart
-                console.log('User acknowledged sandbox failure');
-              }
-            }
-          });
         }
 
         // Handle terminal input. Held so the cleanup below can dispose it — an

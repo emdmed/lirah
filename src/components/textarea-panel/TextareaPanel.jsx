@@ -7,11 +7,11 @@ import { withPromptText } from "../../hooks/buildPrompt";
 
 import { ProjectToolbar } from "./ProjectToolbar";
 import { PromptToolbar } from "./PromptToolbar";
-import { ElementsIndicator } from "./ElementsIndicator";
-import { LinkedReposIndicator } from "./LinkedReposIndicator";
+import { PromptModeLine } from "./PromptModeLine";
+import { ContextChips } from "./ContextChips";
+import { basename } from "../../utils/pathUtils";
 import { CompactedIndicator } from "./CompactedIndicator";
 import { TextareaArea } from "./TextareaArea";
-import { PatternsSelector } from "../../features/patterns";
 import { PromptPreview } from "./PromptPreview";
 import { Button } from "../ui/button";
 import { PaneInfo } from "../PaneInfo";
@@ -70,10 +70,16 @@ export function TextareaPanel({
   patternFiles = NO_PATTERN_FILES,
   selectedPatterns = NO_PATTERNS,
   onTogglePattern,
+  onCreatePatterns,
   promptPreview: promptPreviewBase,
   promptPreviewOpen = false,
   onTogglePromptPreview,
   onClearPromptSection,
+  onRemoveFile,
+  onRemoveElement,
+  keepFilesAfterSend = false,
+  onToggleKeepFiles,
+  onOpenInstructions,
 }) {
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
@@ -142,11 +148,8 @@ export function TextareaPanel({
         const selectedFile = sortedAtMentionResults[atMentionSelectedIndex];
         if (selectedFile) {
           const isAlreadySelected = selectedFiles instanceof Set && selectedFiles.has(selectedFile.path);
-          if (isAlreadySelected) {
-            onAtMentionClose();
-          } else {
-            onAtMentionSelect(selectedFile.path, selectedFile.is_dir);
-          }
+          // An attached file stays attached; the @query is consumed either way.
+          onAtMentionSelect(selectedFile.path, selectedFile.is_dir, isAlreadySelected);
         }
         return;
       }
@@ -188,24 +191,104 @@ export function TextareaPanel({
         ? 'Nothing to send'
         : null;
 
+  // The context list folds away; the choice outlives the pane.
+  const [chipsOpen, setChipsOpen] = useState(() => {
+    try { return localStorage.getItem('lirah:contextChipsOpen') !== 'false'; } catch { return true; }
+  });
+  const toggleChips = useCallback(() => {
+    setChipsOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('lirah:contextChipsOpen', String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+
+  const templateTitle = useMemo(() => {
+    const section = promptPreviewBase?.sections?.find((s) => s.id === 'template');
+    return section ? section.label.replace(/^TEMPLATE · /, '') : null;
+  }, [promptPreviewBase]);
+
+  const openInstructions = useMemo(() => (
+    onOpenInstructions
+      || (onTemplateDropdownOpenChange ? () => onTemplateDropdownOpenChange(true) : undefined)
+  ), [onOpenInstructions, onTemplateDropdownOpenChange]);
+
+  const clearElements = useCallback(() => onClearPromptSection?.('elements'), [onClearPromptSection]);
+  const clearRepos = useCallback(() => onClearPromptSection?.('repos'), [onClearPromptSection]);
+  const openCompacted = useCallback(() => setCompactDialogOpen(true), []);
+
   // Everything below that does not read the text is memoized, so a keystroke
   // re-renders the input and the token estimate, not the toolbars and tooltips.
-  const elementsIndicator = useMemo(() => (
-    <ElementsIndicator
+  const modeLine = useMemo(() => (
+    <PromptModeLine
+      fileCount={fileArray.length}
+      chipsOpen={chipsOpen}
+      onToggleChips={toggleChips}
+      templateTitle={templateTitle}
+      patternCount={selectedPatterns?.size ?? 0}
+      onOpenInstructions={openInstructions}
+      elementCount={elementCount}
       selectedElements={selectedElements}
       currentPath={currentPath}
-      elementCount={elementCount}
-      onClearElements={onClearElements}
+      onClearElements={onClearPromptSection ? clearElements : onClearElements}
+      linkedRepos={linkedRepos}
+      onClearRepos={onClearPromptSection ? clearRepos : undefined}
+      compactedProject={compactedProject}
+      onOpenCompacted={openCompacted}
+      onClearCompacted={onClearCompactedProject}
+      keepFilesAfterSend={keepFilesAfterSend}
+      onToggleKeepFiles={onToggleKeepFiles}
     />
-  ), [selectedElements, currentPath, elementCount, onClearElements]);
+  ), [
+    fileArray.length, chipsOpen, toggleChips, templateTitle, selectedPatterns, openInstructions,
+    elementCount, selectedElements, currentPath, onClearPromptSection, clearElements, onClearElements,
+    linkedRepos, clearRepos, compactedProject, openCompacted, onClearCompactedProject,
+    keepFilesAfterSend, onToggleKeepFiles,
+  ]);
+
+  const contextChips = useMemo(() => (
+    chipsOpen && (fileArray.length > 0 || elementCount > 0) ? (
+      <ContextChips
+        selectedFiles={selectedFiles}
+        fileStates={fileStates}
+        selectedElements={selectedElements}
+        currentPath={currentPath}
+        onSetFileState={onSetFileState}
+        onRemoveFile={onRemoveFile}
+        onRemoveElement={onRemoveElement}
+      />
+    ) : null
+  ), [chipsOpen, fileArray.length, elementCount, selectedFiles, fileStates, selectedElements, currentPath, onSetFileState, onRemoveFile, onRemoveElement]);
+
+  // Per-item remove buttons for the preview's FILES and ELEMENTS sections.
+  const previewItems = useMemo(() => {
+    if (!promptPreviewOpen) return undefined;
+    const items = {};
+    if (onRemoveFile && fileArray.length > 0) {
+      items.files = fileArray.map((abs) => ({
+        key: abs, label: basename(abs), title: abs, onRemove: () => onRemoveFile(abs),
+      }));
+    }
+    if (onRemoveElement && elementCount > 0) {
+      const els = [];
+      selectedElements.forEach((list, filePath) => list.forEach((el) => els.push({
+        key: `${filePath}:${el.key}`,
+        label: el.displayName,
+        title: `${filePath}:${el.line}`,
+        onRemove: () => onRemoveElement(filePath, el.key),
+      })));
+      items.elements = els;
+    }
+    return items;
+  }, [promptPreviewOpen, onRemoveFile, onRemoveElement, fileArray, elementCount, selectedElements]);
 
   const compactedIndicator = useMemo(() => (
     <CompactedIndicator
       compactedProject={compactedProject}
       onClearCompactedProject={onClearCompactedProject}
-      onOpenSections={() => setCompactDialogOpen(true)}
+      onOpenSections={openCompacted}
     />
-  ), [compactedProject, onClearCompactedProject]);
+  ), [compactedProject, onClearCompactedProject, openCompacted]);
 
   const projectZone = useMemo(() => (
     <ProjectToolbar
@@ -228,22 +311,21 @@ export function TextareaPanel({
         onManageTemplates={onManageTemplates}
         templateDropdownOpen={templateDropdownOpen}
         onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
-      />
-      <PatternsSelector
         patternFiles={patternFiles}
         selectedPatterns={selectedPatterns}
         onTogglePattern={onTogglePattern}
+        onCreatePatterns={onCreatePatterns}
       />
     </div>
   ), [
     selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange,
-    patternFiles, selectedPatterns, onTogglePattern,
+    patternFiles, selectedPatterns, onTogglePattern, onCreatePatterns,
   ]);
 
   const footerInfo = (
     <TokenCostEstimate
+      promptBase={promptPreviewBase}
       textareaContent={value}
-      selectedFiles={selectedFiles}
       projectPath={currentPath}
     />
   );
@@ -293,9 +375,8 @@ export function TextareaPanel({
           </Tooltip>
         </div>
       )}
-      <LinkedReposIndicator linkedRepos={linkedRepos} />
     </div>
-  ), [projectZone, promptZone, onTogglePromptPreview, promptPreviewOpen, partCount, linkedRepos]);
+  ), [projectZone, promptZone, onTogglePromptPreview, promptPreviewOpen, partCount]);
 
   const textareaArea = (
     <TextareaArea
@@ -304,7 +385,6 @@ export function TextareaPanel({
       onChange={onChange}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      elementsIndicator={elementsIndicator}
       compactedIndicator={compactedIndicator}
       onClearContext={onClearContext}
       sessionId={sessionId}
@@ -333,12 +413,14 @@ export function TextareaPanel({
           sections={promptPreview.sections}
           text={promptPreview.text}
           onClearSection={onClearPromptSection}
+          itemsBySection={previewItems}
         />
       )}
+      {modeLine}
+      {contextChips}
       {textareaArea}
       <PaneInfo>
         {footerInfo}
-        {fileArray.length > 0 && <span> · {fileArray.length} file{fileArray.length === 1 ? '' : 's'}</span>}
       </PaneInfo>
     </div>
   );

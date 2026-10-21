@@ -80,15 +80,8 @@ export function useTextareaShortcuts({
         return;
       }
 
-      // Ctrl+T: Focus textarea
-      if (e.ctrlKey && e.key === 't') {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Focus textarea
-        textareaRef.current?.focus();
-        return;
-      }
+      // Ctrl+T is the new-tab shortcut (App.jsx); the prompt is focused with
+      // Alt+3, its pane number (usePaneShortcuts).
 
       // Ctrl+Enter: Send content to terminal (only when textarea focused)
       if (e.ctrlKey && e.key === 'Enter') {

@@ -5,6 +5,9 @@ export function useWorkspace() {
   const [workspace, setWorkspace] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [loading, setLoading] = useState(false);
+  // True once the first list has come back (or failed), so callers can tell
+  // "no workspaces" from "not loaded yet".
+  const [workspacesLoaded, setWorkspacesLoaded] = useState(false);
 
   const refreshWorkspaces = useCallback(async () => {
     try {
@@ -12,6 +15,8 @@ export function useWorkspace() {
       setWorkspaces(list);
     } catch (err) {
       console.error('Failed to list workspaces:', err);
+    } finally {
+      setWorkspacesLoaded(true);
     }
   }, []);
 
@@ -69,6 +74,7 @@ export function useWorkspace() {
   return {
     workspace,
     workspaces,
+    workspacesLoaded,
     loading,
     isWorkspace: workspace !== null,
     createWorkspace,

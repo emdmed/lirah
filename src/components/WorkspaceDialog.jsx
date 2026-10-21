@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,7 @@ import {
 } from './ui/dialog';
 import { Button } from './ui/button';
 import { useBookmarks } from '../features/bookmarks';
+import { useConfirm } from '../features/confirm/ConfirmContext';
 import { FolderTree, Plus, X, Layers } from 'lucide-react';
 
 export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existingWorkspaces, onOpenWorkspace, onDeleteWorkspace }) {
@@ -41,6 +42,19 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
     await onCreateWorkspace(name.trim(), selectedProjects);
     onOpenChange(false);
   };
+
+  const confirm = useConfirm();
+  // Deleting removes the workspace folder (its CLAUDE.md and links); the
+  // linked projects themselves are untouched.
+  const handleDelete = useCallback(async (ws) => {
+    const ok = await confirm({
+      title: `Delete workspace "${ws.name}"?`,
+      description: `Its folder (${ws.path}) is removed, with its CLAUDE.md and anything else saved there. The ${ws.projects.length} linked project${ws.projects.length === 1 ? ' is' : 's are'} not touched.`,
+      confirmLabel: 'Delete workspace',
+      destructive: true,
+    });
+    if (ok) await onDeleteWorkspace(ws.path);
+  }, [confirm, onDeleteWorkspace]);
 
   const handleOpen = async (ws) => {
     await onOpenWorkspace(ws.path);
@@ -83,8 +97,9 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                       </span>
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); onDeleteWorkspace(ws.path); }}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(ws); }}
                       className="p-1 opacity-40 hover:opacity-100 transition-opacity"
+                      aria-label={`Delete workspace ${ws.name}`}
                     >
                       <X className="w-3 h-3" />
                     </button>

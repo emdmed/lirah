@@ -1,22 +1,36 @@
 import { useEffect } from "react";
-import { Check, Settings, X, FileText } from "lucide-react";
+import { Check, Settings, X, ScrollText } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { usePromptTemplates } from "../../features/templates";
+import { PatternsMenuItems } from "../../features/patterns/PatternsSelector";
 
+const NO_PATTERN_FILES = [];
+const NO_PATTERNS = new Set();
+const GROUP_LABEL = "text-[10px] font-normal uppercase tracking-wider text-muted-foreground";
+
+// The "instructions" picker: one dropdown for everything that tells the agent
+// how to work. Templates (global, single-select) are text added to the
+// prompt; patterns (this repo's .patterns/*.md, multi-select) are sent as
+// "Read and follow" references. Alt+Alt opens it (controlled `open`).
 export function TemplateSelector({
   selectedTemplateId,
   onSelectTemplate,
   onManageTemplates,
   open,           // Controlled open state
   onOpenChange,   // Callback to change open state
+  patternFiles = NO_PATTERN_FILES,
+  selectedPatterns = NO_PATTERNS,
+  onTogglePattern,
+  onCreatePatterns,
 }) {
   const { templates } = usePromptTemplates();
 
@@ -41,9 +55,19 @@ export function TemplateSelector({
   }, [open, templates.length, onSelectTemplate, onOpenChange]);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+  const patternCount = selectedPatterns.size;
+  const showPatterns = !!onTogglePattern;
 
   // An active template is a lit state: lamp-coloured outline, no fill.
   const badgeStyle = 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-foreground/10';
+
+  const activeParts = [
+    selectedTemplate && `template: ${selectedTemplate.title}`,
+    patternCount > 0 && `patterns: ${Array.from(selectedPatterns).map(f => f.replace(/\.md$/, '')).join(', ')}`,
+  ].filter(Boolean);
+  const triggerTitle = activeParts.length > 0
+    ? `Instructions · ${activeParts.join(' · ')}  ·  Alt+Alt`
+    : 'Instructions: templates and patterns  ·  Alt+Alt';
 
   return (
     <div className="flex items-center gap-1">
@@ -63,18 +87,19 @@ export function TemplateSelector({
           <Button
             variant={selectedTemplateId ? "default" : "ghost"}
             size="xs"
-            aria-label={selectedTemplate ? `Template: ${selectedTemplate.title} (Alt+Alt to clear)` : "Select prompt template (Alt+Alt)"}
-            title={selectedTemplate ? `Template: ${selectedTemplate.title}  ·  Alt+Alt to clear` : "Select prompt template  ·  Alt+Alt"}
-            className="gap-1 px-1.5"
+            aria-label={`Instructions (Alt+Alt)${activeParts.length ? `: ${activeParts.join(', ')}` : ''}`}
+            title={triggerTitle}
+            className={`gap-1 px-1.5 ${patternCount > 0 && !selectedTemplateId ? 'text-[var(--ins-lamp)]' : ''}`}
           >
-            <FileText className="h-3 w-3" />
-            template
+            <ScrollText className="h-3 w-3" />
+            instructions{patternCount > 0 && <span className="tube">:{patternCount}</span>}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" className="w-48 text-xs">
+        <DropdownMenuContent align="end" side="top" className="w-60 text-xs">
+          <DropdownMenuLabel className={GROUP_LABEL}>Templates (all projects)</DropdownMenuLabel>
           {templates.length === 0 ? (
-            <DropdownMenuItem disabled className="text-[11px] text-muted-foreground">
-              No templates available
+            <DropdownMenuItem disabled className="text-[11px] text-muted-foreground pl-3">
+              No templates yet
             </DropdownMenuItem>
           ) : (
             <>
@@ -85,7 +110,6 @@ export function TemplateSelector({
                 <span className="text-muted-foreground">No template</span>
                 {!selectedTemplateId && <Check className="h-3 w-3 text-[var(--ins-lamp)]" />}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
               {templates.map((template, index) => (
                 <DropdownMenuItem
                   key={template.id}
@@ -108,14 +132,25 @@ export function TemplateSelector({
               ))}
             </>
           )}
-          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={onManageTemplates}
-            className="text-[11px] py-1.5"
+            className="text-[11px] py-1.5 pl-3"
           >
             <Settings className="h-3 w-3 mr-1.5" />
-            Manage Templates...
+            Manage templates…
           </DropdownMenuItem>
+          {showPatterns && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className={GROUP_LABEL}>Patterns (this repo)</DropdownMenuLabel>
+              <PatternsMenuItems
+                patternFiles={patternFiles}
+                selectedPatterns={selectedPatterns}
+                onTogglePattern={onTogglePattern}
+                onCreatePatterns={onCreatePatterns}
+              />
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

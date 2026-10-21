@@ -21,6 +21,20 @@ export function useElementPicker() {
     });
   }, []);
 
+  // Drops one element; a file left with none is dropped too, so the prompt
+  // never lists an empty ELEMENTS block.
+  const removeElement = useCallback((filePath, key) => {
+    setSelectedElements(prev => {
+      const existing = prev.get(filePath);
+      if (!existing) return prev;
+      const next = new Map(prev);
+      const remaining = existing.filter(e => e.key !== key);
+      if (remaining.length > 0) next.set(filePath, remaining);
+      else next.delete(filePath);
+      return next;
+    });
+  }, []);
+
   const clearSelectedElements = useCallback(() => {
     setSelectedElements(new Map());
   }, []);
@@ -31,6 +45,7 @@ export function useElementPicker() {
     selectedElements,
     handleOpenElementPicker,
     handleAddElements,
+    removeElement,
     clearSelectedElements,
   };
 }

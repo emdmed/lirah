@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useToast } from '../toast/ToastContext';
 
 const CLI_COMMANDS = {
   'claude-code': {
@@ -15,6 +16,7 @@ const CLI_COMMANDS = {
 };
 
 export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 'claude-code') {
+  const { error: toastError } = useToast();
   const [cliAvailability, setCliAvailability] = useState({
     'claude-code': true, // Always available via npx fallback
     'opencode': false
@@ -41,12 +43,14 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
   const launchCli = useCallback(async () => {
     if (!terminalSessionId) {
       console.warn('Terminal session not ready, cannot launch CLI');
+      toastError('Terminal is still starting. Try launching again in a moment.');
       return;
     }
 
     const cliConfig = CLI_COMMANDS[selectedCli];
     if (!cliConfig) {
       console.error('Unknown CLI:', selectedCli);
+      toastError(`Unknown CLI "${selectedCli}". Pick one in CLI settings.`);
       return;
     }
 
@@ -63,6 +67,7 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
         command = cliConfig.fallback;
       } else {
         console.error(`${selectedCli} is not available and has no fallback`);
+        toastError(`Couldn't launch ${selectedCli}: "${cliConfig.check}" was not found on your PATH. Install it or pick another CLI.`);
         return;
       }
       // Claude Code reports its state (working, needs permission, done) to
@@ -87,8 +92,9 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
       }
     } catch (error) {
       console.error('Failed to launch CLI:', error);
+      toastError(`Couldn't launch ${selectedCli}: ${error?.message || error}`);
     }
-  }, [terminalSessionId, terminalRef, selectedCli]);
+  }, [terminalSessionId, terminalRef, selectedCli, toastError]);
 
   // Keep backward compatibility
   const launchClaude = launchCli;

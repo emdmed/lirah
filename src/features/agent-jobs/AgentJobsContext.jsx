@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, us
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../../lib/notify';
+import { useConfirm } from '../confirm/ConfirmContext';
 
 // Split so consumers subscribe only to what they read: streamed job output
 // changes `jobs` many times a second, and ProjectTab — which only registers its
@@ -27,6 +28,28 @@ function basename(p) {
 }
 
 // Parse `git status --porcelain` into absolute paths of changed files.
+// Uncommitted changes in the tree a job is about to be applied onto, and which
+// of them the job also touches (relative paths). Untracked files only count
+// when the job writes the same path. Null when the status can't be read.
+async function workingTreeConflicts(job, dest) {
+  try {
+    const out = await invoke('run_git_command', { repoPath: dest, args: ['status', '--porcelain'] });
+    const entries = out.split('\n').filter((l) => l.trim()).map((line) => {
+      const rest = line.slice(3);
+      const path = (rest.includes(' -> ') ? rest.split(' -> ')[1] : rest).replace(/^"|"$/g, '');
+      return { path, untracked: line.startsWith('??') };
+    });
+    const prefix = `${job.cwd}/`;
+    const jobPaths = new Set((job.changedFiles || []).map((f) =>
+      f.path.startsWith(prefix) ? f.path.slice(prefix.length) : f.path));
+    const overlap = entries.filter((e) => jobPaths.has(e.path)).map((e) => e.path);
+    const dirty = entries.filter((e) => !e.untracked).length;
+    return { dirty, overlap };
+  } catch {
+    return null;
+  }
+}
+
 function parsePorcelain(output, cwd) {
   return output
     .split('\n')
@@ -290,6 +313,7 @@ export function AgentJobsProvider({ children }) {
   const [selectedContextFiles, setSelectedContextFiles] = useState([]);
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
+  const confirm = useConfirm();
   // Ids already run through finalizeJob this session. Closes the gap between a
   // job finishing and its status landing in state.
   const finalizedRef = useRef(new Set());
@@ -677,7 +701,7 @@ export function AgentJobsProvider({ children }) {
   // unless the caller forces it through. This is the "don't trust per-worktree
   // green — verify the merged result" gate; for a reconcile job the worktree IS
   // the merged tree, so this checks exactly what will land.
-  const approveJob = useCallback(async (id, { force = false } = {}) => {
+  const approveJob = useCallback(async (id, { force = false, allowDirty = false } = {}) => {
     const job = jobsRef.current.find((j) => j.id === id);
     if (!job || !job.worktreePath) return { ok: false, error: 'No isolated changes to apply.' };
     let typecheck = null;
@@ -688,6 +712,26 @@ export function AgentJobsProvider({ children }) {
         patchJob(id, { typecheck });
         if (typecheck.errorCount > 0) {
           return { ok: false, blocked: true, typecheck, label: job.label };
+        }
+      }
+      // `git apply` lands on top of whatever is uncommitted in the working tree,
+      // so ask first when that tree isn't clean.
+      if (!allowDirty) {
+        const conflicts = await workingTreeConflicts(job, job.repoPath);
+        if (conflicts && (conflicts.dirty > 0 || conflicts.overlap.length > 0)) {
+          const n = Math.max(conflicts.dirty, conflicts.overlap.length);
+          const shown = conflicts.overlap.slice(0, 5);
+          const more = conflicts.overlap.length - shown.length;
+          const overlapText = shown.length
+            ? ` The job also changes ${conflicts.overlap.length === 1 ? 'this file' : 'these files'}: ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}.`
+            : '';
+          const ok = await confirm({
+            title: 'Apply onto uncommitted changes?',
+            description: `Your working tree has uncommitted changes in ${n} file${n === 1 ? '' : 's'}.${overlapText} Apply anyway? Commit or stash first if you want to undo the apply cleanly.`,
+            confirmLabel: 'Apply anyway',
+            destructive: true,
+          });
+          if (!ok) return { ok: false, cancelled: true, label: job.label };
         }
       }
       await applyJobPatch(job);
@@ -719,7 +763,7 @@ export function AgentJobsProvider({ children }) {
       patchJob(id, { error: `Approve failed: ${e}` });
       return { ok: false, error: String(e), label: job.label };
     }
-  }, [applyJobPatch, patchJob]);
+  }, [applyJobPatch, patchJob, confirm]);
 
   // Launch a fresh copy of a finished/failed job with the exact same prompt,
   // CLI and isolation — the common "tweak nothing, just run it again" path.

@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 
-export function useHelpShortcut({ showHelp, setShowHelp, secondaryTerminalFocused }) {
+// Ctrl+H toggles the shortcuts dialog. Every booted tab mounts this, so only
+// the active one listens, or each tab would open its own copy.
+export function useHelpShortcut({ setShowHelp, secondaryTerminalFocused, isActive = true }) {
   useEffect(() => {
+    if (!isActive) return;
     const handleKeyDown = (e) => {
       if (secondaryTerminalFocused) return;
-      if (e.ctrlKey && e.key === 'h') {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'h') {
         e.preventDefault();
         e.stopPropagation();
         setShowHelp(prev => !prev);
@@ -13,5 +16,5 @@ export function useHelpShortcut({ showHelp, setShowHelp, secondaryTerminalFocuse
 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [showHelp, setShowHelp, secondaryTerminalFocused]);
+  }, [isActive, setShowHelp, secondaryTerminalFocused]);
 }

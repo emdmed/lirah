@@ -112,9 +112,9 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
           {items.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm opacity-50">
               <div className="text-center">
-                <p>No bookmarks yet.</p>
+                <p>No starred projects yet.</p>
                 <p className="text-xs mt-2">
-                  Open the sidebar (Ctrl+S) and click the star icon to add one.
+                  Press Esc, open a project folder, then use the star button in the files pane header and choose Star this project.
                 </p>
               </div>
             </div>

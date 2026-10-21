@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { Bookmark, BookmarkPlus, X } from 'lucide-react';
+import { Star, X } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useBookmarks } from './BookmarksContext';
 
@@ -29,23 +29,23 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <PanelButton icon={Bookmark} title="Bookmarks" aria-label="Bookmarks" />
+        <PanelButton icon={Star} title="Starred projects  ·  Ctrl+P" aria-label="Starred projects" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[300px]">
-        <DropdownMenuLabel>Project Bookmarks</DropdownMenuLabel>
+        <DropdownMenuLabel>Starred projects</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {onAdd && (
           <>
             <DropdownMenuItem onSelect={onAdd} className="cursor-pointer text-xs">
-              <BookmarkPlus className="w-3 h-3" />
-              Bookmark current directory
+              <Star className="w-3 h-3" />
+              Star this project
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
         {bookmarks.length === 0 ? (
           <div className="px-2 py-4 text-xs opacity-50 text-center">
-            No bookmarks yet.
+            No starred projects yet.
           </div>
         ) : (
           <div className="max-h-[400px] overflow-y-auto">
@@ -67,7 +67,8 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
                   <button
                     onClick={(e) => handleDelete(e, bookmark.id)}
                     className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 flex items-center justify-center rounded-xs opacity-60 hover:opacity-100 hover:bg-destructive/20"
-                    title="Remove bookmark"
+                    title="Unstar project"
+                    aria-label="Unstar project"
                   >
                     <X className="w-2.5 h-2.5" />
                   </button>

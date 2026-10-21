@@ -10,6 +10,7 @@ import { PinnedFilesProvider } from "./features/pinned-files";
 import { AgentJobsProvider } from "./features/agent-jobs/AgentJobsContext";
 import { TabProvider } from "./features/tabs";
 import { ToastProvider } from "./features/toast";
+import { ConfirmProvider } from "./features/confirm/ConfirmContext";
 import { InstrumentKit } from "./dev/InstrumentKit";
 import "./index.css";
 import { perfMark } from "./lib/perf";
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ToastProvider>
       <ThemeProvider>
+        <ConfirmProvider>
         {showKit ? <InstrumentKit /> : (
         <WatcherProvider>
           <BookmarksProvider>
@@ -42,6 +44,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           </BookmarksProvider>
         </WatcherProvider>
         )}
+        </ConfirmProvider>
       </ThemeProvider>
     </ToastProvider>
   </React.StrictMode>,

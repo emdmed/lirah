@@ -5,11 +5,19 @@ import { cn } from "@/lib/utils";
 // Each state maps to a theme token, not a colour. Every theme defines all
 // three, so this is correct in all of them — including the light ones — and a
 // new theme needs no entry here.
-const MODE_TOKENS = {
+export const MODE_TOKENS = {
   'modify': 'text-primary bg-primary/12',
   'do-not-modify': 'text-destructive bg-destructive/12',
   'use-as-example': 'text-accent bg-accent/12',
 };
+
+// Short labels, in cycle order, for compact readouts such as the context chips.
+export const FILE_STATE_LABELS = {
+  'modify': 'EDIT',
+  'do-not-modify': 'READ',
+  'use-as-example': 'COPY',
+};
+export const FILE_STATE_ORDER = ['modify', 'do-not-modify', 'use-as-example'];
 
 /**
  * File state selector: three silkscreened segments on the panel.

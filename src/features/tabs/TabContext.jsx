@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useToast } from "../toast";
+import { useConfirm } from "../confirm/ConfirmContext";
+import { getAgentHookState } from "./agentHookState";
+import { getTabSession } from "./terminalActivity";
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -6,7 +10,16 @@ const TabContext = createContext(null);
 const TabActionsContext = createContext(null);
 
 const STORAGE_KEY = 'nevo-terminal:tabs';
-const MAX_TABS = 8;
+export const MAX_TABS = 8;
+const LIMIT_MESSAGE = `Tab limit reached (${MAX_TABS}) — close a tab first`;
+// Agent states where closing the tab would kill work in flight.
+const BUSY_STATES = new Set(['working', 'permission']);
+
+// What a tab is called: the user's own name, else its bookmark's, else the
+// folder it sits in.
+export function tabDisplayName(tab, bookmarks = []) {
+  return tab.customLabel || bookmarks.find((b) => b.path === tab.projectPath)?.name || tab.label;
+}
 
 function createTab(projectPath) {
   return {
@@ -17,6 +30,8 @@ function createTab(projectPath) {
 }
 
 export function TabProvider({ children }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [tabs, setTabs] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -59,7 +74,7 @@ export function TabProvider({ children }) {
 
   const addTab = useCallback((projectPath) => {
     if (tabsRef.current.length >= MAX_TABS) {
-      console.warn(`Maximum of ${MAX_TABS} tabs reached`);
+      toast.warning(LIMIT_MESSAGE);
       return null;
     }
     const tab = createTab(projectPath);
@@ -67,7 +82,7 @@ export function TabProvider({ children }) {
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
     return tab;
-  }, []);
+  }, [toast]);
 
   const removeTab = useCallback((tabId) => {
     setTabs(prev => {
@@ -84,12 +99,35 @@ export function TabProvider({ children }) {
     });
   }, []);
 
+  // Close with a confirmation when the tab's agent is mid-turn or waiting on a
+  // permission prompt. Resolves true when the tab was closed.
+  const requestCloseTab = useCallback(async (tabId) => {
+    const current = tabsRef.current;
+    const tab = current.find((t) => t.id === tabId);
+    if (!tab || current.length < 2) return false;
+    const hook = getAgentHookState(getTabSession(tabId));
+    if (hook && BUSY_STATES.has(hook.state)) {
+      const ok = await confirm({
+        title: `Close ${tab.customLabel || tab.label}?`,
+        description: hook.state === 'permission'
+          ? 'Its agent is waiting on a permission prompt. Closing the tab ends the agent and its terminal.'
+          : 'Its agent is still working. Closing the tab ends the agent and its terminal.',
+        confirmLabel: 'Close tab',
+        destructive: true,
+      });
+      if (!ok) return false;
+    }
+    removeTab(tabId);
+    return true;
+  }, [confirm, removeTab]);
+
   const switchTab = useCallback((tabId) => {
     setActiveTabId(tabId);
   }, []);
 
   const reorderTab = useCallback((fromIndex, toIndex) => {
     setTabs(prev => {
+      if (fromIndex === toIndex || !prev[fromIndex] || toIndex < 0 || toIndex >= prev.length) return prev;
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
@@ -105,6 +143,13 @@ export function TabProvider({ children }) {
     ));
   }, []);
 
+  // A name the user gave the tab; it wins over the automatic label until it is
+  // cleared (an empty name goes back to automatic).
+  const renameTab = useCallback((tabId, name) => {
+    const customLabel = name?.trim() || undefined;
+    setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, customLabel } : t)));
+  }, []);
+
   // role tags a tab's repo (ui / api / db) for linking it into another prompt.
   const setTabRole = useCallback((tabId, role) => {
     setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, role: role || undefined } : t)));
@@ -113,11 +158,13 @@ export function TabProvider({ children }) {
   const actions = useMemo(() => ({
     addTab,
     removeTab,
+    requestCloseTab,
     switchTab,
     reorderTab,
     updateTabPath,
+    renameTab,
     setTabRole,
-  }), [addTab, removeTab, switchTab, reorderTab, updateTabPath, setTabRole]);
+  }), [addTab, removeTab, requestCloseTab, switchTab, reorderTab, updateTabPath, renameTab, setTabRole]);
 
   const value = useMemo(() => ({ tabs, activeTabId, ...actions }), [tabs, activeTabId, actions]);
 

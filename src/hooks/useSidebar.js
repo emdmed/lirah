@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSeededSetting } from "../features/settings/settingsStore";
 
 const clampWidth = (x) => Math.min(Math.max(200, x), 600);
 
 export function useSidebar({ resetTypeChecker }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  // Seeded from the settings store: each tab keeps its own open state and
+  // width, and the last one set is what the next tab (or restart) opens with.
+  const [sidebarOpen, setSidebarOpen] = useSeededSetting('sidebarOpen');
+  const [storedWidth, setSidebarWidth] = useSeededSetting('sidebarWidth');
+  const sidebarWidth = clampWidth(storedWidth);
   const [isResizing, setIsResizing] = useState(false);
   // The sidebar element: a drag writes its width directly, once per frame, and
   // commits to state on mouseup so the tab doesn't re-render per mousemove.

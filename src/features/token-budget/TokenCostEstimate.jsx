@@ -3,46 +3,51 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { useTokenBudget } from './TokenBudgetContext';
 import { estimatePromptCost, DEFAULT_MODEL } from '../../config/pricing';
 
+// ~1 token per 4 characters, the usual rule of thumb for English and code.
+const CHARS_PER_TOKEN = 4;
+// What the agent's own system prompt adds to any turn.
+const SYSTEM_OVERHEAD = 500;
+// buildPrompt joins sections with a blank line.
+const SECTION_JOIN = 2;
 
-export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath }) {
+const toTokens = (chars) => Math.ceil(chars / CHARS_PER_TOKEN);
+
+/**
+ * Token estimate for the next send, measured on the payload itself.
+ *
+ * `promptBase` is the buildPrompt result without the typed text (the tab
+ * builds it once per context change, for the preview and the sender). The
+ * typed text is one more section, so the full length is
+ * `base.text.length + join + text.length`: O(1) per keystroke, no string is
+ * built. Files go out as paths plus digests, so their size here is what is
+ * really sent; the contents the agent reads afterwards are not counted.
+ */
+export function TokenCostEstimate({ promptBase, textareaContent, projectPath }) {
   const { checkBudgetStatus, getBudget, currentUsage } = useTokenBudget();
 
-  const estimate = useMemo(() => {
-    let tokens = 0;
+  // Per-section breakdown for the tooltip: depends on the context only.
+  const breakdown = useMemo(() => (promptBase?.sections || []).map((s) => ({
+    id: s.id,
+    label: s.label,
+    tokens: toTokens(s.body.length),
+  })), [promptBase]);
 
-    // Textarea content: ~1 token per 4 chars
-    if (textareaContent) {
-      tokens += Math.ceil(textareaContent.length / 4);
-    }
-
-    // Selected files estimate
-    if (selectedFiles && selectedFiles.size > 0) {
-      // Rough estimates based on file analysis tiers
-      tokens += selectedFiles.size * 200; // average per file
-    }
-
-    // System overhead
-    tokens += 500;
-
-    return tokens;
-  }, [textareaContent, selectedFiles]);
+  const baseChars = promptBase?.text?.length ?? 0;
+  const textChars = textareaContent?.trim() ? textareaContent.length : 0;
+  const payloadChars = baseChars + textChars + (baseChars > 0 && textChars > 0 ? SECTION_JOIN : 0);
+  const payloadTokens = toTokens(payloadChars);
+  const estimate = payloadTokens + SYSTEM_OVERHEAD;
 
   const cost = useMemo(() => estimatePromptCost(estimate, DEFAULT_MODEL), [estimate]);
 
-  // Only show estimate when there's actual user content (not just system overhead)
-  const hasUserContent = (textareaContent?.length > 0) || (selectedFiles?.size > 0);
-
-  // Don't show estimate if there's no user content (avoid showing just the 500 base system prompt)
-  if (!hasUserContent) return null;
+  // Nothing to send: don't show the bare system overhead as if it were a prompt.
+  if (payloadChars === 0) return null;
 
   const budget = getBudget(projectPath);
   const { status } = checkBudgetStatus(projectPath);
   const wouldExceed = budget?.dailyLimit && (currentUsage.total + estimate) > budget.dailyLimit;
 
-  // Status colours come from the theme's own tokens. The previous literals
-  // were hardcoded hex, and the neutral case pointed at `--muted-foreground`,
-  // which does not exist — the real variable is `--color-muted-foreground` —
-  // so the default silently resolved to nothing.
+  // Status colours come from the theme's own tokens.
   const valueStyle = wouldExceed
     ? { color: 'var(--color-status-critical)', textShadow: 'none' }
     : status === 'warning'
@@ -66,9 +71,14 @@ export function TokenCostEstimate({ textareaContent, selectedFiles, projectPath 
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs font-mono">
         <div className="space-y-1">
-          <div>Prompt text: ~{textareaContent ? Math.ceil(textareaContent.length / 4) : 0}</div>
-          <div>Files: ~{selectedFiles ? selectedFiles.size * 200 : 0}</div>
-          <div>Base system prompt: ~500</div>
+          {textChars > 0 && <div>Your prompt: ~{toTokens(textChars).toLocaleString()}</div>}
+          {breakdown.map((s) => (
+            <div key={s.id}>{s.label.toLowerCase()}: ~{s.tokens.toLocaleString()}</div>
+          ))}
+          <div>Agent system prompt: ~{SYSTEM_OVERHEAD}</div>
+          <div className="text-muted-foreground font-sans">
+            Measured on the payload ({payloadChars.toLocaleString()} chars ÷ {CHARS_PER_TOKEN}). File contents the agent reads are not included.
+          </div>
           {budget?.dailyLimit && (
             <div className="pt-1 border-t border-border mt-1">
               Remaining: {Math.max(0, budget.dailyLimit - currentUsage.total).toLocaleString()} tokens

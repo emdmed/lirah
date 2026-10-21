@@ -104,20 +104,31 @@ export function FileSelectionProvider({ children }) {
     }));
   }, [selectedFiles, fileStates, currentPath]);
 
-  const handleLoadFileGroup = useCallback((group) => {
-    const newSelectedFiles = new Set();
-    const newFileStates = new Map();
-    group.files.forEach(file => {
-      const absolutePath = `${currentPath}/${file.relativePath}`;
-      newSelectedFiles.add(absolutePath);
-      newFileStates.set(absolutePath, file.state);
+  // Load a context set. 'replace' swaps the whole context for the set;
+  // 'add' merges it in, keeping files already attached (and their states).
+  const handleLoadFileGroup = useCallback((group, mode = 'replace') => {
+    const merge = mode === 'add';
+    const incoming = group.files.map(file => ({
+      absolutePath: `${currentPath}/${file.relativePath}`,
+      state: file.state,
+    }));
+    // Work out the additions from current state up front: updaters must stay
+    // pure (StrictMode runs them twice), so no setters or symbol work inside.
+    const base = merge ? selectedFiles : new Set();
+    const added = incoming.filter(f => !base.has(f.absolutePath));
+    if (merge && added.length === 0) return;
+    added.forEach(({ absolutePath }) => {
       if (symbolCallbacks?.isBabelParseable(absolutePath)) {
         symbolCallbacks.extractFileSymbols(absolutePath);
       }
     });
-    setSelectedFiles(newSelectedFiles);
-    setFileStates(newFileStates);
-  }, [currentPath, symbolCallbacks]);
+    setSelectedFiles(new Set([...base, ...added.map(f => f.absolutePath)]));
+    setFileStates(prevStates => {
+      const nextStates = merge ? new Map(prevStates) : new Map();
+      added.forEach(f => nextStates.set(f.absolutePath, f.state));
+      return nextStates;
+    });
+  }, [currentPath, symbolCallbacks, selectedFiles]);
 
   const value = useMemo(() => ({
     selectedFiles,

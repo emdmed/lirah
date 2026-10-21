@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense, memo } from "react";
 import { Terminal } from "../../components/Terminal";
+import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
+import { useToast } from "../toast/ToastContext";
+import { consumeFirstRun } from "./firstRun";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
@@ -52,6 +55,7 @@ import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
 import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
+import { useSeededSetting } from "../settings/settingsStore";
 import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
@@ -147,7 +151,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
   const { linkedRepos, clearLinkedRepos } = useLinkedRepos(tabId);
-  const [viewMode, setViewMode] = useState('flat');
+  // Last-used file view (flat/tree) is the default for new tabs.
+  const [viewMode, setViewMode] = useSeededSetting('viewMode');
 
   // Template state
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
@@ -160,6 +165,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
 
   // Domain hooks
   const settings = useTerminalSettings();
+  const toast = useToast();
   const dialogs = useDialogs();
 
   const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
@@ -267,8 +273,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       else if (viewMode === 'tree') await treeView.loadTreeData();
     } catch (error) {
       console.error('Failed to navigate to workspace:', error);
+      toast.error(`Couldn't open workspace: ${error?.message || error}`);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData, terminateCliProcess]);
+  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData, terminateCliProcess, toast.error]);
 
   const handleCreateWorkspace = useCallback(async (name, projects) => {
     const info = await workspaceHook.createWorkspace(name, projects);
@@ -293,11 +300,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const elementPicker = useElementPicker();
 
   const atMention = useAtMention({
-    viewMode,
     search: sidebarSearch.search,
     toggleFileSelection: fileSelection.toggleFileSelection,
     setTextareaContent,
     textareaRef,
+    rootPath: currentPath,
   });
 
   // Claude launcher
@@ -354,8 +361,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       }
     } catch (error) {
       console.error('Failed to navigate to bookmark:', error);
+      toast.error(`Couldn't open ${bookmark.name || bookmark.path}: ${error?.message || error}`);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess, settings.autoLaunchCli, launchClaude]);
+  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess, settings.autoLaunchCli, launchClaude, toast.error]);
 
   // Handle project selection from initial dialog (with splash screen) — kept for bookmark navigation
   const handleSelectProject = useCallback(async (bookmark) => {
@@ -619,14 +627,15 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   });
 
   useHelpShortcut({
-    showHelp: dialogs.showHelp, setShowHelp: dialogs.setShowHelp,
+    setShowHelp: dialogs.setShowHelp,
     secondaryTerminalFocused: secondary.secondaryFocused,
+    isActive,
   });
 
   useBookmarksShortcut({
-    bookmarksPaletteOpen: dialogs.bookmarksPaletteOpen,
     setBookmarksPaletteOpen: dialogs.setBookmarksPaletteOpen,
     secondaryTerminalFocused: secondary.secondaryFocused,
+    isActive,
   });
 
   // Fetch data when sidebar opens
@@ -638,8 +647,12 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   }, [sidebar.sidebarOpen, viewMode]);
 
   // Auto-refresh sidebar when terminal session becomes available
+  // The tree loader bails without a session, so a remembered tree view has to
+  // load here too, not only the flat one.
   useEffect(() => {
-    if (terminalSessionId && sidebar.sidebarOpen && folders.length === 0) loadFolders();
+    if (!terminalSessionId || !sidebar.sidebarOpen) return;
+    if (viewMode === 'tree') treeView.loadTreeData();
+    else if (folders.length === 0) loadFolders();
   }, [terminalSessionId]);
 
   // Auto-focus and re-fit terminal when this tab becomes active.
@@ -663,6 +676,16 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       cancelAnimationFrame(raf2);
     };
   }, [isActive, terminalReady]);
+
+  // First run (no saved tabs): offer the starred projects and workspaces once
+  // the shell is up. With none saved the picker has nothing to offer, so skip.
+  useEffect(() => {
+    if (!isActive || !terminalReady || !terminalSessionId || !workspaceHook.workspacesLoaded) return;
+    if (!consumeFirstRun()) return;
+    if (bookmarks.length > 0 || workspaceHook.workspaces.length > 0) {
+      dialogs.setInitialProjectDialogOpen(true);
+    }
+  }, [isActive, terminalReady, terminalSessionId, workspaceHook.workspacesLoaded]);
 
   // Auto-commit and lazygit ask which project first when a workspace holds
   // several. Refs keep these callbacks stable across stage/workspace changes.
@@ -699,19 +722,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     }
   }, [secondary.openWithCommand, setProjectPickerAction, setProjectPickerOpen]);
 
-  useTabShortcuts({
-    isActive,
-    secondary,
-    dialogs,
-    viewMode,
-    sidebarOpen: sidebar.sidebarOpen,
-    searchInputRef,
-    onCompactProject: compact.handleCompactProject,
-    onOpenLazygit: handleOpenLazygit,
-    onAutoCommit: handleAutoCommit,
-    onAutoMerge: handleAutoMerge,
-  });
-
   const handleClearContext = useCallback(async () => {
     if (!terminalSessionId) return;
     const command = settings.selectedCli === 'opencode' ? '/new' : '/clear';
@@ -729,6 +739,20 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       console.error('Failed to clear CLI context:', error);
     }
   }, [terminalSessionId, settings.selectedCli]);
+
+  useTabShortcuts({
+    isActive,
+    secondary,
+    dialogs,
+    viewMode,
+    sidebarOpen: sidebar.sidebarOpen,
+    searchInputRef,
+    onCompactProject: compact.handleCompactProject,
+    onOpenLazygit: handleOpenLazygit,
+    onAutoCommit: handleAutoCommit,
+    onAutoMerge: handleAutoMerge,
+    onClearContext: handleClearContext,
+  });
 
   // Cleanup on unmount: close the terminal. The fs watcher is not stopped
   // here — useTreeView owns it, and watchers are ref-counted per path, so a
@@ -775,18 +799,13 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     sidebarSearch.handleSearchChange(query);
     atMention.setAtMentionQuery(null);
   }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery]);
-  const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen,
-    setAutoChangelogDialogOpen, setAutoCommitConfigOpen,
+  const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setSettingsOpen,
     setWorkspaceDialogOpen, setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
     setSaveFileGroupDialogOpen } = dialogs;
   const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [setShowHelp]);
   const openCliSettings = useCallback(() => setCliSelectionModalOpen(true), [setCliSelectionModalOpen]);
-  const toggleTitleBar = useCallback(() => settings.setShowTitleBar(prev => !prev), [settings.setShowTitleBar]);
-  const toggleAutoLaunchCli = useCallback(() => settings.setAutoLaunchCli(prev => !prev), [settings.setAutoLaunchCli]);
   const openDashboard = useCallback(() => setDashboardOpen(true), [setDashboardOpen]);
-  const openBudgetSettings = useCallback(() => setBudgetDialogOpen(true), [setBudgetDialogOpen]);
-  const openAutoChangelogDialog = useCallback(() => setAutoChangelogDialogOpen(true), [setAutoChangelogDialogOpen]);
-  const openAutoCommitConfig = useCallback(() => setAutoCommitConfigOpen(true), [setAutoCommitConfigOpen]);
+  const openSettings = useCallback(() => setSettingsOpen(true), [setSettingsOpen]);
   const openWorkspaceDialog = useCallback(() => setWorkspaceDialogOpen(true), [setWorkspaceDialogOpen]);
   const openAddBookmark = useCallback(() => setAddBookmarkDialogOpen(true), [setAddBookmarkDialogOpen]);
   const openManageTemplates = useCallback(() => setManageTemplatesDialogOpen(true), [setManageTemplatesDialogOpen]);
@@ -795,16 +814,43 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const clearCompactedProject = useCallback(() => compact.setCompactedProject(null), [compact.setCompactedProject]);
   const toggleSecondaryFullscreen = useCallback(() => secondary.setSecondaryFullscreen(f => !f), [secondary.setSecondaryFullscreen]);
   const handleTerminalReady = useCallback(() => setTerminalReady(true), []);
-  const handleSandboxFailed = useCallback(() => settings.setSandboxFailed(true), [settings.setSandboxFailed]);
+  // Sandboxing is applied at spawn, so retrying without it turns the setting
+  // off and restarts this tab's shell (same path as toggleSandbox).
+  const retryWithoutSandbox = useCallback(() => {
+    settings.setSandboxEnabled(false);
+    settings.setSandboxFailed(false);
+    // Read through the ref: this callback must stay stable, or Terminal's
+    // onSandboxFailed effect re-fires and repeats the warning.
+    const sessionId = terminalSessionIdCleanupRef.current;
+    if (sessionId) {
+      invoke('close_terminal', { sessionId }).catch(console.error);
+    }
+    setTerminalSessionId(null);
+    setTerminalKey(k => k + 1);
+  }, [settings.setSandboxEnabled, settings.setSandboxFailed]);
+  const handleSandboxFailed = useCallback(() => {
+    settings.setSandboxFailed(true);
+    toast.warning('Sandbox failed to initialize. Terminal running without sandbox.', {
+      duration: 10000,
+      action: { label: 'Retry without sandbox', onClick: retryWithoutSandbox },
+    });
+  }, [settings.setSandboxFailed, toast.warning, retryWithoutSandbox]);
 
   const commands = useTabCommands({
+    tabId,
+    projectPath,
     dialogs,
     settings,
     themes,
     changeTheme,
+    secondary,
     onCompactProject: compact.handleCompactProject,
     onAutoCommit: handleAutoCommit,
     onAutoMerge: handleAutoMerge,
+    onLaunchCli: launchClaude,
+    onOpenLazygit: handleOpenLazygit,
+    onClearContext: handleClearContext,
+    onTogglePromptPreview: togglePromptPreview,
     toggleSandbox,
     toggleNetwork,
     onToggleGitFilter: treeView.handleToggleGitFilter,
@@ -891,10 +937,15 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               patternFiles={patterns.patternFiles}
               selectedPatterns={patterns.selectedPatterns}
               onTogglePattern={patterns.togglePattern}
+              onCreatePatterns={patterns.createPatterns}
               promptPreview={promptPreview}
               promptPreviewOpen={promptPreviewOpen}
               onTogglePromptPreview={togglePromptPreview}
               onClearPromptSection={handleClearPromptSection}
+              onRemoveFile={fileSelection.removeFileFromSelection}
+              onRemoveElement={elementPicker.removeElement}
+              keepFilesAfterSend={settings.keepFilesAfterSend}
+              onToggleKeepFiles={settings.setKeepFilesAfterSend}
             />
           )
         }
@@ -910,21 +961,15 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             onOpenCliSettings={openCliSettings}
             showTitleBar={settings.showTitleBar}
             tokenUsage={tokenUsage}
-            onToggleTitleBar={toggleTitleBar}
-            autoLaunchCli={settings.autoLaunchCli}
-            onToggleAutoLaunchCli={toggleAutoLaunchCli}
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
             networkIsolation={settings.networkIsolation}
             onToggleNetworkIsolation={toggleNetwork}
             secondaryTerminalFocused={secondary.secondaryFocused}
             onOpenDashboard={openDashboard}
-            onOpenBudgetSettings={openBudgetSettings}
-            autoChangelogEnabled={settings.autoChangelogEnabled}
             changelogStatus={changelogStatus}
-            onOpenAutoChangelogDialog={openAutoChangelogDialog}
-            autoCommitCli={settings.autoCommitCli}
-            onOpenAutoCommitConfig={openAutoCommitConfig}
+            onOpenSettings={openSettings}
+            onAutoCommit={handleAutoCommit}
             onAutoMerge={handleAutoMerge}
             onToggleSandbox={toggleSandbox}
             workspace={workspaceHook.workspace}
@@ -970,6 +1015,14 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
           onSandboxFailed={handleSandboxFailed}
           reattachKey={tabId}
         />
+        <LaunchAgentPrompt
+          tabId={tabId}
+          sessionId={terminalSessionId}
+          isActive={isActive}
+          selectedCli={settings.selectedCli}
+          onLaunch={launchClaude}
+          onChangeCli={openCliSettings}
+        />
         <Suspense fallback={null}>
         {dialogs.diffDialogOpen && <GitDiffDialog
           open={dialogs.diffDialogOpen}
@@ -995,6 +1048,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         dialogs={dialogs}
         currentPath={currentPath}
         settings={settings}
+        sessionId={terminalSessionId}
+        toggleSandbox={toggleSandbox}
+        toggleNetwork={toggleNetwork}
         cliAvailability={cliAvailability}
         elementPicker={elementPicker}
         fileSelection={fileSelection}
