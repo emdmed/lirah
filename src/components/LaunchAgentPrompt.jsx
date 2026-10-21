@@ -3,10 +3,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { KeyChord } from './instrument/Keycap';
 import { PanelButton } from './instrument/PanelButton';
 import { usePageVisible } from '../hooks/usePageVisible';
+import { TAB_CLI_PROCESSES, tabCliLabel } from '../lib/agentClis';
 import { subscribeAgentHooks, getAgentHookState } from '../features/tabs/agentHookState';
 
-const CLI_LABELS = { 'claude-code': 'Claude Code', opencode: 'opencode' };
-const CLI_PROCESSES = ['claude', 'opencode'];
 const POLL_MS = 2000;
 
 // Tabs whose launch bar was dismissed. Module state so a terminal restart or a
@@ -44,7 +43,7 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
     let cancelled = false;
     let timer = null;
     const poll = async () => {
-      for (const processName of CLI_PROCESSES) {
+      for (const processName of TAB_CLI_PROCESSES) {
         try {
           if (await invoke('check_pty_child_process', { sessionId, processName })) {
             if (!cancelled) setDoneFor(sessionId);
@@ -84,7 +83,7 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
 
   if (!sessionId || dismissed || done) return null;
 
-  const cliLabel = CLI_LABELS[selectedCli] || selectedCli;
+  const cliLabel = tabCliLabel(selectedCli);
 
   return (
     <div

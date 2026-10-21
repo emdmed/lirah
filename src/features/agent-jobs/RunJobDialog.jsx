@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { JOB_CLIS } from '../../lib/agentClis';
 import { plural } from '../../lib/plural';
 import { invoke } from '@tauri-apps/api/core';
 import { git } from '../../lib/git';
@@ -29,17 +30,6 @@ import { useFileGroups } from '../file-groups';
 import { usePromptTemplates } from '../templates';
 import { usePinnedFiles } from '../pinned-files';
 import { useAgentJobs } from './AgentJobsContext';
-
-// Agents the job runner knows how to drive headlessly. `bin` is what gets probed
-// on PATH; `value` is the id the Rust registry matches on.
-const CLI_OPTIONS = [
-  { value: 'claude', label: 'Claude Code', bin: 'claude' },
-  { value: 'opencode', label: 'opencode', bin: 'opencode' },
-  { value: 'codex', label: 'Codex', bin: 'codex' },
-  { value: 'gemini', label: 'Gemini', bin: 'gemini' },
-  { value: 'cursor-agent', label: 'Cursor', bin: 'cursor-agent' },
-  { value: 'amp', label: 'Amp', bin: 'amp' },
-];
 
 const MAX_COPIES = 3;
 
@@ -127,7 +117,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     let cancelled = false;
     (async () => {
       const found = await Promise.all(
-        CLI_OPTIONS.map(async (o) => {
+        JOB_CLIS.map(async (o) => {
           try {
             return (await invoke('check_command_exists', { command: o.bin })) ? o.value : null;
           } catch {
@@ -413,7 +403,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             }
           >
             <div className="flex flex-wrap gap-1.5">
-              {CLI_OPTIONS.map((o) => {
+              {JOB_CLIS.map((o) => {
                 const missing = availableClis && !availableClis.has(o.value);
                 const on = clis.has(o.value);
                 return (

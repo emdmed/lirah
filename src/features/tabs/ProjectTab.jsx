@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense, memo } from "react";
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
+import { TAB_CLI_PROCESSES, tabCliProcess } from "../../lib/agentClis";
 import { useToast } from "../toast/ToastContext";
 import { consumeFirstRun } from "./firstRun";
 import { Layout } from "../../components/Layout";
@@ -245,8 +246,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // Terminate any running CLI process in the terminal before navigation
   const terminateCliProcess = useCallback(async () => {
     if (!terminalSessionId) return;
-    const cliNames = ['claude', 'opencode'];
-    for (const cliName of cliNames) {
+    for (const cliName of TAB_CLI_PROCESSES) {
       try {
         const killed = await invoke('kill_pty_child_process', {
           sessionId: terminalSessionId,
@@ -390,7 +390,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     });
     await launchClaude();
     await new Promise(resolve => {
-      const cliName = settings.selectedCli === 'opencode' ? 'opencode' : 'claude';
+      const cliName = tabCliProcess(settings.selectedCli);
       // setTimeout chain, not setInterval: the next check is only scheduled
       // once the previous one has answered, so checks never pile up.
       const deadline = Date.now() + 15000;

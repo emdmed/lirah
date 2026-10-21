@@ -17,11 +17,9 @@ import {
   getScrollback, setScrollback, subscribeTerminalPrefs,
   SCROLLBACK_OPTIONS, SCROLLBACK_WARN_THRESHOLD,
 } from '../../lib/terminalPrefs';
+import { TAB_CLIS } from '../../lib/agentClis';
 
-const CLI_OPTIONS = [
-  { value: 'claude-code', label: 'Claude Code', short: 'claude' },
-  { value: 'opencode', label: 'OpenCode', short: 'opencode' },
-];
+const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
 
 const TRIGGER_OPTIONS = [
   { value: 'commit', label: 'Every commit' },

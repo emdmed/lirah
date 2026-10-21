@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { TAB_CLI_PROCESSES } from '../../lib/agentClis';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { usePageVisible } from '../../hooks/usePageVisible';
@@ -9,7 +10,6 @@ import { getTabSession } from './terminalActivity';
 const REPO_POLL_MS = 15000;
 const CLI_POLL_MS = 3000;
 const TICK_MS = 1000;
-const CLI_NAMES = ['claude', 'opencode'];
 
 function sameJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -58,7 +58,7 @@ export function useTabsSummary(tabs, enabled = true) {
     const entries = await Promise.all(tabsRef.current.map(async (t) => {
       const sessionId = getTabSession(t.id);
       if (!sessionId) return [t.id, null];
-      for (const processName of CLI_NAMES) {
+      for (const processName of TAB_CLI_PROCESSES) {
         try {
           if (await invoke('check_pty_child_process', { sessionId, processName })) return [t.id, processName];
         } catch { /* session gone */ }
