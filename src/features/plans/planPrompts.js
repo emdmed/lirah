@@ -92,7 +92,14 @@ function commitInstruction(plan, chunk) {
 git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chunkTrailer(plan, chunk)}"`;
 }
 
-export function buildChunkPrompt(plan, chunk) {
+// Under auto-pilot nobody is watching, so the agent says when it is stuck
+// instead of guessing; the last PLAN-STATUS line of its reply is read back.
+const STATUS_INSTRUCTION = `Nobody is watching this run. If you need a decision from the user before you can finish, don't guess: stop and end your reply with a line
+PLAN-STATUS: needs-input — <your question>
+If you can't proceed (a failure you can't fix, something missing), end your reply with a line
+PLAN-STATUS: blocked — <reason>`;
+
+export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
   const active = plan.chunks.filter((c) => c.status !== 'skipped');
   const done = active.filter((c) => c.status === 'implemented');
   const later = active.filter((c) => c.n > chunk.n && c.status !== 'implemented');
@@ -104,6 +111,7 @@ export function buildChunkPrompt(plan, chunk) {
     later.length > 0 && `Coming later (don't do these now):\n${list(later)}`,
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
     `Only do this chunk. ${commitInstruction(plan, chunk)}`,
+    autopilot && STATUS_INSTRUCTION,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -124,4 +132,23 @@ export function buildFixPrompt(plan, chunk, notes) {
     `Review notes (${notes.length}):\n${lines.join('\n')}`,
     `Address every note. Don't revert unrelated work. ${commitInstruction(plan, chunk)}`,
   ].join('\n\n');
+}
+
+/** Auto-pilot's one follow-up when the agent stopped without committing. */
+export function buildNudgePrompt(plan, chunk) {
+  return [
+    `Chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}" isn't committed yet. Finish it if anything is left.`,
+    commitInstruction(plan, chunk),
+    STATUS_INSTRUCTION,
+  ].join('\n\n');
+}
+
+/** The last `PLAN-STATUS:` line of an agent's reply → { kind, message }, or null. */
+export function parseStatusMarker(text) {
+  const lines = String(text || '').split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/PLAN-STATUS:\s*(needs-input|blocked)\b\s*[—–:-]*\s*(.*)$/i);
+    if (m) return { kind: m[1].toLowerCase(), message: m[2].replace(/[`*]+$/, '').trim() };
+  }
+  return null;
 }

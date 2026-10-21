@@ -11,7 +11,11 @@ import { listen } from '@tauri-apps/api/event';
 //   waiting     — idle at its prompt (session started, or idle-prompt notice)
 //   done        — finished its turn; your move
 
-const states = new Map(); // sessionId -> { state, message, notice, source, at, seq }
+const states = new Map(); // sessionId -> { state, message, notice, error, source, at, seq }
+
+// Each Claude session's transcript (JSONL), from its hook payloads, so plan
+// auto-pilot can read what the agent last said.
+const transcripts = new Map(); // sessionId -> path
 
 // What each agent's tools pointed at this turn, so a tab can tell when another
 // tab's agent is working in its repo. Targets are raw strings (a file path or
@@ -107,7 +111,7 @@ function nextState(payload) {
         ? { state: 'permission', message: payload.message }
         : { state: 'waiting', message: payload.message, notice: true };
     case 'Stop':
-      return { state: 'done' };
+      return payload.error ? { state: 'done', error: true } : { state: 'done' };
     case 'SessionStart':
       return { state: 'waiting' };
     case 'SessionEnd':
@@ -125,6 +129,7 @@ export function startAgentHookListener() {
     const { sessionId, payload } = event.payload;
     const hookEvent = payload?.hook_event_name;
     const now = Date.now();
+    if (typeof payload?.transcript_path === 'string') transcripts.set(sessionId, payload.transcript_path);
     if (hookEvent === 'UserPromptSubmit' || hookEvent === 'SessionEnd') touches.delete(sessionId);
     else if (hookEvent === 'PreToolUse') recordTouches(sessionId, payload);
     if (hookEvent === 'UserPromptSubmit') startTurn(sessionId, now);
@@ -179,6 +184,10 @@ export function getAgentTouches(sessionId) {
   return (sessionId && touches.get(sessionId)) || null;
 }
 
+export function getAgentTranscript(sessionId) {
+  return (sessionId && transcripts.get(sessionId)) || null;
+}
+
 // The newest turn, finished or still running.
 export function getLastTurn(sessionId) {
   return (sessionId && turns.get(sessionId)?.at(-1)) || null;
@@ -202,6 +211,7 @@ export function clearAgentHookState(sessionId) {
   states.delete(sessionId);
   touches.delete(sessionId);
   turns.delete(sessionId);
+  transcripts.delete(sessionId);
   acked.delete(sessionId);
   emit({ sessionId });
 }

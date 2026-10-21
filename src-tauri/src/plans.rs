@@ -67,3 +67,45 @@ pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), Str
     })
     .await
 }
+
+/// How much of a transcript's tail to scan for the last assistant message.
+const TRANSCRIPT_TAIL: u64 = 512 * 1024;
+
+/// The text of the newest assistant message in a Claude Code transcript
+/// (JSONL), so plan auto-pilot can read the `PLAN-STATUS:` line an agent ends
+/// on. Only the tail of the file is read; `None` when there is no text there.
+#[tauri::command]
+pub async fn last_assistant_text(transcript_path: String) -> Result<Option<String>, String> {
+    crate::ipc::blocking("last_assistant_text", move || {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut file = std::fs::File::open(&transcript_path)
+            .map_err(|e| format!("Transcript not found: {}", e))?;
+        let len = file.metadata().map_err(|e| e.to_string())?.len();
+        let start = len.saturating_sub(TRANSCRIPT_TAIL);
+        file.seek(SeekFrom::Start(start)).map_err(|e| e.to_string())?;
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        let text = String::from_utf8_lossy(&buf);
+        // A tail read can start mid-line; that first line won't parse and is skipped.
+        for line in text.lines().rev() {
+            let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+            if entry.get("type").and_then(|t| t.as_str()) != Some("assistant") {
+                continue;
+            }
+            let Some(blocks) = entry.pointer("/message/content").and_then(|c| c.as_array()) else {
+                continue;
+            };
+            let parts: Vec<&str> = blocks
+                .iter()
+                .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("text"))
+                .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                .collect();
+            // Tool-use-only entries carry no text; keep looking further back.
+            if !parts.is_empty() {
+                return Ok(Some(parts.join("\n")));
+            }
+        }
+        Ok(None)
+    })
+    .await
+}

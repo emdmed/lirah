@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import {
-  Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, FileText, GitCommit, Pencil, Play, Plus, RefreshCw,
-  RotateCcw, SkipForward, Trash2, Undo2,
+  Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, FileText, GitCommit, Pencil, Plane, Play, Plus,
+  RefreshCw, RotateCcw, SkipForward, Square, SquareTerminal, Trash2, Undo2,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -14,7 +14,7 @@ import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getTabSession } from '../tabs/terminalActivity';
 import { getAgentHookState } from '../tabs/agentHookState';
-import { usePlans, planProgress, planStarted } from './PlansContext';
+import { usePlans, nextChunkId, planProgress, planStarted } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
 
@@ -27,6 +27,8 @@ function chunkLamp(chunk) {
   if (chunk.status === 'rolled-back') return { state: 'warn' };
   return { state: 'off' };
 }
+
+const autopilotActive = (plan) => plan.autopilot?.status === 'running' || plan.autopilot?.status === 'paused';
 
 const STATUS_LABEL = {
   pending: 'pending',
@@ -72,10 +74,10 @@ export function PlansPane({ projectPath }) {
   const { repoRoot, checked } = useRepoRoot(projectPath);
   const {
     plans, createPlan, replaceSource, runSplit, deletePlan, updateChunk, moveChunk, deleteChunk, implementChunk,
-    checkChunk, commitChunk, rollbackChunk, sendFix,
+    checkChunk, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
   } = usePlans(repoRoot);
   const { files, importFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
-  const { activeTabId } = useTabManager();
+  const { tabs, activeTabId, switchTab } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -109,20 +111,21 @@ export function PlansPane({ projectPath }) {
     }
   }, [createPlan, repoRoot, toast]);
 
-  const handleImplement = useCallback(async (plan, chunk) => {
-    const session = getTabSession(activeTabId);
-    const agent = getAgentHookState(session);
-    const other = plan.chunks.find((c) => c.status === 'in-progress' && c.id !== chunk.id);
+  // Before typing into the active tab: is there an agent, and is it free?
+  // `chunk` is the one about to be sent; auto-pilot adopts a chunk in flight.
+  const confirmSend = useCallback(async (plan, chunk) => {
+    const agent = getAgentHookState(getTabSession(activeTabId));
+    const other = chunk && plan.chunks.find((c) => c.status === 'in-progress' && c.id !== chunk.id);
     if (!agent) {
-      const ok = await confirm({
+      return confirm({
         title: 'No agent detected in this tab',
         description: 'The chunk prompt is typed into this tab\'s terminal. Launch Claude there first (Ctrl+K), or send anyway if it is already running.',
         confirmLabel: 'Send anyway',
         destructive: false,
       });
-      if (!ok) return;
-    } else if (agent.state === 'working' || other) {
-      const ok = await confirm({
+    }
+    if (agent.state === 'working' || other) {
+      return confirm({
         title: other ? `Chunk ${other.n} is still in progress` : 'The agent is busy',
         description: other
           ? 'Starting another chunk now may mix their changes into one commit.'
@@ -130,10 +133,50 @@ export function PlansPane({ projectPath }) {
         confirmLabel: 'Send anyway',
         destructive: false,
       });
-      if (!ok) return;
     }
+    return true;
+  }, [activeTabId, confirm]);
+
+  const handleImplement = useCallback(async (plan, chunk) => {
+    if (!(await confirmSend(plan, chunk))) return;
     await withBusy(chunk.id, () => implementChunk(repoRoot, plan.id, chunk.id, activeTabId));
-  }, [activeTabId, confirm, withBusy, implementChunk, repoRoot]);
+  }, [activeTabId, confirmSend, withBusy, implementChunk, repoRoot]);
+
+  const handleAutopilot = useCallback(async (plan) => {
+    if (autopilotActive(plan)) {
+      stopAutopilot(repoRoot, plan.id);
+      toast.info('Auto-pilot off. The agent finishes what it is doing; nothing more is sent.');
+      return;
+    }
+    const clash = plans.find((p) => p.id !== plan.id && autopilotActive(p) && p.autopilot.tabId === activeTabId);
+    if (clash) {
+      toast.error(`"${clash.title || 'Untitled plan'}" is already on auto-pilot in this tab`);
+      return;
+    }
+    if (!(await confirmSend(plan, null))) return;
+    const ok = await confirm({
+      title: 'Run the plan on auto-pilot?',
+      description: 'Chunks go to this tab\'s agent one after another, each committed before the next. You are notified when the plan is complete, when the agent needs you, and when something goes wrong. Permission prompts pause the run: launch the agent with accept-edits to leave it unattended.',
+      confirmLabel: 'Start auto-pilot',
+      destructive: false,
+    });
+    if (!ok) return;
+    try {
+      await startAutopilot(repoRoot, plan.id, activeTabId);
+    } catch (e) {
+      toast.error(`Auto-pilot didn't start: ${e?.message || e}`);
+    }
+  }, [plans, activeTabId, confirm, confirmSend, startAutopilot, stopAutopilot, repoRoot, toast]);
+
+  const handleResume = useCallback(async (plan) => {
+    // The run's own tab if it is still open, else this one.
+    const tabId = tabs.some((t) => t.id === plan.autopilot.tabId) ? plan.autopilot.tabId : activeTabId;
+    try {
+      await resumeAutopilot(repoRoot, plan.id, tabId);
+    } catch (e) {
+      toast.error(`Auto-pilot didn't resume: ${e?.message || e}`);
+    }
+  }, [tabs, activeTabId, resumeAutopilot, repoRoot, toast]);
 
   const handleCheck = useCallback((plan, chunk) => withBusy(chunk.id, async () => {
     const res = await checkChunk(repoRoot, plan.id, chunk.id);
@@ -225,6 +268,11 @@ export function PlansPane({ projectPath }) {
           onBack={() => setOpenPlanId(null)}
           onResplit={() => runSplit(repoRoot, openPlan.id)}
           onDelete={() => handleDeletePlan(openPlan)}
+          autopilotTabOpen={tabs.some((t) => t.id === openPlan.autopilot?.tabId)}
+          onAutopilot={() => handleAutopilot(openPlan)}
+          onResumeAutopilot={() => handleResume(openPlan)}
+          onStopAutopilot={() => stopAutopilot(repoRoot, openPlan.id)}
+          onGoToTab={() => switchTab(openPlan.autopilot.tabId)}
           onImplement={(c) => handleImplement(openPlan, c)}
           onCheck={(c) => handleCheck(openPlan, c)}
           onCommit={(c) => handleCommit(openPlan, c)}
@@ -354,6 +402,7 @@ function ProgressReadout({ plan, done, total }) {
 function PlanRow({ plan, onOpen }) {
   const { done, total } = planProgress(plan);
   const running = plan.chunks.some((c) => c.status === 'in-progress' || c.awaitingFix);
+  const ap = plan.autopilot;
   return (
     <button
       onClick={onOpen}
@@ -365,12 +414,26 @@ function PlanRow({ plan, onOpen }) {
             <Scanner />
           ) : (
             <Lamp
-              state={plan.split === 'failed' ? 'fault' : running ? 'on' : total > 0 && done === total ? 'ok' : 'off'}
+              state={
+                plan.split === 'failed' || ap?.status === 'failed' ? 'fault'
+                  : ap?.status === 'paused' ? 'warn'
+                    : running ? 'on' : total > 0 && done === total ? 'ok' : 'off'
+              }
               blink={running}
             />
           )}
         </span>
         <span className="line-clamp-2 leading-4 text-foreground">{plan.title || 'Untitled plan'}</span>
+        {plan.split === 'done' && plan.autopilot && plan.autopilot.status !== 'done' && (
+          <span
+            className={cn(
+              'ml-auto shrink-0 text-[10px] leading-4',
+              plan.autopilot.status === 'running' ? 'text-[var(--ins-lamp)]' : 'text-[var(--ins-warn)]',
+            )}
+          >
+            {AUTOPILOT_TAG[plan.autopilot.status]}
+          </span>
+        )}
         {plan.split !== 'done' && (
           <span className="ml-auto shrink-0 text-[10px] leading-4 text-muted-foreground">
             {plan.split === 'running' ? 'splitting' : 'split failed'}
@@ -382,17 +445,68 @@ function PlanRow({ plan, onOpen }) {
   );
 }
 
-// The chunk to do next: the first one not yet implemented or skipped.
-function nextChunkId(plan) {
-  return plan.chunks.find((c) => c.status === 'pending' || c.status === 'rolled-back')?.id ?? null;
+const AUTOPILOT_TAG = { running: 'auto-pilot', paused: 'needs you', failed: 'stopped' };
+
+const AUTOPILOT_LAMP = {
+  running: { state: 'on', blink: true },
+  paused: { state: 'warn' },
+  failed: { state: 'fault' },
+  done: { state: 'ok' },
+};
+
+// Reasons the run picks up again by itself once you deal with it in the terminal.
+const RESUMES_ITSELF = new Set(['needs-input', 'no-commit', 'permission']);
+
+/** Where the auto-pilot run stands, and what you can do about it. */
+function AutopilotStrip({ plan, tabOpen, onResume, onStop, onGoToTab }) {
+  const ap = plan.autopilot;
+  const chunk = plan.chunks.find((c) => c.id === ap.chunkId);
+  const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP.paused;
+  const headline = {
+    running: chunk ? `chunk ${chunk.n} of ${plan.chunks.length}${ap.nudged ? ' · nudged to commit' : ''}` : 'starting',
+    paused: 'needs you',
+    failed: 'stopped',
+    done: 'plan complete',
+  }[ap.status];
+  const finished = ap.status === 'done';
+  return (
+    <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]" role="status">
+      <div className="flex min-w-0 items-center gap-2">
+        <Lamp state={lamp.state} blink={lamp.blink} label={ap.status} />
+        <span className="engraved-label shrink-0">auto-pilot</span>
+        <span className="min-w-0 truncate text-foreground">{headline}</span>
+      </div>
+      {ap.message && <Prose text={ap.message} clamp={3} className="text-[10px] leading-relaxed text-muted-foreground" />}
+      {ap.status === 'paused' && RESUMES_ITSELF.has(ap.reason) && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Answer in the terminal and the run carries on by itself, or resume to nudge the agent.
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {!finished && tabOpen && (
+          <PanelButton icon={SquareTerminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
+        )}
+        {(ap.status === 'paused' || ap.status === 'failed') && (
+          <PanelButton icon={Play} onClick={onResume} title={tabOpen ? 'Carry on in the same tab' : 'Carry on in this tab'}>
+            resume
+          </PanelButton>
+        )}
+        <PanelButton icon={finished ? Check : Square} onClick={onStop} title={finished ? 'Clear the status' : 'Turn auto-pilot off (the agent is not interrupted)'}>
+          {finished ? 'dismiss' : 'stop'}
+        </PanelButton>
+      </div>
+    </div>
+  );
 }
 
 function PlanDetail({
-  plan, busy, onBack, onResplit, onDelete, onImplement, onCheck, onCommit, onReview, onRollback, onPatchChunk,
-  onMoveChunk, onDeleteChunk,
+  plan, busy, onBack, onResplit, onDelete, autopilotTabOpen, onAutopilot, onResumeAutopilot, onStopAutopilot, onGoToTab,
+  onImplement, onCheck, onCommit, onReview, onRollback, onPatchChunk, onMoveChunk, onDeleteChunk,
 }) {
   const { done, total } = planProgress(plan);
   const nextId = nextChunkId(plan);
+  const piloted = autopilotActive(plan);
+  const canPilot = plan.split === 'done' && (piloted || !!nextId || plan.chunks.some((c) => c.status === 'in-progress'));
   // Until you fold or unfold something, the chunks in flight and the next one
   // are open: that's where the work is.
   const auto = new Set(plan.chunks.filter((c) => c.status === 'in-progress' || c.awaitingFix).map((c) => c.id));
@@ -421,10 +535,29 @@ function PlanDetail({
               re-split
             </PanelButton>
           )}
+          {canPilot && (
+            <PanelButton
+              icon={Plane}
+              latched={piloted}
+              onClick={onAutopilot}
+              title={piloted ? 'Turn auto-pilot off' : 'Implement the remaining chunks one after another, unattended'}
+            >
+              auto-pilot
+            </PanelButton>
+          )}
           <PanelButton icon={Trash2} onClick={onDelete} title="Delete this plan" aria-label="Delete this plan" className="ml-auto" />
         </div>
         <h3 className="text-xs font-medium leading-snug text-foreground wrap-anywhere">{plan.title || 'Untitled plan'}</h3>
         {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
+        {plan.autopilot && (
+          <AutopilotStrip
+            plan={plan}
+            tabOpen={autopilotTabOpen}
+            onResume={onResumeAutopilot}
+            onStop={onStopAutopilot}
+            onGoToTab={onGoToTab}
+          />
+        )}
         {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
       </div>
 
@@ -457,6 +590,7 @@ function PlanDetail({
           last={i === plan.chunks.length - 1}
           open={open.has(chunk.id)}
           busy={busy === chunk.id}
+          piloted={piloted}
           onToggle={() => toggle(chunk.id)}
           onImplement={() => onImplement(chunk)}
           onCheck={() => onCheck(chunk)}
@@ -483,7 +617,7 @@ function statusNote(chunk) {
 }
 
 function ChunkRow({
-  chunk, isNext, first, last, open, busy, onToggle, onImplement, onCheck, onCommit, onReview, onRollback, onPatch,
+  chunk, isNext, first, last, open, busy, piloted, onToggle, onImplement, onCheck, onCommit, onReview, onRollback, onPatch,
   onMove, onDelete,
 }) {
   const [editing, setEditing] = useState(false);
@@ -600,17 +734,17 @@ function ChunkRow({
           {!editing && (
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               {startable && (
-                <PanelButton icon={Play} onClick={onImplement} disabled={busy} title="Send this chunk to the tab's agent">
+                <PanelButton icon={Play} onClick={onImplement} disabled={busy || piloted} title={piloted ? 'Auto-pilot is running this plan' : "Send this chunk to the tab's agent"}>
                   implement
                 </PanelButton>
               )}
               {chunk.status === 'in-progress' && (
                 <>
                   <PanelButton icon={RefreshCw} onClick={onCheck} disabled={busy} title="Look for the chunk's commit">check</PanelButton>
-                  <PanelButton icon={GitCommit} onClick={onCommit} disabled={busy} title="Commit all changes as this chunk">
+                  <PanelButton icon={GitCommit} onClick={onCommit} disabled={busy || piloted} title="Commit all changes as this chunk">
                     commit
                   </PanelButton>
-                  <PanelButton icon={Undo2} onClick={() => onPatch({ status: 'pending', needsCommit: false })} disabled={busy} title="Back to pending (changes are kept)">
+                  <PanelButton icon={Undo2} onClick={() => onPatch({ status: 'pending', needsCommit: false })} disabled={busy || piloted} title="Back to pending (changes are kept)">
                     reset
                   </PanelButton>
                 </>
