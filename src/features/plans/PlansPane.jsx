@@ -18,13 +18,13 @@ import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getTabSession } from '../tabs/terminalActivity';
 import { getAgentHookState } from '../tabs/agentHookState';
-import { usePlans, nextChunkId, planProgress, planStarted } from './PlansContext';
+import { usePlans } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
 import { PlanGitSection } from './PlanGitSection';
 import {
-  AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, SPLIT_STATUS,
-  UNTITLED_PLAN,
+  AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId,
+  pilotPosition, planProgress, planStarted, runRank, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import {
   chunkBases, chunkCommitsByRepo, inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
@@ -76,17 +76,6 @@ function readFlag(key) {
 function writeFlag(key) {
   try { localStorage.setItem(key, '1'); } catch { /* per-viewer nicety only */ }
 }
-
-/** The auto-pilot chunk's place among the chunks that count (skipped ones don't). */
-function pilotPosition(plan) {
-  const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
-  const chunk = active.find((c) => c.id === plan.autopilot?.chunkId);
-  return chunk ? { chunk, index: active.indexOf(chunk) + 1, total: active.length } : null;
-}
-
-// Plans with a live run first: those are the ones to watch.
-const RUN_ORDER = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1, [AUTOPILOT_STATUS.RUNNING]: 2 };
-const runRank = (plan) => RUN_ORDER[plan.autopilot?.status] ?? 3;
 
 const STATUS_LABEL = {
   [CHUNK_STATE.PENDING]: 'pending',

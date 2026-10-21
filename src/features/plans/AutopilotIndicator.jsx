@@ -1,8 +1,8 @@
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { Lamp } from '../../components/instrument/Lamp';
-import { planProgress, useAutopilotRuns, usePlansActions } from './PlansContext';
-import { AUTOPILOT_STATUS, UNTITLED_PLAN } from './planModel';
+import { useAutopilotRuns, usePlansActions } from './PlansContext';
+import { AUTOPILOT_STATUS, planProgress, UNTITLED_PLAN } from './planModel';
 
 const LAMP = {
   [AUTOPILOT_STATUS.RUNNING]: { state: 'on', blink: true },

@@ -8,7 +8,9 @@ import { currentBranch, git, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import { lirahDir } from '../../lib/lirahPaths';
 import {
-  AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, SPLIT_STATUS, UNTITLED_PLAN,
+  AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, EXCERPT_MAX, HALT_REASON, isAutopilotLive, newChunks,
+  nextChunkId, normalizeLoadedPlan, planProgress, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress, toRolledBack,
+  UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
@@ -58,21 +60,6 @@ function storePath(home, repoRoot) {
   return `${lirahDir(home)}/plans/${name}-${hash8(repoRoot)}/plans.json`;
 }
 
-/** Chunks that count toward progress (skipped ones don't), and how many are in. */
-export function planProgress(plan) {
-  const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
-  return { done: active.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED).length, total: active.length };
-}
-
-export function planStarted(plan) {
-  return plan.chunks.some((c) => c.status !== CHUNK_STATUS.PENDING && c.status !== CHUNK_STATUS.SKIPPED);
-}
-
-// The chunk to do next: the first one not yet implemented or skipped.
-export function nextChunkId(plan) {
-  return plan.chunks.find((c) => c.status === CHUNK_STATUS.PENDING || c.status === CHUNK_STATUS.ROLLED_BACK)?.id ?? null;
-}
-
 // A PermissionRequest carries the tool name; a Notification, a sentence.
 function permissionMessage(message) {
   if (!message) return 'Waiting on a permission prompt in the terminal.';
@@ -84,27 +71,6 @@ function excerpt(text, max = EXCERPT_MAX) {
   const line = String(text || '').trim().split('\n').filter((l) => l.trim()).pop() || '';
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
-
-function newChunks(chunks) {
-  return chunks.map((c, i) => ({
-    id: shortId('c'),
-    n: i + 1,
-    ...c,
-    status: CHUNK_STATUS.PENDING,
-    tabId: null,
-    baseSha: null, // the primary repo's; baseShas has every repo's
-    baseShas: {},
-    commits: [], // every repo's, in order; commitsByRepo splits them by repo root
-    commitsByRepo: {},
-    revertShas: [],
-    needsCommit: false,
-    awaitingFix: false,
-    startedAt: null,
-    doneAt: null,
-  }));
-}
-
-const renumber = (chunks) => chunks.map((c, i) => (c.n === i + 1 ? c : { ...c, n: i + 1 }));
 
 export function PlansProvider({ children }) {
   const [plansByRepo, setPlansByRepo] = useState({}); // repoRoot -> plan[]
@@ -205,14 +171,7 @@ export function PlansProvider({ children }) {
       }
       const commits = Object.values(commitsByRepo).flat();
       if (commits.length > 0) {
-        updateChunk(repoRoot, planId, chunkId, {
-          status: CHUNK_STATUS.IMPLEMENTED,
-          commits,
-          commitsByRepo,
-          needsCommit: false,
-          awaitingFix: false,
-          doneAt: chunk.status === CHUNK_STATUS.IMPLEMENTED ? chunk.doneAt : Date.now(),
-        });
+        updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits, commitsByRepo }));
         return { found: true, commits };
       }
       updateChunk(repoRoot, planId, chunkId, {
@@ -269,22 +228,7 @@ export function PlansProvider({ children }) {
       } catch {
         // No plans for this repo yet.
       }
-      // A split can't survive a restart, and auto-pilot's tab is gone.
-      plans = plans.map((p) => {
-        let next = p.split === SPLIT_STATUS.RUNNING ? { ...p, split: SPLIT_STATUS.FAILED, splitError: 'Interrupted — the app was closed.' } : p;
-        if (isAutopilotLive(p.autopilot)) {
-          next = {
-            ...next,
-            autopilot: {
-              ...p.autopilot,
-              status: AUTOPILOT_STATUS.PAUSED,
-              reason: HALT_REASON.APP_RESTARTED,
-              message: 'The app was closed during the run. Resume it from a tab with an agent.',
-            },
-          };
-        }
-        return next;
-      });
+      plans = plans.map(normalizeLoadedPlan);
       setPlansByRepo((prev) => (prev[repoRoot] ? prev : { ...prev, [repoRoot]: plans }));
       stateRef.current = { ...stateRef.current, [repoRoot]: stateRef.current[repoRoot] || plans };
       // Chunks that finished while the app was closed.
@@ -313,13 +257,7 @@ export function PlansProvider({ children }) {
       split: SPLIT_STATUS.RUNNING,
       splitError: null,
       chunks: [],
-      git: {
-        worktrees: false,
-        branch: defaultBranch(slug),
-        repos: [{ root: repoRoot, base: await currentBranch(repoRoot).catch(() => ''), workPath: null, prepared: false }],
-        workDir: null,
-        preparedAt: null,
-      },
+      git: defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -416,18 +354,7 @@ export function PlansProvider({ children }) {
       baseShas[repo.root] = sha;
     }
     await sendToTab(tabId, buildChunkPrompt(plan, chunk, { autopilot }));
-    updateChunk(repoRoot, planId, chunkId, {
-      status: CHUNK_STATUS.IN_PROGRESS,
-      tabId,
-      baseSha: baseShas[repoRoot] ?? null,
-      baseShas,
-      commits: [],
-      commitsByRepo: {},
-      needsCommit: false,
-      awaitingFix: false,
-      startedAt: Date.now(),
-      doneAt: null,
-    });
+    updateChunk(repoRoot, planId, chunkId, toInProgress({ tabId, baseShas, primaryRoot: repoRoot }));
   }, [findChunk, ensureGit, sendToTab, updateChunk]);
 
   const sendFix = useCallback(async (repoRoot, planId, chunkId, notes, tabId) => {
@@ -482,15 +409,7 @@ export function PlansProvider({ children }) {
       reverted.push(basename(repo.root));
     }
     if (revertShas.length === 0) throw new Error('git revert made no commit');
-    updateChunk(repoRoot, planId, chunkId, {
-      status: CHUNK_STATUS.ROLLED_BACK,
-      revertShas,
-      commits: [],
-      commitsByRepo: {},
-      needsCommit: false,
-      awaitingFix: false,
-      doneAt: null,
-    });
+    updateChunk(repoRoot, planId, chunkId, toRolledBack(revertShas));
   }, [findChunk, updateChunk]);
 
   // --- Auto-pilot ---
@@ -769,7 +688,6 @@ export function usePlans(repoRoot) {
 }
 
 const LIVE = new Set([AUTOPILOT_STATUS.RUNNING, AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED]);
-const URGENCY = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1, [AUTOPILOT_STATUS.RUNNING]: 2 };
 
 /** Auto-pilot runs that need watching, across loaded repos, most urgent first. */
 export function useAutopilotRuns() {
@@ -781,6 +699,6 @@ export function useAutopilotRuns() {
         if (LIVE.has(plan.autopilot?.status)) runs.push({ repoRoot, plan });
       }
     }
-    return runs.sort((a, b) => URGENCY[a.plan.autopilot.status] - URGENCY[b.plan.autopilot.status]);
+    return runs.sort((a, b) => runRank(a.plan) - runRank(b.plan));
   }, [plansByRepo]);
 }
