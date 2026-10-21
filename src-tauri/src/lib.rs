@@ -48,6 +48,15 @@ pub fn run(initial_path: Option<String>) {
         .manage(InitialPath(initial_path))
         .setup(|app| {
             agent_hooks::start(app.handle().clone());
+            // The window starts hidden and the page shows it once its splash
+            // has painted. If the page never gets that far, show it anyway.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                if let Some(window) = handle.get_webview_window("main") {
+                    let _ = window.show();
+                }
+            });
             Ok(())
         })
         // A reload (Ctrl+R, a dev HMR full reload) runs no frontend cleanup, so

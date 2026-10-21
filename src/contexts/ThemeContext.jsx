@@ -48,8 +48,10 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--color-warn', ui.warn ?? terminal.brightYellow);
     root.style.setProperty('--color-fault', ui.fault ?? terminal.brightRed);
 
-    // Save theme preference
+    // Save theme preference, and its gutter colour for the boot splash
+    // (index.html reads it before any module loads).
     saveTheme(currentTheme);
+    try { localStorage.setItem('lirah-splash-bg', ui.background); } catch { /* storage unavailable */ }
 
     return () => {
       clearTimeout(fadeTimer);

@@ -7,6 +7,38 @@
     <!-- The terminal and chrome face; preloaded so xterm measures it, not a fallback. -->
     <link rel="preload" href="/fonts/Typestar-OCR.woff2" as="font" type="font/woff2" crossorigin>
     <title>Lirah</title>
+    <!--
+      Boot splash. The window starts hidden (tauri.conf.json "visible": false)
+      so the bare webview never shows. This paints in the last theme's colours
+      before any module loads, then shows the window; main.jsx fades it out
+      once the app has rendered.
+    -->
+    <style>
+      html, body { margin: 0; background: var(--splash-bg, #1e1e26); }
+      #splash {
+        position: fixed; inset: 0; z-index: 2147483647;
+        display: grid; place-items: center;
+        background: var(--splash-bg, #1e1e26);
+        transition: opacity 220ms ease-out;
+      }
+      /* The mark stays invisible until the window has its final (tiled) size,
+         so it never shows centred in the pre-tiling 1024x768 viewport. */
+      #splash .mark { opacity: 0; transition: opacity 260ms ease-out; }
+      #splash.is-ready .mark { opacity: 1; }
+      #splash img { display: block; width: 64px; height: 64px; animation: splash-breathe 1.6s ease-in-out infinite alternate; }
+      #splash.is-done { opacity: 0; pointer-events: none; }
+      @keyframes splash-breathe { from { opacity: .6; } to { opacity: .95; } }
+      @media (prefers-reduced-motion: reduce) {
+        #splash, #splash .mark { transition: none; }
+        #splash img { animation: none; }
+      }
+    </style>
+    <script>
+      try {
+        var bg = localStorage.getItem('lirah-splash-bg');
+        if (bg) document.documentElement.style.setProperty('--splash-bg', bg);
+      } catch (e) {}
+    </script>
   </head>
 
   <body>
@@ -22,6 +54,33 @@
       works in the one large glass. The lit pane is the one holding focus.
       DOCUMENTED IN: DESIGN.md (tokens, primitives, icon policy).
     -->
+    <div id="splash" aria-hidden="true"><div class="mark"><img src="/lirah.svg" alt=""></div></div>
+    <script>
+      // Show the window once the splash background has painted. The window
+      // manager may resize it right after mapping (tiling), so reveal the mark
+      // only once the size has settled: no resize for 120ms, or 400ms at most.
+      // main.jsx waits on window.__splashReady before retiring the splash.
+      window.__splashReady = new Promise(function (resolve) {
+        var splash = document.getElementById('splash');
+        var settle, cap;
+        function reveal() {
+          clearTimeout(settle); clearTimeout(cap);
+          window.removeEventListener('resize', onResize);
+          splash.classList.add('is-ready');
+          resolve(performance.now());
+        }
+        function onResize() { clearTimeout(settle); settle = setTimeout(reveal, 120); }
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            window.addEventListener('resize', onResize);
+            settle = setTimeout(reveal, 120);
+            cap = setTimeout(reveal, 400);
+            var t = window.__TAURI_INTERNALS__;
+            if (t) t.invoke('plugin:window|show', { label: 'main' }).catch(function () {});
+          });
+        });
+      });
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
