@@ -1,4 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
+import { createEmitter } from '../../lib/createStore';
 
 // What each terminal's agent last said about itself through its hooks (see
 // src-tauri/src/agent_hooks.rs). Plain module state like terminalActivity.js:
@@ -42,7 +43,7 @@ let seq = 0;
 // (an idle-prompt notice), not when a session merely started.
 const ATTENTION = new Set(['permission', 'done', 'waiting']);
 
-const listeners = new Set();
+const hooks = createEmitter();
 let version = 0;
 // Whether the user is looking at this session right now. Set by
 // useAgentAttention, which knows the active tab and window focus.
@@ -50,7 +51,7 @@ let isFocused = () => false;
 
 function emit(change) {
   version += 1;
-  for (const fn of listeners) fn(change);
+  hooks.emit(change);
 }
 
 function recordTouches(sessionId, payload) {
@@ -161,8 +162,7 @@ export function startAgentHookListener() {
 }
 
 export function subscribeAgentHooks(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+  return hooks.subscribe(fn);
 }
 
 // Changes on every event, for useSyncExternalStore.

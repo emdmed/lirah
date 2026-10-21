@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { createEmitter } from '../../lib/createStore';
 
 // App preferences in one module-level store, persisted under one key.
 //
@@ -96,11 +97,12 @@ function load() {
 }
 
 let state = load();
-const listeners = new Set();
-
-function emit() {
-  for (const listener of listeners) listener();
-}
+// Listens for other windows' writes only while something is subscribed.
+const { subscribe: subscribeSettings, emit } = createEmitter({
+  onStart: () => window.addEventListener('storage', onStorage),
+  onStop: () => window.removeEventListener('storage', onStorage),
+});
+export { subscribeSettings };
 
 export function getSettings() {
   return state;
@@ -114,15 +116,6 @@ export function setSetting(key, value) {
   state = { ...state, [key]: next };
   persist(state);
   emit();
-}
-
-export function subscribeSettings(listener) {
-  if (listeners.size === 0) window.addEventListener('storage', onStorage);
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-    if (listeners.size === 0) window.removeEventListener('storage', onStorage);
-  };
 }
 
 // Another window wrote the key (or cleared storage): reload and notify.

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { createEmitter } from '../../lib/createStore';
 
 // Repos linked into each tab's prompt, as { path, name, role }. Module state so
 // the tabs summary pane can show and toggle the active tab's links, and the
@@ -6,17 +7,12 @@ import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
 const EMPTY = [];
 const byTab = new Map(); // tabId -> repos
-const listeners = new Set();
+const { subscribe, emit } = createEmitter();
 
 function setRepos(tabId, repos) {
   if (repos.length) byTab.set(tabId, repos);
   else byTab.delete(tabId);
-  for (const listener of listeners) listener();
-}
-
-function subscribe(listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  emit();
 }
 
 export function getLinkedRepos(tabId) {
