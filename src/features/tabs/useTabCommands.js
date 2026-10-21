@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { requestJobsPane } from '../agent-jobs/jobsPane';
-import { requestPlansPane } from '../plans/plansPane';
+import { requestPlansPane } from '../plans/plansPaneEvents';
 import { useWatcher } from '../watcher';
 import { useTabActions } from './TabContext';
 import { requestAttentionJump } from './useAgentAttention';
