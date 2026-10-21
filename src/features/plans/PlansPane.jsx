@@ -293,9 +293,11 @@ function Prose({ text, clamp, className }) {
   const long = clamp && (text.length > clamp * 70 || text.split('\n').length > clamp);
   const parts = text.split(/`([^`\n]+)`/);
   return (
-    <div className={cn('flex flex-col items-start gap-0.5', className)}>
+    <div className={cn('flex min-w-0 flex-col gap-0.5', className)}>
+      {/* wrap-anywhere (not break-words) lets long paths and identifiers shrink
+          the min-content width, so they wrap instead of widening the pane. */}
       <p
-        className={cn('whitespace-pre-wrap break-words', long && !full && CLAMP[clamp])}
+        className={cn('whitespace-pre-wrap wrap-anywhere', long && !full && CLAMP[clamp])}
       >
         {parts.map((part, i) =>
           i % 2 ? <code key={i} className="text-foreground">{part}</code> : part
@@ -304,7 +306,7 @@ function Prose({ text, clamp, className }) {
       {long && (
         <button
           onClick={() => setFull((v) => !v)}
-          className="tui-btn text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="tui-btn self-start text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
           aria-expanded={full}
         >
           {full ? 'less' : 'more'}
@@ -316,7 +318,7 @@ function Prose({ text, clamp, className }) {
 
 function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-1">
       <span className="engraved-label">{label}</span>
       {children}
     </div>
@@ -421,13 +423,13 @@ function PlanDetail({
           )}
           <PanelButton icon={Trash2} onClick={onDelete} title="Delete this plan" aria-label="Delete this plan" className="ml-auto" />
         </div>
-        <h3 className="text-xs font-medium leading-snug text-foreground">{plan.title || 'Untitled plan'}</h3>
+        <h3 className="text-xs font-medium leading-snug text-foreground wrap-anywhere">{plan.title || 'Untitled plan'}</h3>
         {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
         {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
       </div>
 
       {showSource && (
-        <pre className="ins-well mx-3 my-2 max-h-72 overflow-auto whitespace-pre-wrap px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
+        <pre className="ins-well mx-3 my-2 max-h-72 overflow-auto whitespace-pre-wrap wrap-anywhere px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
           {plan.source}
         </pre>
       )}
@@ -523,7 +525,7 @@ function ChunkRow({
         <span
           className={cn(
             'min-w-0 flex-1 leading-4',
-            open ? 'break-words' : 'line-clamp-2',
+            open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
             skipped ? 'text-muted-foreground line-through' : 'text-foreground',
           )}
         >
@@ -536,7 +538,7 @@ function ChunkRow({
       </button>
 
       {open && (
-        <div className="flex flex-col gap-2.5 pr-3 pb-3 pl-[51px] text-[11px] leading-relaxed">
+        <div className="flex min-w-0 flex-col gap-2.5 pr-3 pb-3 pl-[51px] text-[11px] leading-relaxed">
           {note && <p className="text-[10px] leading-relaxed text-muted-foreground">{note}</p>}
           {editing ? (
             <div className="flex flex-col gap-1.5">

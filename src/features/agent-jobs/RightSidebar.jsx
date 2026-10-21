@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
-import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus } from 'lucide-react';
+import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -30,6 +30,12 @@ const MIN_WIDTH = 224;
 const MAX_WIDTH = 560;
 const DEFAULT_WIDTH = 256;
 const WIDTH_KEY = 'agentJobsSidebarWidth';
+const WIDE_KEY = 'agentJobsSidebarWide';
+
+// Widened, the pane takes half the window for reading plans and reports;
+// dragging can also reach that far.
+const halfWindow = () => Math.round(window.innerWidth / 2);
+const maxWidth = () => Math.max(MAX_WIDTH, halfWindow());
 
 // Compact human duration between two epoch-ms timestamps (endedAt || now).
 function formatDuration(startedAt, endedAt) {
@@ -139,16 +145,36 @@ export function RightSidebar({ projectPath, onNewTab }) {
   // fixed panel is what made the cards feel squashed.
   const [width, setWidth] = useState(() => {
     const saved = parseInt(localStorage.getItem(WIDTH_KEY), 10);
-    return Number.isFinite(saved) ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, saved)) : DEFAULT_WIDTH;
+    return Number.isFinite(saved) ? Math.min(maxWidth(), Math.max(MIN_WIDTH, saved)) : DEFAULT_WIDTH;
   });
   const paneRef = useRef(null);
+
+  // Half-window toggle, kept apart from the dragged width so un-widening
+  // restores it. Tracks the window while widened.
+  const [wide, setWide] = useState(() => {
+    try { return localStorage.getItem(WIDE_KEY) === '1'; } catch { return false; }
+  });
+  const [half, setHalf] = useState(halfWindow);
+  useEffect(() => {
+    if (!wide) return;
+    const onResize = () => setHalf(halfWindow());
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [wide]);
+  const toggleWide = () => setWide((w) => {
+    try { localStorage.setItem(WIDE_KEY, w ? '0' : '1'); } catch { /* storage unavailable */ }
+    return !w;
+  });
+  const paneWidth = wide ? Math.max(width, half) : width;
 
   // A drag writes the width straight onto the pane once per frame; state and
   // storage are committed on mouseup so the pane doesn't re-render per move.
   const startResize = (e) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = width;
+    const startWidth = paneWidth;
+    const limit = maxWidth();
     let frame = 0;
     let pending = null;
     const apply = () => {
@@ -157,7 +183,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
     };
     const onMove = (ev) => {
       // Panel is anchored right, so dragging left (smaller clientX) widens it.
-      pending = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (startX - ev.clientX)));
+      pending = Math.min(limit, Math.max(MIN_WIDTH, startWidth + (startX - ev.clientX)));
       if (!frame) frame = requestAnimationFrame(apply);
     };
     const onUp = () => {
@@ -170,6 +196,8 @@ export function RightSidebar({ projectPath, onNewTab }) {
       apply();
       setWidth(pending);
       localStorage.setItem(WIDTH_KEY, String(pending));
+      // A drag sets the width by hand, which ends the half-window mode.
+      if (wide) toggleWide();
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -502,7 +530,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
   return (
     <div
       ref={paneRef}
-      style={{ width }}
+      style={{ width: paneWidth }}
       onKeyDown={(e) => {
         // N opens a new job while focus is in the pane (not in a text field).
         if (tab !== 'jobs' || e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -527,6 +555,15 @@ export function RightSidebar({ projectPath, onNewTab }) {
         trailing={
           <>
             <KeyChord keys={['alt', '4']} size="sm" />
+            <button
+              onClick={toggleWide}
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
+              title={wide ? 'Restore pane width' : 'Widen pane to half the window'}
+              aria-label={wide ? 'Restore pane width' : 'Widen pane'}
+              aria-pressed={wide}
+            >
+              {wide ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            </button>
             <button
               onClick={() => setCollapsedOverride(true)}
               className="text-[11px] leading-none text-muted-foreground hover:text-foreground cursor-pointer"
@@ -593,7 +630,7 @@ export function RightSidebar({ projectPath, onNewTab }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto min-h-0 pb-1.5 flex flex-col">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
         {tab === 'tabs' ? (
           <TabsSummaryPane />
         ) : tab === 'agents' ? (
