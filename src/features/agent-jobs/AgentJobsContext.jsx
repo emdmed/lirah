@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { git, repoTop, worktreeAdd, worktreeRemove } from '../../lib/git';
+import { jobWorktreesDir, lirahDir } from '../../lib/lirahPaths';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../../lib/notify';
 import { useConfirm } from '../confirm/ConfirmContext';
@@ -72,7 +73,7 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
     const stamp = new Date(endedAt).toISOString().replace(/[:.]/g, '-');
     const safeLabel = (job.label || 'job').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 40);
     const repoName = job.repoPath.replace(/\/+$/, '').split('/').pop() || 'repo';
-    const path = `${home}/.lirah/jobs/${repoName}/${stamp}-${safeLabel}.md`;
+    const path = `${lirahDir(home)}/jobs/${repoName}/${stamp}-${safeLabel}.md`;
 
     const rel = (p) => (job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p);
     const filesList = changedFiles.length
@@ -261,7 +262,7 @@ function buildRevisionPrompt(job, notes) {
 // debounce window on that file).
 async function gcOrphanWorktrees(home, liveJobs) {
   if (!home) return 0;
-  const root = `${home}/.lirah/worktrees`;
+  const root = jobWorktreesDir(home);
   let entries = [];
   try {
     entries = await invoke('read_directory', { path: root });
@@ -330,7 +331,7 @@ export function AgentJobsProvider({ children }) {
     (async () => {
       try {
         const home = await invoke('get_home_dir');
-        stateFileRef.current = `${home}/.lirah/jobs-state.json`;
+        stateFileRef.current = `${lirahDir(home)}/jobs-state.json`;
         let saved = [];
         try {
           const raw = await invoke('read_file_content', { path: stateFileRef.current });
@@ -546,7 +547,7 @@ export function AgentJobsProvider({ children }) {
     const id = makeId();
     const home = await invoke('get_home_dir').catch(() => null);
     // Full output is mirrored here so it survives the in-memory cap and reloads.
-    const logPath = home ? `${home}/.lirah/jobs-logs/${id}.log` : null;
+    const logPath = home ? `${lirahDir(home)}/jobs-logs/${id}.log` : null;
 
     // Resolve the git repo root (works even when repoPath is a subdirectory).
     // Null means repoPath is not inside a git repo.
@@ -568,7 +569,7 @@ export function AgentJobsProvider({ children }) {
     } else if (useWorktree) {
       try {
         if (!home) throw new Error('home directory unavailable');
-        worktreePath = `${home}/.lirah/worktrees/${basename(repoRoot)}-${id}`;
+        worktreePath = `${jobWorktreesDir(home)}/${basename(repoRoot)}-${id}`;
         await worktreeAdd(repoRoot, { path: worktreePath, detach: true });
         cwd = worktreePath;
       } catch (e) {
@@ -662,7 +663,7 @@ export function AgentJobsProvider({ children }) {
     const patch = await git(job.cwd, ['diff', '--cached', '--binary']);
     if (!patch.trim()) return;
     const home = await invoke('get_home_dir');
-    const patchFile = `${home}/.lirah/patches/job-${job.id}.patch`;
+    const patchFile = `${lirahDir(home)}/patches/job-${job.id}.patch`;
     await invoke('write_file_content', { path: patchFile, content: patch });
     const applyArgs = ['apply', '--whitespace=nowarn'];
     if (threeWay) applyArgs.push('--3way');
@@ -775,7 +776,7 @@ export function AgentJobsProvider({ children }) {
     if (!home) return { started: false, error: 'Home directory unavailable.' };
 
     const id = makeId();
-    const intPath = `${home}/.lirah/worktrees/reconcile-${basename(repoRoot)}-${id}`;
+    const intPath = `${jobWorktreesDir(home)}/reconcile-${basename(repoRoot)}-${id}`;
     try {
       await worktreeAdd(repoRoot, { path: intPath, detach: true });
     } catch (e) {
@@ -816,7 +817,7 @@ export function AgentJobsProvider({ children }) {
       setJobs((prev) => prev.map((j) => (conflictIds.has(j.id) ? { ...j, status: 'conflict' } : j)));
     }
 
-    const logPath = `${home}/.lirah/jobs-logs/${id}.log`;
+    const logPath = `${lirahDir(home)}/jobs-logs/${id}.log`;
     const prompt = buildReconcilePrompt(targets, conflicts);
     const job = {
       id,

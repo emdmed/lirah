@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, dirtyCount, git, gitLines, worktreeAdd, worktreeRemove } from '../../lib/git';
+import { planWorktreesDir, planWorktreesRoot } from '../../lib/lirahPaths';
 
 // How a plan handles git (plan.git): which repos it touches, the base branch
 // of each, one branch name for all of them, and whether it runs in worktrees
@@ -7,7 +8,6 @@ import { currentBranch, dirtyCount, git, gitLines, worktreeAdd, worktreeRemove }
 // Set up once, right before the first chunk is sent; locked from then on.
 //
 // Not under ~/.lirah/worktrees: agent jobs garbage-collect everything there.
-export const WORKTREES_DIR = '.lirah/plan-worktrees';
 const MARKER = '.lirah-plan.json';
 
 export const basename = (path) => path.replace(/\/+$/, '').split('/').pop() || path;
@@ -50,11 +50,6 @@ export function listBranches(root) {
 async function branchExists(root, branch) {
   // --quiet: a missing branch exits 1 with nothing on stderr, which comes back as ''.
   return !!(await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim();
-}
-
-/** Folder of the plan's worktrees. */
-export function planWorktreesDir(home, plan) {
-  return `${home}/${WORKTREES_DIR}/${plan.slug}-${plan.id}`;
 }
 
 // One folder name per repo, unique within the plan's worktrees folder.
@@ -159,7 +154,7 @@ export async function cleanupGit(plan) {
 
 /** The repo whose plans a folder inside a plan's worktrees belongs to, or null. */
 export async function planWorktreeOwner(home, path) {
-  const prefix = `${home}/${WORKTREES_DIR}/`;
+  const prefix = `${planWorktreesRoot(home)}/`;
   if (!path?.startsWith(prefix)) return null;
   const dir = path.slice(prefix.length).split('/')[0];
   try {

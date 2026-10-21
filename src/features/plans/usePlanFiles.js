@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { hash8, planStarted } from './PlansContext';
+import { hash8 } from '../../lib/ids';
+import { planStarted } from './PlansContext';
 import { markdownTitle } from './planPrompts';
 
 // `overhaul_plan.md`, `smooth-improvements-plan.md`, `plan.md`.

@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
 import { currentBranch, git, repoTop } from '../../lib/git';
+import { hash8, shortId } from '../../lib/ids';
+import { lirahDir } from '../../lib/lirahPaths';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../tabs/agentHookState';
@@ -46,23 +48,9 @@ const PlansStateContext = createContext(null);
 
 const PERSIST_DEBOUNCE = 400;
 
-function shortId(prefix) {
-  return `${prefix}${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/** FNV-1a, as 8 hex chars. Enough to key a repo path or spot an edited file. */
-export function hash8(text) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16).padStart(8, '0');
-}
-
 function storePath(home, repoRoot) {
   const name = repoRoot.replace(/\/+$/, '').split('/').pop() || 'repo';
-  return `${home}/.lirah/plans/${name}-${hash8(repoRoot)}/plans.json`;
+  return `${lirahDir(home)}/plans/${name}-${hash8(repoRoot)}/plans.json`;
 }
 
 /** Chunks that count toward progress (skipped ones don't), and how many are in. */

@@ -11,7 +11,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
-import { hash8 } from './PlansContext';
+import { hash8 } from '../../lib/ids';
 
 /** Paste a plan (or load one from any path) and hand it to the splitter. */
 export function NewPlanDialog({ open, onOpenChange, onCreate }) {
