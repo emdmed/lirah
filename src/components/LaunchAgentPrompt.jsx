@@ -1,12 +1,10 @@
 import { memo, useCallback, useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { KeyChord } from './instrument/Keycap';
 import { PanelButton } from './instrument/PanelButton';
 import { usePageVisible } from '../hooks/usePageVisible';
-import { TAB_CLI_PROCESSES, tabCliLabel } from '../lib/agentClis';
+import { tabCliLabel } from '../lib/agentClis';
 import { subscribeAgentHooks, getAgentHookState } from '../features/tabs/agentHookState';
-
-const POLL_MS = 2000;
+import { useCliRunning } from '../features/tabs/useTabsSummary';
 
 // Tabs whose launch bar was dismissed. Module state so a terminal restart or a
 // remount doesn't bring it back; it resets with the app.
@@ -37,25 +35,12 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
     });
   }, [live, sessionId]);
 
-  // Any CLI process under the shell (covers CLIs without hooks).
+  // Any CLI process under the shell (covers CLIs without hooks), from the
+  // app's shared CLI poll.
+  const running = useCliRunning(sessionId, live);
   useEffect(() => {
-    if (!live) return;
-    let cancelled = false;
-    let timer = null;
-    const poll = async () => {
-      for (const processName of TAB_CLI_PROCESSES) {
-        try {
-          if (await invoke('check_pty_child_process', { sessionId, processName })) {
-            if (!cancelled) setDoneFor(sessionId);
-            return;
-          }
-        } catch { /* session gone */ }
-      }
-      if (!cancelled) timer = setTimeout(poll, POLL_MS);
-    };
-    poll();
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [live, sessionId]);
+    if (live && running) setDoneFor(sessionId);
+  }, [live, running, sessionId]);
 
   // Typing into this tab's shell means the user wants the shell, not the bar.
   // Capture phase: xterm handles the key before it would bubble here.

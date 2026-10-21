@@ -3,6 +3,7 @@ import { TAB_CLI_PROCESSES } from '../../lib/agentClis';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { usePageVisible } from '../../hooks/usePageVisible';
+import { createStore, useStore } from '../../lib/createStore';
 import { getTabSession } from './terminalActivity';
 
 // get_git_stats is served from the backend cache, so the repo poll is cheap;
@@ -15,6 +16,65 @@ function sameJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+// --- Which sessions have a CLI agent running under their shell ---
+//
+// One poll for the whole app, a setTimeout chain that runs while anyone
+// watches. Watchers only watch while their window is visible, so the poll
+// stops with them. Each watcher is a function returning the session ids it
+// wants, read on every poll, since a tab's session changes when its terminal
+// restarts.
+
+const cliStore = createStore({}); // sessionId -> CLI process name, or null
+const cliWatchers = new Set();
+let cliTimer = null;
+let cliInFlight = false;
+
+async function runningCli(sessionId) {
+  for (const processName of TAB_CLI_PROCESSES) {
+    try {
+      if (await invoke('check_pty_child_process', { sessionId, processName })) return processName;
+    } catch { /* session gone */ }
+  }
+  return null;
+}
+
+async function pollCli() {
+  cliTimer = null;
+  cliInFlight = true;
+  const ids = new Set();
+  for (const watch of cliWatchers) for (const id of watch()) if (id) ids.add(id);
+  const next = Object.fromEntries(await Promise.all([...ids].map(async (id) => [id, await runningCli(id)])));
+  cliInFlight = false;
+  cliStore.set((prev) => (sameJson(prev, next) ? prev : next));
+  if (cliWatchers.size) cliTimer = setTimeout(pollCli, CLI_POLL_MS);
+}
+
+// Start watching: polls now (unless a poll is already under way) and every
+// CLI_POLL_MS after. Returns the function that stops watching.
+function watchCli(getSessionIds) {
+  cliWatchers.add(getSessionIds);
+  if (!cliInFlight) {
+    clearTimeout(cliTimer);
+    pollCli();
+  }
+  return () => {
+    cliWatchers.delete(getSessionIds);
+    if (cliWatchers.size === 0) {
+      clearTimeout(cliTimer);
+      cliTimer = null;
+    }
+  };
+}
+
+/** The CLI process running in `sessionId` ('claude', 'opencode'), or null. Polls only while `enabled`. */
+export function useCliRunning(sessionId, enabled = true) {
+  useEffect(() => {
+    if (!enabled || !sessionId) return undefined;
+    return watchCli(() => [sessionId]);
+  }, [enabled, sessionId]);
+  return useStore(cliStore)[sessionId] ?? null;
+}
+
 /**
  * Branch, diff totals and CLI state for every open tab, for the tabs summary
  * pane. Only works while `enabled` and the window is visible.
@@ -24,7 +84,6 @@ export function useTabsSummary(tabs, enabled = true) {
   const pageVisible = usePageVisible();
   const live = enabled && pageVisible;
   const [repo, setRepo] = useState({});
-  const [cli, setCli] = useState({});
   const [now, setNow] = useState(() => Date.now());
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
@@ -52,21 +111,6 @@ export function useTabsSummary(tabs, enabled = true) {
     }));
     const next = Object.fromEntries(entries);
     setRepo((prev) => (sameJson(prev, next) ? prev : next));
-  }, []);
-
-  const fetchCli = useCallback(async () => {
-    const entries = await Promise.all(tabsRef.current.map(async (t) => {
-      const sessionId = getTabSession(t.id);
-      if (!sessionId) return [t.id, null];
-      for (const processName of TAB_CLI_PROCESSES) {
-        try {
-          if (await invoke('check_pty_child_process', { sessionId, processName })) return [t.id, processName];
-        } catch { /* session gone */ }
-      }
-      return [t.id, null];
-    }));
-    const next = Object.fromEntries(entries);
-    setCli((prev) => (sameJson(prev, next) ? prev : next));
   }, []);
 
   // Repo state: on backend events (debounced, any repo — one cached call per
@@ -103,21 +147,17 @@ export function useTabsSummary(tabs, enabled = true) {
     };
   }, [live, pathsKey, fetchRepos]);
 
-  // Which tabs have a CLI agent running in their terminal.
+  // Which tabs have a CLI agent running in their terminal, by tab id. Kept the
+  // same object while nothing changed.
   useEffect(() => {
-    if (!live) return;
-    let cancelled = false;
-    let timer = null;
-    const poll = async () => {
-      await fetchCli();
-      if (!cancelled) timer = setTimeout(poll, CLI_POLL_MS);
-    };
-    poll();
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [live, pathsKey, fetchCli]);
+    if (!live) return undefined;
+    return watchCli(() => tabsRef.current.map((t) => getTabSession(t.id)));
+  }, [live, pathsKey]);
+  const running = useStore(cliStore);
+  const next = Object.fromEntries(tabs.map((t) => [t.id, running[getTabSession(t.id)] ?? null]));
+  const cliRef = useRef(next);
+  if (!sameJson(cliRef.current, next)) cliRef.current = next;
+  const cli = cliRef.current;
 
   // Clock for activity state and durations, read from terminalActivity.
   useEffect(() => {
