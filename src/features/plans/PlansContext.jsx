@@ -4,7 +4,7 @@ import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
-import { currentBranch, git, repoTop } from '../../lib/git';
+import { currentBranch, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import { lirahDir } from '../../lib/lirahPaths';
 import {
@@ -19,7 +19,10 @@ import { getTabSession } from '../tabs/terminalActivity';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
 import {
-  chunkBases, chunkCommitsByRepo, cleanupGit, defaultBranch, planGit, prepareGit, workPath,
+  captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, rollbackChunk as revertChunk,
+} from './planGitOps';
+import {
+  chunkBases, cleanupGit, defaultBranch, planGit, prepareGit,
 } from './planGit';
 import {
   buildChunkPrompt,
@@ -27,8 +30,6 @@ import {
   buildNudgePrompt,
   buildPlanFixPrompt,
   buildSplitPrompt,
-  chunkCommitMessage,
-  chunkTrailer,
   markdownTitle,
   parseSplitResult,
   parseStatusMarker,
@@ -159,16 +160,7 @@ export function PlansProvider({ children }) {
     if (!plan || Object.keys(bases).length === 0 || checkingRef.current.has(chunkId)) return { found: false };
     checkingRef.current.add(chunkId);
     try {
-      const commitsByRepo = {};
-      for (const repo of planGit(plan).repos) {
-        const base = bases[repo.root];
-        if (!base) continue;
-        const out = await git(workPath(repo), [
-          'log', `${base}..HEAD`, '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
-        ]);
-        const shas = out.split('\n').map((l) => l.trim()).filter(Boolean).reverse();
-        if (shas.length > 0) commitsByRepo[repo.root] = shas;
-      }
+      const commitsByRepo = await chunkCommits(plan, chunk);
       const commits = Object.values(commitsByRepo).flat();
       if (commits.length > 0) {
         updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits, commitsByRepo }));
@@ -347,12 +339,7 @@ export function PlansProvider({ children }) {
     const cfg = await ensureGit(repoRoot, planId);
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (cfg.removedAt) throw new Error('The plan\'s worktrees were removed');
-    const baseShas = {};
-    for (const repo of cfg.repos) {
-      const sha = (await git(workPath(repo), ['rev-parse', 'HEAD']).catch(() => '')).trim();
-      if (!sha) throw new Error(`${basename(repo.root)} has no commits yet`);
-      baseShas[repo.root] = sha;
-    }
+    const baseShas = await captureBaseShas(cfg);
     await sendToTab(tabId, buildChunkPrompt(plan, chunk, { autopilot }));
     updateChunk(repoRoot, planId, chunkId, toInProgress({ tabId, baseShas, primaryRoot: repoRoot }));
   }, [findChunk, ensureGit, sendToTab, updateChunk]);
@@ -375,40 +362,14 @@ export function PlansProvider({ children }) {
   const commitChunk = useCallback(async (repoRoot, planId, chunkId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (!chunk) return { found: false };
-    for (const repo of planGit(plan).repos) {
-      const path = workPath(repo);
-      if (!(await git(path, ['status', '--porcelain'])).trim()) continue;
-      await git(path, ['add', '-A']);
-      await git(path, ['commit', '-m', chunkCommitMessage(plan, chunk), '-m', chunkTrailer(plan, chunk)]);
-    }
+    await commitChunkChanges(plan, chunk);
     return checkChunk(repoRoot, planId, chunkId);
   }, [findChunk, checkChunk]);
 
   const rollbackChunk = useCallback(async (repoRoot, planId, chunkId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (!chunk?.commits?.length) throw new Error('This chunk has no commits to roll back');
-    const byRepo = chunkCommitsByRepo(plan, chunk);
-    const revertShas = [];
-    const reverted = [];
-    for (const repo of planGit(plan).repos) {
-      const commits = byRepo[repo.root];
-      if (!commits?.length) continue;
-      const path = workPath(repo);
-      const before = (await git(path, ['rev-parse', 'HEAD'])).trim();
-      try {
-        await git(path, ['revert', '--no-edit', ...[...commits].reverse()]);
-      } catch (e) {
-        await git(path, ['revert', '--abort']).catch(() => {});
-        const msg = errorMessage(e).trim() || 'git revert failed';
-        throw new Error(reverted.length
-          ? `${basename(repo.root)}: ${msg} (already reverted in ${reverted.join(', ')})`
-          : `${basename(repo.root)}: ${msg}`);
-      }
-      revertShas.push(...(await git(path, ['rev-list', `${before}..HEAD`]))
-        .split('\n').map((l) => l.trim()).filter(Boolean));
-      reverted.push(basename(repo.root));
-    }
-    if (revertShas.length === 0) throw new Error('git revert made no commit');
+    const revertShas = await revertChunk(plan, chunk);
     updateChunk(repoRoot, planId, chunkId, toRolledBack(revertShas));
   }, [findChunk, updateChunk]);
 

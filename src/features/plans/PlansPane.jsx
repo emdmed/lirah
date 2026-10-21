@@ -7,7 +7,7 @@ import {
   RefreshCw, RotateCcw, SkipForward, Square, SquareTerminal, Trash2, Undo2,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { dirtyCount, gitLines, repoTop } from '../../lib/git';
+import { dirtyCount, repoTop } from '../../lib/git';
 import { cn } from '../../lib/utils';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -22,12 +22,13 @@ import { usePlans } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
 import { PlanGitSection } from './PlanGitSection';
+import { chunkReviewRanges, planReviewRanges, reviewOf } from './planGitOps';
 import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId,
   pilotPosition, planProgress, planStarted, runRank, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import {
-  chunkBases, chunkCommitsByRepo, inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
+  inWorkDir, isMultiRepo, planGit, planWorktreeOwner, workPath,
 } from './planGit';
 import {
   subscribeAutopilotToggle, subscribePlanFocus, takeAutopilotToggle, takePlanFocus,
@@ -50,18 +51,6 @@ const AUTOPILOT_TIP_KEY = 'lirah:autopilot-tip-seen';
 const REVIEW_ALL = 'review-all';
 // The `busy` id while the git settings are being changed.
 const GIT_SETUP = 'git-setup';
-
-// The files that commit ranges touched, one range per repo, for one review.
-// Only files the commits themselves touched: unrelated commits can land
-// between a chunk and its fix.
-async function reviewOf(ranges) {
-  const files = [];
-  for (const r of ranges) {
-    const rels = await gitLines(r.path, ['show', '--name-only', '--format=', ...r.commits]);
-    for (const rel of new Set(rels)) files.push(`${r.path}/${rel}`);
-  }
-  return { files, filePath: files[0], ranges };
-}
 
 // The repo and refs to diff the review's current file against.
 function reviewRange(review) {
@@ -343,11 +332,7 @@ export function PlansPane({ projectPath }) {
   }, [confirm, withBusy, rollbackChunk, repoRoot, toast]);
 
   const handleReview = useCallback((plan, chunk) => withBusy(chunk.id, async () => {
-    const byRepo = chunkCommitsByRepo(plan, chunk);
-    const ranges = planGit(plan).repos
-      .filter((r) => byRepo[r.root]?.length)
-      .map((r) => ({ path: workPath(r), commits: byRepo[r.root], baseRef: `${byRepo[r.root][0]}^`, headRef: byRepo[r.root].at(-1) }));
-    const review = await reviewOf(ranges);
+    const review = await reviewOf(chunkReviewRanges(plan, chunk));
     if (review.files.length === 0) throw new Error('That commit changed no files');
     setNotes([]);
     setReview({ planId: plan.id, chunkId: chunk.id, ...review });
@@ -356,22 +341,7 @@ export function PlansPane({ projectPath }) {
   // Everything the plan's chunks committed, as one diff: from before the first
   // chunk started to the last chunk's last commit, limited to their files.
   const handleReviewAll = useCallback((plan) => withBusy(REVIEW_ALL, async () => {
-    const chunks = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED && c.commits?.length > 0);
-    // Per repo: from before the first chunk that committed there to the last
-    // chunk's last commit there.
-    const ranges = [];
-    for (const repo of planGit(plan).repos) {
-      const mine = chunks.filter((c) => chunkCommitsByRepo(plan, c)[repo.root]?.length && chunkBases(plan, c)[repo.root]);
-      if (mine.length === 0) continue;
-      const first = mine.reduce((a, c) => ((c.startedAt ?? 0) < (a.startedAt ?? 0) ? c : a));
-      const last = mine.reduce((a, c) => ((c.doneAt ?? 0) > (a.doneAt ?? 0) ? c : a));
-      ranges.push({
-        path: workPath(repo),
-        commits: mine.flatMap((c) => chunkCommitsByRepo(plan, c)[repo.root]),
-        baseRef: chunkBases(plan, first)[repo.root],
-        headRef: chunkCommitsByRepo(plan, last)[repo.root].at(-1),
-      });
-    }
+    const ranges = planReviewRanges(plan);
     if (ranges.length === 0) throw new Error('No committed chunks to review');
     const review = await reviewOf(ranges);
     if (review.files.length === 0) throw new Error('The plan\'s commits changed no files');
