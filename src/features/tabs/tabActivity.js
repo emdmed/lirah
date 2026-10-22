@@ -1,6 +1,7 @@
-import { AudioWaveform, Bot, CircleCheck, MessageSquareMore, Moon, ShieldAlert, SquareTerminal } from 'lucide-react';
+import { Bot, MessageSquareMore, ShieldAlert, SquareTerminal } from 'lucide-react';
 import { formatAgo } from '../../lib/formatDuration';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
+import { LensLamp, StarLamp, StarOutline } from './ActivityGlyphs';
 import { EDIT_TOOLS, getAgentHookState, getAgentTouches } from './agentHookState';
 
 // What each tab is doing, for the tabs summary pane: from its agent's hooks
@@ -15,16 +16,18 @@ const REMOTE_MS = 2 * 60 * 1000;
 // A tab's own activity that outranks another agent working in its repo.
 export const OWN_BUSY = new Set(['working', 'permission', 'running']);
 
-// What each activity looks like: an icon that names the state and its colour.
+// What each activity looks like: an icon (lucide, or one of the star family)
+// that names the state, and its colour. Working is a lit star, done an outlined
+// star, idle a dark lens, so a moon in the row only ever means context fill.
 // `pulse` marks work in progress. How long it has held is in the row tooltip.
 export const ACTIVITY = {
-  working: { icon: AudioWaveform, color: 'text-[var(--ins-lamp)]', pulse: true },
+  working: { icon: StarLamp, color: 'text-[var(--ins-lamp)]', pulse: true },
   permission: { icon: ShieldAlert, color: 'text-[var(--ins-fault)]', pulse: true },
-  done: { icon: CircleCheck, color: 'text-[var(--ins-ok)]' },
+  done: { icon: StarOutline, color: 'text-[var(--ins-ok)]' },
   waiting: { icon: MessageSquareMore, color: 'text-[var(--ins-warn)]' },
   running: { icon: SquareTerminal, color: 'text-[var(--ins-lamp)]', pulse: true },
   remote: { icon: Bot, color: 'text-[var(--ins-lamp)]', pulse: true },
-  idle: { icon: Moon, color: 'text-muted-foreground' },
+  idle: { icon: LensLamp, color: 'text-muted-foreground' },
 };
 
 // What the agent's own hooks said, when it has them (see agentHookState.js).

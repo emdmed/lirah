@@ -130,10 +130,11 @@
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
   --ins-glow:        6px;
-  /* The Lirah mark's plate (LirahMark): face, engraved cut, and the lit lip. */
-  --ins-plate:       color-mix(in srgb, var(--color-foreground) 17%, var(--ins-raised));
-  --ins-plate-cut:   var(--ins-gutter);
-  --ins-plate-lip:   rgb(255 255 255 / .14);
+  /* Eärendil's star, the mark's four-point star: lit lamps, the meter needle,
+     the scanner's lit cell and the status-bar separator. Same eight points,
+     in the same order, as --ins-star-square, so the scanner can step between them. */
+  --ins-star:        polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  --ins-star-square: polygon(50% 0, 100% 0, 100% 50%, 100% 100%, 50% 100%, 0 100%, 0 50%, 0 0);
   --font-legend: "Departure Mono", var(--font-mono);
   --legend-weight: 400;
   --legend-tracking: 0.04em;
@@ -170,9 +171,6 @@
   --ins-legend: color-mix(in srgb, var(--color-foreground) 92%, var(--color-background));
   --ins-well:   color-mix(in srgb, var(--color-background) 95%, var(--color-foreground));
   --ins-glow:   4px;
-  --ins-plate:     color-mix(in srgb, var(--color-foreground) 10%, var(--ins-raised));
-  --ins-plate-cut: color-mix(in srgb, var(--color-foreground) 70%, var(--color-background));
-  --ins-plate-lip: rgb(255 255 255 / .9);
 }
 
 html,
@@ -528,12 +526,10 @@ body {
     color: var(--ins-lamp);
   }
 
+  /* The focused pane's legend lamp lights as a star (see .ins-lamp). */
   .tui-pane:focus-within > .ins-pane-legend .ins-lamp,
   .tui-pane.terminal-live > .ins-pane-legend .ins-lamp {
     --lamp-c: var(--ins-lamp);
-    background: var(--lamp-c);
-    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 70%, transparent);
-    transition-duration: var(--ins-warm);
   }
 
   .tui-pane-info {
@@ -900,9 +896,15 @@ body {
     padding: 0;
   }
 
-  /* Lamp. Off is a dark lens; lit states glow in their own colour. */
+  /* Lamp. Off is a dark round lens; lit, it is a four-point star (Eärendil's
+     light) in its own colour, so on and off differ in shape as well as hue.
+     The star is the clipped ::before; the glow is a drop-shadow on the lamp
+     itself, which the clip can't cut. The star overhangs the 7px box by 2px,
+     so lighting a lamp never shifts its row. */
   .ins-lamp {
     --lamp-c: var(--ins-lamp);
+    --lamp-glow: 70%;
+    position: relative;
     display: inline-block;
     width: 7px;
     height: 7px;
@@ -911,7 +913,15 @@ body {
     background: var(--ins-lamp-off);
     box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
     /* Cooling: the glow lingers a moment after the lamp goes out. */
-    transition: background-color var(--ins-cool) var(--ins-ease-out), box-shadow var(--ins-cool) var(--ins-ease-out);
+    transition: background-color var(--ins-cool) var(--ins-ease-out), box-shadow var(--ins-cool) var(--ins-ease-out), filter var(--ins-cool) var(--ins-ease-out);
+  }
+
+  .ins-lamp::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    clip-path: var(--ins-star);
+    transition: background-color var(--ins-cool) var(--ins-ease-out);
   }
 
   .ins-lamp[data-state="on"]    { --lamp-c: var(--ins-lamp); }
@@ -919,15 +929,21 @@ body {
   .ins-lamp[data-state="warn"]  { --lamp-c: var(--ins-warn); }
   .ins-lamp[data-state="fault"] { --lamp-c: var(--ins-fault); }
 
-  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]) {
-    background: var(--lamp-c);
-    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 70%, transparent);
+  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]),
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp {
+    background: transparent;
+    box-shadow: none;
+    filter: drop-shadow(0 0 calc(var(--ins-glow) / 2) color-mix(in srgb, var(--lamp-c) var(--lamp-glow), transparent));
     transition-duration: var(--ins-warm);
   }
 
-  :root[data-theme="light"] .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]) {
-    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--lamp-c) 50%, transparent);
+  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"])::before,
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp::before {
+    background: var(--lamp-c);
+    transition-duration: var(--ins-warm);
   }
+
+  :root[data-theme="light"] .ins-lamp { --lamp-glow: 50%; }
 
   .ins-lamp[data-blink] {
     animation: ins-blink 1s steps(1) infinite;
@@ -948,13 +964,50 @@ body {
   .ins-scan[data-size="md"] { --scan-cell: 4px; --scan-gap: 2px; }
   .ins-scan[data-size="lg"] { --scan-cell: 6px; --scan-gap: 3px; }
 
+  /* Resting cells are squares; the lit cell steps up into a star. */
   .ins-scan > i {
     display: block;
     width: var(--scan-cell);
     height: var(--scan-cell);
     background: var(--ins-lamp-off);
+    clip-path: var(--ins-star-square);
     animation: ins-scan 0.6s steps(1) infinite;
   }
+
+  /* The Lirah mark (LirahMark.jsx). Lit, it is the title bar's session lamp:
+     it warms and cools like a filament. */
+  .ins-mark {
+    fill: var(--ins-legend);
+    stroke: var(--ins-legend);
+    transition: fill var(--ins-cool) var(--ins-ease-out), stroke var(--ins-cool) var(--ins-ease-out), filter var(--ins-cool) var(--ins-ease-out);
+  }
+
+  .ins-mark[data-lit] {
+    fill: var(--ins-lamp);
+    stroke: var(--ins-lamp);
+    filter: drop-shadow(0 0 calc(var(--ins-glow) / 2) color-mix(in srgb, var(--ins-lamp) 60%, transparent));
+    transition-duration: var(--ins-warm);
+  }
+
+  /* A faint star between groups in a chrome row, in place of a hairline.
+     Taller than wide with a slim waist, like the mark's star, so at this size
+     it can't be read as a "+" button. */
+  .ins-sep-star {
+    display: inline-block;
+    width: 5px;
+    height: 9px;
+    flex-shrink: 0;
+    background: var(--ins-faint);
+    clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+  }
+
+  /* A context fill as a moon phase (ContextMoon.jsx): the unlit disc is a
+     well, the lit part waxes in the legend colour and turns warn, then fault. */
+  .ins-moon { flex-shrink: 0; }
+  .ins-moon-disc { fill: var(--ins-well); stroke: var(--ins-edge-strong); stroke-width: 0.8; }
+  .ins-moon-lit { fill: var(--ins-legend); transition: fill var(--ins-dur-base) var(--ins-ease); }
+  .ins-moon[data-level="warn"] .ins-moon-lit { fill: var(--ins-warn); }
+  .ins-moon[data-level="fault"] .ins-moon-lit { fill: var(--ins-fault); }
 
   /* Recessed well for inputs. */
   .ins-well {
@@ -1052,44 +1105,61 @@ body {
     left: 0;
     bottom: 0;
     height: 3px;
+    width: 100%;
     background: var(--color-foreground);
-    /* Width is safe here: the fill is absolutely positioned, so nothing
-       around it reflows; it glides in step with the needle. */
-    transition: width var(--ins-dur-enter) var(--ins-ease-out), background-color var(--ins-dur-base) var(--ins-ease);
+    /* Meter.jsx sets scaleX(fill): it glides in step with the needle without
+       animating a layout property. */
+    transform-origin: left center;
+    transition: transform var(--ins-dur-enter) var(--ins-ease-out), background-color var(--ins-dur-base) var(--ins-ease);
   }
 
   .ins-meter[data-level="warn"] .ins-meter-fill { background: var(--ins-warn); }
   .ins-meter[data-level="fault"] .ins-meter-fill { background: var(--ins-fault); }
   /* The needle takes the fill's colour once it leaves ok, so the gauge
      reads as one hue instead of lamp-on-warn. */
-  .ins-meter[data-level="warn"] .ins-meter-needle { border-top-color: var(--ins-warn); }
-  .ins-meter[data-level="fault"] .ins-meter-needle { border-top-color: var(--ins-fault); }
+  .ins-meter[data-level="warn"] .ins-meter-needle { color: var(--ins-warn); }
+  .ins-meter[data-level="fault"] .ins-meter-needle { color: var(--ins-fault); }
 
+  /* The needle is a star riding the end of the fill, centred on the track. */
   .ins-meter-needle {
     position: absolute;
-    top: 0;
-    width: 0;
-    height: 0;
-    margin-left: -3px;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-top: 4px solid var(--ins-lamp);
-    transition: left var(--ins-dur-enter) var(--ins-ease-out), border-top-color var(--ins-dur-base) var(--ins-ease);
+    bottom: -3px;
+    width: 9px;
+    height: 9px;
+    margin-left: -4.5px;
+    color: var(--ins-lamp);
+    filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 60%, transparent));
+    transition: left var(--ins-dur-enter) var(--ins-ease-out), color var(--ins-dur-base) var(--ins-ease);
+  }
+
+  .ins-meter-needle::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    clip-path: var(--ins-star);
+  }
+
+  /* Nothing measured yet: the needle star is unlit, like a lamp that's off. */
+  .ins-meter[data-empty] .ins-meter-needle {
+    color: var(--ins-lamp-off);
+    filter: none;
   }
 
   .ins-meter[data-size="lg"] { gap: 8px; }
+  /* The needle overhangs the scale by half its width at 0% and 100%; the
+     margin keeps it clear of the legend and readout beside the gauge. */
   .ins-meter[data-size="lg"] .ins-meter-scale {
     width: clamp(140px, 16vw, 260px);
     height: 14px;
+    margin-inline: 6px;
   }
   .ins-meter[data-size="lg"] .ins-meter-ticks { inset: 0 0 7px 0; }
   .ins-meter[data-size="lg"] :is(.ins-meter-track, .ins-meter-fill, .ins-meter-zone) { height: 5px; }
-  .ins-meter[data-size="lg"] .ins-meter-fill { min-width: 2px; }
   .ins-meter[data-size="lg"] .ins-meter-needle {
-    margin-left: -4px;
-    border-left-width: 4px;
-    border-right-width: 4px;
-    border-top-width: 5px;
+    width: 11px;
+    height: 11px;
+    margin-left: -5.5px;
   }
 
   .ins-meter-readout {
@@ -1209,15 +1279,18 @@ body {
 @keyframes ins-scan {
   0% {
     background: var(--ins-lamp);
-    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--ins-lamp) 60%, transparent);
+    clip-path: var(--ins-star);
+    transform: scale(1.7);
   }
   25% {
     background: color-mix(in srgb, var(--ins-lamp) 45%, var(--ins-lamp-off));
-    box-shadow: none;
+    clip-path: var(--ins-star-square);
+    transform: none;
   }
   50%, 100% {
     background: var(--ins-lamp-off);
-    box-shadow: none;
+    clip-path: var(--ins-star-square);
+    transform: none;
   }
 }
 

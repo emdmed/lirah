@@ -3,6 +3,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Keycap, KeyChord } from '../components/instrument/Keycap';
 import { Lamp, JOB_LAMP } from '../components/instrument/Lamp';
 import { Meter } from '../components/instrument/Meter';
+import { ContextMoon } from '../components/instrument/ContextMoon';
+import { Scanner } from '../components/instrument/Scanner';
 import { ToggleSwitch } from '../components/instrument/ToggleSwitch';
 import { PanelButton } from '../components/instrument/PanelButton';
 import { Button } from '../components/ui/button';
@@ -68,6 +70,10 @@ export function InstrumentKit() {
             <Meter value={ctx} max={200000} label="Context" />
             <Meter value={170000} max={200000} label="Context warn" />
             <Meter value={196000} max={200000} label="Context fault" />
+            <div className="flex items-center gap-3">
+              {[0.05, ctx / 200000, 0.5, 0.75, 0.86, 0.97].map((r, i) => <ContextMoon key={i} ratio={r} />)}
+              <Scanner size="md" label="Working" />
+            </div>
             <input type="range" min={0} max={200000} value={ctx} onChange={(e) => setCtx(+e.target.value)} />
           </div>
         </section>
@@ -119,6 +125,7 @@ export function InstrumentKit() {
           <PaneLegend index={7} title="Mark" />
           <div className="flex flex-wrap items-end gap-4 py-2">
             {[96, 48, 32, 24, 16].map((size) => <LirahMark key={size} size={size} title={`Lirah ${size}px`} />)}
+            <LirahMark size={18} lit />
             <LirahLockup size={40} wordmarkSize={36} />
           </div>
         </section>

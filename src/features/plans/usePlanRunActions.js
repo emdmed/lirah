@@ -26,7 +26,11 @@ export function usePlanRunActions({
     if (!agent) {
       return confirm({
         title: 'No agent detected in this tab',
-        description: 'The chunk prompt is typed into this tab\'s terminal. Launch Claude there first (Ctrl+K), or send anyway if it is already running.',
+        description: chunk
+          ? 'The chunk prompt is typed into this tab\'s terminal. Launch Claude there first (Ctrl+K), or send anyway if it is already running.'
+          // Auto-pilot hears when a chunk ends only through the hook plugin the launcher loads.
+          : 'Auto-pilot follows the agent through Lirah\'s hooks, which load when Claude is launched with Ctrl+K. '
+            + 'An agent started another way gets the first chunk, then the run pauses.',
         confirmLabel: 'Send anyway',
         destructive: false,
       });

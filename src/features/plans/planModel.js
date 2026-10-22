@@ -36,6 +36,7 @@ export const HALT_REASON = Object.freeze({
   SESSION_ENDED: 'session-ended',
   PERMISSION: 'permission',
   TAB_CLOSED: 'tab-closed',
+  NO_HOOKS: 'no-hooks',
 });
 
 /** plan.split */

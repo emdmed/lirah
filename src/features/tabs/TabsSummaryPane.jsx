@@ -5,6 +5,7 @@ import { useToast } from '../toast';
 import { tabDisplayName, useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getTabSession } from './terminalActivity';
+import { getTabContextFill } from './tabContextFill';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
 import { OWN_BUSY, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
@@ -106,6 +107,7 @@ export function TabsSummaryPane() {
             index={index}
             name={tabName(tab)}
             info={repo[tab.id]}
+            contextFill={getTabContextFill(tab.id)}
             activity={workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel } : own}
             workLabel={workLabel}
             active={active}

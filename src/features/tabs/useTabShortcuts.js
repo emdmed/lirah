@@ -18,7 +18,6 @@ export function useTabShortcuts({
   onAutoCommit,
   onAutoMerge,
   onClearContext,
-  onTogglePromptPreview,
 }) {
   const viewModeRef = useRef(viewMode);
   const sidebarOpenRef = useRef(sidebarOpen);
@@ -88,21 +87,4 @@ export function useTabShortcuts({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
     searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, onAutoMerge, onClearContext, setBudgetDialogOpen, setDashboardOpen]);
-
-  // Ctrl+Shift+E toggles the payload preview from anywhere, including while
-  // the terminal has focus. Shifted so it never shadows readline's Ctrl+E.
-  // Its own listener: unlike the ones above it also works from the secondary
-  // terminal.
-  useEffect(() => {
-    if (isActive === false || !onTogglePromptPreview) return;
-    const handleKeyDown = (e) => {
-      if (matches('prompt-preview', e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        onTogglePromptPreview();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isActive, onTogglePromptPreview]);
 }

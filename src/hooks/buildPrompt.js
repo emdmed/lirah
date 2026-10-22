@@ -116,7 +116,6 @@ export function buildPrompt({
       id: 'compacted',
       label: 'COMPACTED PROJECT',
       body: `Grep inside ${relativePath} for relevant symbols/code before proceeding.`,
-      clearable: true,
     });
   }
 
@@ -125,9 +124,6 @@ export function buildPrompt({
       id: 'prompt',
       label: 'YOUR PROMPT',
       body: textareaContent,
-      // Not clearable from here: the textarea below is already the control for
-      // it, and a one-click wipe of typed prose is the wrong kind of undoable.
-      clearable: false,
     });
   }
 
@@ -140,7 +136,6 @@ export function buildPrompt({
       id: 'repos',
       label: 'LINKED REPOS',
       body: `This task also spans these repos (absolute paths); read and change them as needed:\n${lines.join('\n')}`,
-      clearable: true,
       count: linkedRepos.length,
     });
   }
@@ -154,7 +149,6 @@ export function buildPrompt({
         id: 'files',
         label: 'FILES',
         body: filesString,
-        clearable: true,
         count: files.size,
       });
     }
@@ -169,7 +163,6 @@ export function buildPrompt({
         id: 'elements',
         label: 'ELEMENTS',
         body: elementsOutput.join('\n\n'),
-        clearable: true,
         count,
       });
     }
@@ -182,7 +175,6 @@ export function buildPrompt({
         id: 'template',
         label: `TEMPLATE · ${template.title}`,
         body: template.content,
-        clearable: true,
       });
     }
   }
@@ -194,30 +186,10 @@ export function buildPrompt({
         id: 'patterns',
         label: 'PATTERNS',
         body: instructions,
-        clearable: true,
         count: selectedPatterns.size,
       });
     }
   }
 
-  return { sections, text: sections.map(s => s.body).join('\n\n') };
-}
-
-/**
- * Adds the typed prompt to a result built with an empty `textareaContent`.
- * Lets the preview memoize the expensive sections (file analysis, elements)
- * on their own inputs and re-run only this cheap step per keystroke. Matches
- * buildPrompt's ordering: the prompt follows the compacted-project section.
- */
-export function withPromptText(base, textareaContent) {
-  if (!textareaContent?.trim()) return base;
-  const sections = [...base.sections];
-  const at = sections[0]?.id === 'compacted' ? 1 : 0;
-  sections.splice(at, 0, {
-    id: 'prompt',
-    label: 'YOUR PROMPT',
-    body: textareaContent,
-    clearable: false,
-  });
   return { sections, text: sections.map(s => s.body).join('\n\n') };
 }
