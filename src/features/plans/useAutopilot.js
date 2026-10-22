@@ -11,6 +11,7 @@ import {
 } from './planModel';
 import { buildNudgePrompt, parseStatusMarker } from './planPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
+import { useHookWatchdog } from './useHookWatchdog';
 
 // Auto-pilot (plan.autopilot) chains the chunks in one tab: each Stop with the
 // chunk's commit sends the next one. It stops to notify you when the plan is
@@ -90,14 +91,19 @@ export function useAutopilot({
     if (wasRunning && reason !== HALT_REASON.PERMISSION) announce(repoRoot, plan, status, message);
   }, [findPlan, setAutopilot, announce]);
 
-  // Run `send`; if it throws, the run fails with send-failed.
+  // After a send, pause the run if the agent's hooks stay silent.
+  const expectHooks = useHookWatchdog({ findPlan, halt });
+
+  // Run `send`; if it throws, the run fails with send-failed, else it waits on the agent's hooks.
   const sendOrHalt = useCallback(async (repoRoot, planId, send) => {
     try {
       await send();
     } catch (e) {
       halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.SEND_FAILED, errorMessage(e));
+      return;
     }
-  }, [halt]);
+    expectHooks(repoRoot, planId);
+  }, [halt, expectHooks]);
 
   // Remind the agent to commit `chunk`, once per chunk.
   const nudge = useCallback((repoRoot, plan, chunk) => sendOrHalt(repoRoot, plan.id, async () => {

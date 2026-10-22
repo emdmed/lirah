@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
 
 export const TitleBar = ({ hasTerminalSession = false, currentPath }) => {
@@ -22,8 +21,8 @@ export const TitleBar = ({ hasTerminalSession = false, currentPath }) => {
       data-tauri-drag-region
     >
       <div className="flex items-center gap-2 min-w-0 pointer-events-none" data-tauri-drag-region>
-        <LirahMark size={18} title="Lirah" className="shrink-0" />
-        <Lamp state={hasTerminalSession ? 'on' : 'off'} label={hasTerminalSession ? 'Session live' : 'No session'} />
+        {/* The mark is the session lamp: lit while a terminal session is live. */}
+        <LirahMark size={18} lit={hasTerminalSession} className="shrink-0" />
         {currentPath && <span className="text-muted-foreground truncate">{currentPath}</span>}
       </div>
       <div className="flex items-center gap-1.5">

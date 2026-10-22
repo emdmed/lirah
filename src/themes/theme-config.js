@@ -1206,6 +1206,80 @@ export const themes = {
       treeGuide: '234 16% 35% / 0.1',    // Text with opacity for tree guide lines
     },
   },
+  rivendell: {
+    name: 'Rivendell',
+    type: 'dark',
+    // Terminal colors - Rivendell: twilight slate, parchment, gold leaf
+    terminal: {
+      foreground: '#e8e2d0',      // Parchment
+      background: '#141b1e',      // Deep slate
+      cursor: '#dcb662',          // Gold leaf
+      cursorAccent: '#141b1e',    // Deep slate
+      selectionBackground: '#2f3d3a', // Moss shadow
+      selectionForeground: '#e8e2d0', // Parchment
+
+      // Normal colors
+      black: '#232d31',           // Slate
+      red: '#e3836f',             // Rose clay
+      green: '#a6c78e',           // Sage
+      yellow: '#dcb662',          // Gold leaf
+      blue: '#7fa7b8',            // River
+      magenta: '#b99ac2',         // Heather
+      cyan: '#93c3b8',            // Celadon
+      white: '#c9c3b2',           // Vellum
+
+      // Bright colors
+      brightBlack: '#56625f',     // Lichen
+      brightRed: '#f0998a',       // Bright rose
+      brightGreen: '#bcd9a4',     // Bright sage
+      brightYellow: '#ecc97c',    // Bright gold
+      brightBlue: '#9cc0cf',      // Bright river
+      brightMagenta: '#cdb2d4',   // Bright heather
+      brightCyan: '#aed6cd',      // Bright celadon
+      brightWhite: '#f1ebda',     // Bright parchment
+    },
+    // UI colors
+    ui: {
+      background: 'hsl(200 20% 12%)',
+      foreground: 'hsl(45 34% 86%)',
+      card: 'hsl(197 19% 14%)',
+      cardForeground: 'hsl(45 34% 86%)',
+      popover: 'hsl(197 19% 14%)',
+      popoverForeground: 'hsl(45 34% 86%)',
+      primary: 'hsl(166 29% 67%)',
+      primaryForeground: 'hsl(200 20% 12%)',
+      secondary: 'hsl(199 20% 16%)',
+      secondaryForeground: 'hsl(45 34% 86%)',
+      muted: 'hsl(199 20% 16%)',
+      mutedForeground: 'hsl(127 5% 62%)',
+      accent: 'hsl(41 64% 62%)',
+      accentForeground: 'hsl(200 20% 12%)',
+      destructive: 'hsl(10 67% 66%)',
+      destructiveForeground: 'hsl(200 20% 12%)',
+      border: 'hsl(197 16% 22%)',
+      input: 'hsl(199 20% 16%)',
+      inputBackground: 'hsl(200 21% 8%)',
+      ring: 'hsl(41 64% 62%)',
+      sidebar: 'hsl(200 20% 12%)',
+      sidebarForeground: 'hsl(45 34% 86%)',
+      sidebarPrimary: 'hsl(166 29% 67%)',
+      sidebarPrimaryForeground: 'hsl(200 20% 12%)',
+      sidebarAccent: 'hsl(199 20% 16%)',
+      sidebarAccentForeground: 'hsl(45 34% 86%)',
+      sidebarBorder: 'hsl(197 16% 22%)',
+      sidebarRing: 'hsl(41 64% 62%)',
+      // Instrument lamps: gold leaf lit, sage ok, amber warn, rose fault.
+      lamp: '#dcb662',
+      ok: '#b8d6a0',
+      warn: '#e4b56e',
+      fault: '#dc6f5c',
+      // Semantic colors
+      folder: '41 64% 62%',              // Gold leaf for folder icons
+      gitAdded: '95 34% 67%',            // Sage for +lines
+      gitDeleted: '10 67% 66%',          // Rose clay for -lines
+      treeGuide: '45 34% 86% / 0.1',    // Parchment with opacity for tree guide lines
+    },
+  },
 };
 
 export const defaultTheme = 'tokyo-night';

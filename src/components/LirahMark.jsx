@@ -1,61 +1,40 @@
-// The Lirah mark: the Grenze Gotisch "L" engraved into a riveted plate.
-// The outline is the font's own glyph (units per em 1000, y up), so the mark
-// never depends on the webfont having loaded.
-const GLYPH =
-  'M203 559Q196 494 195.5 434.0Q195 374 196.5 320.0Q198 266 198 217Q198 186 191.5 166.5Q185 147 171.0 133.5Q157 120 135 107L137 101L442 84Q453 73 453 57L415 -14Q351 -6 304.0 0.0Q257 6 225.0 10.0Q193 14 173.0 15.5Q153 17 143 17Q129 17 107.0 14.0Q85 11 59.5 6.0Q34 1 9 -4L-2 3L6 64Q37 73 53.0 84.5Q69 96 75.0 115.5Q81 135 81 165Q81 185 79.0 214.0Q77 243 75.0 277.0Q73 311 70.5 344.5Q68 378 67.5 406.5Q67 435 68 454Q78 476 93.5 497.5Q109 519 130.0 540.5Q151 562 174 580ZM249 83V534Q249 544 256.0 567.5Q263 591 272 615L302 611V140Q302 134 296.0 118.5Q290 103 279 83ZM441 415H376L363 525Q353 528 339.0 531.5Q325 535 312.0 537.5Q299 540 288 540Q281 540 275.0 539.5Q269 539 264 538L272 615Q277 617 280.5 617.0Q284 617 288 617Q303 617 331.5 614.5Q360 612 392.5 609.0Q425 606 453 602Z';
+import { cn } from '@/lib/utils';
 
-// Glyph placement in the 64-unit box. At 24px and under the screws and bevel
-// drop, the plate takes the legend colour so it reads in chrome rows, and the
-// L grows to fill it. The glyph is centred on its ink bounds (x -2..453,
-// y -14..617), not its baseline, so it sits optically centred on the plate.
-const FULL = { scale: 0.058 };
-const SMALL = { scale: 0.078 };
-const GLYPH_CENTER_X = 225.5;
-const GLYPH_CENTER_Y = 301.5;
-const SCREWS = [[9, 9], [55, 9], [9, 55], [55, 55]];
+// The Lirah mark: Ithil's crescent as the bowl of a lyre, its horns drawn up
+// into tall elvish points, a dipped yoke across them and Eärendil's star above.
+// One flat colour, drawn on a 100-unit grid (ink x 12..88, y 5..94).
+const BODY =
+  'M22 8C24 34 12 48 14 64C16 84 32 94 50 94C68 94 84 84 86 64C88 48 76 34 78 8C77 34 70 48 70 60C70 74 62 80 50 80C38 80 30 74 30 60C30 48 23 34 22 8Z';
+const STAR = 'M50 5Q51.28 15.08 58 17Q51.28 18.92 50 29Q48.72 18.92 42 17Q48.72 15.08 50 5Z';
+const YOKE = 'M23.5 32Q50 41 76.5 32';
+const STRINGS = 'M40 35.6L40 78M50 37L50 80M60 35.6L60 78';
 
-function glyphTransform({ scale }, dy = 0) {
-  return `translate(${32 - GLYPH_CENTER_X * scale} ${32 + GLYPH_CENTER_Y * scale + dy}) scale(${scale} ${-scale})`;
-}
+// At 24px and under the strings would fall below a device pixel, so they
+// thicken to stay visible in chrome rows. `lit` makes the mark a lamp: it
+// takes the lamp colour and glows (the title bar's live-session indicator).
+// Passing `lit` at all makes the mark a session lamp, titled for its state
+// unless `title` says otherwise.
+const FULL = { yoke: 3, strings: 2.2 };
+const SMALL = { yoke: 4.2, strings: 3.6 };
 
-function Screw({ x, y, r = 2.7 }) {
-  return (
-    <>
-      <circle cx={x} cy={y} r={r} style={{ fill: 'color-mix(in srgb, var(--color-foreground) 30%, var(--ins-raised))', stroke: 'var(--ins-edge-strong)', strokeWidth: 0.8 }} />
-      <path d={`M${x - r * 0.6} ${y + r * 0.6}L${x + r * 0.6} ${y - r * 0.6}`} style={{ stroke: 'var(--color-muted-foreground)', strokeWidth: 0.9 }} />
-    </>
-  );
-}
-
-export function LirahMark({ size = 48, title, className }) {
-  const small = size <= 24;
-  const fit = small ? SMALL : FULL;
+export function LirahMark({ size = 48, title, lit, className }) {
+  const weight = size <= 24 ? SMALL : FULL;
+  if (title === undefined && lit !== undefined) title = lit ? 'Lirah · session live' : 'Lirah · no session';
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
-      className={className}
+      viewBox="2 1.5 96 96"
+      className={cn('ins-mark', className)}
+      data-lit={lit || undefined}
       role={title ? 'img' : undefined}
       aria-label={title}
       aria-hidden={title ? undefined : true}
     >
-      {small ? (
-        <>
-          <rect x="3" y="3" width="58" height="58" style={{ fill: 'var(--ins-legend)' }} />
-          <path d={GLYPH} transform={glyphTransform(fit)} style={{ fill: 'var(--ins-gutter)' }} />
-        </>
-      ) : (
-        <>
-          <rect x="3" y="3" width="58" height="58" style={{ fill: 'var(--ins-plate)' }} />
-          <rect x="3.6" y="3.6" width="56.8" height="56.8" style={{ fill: 'none', stroke: 'var(--ins-edge-strong)', strokeWidth: 1.2 }} />
-          <path d="M4.5 4.6H59.5" style={{ stroke: 'var(--ins-plate-lip)', strokeWidth: 1 }} />
-          {SCREWS.map(([x, y]) => <Screw key={`${x}-${y}`} x={x} y={y} />)}
-          {/* The cut, with light catching its lower lip. */}
-          <path d={GLYPH} transform={glyphTransform(fit, 1)} style={{ fill: 'var(--ins-plate-lip)' }} />
-          <path d={GLYPH} transform={glyphTransform(fit)} style={{ fill: 'var(--ins-plate-cut)' }} />
-        </>
-      )}
+      <path d={BODY} style={{ stroke: 'none' }} />
+      <path d={STAR} style={{ stroke: 'none' }} />
+      <path d={YOKE} style={{ fill: 'none', strokeWidth: weight.yoke, strokeLinecap: 'round' }} />
+      <path d={STRINGS} style={{ fill: 'none', strokeWidth: weight.strings, strokeLinecap: 'round' }} />
     </svg>
   );
 }

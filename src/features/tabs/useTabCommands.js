@@ -27,7 +27,6 @@ export function useTabCommands({
   onLaunchCli,
   onOpenLazygit,
   onClearContext,
-  onTogglePromptPreview,
   toggleSandbox,
   toggleNetwork,
   onToggleGitFilter,
@@ -74,7 +73,6 @@ export function useTabCommands({
 
       // Prompt
       { id: 'compact', hint: 'compact the project for the prompt', run: () => onCompactProject() },
-      { id: 'preview', hint: 'show or hide what will be sent', run: () => onTogglePromptPreview() },
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));
       } },
@@ -123,7 +121,7 @@ export function useTabCommands({
       commands.push({ id: 'settings', aliases: ['prefs'], hint: 'all settings', run: () => setSettingsOpen(true) });
     }
     return commands;
-  }, [tabId, projectPath, addTab, requestCloseTab, onLaunchCli, onClearContext, onOpenLazygit, onTogglePromptPreview,
+  }, [tabId, projectPath, addTab, requestCloseTab, onLaunchCli, onClearContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onCompactProject, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,

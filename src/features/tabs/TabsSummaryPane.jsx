@@ -5,6 +5,7 @@ import { useToast } from '../toast';
 import { tabDisplayName, useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getTabSession } from './terminalActivity';
+import { getTabContextFill } from './tabContextFill';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
 import { OWN_BUSY, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
@@ -12,6 +13,9 @@ import { getTabPrompt } from './tabPrompts';
 import { linkRepo, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
 import { useDragReorder } from './useDragReorder';
 import { TabRow } from './TabRow';
+import { useTabPlans } from '../plans/useTabPlans';
+import { PlanRow } from '../plans/PlanRow';
+import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
 
 export function TabsSummaryPane() {
   const { tabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
@@ -26,6 +30,7 @@ export function TabsSummaryPane() {
   const [openTrail, setOpenTrail] = useState(null); // tab id whose last turn is expanded
   const [renamingId, setRenamingId] = useState(null);
   const drag = useDragReorder(reorderTab);
+  const plans = useTabPlans(tabs, activeTabId);
 
   const commitRename = useCallback((tab, value) => {
     const name = value.trim();
@@ -65,8 +70,16 @@ export function TabsSummaryPane() {
     toast.success(`Attached ${plural(files.length, 'file')} to the prompt`);
   }, [activeTabId, toast]);
 
+  // A plan opens in the plans view, which shows the active tab's repo: its
+  // tab comes forward first.
+  const openPlan = useCallback((tabId, planId) => {
+    if (tabId !== activeTabId) switchTab(tabId);
+    requestPlanFocus(planId);
+  }, [activeTabId, switchTab]);
+
   const actions = useMemo(() => ({
     switchTab,
+    openPlan,
     closeTab: requestCloseTab,
     startRename: setRenamingId,
     commitRename,
@@ -75,7 +88,7 @@ export function TabsSummaryPane() {
     copyBranch,
     attachEdits,
     toggleTrail: (id) => setOpenTrail((open) => (open === id ? null : id)),
-  }), [switchTab, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, attachEdits]);
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, attachEdits]);
 
   return (
     <div className="flex flex-col">
@@ -94,6 +107,7 @@ export function TabsSummaryPane() {
             index={index}
             name={tabName(tab)}
             info={repo[tab.id]}
+            contextFill={getTabContextFill(tab.id)}
             activity={workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel } : own}
             workLabel={workLabel}
             active={active}
@@ -103,12 +117,33 @@ export function TabsSummaryPane() {
             turn={turn}
             summary={summary}
             trailOpen={!!summary && openTrail === tab.id}
+            plans={plans.byTab[tab.id]}
             renaming={renamingId === tab.id}
             drag={drag}
             actions={actions}
           />
         );
       })}
+
+      {/* The active repo's plans with work left that no tab is working on. */}
+      {plans.loose.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 px-3 pt-3.5 pb-1.5 edge-b-engraved">
+            <span className="engraved-label">plans</span>
+            <span className="font-mono text-[10px] tabular-nums text-faint">{plans.loose.length}</span>
+            <button
+              onClick={() => requestPlansPane('open')}
+              className="ml-auto text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Show every plan of this repo"
+            >
+              all plans
+            </button>
+          </div>
+          {plans.loose.map((plan) => (
+            <PlanRow key={plan.id} plan={plan} onOpen={() => requestPlanFocus(plan.id)} />
+          ))}
+        </>
+      )}
     </div>
   );
 }

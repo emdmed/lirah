@@ -8,7 +8,11 @@ export function Layout({ sidebar, children, statusBar, textarea, titleBar, secon
           handle is the 12px gap to its right. */}
       <div className="flex flex-1 min-h-0 pl-3 pt-1.5 pb-1.5">
         {sidebar}
-        <div className="flex-1 flex flex-row gap-3 min-h-0 relative">
+        {/* min-w-0: without it this row's floor is xterm's canvas width, so a
+            narrowing window can't shrink it — it overflows, FitAddon measures
+            the overflow and drops a column or two per frame, and the terminal
+            crawls to its new width instead of snapping. */}
+        <div className="flex-1 flex flex-row gap-3 min-h-0 min-w-0 relative">
           <div className="flex-1 flex flex-col min-h-0 min-w-0 relative overflow-hidden">
             {children}
             {textarea && (

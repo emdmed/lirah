@@ -34,8 +34,7 @@ export const SETTINGS_DEFAULTS = {
   viewMode: 'flat',
   // Terminal scrollback in lines (see lib/terminalPrefs.js).
   scrollback: 10000,
-  // Per tab, seeded: the prompt's payload preview and its context list.
-  promptPreviewOpen: false,
+  // Per tab, seeded: whether the prompt's context list is open.
   contextChipsOpen: true,
   // The right sidebar: its dragged width (0 until dragged) and half-window mode.
   jobsSidebarWidth: 0,
@@ -70,7 +69,6 @@ const LATER_KEYS = {
     const n = parseInt(raw, 10);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }],
-  promptPreviewOpen: ['lirah:promptPreviewOpen', (raw) => raw === 'true'],
   contextChipsOpen: ['lirah:contextChipsOpen', (raw) => raw !== 'false'],
   jobsSidebarWidth: ['agentJobsSidebarWidth', (raw) => {
     const n = parseInt(raw, 10);

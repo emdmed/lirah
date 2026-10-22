@@ -302,7 +302,7 @@ export const StatusBar = memo(({
       {/* LEFT: maker's legend, workspace + update. Project and branch live in
           the sidebar's TABS pane. The title bar carries the legend when shown. */}
       <div className="flex items-center gap-3 overflow-hidden min-w-0">
-        {!showTitleBar && <LirahMark size={18} title="Lirah" className="shrink-0 ml-1" />}
+        {!showTitleBar && <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />}
         <div className="flex items-center gap-1.5 min-w-0">
           {workspace && (
             <Tooltip>
@@ -383,7 +383,7 @@ export const StatusBar = memo(({
         </div>
 
         {/* Settings — visually separated as the final anchor */}
-        <span className="w-px h-4 bg-[var(--tui-line)] mx-1" aria-hidden="true" />
+        <span className="ins-sep-star mx-1" aria-hidden="true" />
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>

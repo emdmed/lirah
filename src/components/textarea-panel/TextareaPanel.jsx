@@ -1,18 +1,15 @@
-import { useRef, useMemo, useState, useCallback, useEffect, useDeferredValue, Suspense } from "react";
+import { useRef, useMemo, useState, useCallback, useEffect, Suspense } from "react";
 import { useTokenBudget } from "../../features/token-budget/TokenBudgetContext";
 import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
 import { lazyNamed } from "../../lib/lazyNamed";
 import { usePromptText } from "../../hooks/usePromptStore";
-import { withPromptText } from "../../hooks/buildPrompt";
 
 import { ProjectToolbar } from "./ProjectToolbar";
 import { PromptToolbar } from "./PromptToolbar";
 import { PromptModeLine } from "./PromptModeLine";
 import { ContextChips } from "./ContextChips";
-import { basename } from "../../utils/pathUtils";
 import { CompactedIndicator } from "./CompactedIndicator";
 import { TextareaArea } from "./TextareaArea";
-import { PromptPreview } from "./PromptPreview";
 import { PaneInfo } from "../PaneInfo";
 import { PaneLegend } from "../instrument/PaneLegend";
 import { useSeededSetting } from "../../features/settings/settingsStore";
@@ -69,9 +66,8 @@ export function TextareaPanel({
   selectedPatterns = NO_PATTERNS,
   onTogglePattern,
   onCreatePatterns,
-  promptPreview: promptPreviewBase,
-  promptPreviewOpen = false,
-  onClearPromptSection,
+  promptBase,
+  onClearRepos,
   onRemoveFile,
   onRemoveElement,
   keepFilesAfterSend = false,
@@ -80,13 +76,6 @@ export function TextareaPanel({
   const containerRef = useRef(null);
   const [isWide, setIsWide] = useState(false);
   const value = usePromptText(promptStore);
-  // Splicing the text in joins every section's body, so it runs only while the
-  // preview is open, and on a deferred value so it never holds up a keystroke.
-  const previewValue = useDeferredValue(promptPreviewOpen ? value : '');
-  const promptPreview = useMemo(
-    () => (promptPreviewBase && promptPreviewOpen ? withPromptText(promptPreviewBase, previewValue) : promptPreviewBase),
-    [promptPreviewBase, promptPreviewOpen, previewValue]
-  );
   const hasText = !!value?.trim();
 
   useEffect(() => {
@@ -193,8 +182,6 @@ export function TextareaPanel({
     setChipsOpen((prev) => !prev);
   }, [setChipsOpen]);
 
-  const clearElements = useCallback(() => onClearPromptSection?.('elements'), [onClearPromptSection]);
-  const clearRepos = useCallback(() => onClearPromptSection?.('repos'), [onClearPromptSection]);
   const openCompacted = useCallback(() => setCompactDialogOpen(true), []);
 
   // Everything below that does not read the text is memoized, so a keystroke
@@ -207,9 +194,9 @@ export function TextareaPanel({
       elementCount={elementCount}
       selectedElements={selectedElements}
       currentPath={currentPath}
-      onClearElements={onClearPromptSection ? clearElements : onClearElements}
+      onClearElements={onClearElements}
       linkedRepos={linkedRepos}
-      onClearRepos={onClearPromptSection ? clearRepos : undefined}
+      onClearRepos={onClearRepos}
       compactedProject={compactedProject}
       onOpenCompacted={openCompacted}
       onClearCompacted={onClearCompactedProject}
@@ -218,8 +205,8 @@ export function TextareaPanel({
     />
   ), [
     fileArray.length, chipsOpen, toggleChips,
-    elementCount, selectedElements, currentPath, onClearPromptSection, clearElements, onClearElements,
-    linkedRepos, clearRepos, compactedProject, openCompacted, onClearCompactedProject,
+    elementCount, selectedElements, currentPath, onClearElements,
+    linkedRepos, onClearRepos, compactedProject, openCompacted, onClearCompactedProject,
     keepFilesAfterSend, onToggleKeepFiles,
   ]);
 
@@ -236,28 +223,6 @@ export function TextareaPanel({
       />
     ) : null
   ), [chipsOpen, fileArray.length, elementCount, selectedFiles, fileStates, selectedElements, currentPath, onSetFileState, onRemoveFile, onRemoveElement]);
-
-  // Per-item remove buttons for the preview's FILES and ELEMENTS sections.
-  const previewItems = useMemo(() => {
-    if (!promptPreviewOpen) return undefined;
-    const items = {};
-    if (onRemoveFile && fileArray.length > 0) {
-      items.files = fileArray.map((abs) => ({
-        key: abs, label: basename(abs), title: abs, onRemove: () => onRemoveFile(abs),
-      }));
-    }
-    if (onRemoveElement && elementCount > 0) {
-      const els = [];
-      selectedElements.forEach((list, filePath) => list.forEach((el) => els.push({
-        key: `${filePath}:${el.key}`,
-        label: el.displayName,
-        title: `${filePath}:${el.line}`,
-        onRemove: () => onRemoveElement(filePath, el.key),
-      })));
-      items.elements = els;
-    }
-    return items;
-  }, [promptPreviewOpen, onRemoveFile, onRemoveElement, fileArray, elementCount, selectedElements]);
 
   const compactedIndicator = useMemo(() => (
     <CompactedIndicator
@@ -301,7 +266,7 @@ export function TextareaPanel({
 
   const footerInfo = (
     <TokenCostEstimate
-      promptBase={promptPreviewBase}
+      promptBase={promptBase}
       textareaContent={value}
       projectPath={currentPath}
     />
@@ -323,8 +288,7 @@ export function TextareaPanel({
 
   // One line under the input: what the send carries (context, instructions)
   // on the left, then the project menu. Send sits on the right edge
-  // (TextareaArea). It wraps rather than clipping in a narrow pane. The
-  // payload preview has no button: Ctrl+Shift+E or the `preview` command.
+  // (TextareaArea). It wraps rather than clipping in a narrow pane.
   const toolbarRow = useMemo(() => (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {modeLine}
@@ -365,14 +329,6 @@ export function TextareaPanel({
     <div ref={containerRef} data-pane="3" data-title="[3] prompt" data-legend className="tui-pane flex flex-col px-2 pb-4 pt-[16px] gap-1.5">
       <PaneLegend index={3} title="Prompt" />
       {dialogs}
-      {promptPreviewOpen && promptPreview && (
-        <PromptPreview
-          sections={promptPreview.sections}
-          text={promptPreview.text}
-          onClearSection={onClearPromptSection}
-          itemsBySection={previewItems}
-        />
-      )}
       {contextChips}
       {textareaArea}
       <PaneInfo>

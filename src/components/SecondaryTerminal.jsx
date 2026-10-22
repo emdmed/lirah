@@ -69,7 +69,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
         ? 'terminal-live'
         : ''
         }`}
-      style={{ width: '100%', flex: 1, minHeight: 0, position: 'relative' }}
+      style={{ width: '100%', flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}
     >
       <PaneLegend title="Terminal 2" lit={isFocused} />
       <div className="ins-glass relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>

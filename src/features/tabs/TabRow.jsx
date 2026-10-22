@@ -2,11 +2,13 @@ import { Bot, GitBranch, Link2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
+import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { ACTIVITY } from './tabActivity';
 import { RowAction } from './RowAction';
 import { RenameField } from './RenameField';
 import { RoleChip, RoleTagButton } from './RoleMenu';
 import { TurnTrail } from './TurnTrail';
+import { TabPlanTier } from '../plans/TabPlanTier';
 
 function ActivityIcon({ kind, label }) {
   const { icon: Icon, color, pulse } = ACTIVITY[kind];
@@ -23,12 +25,13 @@ function ActivityIcon({ kind, label }) {
 
 /**
  * One tab in the tabs summary pane: what it is doing, its branch, its agent's
- * latest turn and another agent working in its repo. `drag` is useDragReorder's
- * result; `actions` the pane's handlers.
+ * latest turn, the plans it is working through and another agent working in its
+ * repo. `contextFill` (0..1, or null) is its agent's context window, drawn as a
+ * moon. `drag` is useDragReorder's result; `actions` the pane's handlers.
  */
 export function TabRow({
-  tab, index, name, info, activity, workLabel, active, linked, closable, queuePos, turn, summary, trailOpen, renaming,
-  drag, actions,
+  tab, index, name, info, contextFill, activity, workLabel, active, linked, closable, queuePos, turn, summary, trailOpen, renaming,
+  plans, drag, actions,
 }) {
   const root = tab.projectPath.replace(/\/+$/, '');
   const linkLabel = linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`;
@@ -125,16 +128,17 @@ export function TabRow({
           </RowAction>
         )}
 
-        {info?.branch && (
-          <span className="ml-auto shrink-0 whitespace-nowrap font-mono tabular-nums text-muted-foreground group-hover:hidden group-has-[[data-state=open]]:hidden">
-            {info.files === 0 ? (
+        {(info?.branch || contextFill != null) && (
+          <span className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground group-hover:hidden group-has-[[data-state=open]]:hidden">
+            {info?.branch && (info.files === 0 ? (
               'clean'
             ) : (
               <span title={`${plural(info.files, 'file')} changed`}>
                 <span className="text-git-added">+{info.added}</span>{' '}
                 <span className="text-git-deleted">−{info.deleted}</span>
               </span>
-            )}
+            ))}
+            {contextFill != null && <ContextMoon ratio={contextFill} />}
           </span>
         )}
         <span className="ml-auto hidden shrink-0 items-center gap-0.5 group-hover:flex group-has-[[data-state=open]]:flex">
@@ -196,7 +200,12 @@ export function TabRow({
         />
       )}
 
-      {/* Tier 4: another tab's agent working in this repo. */}
+      {/* Tier 4: the plans its agent is working through; click for the plan. */}
+      {plans?.map((plan) => (
+        <TabPlanTier key={plan.id} plan={plan} onOpen={() => actions.openPlan(tab.id, plan.id)} />
+      ))}
+
+      {/* Tier 5: another tab's agent working in this repo. */}
       {workLabel && (
         <div className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-[var(--ins-lamp)]">
           <Bot className="h-3 w-3 shrink-0" />

@@ -18,6 +18,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCwdMonitor } from "../../hooks/useCwdMonitor";
 import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession } from "./terminalActivity";
+import { useTabContextFill } from "./tabContextFill";
 import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
@@ -499,11 +500,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     clearLinkedRepos,
   });
 
-  // The composer's payload preview. Built with the same function the sender
-  // uses, so what is on screen is what the agent receives — not a summary of it.
-  // Everything but the typed text is built here; TextareaPanel splices the
-  // text in (withPromptText), so keystrokes don't redo file analysis.
-  const promptPreview = useMemo(() => buildPrompt({
+  // The prompt as the sender builds it, minus the typed text: the cost
+  // estimate prices it, so keystrokes don't redo file analysis.
+  const promptBase = useMemo(() => buildPrompt({
     textareaContent: '',
     selectedFiles: fileSelection.selectedFiles,
     currentPath,
@@ -524,21 +523,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     elementPicker.selectedElements, compact.compactedProject,
     patterns.selectedPatterns, patterns.getPatternInstructions, linkedRepos,
   ]);
-
-  const handleClearPromptSection = useCallback((sectionId) => {
-    if (sectionId === 'compacted') compact.setCompactedProject(null);
-    else if (sectionId === 'files') fileSelection.clearFileSelection();
-    else if (sectionId === 'elements') elementPicker.clearSelectedElements();
-    else if (sectionId === 'template') setSelectedTemplateId(null);
-    else if (sectionId === 'patterns') patterns.clearPatterns();
-    else if (sectionId === 'repos') clearLinkedRepos();
-  }, [compact.setCompactedProject, fileSelection.clearFileSelection, elementPicker.clearSelectedElements, patterns.clearPatterns, clearLinkedRepos]);
-
-  const [promptPreviewOpen, setPromptPreviewOpen] = useSeededSetting('promptPreviewOpen');
-
-  const togglePromptPreview = useCallback(() => {
-    setPromptPreviewOpen((prev) => !prev);
-  }, [setPromptPreviewOpen]);
 
   // Keyboard shortcut hooks
   useViewModeShortcuts({
@@ -573,6 +557,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     if (!terminalSessionId || !tabId) return;
     return registerTabSession(tabId, terminalSessionId);
   }, [tabId, terminalSessionId]);
+
+  // The tabs pane draws each tab's context fill as a moon.
+  useTabContextFill(tabId, isActive, tokenUsage, terminalSessionId);
 
   // Lets the tabs summary pane link other repos and attach files to this
   // tab's prompt.
@@ -739,7 +726,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     onAutoCommit: handleAutoCommit,
     onAutoMerge: handleAutoMerge,
     onClearContext: handleClearContext,
-    onTogglePromptPreview: togglePromptPreview,
   });
 
   // Cleanup on unmount: close the terminal. The fs watcher is not stopped
@@ -838,7 +824,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     onLaunchCli: launchClaude,
     onOpenLazygit: handleOpenLazygit,
     onClearContext: handleClearContext,
-    onTogglePromptPreview: togglePromptPreview,
     toggleSandbox,
     toggleNetwork,
     onToggleGitFilter: treeView.handleToggleGitFilter,
@@ -926,9 +911,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               selectedPatterns={patterns.selectedPatterns}
               onTogglePattern={patterns.togglePattern}
               onCreatePatterns={patterns.createPatterns}
-              promptPreview={promptPreview}
-              promptPreviewOpen={promptPreviewOpen}
-              onClearPromptSection={handleClearPromptSection}
+              promptBase={promptBase}
+              onClearRepos={clearLinkedRepos}
               onRemoveFile={fileSelection.removeFileFromSelection}
               onRemoveElement={elementPicker.removeElement}
               keepFilesAfterSend={settings.keepFilesAfterSend}
