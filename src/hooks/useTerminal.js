@@ -165,9 +165,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // background terminals hand their context back (see the budget below).
     attachWebgl(term);
 
-    // Initial fit
+    // Initial fit. The window starts hidden (boot splash), and on Linux the
+    // hidden webview has no layout box yet, so fit() would hit the 2x1 floor
+    // and the shell would spawn at 2 columns. Keep xterm's 80x24 default until
+    // there is room; the ResizeObserver fits once the window is shown.
     try {
-      fit.fit();
+      const proposed = fit.proposeDimensions();
+      if (proposed && proposed.cols >= MIN_USABLE_COLS && proposed.rows >= MIN_USABLE_ROWS) {
+        fit.fit();
+      }
     } catch (e) {
       // Container may not have dimensions yet, spawn effect will re-fit
     }
