@@ -1,52 +1,33 @@
 # Lirah
 
-A native desktop app for CLI agents. Keep your files, prompts, and terminal perfectly in sync—so you can focus on shipping, not wrangling context.
+A native desktop workspace for CLI coding agents. Lirah runs your agent (Claude Code, opencode, or headless Codex, Gemini, Cursor and Amp) in a real terminal and builds what a session needs around it: file context, prompts, git, token budgets, background jobs and multi-step plans.
 
-Built with **Tauri 2** | **React 19** | **xterm.js** | **TypeScript**
+Lirah doesn't wrap or replace the agent. The terminal stays in the centre, and everything else is a pane, a key or a `:` command away.
 
-**Tested with**: Claude Code, opencode, and other CLI agents
+Built with **Tauri 2**, **React 19** and **xterm.js**. Linux is the primary platform. macOS and Windows builds exist, without the sandbox.
 
-## Installation
-
-### Quick Install
-
-**Ubuntu/Debian:**
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
 ```
 
-**Arch Linux:**
+The script picks the latest [release](https://github.com/emdmed/lirah/releases) for your distro and architecture (x86_64 or aarch64) and checks its SHA-256:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
-```
+| Distro family | What it installs |
+|---|---|
+| Debian, Ubuntu, Mint, Pop!_OS | `.deb` |
+| Fedora, RHEL, openSUSE | `.rpm` |
+| Arch, Manjaro, EndeavourOS, Omarchy, CachyOS | Builds from source (the AppImage has EGL issues there) and prompts for missing build tools |
+| Anything else | AppImage |
 
-On Arch-based distros, the installer builds from source to avoid AppImage EGL compatibility issues. This requires Rust, Node.js, and Tauri build dependencies (the script will prompt to install any that are missing).
+macOS (`.dmg`) and Windows (`.exe`, `.msi`) installers are on the releases page.
 
-### Build from Source
+**Optional tools:** `bwrap` (bubblewrap) for the sandbox, `lazygit` for Alt+L, `nvim` for Alt+N.
 
-**Prerequisites:**
-- [Rust](https://rustup.rs/) (latest stable)
-- [Node.js](https://nodejs.org/) (v18+)
-- Your preferred CLI agent (Claude Code, opencode, etc.)
-- System libraries: `libcairo2-dev` `pkg-config`
+### Build from source
 
-**Linux Users:**
-```bash
-# Install dependencies automatically
-./scripts/install-deps.sh
-
-# Or install manually:
-# Ubuntu/Debian
-sudo apt install libcairo2-dev pkg-config
-
-# Fedora/CentOS
-sudo dnf install cairo-devel pkgconfig
-
-# Arch Linux
-sudo pacman -S cairo pkgconf
-```
+You need [Rust](https://rustup.rs/) (stable), [Node.js](https://nodejs.org/) 18+, the [Tauri 2 system dependencies](https://v2.tauri.app/start/prerequisites/), and cairo with pkg-config. On Linux, `./scripts/install-deps.sh` installs cairo and pkg-config with apt, dnf or pacman.
 
 ```bash
 git clone https://github.com/emdmed/lirah.git
@@ -55,150 +36,131 @@ npm install
 npm run tauri:build
 ```
 
-The built application will be in `src-tauri/target/release/`.
-
-## Why Lirah?
-
-| | |
-|---|---|
-| **Native & Fast** | Lightweight Tauri app, not an Electron behemoth |
-| **Better Output** | Structured context = better AI agent results |
-| **Universal** | Works with any CLI agent (Claude Code, opencode, etc.) |
-| **Real Workflows** | Designed for actual development, not demos |
-| **Terminal-First** | Terminal-first, not terminal-hostile |
-
-If you use CLI agents seriously, Lirah becomes the place you run them.
+The bundles land in `src-tauri/target/release/bundle/`. To open a directory at startup, run `lirah <dir>`.
 
 ## Features
 
-### Core
+### Layout and tabs
+- Four numbered panes, focused with Alt+1–4: **[1] Files**, **[2] Terminal**, **[3] Prompt**, **[4] Workspace**. A secondary terminal (Ctrl+\`) opens beside the main one.
+- Up to 8 project tabs, each with its own PTY, CLI, sandbox and sidebar state. Tabs persist and boot lazily when you return to them.
+- Tab rows show a context-fill moon, an activity lamp, the branch, the files the agent edited in its last turn, and the plan the tab is working through.
+- Agent hooks (installed automatically for Claude Code and opencode) report working, permission, waiting and done states. Alt+A jumps to the next agent waiting on you, and desktop notifications follow.
+- Terminals survive a webview reload: sessions detach, reattach and replay their output.
 
-- **Terminal Emulator** — Full xterm.js terminal with PTY integration, session management, and automatic CWD monitoring. The terminal is the primary interface — everything else enhances it.
-- **Secondary Terminal** — A second terminal panel for running background processes (tests, servers, git log) without leaving your main session. Pick from preset commands or type your own.
-- **Tauri Desktop App** — Native Linux desktop app built with Tauri 2. Lightweight, fast startup, custom title bar with window controls.
+### Terminal
+- xterm.js on a login-shell PTY with WebGL rendering and flow control.
+- Scrollback search (Ctrl+Shift+F) and scrollback from 1k to 200k lines.
+- A launch bar while no agent is running. Ctrl+K launches the tab's CLI and Ctrl+Shift+L clears its context.
+- Ctrl+S switches to navigation mode, stopping the agent first (it asks if the agent is busy).
 
-### File Navigation & Management
+### Sandbox (Linux)
+- An optional per-tab bubblewrap sandbox. The root filesystem is read-only, while home and the project are writable. `.ssh`, `.gnupg`, shell rc files, `.gitconfig` and autostart stay read-only, `/tmp` is private, and the PID, IPC and UTS namespaces are isolated.
+- Optional network isolation on top of the sandbox.
+- On Ubuntu 24.04+, Lirah installs an AppArmor profile when one is needed. If the sandbox fails to start, a toast offers to retry without it.
 
-- **File Tree View** — Hierarchical project browser with expand/collapse folders, git status badges, and file selection for AI context.
-- **Flat View Navigation** — Alternative flat directory listing with parent navigation. Quick for jumping between directories.
-- **File Search** — Filter files in the sidebar by name. Keyboard-driven with `Ctrl+F`.
-- **Git-Only Filter** — Toggle (`Ctrl+G`) to show only files with uncommitted git changes. Useful for reviewing what you've touched.
-- **File Watcher** — Monitors the filesystem for changes and auto-refreshes the sidebar tree. Toggle with `Ctrl+W`.
+### Files
+- Flat or virtualized tree view with vim keys (j/k, g/G, l/h, `/` to search, X to collapse all).
+- Git colouring and +/- line badges, updated live by a native file watcher.
+- Filters for git changes (Ctrl+G, where clicking a file opens its diff), markdown (Ctrl+M, where clicking opens the viewer) and file names (Ctrl+F).
+- Pinned files (`p` on a row), shared across tabs.
 
-### AI / CLI Integration
+### Prompt and context
+- A multi-line prompt that sits over the bottom of the terminal. Ctrl+Enter sends it, and Ctrl+Shift+Z restores the last one.
+- File chips with a per-file intent (EDIT, READ or COPY) and detail level (full, signatures or skeleton). The default detail level depends on file size.
+- `@` searches for files inline in the prompt.
+- **Instructions** (double-tap Alt): prompt templates plus the repo's `.patterns/*.md` conventions.
+- **Context sets:** save the current file selection under a name and restore it later.
+- **Compact project** (Ctrl+Shift+P): attaches a structural skeleton of every JS, TS and Python file, with sections you can toggle.
+- A live token cost estimate as you type.
 
-- **CLI Selection** — Switch between CLI agents (Claude Code, opencode, etc.) with automatic availability detection.
-- **Claude Launcher** — Launch Claude Code sessions directly from within Lirah with `Ctrl+K`.
-- **Prompt Textarea Panel** — Multi-line editor for composing prompts. Attach files, apply templates, toggle orchestration context, and send everything to your CLI agent with `Ctrl+Enter`.
-- **Orchestration Protocol** — Auto-detects and installs the [Agentic Orchestration Workflows](https://agentic-orchestration-workflows.vercel.app/) system, served via CDN for always-up-to-date workflow definitions. Appends workflow instructions to your prompts so the agent follows structured development processes (feature, bugfix, refactor, review, etc.). The orchestration system includes compaction scripts, dependency graph analysis, and symbol indexing tools.
-- **Token Cost Estimator** — Shows estimated cost (input tokens × model pricing) before you send a prompt, so you know what you're spending.
-- **Patterns Enforcement** — Define coding conventions in `.patterns/` files. A UI selector lets you toggle which patterns are active — selected patterns are automatically appended to prompts so your CLI agent follows project-specific rules.
+### Git
+- **Auto commit** (Ctrl+Shift+Space): an agent drafts a conventional commit message for you to edit.
+- **Auto merge** (Alt+M): merges the feature branch into a base, fast-forward or `--no-ff`. It shows the git commands first, rolls back on a conflict or failed check, and understands worktrees.
+- **Auto changelog:** after a commit or merge, a headless agent updates `CHANGELOG.md`, with Undo in the toast.
+- **Diff viewer:** side-by-side word-level diffs, collapsible unchanged regions and review notes.
 
-### File Context & Analysis
+### Background jobs (Workspace → jobs)
+- Run headless agents on a template plus context files, optionally in an isolated git worktree.
+- **Race** several agents on the same task and compare the results side by side.
+- Review the diff and send notes back to the agent, then apply (gated by a TypeScript check), re-run or discard.
+- **Reconcile** merges several jobs in an integration worktree. A watchdog stops any job stuck for 15 minutes.
 
-- **File Selection** — Click files in the tree to attach them as context to your prompt. Selected files appear in the textarea panel with per-file controls.
-- **File State Management** — Set each selected file to a state that controls how much detail is sent:
-  - **Full** — Entire file contents
-  - **Signatures** — Function signatures and structure only
-  - **Skeleton** — Imports, exports, and component map
-  - Auto-selects based on file size (< 300 lines → full, 300-799 → signatures, 800+ → skeleton).
-- **Element Picker** — Opens a dialog to pick individual symbols (functions, components, types, constants) from a file using Babel (JS/TS) or Python AST parsing. Send only the specific code you need.
-- **Type Checker** — Run TypeScript type checking on selected files and surface errors directly in the UI, without leaving Lirah.
-- **@-Mention System** — Type `@` in the textarea to search and attach files inline, similar to chat apps.
+### Plans and auto-pilot (Workspace → plans)
+- Paste a plan or import the repo's `*_plan.md` files. An agent splits the plan into chunks.
+- For each chunk: implement it in the tab's agent (one commit per chunk), review it with notes, roll back, skip or reorder.
+- **Auto-pilot** (`:autopilot`) chains chunks unattended. It pauses on questions, permission prompts, a missing commit, or when the agent hooks go silent.
 
-### Project Compaction
+### Tokens and budget
+- A context meter in the status bar for the tab's Claude session, subagents included.
+- A token dashboard (Ctrl+Shift+D) with history, a calendar heatmap, project comparison, model cost insights and CSV/JSON export.
+- Daily and weekly budgets per project (Ctrl+Shift+B), with alerts at 80% and 95%.
 
-- **Project Compact** — Compresses your entire project into a token-efficient summary: imports, exports, function signatures, component props, and hook usage. Achieves ~95% token reduction.
-- **Compact Sections Dialog** — View and toggle individual sections of the compacted output. Disable irrelevant files to save more tokens.
+### Projects
+- **Starred projects** (Ctrl+P) open from a searchable palette.
+- **Workspaces** group several repos into one folder of symlinks with a generated `CLAUDE.md`.
 
-### Templates & File Groups
+### Everything else
+- `:` opens a vim-style command line with fuzzy matching and argument completion.
+- 18 themes. Tokyo Night is the default, and the set includes Rivendell, Flexoki Light and Catppuccin Latte.
+- A markdown viewer, an update checker against GitHub releases, and one searchable Settings dialog.
 
-- **Prompt Templates** — Create, edit, and select reusable prompt templates. Ships with defaults. Toggle with `Alt+Alt` (double-tap).
-- **File Groups** — Save named sets of selected files per project. Load a group to instantly restore a file selection context you use often.
+## Keyboard shortcuts
 
-### Bookmarks & Workspaces
+Ctrl+H lists every shortcut, and holding Ctrl or Ctrl+Shift shows a hint bar. The most used:
 
-- **Bookmarks** — Save project paths as bookmarks. Access via palette (`Ctrl+P`), dropdown, or sidebar section. Navigate between projects instantly.
-- **Multi-Project Workspaces** — Group multiple projects into a workspace. Uses symlinks to create a unified directory structure. Open a workspace to see all projects in one sidebar.
+| Keys | Action |
+|---|---|
+| `Alt+1`–`4` | Focus files, terminal, prompt or workspace pane |
+| `:` / `Ctrl+:` | Command palette |
+| `Ctrl+T` / `Ctrl+W` | New tab / close tab |
+| `Ctrl+1`–`9`, `Ctrl+Tab` | Switch tabs |
+| `Alt+A` | Jump to the next agent waiting on you |
+| `Ctrl+K` | Launch the CLI |
+| `Ctrl+Shift+L` | Clear CLI context |
+| `Ctrl+S` | Navigation mode |
+| `Ctrl+Enter` | Send prompt |
+| `Alt Alt` | Instructions picker (double-tap) |
+| `Ctrl+Shift+P` | Compact project |
+| `Ctrl+F` / `Ctrl+G` / `Ctrl+M` | File search / git filter / markdown filter |
+| `Ctrl+Shift+F` | Search terminal output |
+| `Ctrl+Shift+Space` | Auto commit |
+| `Alt+M` | Merge branch into base |
+| ``Ctrl+` `` | Secondary terminal |
+| `Alt+L` / `Alt+N` | Lazygit / Nvim |
+| `Ctrl+P` | Starred projects |
+| `Ctrl+Shift+D` / `Ctrl+Shift+B` | Token dashboard / budgets |
 
-### Git Integration
-
-- **Git Stats Badges** — Real-time added/modified/deleted indicators on files in the tree, powered by `git status`.
-- **Git Diff Viewer** — Side-by-side diff dialog with word-level highlighting, a minimap, line selection, collapsed unchanged regions, and virtualized scrolling for large diffs.
-- **Auto Commit** — Automatically stage and commit changes via your CLI agent with a configurable commit prompt.
-- **Auto Changelog** — Generates changelog entries automatically on commit triggers using your CLI agent.
-- **Branch Name Display** — Shows the current git branch in the status bar.
-
-### Token Budget & Analytics
-
-- **Token Usage Tracking** — Monitors input, output, and cache token usage per session by reading Claude's session files.
-- **Token Budget Limits** — Set daily and weekly token limits. An alert banner appears when you're approaching or over budget.
-- **Token Dashboard** — Full analytics view with:
-  - Line charts for usage over time (daily/weekly/monthly)
-  - Model breakdown pie chart
-  - Calendar heatmap of daily usage
-  - Session efficiency metrics
-  - Historical session browser with search and filters
-- **Project Comparison** — Compare token usage and costs across all your projects.
-- **Export Reports** — Export usage data as CSV or JSON with date range filtering.
-
-### UI & Theming
-
-- **Theme System** — Multiple built-in themes with runtime switching. Persisted in localStorage.
-- **Keyboard Shortcuts** — Comprehensive shortcut system. Press `Ctrl+H` to open the shortcuts dialog.
-- **Splash Screen** — Animated project initialization screen with step indicators.
-- **Toast Notifications** — Stackable notification system for success, error, warning, and info messages.
-- **Sandbox Mode** — Toggle sandboxed terminal execution from the status bar.
-- **Network Isolation** — Toggle network access for terminal sessions from the status bar.
+The list lives in `src/lib/shortcuts.js`, which the help dialog, the hint bar and the palette all read.
 
 ## Development
 
 ```bash
-npm run dev         # Start development server (Tauri + Vite hot reload)
-npm run build       # Build frontend for production
-npm run tauri:build # Build full Tauri application
-npm run dev:vite    # Run Vite dev server only (frontend development)
-npm run preview     # Preview production build
+npm run dev            # Tauri app with Vite hot reload
+npm run dev:vite       # Frontend only
+npm run dev:instance   # Extra dev instance on its own ports (node scripts/dev.js 2)
+npm run build          # Frontend production build
+npm run tauri:build    # Full app bundles
 ```
 
-## Keyboard Shortcuts
+Checks:
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+S` | Toggle Navigation Mode |
-| `Ctrl+K` | Launch CLI / Toggle Context Mode |
-| `Ctrl+P` | Open Projects Palette |
-| `Ctrl+T` | Focus Textarea Panel |
-| `Ctrl+Enter` | Send Textarea Content |
-| `Ctrl+Shift+E` | Show/Hide What Will Be Sent |
-| `Ctrl+Ctrl` | Toggle Orchestration Mode (double-tap) |
-| `Alt+Alt` | Open Template Selector / Clear Template (double-tap) |
-| `Ctrl+F` | Focus File Search |
-| `Ctrl+G` | Toggle Git Filter |
-| `Ctrl+W` | Toggle File Watchers |
-| `Ctrl+H` | Open Keyboard Shortcuts Dialog |
+```bash
+npm run check:contrast        # Legibility of the instrument tokens in every theme
+npm run check:async-commands  # Fails on sync Tauri commands that do IO (they freeze the UI thread)
+npm run check:bundle          # Startup JS size budget (run npm run build first)
+```
 
-## Architecture
+### Layout of the code
+- `src/features/*`: one folder per feature (tabs, agent-jobs, plans, token-budget, compact, bookmarks, settings and so on).
+- `src/hooks`, `src/components`, `src/lib`: shared hooks, UI primitives and the shortcut registry.
+- `src/themes/theme-config.js`: every theme's terminal and UI colours.
+- `src-tauri/src`: the Rust backend. It covers the PTY, file system and file watcher, git, agent runner and hooks, plans, Claude session and token parsing, and workspaces.
 
-### Frontend
-
-- **App.jsx** orchestrates the terminal and sidebar
-- **useTerminal** hook manages the PTY lifecycle
-- **useCwdMonitor** polls the backend to keep the sidebar in sync
-
-**Dual-Mode Sidebar:**
-- **Navigation Mode** (`Ctrl+S`): Flat directory view for quick navigation
-- **Context Mode** (`Ctrl+K`): Hierarchical tree with file selection for AI context
-
-### Backend (Rust/Tauri)
-
-- **PTY Management**: Sessions stored in `AppState` with UUID identifiers
-- **CWD Detection**: Linux-only via `/proc/[pid]/cwd` symlink resolution
-- **Filesystem Operations**: Directory reading, file content, git stats
+Product and design notes are in [PRODUCT.md](PRODUCT.md) and [DESIGN.md](DESIGN.md).
 
 ## Changelog
 
-See the [CHANGELOG](./CHANGELOG.md) for release history and notable changes.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
