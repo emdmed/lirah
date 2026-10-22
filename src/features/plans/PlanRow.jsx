@@ -4,15 +4,22 @@ import { Scanner } from '../../components/instrument/Scanner';
 import { ProgressReadout } from './parts';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition, planProgress, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
-export function PlanRow({ plan, onOpen }) {
+/** The plan's lamp and auto-pilot tag, as its row and its tab show them. */
+export function planStatus(plan) {
   const { done, total } = planProgress(plan);
   const running = plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
   const ap = plan.autopilot;
   const tag = AUTOPILOT_TAG[ap?.status];
-  const pos = tag ? pilotPosition(plan) : null;
   const lampState = plan.split === SPLIT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.FAILED ? 'fault'
     : ap?.status === AUTOPILOT_STATUS.PAUSED ? 'warn'
       : running ? 'on' : total > 0 && done === total ? 'ok' : 'off';
+  return { done, total, running, tag, lampState };
+}
+
+export function PlanRow({ plan, onOpen }) {
+  const { done, total, running, tag, lampState } = planStatus(plan);
+  const ap = plan.autopilot;
+  const pos = tag ? pilotPosition(plan) : null;
   return (
     <button
       onClick={onOpen}

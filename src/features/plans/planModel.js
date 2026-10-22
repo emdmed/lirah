@@ -109,6 +109,16 @@ const RUN_URGENCY = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1
 /** Sort key: plans with a failed, then paused, then running run first; the rest after. */
 export const runRank = (plan) => RUN_URGENCY[plan.autopilot?.status] ?? 3;
 
+/**
+ * The tab the plan is working in: its auto-pilot run's (finished runs count
+ * until dismissed), else the tab of a chunk in flight or awaiting its fix.
+ */
+export function planTabId(plan) {
+  const ap = plan.autopilot;
+  if (ap?.tabId && ap.status !== AUTOPILOT_STATUS.OFF) return ap.tabId;
+  return plan.chunks.find((c) => c.tabId && (c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix))?.tabId ?? null;
+}
+
 // --- New and loaded plans ---
 
 /** Chunks from a split, numbered from 1, with nothing done yet. */

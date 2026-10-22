@@ -315,6 +315,11 @@ export function usePlans(repoRoot) {
   return { plans, loaded: !!plans, ...actions };
 }
 
+/** Every loaded repo's plans (repoRoot -> plans). */
+export function usePlansByRepo() {
+  return useContext(PlansStateContext);
+}
+
 const LIVE = new Set([AUTOPILOT_STATUS.RUNNING, AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED]);
 
 /** Auto-pilot runs that need watching, across loaded repos, most urgent first. */

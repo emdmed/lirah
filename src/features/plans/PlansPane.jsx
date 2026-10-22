@@ -1,8 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { errorMessage } from '../../lib/errorMessage';
 import { Plus } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
-import { repoTop } from '../../lib/git';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Scanner } from '../../components/instrument/Scanner';
 import { useConfirm } from '../confirm/ConfirmContext';
@@ -13,7 +11,8 @@ import { usePlanFiles } from './usePlanFiles';
 import { FoundPlansSection } from './FoundPlansSection';
 import { EmptyLine } from './parts';
 import { runRank, UNTITLED_PLAN } from './planModel';
-import { planGit, planWorktreeOwner } from './planGit';
+import { planGit } from './planGit';
+import { useRepoRoot } from './planRepoRoot';
 import { subscribePlanFocus, takePlanFocus } from './plansPaneEvents';
 import { PlanDetail } from './PlanDetail';
 import { BUSY, PlanPaneProvider } from './PlanPaneContext';
@@ -23,32 +22,6 @@ import { usePlanReview } from './usePlanReview';
 
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
 const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog');
-
-// A tab inside a plan's worktrees shows the plans of the repo that owns them.
-async function resolveRepoRoot(projectPath) {
-  const home = await invoke('get_home_dir').catch(() => null);
-  const owner = home ? await planWorktreeOwner(home, projectPath) : null;
-  if (owner) return owner;
-  return repoTop(projectPath);
-}
-
-function useRepoRoot(projectPath) {
-  const [repoRoot, setRepoRoot] = useState(null);
-  const [checked, setChecked] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    setChecked(false);
-    if (!projectPath) return;
-    resolveRepoRoot(projectPath)
-      .then((root) => !cancelled && setRepoRoot(root))
-      .catch(() => !cancelled && setRepoRoot(null))
-      .finally(() => !cancelled && setChecked(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [projectPath]);
-  return { repoRoot, checked };
-}
 
 /** The plans of the active tab's repo: a list, or one plan's chunks. */
 export function PlansPane({ projectPath }) {
