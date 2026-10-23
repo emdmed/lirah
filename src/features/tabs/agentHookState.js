@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { createEmitter } from '../../lib/createStore';
+import { bashFileTargets } from './bashFileTargets';
 
 // What each terminal's agent last said about itself through its hooks (see
 // src-tauri/src/agent_hooks.rs). Plain module state like terminalActivity.js:
@@ -28,6 +29,59 @@ const TARGET_KEYS = ['file_path', 'notebook_path', 'path', 'command'];
 
 export const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const READ_TOOLS = new Set(['Read', 'NotebookRead']);
+
+// Files each agent read or edited this turn, by absolute path, for the file
+// tree's marks. `live` while the tool is running. Cleared on the next prompt.
+const fileActivity = new Map(); // sessionId -> Map<path, { kind: 'edit'|'read', live }>
+const files = createEmitter();
+let filesVersion = 0;
+
+function emitFiles() {
+  filesVersion += 1;
+  files.emit();
+}
+
+// The files one tool call touched: its file argument, or for Bash, the files
+// named in the command (agents often read with cat/sed instead of Read).
+function toolFiles(payload) {
+  const tool = payload.tool_name;
+  const input = payload.tool_input || {};
+  if (tool === 'Bash') return bashFileTargets(input.command, payload.cwd);
+  const kind = EDIT_TOOLS.has(tool) ? 'edit' : READ_TOOLS.has(tool) ? 'read' : null;
+  const path = input.file_path || input.notebook_path;
+  if (!kind || typeof path !== 'string' || !path.startsWith('/')) return [];
+  return [{ path, kind }];
+}
+
+function recordFile(sessionId, payload, live) {
+  const found = toolFiles(payload);
+  if (found.length === 0) return;
+  let paths = fileActivity.get(sessionId);
+  if (!paths) fileActivity.set(sessionId, (paths = new Map()));
+  for (const { path, kind } of found) {
+    const prev = paths.get(path);
+    paths.set(path, { kind: prev?.kind === 'edit' ? 'edit' : kind, live });
+  }
+  emitFiles();
+}
+
+// A tool denied at the prompt never sends PostToolUse; the turn's end settles it.
+function settleFiles(sessionId) {
+  const paths = fileActivity.get(sessionId);
+  if (!paths) return;
+  let changed = false;
+  for (const [path, entry] of paths) {
+    if (entry.live) {
+      paths.set(path, { ...entry, live: false });
+      changed = true;
+    }
+  }
+  if (changed) emitFiles();
+}
+
+function forgetFiles(sessionId) {
+  if (fileActivity.delete(sessionId)) emitFiles();
+}
 
 // The last few turns per session, from prompt to Stop: what the tools actually
 // did (PostToolUse, so an edit denied at the permission prompt isn't counted).
@@ -131,8 +185,17 @@ export function startAgentHookListener() {
     const hookEvent = payload?.hook_event_name;
     const now = Date.now();
     if (typeof payload?.transcript_path === 'string') transcripts.set(sessionId, payload.transcript_path);
-    if (hookEvent === 'UserPromptSubmit' || hookEvent === 'SessionEnd') touches.delete(sessionId);
-    else if (hookEvent === 'PreToolUse') recordTouches(sessionId, payload);
+    if (hookEvent === 'UserPromptSubmit' || hookEvent === 'SessionEnd') {
+      touches.delete(sessionId);
+      forgetFiles(sessionId);
+    } else if (hookEvent === 'PreToolUse') {
+      recordTouches(sessionId, payload);
+      recordFile(sessionId, payload, true);
+    } else if (hookEvent === 'PostToolUse') {
+      recordFile(sessionId, payload, false);
+    } else if (hookEvent === 'Stop') {
+      settleFiles(sessionId);
+    }
     if (hookEvent === 'UserPromptSubmit') startTurn(sessionId, now);
     else if (hookEvent === 'PostToolUse') recordTool(sessionId, payload, now);
 
@@ -213,5 +276,34 @@ export function clearAgentHookState(sessionId) {
   turns.delete(sessionId);
   transcripts.delete(sessionId);
   acked.delete(sessionId);
+  forgetFiles(sessionId);
   emit({ sessionId });
+}
+
+export function subscribeFileActivity(fn) {
+  return files.subscribe(fn);
+}
+
+export function getFileActivityVersion() {
+  return filesVersion;
+}
+
+// Every agent's files merged, path -> { kind, live }: edit beats read, live
+// beats settled.
+export function getFileActivity() {
+  const merged = new Map();
+  for (const paths of fileActivity.values()) {
+    for (const [path, entry] of paths) merged.set(path, strongerMark(merged.get(path), entry));
+  }
+  return merged;
+}
+
+const MARK_RANK = { read: 1, edit: 2 };
+export function strongerMark(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    kind: MARK_RANK[b.kind] > MARK_RANK[a.kind] ? b.kind : a.kind,
+    live: a.live || b.live,
+  };
 }

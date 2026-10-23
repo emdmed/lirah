@@ -7,6 +7,7 @@ import { useGitStats } from "../../features/git/useGitStats";
 import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtils";
 import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
+import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
 
 // Row pitch: rows fill it edge to edge so indent guides run unbroken.
 const ROW_HEIGHT = 24;
@@ -53,6 +54,8 @@ export function FileTree({
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
+  // Files agents are reading or editing, marked on their rows and folders
+  const agentActivity = useAgentFileActivity(currentPath);
 
   // Apply filters to get displayed nodes
   const displayedNodes = useMemo(() => {
@@ -278,6 +281,7 @@ export function FileTree({
               gitAdded={stats?.added || 0}
               gitDeleted={stats?.deleted || 0}
               gitStatus={stats?.status || undefined}
+              agentMark={markKey((node.is_dir ? agentActivity.folders : agentActivity.files).get(path))}
               onToggle={onToggle}
               onActivateFile={handleActivateFile}
               onTogglePin={onTogglePin}

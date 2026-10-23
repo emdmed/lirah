@@ -22,6 +22,7 @@ export const TreeNode = memo(function TreeNode({
   gitAdded,
   gitDeleted,
   gitStatus,
+  agentMark,
   onToggle,
   onActivateFile,
   onTogglePin,
@@ -39,6 +40,7 @@ export const TreeNode = memo(function TreeNode({
           isCurrentPath={isCurrentPath}
           isCursor={isCursor}
           isDimmed={isDimmed}
+          agentMark={agentMark}
           onToggle={onToggle}
         />
       ) : (
@@ -55,6 +57,7 @@ export const TreeNode = memo(function TreeNode({
           gitAdded={gitAdded}
           gitDeleted={gitDeleted}
           gitStatus={gitStatus}
+          agentMark={agentMark}
           onActivateFile={onActivateFile}
           onTogglePin={onTogglePin}
         />

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { TreeGuide } from "./TreeGuide";
+import { AgentMark } from "./AgentMark";
 import { gitColorClass, splitExtension } from "./utils/lsColors";
 
 /**
@@ -20,6 +21,7 @@ export function FileNode({
   gitAdded,
   gitDeleted,
   gitStatus,
+  agentMark,
   onActivateFile,
   onTogglePin,
 }) {
@@ -69,10 +71,11 @@ export function FileNode({
           {ext && <span className={`shrink-0 ${extClass} ${isDeleted ? 'line-through' : ''}`}>{ext}</span>}
         </span>
 
-        {/* Git stats badge */}
-        {hasGitChanges && (
-          <span className="ml-auto pl-1.5 shrink-0">
-            <GitStatsBadge stats={stats} />
+        {/* Git stats badge, then the agent mark, at the row end */}
+        {(hasGitChanges || agentMark) && (
+          <span className="ml-auto pl-1.5 shrink-0 flex items-center">
+            {hasGitChanges && <GitStatsBadge stats={stats} />}
+            <AgentMark mark={agentMark} />
           </span>
         )}
       </div>

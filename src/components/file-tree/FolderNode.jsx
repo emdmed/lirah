@@ -1,6 +1,7 @@
 import React from "react";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { TreeGuide } from "./TreeGuide";
+import { AgentMark } from "./AgentMark";
 
 /**
  * Renders a folder row in the tree with expand/collapse functionality
@@ -11,9 +12,10 @@ import { TreeGuide } from "./TreeGuide";
  * @param {boolean} isCurrentPath - Whether this is the current working directory
  * @param {boolean} isCursor - Whether the keyboard cursor is on this row
  * @param {boolean} isDimmed - Dotfile or build output: drawn in the faint tier
+ * @param {string} [agentMark] - An agent read or edited something inside (see AgentMark)
  * @param {Function} onToggle - Callback to toggle folder expansion
  */
-export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCursor, isDimmed, onToggle }) {
+export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCursor, isDimmed, agentMark, onToggle }) {
   return (
     <SidebarMenuButton
       size="sm"
@@ -30,6 +32,11 @@ export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCur
         <span className={`truncate pl-1 ${isDimmed ? 'text-faint' : 'text-foreground'}`} title={name}>
           {name}<span className="text-faint">/</span>
         </span>
+        {agentMark && (
+          <span className="ml-auto pr-[18px]">
+            <AgentMark mark={agentMark} isDir />
+          </span>
+        )}
       </div>
     </SidebarMenuButton>
   );
