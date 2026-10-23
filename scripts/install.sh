@@ -24,9 +24,25 @@ warn() {
 }
 
 error() {
-    printf "${RED}[ERROR]${NC} %s\n" "$1"
+    printf "${RED}[ERROR]${NC} %s\n" "$1" >&2
     exit 1
 }
+
+# Directories removed on any exit (including error()), so failed runs don't leak files
+CLEANUP_DIRS=()
+cleanup() {
+    for DIR in "${CLEANUP_DIRS[@]+"${CLEANUP_DIRS[@]}"}"; do
+        rm -rf "$DIR"
+    done
+}
+trap cleanup EXIT
+
+# Use sudo only when not already root (e.g. minimal Ubuntu containers ship without sudo)
+if [ "$(id -u)" = "0" ]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
 
 # Detect architecture
 detect_arch() {
@@ -81,7 +97,7 @@ fetch() {
 
 # Get latest release version from GitHub
 get_latest_version() {
-    VERSION=$(fetch "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    VERSION=$(fetch "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
     if [ -z "$VERSION" ]; then
         error "Failed to get latest version from GitHub"
     fi
@@ -119,7 +135,7 @@ verify_checksum() {
     fi
 
     if [ "$ACTUAL" != "$EXPECTED" ]; then
-        error "Checksum verification failed!\nExpected: $EXPECTED\nActual: $ACTUAL"
+        error "Checksum verification failed! Expected: $EXPECTED Actual: $ACTUAL"
     fi
     info "Checksum verified successfully"
 }
@@ -129,7 +145,7 @@ get_checksum() {
     FILENAME="$1"
     CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.sha256"
 
-    CHECKSUM=$(fetch "$CHECKSUMS_URL" 2>/dev/null | grep -iF "$FILENAME" | grep -v '\.sig' | cut -d' ' -f1)
+    CHECKSUM=$(fetch "$CHECKSUMS_URL" 2>/dev/null | grep -iF "$FILENAME" | grep -v '\.sig' | cut -d' ' -f1 || true)
     if [ -z "$CHECKSUM" ]; then
         warn "Could not fetch checksum for $FILENAME" >&2
         echo ""
@@ -140,9 +156,14 @@ get_checksum() {
 
 # Install using DEB package
 install_deb() {
-    FILENAME="${APP_NAME}_${VERSION_NUM}_${DEB_ARCH}.deb"
+    # Release assets use the product name: Lirah_{version}_{arch}.deb
+    FILENAME="${DISPLAY_NAME}_${VERSION_NUM}_${DEB_ARCH}.deb"
     URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
-    TMPFILE="/tmp/$FILENAME"
+    DOWNLOAD_DIR=$(mktemp -d)
+    CLEANUP_DIRS+=("$DOWNLOAD_DIR")
+    # apt reads local .debs as the _apt user, which can't enter mktemp's 0700 dir
+    chmod 755 "$DOWNLOAD_DIR"
+    TMPFILE="$DOWNLOAD_DIR/$FILENAME"
 
     download "$URL" "$TMPFILE"
 
@@ -154,27 +175,30 @@ install_deb() {
     # Remove old nevo-terminal package if present (project was renamed to lirah)
     if has_pkg "nevo-terminal"; then
         info "Removing old 'nevo-terminal' package (renamed to lirah)..."
-        sudo apt remove -y nevo-terminal
+        $SUDO apt-get remove -y nevo-terminal
     fi
 
     info "Installing DEB package..."
-    if command -v apt >/dev/null 2>&1; then
-        sudo apt install -y "$TMPFILE"
+    if command -v apt-get >/dev/null 2>&1; then
+        # apt-get (stable CLI) resolves the .deb's runtime deps like libwebkit2gtk-4.1-0
+        $SUDO apt-get install -y "$TMPFILE" || error "Failed to install DEB package"
     elif command -v dpkg >/dev/null 2>&1; then
-        sudo dpkg -i "$TMPFILE" || sudo apt-get install -f -y
+        $SUDO dpkg -i "$TMPFILE" || error "Failed to install DEB package"
     else
-        error "Neither apt nor dpkg found"
+        error "Neither apt-get nor dpkg found"
     fi
 
-    rm -f "$TMPFILE"
     info "Installation complete!"
 }
 
 # Install using RPM package
 install_rpm() {
-    FILENAME="${APP_NAME}-${VERSION_NUM}-1.${ARCH}.rpm"
+    # Release assets use the product name: Lirah-{version}-1.{arch}.rpm
+    FILENAME="${DISPLAY_NAME}-${VERSION_NUM}-1.${ARCH}.rpm"
     URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
-    TMPFILE="/tmp/$FILENAME"
+    DOWNLOAD_DIR=$(mktemp -d)
+    CLEANUP_DIRS+=("$DOWNLOAD_DIR")
+    TMPFILE="$DOWNLOAD_DIR/$FILENAME"
 
     download "$URL" "$TMPFILE"
 
@@ -185,22 +209,30 @@ install_rpm() {
 
     info "Installing RPM package..."
     if command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y "$TMPFILE"
+        $SUDO dnf install -y "$TMPFILE" || error "Failed to install RPM package"
     elif command -v zypper >/dev/null 2>&1; then
-        sudo zypper install -y "$TMPFILE"
+        $SUDO zypper install -y --allow-unsigned-rpm "$TMPFILE" || error "Failed to install RPM package"
     elif command -v rpm >/dev/null 2>&1; then
-        sudo rpm -i "$TMPFILE"
+        $SUDO rpm -U "$TMPFILE" || error "Failed to install RPM package"
     else
         error "No RPM package manager found (dnf/zypper/rpm)"
     fi
 
-    rm -f "$TMPFILE"
     info "Installation complete!"
 }
 
 # Install by building from source (for Arch-based distros where AppImage has EGL issues)
 install_from_source() {
-    BUILD_DIR=$(mktemp -d)
+    # Toolchain and -dev packages are only needed when compiling
+    check_tauri_deps
+
+    remove_stale_builds
+
+    # Build on disk, not in /tmp: on tmpfs (e.g. Omarchy) a ~2GB build tree hits the RAM-backed quota.
+    BUILD_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/lirah-build"
+    mkdir -p "$BUILD_ROOT"
+    BUILD_DIR=$(mktemp -d -p "$BUILD_ROOT")
+    CLEANUP_DIRS+=("$BUILD_DIR")
     info "Building from source in $BUILD_DIR..."
 
     info "Cloning repository (tag: $VERSION)..."
@@ -265,10 +297,19 @@ EOF
             ;;
     esac
 
-    # Cleanup build directory
-    rm -rf "$BUILD_DIR"
-
     info "Installation complete! Run '$APP_NAME' from terminal or launch from your application menu."
+}
+
+# Remove build trees leaked into /tmp by older installers, which never cleaned up after a failed build
+remove_stale_builds() {
+    for DIR in /tmp/tmp.*; do
+        [ -d "$DIR/lirah/.git" ] && [ -O "$DIR" ] || continue
+        # Only touch dirs holding nothing but our clone
+        [ "$(ls -A "$DIR")" = "lirah" ] || continue
+        info "Removing leftover build directory $DIR..."
+        rm -rf "$DIR"
+    done
+    rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/lirah-build"
 }
 
 # Install using AppImage (fallback)
@@ -386,6 +427,34 @@ has_pkg() {
     esac
 }
 
+# Vite 7 requires Node.js 20.19+ or 22.12+
+node_is_supported() {
+    has_cmd node || return 1
+    NODE_VER=$(node --version | sed 's/^v//')
+    NODE_MAJOR=${NODE_VER%%.*}
+    NODE_MINOR=$(echo "$NODE_VER" | cut -d. -f2)
+    [ "$NODE_MAJOR" -gt 22 ] && return 0
+    [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 12 ] && return 0
+    [ "$NODE_MAJOR" -eq 21 ] && return 0
+    [ "$NODE_MAJOR" -eq 20 ] && [ "$NODE_MINOR" -ge 19 ] && return 0
+    return 1
+}
+
+# Install nvm and the current Node.js LTS into this shell
+install_node_lts() {
+    fetch https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash || return 1
+    export NVM_DIR="${HOME}/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] || return 1
+    # nvm references unset variables, so it can't run under set -u
+    set +u
+    # shellcheck source=/dev/null
+    \. "$NVM_DIR/nvm.sh"
+    nvm install --lts
+    NVM_STATUS=$?
+    set -u
+    return $NVM_STATUS
+}
+
 # Check and prompt for Tauri build dependencies
 check_tauri_deps() {
     info "Checking Tauri build dependencies..."
@@ -396,13 +465,13 @@ check_tauri_deps() {
         if ! has_cmd "$CMD"; then
             case "$DISTRO_ID" in
                 ubuntu|debian|linuxmint|pop|elementary|zorin|kali)
-                    prompt_install "$CMD" "sudo apt install -y $CMD" || MISSING=$((MISSING + 1))
+                    prompt_install "$CMD" "$SUDO apt-get install -y $CMD" || MISSING=$((MISSING + 1))
                     ;;
                 arch|manjaro|endeavouros|garuda|artix)
-                    prompt_install "$CMD" "sudo pacman -S --needed --noconfirm $CMD" || MISSING=$((MISSING + 1))
+                    prompt_install "$CMD" "$SUDO pacman -S --needed --noconfirm $CMD" || MISSING=$((MISSING + 1))
                     ;;
                 fedora|rhel|centos|rocky|alma|nobara)
-                    prompt_install "$CMD" "sudo dnf install -y $CMD" || MISSING=$((MISSING + 1))
+                    prompt_install "$CMD" "$SUDO dnf install -y $CMD" || MISSING=$((MISSING + 1))
                     ;;
                 *)
                     warn "$CMD is missing — please install it manually"
@@ -418,7 +487,7 @@ check_tauri_deps() {
             DEB_DEPS="libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libgtk-3-dev"
             for PKG in $DEB_DEPS; do
                 if ! has_pkg "$PKG"; then
-                    prompt_install "$PKG" "sudo apt install -y $PKG" || MISSING=$((MISSING + 1))
+                    prompt_install "$PKG" "$SUDO apt-get install -y $PKG" || MISSING=$((MISSING + 1))
                 fi
             done
             ;;
@@ -426,7 +495,7 @@ check_tauri_deps() {
             ARCH_DEPS="webkit2gtk-4.1 base-devel openssl gtk3 appmenu-gtk-module libappindicator-gtk3 librsvg xdotool"
             for PKG in $ARCH_DEPS; do
                 if ! has_pkg "$PKG"; then
-                    prompt_install "$PKG" "sudo pacman -S --needed --noconfirm $PKG" || MISSING=$((MISSING + 1))
+                    prompt_install "$PKG" "$SUDO pacman -S --needed --noconfirm $PKG" || MISSING=$((MISSING + 1))
                 fi
             done
             ;;
@@ -434,19 +503,19 @@ check_tauri_deps() {
             FED_DEPS="webkit2gtk4.1-devel openssl-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel libxdo-devel"
             for PKG in $FED_DEPS; do
                 if ! has_pkg "$PKG"; then
-                    prompt_install "$PKG" "sudo dnf install -y $PKG" || MISSING=$((MISSING + 1))
+                    prompt_install "$PKG" "$SUDO dnf install -y $PKG" || MISSING=$((MISSING + 1))
                 fi
             done
             # C development group
             if ! dnf group info "C Development Tools and Libraries" 2>/dev/null | grep -q "Installed"; then
-                prompt_install "C Development Tools" "sudo dnf group install -y 'C Development Tools and Libraries'" || MISSING=$((MISSING + 1))
+                prompt_install "C Development Tools" "$SUDO dnf group install -y 'C Development Tools and Libraries'" || MISSING=$((MISSING + 1))
             fi
             ;;
         opensuse*|suse|sles)
             SUSE_DEPS="webkit2gtk3-devel libopenssl-devel gtk3-devel libappindicator3-devel librsvg-devel libxdo-devel"
             for PKG in $SUSE_DEPS; do
                 if ! has_pkg "$PKG"; then
-                    prompt_install "$PKG" "sudo zypper install -y $PKG" || MISSING=$((MISSING + 1))
+                    prompt_install "$PKG" "$SUDO zypper install -y $PKG" || MISSING=$((MISSING + 1))
                 fi
             done
             ;;
@@ -456,7 +525,7 @@ check_tauri_deps() {
                     DEB_DEPS="libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libgtk-3-dev"
                     for PKG in $DEB_DEPS; do
                         if ! has_pkg "$PKG"; then
-                            prompt_install "$PKG" "sudo apt install -y $PKG" || MISSING=$((MISSING + 1))
+                            prompt_install "$PKG" "$SUDO apt-get install -y $PKG" || MISSING=$((MISSING + 1))
                         fi
                     done
                     ;;
@@ -464,7 +533,7 @@ check_tauri_deps() {
                     FED_DEPS="webkit2gtk4.1-devel openssl-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel libxdo-devel"
                     for PKG in $FED_DEPS; do
                         if ! has_pkg "$PKG"; then
-                            prompt_install "$PKG" "sudo dnf install -y $PKG" || MISSING=$((MISSING + 1))
+                            prompt_install "$PKG" "$SUDO dnf install -y $PKG" || MISSING=$((MISSING + 1))
                         fi
                     done
                     ;;
@@ -484,9 +553,13 @@ check_tauri_deps() {
         read -r REPLY < /dev/tty
         case "$REPLY" in
             [yY]|[yY][eE][sS])
-                fetch https://sh.rustup.rs | sh -s -- -y || { warn "Failed to install Rust"; MISSING=$((MISSING + 1)); }
-                . "$HOME/.cargo/env"
-                info "Rust installed successfully"
+                if fetch https://sh.rustup.rs | sh -s -- -y && [ -f "$HOME/.cargo/env" ]; then
+                    . "$HOME/.cargo/env"
+                    info "Rust installed successfully"
+                else
+                    warn "Failed to install Rust"
+                    MISSING=$((MISSING + 1))
+                fi
                 ;;
             *)
                 warn "Skipping Rust — required for building Tauri apps"
@@ -506,14 +579,36 @@ check_tauri_deps() {
         case "$REPLY" in
             [yY]|[yY][eE][sS])
                 fetch https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash || { warn "Failed to install nvm"; MISSING=$((MISSING + 1)); }
-                export NVM_DIR="${HOME}/.nvm"
-                # shellcheck source=/dev/null
-                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-                nvm install --lts || { warn "Failed to install Node.js"; MISSING=$((MISSING + 1)); }
-                info "Node.js $(node --version) installed successfully"
+                install_node_lts
+                if has_cmd node; then
+                    info "Node.js $(node --version) installed successfully"
+                else
+                    warn "Failed to install Node.js"
+                    MISSING=$((MISSING + 1))
+                fi
                 ;;
             *)
                 warn "Skipping Node.js — required for building the frontend"
+                MISSING=$((MISSING + 1))
+                ;;
+        esac
+    elif ! node_is_supported; then
+        # Ubuntu's apt nodejs (12/18) is too old for Vite 7
+        printf "${YELLOW}[OUTDATED]${NC} Node.js $(node --version) is too old (need >= 20.19).\n"
+        printf "  Install the current LTS via nvm now? [y/N] "
+        read -r REPLY < /dev/tty
+        case "$REPLY" in
+            [yY]|[yY][eE][sS])
+                install_node_lts
+                if node_is_supported; then
+                    info "Node.js $(node --version) installed successfully"
+                else
+                    warn "Failed to install a supported Node.js"
+                    MISSING=$((MISSING + 1))
+                fi
+                ;;
+            *)
+                warn "Skipping Node.js upgrade — the frontend build will likely fail"
                 MISSING=$((MISSING + 1))
                 ;;
         esac
@@ -541,15 +636,21 @@ main() {
     # Check for root (we need sudo for package installation)
     if [ "$(id -u)" = "0" ]; then
         warn "Running as root. Consider running as a normal user (sudo will be used when needed)."
+    elif ! has_cmd sudo; then
+        error "sudo is required to install packages. Install it or run as root."
     fi
 
     detect_arch
     detect_distro
 
-    # Check Tauri build dependencies before proceeding
-    check_tauri_deps
-
     get_latest_version
+
+    # Releases only ship x86_64 Linux packages; other architectures must compile
+    if [ "$ARCH" != "x86_64" ]; then
+        info "No prebuilt $ARCH Linux package, building from source..."
+        install_from_source
+        return
+    fi
 
     # Determine installation method based on distro
     case "$DISTRO_ID" in
