@@ -12,9 +12,9 @@ Built with **Tauri 2**, **React 19** and **xterm.js**. Linux is the primary plat
 curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
 ```
 
-The script picks the latest [release](https://github.com/emdmed/lirah/releases) for your distro and architecture (x86_64 or aarch64) and checks its SHA-256:
+The script picks the latest [release](https://github.com/emdmed/lirah/releases) for your distro and checks its SHA-256. Prebuilt Linux packages are x86_64 only; on aarch64 the script builds from source whatever the distro.
 
-| Distro family | What it installs |
+| Distro family (x86_64) | What it installs |
 |---|---|
 | Debian, Ubuntu, Mint, Pop!_OS | `.deb` |
 | Fedora, RHEL, openSUSE | `.rpm` |
