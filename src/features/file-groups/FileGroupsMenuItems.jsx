@@ -9,6 +9,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '../../components/ui/dropdown-menu';
+import { useHoldToConfirm } from '../../components/instrument/HoldButton';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 import { useFileGroups } from './FileGroupsContext';
@@ -51,8 +52,25 @@ function RenameField({ initialName, onSubmit, onCancel }) {
 // set…", rendered as items inside a host dropdown. Each set opens a submenu:
 // replace or add to the current context, update it from the current
 // context, rename, delete.
+// The set's delete item: hold to delete. Selecting it (a click or a quick
+// Enter) does nothing and keeps the menu open.
+function HoldDeleteItem({ onConfirm, onFallback }) {
+  const { state, props } = useHoldToConfirm({ onConfirm, onFallback });
+  return (
+    <DropdownMenuItem
+      onSelect={(e) => e.preventDefault()}
+      title="Hold to delete. Shift+Enter asks first."
+      className={`${ITEM} text-destructive ins-hold`}
+      {...props}
+    >
+      <Trash2 className="h-3 w-3 mr-1.5" />
+      <span aria-live="polite">{state === 'holding' ? 'Keep holding…' : 'Hold to delete'}</span>
+    </DropdownMenuItem>
+  );
+}
+
 export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, hasSelectedFiles }) {
-  const { getGroupsForProject, removeGroup, updateGroup } = useFileGroups();
+  const { getGroupsForProject, removeGroup, restoreGroup, updateGroup } = useFileGroups();
   const { filesForGroup } = useFileSelection();
   const confirm = useConfirm();
   const toast = useToast();
@@ -81,15 +99,25 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
 
   const cancelRename = useCallback(() => setRenamingId(null), []);
 
-  const handleDelete = useCallback(async (group) => {
+  // Deleting a set is a hold (it can be undone from the toast). Shift+Enter
+  // asks through the shared confirm instead.
+  const handleDelete = useCallback((group) => {
+    removeGroup(group.id);
+    toast.success(`Deleted context set "${group.name}"`, {
+      duration: 8000,
+      action: { label: 'undo', onClick: () => restoreGroup(group) },
+    });
+  }, [removeGroup, restoreGroup, toast]);
+
+  const handleAskDelete = useCallback(async (group) => {
     const ok = await confirm({
       title: `Delete context set "${group.name}"?`,
       description: `The saved set of ${plural(group.files.length, 'file')} is removed. Your current context and the files themselves are untouched.`,
       confirmLabel: 'Delete set',
       destructive: true,
     });
-    if (ok) removeGroup(group.id);
-  }, [confirm, removeGroup]);
+    if (ok) handleDelete(group);
+  }, [confirm, handleDelete]);
 
   return (
     <>
@@ -142,10 +170,10 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
                     <Pencil className="h-3 w-3 mr-1.5" />
                     Rename…
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleDelete(group)} className={`${ITEM} text-destructive`}>
-                    <Trash2 className="h-3 w-3 mr-1.5" />
-                    Delete…
-                  </DropdownMenuItem>
+                  <HoldDeleteItem
+                    onConfirm={() => handleDelete(group)}
+                    onFallback={() => handleAskDelete(group)}
+                  />
                 </>
               )}
             </DropdownMenuSubContent>

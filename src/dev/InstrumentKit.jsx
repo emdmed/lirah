@@ -13,6 +13,12 @@ import { FileText, RefreshCw } from 'lucide-react';
 import { PaneLegend } from '../components/instrument/PaneLegend';
 import { DiffBar } from '../components/instrument/DiffBar';
 import { LirahMark, LirahLockup } from '../components/LirahMark';
+import { Checkbox } from '../components/ui/checkbox';
+import { HoldButton } from '../components/instrument/HoldButton';
+import { Detent } from '../components/instrument/Detent';
+import { StepSlider } from '../components/instrument/StepSlider';
+import { SegmentBank } from '../components/instrument/SegmentBank';
+import { SplitKey } from '../components/instrument/SplitKey';
 
 // Component sheet for the Instrument TUI primitives (board 01b). Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -22,6 +28,10 @@ export function InstrumentKit() {
   const [net, setNet] = useState(false);
   const [latch, setLatch] = useState(true);
   const [ctx, setCtx] = useState(48200);
+  const [check, setCheck] = useState(true);
+  const [range, setRange] = useState('weekly');
+  const [detail, setDetail] = useState('signatures');
+  const [scroll, setScroll] = useState(10000);
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--ins-gutter)] p-4 text-xs font-mono text-foreground">
@@ -118,6 +128,20 @@ export function InstrumentKit() {
           <div className="flex flex-col gap-2 py-2">
             <div className="ins-glass h-16 p-2 text-[var(--color-foreground)]">$ cargo test</div>
             <div className="ins-well px-2 py-1.5"><span className="text-[var(--ins-lamp)]">❯</span> prompt well</div>
+          </div>
+        </section>
+
+        <section className="tui-pane px-3" data-legend>
+          <PaneLegend index={8} title="Controls" />
+          <div className="flex flex-col gap-3 py-2">
+            <div className="flex flex-wrap items-center gap-4">
+              <SplitKey onClick={() => {}} onChoose={() => {}} chooseLabel="Choose agent">▶ Launch Claude Code</SplitKey>
+              <HoldButton onConfirm={() => {}} onFallback={() => {}}>hold to delete</HoldButton>
+              <span className="flex items-center gap-1.5"><Checkbox checked={check} onCheckedChange={setCheck} id="kit-check" /><label htmlFor="kit-check">keep</label></span>
+            </div>
+            <SegmentBank label="Range" value={range} onChange={setRange} options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]} />
+            <Detent label="Detail level" value={detail} onChange={setDetail} options={[{ value: 'symbols', label: 'symbols' }, { value: 'signatures', label: 'signatures' }, { value: 'skeleton', label: 'skeleton' }]} className="max-w-[240px]" />
+            <StepSlider label="Scrollback" value={scroll} onChange={setScroll} warnFrom={2} steps={[{ value: 1000, label: '1,000 lines', short: '1k' }, { value: 10000, label: '10,000 lines', short: '10k' }, { value: 50000, label: '50,000 lines', short: '50k' }, { value: 200000, label: '200,000 lines', short: '200k' }]} />
           </div>
         </section>
 

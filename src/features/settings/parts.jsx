@@ -3,6 +3,7 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
+import { StepSlider } from '../../components/instrument/StepSlider';
 import { FilterContext, rowMatches, SECTIONS } from './settingsSections';
 
 // A section's rows. While filtering, every section with a match is shown at
@@ -108,6 +109,15 @@ export function ToggleRow({ row, value, onChange, hint = row.hint, disabled, ton
       control={<ToggleSwitch checked={value} onChange={onChange} disabled={disabled} tone={tone} label={row.label} />}
     >
       {children}
+    </Row>
+  );
+}
+
+/** A SETTINGS_ROWS stepped-slider row (an ordered quantity). `hint` overrides the config's. */
+export function StepRow({ row, value, steps, onChange, warnFrom, hint = row.hint }) {
+  return (
+    <Row id={row.id} sectionId={row.section} label={row.label} hint={hint}>
+      <StepSlider label={row.label} value={value} steps={steps} onChange={onChange} warnFrom={warnFrom} />
     </Row>
   );
 }

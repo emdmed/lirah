@@ -81,6 +81,18 @@ export function SidebarFileSelection({
     return null;
   }
 
+  // Detail levels in order of how much of the file they send.
+  const detailOptions = VIEW_MODES ? [
+    { value: VIEW_MODES.SYMBOLS, label: 'symbols', title: 'Symbol list with line numbers' },
+    { value: VIEW_MODES.SIGNATURES, label: 'signatures', title: 'Function signatures' },
+    { value: VIEW_MODES.SKELETON, label: 'skeleton', title: 'Structural outline' },
+  ] : null;
+  const LABEL_TO_MODE = VIEW_MODES ? {
+    Symbols: VIEW_MODES.SYMBOLS,
+    Signatures: VIEW_MODES.SIGNATURES,
+    Skeleton: VIEW_MODES.SKELETON,
+  } : {};
+
   return (
     <div className="border-t edge-t-engraved px-1.5 py-1">
       {/* Header */}
@@ -146,6 +158,9 @@ export function SidebarFileSelection({
                 lineCount={lineCount}
                 viewModeLabel={getViewModeLabel?.(file.absolute) ?? null}
                 onCycleViewMode={cycleViewMode}
+                viewMode={LABEL_TO_MODE[getViewModeLabel?.(file.absolute)]}
+                detailOptions={detailOptions}
+                onSetViewMode={setFileViewMode}
               />
             </React.Fragment>
           );

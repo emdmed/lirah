@@ -1,10 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
 
 /**
- * Simple checkbox component
- * Uses native HTML checkbox with custom styling
+ * Checkbox: a native checkbox (visually hidden, so it keeps keyboard and
+ * screen-reader behaviour) drawn as an instrument well.
  */
 const Checkbox = React.forwardRef(({
   className,
@@ -43,23 +42,14 @@ const Checkbox = React.forwardRef(({
         className="peer sr-only"
         {...props}
       />
-      <div
+      {/* A square well; checked draws Eärendil's star in ink (.ins-check). */}
+      <span
         onClick={handleVisualClick}
         role="presentation"
-        className={cn(
-          "h-4 w-4 shrink-0 flex items-center justify-center border border-[var(--tui-line-strong)] bg-background",
-          "peer-focus-visible:outline-1 peer-focus-visible:outline-solid peer-focus-visible:outline-[var(--ins-lamp)]",
-          "peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
-          "peer-checked:bg-[var(--ins-lamp)] peer-checked:text-[var(--ins-panel)] peer-checked:border-[var(--ins-lamp)]",
-          "",
-          disabled ? "cursor-not-allowed" : "cursor-pointer",
-          className
-        )}
-      >
-        {checked && (
-          <Check className="h-3 w-3 text-current" strokeWidth={4} />
-        )}
-      </div>
+        data-checked={checked || undefined}
+        data-disabled={disabled || undefined}
+        className={cn("ins-check", className)}
+      />
     </div>
   );
 });

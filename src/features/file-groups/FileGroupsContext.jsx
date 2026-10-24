@@ -82,6 +82,13 @@ export function FileGroupsProvider({ children }) {
     setGroups(prev => prev.filter(g => g.id !== id));
   }, []);
 
+  // Undo for removeGroup: puts a removed set back in creation order.
+  const restoreGroup = useCallback((group) => {
+    setGroups(prev => (prev.some(g => g.id === group.id)
+      ? prev
+      : [...prev, group].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))));
+  }, []);
+
   // `updates` may carry `name` and/or `files` ([{ relativePath, state }]).
   const updateGroup = useCallback((id, updates) => {
     const clean = {};
@@ -103,8 +110,9 @@ export function FileGroupsProvider({ children }) {
     getGroupsForProject,
     addGroup,
     removeGroup,
+    restoreGroup,
     updateGroup,
-  }), [groups, getGroupsForProject, addGroup, removeGroup, updateGroup]);
+  }), [groups, getGroupsForProject, addGroup, removeGroup, restoreGroup, updateGroup]);
 
   return <FileGroupsContext.Provider value={value}>{children}</FileGroupsContext.Provider>;
 }

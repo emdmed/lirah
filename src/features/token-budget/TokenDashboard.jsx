@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Download, FileSpreadsheet, FileJson, FileText, BarChart3 } from 'lucide-react';
 import { Scanner } from '@/components/instrument/Scanner';
+import { SegmentBank } from '@/components/instrument/SegmentBank';
 import { EmptyState } from '@/components/EmptyState';
 import { TokenLineChart } from './token-dashboard/TokenLineChart';
 import { SessionEfficiencyPanel } from './token-dashboard/SessionEfficiencyPanel';
@@ -36,6 +37,12 @@ const TABS = [
   { id: 'projects', label: 'Projects' },
   { id: 'history', label: 'History' },
   { id: 'insights', label: 'Insights' },
+];
+
+const TIME_RANGES = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
 ];
 
 export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, refreshStats, projectPath, theme }) {
@@ -212,13 +219,12 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
               {/* Time range tabs (overview only) */}
               {activeTab === 'overview' && (
-                <Tabs value={timeRange} onValueChange={setTimeRange}>
-                  <TabsList className="h-8">
-                    <TabsTrigger value="daily" className="text-xs px-3 font-mono">Daily</TabsTrigger>
-                    <TabsTrigger value="weekly" className="text-xs px-3 font-mono">Weekly</TabsTrigger>
-                    <TabsTrigger value="monthly" className="text-xs px-3 font-mono">Monthly</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <SegmentBank
+                  label="Time range"
+                  value={timeRange}
+                  onChange={setTimeRange}
+                  options={TIME_RANGES}
+                />
               )}
 
               <DropdownMenu>

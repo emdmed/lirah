@@ -16,7 +16,7 @@ import {
 import { TAB_CLIS } from '../../lib/agentClis';
 import { shortcutForCommand } from '../../lib/shortcuts';
 import { FilterContext, SECTIONS, SETTINGS_ROW as ROW } from './settingsSections';
-import { Choice, ChoiceRow, DraftField, Row, Section, ToggleRow } from './parts';
+import { Choice, ChoiceRow, DraftField, Row, Section, StepRow, ToggleRow } from './parts';
 import { AppearanceSection } from './AppearanceSection';
 import { useSettingsNav } from './useSettingsNav';
 
@@ -103,7 +103,11 @@ export function SettingsDialog({
     sandbox: <Lamp state={sandboxEnabled ? (sandboxFailed ? 'fault' : 'ok') : 'off'} label={sandboxEnabled ? (sandboxFailed ? 'Sandbox failed' : 'Sandbox on') : 'Sandbox off'} />,
   };
 
-  const scrollbackOptions = SCROLLBACK_OPTIONS.map((o) => ({ value: o.value, label: o.label.replace(' lines', '') }));
+  const scrollbackSteps = SCROLLBACK_OPTIONS.map((o) => ({
+    value: o.value,
+    label: o.label,
+    short: o.value >= 1000 ? `${o.value / 1000}k` : String(o.value),
+  }));
   const section = (id) => SECTIONS.find((s) => s.id === id);
 
   return (
@@ -201,10 +205,11 @@ export function SettingsDialog({
                 />
 
                 <Section section={section('terminal')} active={activeId === 'terminal'}>
-                  <ChoiceRow
+                  <StepRow
                     row={ROW.scrollback}
                     value={scrollback}
-                    options={scrollbackOptions}
+                    steps={scrollbackSteps}
+                    warnFrom={scrollbackSteps.findIndex((s) => s.value > SCROLLBACK_WARN_THRESHOLD)}
                     onChange={setScrollback}
                     hint={scrollback > SCROLLBACK_WARN_THRESHOLD
                       ? <span className="text-[var(--ins-warn)]">Lines kept per terminal. This depth uses a lot of memory and slows resizing.</span>

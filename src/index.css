@@ -126,6 +126,9 @@
      (tuned per theme to stay >= 4.5:1), and faint, for marks that carry no
      reading load (separators, ordinals, empty-state glyphs, an unlit option). */
   --ins-faint:       color-mix(in srgb, var(--color-foreground) 40%, var(--color-background));
+  /* Outlines of controls that sit on a well (switch track, checkbox): strong
+     enough to read as a control, >= 3:1 against the well. */
+  --ins-edge-ctl:    color-mix(in srgb, var(--color-foreground) 42%, var(--color-background));
   --ins-ok:          var(--color-ok, #98BB6C);
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
@@ -1320,7 +1323,8 @@ body {
   }
 
   /* Toggle switch: a framed well track with a knob. Off, the knob is an
-     unlit lens on the left; on, it slides right and lights in its tone. */
+     unlit lens on the left; on, it slides right and fills in its tone. It
+     doesn't glow: a setting being on is not live state. */
   .ins-switch {
     position: relative;
     display: inline-block;
@@ -1328,7 +1332,7 @@ body {
     width: 24px;
     height: 12px;
     flex-shrink: 0;
-    border: 1px solid var(--ins-edge-strong);
+    border: 1px solid var(--ins-edge-ctl);
     border-radius: 6px;
     cursor: pointer;
   }
@@ -1357,12 +1361,299 @@ body {
   .ins-switch[aria-checked="true"] .ins-switch-knob {
     left: 13px;
     background: var(--switch-c, var(--ins-ok));
-    box-shadow: 0 0 var(--ins-glow) color-mix(in srgb, var(--switch-c, var(--ins-ok)) 60%, transparent);
+    box-shadow: none;
   }
 
   .ins-switch:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  /* Checkbox (ui/checkbox.jsx): a square well. Checked is Eärendil's star in
+     ink, not gold: checked is a setting, and gold is kept for live state. */
+  .ins-check {
+    position: relative;
+    display: inline-block;
+    box-sizing: border-box;
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+    border: 1px solid var(--ins-edge-ctl);
+    background: var(--ins-well);
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
+    cursor: pointer;
+    transition: border-color 200ms var(--ins-ease);
+  }
+
+  .ins-check::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    clip-path: var(--ins-star);
+    background: transparent;
+    transition: background-color var(--ins-cool) var(--ins-ease-out);
+  }
+
+  .ins-check:hover,
+  .ins-check[data-checked] {
+    border-color: var(--ins-legend);
+  }
+
+  .ins-check[data-checked]::before {
+    background: var(--color-foreground);
+    transition-duration: var(--ins-warm);
+  }
+
+  .peer:focus-visible + .ins-check {
+    outline: 1px solid var(--ins-lamp);
+    outline-offset: 1px;
+  }
+
+  .ins-check[data-disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Hold to confirm (HoldButton / useHoldToConfirm): a fault tint sweeps
+     across while the key is held and drains fast when it is let go. */
+  .ins-hold {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ins-hold::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--ins-fault) 16%, transparent);
+    box-shadow: inset 0 -1px 0 var(--ins-fault);
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform var(--ins-dur-quick) var(--ins-ease-exit);
+  }
+
+  .ins-hold[data-holding]::before {
+    transform: scaleX(1);
+    transition: transform var(--hold-ms, 900ms) linear;
+  }
+
+  .ins-hold[data-fired] {
+    color: var(--ins-fault);
+    background: color-mix(in srgb, var(--ins-fault) 12%, transparent);
+  }
+
+  /* Detent (Detent.jsx): an ordered choice of 3-5 steps. Labels over ticks
+     on a well rail; the meter's star is the needle and steps between them. */
+  .ins-detent {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    padding-top: 1px;
+  }
+
+  .ins-detent::before {
+    content: '';
+    position: absolute;
+    left: calc(50% / var(--n));
+    right: calc(50% / var(--n));
+    top: 22px;
+    height: 3px;
+    background: var(--ins-well);
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.5);
+  }
+
+  .ins-detent-stop {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 12px;
+    transition: color 200ms var(--ins-ease);
+  }
+
+  .ins-detent-stop::after {
+    content: '';
+    width: 1px;
+    height: 9px;
+    background: var(--ins-edge-strong);
+    position: relative;
+    z-index: 1;
+  }
+
+  .ins-detent-stop:hover,
+  .ins-detent-stop[aria-checked="true"] {
+    color: var(--color-foreground);
+  }
+
+  .ins-detent-stop:focus-visible {
+    outline: 1px solid var(--ins-lamp);
+    outline-offset: 2px;
+  }
+
+  .ins-detent-needle {
+    position: absolute;
+    top: 18px;
+    left: calc((var(--i) + 0.5) * 100% / var(--n));
+    width: 11px;
+    height: 11px;
+    margin-left: -5.5px;
+    background: var(--color-foreground);
+    clip-path: var(--ins-star);
+    pointer-events: none;
+    z-index: 2;
+    transition: left var(--ins-dur-base) var(--ins-ease-out), background-color 200ms var(--ins-ease);
+  }
+
+  .ins-detent:focus-within .ins-detent-needle {
+    background: var(--ins-lamp);
+  }
+
+  /* Stepped slider (StepSlider.jsx): ticks per step, a well rail with a
+     legend fill, the star as thumb, and a tube readout. */
+  .ins-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ins-step-track {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 140px;
+    max-width: 280px;
+    height: 34px;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+  }
+
+  .ins-step-track:focus-visible {
+    outline: 1px solid var(--ins-lamp);
+    outline-offset: 3px;
+  }
+
+  .ins-step-tick {
+    position: absolute;
+    top: 2px;
+    width: 1px;
+    height: 5px;
+    background: var(--ins-edge-strong);
+  }
+
+  .ins-step-tick[data-warn] {
+    background: var(--ins-warn);
+  }
+
+  .ins-step-rail,
+  .ins-step-fill {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 11px;
+    height: 3px;
+  }
+
+  .ins-step-rail {
+    background: var(--ins-well);
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.5);
+  }
+
+  .ins-step-fill {
+    background: var(--ins-legend);
+    transform-origin: left;
+    transform: scaleX(var(--pv));
+    transition: transform var(--ins-dur-base) var(--ins-ease-out);
+  }
+
+  .ins-step-thumb {
+    position: absolute;
+    top: 7px;
+    left: calc(var(--pv) * 100%);
+    width: 11px;
+    height: 11px;
+    margin-left: -5.5px;
+    background: var(--color-foreground);
+    clip-path: var(--ins-star);
+    transition: left var(--ins-dur-base) var(--ins-ease-out), background-color 200ms var(--ins-ease);
+  }
+
+  .ins-step-track:focus-visible .ins-step-thumb {
+    background: var(--ins-lamp);
+  }
+
+  .ins-step-label {
+    position: absolute;
+    top: 21px;
+    transform: translateX(-50%);
+    color: var(--color-muted-foreground);
+    font-size: 10px;
+    line-height: 12px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ins-step-label[data-first] { transform: none; }
+  .ins-step-label[data-last] { transform: translateX(-100%); }
+
+  .ins-step-read {
+    min-width: 9ch;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ins-step-read[data-level="warn"] {
+    color: var(--ins-warn);
+  }
+
+  /* Segment bank (SegmentBank.jsx): printed keys side by side with no box.
+     The chosen one takes the latch tint and an ink underline. */
+  .ins-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .ins-seg > .ins-key[aria-checked="true"] {
+    color: var(--color-foreground);
+    background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
+    box-shadow: inset 0 -1px 0 var(--ins-legend);
+  }
+
+  /* Split key (SplitKey.jsx): a primary action and its chooser under one
+     lamp hairline. */
+  .ins-split {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid color-mix(in srgb, var(--ins-lamp) 70%, var(--ins-edge-strong));
+    border-radius: 2px;
+    transition: border-color 200ms var(--ins-ease);
+  }
+
+  .ins-split:hover,
+  .ins-split:focus-within {
+    border-color: var(--ins-lamp);
+  }
+
+  .ins-split > .ins-key {
+    border: 0;
+    border-radius: 0;
+    color: var(--ins-lamp);
+  }
+
+  .ins-split > .ins-key:hover {
+    background: color-mix(in srgb, var(--ins-lamp) 8%, transparent);
+    color: var(--ins-lamp);
+  }
+
+  .ins-split > .ins-key + .ins-key {
+    border-left: 1px solid color-mix(in srgb, var(--ins-lamp) 35%, transparent);
   }
 
   /* Pane legend: keycap + legend on the top border line, status + lamp on
@@ -1452,6 +1743,9 @@ body {
   .ins-meter-fill,
   .ins-meter-zone,
   .ins-switch-knob,
+  .ins-detent-needle,
+  .ins-step-thumb,
+  .ins-step-fill,
   .ins-key { transition: none; }
 }
 

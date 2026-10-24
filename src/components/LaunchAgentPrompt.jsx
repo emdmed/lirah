@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { KeyChord } from './instrument/Keycap';
-import { PanelButton } from './instrument/PanelButton';
+import { SplitKey } from './instrument/SplitKey';
 import { usePageVisible } from '../hooks/usePageVisible';
 import { tabCliLabel } from '../lib/agentClis';
 import { subscribeAgentHooks, getAgentHookState } from '../features/tabs/agentHookState';
@@ -12,7 +12,8 @@ const dismissedTabs = new Set();
 
 /**
  * Slim bar at the top-right of the terminal pane while the tab's shell has no
- * agent: launches the selected CLI (same as Ctrl+K), or opens the CLI picker.
+ * agent: a split key that launches the selected CLI (same as Ctrl+K), or opens
+ * the CLI picker from its chevron.
  * Goes away once an agent runs, the user types into the shell, or it is
  * dismissed for the tab.
  */
@@ -76,16 +77,13 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
       role="region"
       aria-label="Launch agent"
     >
-      <PanelButton onClick={handleLaunch} className="h-5 px-2 text-xs">
-        ▶ Launch {cliLabel}
-      </PanelButton>
-      <button
-        type="button"
-        onClick={onChangeCli}
-        className="ins-link text-muted-foreground hover:text-foreground"
+      <SplitKey
+        onClick={handleLaunch}
+        onChoose={onChangeCli}
+        chooseLabel="Choose agent"
       >
-        change
-      </button>
+        ▶ Launch {cliLabel}
+      </SplitKey>
       <KeyChord keys={['^', 'K']} size="sm" />
       <button
         type="button"
