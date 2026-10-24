@@ -121,6 +121,7 @@ pub fn run(initial_path: Option<String>) {
             claude::tokens::get_session_token_usage,
             claude::tokens::get_project_stats,
             claude::tokens::get_all_projects_stats,
+            claude::context::get_context_breakdown,
             agent_hooks::get_agent_hook_plugin_dir,
             // Workspaces
             workspace::create_workspace,

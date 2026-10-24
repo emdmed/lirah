@@ -716,23 +716,30 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     }
   }, [secondary.openWithCommand, setProjectPickerAction, setProjectPickerOpen]);
 
-  const handleClearContext = useCallback(async () => {
+  // Types a slash command into the tab's CLI and presses Enter.
+  const sendCliCommand = useCallback(async (command) => {
     if (!terminalSessionId) return;
-    const command = settings.selectedCli === 'opencode' ? '/new' : '/clear';
     try {
       await invoke('write_to_terminal', { sessionId: terminalSessionId, data: command });
       setTimeout(async () => {
         try {
           await invoke('write_to_terminal', { sessionId: terminalSessionId, data: '\r' });
         } catch (error) {
-          console.error('Failed to send Enter for clear context:', error);
+          console.error(`Failed to send Enter for ${command}:`, error);
         }
       }, 100);
       terminalRef.current?.focus?.();
     } catch (error) {
-      console.error('Failed to clear CLI context:', error);
+      console.error(`Failed to send ${command} to the CLI:`, error);
     }
-  }, [terminalSessionId, settings.selectedCli]);
+  }, [terminalSessionId]);
+
+  const handleClearContext = useCallback(
+    () => sendCliCommand(settings.selectedCli === 'opencode' ? '/new' : '/clear'),
+    [sendCliCommand, settings.selectedCli],
+  );
+  // Claude Code and opencode both summarise the session with /compact.
+  const handleCompactContext = useCallback(() => sendCliCommand('/compact'), [sendCliCommand]);
 
   useTabShortcuts({
     isActive,
@@ -793,12 +800,13 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     sidebarSearch.handleSearchChange(query);
     atMention.setAtMentionQuery(null);
   }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery]);
-  const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setSettingsOpen,
+  const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setContextDetailsOpen, setSettingsOpen,
     setWorkspaceDialogOpen, setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
     setSaveFileGroupDialogOpen } = dialogs;
   const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [setShowHelp]);
   const openCliSettings = useCallback(() => setCliSelectionModalOpen(true), [setCliSelectionModalOpen]);
   const openDashboard = useCallback(() => setDashboardOpen(true), [setDashboardOpen]);
+  const openContextDetails = useCallback(() => setContextDetailsOpen(true), [setContextDetailsOpen]);
   const openSettings = useCallback(() => setSettingsOpen(true), [setSettingsOpen]);
   const openWorkspaceDialog = useCallback(() => setWorkspaceDialogOpen(true), [setWorkspaceDialogOpen]);
   const openAddBookmark = useCallback(() => setAddBookmarkDialogOpen(true), [setAddBookmarkDialogOpen]);
@@ -958,6 +966,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             onToggleNetworkIsolation={toggleNetwork}
             secondaryTerminalFocused={secondary.secondaryFocused}
             onOpenDashboard={openDashboard}
+            onOpenContextDetails={openContextDetails}
             changelogStatus={changelogStatus}
             onOpenSettings={openSettings}
             onAutoCommit={handleAutoCommit}
@@ -967,6 +976,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             onOpenWorkspaceDialog={openWorkspaceDialog}
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
+            onCompactContext={handleCompactContext}
             availableUpdate={availableUpdate}
           />
           </TabBarStatusSlot>

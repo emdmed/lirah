@@ -1,7 +1,7 @@
 import { useMemo, memo } from 'react';
 import {
   Keyboard, Bot, Terminal, BarChart3, Settings, GitCommitHorizontal,
-  Layers, X, GitMerge
+  Layers, X, GitMerge, ScanSearch, Shrink, Eraser
 } from 'lucide-react';
 import { Scanner } from './instrument/Scanner';
 import { Button } from './ui/button';
@@ -25,6 +25,7 @@ import { shortcutForCommand, shortcutKeys } from '../lib/shortcuts';
 import { KeyChord } from './instrument/Keycap';
 import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAgentAttention';
 import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
+import { ContextPeek } from '../features/token-budget/ContextPeek';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -85,11 +86,11 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
 // data arrives, the daily budget) with used / max and %. Past
 // HEAVY_CONTEXT_TOKENS the fill and readout go amber; billable and cache
 // figures live in the tooltip. Every slot has a fixed width and an idle
-// placeholder so the gauge never shifts between tabs. Click opens the token
-// dashboard.
+// placeholder so the gauge never shifts between tabs. Click opens a summary
+// of what fills the context, with Details for the full breakdown.
 // Reads usage from the tab's store itself, so a usage poll re-renders only
 // the gauge, not the status bar.
-function ContextMeter({ currentPath, onOpenDashboard }) {
+function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onClearContext, onCompactContext }) {
   const { getBudget, currentUsage, formatTokenCount, tokenUsageStore } = useTokenBudget();
   const tokenUsage = useTokenUsageValue(tokenUsageStore);
   const ctx = getContextFill(tokenUsage);
@@ -111,20 +112,21 @@ function ContextMeter({ currentPath, onOpenDashboard }) {
   }
   const pct = max ? Math.round((value / max) * 100) : null;
   const heavy = !!ctx && ctx.used > HEAVY_CONTEXT_TOKENS;
+  // Worth acting on: near the warn zone, or heavy whatever the window size.
+  const crowded = heavy || pct >= 80;
   // Mirrors Meter's thresholds: the readout only lights once it means something.
   const tone = pct >= 95 ? 'tube tube-overflow' : pct >= 80 || heavy ? 'text-[var(--ins-warn)]' : 'text-foreground';
 
   return (
+    <DropdownMenu>
     <Tooltip>
       <TooltipTrigger asChild>
+        <DropdownMenuTrigger asChild>
         <span
-          role={onOpenDashboard ? 'button' : undefined}
-          tabIndex={onOpenDashboard ? 0 : undefined}
-          onClick={onOpenDashboard}
-          onKeyDown={(e) => {
-            if (onOpenDashboard && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpenDashboard(); }
-          }}
-          className={cn('flex items-center gap-2 px-1 focus-ring', onOpenDashboard ? 'cursor-pointer' : 'cursor-default')}
+          role="button"
+          tabIndex={0}
+          aria-label="Context usage"
+          className="flex items-center gap-2 px-1 focus-ring cursor-pointer"
         >
           <span className="ins-legend shrink-0">{legend}</span>
           <Meter
@@ -144,6 +146,7 @@ function ContextMeter({ currentPath, onOpenDashboard }) {
             <span className="w-[5ch] text-faint">{max ? fmt(max) : '--'}</span>
           </span>
         </span>
+        </DropdownMenuTrigger>
       </TooltipTrigger>
       <TooltipContent side="bottom">
         <div className="grid grid-cols-[auto_auto_auto] gap-x-3 font-mono tabular-nums">
@@ -183,10 +186,52 @@ function ContextMeter({ currentPath, onOpenDashboard }) {
               <span className="col-span-3 opacity-70">cache reads bill at ≈0.1× input</span>
             </>
           ) : null}
-          {onOpenDashboard && <span className="col-span-3 mt-1 opacity-70">click for token metrics</span>}
+          <span className="col-span-3 mt-1 opacity-70">click for what's in context</span>
         </div>
       </TooltipContent>
     </Tooltip>
+      {/* What fills the context: a short summary, then the full dialog. */}
+      <DropdownMenuContent side="bottom" align="center" className="w-80 text-xs">
+        <DropdownMenuLabel className="flex items-baseline justify-between gap-2 text-[11px]">
+          <span>Context · this tab</span>
+          {ctx && (
+            <span className="tabular-nums normal-case tracking-normal">
+              <span className={tone}>{fmt(ctx.used)}</span>
+              <span className="text-faint"> / {fmt(ctx.max)} · </span>
+              <span className={tone}>{pct}%</span>
+            </span>
+          )}
+        </DropdownMenuLabel>
+        <ContextPeek tokenUsage={tokenUsage} projectPath={currentPath} heavy={crowded} />
+        <DropdownMenuSeparator />
+        {crowded && onCompactContext && (
+          <DropdownMenuItem onClick={onCompactContext} className="cursor-pointer py-1">
+            <Shrink className="mr-2 w-3 h-3" />
+            Compact (summarise and continue)
+          </DropdownMenuItem>
+        )}
+        {crowded && onClearContext && (
+          <DropdownMenuItem onClick={onClearContext} className="cursor-pointer py-1">
+            <Eraser className="mr-2 w-3 h-3" />
+            Clear context
+            <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
+          </DropdownMenuItem>
+        )}
+        {onOpenContextDetails && (
+          <DropdownMenuItem onClick={onOpenContextDetails} className="cursor-pointer py-1">
+            <ScanSearch className="mr-2 w-3 h-3" />
+            Details…
+          </DropdownMenuItem>
+        )}
+        {onOpenDashboard && (
+          <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
+            <BarChart3 className="mr-2 w-3 h-3" />
+            Token Metrics
+            <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -224,8 +269,8 @@ export const StatusBar = memo(({
   selectedCli, onOpenCliSettings, showTitleBar,
   sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
-  onOpenDashboard, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
-  workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
+  onOpenDashboard, onOpenContextDetails, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
+  workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext, onCompactContext,
   availableUpdate
 }) => {
   const confirm = useConfirm();
@@ -314,7 +359,13 @@ export const StatusBar = memo(({
 
       {/* CENTRE: the context gauge, alone so it reads at a glance. The side
           columns share the remaining width equally, keeping it centred. */}
-      <ContextMeter currentPath={currentPath} onOpenDashboard={onOpenDashboard} />
+      <ContextMeter
+        currentPath={currentPath}
+        onOpenDashboard={onOpenDashboard}
+        onOpenContextDetails={onOpenContextDetails}
+        onClearContext={sessionId ? onClearContext : undefined}
+        onCompactContext={sessionId ? onCompactContext : undefined}
+      />
 
       {/* RIGHT: Runtime status + Settings */}
       <div className="flex items-center justify-end gap-1.5 min-w-0">

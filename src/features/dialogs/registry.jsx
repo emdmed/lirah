@@ -20,6 +20,7 @@ const ManageTemplatesDialog = lazyNamed(() => import("@/features/templates/Manag
 const KeyboardShortcutsDialog = lazyNamed(() => import("@/components/KeyboardShortcutsDialog"), "KeyboardShortcutsDialog");
 const TokenBudgetDialog = lazyNamed(() => import("@/features/token-budget/TokenBudgetDialog"), "TokenBudgetDialog");
 const TokenDashboard = lazyNamed(() => import("@/features/token-budget/TokenDashboard"), "TokenDashboard");
+const ContextBreakdownDialog = lazyNamed(() => import("@/features/token-budget/ContextBreakdownDialog"), "ContextBreakdownDialog");
 const AutoChangelogDialog = lazyNamed(() => import("@/features/git/AutoChangelogDialog"), "AutoChangelogDialog");
 const OrchestrationDashboard = lazyNamed(() => import("@/components/OrchestrationDashboard"), "OrchestrationDashboard");
 const WorkspaceDialog = lazyNamed(() => import("@/components/WorkspaceDialog"), "WorkspaceDialog");
@@ -32,6 +33,11 @@ const MarkdownViewerDialog = lazyNamed(() => import("@/features/markdown/Markdow
 function TokenDashboardLive({ tokenUsageStore, ...props }) {
   const tokenUsage = useTokenUsageValue(tokenUsageStore);
   return <TokenDashboard tokenUsage={tokenUsage} {...props} />;
+}
+
+function ContextBreakdownLive({ tokenUsageStore, ...props }) {
+  const tokenUsage = useTokenUsageValue(tokenUsageStore);
+  return <ContextBreakdownDialog tokenUsage={tokenUsage} {...props} />;
 }
 
 export const TAB_DIALOGS = {
@@ -88,6 +94,14 @@ export const TAB_DIALOGS = {
       tokenUsageStore: ctx.tokenUsageStore,
       projectStats: ctx.projectStats,
       refreshStats: ctx.refreshProjectStats,
+      projectPath: ctx.currentPath,
+      theme: ctx.theme,
+    }),
+  },
+  contextBreakdown: {
+    Component: ContextBreakdownLive,
+    props: (ctx) => ({
+      tokenUsageStore: ctx.tokenUsageStore,
       projectPath: ctx.currentPath,
       theme: ctx.theme,
     }),

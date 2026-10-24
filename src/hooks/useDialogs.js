@@ -17,6 +17,7 @@ const FLAGS = {
   budgetDialogOpen: "budget",
   settingsOpen: "settings",
   dashboardOpen: "tokens",
+  contextDetailsOpen: "contextBreakdown",
   autoChangelogDialogOpen: "autoChangelog",
   workspaceDialogOpen: "workspace",
   projectPickerOpen: "projectPicker",
