@@ -29,6 +29,7 @@ notify = "6.1"
 rustpython-parser = "0.4"
 dirs = "5.0"
 sysinfo = "0.33"
+tauri-plugin-dialog = "2"
 
 [profile.release]
 lto = true

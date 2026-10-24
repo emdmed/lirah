@@ -70,6 +70,9 @@ const GIT_STATE_FILES: &[&str] = &[
 const DEBOUNCE_QUIET: Duration = Duration::from_millis(1000);
 /// Longest a batch may grow before it is emitted anyway.
 const DEBOUNCE_MAX_WAIT: Duration = Duration::from_millis(3000);
+/// Longest "git-stats-changed" is held back while only work-tree files keep
+/// changing (an agent editing for minutes). Git state changes go out at once.
+const GIT_STATS_CONTENT_MAX_WAIT: Duration = Duration::from_millis(8000);
 
 /// Per-event info sent from the notify callback to the debounce thread.
 #[derive(Debug)]
@@ -241,6 +244,17 @@ fn build_fs_watcher(
     // period (or the max wait).
     thread::spawn(move || {
         let mut last_branch = read_current_branch(&watch_path);
+        // Work-tree changes not yet reported as "git-stats-changed": when the
+        // first of them arrived. `last_event` is when the latest batch ended.
+        let mut stats_pending_since: Option<Instant> = None;
+        let mut last_event = Instant::now();
+        let emit_stats = |pending: &mut Option<Instant>| {
+            *pending = None;
+            if let Ok(state_lock) = app_state.lock() {
+                state_lock.git_cache.invalidate(&canonical_path);
+            }
+            let _ = app_handle.emit("git-stats-changed", &path);
+        };
 
         loop {
             // Wait for either a stop signal or a FS event
@@ -251,7 +265,13 @@ fn build_fs_watcher(
 
             let first_event = match event_rx.recv_timeout(Duration::from_millis(200)) {
                 Ok(ev) => ev,
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // Held-back stats go out once things have been quiet.
+                    if stats_pending_since.is_some() && last_event.elapsed() >= DEBOUNCE_QUIET {
+                        emit_stats(&mut stats_pending_since);
+                    }
+                    continue;
+                }
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             };
 
@@ -279,8 +299,13 @@ fn build_fs_watcher(
                     head_changed |= head;
                 }
             };
+            let batch_start = Instant::now();
             handle(first_event);
-            drain_debounced(&event_rx, Instant::now(), DEBOUNCE_QUIET, DEBOUNCE_MAX_WAIT, &mut handle);
+            drain_debounced(&event_rx, batch_start, DEBOUNCE_QUIET, DEBOUNCE_MAX_WAIT, &mut handle);
+            // Cut off by the max wait rather than ended by a quiet period:
+            // events are still coming.
+            let still_busy = batch_start.elapsed() >= DEBOUNCE_MAX_WAIT;
+            last_event = Instant::now();
 
             // Whether a path was created or deleted is decided by what is on
             // disk now, so a file created and removed within one batch is
@@ -309,12 +334,17 @@ fn build_fs_watcher(
             }
 
             // Git index/HEAD changes, content writes and created/deleted files
-            // all move the per-file stats.
-            if git_changed || content_modified || has_fs_changes {
-                if let Ok(state_lock) = app_state.lock() {
-                    state_lock.git_cache.invalidate(&canonical_path);
+            // all move the per-file stats. Git state changes are reported at
+            // once; work-tree-only changes wait out continuous activity, up to
+            // GIT_STATS_CONTENT_MAX_WAIT, so a long edit storm does not rerun
+            // git status every few seconds. fs-changes above is never held.
+            if git_changed {
+                emit_stats(&mut stats_pending_since);
+            } else if content_modified || has_fs_changes {
+                let since = *stats_pending_since.get_or_insert(batch_start);
+                if !still_busy || since.elapsed() >= GIT_STATS_CONTENT_MAX_WAIT {
+                    emit_stats(&mut stats_pending_since);
                 }
-                let _ = app_handle.emit("git-stats-changed", &path);
             }
 
             if head_changed {

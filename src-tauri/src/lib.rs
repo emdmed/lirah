@@ -40,6 +40,7 @@ pub fn run(initial_path: Option<String>) {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(create_state())
         .manage(commit_watcher::create_commit_watcher_store())
         .manage(std::sync::Arc::new(FsWatcherStore::new()))
@@ -81,6 +82,7 @@ pub fn run(initial_path: Option<String>) {
             pty::commands::pty_resume,
             pty::commands::spawn_hidden_terminal,
             pty::commands::check_pty_child_process,
+            pty::commands::detect_pty_clis,
             pty::commands::kill_pty_child_process,
             fs::cwd::get_terminal_cwd,
             get_initial_path,

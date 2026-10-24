@@ -1,3 +1,4 @@
+use crate::git_cache::{Flight, Lookup, Stats};
 use crate::state::AppState;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -192,15 +193,26 @@ fn get_git_diff_stats(repo_path: &Path) -> Result<HashMap<String, GitStats>, Str
         None => return Ok(HashMap::new()),
     };
 
-    // One status for deletions + untracked files, one numstat for line counts.
-    let status = git_output(
-        &git_root,
-        &["status", "--porcelain=v2", "-z", "--untracked-files=all"],
-    )?
-    .map(|raw| parse_porcelain_v2(&raw))
-    .unwrap_or_default();
-    // Fails on a repo with no commits yet (no HEAD); status still covers it.
-    let numstat = git_output(&git_root, &["diff", "HEAD", "--numstat", "-z"])?
+    // One status for deletions + untracked files, one numstat for line counts,
+    // run side by side.
+    let (status, numstat) = std::thread::scope(|scope| {
+        let status = scope.spawn(|| {
+            git_output(
+                &git_root,
+                &["status", "--porcelain=v2", "-z", "--untracked-files=all"],
+            )
+        });
+        // Fails on a repo with no commits yet (no HEAD); status still covers it.
+        let numstat = git_output(&git_root, &["diff", "HEAD", "--numstat", "-z"]);
+        let status = status
+            .join()
+            .unwrap_or_else(|_| Err("git status thread panicked".to_string()));
+        (status, numstat)
+    });
+    let status = status?
+        .map(|raw| parse_porcelain_v2(&raw))
+        .unwrap_or_default();
+    let numstat = numstat?
         .map(|raw| parse_numstat_z(&raw))
         .unwrap_or_default();
 
@@ -260,24 +272,46 @@ pub async fn get_git_stats(
             .unwrap_or_else(|_| repo_path.clone());
 
         // The state lock is only held for the cache lookups, never across git.
-        let cached = state
+        // Concurrent misses on one repo share a single computation.
+        let lookup = state
             .lock()
             .map_err(|e| format!("Failed to lock state: {}", e))?
             .git_cache
-            .get(&canonical_path);
-        if let Some(stats) = cached {
-            return Ok(stats);
+            .lookup(&canonical_path);
+        let flight = match lookup {
+            Lookup::Hit(stats) => return Ok(stats),
+            Lookup::Join(flight) => return flight.wait(),
+            Lookup::Lead(flight) => flight,
+        };
+
+        // Completes the flight even if the computation panics, so callers
+        // waiting on it are never left hanging.
+        struct Leader<'a> {
+            state: &'a AppState,
+            path: &'a Path,
+            flight: Arc<Flight>,
+            result: Option<Result<Stats, String>>,
         }
-
-        let stats = Arc::new(get_git_diff_stats(&repo_path)?);
-
-        state
-            .lock()
-            .map_err(|e| format!("Failed to lock state: {}", e))?
-            .git_cache
-            .set(canonical_path, stats.clone());
-
-        Ok(stats)
+        impl Drop for Leader<'_> {
+            fn drop(&mut self) {
+                let result = self
+                    .result
+                    .take()
+                    .unwrap_or_else(|| Err("Git stats computation aborted".to_string()));
+                let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+                state.git_cache.complete(self.path, &self.flight, result);
+            }
+        }
+        let mut leader = Leader {
+            state: &state,
+            path: &canonical_path,
+            flight,
+            result: None,
+        };
+        let result = get_git_diff_stats(&repo_path).map(Arc::new);
+        leader.result = Some(result.clone());
+        drop(leader);
+        result
     })
     .await
 }

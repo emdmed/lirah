@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Bot, GitBranch, Link2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
@@ -28,11 +29,16 @@ function ActivityIcon({ kind, label }) {
  * latest turn, the plans it is working through and another agent working in its
  * repo. `contextFill` (0..1, or null) is its agent's context window, drawn as a
  * moon. `drag` is useDragReorder's result; `actions` the pane's handlers.
+ * Memoized: the pane re-renders on its 1s clock, so activity and the turn
+ * summary come in as primitives and a row only redraws when what it shows
+ * (a running "since" or duration included) changes.
  */
-export function TabRow({
-  tab, index, name, info, contextFill, activity, workLabel, active, linked, closable, queuePos, turn, summary, trailOpen, renaming,
-  plans, drag, actions,
+export const TabRow = memo(function TabRow({
+  tab, index, name, info, contextFill, activityKind, activityLabel, activitySince, workLabel, active, linked, closable, queuePos,
+  turn, summaryText, summaryRunning, trailOpen, renaming, plans, drag, actions,
 }) {
+  const activity = { kind: activityKind, label: activityLabel, since: activitySince };
+  const summary = summaryText ? { text: summaryText, running: summaryRunning } : null;
   const root = tab.projectPath.replace(/\/+$/, '');
   const linkLabel = linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`;
   const dropLine = drag.dropLineAt(index);
@@ -214,4 +220,4 @@ export function TabRow({
       )}
     </div>
   );
-}
+});

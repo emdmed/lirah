@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { APP_EVENTS, createRequest } from '../../lib/appEvents';
 import { notify } from '../../lib/notify';
 import { formatDuration } from '../../lib/formatDuration';
@@ -9,7 +9,6 @@ import { tabDisplayName } from './TabContext';
 import {
   acknowledgeAgent,
   getAgentHookState,
-  getAgentHookVersion,
   needsAttention,
   setAgentFocusResolver,
   subscribeAgentHooks,
@@ -33,26 +32,37 @@ function cliLabel(source) {
   return source === 'opencode' ? 'opencode' : 'Claude';
 }
 
+function buildQueue(tabs) {
+  const queue = [];
+  for (const tab of tabs) {
+    const sessionId = getTabSession(tab.id);
+    if (!needsAttention(sessionId)) continue;
+    const { state, at } = getAgentHookState(sessionId);
+    queue.push({ tabId: tab.id, sessionId, state, at });
+  }
+  return queue.sort((a, b) => (a.state === 'permission') !== (b.state === 'permission')
+    ? (a.state === 'permission' ? -1 : 1)
+    : a.at - b.at);
+}
+
+const queueKey = (queue) => queue.map((q) => `${q.tabId}:${q.sessionId}:${q.state}:${q.at}`).join('|');
+
 /**
  * Tabs whose agent is waiting on you and that you haven't looked at since:
  * blocked on permission first, then oldest first.
+ * The same array comes back until the queue itself changes, so the hook events
+ * of a busy agent (every tool call) don't re-render the caller.
  * @returns {Array<{ tabId: string, sessionId: string, state: string, at: number }>}
  */
 export function useAttentionQueue(tabs) {
-  // Changes on every hook event; the queue is rebuilt from module state.
-  const version = useSyncExternalStore(subscribeAgentHooks, getAgentHookVersion);
-  return useMemo(() => {
-    const queue = [];
-    for (const tab of tabs) {
-      const sessionId = getTabSession(tab.id);
-      if (!needsAttention(sessionId)) continue;
-      const { state, at } = getAgentHookState(sessionId);
-      queue.push({ tabId: tab.id, sessionId, state, at });
-    }
-    return queue.sort((a, b) => (a.state === 'permission') !== (b.state === 'permission')
-      ? (a.state === 'permission' ? -1 : 1)
-      : a.at - b.at);
-  }, [tabs, version]);
+  const cacheRef = useRef({ key: null, queue: [] });
+  const getSnapshot = useCallback(() => {
+    const queue = buildQueue(tabs);
+    const key = queueKey(queue);
+    if (key !== cacheRef.current.key) cacheRef.current = { key, queue };
+    return cacheRef.current.queue;
+  }, [tabs]);
+  return useSyncExternalStore(subscribeAgentHooks, getSnapshot);
 }
 
 /**
@@ -139,14 +149,17 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
 
   // Switches to the first tab in the queue and puts focus in its terminal.
   // Switching acknowledges it, so the next call moves on to the next one.
+  const queueRef = useRef(queue);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
   const jumpToNext = useCallback(() => {
+    const queue = queueRef.current;
     const target = queue.find((q) => q.tabId !== activeTabIdRef.current) || queue[0];
     if (!target) return false;
     if (target.tabId === activeTabIdRef.current) acknowledgeAgent(target.sessionId);
     else switchTab(target.tabId);
     requestAnimationFrame(() => requestAnimationFrame(() => focusPane(2)));
     return true;
-  }, [queue, switchTab]);
+  }, [switchTab]);
 
   useEffect(() => {
     const onRequest = () => jumpToNext();

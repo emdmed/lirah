@@ -155,7 +155,7 @@ export function useAtMention({ search, toggleFileSelection, setTextareaContent, 
     setAtMentionSelectedIndex(0);
   }, []);
 
-  return {
+  return useMemo(() => ({
     atMentionQuery, setAtMentionQuery,
     atMentionSelectedIndex,
     atMentionDisplayedResults,
@@ -163,5 +163,7 @@ export function useAtMention({ search, toggleFileSelection, setTextareaContent, 
     handleAtMentionNavigate,
     handleAtMentionSelect,
     handleAtMentionClose,
-  };
+  }), [
+    atMentionQuery, setAtMentionQuery, atMentionSelectedIndex, atMentionDisplayedResults, extractAtMention, handleAtMentionNavigate, handleAtMentionSelect, handleAtMentionClose,
+  ]);
 }

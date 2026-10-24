@@ -103,7 +103,7 @@ function isSelfOrDescendantOf(path, pathSet) {
   return false;
 }
 
-export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults }) {
+export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults, isActive = true }) {
   const [treeData, setTreeData] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeTruncated, setTreeTruncated] = useState(false);
@@ -133,14 +133,15 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     initializeSearch(files, projectRootRef.current);
   }, [initializeSearch]);
 
-  const loadTreeData = useCallback(async () => {
+  // `silent` keeps the current tree on screen while it reloads (no spinner).
+  const loadTreeData = useCallback(async (opts) => {
     try {
       if (!terminalSessionId) {
         setTreeData([]);
         setCurrentPath('Waiting for terminal...');
         return;
       }
-      setTreeLoading(true);
+      if (opts?.silent !== true) setTreeLoading(true);
       let cwd;
       if (projectRootRef.current) {
         cwd = projectRootRef.current;
@@ -214,6 +215,19 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     if (newEntries.length > 0) commitAllFiles([...prev, ...newEntries]);
   }, [commitAllFiles]);
 
+  // A hidden tab keeps its watcher running (the backend's watcher and caches
+  // stay valid) but doesn't apply fs changes: agent edits in a background tab
+  // would re-render it for nothing. It marks the tree stale and reloads once
+  // on activation, like useGitStats pausing on isActive.
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  const staleRef = useRef(false);
+  useEffect(() => {
+    if (!isActive || !staleRef.current) return;
+    staleRef.current = false;
+    loadTreeData({ silent: true });
+  }, [isActive, loadTreeData]);
+
   // Start native FS watcher and listen for create/delete events
   useEffect(() => {
     if (!watchPath || !fileWatchingEnabled) return;
@@ -240,6 +254,10 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
           const { created, deleted, root_path } = event.payload || {};
           // Only process events for our watched path
           if (root_path && root_path !== watchPath) return;
+          if (!isActiveRef.current) {
+            staleRef.current = true;
+            return;
+          }
           const hasCreated = created && created.length > 0;
           const hasDeleted = deleted && deleted.length > 0;
 

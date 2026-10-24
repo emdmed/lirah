@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 
 export function useSecondaryTerminal(terminalRef) {
   const [secondaryVisible, setSecondaryVisible] = useState(false);
@@ -35,7 +35,7 @@ export function useSecondaryTerminal(terminalRef) {
     }
   }, [terminalRef]);
 
-  return {
+  return useMemo(() => ({
     secondaryVisible,
     setSecondaryVisible,
     secondaryFocused,
@@ -52,5 +52,7 @@ export function useSecondaryTerminal(terminalRef) {
     pendingCommand,
     setPendingCommand,
     openWithCommand,
-  };
+  }), [
+    secondaryVisible, setSecondaryVisible, secondaryFocused, setSecondaryFocused, secondaryFullscreen, setSecondaryFullscreen, secondarySessionId, setSecondarySessionId, secondaryKey, secondaryTerminalRef, closeSecondaryTerminal, handlePickerVisibilityChange, projectDirOverride, pendingCommand, setPendingCommand, openWithCommand,
+  ]);
 }

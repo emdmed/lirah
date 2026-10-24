@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useMemo, useCallback, useEffect, useLayoutEffect, useRef, useState, memo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
@@ -24,8 +24,11 @@ const rowHeight = (row) =>
  * The nested tree is flattened into the rows that are currently visible
  * (pinned section first, then the tree) and only the rows in the viewport
  * are rendered, positioned inside `scrollRef` (the pane's scroll container).
+ *
+ * Memoized: the sidebar re-renders while it is resized and as symbols parse,
+ * neither of which changes the tree.
  */
-export function FileTree({
+export const FileTree = memo(function FileTree({
   nodes,
   searchQuery,
   expandedFolders,
@@ -51,11 +54,13 @@ export function FileTree({
   scrollRef,
   cursorIndex = null,
   registerList,
+  isActive = true,
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
-  // Files agents are reading or editing, marked on their rows and folders
-  const agentActivity = useAgentFileActivity(currentPath);
+  // Files agents are reading or editing, marked on their rows and folders.
+  // A background tab stops listening and catches up on activation.
+  const agentActivity = useAgentFileActivity(isActive);
 
   // Apply filters to get displayed nodes
   const displayedNodes = useMemo(() => {
@@ -291,4 +296,4 @@ export function FileTree({
       })}
     </SidebarMenu>
   );
-}
+});

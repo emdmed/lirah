@@ -3,10 +3,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { usePageVisible } from '../../hooks/usePageVisible';
 
-// The fs watcher emits `branch-changed` when .git/HEAD moves. The poll covers
-// what it can't see — watching disabled, a project nested inside a repo, a
-// terminal cd'd into another repo — at a tenth of the old 2 Hz rate.
-const FALLBACK_POLL_MS = 5000;
+// The fs watcher emits `branch-changed` when .git/HEAD moves, which covers the
+// normal cases. The poll is only a slow safety net for what it can't see —
+// watching disabled, a project nested inside a repo, a terminal cd'd into
+// another repo — and the fetch on enable catches up on every tab activation.
+const FALLBACK_POLL_MS = 30_000;
 
 export function useBranchName(repoPath, enabled = true) {
   const [branchName, setBranchName] = useState(null);

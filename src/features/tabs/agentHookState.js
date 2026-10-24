@@ -58,11 +58,16 @@ function recordFile(sessionId, payload, live) {
   if (found.length === 0) return;
   let paths = fileActivity.get(sessionId);
   if (!paths) fileActivity.set(sessionId, (paths = new Map()));
+  let changed = false;
   for (const { path, kind } of found) {
     const prev = paths.get(path);
-    paths.set(path, { kind: prev?.kind === 'edit' ? 'edit' : kind, live });
+    const nextKind = prev?.kind === 'edit' ? 'edit' : kind;
+    if (prev && prev.kind === nextKind && prev.live === live) continue;
+    paths.set(path, { kind: nextKind, live });
+    changed = true;
   }
-  emitFiles();
+  // Every FileTree hears this, so only when a mark actually moved.
+  if (changed) emitFiles();
 }
 
 // A tool denied at the prompt never sends PostToolUse; the turn's end settles it.
@@ -80,7 +85,10 @@ function settleFiles(sessionId) {
 }
 
 function forgetFiles(sessionId) {
-  if (fileActivity.delete(sessionId)) emitFiles();
+  const paths = fileActivity.get(sessionId);
+  if (!paths) return;
+  fileActivity.delete(sessionId);
+  if (paths.size > 0) emitFiles();
 }
 
 // The last few turns per session, from prompt to Stop: what the tools actually
@@ -289,13 +297,25 @@ export function getFileActivityVersion() {
 }
 
 // Every agent's files merged, path -> { kind, live }: edit beats read, live
-// beats settled.
+// beats settled. `folders` holds, for every ancestor directory of a marked path
+// (and the path itself, since a Bash target can be a directory), the strongest
+// mark inside it. Built once per change and shared by every FileTree.
+let mergedCache = null; // { version, files, folders }
 export function getFileActivity() {
+  if (mergedCache?.version === filesVersion) return mergedCache;
   const merged = new Map();
   for (const paths of fileActivity.values()) {
     for (const [path, entry] of paths) merged.set(path, strongerMark(merged.get(path), entry));
   }
-  return merged;
+  const folders = new Map();
+  for (const [path, mark] of merged) {
+    folders.set(path, strongerMark(folders.get(path), mark));
+    for (let dir = path.slice(0, path.lastIndexOf('/')); dir.length > 0; dir = dir.slice(0, dir.lastIndexOf('/'))) {
+      folders.set(dir, strongerMark(folders.get(dir), mark));
+    }
+  }
+  mergedCache = { version: filesVersion, files: merged, folders };
+  return mergedCache;
 }
 
 const MARK_RANK = { read: 1, edit: 2 };

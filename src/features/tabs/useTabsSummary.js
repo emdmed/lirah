@@ -12,6 +12,13 @@ const REPO_POLL_MS = 15000;
 const CLI_POLL_MS = 3000;
 const TICK_MS = 1000;
 
+/** Path with trailing slashes removed (but "/" kept), for comparing repo paths. */
+function normPath(p) {
+  if (typeof p !== 'string') return p;
+  const trimmed = p.replace(/[\\/]+$/, '');
+  return trimmed || p;
+}
+
 function sameJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -29,21 +36,18 @@ const cliWatchers = new Set();
 let cliTimer = null;
 let cliInFlight = false;
 
-async function runningCli(sessionId) {
-  for (const processName of TAB_CLI_PROCESSES) {
-    try {
-      if (await invoke('check_pty_child_process', { sessionId, processName })) return processName;
-    } catch { /* session gone */ }
-  }
-  return null;
-}
-
 async function pollCli() {
   cliTimer = null;
   cliInFlight = true;
   const ids = new Set();
   for (const watch of cliWatchers) for (const id of watch()) if (id) ids.add(id);
-  const next = Object.fromEntries(await Promise.all([...ids].map(async (id) => [id, await runningCli(id)])));
+  let next = {};
+  if (ids.size) {
+    try {
+      // One call for every session: the backend walks each process tree once.
+      next = await invoke('detect_pty_clis', { sessionIds: [...ids], names: TAB_CLI_PROCESSES });
+    } catch { /* keep {}: treat all as not running */ }
+  }
   cliInFlight = false;
   cliStore.set((prev) => (sameJson(prev, next) ? prev : next));
   if (cliWatchers.size) cliTimer = setTimeout(pollCli, CLI_POLL_MS);
@@ -89,8 +93,14 @@ export function useTabsSummary(tabs, enabled = true) {
   tabsRef.current = tabs;
   const pathsKey = tabs.map((t) => `${t.id}:${t.projectPath}`).join('|');
 
-  const fetchRepos = useCallback(async () => {
-    const entries = await Promise.all(tabsRef.current.map(async (t) => {
+  // Refetch every tab, or only those whose project is `repoPath`.
+  const fetchRepos = useCallback(async (repoPath) => {
+    const target = repoPath == null ? null : normPath(repoPath);
+    const tabs = target == null
+      ? tabsRef.current
+      : tabsRef.current.filter((t) => normPath(t.projectPath) === target);
+    if (!tabs.length) return;
+    const entries = await Promise.all(tabs.map(async (t) => {
       try {
         const [branch, stats] = await Promise.all([
           invoke('get_current_branch', { repoPath: t.projectPath }),
@@ -109,12 +119,19 @@ export function useTabsSummary(tabs, enabled = true) {
         return [t.id, null];
       }
     }));
-    const next = Object.fromEntries(entries);
-    setRepo((prev) => (sameJson(prev, next) ? prev : next));
+    const fetched = Object.fromEntries(entries);
+    const current = new Set(tabsRef.current.map((t) => t.id));
+    setRepo((prev) => {
+      // A full refetch replaces the map; a partial one merges into it. Either
+      // way, drop tabs that have closed.
+      const merged = target == null ? fetched : { ...prev, ...fetched };
+      const next = Object.fromEntries(Object.entries(merged).filter(([id]) => current.has(id)));
+      return sameJson(prev, next) ? prev : next;
+    });
   }, []);
 
-  // Repo state: on backend events (debounced, any repo — one cached call per
-  // tab) plus a slow fallback poll.
+  // Repo state: on backend events (debounced, only the changed repo's tabs)
+  // plus a slow fallback poll.
   useEffect(() => {
     if (!live) return;
     let cancelled = false;
@@ -128,9 +145,25 @@ export function useTabsSummary(tabs, enabled = true) {
     };
     poll();
 
-    const onEvent = () => {
+    // Debounced, then only the tabs of the repos that changed. Payloads:
+    // git-stats-changed is the watched path, branch-changed is { path, branch }.
+    // An event without a path refetches every tab.
+    let pendingPaths = new Set();
+    let pendingAll = false;
+    const onEvent = ({ payload }) => {
+      const repoPath = typeof payload === 'string' ? payload : payload?.path;
+      if (repoPath) pendingPaths.add(repoPath);
+      else pendingAll = true;
       clearTimeout(eventTimer);
-      eventTimer = setTimeout(() => { if (!cancelled) fetchRepos(); }, 300);
+      eventTimer = setTimeout(() => {
+        if (cancelled) return;
+        const paths = [...pendingPaths];
+        const all = pendingAll;
+        pendingPaths = new Set();
+        pendingAll = false;
+        if (all) fetchRepos();
+        else paths.forEach((p) => fetchRepos(p));
+      }, 300);
     };
     for (const name of ['git-stats-changed', 'branch-changed']) {
       listen(name, onEvent).then((fn) => {

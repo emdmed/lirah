@@ -49,12 +49,54 @@ const WEBGL_RETRY_RESET_MS = 60_000;
 // resets the *calling* renderer's cell model. Every other terminal keeps its
 // cached glyph coordinates into pages that are now being refilled with other
 // glyphs, and paints the right colours in the wrong shapes until each of those
-// cells changes. So a clear has to reach all of them (see repaintAll).
+// cells changes. So a clear has to reach all of them (see requestRepaint).
 const liveWebglRenderers = new Set();
 
 function disposeWebgl(webgl) {
   liveWebglRenderers.delete(webgl);
   webgl.dispose();
+}
+
+// Window-wide repaint coalescing. One clear already reaches every renderer, so
+// requests from any terminal in the same frame — a tab switch can raise the
+// primary's and the secondary's intersection edges, a focus event and a WebGL
+// rebuild together — share a single atlas clear, then each requester refreshes.
+const repaintRequests = new Set(); // Terminal instances
+let repaintRaf = 0;
+
+function runRepaints() {
+  repaintRaf = 0;
+  const terms = [...repaintRequests];
+  repaintRequests.clear();
+  if (terms.length === 0) return;
+  for (const webgl of liveWebglRenderers) {
+    try {
+      webgl.clearTextureAtlas();
+    } catch (e) {
+      console.debug('Texture atlas clear skipped:', e?.message);
+    }
+  }
+  for (const term of terms) {
+    try {
+      term.refresh(0, term.rows - 1);
+    } catch (e) {
+      // Renderer may not be ready (or the terminal was disposed); ignore.
+    }
+  }
+}
+
+function requestRepaint(term) {
+  if (!term) return;
+  repaintRequests.add(term);
+  if (!repaintRaf) repaintRaf = requestAnimationFrame(runRepaints);
+}
+
+function cancelRepaint(term) {
+  repaintRequests.delete(term);
+  if (repaintRequests.size === 0 && repaintRaf) {
+    cancelAnimationFrame(repaintRaf);
+    repaintRaf = 0;
+  }
 }
 
 export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true, reattachKey = null) {
@@ -84,11 +126,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const webglSuspendedRef = useRef(false);
   // A resize arrived while hidden; refit when shown again.
   const resizeDirtyRef = useRef(false);
-  // Repaint scheduling. Several signals can ask for the same repaint in one
-  // frame (the tab becoming visible also focuses the window, which also fires
-  // visibilitychange), and clearing the atlas re-rasterizes every glyph — so
-  // coalesce to one per frame.
-  const repaintRafRef = useRef(0);
+  // fit() changed rows/cols since the last SIGWINCH flush, i.e. the canvas was
+  // reallocated and the flush owes a repaint (see flushSigwinch).
+  const geometryChangedRef = useRef(false);
+  // Last state seen by the IntersectionObserver; null until its first callback.
+  const visibleRef = useRef(null);
   const isActiveRef = useRef(isActive);
   const { error } = useToast();
 
@@ -379,49 +421,33 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     };
   }, [terminal, fitAddon]);
 
-  // Rebuild the GPU glyph atlas and repaint every cell. refresh() alone re-runs
-  // the renderer against the *existing* atlas, so glyphs smeared when the canvas
-  // was reallocated during a resize (WebKitGTK does this on window maximize) get
-  // painted right back. Clearing the atlas first forces them to be re-rasterized.
-  // The atlas is shared, so every other live renderer is told too; only the
-  // first clear does any work; the rest find it empty and just drop their models.
-  const repaintAll = useCallback(() => {
-    const term = terminalInstRef.current;
-    if (!term) return;
-    for (const webgl of liveWebglRenderers) {
-      try {
-        webgl.clearTextureAtlas();
-      } catch (e) {
-        console.debug('Texture atlas clear skipped:', e?.message);
-      }
-    }
-    try {
-      term.refresh(0, term.rows - 1);
-    } catch (e) {
-      // Renderer may not be ready; ignore.
-    }
+  // Rebuild the GPU glyph atlas and repaint every cell, on the next frame.
+  // refresh() alone re-runs the renderer against the *existing* atlas, so glyphs
+  // smeared when the canvas was reallocated during a resize (WebKitGTK does this
+  // on window maximize) get painted right back. Clearing the atlas first forces
+  // them to be re-rasterized. The atlas is shared, so every other live renderer
+  // is told too. Every caller goes through here: they can all fire for the same
+  // event, and each clear costs a full re-rasterization (see requestRepaint).
+  const scheduleRepaint = useCallback(() => {
+    requestRepaint(terminalInstRef.current);
   }, []);
 
-  // Coalesced form of the above, for the recovery paths below. They can all
-  // fire for the same event, and each atlas clear costs a full re-rasterization.
-  const scheduleRepaint = useCallback(() => {
-    if (repaintRafRef.current) return;
-    repaintRafRef.current = requestAnimationFrame(() => {
-      repaintRafRef.current = 0;
-      repaintAll();
-    });
-  }, [repaintAll]);
+  // For repaints a resize or renderer rebuild owes while the terminal may still
+  // be off screen: there xterm is paused and would swallow the refresh, and the
+  // hidden -> visible edge below repaints anyway once it has resumed — so
+  // defer to that rather than paying for two atlas clears on one tab switch.
+  const repaintUnlessHidden = useCallback(() => {
+    if (visibleRef.current !== false) scheduleRepaint();
+  }, [scheduleRepaint]);
 
   useEffect(() => {
     isActiveRef.current = isActive;
   }, [isActive]);
 
   useEffect(() => {
-    return () => {
-      if (repaintRafRef.current) cancelAnimationFrame(repaintRafRef.current);
-      repaintRafRef.current = 0;
-    };
-  }, []);
+    if (!terminal) return;
+    return () => cancelRepaint(terminal);
+  }, [terminal]);
 
   // Repaint when this terminal comes back on screen. Background tabs are moved
   // out of the viewport (see ProjectTab), which is what engages xterm's own
@@ -448,10 +474,14 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // nothing stale to repaint.
         if (wasVisible === false && visible) scheduleRepaint();
         wasVisible = visible;
+        visibleRef.current = visible;
       }
     });
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      visibleRef.current = null;
+    };
   }, [terminal, scheduleRepaint]);
 
   // Repaint when the window itself comes back. Alt-tabbing away lets the
@@ -487,7 +517,12 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     pendingSinceRef.current = 0;
     // The resize gesture has settled — this is the point where a stale atlas is
     // worth the cost of rebuilding, once, rather than on every intermediate fit.
-    repaintAll();
+    // Only if the geometry actually moved, though: a tab activation re-fits at
+    // the same size, and no canvas reallocation means nothing smeared.
+    if (geometryChangedRef.current) {
+      geometryChangedRef.current = false;
+      repaintUnlessHidden();
+    }
     const pending = pendingDimsRef.current;
     const id = sessionIdRef.current;
     if (!pending || !id) return;
@@ -499,7 +534,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     invoke('resize_terminal', { sessionId: id, rows: pending.rows, cols: pending.cols }).catch((err) => {
       console.error('Failed to resize terminal:', err);
     });
-  }, [repaintAll]);
+  }, [repaintUnlessHidden]);
 
   // Handle resize — refits the xterm canvas to its container synchronously
   // (cheap, local) and queues a debounced SIGWINCH to the backend PTY. The
@@ -529,13 +564,20 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       if (proposed.cols < MIN_USABLE_COLS || proposed.rows < MIN_USABLE_ROWS) {
         return;
       }
+      const prevRows = terminal.rows;
+      const prevCols = terminal.cols;
       fitAddon.fit();
       const rows = terminal.rows;
       const cols = terminal.cols;
-      try {
-        terminal.refresh(0, terminal.rows - 1);
-      } catch (e) {
-        // Renderer may not be ready; ignore.
+      // The refresh evicts pixels the canvas reallocation left behind; when fit()
+      // was a no-op there was no reallocation and nothing to evict.
+      if (rows !== prevRows || cols !== prevCols) {
+        geometryChangedRef.current = true;
+        try {
+          terminal.refresh(0, rows - 1);
+        } catch (e) {
+          // Renderer may not be ready; ignore.
+        }
       }
       pendingDimsRef.current = { rows, cols };
       if (immediate) {
@@ -624,12 +666,12 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // that built it, so a fresh renderer can come back pointing at pages that
     // were uploaded to the context we just lost — which paints the right
     // glyph shapes from the wrong slots. Force a re-rasterization.
-    repaintAll();
+    repaintUnlessHidden();
     clearTimeout(rendererRetryResetRef.current);
     rendererRetryResetRef.current = setTimeout(() => {
       if (webglRef.current === webgl) rendererRetriesRef.current = 0;
     }, WEBGL_RETRY_RESET_MS);
-  }, [terminal, rendererLost, isActive, attachWebgl, repaintAll]);
+  }, [terminal, rendererLost, isActive, attachWebgl, repaintUnlessHidden]);
 
   useEffect(() => () => clearTimeout(rendererRetryResetRef.current), []);
 
@@ -641,7 +683,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     if (isActive) {
       if (webglSuspendedRef.current) {
         webglSuspendedRef.current = false;
-        if (!webglRef.current && attachWebgl(terminal)) repaintAll();
+        if (!webglRef.current && attachWebgl(terminal)) repaintUnlessHidden();
       }
       return;
     }
@@ -653,7 +695,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       disposeWebgl(webgl);
     }, WEBGL_IDLE_DISPOSE_MS);
     return () => clearTimeout(timer);
-  }, [terminal, isActive, attachWebgl, repaintAll]);
+  }, [terminal, isActive, attachWebgl, repaintUnlessHidden]);
 
   // Apply preference changes to this already-open terminal, including ones made
   // in another window of the app.

@@ -2,6 +2,7 @@ use crate::commit_watcher::CommitWatcherStore;
 use crate::pty::manager;
 use crate::pty::session::SessionHandle;
 use crate::state::AppState;
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -429,18 +430,34 @@ fn session_pid(state: &AppState, session_id: &str) -> Result<u32, String> {
 /// Find a descendant of `root` whose process name contains `target`
 /// (lowercase). Blocking: run it off the main thread.
 fn find_descendant(root: u32, target: &str) -> Option<u32> {
+    find_descendant_any(root, &[target]).map(|(pid, _)| pid)
+}
+
+/// Find a descendant of `root` whose process name contains any of `targets`
+/// (lowercase), in one walk of the subtree. Returns its PID and the index of
+/// the matched target; earlier targets win, as if each were searched for in
+/// turn. Blocking: run it off the main thread.
+fn find_descendant_any<S: AsRef<str>>(root: u32, targets: &[S]) -> Option<(u32, usize)> {
+    if targets.is_empty() {
+        return None;
+    }
     #[cfg(target_os = "linux")]
     if procfs::children_supported() {
-        return procfs::find_descendant(root, target);
+        return procfs::find_descendant_any(root, targets);
     }
-    find_descendant_sysinfo(root, target)
+    find_descendant_sysinfo(root, targets)
+}
+
+/// Index of the first of `targets` that `name` (lowercase) contains.
+fn first_match<S: AsRef<str>>(name: &str, targets: &[S]) -> Option<usize> {
+    targets.iter().position(|t| name.contains(t.as_ref()))
 }
 
 /// Linux fast path: walk only the shell's subtree through
 /// /proc/<pid>/task/<tid>/children instead of scanning every process.
 #[cfg(target_os = "linux")]
 mod procfs {
-    use super::MAX_DESCENDANT_DEPTH;
+    use super::{first_match, MAX_DESCENDANT_DEPTH};
     use std::fs;
     use std::os::unix::ffi::OsStrExt;
     use std::sync::OnceLock;
@@ -471,35 +488,41 @@ mod procfs {
 
     /// Same notion of "name" as sysinfo: `comm`, or argv[0]'s basename when
     /// `comm` hit the kernel's 15-byte limit and may be cut short.
-    fn name_matches(pid: u32, target: &str) -> bool {
-        let Ok(comm) = fs::read_to_string(format!("/proc/{}/comm", pid)) else {
-            return false;
-        };
+    /// Index of the first target this process's name contains.
+    fn name_matches<S: AsRef<str>>(pid: u32, targets: &[S]) -> Option<usize> {
+        let comm = fs::read_to_string(format!("/proc/{}/comm", pid)).ok()?;
         let comm = comm.trim_end();
-        if comm.to_lowercase().contains(target) {
-            return true;
+        let by_comm = first_match(&comm.to_lowercase(), targets);
+        if comm.len() < 15 || by_comm == Some(0) {
+            return by_comm;
         }
-        if comm.len() < 15 {
-            return false;
-        }
-        fs::read(format!("/proc/{}/cmdline", pid))
+        let by_argv0 = fs::read(format!("/proc/{}/cmdline", pid))
             .ok()
             .and_then(|cmdline| {
                 let argv0 = cmdline.split(|b| *b == 0).next()?;
                 let base = std::path::Path::new(std::ffi::OsStr::from_bytes(argv0)).file_name()?;
-                Some(base.to_string_lossy().to_lowercase().contains(target))
-            })
-            .unwrap_or(false)
+                first_match(&base.to_string_lossy().to_lowercase(), targets)
+            });
+        match (by_comm, by_argv0) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        }
     }
 
-    pub fn find_descendant(root: u32, target: &str) -> Option<u32> {
+    pub fn find_descendant_any<S: AsRef<str>>(root: u32, targets: &[S]) -> Option<(u32, usize)> {
+        let mut best: Option<(u32, usize)> = None;
         let mut level = vec![root];
         for _ in 0..MAX_DESCENDANT_DEPTH {
             let mut next = Vec::new();
             for pid in level {
                 for child in children(pid) {
-                    if name_matches(child, target) {
-                        return Some(child);
+                    if let Some(i) = name_matches(child, targets) {
+                        if i == 0 {
+                            return Some((child, 0));
+                        }
+                        if best.is_none_or(|(_, b)| i < b) {
+                            best = Some((child, i));
+                        }
                     }
                     next.push(child);
                 }
@@ -509,12 +532,12 @@ mod procfs {
             }
             level = next;
         }
-        None
+        best
     }
 }
 
 /// Portable fallback: one full process scan, then check ancestry.
-fn find_descendant_sysinfo(root: u32, target: &str) -> Option<u32> {
+fn find_descendant_sysinfo<S: AsRef<str>>(root: u32, targets: &[S]) -> Option<(u32, usize)> {
     use sysinfo::{Pid, ProcessesToUpdate, System};
 
     let mut sys = System::new();
@@ -535,10 +558,11 @@ fn find_descendant_sysinfo(root: u32, target: &str) -> Option<u32> {
 
     sys.processes()
         .iter()
-        .find(|(pid, process)| {
-            process.name().to_string_lossy().to_lowercase().contains(target) && is_descendant(**pid)
+        .filter_map(|(pid, process)| {
+            let i = first_match(&process.name().to_string_lossy().to_lowercase(), targets)?;
+            is_descendant(*pid).then_some((pid.as_u32(), i))
         })
-        .map(|(pid, _)| pid.as_u32())
+        .min_by_key(|(_, i)| *i)
 }
 
 #[tauri::command]
@@ -550,6 +574,37 @@ pub async fn check_pty_child_process(
     let shell_pid = session_pid(&state, &session_id)?;
     let target = process_name.to_lowercase();
     crate::ipc::blocking("check_pty_child_process", move || Ok(find_descendant(shell_pid, &target).is_some())).await
+}
+
+/// For each session, the first of `names` running somewhere under its shell,
+/// or None (also for a session that is gone). One walk of each session's
+/// process tree, instead of one `check_pty_child_process` per name.
+#[tauri::command]
+pub async fn detect_pty_clis(
+    session_ids: Vec<String>,
+    names: Vec<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<HashMap<String, Option<String>>, String> {
+    let sessions: Vec<(String, Option<u32>)> = session_ids
+        .into_iter()
+        .map(|id| {
+            let pid = session_pid(&state, &id).ok();
+            (id, pid)
+        })
+        .collect();
+    let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
+    crate::ipc::blocking("detect_pty_clis", move || {
+        Ok(sessions
+            .into_iter()
+            .map(|(id, pid)| {
+                let found = pid
+                    .and_then(|pid| find_descendant_any(pid, &targets))
+                    .map(|(_, i)| names[i].clone());
+                (id, found)
+            })
+            .collect())
+    })
+    .await
 }
 
 /// Kill a named child process running under the PTY session (e.g. claude, opencode).
@@ -576,4 +631,23 @@ pub async fn kill_pty_child_process(
         Ok(true)
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn find_descendant_any_prefers_earlier_names() {
+        let mut child = std::process::Command::new("sleep").arg("5").spawn().unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        let me = std::process::id();
+        let found = find_descendant_any(me, &["no-such-cli", "sleep"]);
+        assert_eq!(found, Some((child.id(), 1)));
+        assert_eq!(find_descendant_any(me, &["no-such-cli"]), None);
+        assert_eq!(find_descendant(me, "sleep"), Some(child.id()));
+        assert_eq!(find_descendant_sysinfo(me, &["sle", "sleep"]).map(|(_, i)| i), Some(0));
+        let _ = child.kill();
+        let _ = child.wait();
+    }
 }

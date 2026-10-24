@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSetting, useSeededSetting } from "../features/settings/settingsStore";
 
 // Preferences live in the shared settings store (src/features/settings), so a
@@ -23,7 +23,8 @@ export function useTerminalSettings() {
   const [autoCommitCli, setAutoCommitCli] = useSetting('autoCommitCli');
   const [autoCommitCustomPrompt, setAutoCommitCustomPrompt] = useSetting('autoCommitCustomPrompt');
 
-  return {
+  // Memoized so callers can depend on `settings` without changing every render.
+  return useMemo(() => ({
     sandboxEnabled, setSandboxEnabled,
     sandboxFailed, setSandboxFailed,
     networkIsolation, setNetworkIsolation,
@@ -37,5 +38,7 @@ export function useTerminalSettings() {
     autoChangelogCli, setAutoChangelogCli,
     autoCommitCli, setAutoCommitCli,
     autoCommitCustomPrompt, setAutoCommitCustomPrompt,
-  };
+  }), [
+    sandboxEnabled, setSandboxEnabled, sandboxFailed, setSandboxFailed, networkIsolation, setNetworkIsolation, showTitleBar, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend, autoLaunchCli, setAutoLaunchCli, selectedCli, setSelectedCli, autoChangelogEnabled, setAutoChangelogEnabled, autoChangelogTarget, setAutoChangelogTarget, autoChangelogTrigger, setAutoChangelogTrigger, autoChangelogCli, setAutoChangelogCli, autoCommitCli, setAutoCommitCli, autoCommitCustomPrompt, setAutoCommitCustomPrompt,
+  ]);
 }

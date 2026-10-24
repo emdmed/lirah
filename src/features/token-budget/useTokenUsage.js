@@ -1,13 +1,18 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { usePageVisible } from '../../hooks/usePageVisible';
+import { useTokenUsageStore } from './tokenUsageStore';
 
 // terminalSessionId lets the backend read the session of the `claude` process
 // running in this tab's PTY; without it usage falls back to the project's
 // most recently written session.
+//
+// Usage goes into a store (read it with useTokenUsageValue), not state, so a
+// poll re-renders only the components showing it, not the caller.
 export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
   const pageVisible = usePageVisible();
-  const [tokenUsage, setTokenUsage] = useState(null);
+  const tokenUsageStore = useTokenUsageStore();
+  const setTokenUsage = tokenUsageStore.set;
   const [projectStats, setProjectStats] = useState(null);
   const lastUsageRef = useRef(null);
   const checkIntervalRef = useRef(null);
@@ -25,14 +30,14 @@ export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
       }
     } catch (error) {
     }
-  }, [projectPath, terminalSessionId, enabled]);
+  }, [projectPath, terminalSessionId, enabled, setTokenUsage]);
 
   // Drop the previous project's/terminal's numbers instead of showing them
   // until the next poll lands.
   useEffect(() => {
     lastUsageRef.current = null;
     setTokenUsage(null);
-  }, [projectPath, terminalSessionId]);
+  }, [projectPath, terminalSessionId, setTokenUsage]);
 
   const fetchProjectStats = useCallback(async () => {
     if (!projectPath || !enabled) return;
@@ -74,5 +79,8 @@ export function useTokenUsage(projectPath, terminalSessionId, enabled = true) {
     fetchProjectStats();
   }, [fetchProjectStats]);
 
-  return { tokenUsage, projectStats, refreshProjectStats };
+  return useMemo(
+    () => ({ tokenUsageStore, projectStats, refreshProjectStats }),
+    [tokenUsageStore, projectStats, refreshProjectStats],
+  );
 }

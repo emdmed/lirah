@@ -594,16 +594,62 @@ fn get_all_projects_stats_internal() -> Result<AllProjectsStats, String> {
     })
 }
 
+/// Running sums of the deduplicated per-message usage.
+#[derive(Default, Clone, Copy)]
+struct UsageTotals {
+    input: u64,
+    output: u64,
+    cache_read: u64,
+    cache_creation: u64,
+    messages: u64,
+}
+
+impl UsageTotals {
+    fn add(&mut self, u: &UsageData) {
+        self.input += u.input_tokens.unwrap_or(0);
+        self.output += u.output_tokens.unwrap_or(0);
+        self.cache_read += u.cache_read_input_tokens.unwrap_or(0);
+        self.cache_creation += u.cache_creation_input_tokens.unwrap_or(0);
+    }
+
+    fn sub(&mut self, u: &UsageData) {
+        self.input = self.input.saturating_sub(u.input_tokens.unwrap_or(0));
+        self.output = self.output.saturating_sub(u.output_tokens.unwrap_or(0));
+        self.cache_read = self.cache_read.saturating_sub(u.cache_read_input_tokens.unwrap_or(0));
+        self.cache_creation = self
+            .cache_creation
+            .saturating_sub(u.cache_creation_input_tokens.unwrap_or(0));
+    }
+}
+
 /// Accumulated parse state for one session file, retained between calls so a
 /// growing (append-only) JSONL is never re-read from the top.
+///
+/// The summary fields (`totals`, `last_usage`, ids, model) are a few hundred
+/// bytes and kept for every file, so dashboard scans hit the cache. The
+/// per-message map is the heavy part; it exists only so a message id that
+/// reappears in a later line (streaming writes the same id on several lines)
+/// replaces its earlier usage instead of being counted twice. It is only
+/// needed while a file can still grow, so it is kept for recently modified
+/// files and dropped otherwise. A file that grows after its map was dropped
+/// is re-parsed from offset 0.
 #[derive(Default)]
 struct CachedSession {
-    /// Byte offset up to which complete lines have been merged into `usage_by_msg`.
+    /// Byte offset up to which complete lines have been merged.
     len: u64,
+    /// File size when last parsed. Unchanged size means nothing new to read,
+    /// even if the file ends in a partial line (so `len` < size).
+    seen_len: u64,
+    /// File mtime when last parsed; the least recently modified files lose
+    /// their dedup map first.
+    modified: Option<std::time::SystemTime>,
     /// Value of `CACHE_CLOCK` when last used, for least-recently-used eviction.
     last_used: u64,
-    /// Usage keyed by message id (dedup: a resent id overwrites, never double-counts).
-    usage_by_msg: HashMap<String, UsageData>,
+    /// Sums over the deduplicated messages.
+    totals: UsageTotals,
+    /// Usage keyed by message id (dedup: a resent id overwrites, never
+    /// double-counts). `None` once dropped; then the entry cannot resume.
+    usage_by_msg: Option<HashMap<String, UsageData>>,
     session_id: String,
     model: Option<String>,
     timestamp: Option<String>,
@@ -613,16 +659,31 @@ struct CachedSession {
     last_model: Option<String>,
 }
 
+impl CachedSession {
+    fn fresh() -> Self {
+        CachedSession { usage_by_msg: Some(HashMap::new()), ..Default::default() }
+    }
+}
+
 /// Per-file incremental parse cache. Claude session files are append-only and
 /// the active one is polled every 5s; without this each poll re-parsed the
-/// entire (tens-of-MB) file, and get_project_stats re-parsed every session
-/// file in the project on every call. Keyed by path, capped at
-/// `SESSION_CACHE_CAPACITY` files with least-recently-used eviction.
+/// entire (tens-of-MB) file, and the dashboards re-parsed every session file
+/// on every call. Keyed by path. Summaries are capped at
+/// `SESSION_CACHE_CAPACITY` (large enough for every transcript on disk), and
+/// at most `DEDUP_MAP_CAPACITY` entries keep their per-message map.
 static SESSION_USAGE_CACHE: Mutex<Option<HashMap<PathBuf, CachedSession>>> = Mutex::new(None);
 
-/// Most session files kept parsed. Each holds a usage entry per message, so an
-/// unbounded cache grew with every session ever opened in the dashboard.
-const SESSION_CACHE_CAPACITY: usize = 200;
+/// Most session summaries kept. Each is small and fixed-size, so this only
+/// guards against pathological directories; it must exceed the number of
+/// transcripts or a full dashboard scan evicts every entry before reuse.
+const SESSION_CACHE_CAPACITY: usize = 10_000;
+
+/// Most entries that keep their per-message dedup map (the memory-heavy part).
+const DEDUP_MAP_CAPACITY: usize = 32;
+
+/// Files untouched for longer than this are treated as finished: their dedup
+/// map is dropped after parsing.
+const ACTIVE_FILE_WINDOW: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
 
 /// Logical clock for `CachedSession::last_used`.
 static CACHE_CLOCK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -631,7 +692,10 @@ fn cache_tick() -> u64 {
     CACHE_CLOCK.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Insert `state` for `path`, evicting the least recently used entry when full.
+/// Insert `state` for `path`, evicting the least recently used entry when
+/// full and dropping the dedup maps of the least recently modified files
+/// beyond `DEDUP_MAP_CAPACITY` (so a dashboard scan cannot strip the map of
+/// the session currently being written).
 fn cache_insert(cache: &mut HashMap<PathBuf, CachedSession>, path: PathBuf, mut state: CachedSession) {
     state.last_used = cache_tick();
     if cache.len() >= SESSION_CACHE_CAPACITY && !cache.contains_key(&path) {
@@ -643,32 +707,35 @@ fn cache_insert(cache: &mut HashMap<PathBuf, CachedSession>, path: PathBuf, mut 
             cache.remove(&oldest);
         }
     }
+    let has_map = state.usage_by_msg.is_some();
     cache.insert(path, state);
+    if has_map {
+        let mut with_maps: Vec<&mut CachedSession> =
+            cache.values_mut().filter(|c| c.usage_by_msg.is_some()).collect();
+        if with_maps.len() > DEDUP_MAP_CAPACITY {
+            with_maps.sort_by_key(|c| (c.modified, c.last_used));
+            let excess = with_maps.len() - DEDUP_MAP_CAPACITY;
+            for c in with_maps.into_iter().take(excess) {
+                c.usage_by_msg = None;
+            }
+        }
+    }
 }
 
-/// Sum the cached per-message usage into a `SessionInfo` — cheap, no file I/O.
+/// Build a `SessionInfo` from the cached summary — cheap, no file I/O.
 fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
-    let mut input_tokens = 0u64;
-    let mut output_tokens = 0u64;
-    let mut cache_read = 0u64;
-    let mut cache_creation = 0u64;
-    for u in c.usage_by_msg.values() {
-        input_tokens += u.input_tokens.unwrap_or(0);
-        output_tokens += u.output_tokens.unwrap_or(0);
-        cache_read += u.cache_read_input_tokens.unwrap_or(0);
-        cache_creation += u.cache_creation_input_tokens.unwrap_or(0);
-    }
+    let t = &c.totals;
     SessionInfo {
         session_id: c.session_id.clone(),
         session_file: path.to_string_lossy().to_string(),
         model: c.model.clone(),
-        input_tokens,
-        output_tokens,
-        cache_read_input_tokens: cache_read,
-        cache_creation_input_tokens: cache_creation,
-        billable_input_tokens: input_tokens + cache_creation,
-        billable_output_tokens: output_tokens,
-        message_count: c.usage_by_msg.len() as u64,
+        input_tokens: t.input,
+        output_tokens: t.output,
+        cache_read_input_tokens: t.cache_read,
+        cache_creation_input_tokens: t.cache_creation,
+        billable_input_tokens: t.input + t.cache_creation,
+        billable_output_tokens: t.output,
+        message_count: t.messages,
         timestamp: c.timestamp.clone().unwrap_or_default(),
         context_tokens: c.last_usage.as_ref().map(context_tokens_of).unwrap_or(0),
         last_model: c.last_model.clone(),
@@ -732,7 +799,12 @@ fn merge_session_lines<R: BufRead>(reader: &mut R, state: &mut CachedSession) ->
                     }
                 }
                 if let (Some(id), Some(u)) = (message.id, message.usage) {
-                    state.usage_by_msg.insert(id, u);
+                    let map = state.usage_by_msg.get_or_insert_with(HashMap::new);
+                    state.totals.add(&u);
+                    match map.insert(id, u) {
+                        Some(prev) => state.totals.sub(&prev),
+                        None => state.totals.messages += 1,
+                    }
                 }
             }
         }
@@ -741,7 +813,12 @@ fn merge_session_lines<R: BufRead>(reader: &mut R, state: &mut CachedSession) ->
 }
 
 fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
-    let current_len = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    let meta = fs::metadata(path).ok();
+    let current_len = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+    let modified = meta.and_then(|m| m.modified().ok());
+    let recently_modified = modified
+        .and_then(|t| t.elapsed().ok())
+        .map_or(true, |age| age < ACTIVE_FILE_WINDOW);
 
     // Consult the cache for a resume point. Lock is held only briefly here.
     let (mut state, start_offset) = {
@@ -751,7 +828,7 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
         // with no file read. Hot path for the 5s poll between new messages
         // and for every unchanged file in get_project_stats.
         if let Some(c) = cache.get_mut(path) {
-            if c.len == current_len {
+            if c.seen_len == current_len {
                 c.last_used = cache_tick();
                 return Ok(build_session_info(path, c));
             }
@@ -759,13 +836,15 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
         // Take the entry out rather than cloning its whole message map; it
         // goes back in once the new lines are merged.
         match cache.remove(path) {
-            // Grew (append-only) — resume from the last consumed offset.
-            Some(c) if current_len > c.len => {
+            // Grew (append-only) and the dedup map is still held — resume
+            // from the last consumed offset.
+            Some(c) if current_len > c.seen_len && c.usage_by_msg.is_some() => {
                 let offset = c.len;
                 (c, offset)
             }
-            // New file, or truncated/rotated — parse from the start.
-            _ => (CachedSession::default(), 0),
+            // New file, truncated/rotated, or grew after its map was
+            // dropped — parse from the start.
+            _ => (CachedSession::fresh(), 0),
         }
     };
 
@@ -773,6 +852,12 @@ fn parse_session_file(path: &PathBuf) -> Result<SessionInfo, String> {
         .map_err(|e| format!("Failed to open session file: {}", e))?;
     let consumed = merge_session_lines(&mut reader, &mut state);
     state.len = start_offset + consumed;
+    state.seen_len = current_len;
+    state.modified = modified;
+    if !recently_modified {
+        // Finished file: keep only the summary.
+        state.usage_by_msg = None;
+    }
 
     let info = build_session_info(path, &state);
     {
@@ -908,5 +993,63 @@ mod tests {
         let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
         assert_eq!(info.context_tokens, 0);
         assert!(info.last_model.is_none());
+    }
+    #[test]
+    fn repeated_message_id_replaces_usage_in_totals() {
+        let jsonl = concat!(
+            r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-4-6","usage":{"input_tokens":10,"output_tokens":1}}}"#, "\n",
+            r#"{"type":"assistant","message":{"id":"m1","model":"claude-opus-4-6","usage":{"input_tokens":10,"output_tokens":40}}}"#, "\n",
+            r#"{"type":"assistant","message":{"id":"m2","model":"claude-opus-4-6","usage":{"input_tokens":5,"output_tokens":2}}}"#, "\n",
+        );
+        let mut state = CachedSession::fresh();
+        merge_session_lines(&mut Cursor::new(jsonl.as_bytes()), &mut state);
+        let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
+        assert_eq!(info.message_count, 2);
+        assert_eq!(info.input_tokens, 15);
+        assert_eq!(info.output_tokens, 42);
+    }
+
+    #[test]
+    fn dedup_maps_trimmed_least_recently_modified_first() {
+        use std::time::{Duration, SystemTime};
+        let mut cache = HashMap::new();
+        let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        // The newest-modified file is inserted first, so it is the least
+        // recently used, yet it must keep its map.
+        for i in (0..=DEDUP_MAP_CAPACITY).rev() {
+            let mut c = CachedSession::fresh();
+            c.modified = Some(base + Duration::from_secs(i as u64));
+            cache_insert(&mut cache, PathBuf::from(format!("s{}", i)), c);
+        }
+        assert_eq!(cache.len(), DEDUP_MAP_CAPACITY + 1);
+        assert_eq!(cache.values().filter(|c| c.usage_by_msg.is_some()).count(), DEDUP_MAP_CAPACITY);
+        assert!(cache[&PathBuf::from("s0")].usage_by_msg.is_none());
+        assert!(cache[&PathBuf::from(format!("s{}", DEDUP_MAP_CAPACITY))].usage_by_msg.is_some());
+    }
+
+    #[test]
+    fn growth_after_map_dropped_reparses_without_double_count() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("nevo-tokens-regrow-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.jsonl");
+        let line = |out: u64| {
+            format!(r#"{{"type":"assistant","message":{{"id":"m1","model":"claude-opus-4-6","usage":{{"input_tokens":1,"output_tokens":{}}}}}}}"#, out) + "\n"
+        };
+        fs::write(&path, line(1)).unwrap();
+        assert_eq!(parse_session_file(&path).unwrap().output_tokens, 1);
+        // Simulate a finished file whose map was dropped.
+        {
+            let mut guard = SESSION_USAGE_CACHE.lock().unwrap();
+            guard.as_mut().unwrap().get_mut(&path).unwrap().usage_by_msg = None;
+        }
+        // Same message id streamed again with final usage.
+        fs::OpenOptions::new().append(true).open(&path).unwrap().write_all(line(9).as_bytes()).unwrap();
+        let info = parse_session_file(&path).unwrap();
+        assert_eq!(info.message_count, 1);
+        assert_eq!(info.output_tokens, 9);
+        // Unchanged file is served from the summary.
+        assert_eq!(parse_session_file(&path).unwrap().output_tokens, 9);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

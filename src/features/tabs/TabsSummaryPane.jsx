@@ -29,7 +29,13 @@ export function TabsSummaryPane() {
   const queue = useAttentionQueue(tabs);
   const [openTrail, setOpenTrail] = useState(null); // tab id whose last turn is expanded
   const [renamingId, setRenamingId] = useState(null);
-  const drag = useDragReorder(reorderTab);
+  // useDragReorder hands back a new object each render; rows are memoized, so
+  // keep it the same until one of its parts changes.
+  const { dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt } = useDragReorder(reorderTab);
+  const drag = useMemo(
+    () => ({ dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt }),
+    [dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt],
+  );
   const plans = useTabPlans(tabs, activeTabId);
 
   const commitRename = useCallback((tab, value) => {
@@ -77,6 +83,8 @@ export function TabsSummaryPane() {
     requestPlanFocus(planId);
   }, [activeTabId, switchTab]);
 
+  const toggleTrail = useCallback((id) => setOpenTrail((open) => (open === id ? null : id)), []);
+
   const actions = useMemo(() => ({
     switchTab,
     openPlan,
@@ -87,8 +95,8 @@ export function TabsSummaryPane() {
     toggleLink,
     copyBranch,
     attachEdits,
-    toggleTrail: (id) => setOpenTrail((open) => (open === id ? null : id)),
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, attachEdits]);
+    toggleTrail,
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, attachEdits, toggleTrail]);
 
   return (
     <div className="flex flex-col">
@@ -100,6 +108,7 @@ export function TabsSummaryPane() {
         const active = tab.id === activeTabId;
         const turn = cli[tab.id] ? getLastTurn(getTabSession(tab.id)) : null;
         const summary = turnSummary(turn, now);
+        const activity = workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel } : own;
         return (
           <TabRow
             key={tab.id}
@@ -108,14 +117,17 @@ export function TabsSummaryPane() {
             name={tabName(tab)}
             info={repo[tab.id]}
             contextFill={getTabContextFill(tab.id)}
-            activity={workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel } : own}
+            activityKind={activity.kind}
+            activityLabel={activity.label}
+            activitySince={activity.since}
             workLabel={workLabel}
             active={active}
             linked={!active && linkedRepos.some((r) => r.path === tab.projectPath)}
             closable={closable}
             queuePos={active ? -1 : queue.findIndex((q) => q.tabId === tab.id)}
             turn={turn}
-            summary={summary}
+            summaryText={summary?.text}
+            summaryRunning={!!summary?.running}
             trailOpen={!!summary && openTrail === tab.id}
             plans={plans.byTab[tab.id]}
             renaming={renamingId === tab.id}

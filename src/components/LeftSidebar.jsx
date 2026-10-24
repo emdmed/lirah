@@ -4,7 +4,7 @@ import { FlatViewMenu } from "./FlatViewMenu";
 import { SidebarFileSelection } from "../features/file-groups";
 import { useFileSelection } from "../features/file-groups";
 import { usePinnedFiles } from "../features/pinned-files";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, memo } from "react";
 import { Scanner } from "./instrument/Scanner";
 import { PaneLegend } from "./instrument/PaneLegend";
 import { useRowCursor } from "../hooks/useRowCursor";
@@ -15,7 +15,11 @@ import {
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
 
-export function LeftSidebar({
+// Memoized: the tab re-renders for its prompt, branch, cwd, at-mention and
+// secondary-terminal state, none of which the sidebar shows. Every prop it
+// takes is stable at its source (the hook objects are memoized there, the
+// handlers are useCallbacks in ProjectTab).
+export const LeftSidebar = memo(function LeftSidebar({
   sidebar,
   search,
   searchInputRef,
@@ -40,6 +44,7 @@ export function LeftSidebar({
   onOpenElementPicker,
   keepFilesAfterSend,
   onToggleKeepFiles,
+  isActive = true,
 }) {
   const {
     selectedFiles, toggleFileSelection, filesWithRelativePaths,
@@ -146,6 +151,7 @@ export function LeftSidebar({
                     scrollRef={rowsRef}
                     cursorIndex={cursorIndex}
                     registerList={registerList}
+                    isActive={isActive}
                   />
                 )
               )}
@@ -179,4 +185,4 @@ export function LeftSidebar({
       />
     </>
   );
-}
+});

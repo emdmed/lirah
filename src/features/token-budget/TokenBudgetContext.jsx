@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useTokenUsageValue } from './tokenUsageStore';
 import { getStartOfDay, getStartOfWeek, formatTokenCount, formatCost, computeCostFromUsage } from './tokenCalculations';
 import { prepareChartData, prepareModelBreakdown, calculateEfficiencyMetrics } from './dashboardData';
 import { exportToCSV, exportToJSON } from './exportData';
@@ -18,7 +19,33 @@ function saveToStorage(data) {
   saveJson(STORAGE_KEY, data);
 }
 
-export function TokenBudgetProvider({ children, tokenUsage, projectStats, projectPath }) {
+const NO_USAGE = { total: 0, cost: 0 };
+
+function tokenTotal(tokenUsage) {
+  return tokenUsage ? (tokenUsage.billable_input_tokens || 0) + (tokenUsage.billable_output_tokens || 0) : 0;
+}
+
+function usageSummary(tokenUsage) {
+  if (!tokenUsage) return NO_USAGE;
+  const total = tokenTotal(tokenUsage);
+  const cost = computeCostFromUsage(tokenUsage, tokenUsage.model || DEFAULT_MODEL);
+  return { total, cost, model: tokenUsage.model };
+}
+
+function budgetStatus(budgets, path, total) {
+  const limit = budgets[path]?.dailyLimit;
+  if (!limit) return { status: 'none', percentage: 0 };
+  const percentage = Math.min((total / limit) * 100, 100);
+  if (percentage >= 95) return { status: 'critical', percentage };
+  if (percentage >= 80) return { status: 'warning', percentage };
+  return { status: 'ok', percentage };
+}
+
+// The context value holds no live usage: it only changes when budgets, alerts
+// or project stats do. Live usage comes from `tokenUsageStore` (see
+// tokenUsageStore.js), subscribed to by useTokenBudget / useBudgetExhausted,
+// so a usage poll re-renders those readers and nothing else.
+export function TokenBudgetProvider({ children, tokenUsageStore, projectStats, projectPath }) {
   const [storageData, setStorageData] = useState(loadFromStorage);
   const saveTimeoutRef = useRef(null);
 
@@ -63,24 +90,6 @@ export function TokenBudgetProvider({ children, tokenUsage, projectStats, projec
       return next;
     });
   }, [debouncedSave]);
-
-  const currentUsage = useMemo(() => {
-    if (!tokenUsage) return { total: 0, cost: 0 };
-    const total = (tokenUsage.billable_input_tokens || 0) + (tokenUsage.billable_output_tokens || 0);
-    const cost = computeCostFromUsage(tokenUsage, tokenUsage.model || DEFAULT_MODEL);
-    return { total, cost, model: tokenUsage.model };
-  }, [tokenUsage]);
-
-  const checkBudgetStatus = useCallback((path) => {
-    const budget = storageData.budgets[path];
-    if (!budget) return { status: 'none', percentage: 0 };
-    const limit = budget.dailyLimit;
-    if (!limit) return { status: 'none', percentage: 0 };
-    const percentage = Math.min((currentUsage.total / limit) * 100, 100);
-    if (percentage >= 95) return { status: 'critical', percentage };
-    if (percentage >= 80) return { status: 'warning', percentage };
-    return { status: 'ok', percentage };
-  }, [storageData.budgets, currentUsage.total]);
 
   const getAlertState = useCallback((path) => {
     return storageData.alertStates[path] || {};
@@ -147,11 +156,11 @@ export function TokenBudgetProvider({ children, tokenUsage, projectStats, projec
   }, []);
 
   const value = useMemo(() => ({
+    tokenUsageStore,
+    budgets: storageData.budgets,
     getBudget,
     setBudget,
     removeBudget,
-    currentUsage,
-    checkBudgetStatus,
     getAlertState,
     dismissAlert,
     resetAlerts,
@@ -163,7 +172,7 @@ export function TokenBudgetProvider({ children, tokenUsage, projectStats, projec
     getEfficiencyMetrics,
     exportData,
     projectStats,
-  }), [getBudget, setBudget, removeBudget, currentUsage, checkBudgetStatus, getAlertState, dismissAlert, resetAlerts, shouldShowAlert, getHistoricalData, getModelBreakdown, getEfficiencyMetrics, exportData, projectStats]);
+  }), [tokenUsageStore, storageData.budgets, getBudget, setBudget, removeBudget, getAlertState, dismissAlert, resetAlerts, shouldShowAlert, getHistoricalData, getModelBreakdown, getEfficiencyMetrics, exportData, projectStats]);
 
   return (
     <TokenBudgetContext.Provider value={value}>
@@ -172,8 +181,34 @@ export function TokenBudgetProvider({ children, tokenUsage, projectStats, projec
   );
 }
 
-export function useTokenBudget() {
+function useTokenBudgetContext() {
   const ctx = useContext(TokenBudgetContext);
   if (!ctx) throw new Error('useTokenBudget must be used within TokenBudgetProvider');
   return ctx;
+}
+
+// Budgets plus the tab's live usage (`currentUsage`, `checkBudgetStatus`).
+// Re-renders on every usage change; use useBudgetExhausted when only that
+// flag is needed.
+export function useTokenBudget() {
+  const ctx = useTokenBudgetContext();
+  const tokenUsage = useTokenUsageValue(ctx.tokenUsageStore);
+  const currentUsage = useMemo(() => usageSummary(tokenUsage), [tokenUsage]);
+  const { budgets } = ctx;
+  const checkBudgetStatus = useCallback(
+    (path) => budgetStatus(budgets, path, currentUsage.total),
+    [budgets, currentUsage.total],
+  );
+  return useMemo(() => ({ ...ctx, currentUsage, checkBudgetStatus }), [ctx, currentUsage, checkBudgetStatus]);
+}
+
+// True once today's usage has used up `path`'s daily budget. Re-renders only
+// when the flag flips, not on every usage poll.
+export function useBudgetExhausted(path) {
+  const { tokenUsageStore, budgets } = useTokenBudgetContext();
+  const getSnapshot = () => {
+    const { status, percentage } = budgetStatus(budgets, path, tokenTotal(tokenUsageStore.get()));
+    return status === 'critical' && percentage >= 100;
+  };
+  return useSyncExternalStore(tokenUsageStore.subscribe, getSnapshot);
 }
