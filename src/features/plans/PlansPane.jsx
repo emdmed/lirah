@@ -3,6 +3,7 @@ import { errorMessage } from '../../lib/errorMessage';
 import { Plus } from 'lucide-react';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Scanner } from '../../components/instrument/Scanner';
+import { PanelButton } from '../../components/instrument/PanelButton';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
@@ -30,7 +31,7 @@ export function PlansPane({ projectPath }) {
     plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix,
     sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees,
   } = usePlans(repoRoot);
-  const { files, importFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
+  const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
   const { tabs, activeTabId, addTab } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
@@ -174,25 +175,25 @@ export function PlansPane({ projectPath }) {
         </PlanPaneProvider>
       ) : (
         <>
-          <FoundPlansSection files={files} importFile={importFile} />
+          <FoundPlansSection files={files} importFile={importFile} deleteFile={deleteFile} />
           {plans.length === 0 ? (
             <EmptyLine hint="paste a plan and an agent splits it into chunks you implement one commit at a time">
               no plans
             </EmptyLine>
           ) : (
             <div className="flex flex-col">
+              <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 text-[10px] text-muted-foreground edge-b-engraved">
+                <span className="engraved-label">plans</span>
+                <span className="font-mono tabular-nums">{plans.length}</span>
+              </div>
               {[...plans].sort((a, b) => runRank(a) - runRank(b)).map((plan) => (
                 <PlanRow key={plan.id} plan={plan} onOpen={() => setOpenPlanId(plan.id)} />
               ))}
             </div>
           )}
-          <button
-            onClick={() => setNewOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-2 text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
-          >
-            <Plus className="h-3 w-3" />
+          <PanelButton icon={Plus} onClick={() => setNewOpen(true)} className="mx-3 my-2 self-start">
             new plan
-          </button>
+          </PanelButton>
         </>
       )}
 

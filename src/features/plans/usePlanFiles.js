@@ -63,7 +63,7 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
     };
   }, [repoRoot, importedKey]);
 
-  const importFile = useCallback(async (file, { deleteOriginal = false } = {}) => {
+  const importFile = useCallback(async (file) => {
     const importedFrom = { path: file.path, hash: file.hash };
     const existing = file.planId && plans?.find((p) => p.id === file.planId);
     if (existing && !planStarted(existing)) {
@@ -72,8 +72,13 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
       await createPlan(repoRoot, { source: file.source, importedFrom });
     }
     setFiles((list) => list.filter((f) => f.path !== file.path));
-    if (deleteOriginal) await invoke('delete_plan_file', { path: file.path, repoRoot });
   }, [repoRoot, plans, createPlan, replaceSource]);
 
-  return { files, importFile };
+  // Offered after an import, so the choice comes once the plan is safe.
+  const deleteFile = useCallback(
+    (file) => invoke('delete_plan_file', { path: file.path, repoRoot }),
+    [repoRoot],
+  );
+
+  return { files, importFile, deleteFile };
 }

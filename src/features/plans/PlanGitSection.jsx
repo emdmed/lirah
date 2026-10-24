@@ -45,6 +45,13 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
   const removed = !!cfg.removedAt;
   const candidates = bookmarks.filter((b) => !cfg.repos.some((r) => r.root === b.path || b.path.startsWith(`${r.root}/`)));
   const where = cfg.worktrees ? 'worktrees' : 'in place';
+  // A lone repo's line only earns its place when it says more than its name:
+  // a base to pick, a branch ← base, or a worktree path.
+  const multi = cfg.repos.length > 1;
+  const solo = cfg.repos[0];
+  const showRepos = multi || (locked
+    ? !!(cfg.branch || solo?.base || (cfg.worktrees && solo?.workPath && solo.workPath !== solo.root))
+    : !!cfg.branch.trim());
   const headline = locked
     ? [cfg.branch || 'current branch', where, removed && 'removed'].filter(Boolean).join(' · ')
     : 'set up when the first chunk is sent';
@@ -54,7 +61,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
     <div className={cn('flex min-w-0 flex-col gap-1.5 text-[11px]', !locked && 'ins-well px-2 py-1.5')}>
       <div className="flex min-w-0 items-center gap-2">
         {!locked && <Lamp state="off" label="git not set up yet" />}
-        <span className="engraved-label shrink-0">git</span>
+        <span className="engraved-label w-12 shrink-0">git</span>
         <span className={cn('min-w-0 truncate', locked ? 'text-muted-foreground' : 'text-foreground')} title={headline}>{headline}</span>
       </div>
 
@@ -86,13 +93,13 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         </>
       )}
 
-      <div className="flex min-w-0 flex-col gap-1">
+      {showRepos && <div className="flex min-w-0 flex-col gap-1">
         {cfg.repos.map((repo, i) => (
           <div key={repo.root} className="flex min-w-0 flex-col gap-0.5">
             <div className="flex min-w-0 items-center gap-1.5">
               <span className={cn('min-w-0 flex-1 truncate font-mono text-[10px]', locked ? 'text-muted-foreground' : 'text-foreground')} title={repo.root}>
                 {basename(repo.root)}
-                {i === 0 && <span className="text-faint"> · primary</span>}
+                {i === 0 && multi && <span className="text-muted-foreground"> · primary</span>}
               </span>
               {locked ? (
                 // With no branch the headline already says "current branch".
@@ -119,7 +126,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
             )}
           </div>
         ))}
-      </div>
+      </div>}
 
       {!locked && candidates.length > 0 && (
         <select

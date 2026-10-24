@@ -42,6 +42,8 @@ const STATUS_NOTE = {
 };
 const statusNote = (chunk) => STATUS_NOTE[effectiveChunkState(chunk)] ?? null;
 
+const REORDER = 'opacity-0 group-hover/chunk:opacity-100 focus-visible:opacity-100';
+
 export function ChunkRow({ plan, chunk, open, onToggle }) {
   const pane = usePlanPane();
   const { repoRoot } = pane;
@@ -78,7 +80,7 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
   };
 
   return (
-    <div className="flex flex-col edge-b-engraved">
+    <div className="group/chunk flex flex-col edge-b-engraved">
       <button
         onClick={onToggle}
         className="group flex min-w-0 items-start gap-2 px-3 py-2 text-left text-[11px] cursor-pointer hover:bg-foreground/5 outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
@@ -91,14 +93,14 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
         <span
           className={cn(
             'w-4 shrink-0 text-right font-mono text-[10px] leading-4 tabular-nums',
-            isNext ? 'text-[var(--ins-lamp)]' : 'text-faint',
+            isNext ? 'text-[var(--ins-lamp)]' : 'text-muted-foreground',
           )}
         >
           {chunk.n}
         </span>
         <span
           className={cn(
-            'min-w-0 flex-1 leading-4',
+            'min-w-0 flex-1 font-medium leading-4',
             open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
             skipped ? 'text-muted-foreground line-through' : implemented && !open ? 'text-muted-foreground' : 'text-foreground',
           )}
@@ -113,7 +115,7 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
           )}
           {/* Implemented is the lamp's job; the row only says how long it took. */}
           {busy ? <Scanner /> : implemented ? took && (
-            <span className="tabular-nums text-faint" title={`${status}; took ${took} from sending to commit`}>{took}</span>
+            <span className="tabular-nums" title={`${status}; took ${took} from sending to commit`}>{took}</span>
           ) : chunk.status !== CHUNK_STATUS.PENDING && (
             <span className="tabular-nums">{status}</span>
           )}
@@ -124,7 +126,8 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
       </button>
 
       {open && (
-        <div className="flex min-w-0 flex-col gap-2.5 pr-3 pb-3 pl-[51px] text-[11px] leading-relaxed">
+        // Indented to the chunk number, not the title: the pane is narrow.
+        <div className="flex min-w-0 flex-col gap-2.5 pr-3 pb-3 pl-7 text-[11px] leading-relaxed">
           {note && <p className="text-[10px] leading-relaxed text-muted-foreground">{note}</p>}
           {editing ? (
             <div className="flex flex-col gap-1.5">
@@ -151,10 +154,11 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
             </div>
           ) : (
             <>
-              {chunk.goal && <Prose text={chunk.goal} className="text-foreground" />}
+              {chunk.goal && <Prose text={chunk.goal} className="text-muted-foreground" />}
+              {/* Opening a chunk means reading it: details show in full. */}
               {chunk.details && (
                 <Field label="details">
-                  <Prose text={chunk.details} clamp={4} className="text-muted-foreground" />
+                  <Prose text={chunk.details} className="text-muted-foreground" />
                 </Field>
               )}
               {chunk.files?.length > 0 && (
@@ -215,7 +219,8 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
               {(chunk.status === CHUNK_STATUS.PENDING || skipped) && (
                 <PanelButton
                   icon={SkipForward}
-                  latched={skipped}
+                  // Its lamp only once it is on, so it can't read as a second status.
+                  {...(skipped ? { latched: true } : { 'aria-pressed': false })}
                   onClick={() => onPatch({ status: skipped ? CHUNK_STATUS.PENDING : CHUNK_STATUS.SKIPPED })}
                   title="Skipped chunks don't count toward progress"
                 >
@@ -225,8 +230,9 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
               {chunk.status === CHUNK_STATUS.PENDING && (
                 <span className="ml-auto flex gap-1">
                   <PanelButton icon={Pencil} onClick={startEdit} title="Edit chunk" aria-label="Edit chunk" />
-                  <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" />
-                  <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" />
+                  {/* Reordering is rare: shown on hover or keyboard focus. */}
+                  <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" className={REORDER} />
+                  <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" className={REORDER} />
                   <PanelButton icon={Trash2} onClick={() => deleteChunk(repoRoot, plan.id, chunk.id)} title="Delete chunk" aria-label="Delete chunk" />
                 </span>
               )}

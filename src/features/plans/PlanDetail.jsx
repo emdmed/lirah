@@ -88,7 +88,23 @@ export function PlanDetail({ plan }) {
           <h3 className="text-[13px] font-medium leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
           {plan.summary && <Prose text={plan.summary} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
         </div>
-        {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
+        {/* Where it stands: progress, and the way to run the rest. */}
+        {(total > 0 || canPilot) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1.5">
+            {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
+            {canPilot && (
+              <PanelButton
+                icon={Plane}
+                onClick={() => pane.autopilot(plan)}
+                // The plan's one primary key: framed and lamp-lit.
+                className="ml-auto ins-key-primary"
+                title="Implement the remaining chunks one after another, unattended"
+              >
+                run on auto-pilot
+              </PanelButton>
+            )}
+          </div>
+        )}
         {plan.autopilot && (
           <AutopilotStrip
             plan={plan}
@@ -101,16 +117,8 @@ export function PlanDetail({ plan }) {
             onReviewAll={() => pane.reviewAll(plan)}
           />
         )}
-        {canPilot && (
-          <PanelButton
-            icon={Plane}
-            onClick={() => pane.autopilot(plan)}
-            className="self-start"
-            title="Implement the remaining chunks one after another, unattended"
-          >
-            run on auto-pilot
-          </PanelButton>
-        )}
+        {/* Setup: set apart by a hairline. */}
+        <div className="mt-1 pt-2.5 edge-t-engraved">
         <PlanGitSection
           plan={plan}
           busy={settingUpGit}
@@ -120,6 +128,7 @@ export function PlanDetail({ plan }) {
           onOpenTab={() => addTab(planGit(plan).workDir)}
           onRemoveWorktrees={() => pane.removeWorktrees(plan)}
         />
+        </div>
       </div>
 
       {showSource && (
@@ -144,8 +153,8 @@ export function PlanDetail({ plan }) {
 
       {total > 0 && (
         <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 edge-b-engraved">
+          {/* The count is the header's progress readout; not repeated here. */}
           <span className="engraved-label">chunks</span>
-          <span className="font-mono text-[10px] tabular-nums text-faint">{done}/{total}</span>
         </div>
       )}
 

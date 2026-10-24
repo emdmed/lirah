@@ -71,7 +71,7 @@ const CELL = {
 
 export function ProgressReadout({ plan, done, total }) {
   return (
-    <div className="flex items-center gap-2" role="img" aria-label={`${done} of ${total} chunks implemented`}>
+    <div className="flex items-center gap-2" role="img" aria-label={`${done} of ${total} chunks implemented`} title={`${done} of ${total} chunks implemented`}>
       {/* Sized by its cells (24px each, shrinking when many) so the count
           sits right after the bar instead of across the row. */}
       <div className="flex h-1.5 min-w-0 gap-px">
@@ -80,7 +80,7 @@ export function ProgressReadout({ plan, done, total }) {
         ))}
       </div>
       <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-        <span className={done > 0 ? 'text-foreground' : undefined}>{done}</span>/{total}
+        <span className={done > 0 ? 'text-foreground' : undefined}>{done}</span>/{total}{' '}chunks
       </span>
     </div>
   );
