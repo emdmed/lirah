@@ -24,7 +24,11 @@ export function ToastProvider({ children }) {
   const idCounter = useRef(0);
   const timers = useRef(new Map());
 
+  // Live toasts by id, for dedupe and dismiss callbacks without reading state.
+  const live = useRef(new Map());
+
   const removeToast = useCallback((id) => {
+    live.current.delete(id);
     setToasts((prev) => prev.filter((t) => t.id !== id));
     const timer = timers.current.get(id);
     if (timer) {
@@ -33,7 +37,14 @@ export function ToastProvider({ children }) {
     }
   }, []);
 
+  // `dedupeKey`: skip while a toast with the same key is showing.
+  // `onDismiss`: runs when it is dismissed by hand, not when it times out.
   const addToast = useCallback((toast) => {
+    if (toast.dedupeKey != null) {
+      for (const [liveId, t] of live.current) {
+        if (t.dedupeKey === toast.dedupeKey) return liveId;
+      }
+    }
     const id = ++idCounter.current;
     const newToast = {
       id,
@@ -42,6 +53,7 @@ export function ToastProvider({ children }) {
       ...toast,
       createdAt: Date.now(),
     };
+    live.current.set(id, newToast);
 
     setToasts((prev) => {
       // Remove oldest if at max capacity
@@ -102,7 +114,9 @@ export function ToastProvider({ children }) {
 
   const dismiss = useCallback(
     (id) => {
+      const t = live.current.get(id);
       removeToast(id);
+      t?.onDismiss?.();
     },
     [removeToast]
   );
@@ -110,6 +124,7 @@ export function ToastProvider({ children }) {
   const dismissAll = useCallback(() => {
     timers.current.forEach((timer) => clearTimeout(timer));
     timers.current.clear();
+    live.current.clear();
     setToasts([]);
   }, []);
 

@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -185,12 +186,18 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] h-[92vh] max-w-[1400px] max-h-[900px] p-0 flex flex-col overflow-hidden font-mono" instant>
-        <DialogHeader className="px-4 py-3 pr-10 border-b edge-engraved shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-base font-semibold">
-              Token Usage Dashboard
-            </DialogTitle>
+      <DialogContent
+        size="full"
+        keys={['^', '⇧', 'D']}
+        lamp={refreshing ? 'blink' : 'on'}
+        status={refreshing ? <><Scanner label="Refreshing" />refreshing</> : null}
+        className="max-w-[1400px] max-h-[900px] p-0 flex flex-col gap-0 overflow-hidden font-mono"
+        instant
+      >
+        <DialogTitle>Tokens</DialogTitle>
+        <DialogDescription className="sr-only">Token usage and cost across sessions and projects.</DialogDescription>
+        <DialogHeader className="px-4 pb-3 edge-b-engraved shrink-0">
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
               {/* Main tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab}>

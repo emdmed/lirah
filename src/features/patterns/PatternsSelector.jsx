@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Check, FolderPlus } from "lucide-react";
+import { Lamp } from "../../components/instrument/Lamp";
 import {
   DropdownMenuItem,
   DropdownMenuSub,
@@ -18,7 +18,7 @@ function PatternRow({ filename, label, isSelected, onToggle }) {
       className={`${ROW} ${isSelected ? 'ins-row-selected' : ''}`}
     >
       <span className="truncate pr-2">{label}</span>
-      <Check className={`h-3 w-3 flex-shrink-0 ${isSelected ? 'text-[var(--ins-lamp)]' : 'invisible'}`} />
+      {isSelected ? <Lamp state="on" label="Selected" /> : <span className="w-[7px]" aria-hidden="true" />}
     </DropdownMenuItem>
   );
 }
@@ -64,9 +64,9 @@ export function PatternsMenuItems({ patternFiles, selectedPatterns, onTogglePatt
       <DropdownMenuItem
         onClick={handleCreate}
         disabled={!onCreatePatterns || creating}
-        className="flex items-start gap-1.5 text-[11px] py-1.5 pl-3"
+        className="flex items-start gap-2.5 text-[11px] py-1.5 pl-3"
       >
-        {creating ? <Scanner className="mt-0.5" /> : <FolderPlus className="h-3 w-3 mt-0.5 flex-shrink-0" />}
+        {creating ? <Scanner className="mt-0.5" /> : <span className="tui-dialog-empty-star mt-0.5" aria-hidden="true" />}
         <span className="flex flex-col">
           <span className="text-muted-foreground">No patterns in this repo</span>
           <span>Create .patterns/</span>

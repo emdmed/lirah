@@ -1,5 +1,5 @@
-import { useRef, useMemo, useState, useCallback, useEffect, Suspense } from "react";
-import { useTokenBudget } from "../../features/token-budget/TokenBudgetContext";
+import { useRef, useMemo, useState, useCallback, useEffect, Suspense, memo } from "react";
+import { useBudgetExhausted } from "../../features/token-budget/TokenBudgetContext";
 import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
 import { lazyNamed } from "../../lib/lazyNamed";
 import { usePromptText } from "../../hooks/usePromptStore";
@@ -23,7 +23,9 @@ const NO_PATTERNS = new Set();
 // Loaded on first open, and mounted only while open.
 const CompactSectionsDialog = lazyNamed(() => import("../../features/compact/CompactSectionsDialog"), "CompactSectionsDialog");
 
-export function TextareaPanel({
+// Memoized: the tab re-renders for branch, cwd, changelog and secondary-focus
+// changes the panel doesn't show. ProjectTab passes it stable callbacks.
+export const TextareaPanel = memo(function TextareaPanel({
   promptStore,
   onChange,
   onSend,
@@ -100,9 +102,9 @@ export function TextareaPanel({
     return () => { observer.disconnect(); clearTimeout(timeoutId); };
   }, []);
 
-  const { checkBudgetStatus } = useTokenBudget();
-  const budgetStatus = checkBudgetStatus(currentPath);
-  const budgetExhausted = budgetStatus.status === 'critical' && budgetStatus.percentage >= 100;
+  // Only the exhausted flag: reading full usage here would re-render the
+  // panel on every token poll.
+  const budgetExhausted = useBudgetExhausted(currentPath);
 
   const elementCount = useMemo(() => {
     if (!selectedElements || selectedElements.size === 0) return 0;
@@ -336,4 +338,4 @@ export function TextareaPanel({
       </PaneInfo>
     </div>
   );
-}
+});

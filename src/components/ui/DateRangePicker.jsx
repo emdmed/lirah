@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format, subDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { Button } from './button';
-import { Calendar } from 'lucide-react';
+import { Input } from './input';
 
 const PRESETS = [
   { label: 'Last 7 Days', getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
@@ -42,8 +42,9 @@ export function DateRangePicker({ value, onChange, className = '' }) {
         {PRESETS.map(preset => (
           <Button
             key={preset.label}
-            variant={activePreset === preset.label ? 'default' : 'outline'}
+            variant="ghost"
             size="sm"
+            aria-pressed={activePreset === preset.label}
             className="h-6 font-mono px-2"
             style={{ fontSize: 'var(--font-xs)' }}
             onClick={() => handlePreset(preset)}
@@ -52,33 +53,35 @@ export function DateRangePicker({ value, onChange, className = '' }) {
           </Button>
         ))}
         <Button
-          variant={showCustom ? 'default' : 'outline'}
+          variant="ghost"
           size="sm"
-          className="h-6 font-mono px-2 gap-1"
+          aria-pressed={showCustom}
+          className="h-6 font-mono px-2"
           style={{ fontSize: 'var(--font-xs)' }}
           onClick={() => setShowCustom(!showCustom)}
         >
-          <Calendar size={10} />
           Custom
         </Button>
       </div>
 
       {showCustom && (
         <div className="flex items-center gap-2">
-          <input
+          <Input
             type="date"
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="h-6 font-mono px-2 border edge-engraved rounded-none"
-            style={{ fontSize: 'var(--font-xs)', backgroundColor: 'var(--color-input-background)' }}
+            aria-label="From"
+            className="h-6 w-auto font-mono px-2"
+            style={{ fontSize: 'var(--font-xs)' }}
           />
           <span className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>to</span>
-          <input
+          <Input
             type="date"
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="h-6 font-mono px-2 border edge-engraved rounded-none"
-            style={{ fontSize: 'var(--font-xs)', backgroundColor: 'var(--color-input-background)' }}
+            aria-label="To"
+            className="h-6 w-auto font-mono px-2"
+            style={{ fontSize: 'var(--font-xs)' }}
           />
           <Button size="sm" className="h-6 px-2" style={{ fontSize: 'var(--font-xs)' }} onClick={handleCustomApply}>
             Apply

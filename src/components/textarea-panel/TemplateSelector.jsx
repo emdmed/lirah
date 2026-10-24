@@ -1,7 +1,11 @@
 import { useEffect } from "react";
-import { Check, Settings, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { Keycap } from "../instrument/Keycap";
+import { Lamp } from "../instrument/Lamp";
+import { joinKeys } from "../instrument/FrameHints";
+import { shortcutKeys } from "../../lib/shortcuts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +19,7 @@ import { PatternsMenuItems } from "../../features/patterns/PatternsSelector";
 
 const NO_PATTERN_FILES = [];
 const NO_PATTERNS = new Set();
-const GROUP_LABEL = "text-[10px] font-normal uppercase tracking-wider text-muted-foreground";
+const OPEN_KEYS = joinKeys(shortcutKeys("templates") ?? ["alt", "alt"]);
 
 // The "instructions" picker: one dropdown for everything that tells the agent
 // how to work. Templates (global, single-select) are text added to the
@@ -66,8 +70,8 @@ export function TemplateSelector({
     patternCount > 0 && `patterns: ${Array.from(selectedPatterns).map(f => f.replace(/\.md$/, '')).join(', ')}`,
   ].filter(Boolean);
   const triggerTitle = activeParts.length > 0
-    ? `Instructions · ${activeParts.join(' · ')}  ·  Alt+Alt`
-    : 'Instructions: templates and patterns  ·  Alt+Alt';
+    ? `Instructions · ${activeParts.join(' · ')}  ·  ${OPEN_KEYS}`
+    : `Instructions: templates and patterns  ·  ${OPEN_KEYS}`;
 
   return (
     <div className="flex items-center gap-1">
@@ -76,7 +80,7 @@ export function TemplateSelector({
           variant="outline"
           className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border-0 ${badgeStyle}`}
           onClick={() => onSelectTemplate(null)}
-          title="Click to clear template  ·  Alt+Alt"
+          title={`Click to clear template  ·  ${OPEN_KEYS}`}
         >
           {selectedTemplate.title}
           <X className="h-2.5 w-2.5 flex-shrink-0 hover:opacity-70" />
@@ -88,7 +92,7 @@ export function TemplateSelector({
             variant="ghost"
             size="xs"
             data-lit={activeParts.length > 0 || undefined}
-            aria-label={`Instructions (Alt+Alt)${activeParts.length ? `: ${activeParts.join(', ')}` : ''}`}
+            aria-label={`Instructions (${OPEN_KEYS})${activeParts.length ? `: ${activeParts.join(', ')}` : ''}`}
             title={triggerTitle}
             className="px-1.5"
           >
@@ -96,9 +100,10 @@ export function TemplateSelector({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-60 text-xs">
-          <DropdownMenuLabel className={GROUP_LABEL}>Templates (all projects)</DropdownMenuLabel>
+          <DropdownMenuLabel>templates · all projects</DropdownMenuLabel>
           {templates.length === 0 ? (
-            <DropdownMenuItem disabled className="text-[11px] text-muted-foreground pl-3">
+            <DropdownMenuItem disabled className="tui-dialog-empty text-[11px] pl-3 data-[disabled]:opacity-100">
+              <span className="tui-dialog-empty-star" aria-hidden="true" />
               No templates yet
             </DropdownMenuItem>
           ) : (
@@ -108,7 +113,7 @@ export function TemplateSelector({
                 className="flex items-center justify-between text-[11px] py-1.5 pl-3"
               >
                 <span className="text-muted-foreground">No template</span>
-                {!selectedTemplateId && <Check className="h-3 w-3 text-[var(--ins-lamp)]" />}
+                {!selectedTemplateId && <Lamp state="on" label="Selected" />}
               </DropdownMenuItem>
               {templates.map((template, index) => (
                 <DropdownMenuItem
@@ -117,17 +122,15 @@ export function TemplateSelector({
                   className={`flex items-center justify-between text-[11px] py-1.5 pl-3 ${selectedTemplateId === template.id ? 'ins-row-selected' : ''
                     }`}
                 >
-                  <span className="flex items-center">
-                    {index < 9 && (
-                      <span className="text-muted-foreground w-4 text-right mr-1.5">
-                        {index + 1}
-                      </span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    {index < 9 ? (
+                      <Keycap size="sm">{index + 1}</Keycap>
+                    ) : (
+                      <span className="w-3.5 shrink-0" aria-hidden="true" />
                     )}
                     <span className="truncate pr-2">{template.title}</span>
                   </span>
-                  {selectedTemplateId === template.id && (
-                    <Check className="h-3 w-3 text-[var(--ins-lamp)] flex-shrink-0" />
-                  )}
+                  {selectedTemplateId === template.id && <Lamp state="on" label="Selected" />}
                 </DropdownMenuItem>
               ))}
             </>
@@ -136,13 +139,12 @@ export function TemplateSelector({
             onClick={onManageTemplates}
             className="text-[11px] py-1.5 pl-3"
           >
-            <Settings className="h-3 w-3 mr-1.5" />
             Manage templates…
           </DropdownMenuItem>
           {showPatterns && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className={GROUP_LABEL}>Patterns (this repo)</DropdownMenuLabel>
+              <DropdownMenuLabel>patterns · this repo</DropdownMenuLabel>
               <PatternsMenuItems
                 patternFiles={patternFiles}
                 selectedPatterns={selectedPatterns}

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useConfirm } from '../features/confirm/ConfirmContext';
+import { useConfirm } from '../features/dialogs/DialogProvider';
 import { matches } from '../lib/shortcuts';
 import { getAgentHookState } from '../features/tabs/agentHookState';
 import { getLastOutputAt } from '../features/tabs/terminalActivity';

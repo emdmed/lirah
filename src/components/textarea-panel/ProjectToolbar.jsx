@@ -37,7 +37,6 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel
-            className="text-[10px] font-normal uppercase tracking-wider text-muted-foreground"
             title="Saved context for this project. Replace or add to the current context."
           >
             Context sets

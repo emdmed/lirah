@@ -9,7 +9,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '../../components/ui/dropdown-menu';
-import { useConfirm } from '../confirm/ConfirmContext';
+import { useConfirm } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 import { useFileGroups } from './FileGroupsContext';
 import { useFileSelection } from './FileSelectionContext';
@@ -93,7 +93,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
 
   return (
     <>
-      <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">
+      <DropdownMenuLabel>
         Saved context for this project
       </DropdownMenuLabel>
       {groups.length === 0 ? (

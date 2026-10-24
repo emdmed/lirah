@@ -1,6 +1,6 @@
-import { useState, useMemo, memo } from 'react';
+import { useMemo, memo } from 'react';
 import {
-  Keyboard, Bot, Terminal, BarChart3, AlertCircle, Settings, GitCommitHorizontal,
+  Keyboard, Bot, Terminal, BarChart3, Settings, GitCommitHorizontal,
   Layers, X, GitMerge
 } from 'lucide-react';
 import { Scanner } from './instrument/Scanner';
@@ -10,23 +10,19 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
   DropdownMenuLabel, DropdownMenuGroup,
 } from './ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
+import { useTokenUsageValue } from '../features/token-budget/tokenUsageStore';
 import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
 import { useTabManager } from '../features/tabs/TabContext';
+import { useConfirm } from '../features/dialogs/DialogProvider';
+import { shortcutForCommand, shortcutKeys } from '../lib/shortcuts';
+import { KeyChord } from './instrument/Keycap';
 import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAgentAttention';
 import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
 
@@ -91,8 +87,11 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
 // figures live in the tooltip. Every slot has a fixed width and an idle
 // placeholder so the gauge never shifts between tabs. Click opens the token
 // dashboard.
-function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
-  const { getBudget, currentUsage, formatTokenCount } = useTokenBudget();
+// Reads usage from the tab's store itself, so a usage poll re-renders only
+// the gauge, not the status bar.
+function ContextMeter({ currentPath, onOpenDashboard }) {
+  const { getBudget, currentUsage, formatTokenCount, tokenUsageStore } = useTokenBudget();
+  const tokenUsage = useTokenUsageValue(tokenUsageStore);
   const ctx = getContextFill(tokenUsage);
   const dailyLimit = getBudget(currentPath)?.dailyLimit;
   const fmt = (n) => (formatTokenCount ? formatTokenCount(n) : String(n));
@@ -191,36 +190,6 @@ function ContextMeter({ tokenUsage, currentPath, onOpenDashboard }) {
   );
 }
 
-function ConfirmToggleDialog({ open, onOpenChange, title, description, onConfirm }) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px] border-destructive/30 edge-engraved bg-destructive/5">
-        <DialogHeader className="gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/20">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-            </div>
-            <DialogTitle className="text-base font-semibold">
-              {title}
-            </DialogTitle>
-          </div>
-          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-            {description}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex justify-end gap-2 sm:justify-end mt-4">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="edge-engraved">
-            Cancel
-          </Button>
-          <Button variant="destructive" size="sm" onClick={onConfirm}>
-            Continue
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // Agents in other tabs waiting on you. Click (or Alt+A) jumps to the next one.
 function AttentionIndicator() {
   const { tabs } = useTabManager();
@@ -241,7 +210,7 @@ function AttentionIndicator() {
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {blocked ? `${blocked} blocked on permission · ` : ''}Jump to the next one (Alt+A)
+        {blocked ? `${blocked} blocked on permission · ` : ''}Jump to the next one <KeyChord keys={shortcutKeys('attention-jump')} size="sm" className="ml-1" />
       </TooltipContent>
     </Tooltip>
   );
@@ -257,10 +226,9 @@ export const StatusBar = memo(({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenDashboard, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext,
-  availableUpdate, tokenUsage
+  availableUpdate
 }) => {
-  const [showSandboxConfirm, setShowSandboxConfirm] = useState(false);
-  const [showNetworkConfirm, setShowNetworkConfirm] = useState(false);
+  const confirm = useConfirm();
 
   // File watching has no shortcut (Ctrl+W closes the tab): it's in Settings
   // and the `:watch` command. Ctrl+Shift+L lives in useTabShortcuts,
@@ -268,29 +236,22 @@ export const StatusBar = memo(({
 
   const cliName = CLI_DISPLAY[selectedCli]?.name || selectedCli;
 
-  const handleSandboxToggle = () => {
-    if (sessionId) {
-      setShowSandboxConfirm(true);
-    } else {
-      onToggleSandbox();
-    }
-  };
-
-  const confirmSandboxToggle = () => {
-    setShowSandboxConfirm(false);
+  // Both switches restart the terminal, so a live session asks first.
+  const handleSandboxToggle = async () => {
+    if (sessionId && !(await confirm({
+      title: sandboxEnabled ? 'Turn sandbox off' : 'Turn sandbox on',
+      description: <>Restarts this terminal and ends anything running in it. File system isolation will be {sandboxEnabled ? 'off' : 'on'}.</>,
+      confirmLabel: 'Restart',
+    }))) return;
     onToggleSandbox();
   };
 
-  const handleNetworkToggle = () => {
-    if (sessionId) {
-      setShowNetworkConfirm(true);
-    } else {
-      onToggleNetworkIsolation();
-    }
-  };
-
-  const confirmNetworkToggle = () => {
-    setShowNetworkConfirm(false);
+  const handleNetworkToggle = async () => {
+    if (sessionId && !(await confirm({
+      title: networkIsolation ? 'Restore network' : 'Block network',
+      description: <>Restarts this terminal and ends anything running in it. External network access will be {networkIsolation ? 'restored' : 'blocked'}.</>,
+      confirmLabel: 'Restart',
+    }))) return;
     onToggleNetworkIsolation();
   };
 
@@ -353,7 +314,7 @@ export const StatusBar = memo(({
 
       {/* CENTRE: the context gauge, alone so it reads at a glance. The side
           columns share the remaining width equally, keeping it centred. */}
-      <ContextMeter tokenUsage={tokenUsage} currentPath={currentPath} onOpenDashboard={onOpenDashboard} />
+      <ContextMeter currentPath={currentPath} onOpenDashboard={onOpenDashboard} />
 
       {/* RIGHT: Runtime status + Settings */}
       <div className="flex items-center justify-end gap-1.5 min-w-0">
@@ -401,32 +362,32 @@ export const StatusBar = memo(({
               <Settings className="mr-2 w-3 h-3" />
               Settings…
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator star />
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
                 <BarChart3 className="mr-2 w-3 h-3" />
                 Token Metrics
-                <DropdownMenuShortcut>Ctrl+Shift+D</DropdownMenuShortcut>
+                <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoCommit} className="cursor-pointer py-1">
                 <GitCommitHorizontal className="mr-2 w-3 h-3" />
                 Auto Commit…
-                <DropdownMenuShortcut>Ctrl+Shift+Space</DropdownMenuShortcut>
+                <DropdownMenuShortcut keys={shortcutForCommand('commit')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoMerge} className="cursor-pointer py-1">
                 <GitMerge className="mr-2 w-3 h-3" />
                 Auto Merge…
-                <DropdownMenuShortcut>Alt+M</DropdownMenuShortcut>
+                <DropdownMenuShortcut keys={shortcutForCommand('merge')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
                 <Keyboard className="mr-2 w-3 h-3" />
                 Keyboard Shortcuts
-                <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+                <DropdownMenuShortcut keys={shortcutForCommand('help')} />
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="ins-legend text-[10px] font-normal">Workspaces</DropdownMenuLabel>
+            <DropdownMenuSeparator star />
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenWorkspaceDialog} className="cursor-pointer py-1">
                 <Layers className="mr-2 w-3 h-3" />
@@ -444,21 +405,6 @@ export const StatusBar = memo(({
       </div>
     </div>
 
-    <ConfirmToggleDialog
-      open={showSandboxConfirm}
-      onOpenChange={setShowSandboxConfirm}
-      title="Toggle Sandbox Mode?"
-      description={<>This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated and file system isolation will be {sandboxEnabled ? 'disabled' : 'enabled'}.</>}
-      onConfirm={confirmSandboxToggle}
-    />
-
-    <ConfirmToggleDialog
-      open={showNetworkConfirm}
-      onOpenChange={setShowNetworkConfirm}
-      title="Toggle Network Isolation?"
-      description={<>This will <span className="font-medium text-destructive">reset and restart</span> your terminal session. Any running processes will be terminated and external network access will be {networkIsolation ? 'restored' : 'blocked'}.</>}
-      onConfirm={confirmNetworkToggle}
-    />
   </>
   );
 });

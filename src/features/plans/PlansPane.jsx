@@ -3,7 +3,7 @@ import { errorMessage } from '../../lib/errorMessage';
 import { Plus } from 'lucide-react';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Scanner } from '../../components/instrument/Scanner';
-import { useConfirm } from '../confirm/ConfirmContext';
+import { useConfirm } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { usePlans } from './PlansContext';
@@ -199,9 +199,7 @@ export function PlansPane({ projectPath }) {
       <Suspense fallback={null}>
         {newOpen && <NewPlanDialog open onOpenChange={setNewOpen} onCreate={handleCreate} />}
         {diffProps && (
-          <div className="fixed inset-0 z-50">
-            <GitDiffDialog {...diffProps} />
-          </div>
+          <GitDiffDialog {...diffProps} />
         )}
       </Suspense>
     </>

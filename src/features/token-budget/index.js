@@ -4,7 +4,6 @@ export { TokenBudgetProvider, useTokenBudget } from './TokenBudgetContext';
 // Components
 export { TokenDashboard } from './TokenDashboard';
 export { TokenBudgetDialog } from './TokenBudgetDialog';
-export { TokenAlertBanner } from './TokenAlertBanner';
 export { TokenCostEstimate } from './TokenCostEstimate';
 
 // Hook

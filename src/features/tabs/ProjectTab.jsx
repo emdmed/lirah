@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
 import { TAB_CLI_PROCESSES, tabCliProcess } from "../../lib/agentClis";
@@ -15,7 +15,6 @@ import { useWatcher } from "../watcher";
 import { useBookmarks } from "../bookmarks";
 import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
-import { useCwdMonitor } from "../../hooks/useCwdMonitor";
 import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession } from "./terminalActivity";
 import { useTabContextFill } from "./tabContextFill";
@@ -24,7 +23,6 @@ import { useLinkedRepos } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
 import { useAutoMerge } from "../git/useAutoMerge";
-import { lazyNamed } from "../../lib/lazyNamed";
 import { useFlatViewNavigation } from "../../hooks/useFlatViewNavigation";
 import { useViewModeShortcuts } from "../../hooks/useViewModeShortcuts";
 import { useTextareaShortcuts } from "../../hooks/useTextareaShortcuts";
@@ -33,6 +31,7 @@ import { useBookmarksShortcut } from "../bookmarks";
 import { useClaudeLauncher } from "../cli-selection";
 import { useFileSymbols } from "../file-analysis/useFileSymbols";
 import { useTokenUsage } from "../token-budget/useTokenUsage";
+import { useTokenUsageValue } from "../token-budget/tokenUsageStore";
 import { useTypeChecker } from "../../hooks/useTypeChecker";
 import { usePromptSender } from "../../hooks/usePromptSender";
 import { usePromptStore } from "../../hooks/usePromptStore";
@@ -49,6 +48,7 @@ import { FileSelectionProvider } from "../file-groups";
 // Domain hooks
 import { useSecondaryTerminal } from "../../hooks/useSecondaryTerminal";
 import { useDialogs } from "../../hooks/useDialogs";
+import { DialogScope } from "../dialogs/DialogProvider";
 import { useTerminalSettings } from "../../hooks/useTerminalSettings";
 import { useCompact } from "../compact/useCompact";
 import { useElementPicker } from "../file-analysis/useElementPicker";
@@ -71,11 +71,26 @@ import { useAgentJobsActions } from "../agent-jobs/AgentJobsContext";
 // cwd monitor then persists home over the tab's restored path — so anything
 // that treats currentPath as a filesystem path must go through this guard.
 // Loaded on first open, mounted only while open.
-const GitDiffDialog = lazyNamed(() => import("../git/GitDiffDialog"), "GitDiffDialog");
-const MarkdownViewerDialog = lazyNamed(() => import("../markdown/MarkdownViewerDialog"), "MarkdownViewerDialog");
 
 function isRealPath(p) {
   return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
+}
+
+// A callback whose identity never changes but always runs the latest `fn`.
+// For handlers built from sources that aren't memoized (useFlatViewNavigation,
+// the bookmarks context), so the memoized sidebar can keep its props stable.
+function useStableHandler(fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  return useCallback((...args) => ref.current(...args), []);
+}
+
+// Feeds the tabs pane's context-fill moon from the usage store. Its own
+// component, so a usage poll re-renders this and not the tab.
+function TabContextFillSync({ tabId, isActive, tokenUsageStore, terminalSessionId }) {
+  const tokenUsage = useTokenUsageValue(tokenUsageStore);
+  useTabContextFill(tabId, isActive, tokenUsage, terminalSessionId);
+  return null;
 }
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
@@ -124,9 +139,11 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   return (
     <div style={style} aria-hidden={!isActive} data-tab-pane data-tab-active={isActive || undefined}>
       {booted && (
-        <FileSelectionProvider>
-          <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} availableUpdate={availableUpdate} />
-        </FileSelectionProvider>
+        <DialogScope scope={tabId} active={isActive}>
+          <FileSelectionProvider>
+            <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} availableUpdate={availableUpdate} />
+          </FileSelectionProvider>
+        </DialogScope>
       )}
     </div>
   );
@@ -168,9 +185,13 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // Domain hooks
   const settings = useTerminalSettings();
   const toast = useToast();
-  const dialogs = useDialogs();
+  const dialogs = useDialogs(tabId);
 
-  const { folders, currentPath, setCurrentPath, loadFolders, navigateToParent } = useFlatViewNavigation(terminalSessionId);
+  const flatView = useFlatViewNavigation(terminalSessionId);
+  const { folders, currentPath, setCurrentPath } = flatView;
+  // useFlatViewNavigation returns fresh functions each render.
+  const loadFolders = useStableHandler(flatView.loadFolders);
+  const navigateToParent = useStableHandler(flatView.navigateToParent);
 
   // Set currentPath from projectPath prop on mount
   useEffect(() => {
@@ -242,6 +263,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     setCurrentPath,
     initializeSearch: sidebarSearch.initializeSearch,
     searchResults: sidebarSearch.searchResults,
+    isActive,
   });
 
   // Terminate any running CLI process in the terminal before navigation
@@ -290,7 +312,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     return info;
   }, [workspaceHook.openWorkspace, navigateToWorkspace]);
 
-  const { tokenUsage, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
+  const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
   const compact = useCompact({
     currentPath,
@@ -316,7 +338,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const switchToClaudeMode = useCallback(() => {
     setViewMode('tree');
     sidebar.setSidebarOpen(true);
-  }, [sidebar]);
+  }, [sidebar.setSidebarOpen]);
 
   // Delete orchestration folder
   const handleDeleteOrchestration = useCallback(async () => {
@@ -343,6 +365,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // act, whereas restoring persisted tabs at startup is not, so a restored tab
   // stays at its shell until you press Ctrl+K.
   // `autoLaunch: false` is for callers that run their own launch sequence.
+  // The bookmarks context hands out a new updateBookmark each render.
+  const updateBookmarkStable = useStableHandler(updateBookmark);
   const navigateToBookmark = useCallback(async (bookmark, { autoLaunch = true } = {}) => {
     if (!terminalSessionId) return;
     try {
@@ -351,7 +375,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
       await new Promise(resolve => setTimeout(resolve, 100));
       await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-      updateBookmark(bookmark.id, { lastAccessedAt: Date.now() });
+      updateBookmarkStable(bookmark.id, { lastAccessedAt: Date.now() });
       if (viewMode === 'flat') await loadFolders();
       else if (viewMode === 'tree') await treeView.loadTreeData();
       terminalRef.current?.focus?.();
@@ -364,7 +388,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       console.error('Failed to navigate to bookmark:', error);
       toast.error(`Couldn't open ${bookmark.name || bookmark.path}: ${error?.message || error}`);
     }
-  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmark, terminateCliProcess, settings.autoLaunchCli, launchClaude, toast.error]);
+  }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmarkStable, terminateCliProcess, settings.autoLaunchCli, launchClaude, toast.error]);
 
   // Handle project selection from initial dialog (with splash screen) — kept for bookmark navigation
   const handleSelectProject = useCallback(async (bookmark) => {
@@ -409,7 +433,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
       setTimeout(checkCli, 300);
     });
     await new Promise(resolve => setTimeout(resolve, 1500));
-  }, [navigateToBookmark, switchToClaudeMode, launchClaude, currentPath, settings]);
+  }, [navigateToBookmark, switchToClaudeMode, launchClaude, terminalSessionId, settings.selectedCli]);
 
   // Git changes handler
   const handleGitChanges = useCallback((changes) => {
@@ -542,15 +566,13 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     }
   }, [sidebar.sidebarOpen]);
 
-  // Monitor terminal CWD
-  const detectedCwd = useCwdMonitor(terminalSessionId, isActive && sidebar.sidebarOpen && fileWatchingEnabled && !secondary.secondaryFullscreen);
-
-  // Update tab label when terminal CWD changes
+  // The tab follows the project the app navigated to (bookmarks, folder
+  // navigation), not a `cd` typed in the shell, so tab, branch and tree agree.
   useEffect(() => {
-    if (detectedCwd && tabId) {
-      updateTabPath(tabId, detectedCwd);
+    if (tabId && isRealPath(currentPath) && currentPath !== projectPath) {
+      updateTabPath(tabId, currentPath);
     }
-  }, [detectedCwd, tabId, updateTabPath]);
+  }, [currentPath, projectPath, tabId, updateTabPath]);
 
   // Lets the tabs summary pane find this tab's terminal activity.
   useEffect(() => {
@@ -558,8 +580,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     return registerTabSession(tabId, terminalSessionId);
   }, [tabId, terminalSessionId]);
 
-  // The tabs pane draws each tab's context fill as a moon.
-  useTabContextFill(tabId, isActive, tokenUsage, terminalSessionId);
 
   // Lets the tabs summary pane link other repos and attach files to this
   // tab's prompt.
@@ -588,7 +608,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   useEffect(() => () => clearLinkedRepos(), [clearLinkedRepos]);
 
   // Get current git branch
-  const branchName = useBranchName(secondary.secondaryFullscreen ? null : detectedCwd, isActive);
+  const branchName = useBranchName(secondary.secondaryFullscreen ? null : resolvedProjectDir, isActive);
 
   // Keyboard shortcuts
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
@@ -833,7 +853,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   });
 
   return (
-    <TokenBudgetProvider tokenUsage={tokenUsage} projectStats={projectStats} projectPath={currentPath}>
+    <TokenBudgetProvider tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
       <Layout
         sidebar={
@@ -864,6 +884,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               onOpenElementPicker={elementPicker.handleOpenElementPicker}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
+              isActive={isActive}
             />
           )
         }
@@ -931,7 +952,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             selectedCli={settings.selectedCli}
             onOpenCliSettings={openCliSettings}
             showTitleBar={settings.showTitleBar}
-            tokenUsage={tokenUsage}
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
             networkIsolation={settings.networkIsolation}
@@ -994,24 +1014,10 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
           onLaunch={launchClaude}
           onChangeCli={openCliSettings}
         />
-        <Suspense fallback={null}>
-        {dialogs.diffDialogOpen && <GitDiffDialog
-          open={dialogs.diffDialogOpen}
-          onOpenChange={dialogs.setDiffDialogOpen}
-          filePath={dialogs.diffFilePath}
-          repoPath={currentPath}
-        />}
-        {dialogs.markdownViewerOpen && <MarkdownViewerDialog
-          open={dialogs.markdownViewerOpen}
-          onOpenChange={dialogs.setMarkdownViewerOpen}
-          filePath={dialogs.markdownFilePath}
-          repoPath={currentPath}
-          markdownFiles={markdownFiles}
-          onFileChange={viewMarkdownFile}
-        />}
-        </Suspense>
       </Layout>
 
+      {/* The tabs pane draws each tab's context fill as a moon. */}
+      <TabContextFillSync tabId={tabId} isActive={isActive} tokenUsageStore={tokenUsageStore} terminalSessionId={terminalSessionId} />
       {isActive && (
         <CommandPalette open={palette.open} onClose={palette.close} commands={commands} />
       )}
@@ -1029,7 +1035,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         autoCommit={autoCommit}
         autoMerge={autoMerge}
         changelogStatus={changelogStatus}
-        tokenUsage={tokenUsage}
+        tokenUsageStore={tokenUsageStore}
         projectStats={projectStats}
         refreshProjectStats={refreshProjectStats}
         theme={theme}
@@ -1040,6 +1046,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
         handleSelectProject={handleSelectProject}
         handleCreateWorkspace={handleCreateWorkspace}
         handleOpenWorkspace={handleOpenWorkspace}
+        markdownFiles={markdownFiles}
+        viewMarkdownFile={viewMarkdownFile}
       />
     </SidebarProvider>
     </TokenBudgetProvider>

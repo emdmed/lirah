@@ -7,7 +7,7 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useWatcher } from '../watcher/WatcherContext';
-import { useConfirm } from '../confirm/ConfirmContext';
+import { useConfirm } from '../dialogs/DialogProvider';
 import { useSetting } from './settingsStore';
 import {
   getScrollback, setScrollback, subscribeTerminalPrefs,
@@ -109,7 +109,14 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[780px] max-w-[95vw] h-[min(600px,85vh)] flex flex-col gap-0 overflow-hidden"
+        className="max-w-[780px] h-[min(600px,85vh)] flex flex-col gap-0 overflow-hidden"
+        status={filtering
+          ? `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'}`
+          : section(activeId)?.title.toLowerCase()}
+        hints={[
+          { keys: ['1–6'], label: 'section' },
+          { keys: ['/'], label: 'filter' },
+        ]}
         onOpenAutoFocus={handleOpenAutoFocus}
         onEscapeKeyDown={handleEscape}
         onKeyDown={handleKeyDown}

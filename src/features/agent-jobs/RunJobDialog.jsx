@@ -3,7 +3,7 @@ import { JOB_CLIS } from '../../lib/agentClis';
 import { plural } from '../../lib/plural';
 import { invoke } from '@tauri-apps/api/core';
 import { git } from '../../lib/git';
-import { Bot, ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
+import { ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,6 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { Lamp } from '../../components/instrument/Lamp';
-import { KeyChord } from '../../components/instrument/Keycap';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -263,7 +262,11 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[520px] max-w-[95vw] max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        size="md"
+        className="max-w-[95vw] max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        status={checkedFiles.length > 0 ? plural(checkedFiles.length, 'file') : undefined}
+        hints={[{ keys: ['^', '↵'], label: candidateCount > 1 ? 'race' : 'run' }]}
+        escLabel="cancel"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canRun) {
             e.preventDefault();
@@ -431,7 +434,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             </div>
           </Field>
 
-          <div className="flex items-center gap-3 edge-engraved px-3 py-2.5">
+          <div className="flex items-center gap-3">
             <ToggleSwitch
               checked={useWorktree}
               onChange={(v) => isGitRepo && setUseWorktree(v)}
@@ -455,10 +458,10 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           {/* Jobs are spawned with each CLI's auto-approve flag (agent_runner
               commands.rs), so nothing stops a tool call. Say so before Run. */}
           <div
-            className="flex items-start gap-2.5 edge-engraved px-3 py-2 text-[11px] leading-snug"
+            className="flex items-start gap-2.5 text-[11px] leading-snug"
             role={useWorktree ? 'note' : 'alert'}
           >
-            <Lamp state={useWorktree ? 'off' : 'warn'} className="mt-[3px]" />
+            {!useWorktree && <Lamp state="warn" className="mt-[3px]" />}
             <span className={useWorktree ? 'text-muted-foreground' : 'text-foreground'}>
               Jobs run unattended with auto-approve: no permission prompts, and they are not
               sandboxed.{' '}
@@ -474,8 +477,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           </div>
 
           {candidateCount > 1 && (
-            <div className="flex items-start gap-2 text-[11px] leading-snug text-muted-foreground">
-              <Lamp state="on" className="mt-[3px]" />
+            <div className="text-[11px] leading-snug text-muted-foreground">
               <span>
                 <span className="text-foreground">Race · {candidateCount} candidates</span> on the same
                 prompt, one worktree each. Compare the diffs and keep one; the rest are discarded.
@@ -484,7 +486,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           )}
 
           {overlaps.length > 0 && (
-            <div className="flex items-start gap-2.5 edge-engraved px-3 py-2.5 text-[11px] leading-snug" role="alert">
+            <div className="flex items-start gap-2.5 text-[11px] leading-snug" role="alert">
               <Lamp state="warn" className="mt-[3px]" />
               <div className="min-w-0 flex-1">
                 <div className="text-[var(--ins-warn)]">
@@ -507,17 +509,13 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
           )}
         </div>
 
-        <DialogFooter className="shrink-0 items-center sm:justify-between">
-          <KeyChord keys={['^', '↵']} label="run" size="sm" className="text-[11px]" />
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="px-3 text-xs">
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleRun} disabled={!canRun} className="min-w-[96px] px-3 text-xs">
-              <Bot className="h-3 w-3" />
-              {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
-            </Button>
-          </div>
+        <DialogFooter className="shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="px-3 text-xs">
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleRun} disabled={!canRun} className="px-3 text-xs">
+            {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -534,7 +532,7 @@ function Field({ label, count, action, htmlFor, children }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex min-h-5 items-center justify-between gap-2">
-        <label htmlFor={htmlFor} className="ins-legend text-[10px]">
+        <label htmlFor={htmlFor} className="ins-legend">
           {label}
           {count !== undefined && <span className="tube-idle ml-1.5">{count}</span>}
         </label>

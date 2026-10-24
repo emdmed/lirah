@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../toast';
 import { KeyChord } from '../../components/instrument/Keycap';
+import { FrameHints } from '../../components/instrument/FrameHints';
+import { FloatPane } from '../../components/ui/float-pane';
 import { shortcutForCommand } from '../../lib/shortcuts';
 
 const MAX_SUGGESTIONS = 8;
+const LINE_HINTS = [
+  { keys: ['tab'], label: 'complete' },
+  { keys: ['↵'], label: 'run' },
+  { keys: ['esc'], label: 'close' },
+];
 
 /**
  * Vim-style command line. `commands` is a list of
@@ -122,7 +129,12 @@ export function CommandPalette({ open, onClose, commands }) {
   return (
     <div className="fixed left-0 right-0 bottom-0 z-[110] flex flex-col font-mono text-xs">
       {suggestions.length > 0 && (
-        <div className="ins-rise-enter tui-pane mx-1 px-1 max-w-xl" data-title="commands" data-float>
+        <FloatPane
+          title="commands"
+          keys={[':']}
+          status={`${suggestions.length} ${suggestions.length === 1 ? 'match' : 'matches'}`}
+          className="ins-rise-enter mx-1 px-1 max-w-xl"
+        >
           <ul role="listbox">
             {suggestions.map((s, i) => (
               <li
@@ -135,15 +147,15 @@ export function CommandPalette({ open, onClose, commands }) {
                   if (s.arg != null || !s.command.options) run(s.command, s.arg ?? undefined);
                   else complete(s);
                 }}
-                className={`flex items-center gap-3 px-1.5 h-5 cursor-pointer ${i === selected ? 'bg-foreground text-background' : 'hover:bg-foreground/10'}`}
+                className={`relative flex items-center gap-3 pl-3.5 pr-1.5 h-5 cursor-pointer ${i === selected ? 'ins-row-selected text-foreground' : 'hover:bg-foreground/5'}`}
               >
                 <span className="shrink-0 w-24">{s.arg != null ? `${s.command.id} ${s.label}` : s.label}</span>
-                <span className={`truncate min-w-0 ${i === selected ? '' : 'text-muted-foreground'}`}>{s.hint}</span>
+                <span className="truncate min-w-0 text-muted-foreground">{s.hint}</span>
                 {s.keys && <KeyChord keys={s.keys} size="sm" className="ml-auto shrink-0 pl-3" />}
               </li>
             ))}
           </ul>
-        </div>
+        </FloatPane>
       )}
       <div className="ins-line-enter flex items-center h-8 px-2 bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]">
         <span className="text-[var(--ins-lamp)] select-none">:</span>
@@ -160,8 +172,8 @@ export function CommandPalette({ open, onClose, commands }) {
           aria-label="Command"
           className="flex-1 bg-transparent outline-none focus-visible:outline-none border-0 px-0.5 text-xs"
         />
-        <span className="text-muted-foreground select-none">
-          <span className="tui-key">tab</span> complete · <span className="tui-key">↵</span> run · <span className="tui-key">esc</span> close
+        <span className="flex items-center gap-[9px] text-muted-foreground select-none">
+          <FrameHints hints={LINE_HINTS} />
         </span>
       </div>
     </div>

@@ -678,21 +678,48 @@ body {
 }
 
 /*
-  Dialogs are panes floating over the app: title set into the top line, a
-  close control in the top-right corner of the frame, `esc close` in the
-  bottom line. Unlayered so a dialog's own padding or title classes can't
-  push the content onto the frame.
+  Dialogs are panes floating over the app, drawn like the focused pane:
+    ┌─ ^T NEW TAB ✦ ─────────────── status ┐
+    └──────── ↑ ↓ move ✦ ↵ open ✦ esc close┘
+  The title (with the shortcut keycap and lamp DialogTitle adds) sits in the
+  top line, a status in the top-right corner, and every key hint in the
+  bottom line, ending in a clickable esc cap. Unlayered so a dialog's own
+  padding or title classes can't push the content onto the frame.
 */
 .tui-dialog {
   /* A dialog floats over the app, so its legends mask with its own face. */
   --pane-bg: var(--ins-raised);
+  --dialog-edge: var(--ins-edge-focus);
   background: var(--ins-raised);
   padding-top: 22px !important;
   padding-bottom: 20px !important;
 }
 
-.tui-dialog::after {
-  border-color: var(--ins-edge-strong);
+/* A dialog holds focus, so its frame is the focused pane's edge. */
+.tui-dialog::after,
+.tui-dialog:focus-within::after {
+  border-color: var(--dialog-edge);
+}
+
+.tui-dialog[data-tone="fault"] {
+  --dialog-edge: color-mix(in srgb, var(--ins-fault) 55%, var(--ins-edge-strong));
+}
+
+/* The frame strikes lamp-bright as the dialog arrives, then cools to its
+   edge: the filament the panes use. */
+[data-slot="dialog-content"].tui-dialog[data-state="open"]:not([data-instant])::after {
+  animation: ins-dialog-strike calc(var(--ins-warm) + var(--ins-cool)) var(--ins-ease) both;
+}
+@keyframes ins-dialog-strike {
+  0%, 28% { border-color: var(--ins-lamp); }
+  100% { border-color: var(--dialog-edge); }
+}
+.tui-dialog[data-tone="fault"][data-state="open"]:not([data-instant])::after {
+  animation-name: ins-dialog-strike-fault;
+}
+@keyframes ins-dialog-strike-fault {
+  0%, 28% { border-color: var(--ins-fault); }
+  100% { border-color: var(--dialog-edge); }
 }
 
 /* The title is a real element (DialogTitle), not the data-title attribute. */
@@ -706,9 +733,12 @@ body {
   position: absolute;
   top: 0;
   left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
   padding: 0 5px;
-  max-width: calc(100% - 80px);
+  max-width: calc(100% - 140px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -718,8 +748,15 @@ body {
   line-height: 12px;
   letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
+  color: var(--color-foreground);
   background: var(--pane-bg);
   z-index: 6;
+}
+
+/* The keycap and lamp in a title keep their own type. */
+.tui-dialog [data-slot="dialog-title"] .ins-cap {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .tui-dialog [data-slot="dialog-title"]:not(:has(div, p)) svg {
@@ -727,11 +764,120 @@ body {
   height: 12px;
 }
 
-.tui-dialog-close {
+/* Top-right corner: counts, the section, or what is running. */
+.tui-frame-status,
+.tui-dialog-status {
   position: absolute;
-  top: -2px;
+  top: 0;
   right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 40%;
+  padding: 0 5px;
+  overflow: hidden;
+  font-size: var(--font-xs);
+  line-height: 12px;
+  white-space: nowrap;
+  color: var(--color-muted-foreground);
+  background: var(--pane-bg);
   z-index: 6;
+}
+
+/* Bottom line: key hints separated by faint stars. */
+.tui-frame-hints,
+.tui-dialog-hints {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+}
+
+.tui-frame-hint,
+.tui-dialog-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.tui-frame-hint > span:last-child:not(.ins-cap),
+.tui-dialog-hint > span:last-child:not(.ins-cap) {
+  margin-left: 3px;
+}
+
+/* A pane floating over its anchor (FloatPane): a dialog's face and frame,
+   without the scrim or focus trap. Its legend and hints mask with its face. */
+.tui-pane.tui-float {
+  --pane-bg: var(--ins-raised);
+  background: linear-gradient(var(--ins-raised), var(--ins-raised)) 0 6px / 100% calc(100% - 12px) no-repeat;
+}
+
+.tui-pane.tui-float::after {
+  border-color: var(--ins-edge-focus);
+}
+
+/* The status at the legend's right end, as the dialog's status corner. */
+.tui-frame-status-inline {
+  font-size: var(--font-xs);
+  line-height: 12px;
+  white-space: nowrap;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A group label in the body: legend, then a hairline to the edge. */
+.tui-dialog-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tui-dialog-group > .ins-legend {
+  font-size: 10px;
+}
+
+.tui-dialog-group::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--ins-edge);
+}
+
+/* An empty list: a faint star and one line. */
+.tui-dialog-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: var(--font-xs);
+  color: var(--color-muted-foreground);
+}
+
+.tui-dialog-empty-star {
+  width: 9px;
+  height: 13px;
+  flex-shrink: 0;
+  background: var(--ins-faint);
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+}
+
+/* Actions print as `[label]`; a destructive one draws a fault hairline, as
+   the primary draws a lamp one. */
+.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg))::before {
+  content: "[";
+  opacity: 0.55;
+}
+.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg))::after {
+  content: "]";
+  opacity: 0.55;
+}
+.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg)) {
+  column-gap: 0;
+}
+.tui-dialog [data-slot="dialog-footer"] .ins-key-danger {
+  border-color: color-mix(in srgb, var(--ins-fault) 70%, var(--ins-edge-strong));
 }
 
 /*

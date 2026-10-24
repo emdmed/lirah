@@ -11,7 +11,7 @@ import { AgentJobsProvider } from "./features/agent-jobs/AgentJobsContext";
 import { TabProvider } from "./features/tabs";
 import { PlansProvider } from "./features/plans/PlansContext";
 import { ToastProvider } from "./features/toast";
-import { ConfirmProvider } from "./features/confirm/ConfirmContext";
+import { DialogProvider } from "./features/dialogs/DialogProvider";
 import { InstrumentKit } from "./dev/InstrumentKit";
 import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -28,7 +28,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ToastProvider>
       <ThemeProvider>
-        <ConfirmProvider>
+        <DialogProvider>
         {showKit ? <InstrumentKit /> : (
         <WatcherProvider>
           <BookmarksProvider>
@@ -48,7 +48,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           </BookmarksProvider>
         </WatcherProvider>
         )}
-        </ConfirmProvider>
+        </DialogProvider>
       </ThemeProvider>
     </ToastProvider>
   </React.StrictMode>,

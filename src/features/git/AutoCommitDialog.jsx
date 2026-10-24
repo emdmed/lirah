@@ -1,9 +1,8 @@
 import { useMemo, useRef } from 'react';
 import { plural } from '../../lib/plural';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
-import { KeyChord } from '../../components/instrument/Keycap';
 import { Scanner } from '../../components/instrument/Scanner';
 import { cn } from '../../lib/utils';
 
@@ -28,39 +27,31 @@ const STEPS = [
 const stepIndex = (stage) => STEPS.findIndex((s) => s.stages.includes(stage));
 
 
+// One line: `● stage ✦ ● message ✦ ● commit`. A step's lamp is lit while it
+// runs, ok once done, fault where it failed.
 function StepLine({ stage, failedAt }) {
   const current = stage === 'error' ? failedAt : stepIndex(stage);
   return (
-    <ol className="grid grid-cols-3 gap-1.5">
+    <ol className="flex flex-wrap items-center gap-2 text-[11px]">
       {STEPS.map((step, i) => {
         // done | active | fault | pending
         let state = 'pending';
         if (i < current || stage === 'done') state = 'done';
         else if (i === current) state = stage === 'error' ? 'fault' : 'active';
         const busy = state === 'active' && stage !== 'ready';
+        const lamp = { done: 'ok', active: 'on', fault: 'fault', pending: 'off' }[state];
         return (
-          <li key={step.id} className="flex flex-col gap-1.5" aria-current={state === 'active' ? 'step' : undefined}>
-            <span
-              aria-hidden="true"
-              className={cn(
-                'h-[2px]',
-                state === 'done' && 'bg-[var(--ins-ok)]',
-                state === 'active' && 'bg-[var(--ins-lamp)]',
-                state === 'fault' && 'bg-[var(--ins-fault)]',
-                state === 'pending' && 'bg-[var(--ins-edge-strong)]',
-                busy && 'ins-pulse',
-              )}
-            />
-            <span className="flex items-center gap-1.5 text-[10px]">
-              <span className="tabular-nums text-faint">0{i + 1}</span>
+          <li key={step.id} className="flex items-center gap-2" aria-current={state === 'active' ? 'step' : undefined}>
+            {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
+            <span className="flex items-center gap-1.5">
+              <Lamp state={lamp} blink={busy} />
               <span
                 className={cn(
-                  'ins-legend text-[10px]',
                   state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
                   state === 'fault' && 'text-[var(--ins-fault)]',
                 )}
               >
-                {step.label}
+                {step.label.toLowerCase()}
               </span>
             </span>
           </li>
@@ -143,10 +134,41 @@ export function AutoCommitDialog({ autoCommit }) {
   const lastStepRef = useRef(0);
   if (stage !== 'error' && stage !== 'idle') lastStepRef.current = Math.max(0, stepIndex(stage));
 
+  const working = stage === 'loading-files' || stage === 'generating-message' || stage === 'committing';
+  const lamp = working ? 'blink' : stage === 'done' ? 'ok' : stage === 'error' ? 'fault' : 'on';
+  const running = {
+    'loading-files': 'scanning the repository',
+    'generating-message': 'writing from the diff',
+    committing: 'committing',
+  }[stage];
+  const status = running ? (
+    <>
+      <Scanner label={running} />
+      {running}
+    </>
+  ) : stage === 'ready' ? (
+    <span
+      className={cn('tabular-nums', subjectLength > SUBJECT_MAX && 'text-[var(--ins-warn)]')}
+      title={`Keep the first line under ${SUBJECT_MAX} characters`}
+    >
+      subject {subjectLength}/{SUBJECT_MAX}
+    </span>
+  ) : null;
+  const hints = stage === 'ready' || stage === 'generating-message'
+    ? [{ keys: ['↵'], label: 'commit' }, { keys: ['⇧', '↵'], label: 'new line' }]
+    : undefined;
+  const settled = stage === 'done' || stage === 'error';
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) cancel(); }}>
       <DialogContent
-        className="sm:max-w-[640px] max-w-[95vw] max-h-[85vh] flex flex-col gap-5 overflow-hidden"
+        size="lg"
+        className="max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        keys={['^', '⇧', '␣']}
+        lamp={lamp}
+        status={status}
+        hints={hints}
+        escLabel={settled ? 'close' : 'cancel'}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && canCommit) {
             e.preventDefault();
@@ -162,79 +184,53 @@ export function AutoCommitDialog({ autoCommit }) {
           Stage every change, generate a commit message, review it and commit.
         </DialogDescription>
 
-        {/* Summary: what is about to be committed, then where we are. */}
-        <div className="flex shrink-0 flex-col gap-4 pt-2">
-          <div className="flex items-end justify-between gap-4">
-            {stage === 'loading-files' ? (
-              <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                <Scanner label="Scanning" />
-                Scanning repository…
-              </span>
-            ) : files.length > 0 ? (
-              <div className="flex min-w-0 items-baseline gap-3">
-                <span className="text-sm text-foreground">{plural(files.length, 'file')}</span>
-                {(totals.added > 0 || totals.removed > 0) && (
-                  <span className="font-mono text-xs tabular-nums">
-                    <span className="text-git-added">+{totals.added}</span>{' '}
-                    <span className="text-git-deleted">−{totals.removed}</span>
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className="text-sm text-muted-foreground">No changes</span>
-            )}
-            {files.length > 0 && <StatusTally files={files} />}
-          </div>
+        {/* Where we are, then what is about to be committed. */}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <StepLine stage={stage} failedAt={lastStepRef.current} />
+          {files.length > 0 ? (
+            <span className="flex items-baseline gap-3 text-xs tabular-nums">
+              <span className="text-foreground">{plural(files.length, 'file')}</span>
+              {(totals.added > 0 || totals.removed > 0) && (
+                <span>
+                  <span className="text-git-added">+{totals.added}</span>{' '}
+                  <span className="text-git-deleted">−{totals.removed}</span>
+                </span>
+              )}
+              <StatusTally files={files} />
+            </span>
+          ) : stage !== 'loading-files' && (
+            <span className="text-xs text-muted-foreground">No changes</span>
+          )}
         </div>
 
+        {/* Settled results are one line, not a box. */}
         {stage === 'done' && (
-          <div className="flex items-start gap-3 edge-engraved px-4 py-3.5" role="status">
-            <Lamp state="ok" className="mt-1" />
-            <div className="min-w-0">
-              <p className="text-sm text-foreground">Committed {plural(files.length, 'file')}</p>
-              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{commitMessage.split('\n')[0]}</p>
-            </div>
-          </div>
+          <p className="flex min-w-0 items-center gap-2.5 text-sm" role="status">
+            <Lamp state="ok" />
+            <span className="shrink-0 text-foreground">Committed {plural(files.length, 'file')}</span>
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{commitMessage.split('\n')[0]}</span>
+          </p>
         )}
 
         {stage === 'error' && (
-          <div className="flex items-start gap-3 edge-engraved px-4 py-3.5" role="alert">
-            <Lamp state="fault" className="mt-1" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-[var(--ins-fault)]">
-                {files.length === 0 ? 'Nothing to commit' : 'Commit failed'}
-              </p>
-              <pre className="mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-col gap-1.5" role="alert">
+            <p className="flex items-center gap-2.5 text-sm text-[var(--ins-fault)]">
+              <Lamp state="fault" />
+              {files.length === 0 ? 'Nothing to commit' : 'Commit failed'}
+            </p>
+            {error && (
+              <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words pl-[17px] text-xs text-muted-foreground">
                 {error}
               </pre>
-            </div>
+            )}
           </div>
         )}
 
         {showWork && (
-          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
             {/* The message is what you review, so it leads. */}
             <section className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="autocommit-message" className="ins-legend text-[10px]">Commit message</label>
-                {stage === 'generating-message' ? (
-                  <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <Scanner label="Generating" />
-                    writing from the diff
-                  </span>
-                ) : (
-                  <span
-                    className={cn(
-                      'text-[11px] tabular-nums',
-                      subjectLength > SUBJECT_MAX ? 'text-[var(--ins-warn)]' : 'text-muted-foreground',
-                    )}
-                    title={`Keep the first line under ${SUBJECT_MAX} characters`}
-                  >
-                    subject {subjectLength}/{SUBJECT_MAX}
-                  </span>
-                )}
-              </div>
+              <DialogGroup label={<label htmlFor="autocommit-message">Commit message</label>} />
               {stage === 'generating-message' ? (
                 <div className="ins-well flex h-32 flex-col gap-2.5 px-3 py-3" aria-hidden="true">
                   <span className="ins-pulse h-2 w-3/5 bg-foreground/10" />
@@ -256,59 +252,40 @@ export function AutoCommitDialog({ autoCommit }) {
               )}
             </section>
 
-            <section className="flex min-h-0 flex-col gap-2">
-              <span className="ins-legend text-[10px]">Staged changes</span>
-              <div className="edge-engraved">
-                <FileList files={files} className="max-h-[24vh]" />
-              </div>
+            <section className="flex min-h-0 flex-col gap-1">
+              <DialogGroup label="Staged changes" />
+              <FileList files={files} className="-mx-3 max-h-[24vh]" />
             </section>
           </div>
         )}
 
-        <footer className="-mx-5 flex shrink-0 items-center justify-between gap-3 px-5 pt-4 edge-t-engraved">
-          <span className="flex items-center gap-3 text-[11px]">
-            {(stage === 'ready' || stage === 'generating-message') && (
-              <>
-                <KeyChord keys={['↵']} label="commit" size="sm" />
-                <KeyChord keys={['⇧', '↵']} label="new line" size="sm" />
-              </>
-            )}
-          </span>
-          <div className="flex gap-2">
-            {stage === 'done' || stage === 'error' ? (
-              <Button variant="ghost" size="sm" onClick={cancel} className="min-w-[88px] px-3 text-xs">
-                Close
+        <DialogFooter className="shrink-0">
+          {settled ? (
+            <Button variant="ghost" size="sm" onClick={cancel} className="px-3 text-xs">
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={cancel}
+                disabled={stage === 'committing'}
+                className="px-3 text-xs"
+              >
+                Cancel
               </Button>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={cancel}
-                  disabled={stage === 'committing'}
-                  className="min-w-[88px] px-3 text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => confirm(commitMessage)}
-                  disabled={!canCommit}
-                  className="min-w-[120px] px-3 text-xs"
-                >
-                  {stage === 'committing' ? (
-                    <>
-                      <Scanner label="Committing" />
-                      Committing
-                    </>
-                  ) : (
-                    `Commit ${plural(files.length, 'file')}`
-                  )}
-                </Button>
-              </>
-            )}
-          </div>
-        </footer>
+              <Button
+                size="sm"
+                onClick={() => confirm(commitMessage)}
+                disabled={!canCommit}
+                className="px-3 text-xs"
+              >
+                {stage === 'committing' ? 'Committing…' : `Commit ${plural(files.length, 'file')}`}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

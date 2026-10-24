@@ -1,12 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../components/ui/sheet';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '../../components/ui/sheet';
 import { Input } from '../../components/ui/input';
+import { DialogEmpty } from '../../components/ui/dialog';
+import { PickerRow, OpenTabTag, tildePath, useOpenTabsByPath } from '../../components/ui/picker';
+import { Keycap } from '../../components/instrument/Keycap';
+import { Lamp } from '../../components/instrument/Lamp';
 import { useBookmarks } from './BookmarksContext';
-import { EmptyState } from '../../components/EmptyState';
-import { Search, Star } from 'lucide-react';
+
+// A key hint on the palette's bottom line: `↑ ↓ move`.
+function Hint({ keys, label }) {
+  return (
+    <span className="inline-flex items-center gap-[3px] whitespace-nowrap">
+      {keys.map((k, i) => <Keycap key={i} size="sm">{k}</Keycap>)}
+      <span className="ml-[3px]">{label}</span>
+    </span>
+  );
+}
 
 export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
   const { bookmarks } = useBookmarks();
+  const openTabs = useOpenTabsByPath();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchInputRef = useRef(null);
@@ -84,70 +97,68 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
     onOpenChange(false);
   };
 
+  // A pane rising from the window's bottom edge, like the `:` line: the
+  // title sits in its top line, the key hints on its last line.
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[50vh]">
-        <SheetHeader>
-          <SheetTitle>Starred projects</SheetTitle>
-        </SheetHeader>
+      <SheetContent
+        side="bottom"
+        className="h-[50vh] gap-3 border-t-[var(--ins-edge-focus)] bg-[var(--ins-raised)] px-5 pt-5 pb-3 font-mono shadow-none [&>[data-slot=sheet-close]]:hidden"
+      >
+        <SheetTitle className="ins-legend absolute -top-[6px] left-[10px] flex items-center gap-[7px] bg-[var(--ins-raised)] px-[5px] font-normal leading-[12px] text-foreground">
+          <Keycap size="sm" lit>^P</Keycap>
+          Starred projects
+          <Lamp state="on" />
+        </SheetTitle>
+        <SheetDescription className="sr-only">Jump to a starred project.</SheetDescription>
 
-        <div className="flex flex-col gap-4 h-full">
-          {/* Search input */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search starred projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+        <Input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Filter starred projects…"
+          aria-label="Filter starred projects"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
 
-          {/* Bookmarks list */}
-          <div className="flex-1 overflow-y-auto">
-            {filteredBookmarks.length === 0 ? (
-              bookmarks.length === 0 ? (
-                <EmptyState
-                  icon={Star}
-                  title="No starred projects yet"
-                  description="Star a project to jump back to it here. Open the project, then use the star button in the files pane header and choose Star this project."
-                />
+        <div className="-mx-2 flex-1 overflow-y-auto" role="listbox" aria-label="Starred projects">
+          {filteredBookmarks.length === 0 ? (
+            <div className="px-2">
+              {bookmarks.length === 0 ? (
+                <DialogEmpty>None yet. Open a project, then use the star button in the files pane header and choose Star this project.</DialogEmpty>
               ) : (
-                <EmptyState
-                  icon={Search}
-                  title="No starred projects match your search"
-                  description="Try a different search term or clear the search to see all starred projects"
-                />
-              )
-            ) : (
-              <div className="flex flex-col gap-1">
-                {filteredBookmarks.map((bookmark, index) => (
-                  <button
-                    key={bookmark.id}
-                    ref={index === selectedIndex ? selectedItemRef : null}
-                    onClick={() => handleSelectBookmark(bookmark)}
-                    className={`flex flex-col items-start gap-1 px-4 py-2.5 text-left transition-colors ${
-                      index === selectedIndex
-                        ? 'ins-row-selected'
-                        : 'hover:bg-foreground/5'
-                    }`}
-                  >
-                    <span className="font-medium">{bookmark.name}</span>
-                    <span className="text-xs opacity-50 truncate max-w-full">{bookmark.path}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                <DialogEmpty>No starred project matches “{searchQuery.trim()}”.</DialogEmpty>
+              )}
+            </div>
+          ) : (
+            filteredBookmarks.map((bookmark, index) => (
+              <PickerRow
+                key={bookmark.id}
+                ref={index === selectedIndex ? selectedItemRef : null}
+                selected={index === selectedIndex}
+                glyph="★"
+                name={bookmark.name}
+                path={tildePath(bookmark.path)}
+                tag={<OpenTabTag tab={openTabs.get(bookmark.path)} />}
+                onClick={() => handleSelectBookmark(bookmark)}
+                onMouseMove={() => setSelectedIndex(index)}
+              />
+            ))
+          )}
+        </div>
 
-          {/* Keyboard hints */}
-          <div className="flex items-center gap-4 text-xs opacity-50 border-t edge-t-engraved pt-2">
-            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">↑↓</span> Navigate</span>
-            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">Enter</span> Select</span>
-            <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">ESC</span> Close</span>
-          </div>
+        <div className="flex items-center justify-end gap-[9px] border-t border-[var(--ins-edge)] pt-2 text-[11px] text-muted-foreground">
+          <Hint keys={['↑', '↓']} label="move" />
+          <span className="ins-sep-star" aria-hidden="true" />
+          <Hint keys={['↵']} label="open" />
+          <span className="ins-sep-star" aria-hidden="true" />
+          <span className="inline-flex items-center gap-[3px] whitespace-nowrap">
+            <SheetClose className="ins-cap ins-round" data-size="sm">
+              esc
+              <span className="sr-only">Close</span>
+            </SheetClose>
+            <span className="ml-[3px]" aria-hidden="true">close</span>
+          </span>
         </div>
       </SheetContent>
     </Sheet>

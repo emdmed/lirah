@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useToast } from "../toast";
-import { useConfirm } from "../confirm/ConfirmContext";
+import { useConfirm } from "../dialogs/DialogProvider";
 import { getAgentHookState } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
 import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";

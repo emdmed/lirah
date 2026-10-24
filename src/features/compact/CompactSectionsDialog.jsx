@@ -2,12 +2,9 @@ import React, { useState, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { estimateTokens, formatTokenCount } from "./useProjectCompact";
 
@@ -165,13 +162,15 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Compacted Sections</DialogTitle>
-          <DialogDescription>
-            {enabledCount}/{sections.length} files · ~{formatTokenCount(liveTokenEstimate)} tokens
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        size="md"
+        className="max-h-[70vh] flex flex-col"
+        status={<span className="tabular-nums">{enabledCount}/{sections.length} files · ~{formatTokenCount(liveTokenEstimate)} tokens</span>}
+      >
+        <DialogTitle>Compacted sections</DialogTitle>
+        <DialogDescription className="sr-only">
+          Turn files of the compacted project on or off. Click a token count to toggle it.
+        </DialogDescription>
         <div className="overflow-y-auto flex-1 -mx-2 px-2">
           {grouped.map(([dirPath, files]) => {
             const filePaths = files.map(f => f.path);
@@ -195,7 +194,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                       : <ChevronDown className="w-3 h-3 text-muted-foreground" />
                     }
                     <span
-                      className="shrink-0 px-1 py-0 rounded-xs border border-[var(--ins-edge-strong)] text-[var(--ins-lamp)]/70 font-mono cursor-pointer hover:bg-foreground/10 hover:text-[var(--ins-lamp)] transition-colors text-center"
+                      className="shrink-0 px-1 py-0 border border-[var(--ins-edge-strong)] text-[var(--ins-lamp)]/70 font-mono cursor-pointer hover:bg-foreground/10 hover:text-[var(--ins-lamp)] transition-colors text-center"
                       style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
                       onClick={(e) => { e.stopPropagation(); toggleDir(dirPath, filePaths); }}
                     >
@@ -211,7 +210,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                 </div>
                 {/* Files */}
                 {!collapsed && (
-                  <div className="ml-4 border-l border-border/20 pl-1.5">
+                  <div className="ml-4 border-l border-[var(--ins-edge)] pl-1.5">
                     {files.map(file => {
                       const isDisabled = disabledPaths.has(file.path);
                       return (
@@ -224,7 +223,7 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
                           }`}
                         >
                           <span
-                            className="shrink-0 px-1 py-0 rounded-xs border border-[var(--ins-edge-strong)] text-[var(--ins-lamp)]/70 font-mono cursor-pointer hover:bg-foreground/10 hover:text-[var(--ins-lamp)] transition-colors text-center"
+                            className="shrink-0 px-1 py-0 border border-[var(--ins-edge-strong)] text-[var(--ins-lamp)]/70 font-mono cursor-pointer hover:bg-foreground/10 hover:text-[var(--ins-lamp)] transition-colors text-center"
                             style={{ fontSize: '9px', lineHeight: '14px', minWidth: '38px' }}
                             onClick={() => togglePath(file.path)}
                           >
@@ -242,11 +241,6 @@ export function CompactSectionsDialog({ open, onOpenChange, compactedProject, on
             );
           })}
         </div>
-        <DialogFooter className="gap-2 sm:gap-2 border-t border-border pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

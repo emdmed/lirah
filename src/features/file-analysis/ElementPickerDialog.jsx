@@ -6,9 +6,10 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogEmpty,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Check } from "lucide-react";
 import { Scanner } from "@/components/instrument/Scanner";
 import { invoke } from "@tauri-apps/api/core";
 import { isBabelParseable } from "./babelSupport";
@@ -317,32 +318,38 @@ export function ElementPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[80vh]  flex flex-col">
+      <DialogContent
+        size="md"
+        className="max-h-[80vh] flex flex-col"
+        lamp={loading ? 'blink' : 'on'}
+        status={loading ? (
+          <>
+            <Scanner label="Reading file" />
+            reading file
+          </>
+        ) : selectedKeys.size > 0 ? `${selectedKeys.size} selected` : null}
+        escLabel="cancel"
+      >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Select Elements
-          </DialogTitle>
-          <DialogDescription className="truncate">
+          <DialogTitle>Select elements</DialogTitle>
+          <DialogDescription className="truncate font-mono text-xs" title={relativePath}>
             {relativePath}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0 py-2">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Scanner size="lg" />
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-sm text-destructive">
+            <p className="py-2 text-sm text-[var(--ins-fault)]" role="alert">
               {error}
-            </div>
+            </p>
           ) : elements.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              No elements found in this file
-            </div>
+            <DialogEmpty>No elements found in this file</DialogEmpty>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-3">
               {groupedElements.map(group => {
                 const isExpanded = expandedGroups.has(group.type);
                 const groupKeys = group.elements.map(el => el.key);
@@ -351,15 +358,15 @@ export function ElementPickerDialog({
                 const someSelected = selectedCount > 0 && !allSelected;
 
                 return (
-                  <div key={group.type} className="border edge-engraved rounded-none">
+                  <div key={group.type} className="flex flex-col">
                     <div
-                      className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted"
+                      className="flex cursor-pointer items-center gap-2 py-1"
                       onClick={() => toggleGroup(group.type)}
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       ) : (
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                       )}
                       <Button
                         variant="secondary"
@@ -369,20 +376,21 @@ export function ElementPickerDialog({
                       >
                         {allSelected ? 'none' : 'all'}
                       </Button>
-                      <span className="font-medium text-sm flex-1">
+                      <span className="ins-legend text-[10px]">
                         {group.type}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
                         {selectedCount > 0 && `${selectedCount}/`}{group.elements.length}
                       </span>
+                      <span aria-hidden="true" className="h-px flex-1 bg-[var(--ins-edge)]" />
                     </div>
 
                     {isExpanded && (
-                      <div className="px-3 py-1 space-y-1">
+                      <div className="-mx-3 flex flex-col">
                         {group.elements.map(el => (
                           <div
                             key={el.key}
-                            className="flex items-center gap-2 py-1 pl-6 hover:bg-muted/30 rounded-none cursor-pointer"
+                            className="flex cursor-pointer items-center gap-2 py-[3px] pl-7 pr-3 hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]"
                             onClick={() => toggleElement(el.key)}
                           >
                             <span className="w-4 h-4 flex items-center justify-center">
@@ -407,11 +415,12 @@ export function ElementPickerDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2 border-t border-border pt-4">
-          <Button variant="outline" onClick={handleCancel}>
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={handleCancel}>
             Cancel
           </Button>
           <Button
+            size="sm"
             onClick={handleAddSelected}
             disabled={selectedKeys.size === 0}
           >

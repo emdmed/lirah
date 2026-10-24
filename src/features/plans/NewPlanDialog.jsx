@@ -55,17 +55,23 @@ export function NewPlanDialog({ open, onOpenChange, onCreate }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
-      <DialogContent className="sm:max-w-[640px]">
+      <DialogContent
+        size="lg"
+        escLabel="cancel"
+        status={source.trim() ? `${source.split('\n').length} lines${loadedFrom ? ' · loaded' : ''}` : undefined}
+      >
         <DialogHeader>
           <DialogTitle>New plan</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs leading-relaxed">
             An agent reads the plan (and the code, read-only) and splits it into small chunks you implement one
             commit at a time. Plans are kept in ~/.lirah/plans, not in the repo.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <label htmlFor="new-plan-source" className="ins-legend">Plan</label>
           <Textarea
+            id="new-plan-source"
             value={source}
             onChange={(e) => {
               setSource(e.target.value);
@@ -86,19 +92,20 @@ export function NewPlanDialog({ open, onOpenChange, onCreate }) {
                 }
               }}
               placeholder="or load a file: /path/to/plan.md"
+              aria-label="Load a plan from a file path"
               className="h-8 text-xs"
             />
-            <Button type="button" variant="outline" size="sm" onClick={handleLoad} disabled={!path.trim()}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleLoad} disabled={!path.trim()}>
               Load
             </Button>
           </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-[var(--ins-fault)]" role="alert">{error}</p>}
 
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={close}>
+            <Button type="button" variant="ghost" size="sm" onClick={close}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!source.trim()}>
+            <Button type="submit" size="sm" disabled={!source.trim()}>
               Split into chunks
             </Button>
           </DialogFooter>

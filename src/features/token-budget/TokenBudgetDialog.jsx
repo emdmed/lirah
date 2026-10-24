@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Meter } from '@/components/instrument/Meter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTokenBudget } from './TokenBudgetContext';
@@ -58,96 +59,59 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
     resetAlerts(projectPath);
   };
 
-  const usagePercent = (limit) => {
-    if (!limit) return 0;
-    return Math.min((currentUsage.total / parseInt(limit)) * 100, 100);
-  };
+  const cost = currentUsage.cost < 0.01 ? '<$0.01' : `$${currentUsage.cost.toFixed(2)}`;
+
+  const limitField = (id, label, value, setValue, placeholder) => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="ins-legend">{label}</label>
+      <Input
+        id={id}
+        type="number"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => { setValue(e.target.value); setError(''); }}
+        min={1000}
+        max={10000000}
+        className="text-xs tabular-nums"
+      />
+      {value && parseInt(value) > 0 && (
+        <Meter value={currentUsage.total} max={parseInt(value)} label={`${label} used`} />
+      )}
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent
+        size="sm"
+        keys={['^', '⇧', 'B']}
+        escLabel="cancel"
+        status={<span className="tabular-nums">{currentUsage.total.toLocaleString()} tokens · {cost}</span>}
+      >
         <DialogHeader>
-          <DialogTitle className="text-sm">Token Budget Settings</DialogTitle>
+          <DialogTitle>Token budget</DialogTitle>
+          <DialogDescription className="truncate font-mono text-xs" title={projectPath || undefined}>
+            {projectPath || 'No project'}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="text-xs text-muted-foreground font-mono truncate">
-            {projectPath || 'No project'}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium">Daily Limit (tokens)</label>
-            <Input
-              type="number"
-              placeholder="e.g. 100000"
-              value={dailyLimit}
-              onChange={(e) => { setDailyLimit(e.target.value); setError(''); }}
-              min={1000}
-              max={10000000}
-              className="text-xs"
-            />
-            {dailyLimit && (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${usagePercent(dailyLimit)}%`,
-                      backgroundColor: usagePercent(dailyLimit) >= 95 ? '#E82424' : usagePercent(dailyLimit) >= 80 ? '#FF9E3B' : '#76946A',
-                    }}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground font-mono">
-                  {currentUsage.total.toLocaleString()} / {parseInt(dailyLimit).toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium">Weekly Limit (tokens)</label>
-            <Input
-              type="number"
-              placeholder="e.g. 500000"
-              value={weeklyLimit}
-              onChange={(e) => { setWeeklyLimit(e.target.value); setError(''); }}
-              min={1000}
-              max={10000000}
-              className="text-xs"
-            />
-            {weeklyLimit && (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${usagePercent(weeklyLimit)}%`,
-                      backgroundColor: usagePercent(weeklyLimit) >= 95 ? '#E82424' : usagePercent(weeklyLimit) >= 80 ? '#FF9E3B' : '#76946A',
-                    }}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground font-mono">
-                  {currentUsage.total.toLocaleString()} / {parseInt(weeklyLimit).toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="text-xs text-muted-foreground">
-            Current session: {currentUsage.total.toLocaleString()} tokens ({currentUsage.cost < 0.01 ? '<$0.01' : `$${currentUsage.cost.toFixed(2)}`})
-          </div>
-
-          {error && <div className="text-xs text-destructive">{error}</div>}
+        <div className="flex flex-col gap-4">
+          {limitField('budget-daily', 'Daily limit', dailyLimit, setDailyLimit, 'e.g. 100000')}
+          {limitField('budget-weekly', 'Weekly limit', weeklyLimit, setWeeklyLimit, 'e.g. 500000')}
+          <p className="text-xs text-muted-foreground">
+            Leave both empty to remove the budget. Alerts show at 80% and 95%.
+          </p>
+          {error && <p className="text-xs text-[var(--ins-fault)]" role="alert">{error}</p>}
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="ghost" size="sm" onClick={handleReset} className="mr-auto text-xs">
-            Reset Alerts
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={handleReset} className="sm:mr-auto">
+            Reset alerts
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleSave} className="text-xs">
+          <Button size="sm" onClick={handleSave}>
             Save
           </Button>
         </DialogFooter>

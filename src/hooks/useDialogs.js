@@ -1,57 +1,62 @@
 import { useMemo, useState } from "react";
+import { useDialogStore, useOpenDialogs } from "../features/dialogs/DialogProvider";
 
-export function useDialogs() {
-  const [addBookmarkDialogOpen, setAddBookmarkDialogOpen] = useState(false);
-  const [bookmarksPaletteOpen, setBookmarksPaletteOpen] = useState(false);
-  const [initialProjectDialogOpen, setInitialProjectDialogOpen] = useState(false);
-  const [manageTemplatesDialogOpen, setManageTemplatesDialogOpen] = useState(false);
-  const [saveFileGroupDialogOpen, setSaveFileGroupDialogOpen] = useState(false);
-  const [diffDialogOpen, setDiffDialogOpen] = useState(false);
+// A tab's dialogs as `{ settingsOpen, setSettingsOpen, … }`. Open state lives
+// in DialogProvider under the tab's scope; this keeps the flag-and-setter
+// shape that shortcuts and commands use. Setters accept a value or an
+// updater, like useState's.
+const FLAGS = {
+  addBookmarkDialogOpen: "addBookmark",
+  bookmarksPaletteOpen: "bookmarks",
+  initialProjectDialogOpen: "initialProject",
+  manageTemplatesDialogOpen: "templates",
+  saveFileGroupDialogOpen: "saveFileGroup",
+  diffDialogOpen: "gitDiff",
+  cliSelectionModalOpen: "cliSelection",
+  showHelp: "help",
+  budgetDialogOpen: "budget",
+  settingsOpen: "settings",
+  dashboardOpen: "tokens",
+  autoChangelogDialogOpen: "autoChangelog",
+  workspaceDialogOpen: "workspace",
+  projectPickerOpen: "projectPicker",
+  orchestrationDashboardOpen: "orchestration",
+  markdownViewerOpen: "markdown",
+};
+
+const setterName = (flag) => `set${flag[0].toUpperCase()}${flag.slice(1)}`;
+
+export function useDialogs(scope) {
+  const store = useDialogStore();
+  const open = useOpenDialogs(scope);
+
+  // What a dialog opens on, set just before it opens.
   const [diffFilePath, setDiffFilePath] = useState(null);
-  const [cliSelectionModalOpen, setCliSelectionModalOpen] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dashboardOpen, setDashboardOpen] = useState(false);
-  const [autoChangelogDialogOpen, setAutoChangelogDialogOpen] = useState(false);
-  const [autoCommitConfigOpen, setAutoCommitConfigOpen] = useState(false);
-  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
-  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [markdownFilePath, setMarkdownFilePath] = useState(null);
   const [projectPickerAction, setProjectPickerAction] = useState(null);
 
-  const [orchestrationDashboardOpen, setOrchestrationDashboardOpen] = useState(false);
-  const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
-  const [markdownFilePath, setMarkdownFilePath] = useState(null);
+  const setters = useMemo(() => {
+    const out = {};
+    for (const [flag, id] of Object.entries(FLAGS)) {
+      out[setterName(flag)] = (next) => {
+        const was = store.isOpen(id, scope);
+        const now = typeof next === "function" ? next(was) : next;
+        if (now && !was) store.open(id, {}, scope);
+        else if (!now && was) store.close(id, scope);
+      };
+    }
+    return out;
+  }, [store, scope]);
 
-  // Setters are stable, so the object only changes when a dialog opens or
-  // closes — consumers that depend on `dialogs` don't re-run on every render.
-  return useMemo(() => ({
-    addBookmarkDialogOpen, setAddBookmarkDialogOpen,
-    bookmarksPaletteOpen, setBookmarksPaletteOpen,
-    initialProjectDialogOpen, setInitialProjectDialogOpen,
-    manageTemplatesDialogOpen, setManageTemplatesDialogOpen,
-    saveFileGroupDialogOpen, setSaveFileGroupDialogOpen,
-    diffDialogOpen, setDiffDialogOpen,
-    diffFilePath, setDiffFilePath,
-    cliSelectionModalOpen, setCliSelectionModalOpen,
-    showHelp, setShowHelp,
-    budgetDialogOpen, setBudgetDialogOpen,
-    settingsOpen, setSettingsOpen,
-    dashboardOpen, setDashboardOpen,
-    autoChangelogDialogOpen, setAutoChangelogDialogOpen,
-    autoCommitConfigOpen, setAutoCommitConfigOpen,
-    workspaceDialogOpen, setWorkspaceDialogOpen,
-    projectPickerOpen, setProjectPickerOpen,
-    projectPickerAction, setProjectPickerAction,
-
-    orchestrationDashboardOpen, setOrchestrationDashboardOpen,
-    markdownViewerOpen, setMarkdownViewerOpen,
-    markdownFilePath, setMarkdownFilePath,
-  }), [
-    addBookmarkDialogOpen, bookmarksPaletteOpen, initialProjectDialogOpen,
-    manageTemplatesDialogOpen, saveFileGroupDialogOpen, diffDialogOpen, diffFilePath,
-    cliSelectionModalOpen, showHelp, budgetDialogOpen, settingsOpen, dashboardOpen,
-    autoChangelogDialogOpen, autoCommitConfigOpen, workspaceDialogOpen, projectPickerOpen,
-    projectPickerAction, orchestrationDashboardOpen, markdownViewerOpen, markdownFilePath,
-  ]);
+  return useMemo(() => {
+    const flags = {};
+    for (const [flag, id] of Object.entries(FLAGS)) flags[flag] = id in open;
+    return {
+      ...flags,
+      ...setters,
+      diffFilePath, setDiffFilePath,
+      markdownFilePath, setMarkdownFilePath,
+      projectPickerAction, setProjectPickerAction,
+    };
+  }, [open, setters, diffFilePath, markdownFilePath, projectPickerAction]);
 }

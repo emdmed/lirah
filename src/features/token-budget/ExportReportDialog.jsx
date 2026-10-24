@@ -3,10 +3,13 @@ import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogGroup,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
   const [exportFormat, setExportFormat] = useState('csv');
@@ -81,31 +84,41 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
   };
 
   const includeOptions = [
-    { key: 'allProjects', label: 'All Projects' },
+    { key: 'allProjects', label: 'All projects' },
     { key: 'tokenDetails', label: 'Token details' },
     { key: 'costBreakdown', label: 'Cost breakdown' },
     { key: 'modelUsage', label: 'Model usage' },
     { key: 'sessionMetadata', label: 'Session metadata' },
   ];
 
+  const rangeCount = (sessions || []).filter((s) => {
+    const d = (s.timestamp || '').slice(0, 10);
+    return (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+  }).length;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md font-mono">
-        <DialogHeader>
-          <DialogTitle className="text-sm">Export Usage Report</DialogTitle>
-        </DialogHeader>
+      <DialogContent
+        size="sm"
+        escLabel="cancel"
+        status={<span className="tabular-nums">{rangeCount} session{rangeCount === 1 ? '' : 's'}</span>}
+      >
+        <DialogTitle>Export usage report</DialogTitle>
+        <DialogDescription className="sr-only">
+          Pick a format, a date range and which columns to include, then export.
+        </DialogDescription>
 
-        <div className="space-y-4">
-          {/* Format */}
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Format</div>
-            <div className="flex gap-2">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="ins-legend" id="export-format-label">Format</span>
+            <div className="flex gap-1" role="group" aria-labelledby="export-format-label">
               {['csv', 'json'].map(f => (
                 <Button
                   key={f}
-                  variant={exportFormat === f ? 'default' : 'outline'}
+                  variant="ghost"
                   size="sm"
-                  className="h-7 text-xs px-3"
+                  aria-pressed={exportFormat === f}
+                  className="h-7 px-3 text-xs"
                   onClick={() => setExportFormat(f)}
                 >
                   {f.toUpperCase()}
@@ -114,56 +127,53 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
             </div>
           </div>
 
-          {/* Date Range */}
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Date Range</div>
+          <div className="flex flex-col gap-1.5">
+            <span className="ins-legend">Dates</span>
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="h-7 text-xs px-2 border edge-engraved rounded-none flex-1"
-                style={{ backgroundColor: 'var(--color-input-background)' }}
+                aria-label="From"
+                className="h-7 flex-1 text-xs"
               />
               <span className="text-xs text-muted-foreground">to</span>
-              <input
+              <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="h-7 text-xs px-2 border edge-engraved rounded-none flex-1"
-                style={{ backgroundColor: 'var(--color-input-background)' }}
+                aria-label="To"
+                className="h-7 flex-1 text-xs"
               />
             </div>
           </div>
 
-          {/* Include */}
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Include</div>
-            <div className="grid grid-cols-2 gap-1">
+          <div className="flex flex-col gap-2">
+            <DialogGroup label="Include" />
+            <div className="grid grid-cols-2 gap-1.5">
               {includeOptions.map(opt => (
                 <label key={opt.key} className="flex items-center gap-2 text-xs cursor-pointer">
                   <input
                     type="checkbox"
                     checked={include[opt.key]}
                     onChange={() => toggleInclude(opt.key)}
-                    className="rounded"
+                    className="accent-[var(--ins-lamp)]"
                   />
                   {opt.label}
                 </label>
               ))}
             </div>
           </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleExport}>
-              Export
-            </Button>
-          </div>
         </div>
+
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleExport} disabled={exportFormat === 'csv' && rangeCount === 0}>
+            Export
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

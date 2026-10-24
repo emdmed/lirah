@@ -1,64 +1,68 @@
-import { useState, useEffect, useCallback } from "react";
-import { Folder } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import { PickerRow, tildePath } from "./ui/picker";
+import { shortcutForCommand } from "../lib/shortcuts";
 
-export function WorkspaceProjectPicker({ projects, onSelect, onCancel }) {
+// In a workspace, commit, merge and lazygit ask which project to act on.
+const ACTIONS = {
+  lazygit: { title: "Lazygit", command: "lazygit" },
+  autocommit: { title: "Auto commit", command: "commit" },
+  automerge: { title: "Auto merge", command: "merge" },
+};
+
+export function WorkspaceProjectPicker({ open = true, onOpenChange, projects, onSelect, action }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-
-  const handleKeyDown = useCallback((e) => {
-    switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : projects.length - 1));
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev < projects.length - 1 ? prev + 1 : 0));
-        break;
-      case 'Enter':
-        e.preventDefault();
-        onSelect(projects[selectedIndex]);
-        break;
-      case 'Escape':
-        e.preventDefault();
-        onCancel();
-        break;
-    }
-  }, [selectedIndex, projects, onSelect, onCancel]);
+  const selectedRef = useRef(null);
+  const meta = ACTIONS[action];
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    selectedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : projects.length - 1));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev < projects.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (projects[selectedIndex]) onSelect(projects[selectedIndex]);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div
-        className="flex flex-col gap-1 border edge-engraved p-4 shadow-xs font-mono rounded-none min-w-[300px]"
-        style={{ backgroundColor: 'var(--color-input-background)' }}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="md"
+        keys={meta ? shortcutForCommand(meta.command) ?? undefined : undefined}
+        status={`${projects.length} ${projects.length === 1 ? "project" : "projects"}`}
+        hints={[{ keys: ["↑", "↓"], label: "move" }, { keys: ["↵"], label: "pick" }]}
+        escLabel="cancel"
+        onKeyDown={handleKeyDown}
       >
-        <div className="text-sm font-semibold text-foreground mb-2">Select project</div>
-        {projects.map((project, index) => (
-          <button
-            key={project.name}
-            className={`flex items-center gap-3 px-3 py-2 text-sm text-foreground transition-colors outline-none rounded-sm hover:bg-foreground/5 ${
-              index === selectedIndex ? 'ins-row-selected' : ''
-            }`}
-            onClick={() => onSelect(project)}
-            onMouseEnter={() => setSelectedIndex(index)}
-          >
-            <Folder className="size-4 text-muted-foreground" />
-            <div className="flex flex-col items-start">
-              <span>{project.name}</span>
-              <span className="text-xs text-muted-foreground">{project.real_path || project.path}</span>
-            </div>
-          </button>
-        ))}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t edge-t-engraved">
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">↑↓</span> Navigate</span>
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">Enter</span> Select</span>
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">ESC</span> Cancel</span>
+        <DialogTitle>{meta ? `${meta.title} · pick project` : "Pick project"}</DialogTitle>
+        <DialogDescription className="sr-only">Choose the workspace project to act on.</DialogDescription>
+
+        <div className="-mx-2 flex max-h-[320px] flex-col overflow-y-auto" role="listbox" aria-label="Projects">
+          {projects.map((project, index) => {
+            const selected = index === selectedIndex;
+            return (
+              <PickerRow
+                key={project.name}
+                ref={selected ? selectedRef : null}
+                selected={selected}
+                glyph={selected ? "↵" : ""}
+                name={project.name}
+                path={tildePath(project.real_path || project.path)}
+                onClick={() => onSelect(project)}
+                onMouseMove={() => setSelectedIndex(index)}
+              />
+            );
+          })}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

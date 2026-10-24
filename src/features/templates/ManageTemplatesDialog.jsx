@@ -6,12 +6,14 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogGroup,
+  DialogEmpty,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { usePromptTemplates } from './PromptTemplatesContext';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 
 export function ManageTemplatesDialog({ open, onOpenChange }) {
   const { templates, addTemplate, removeTemplate, updateTemplate } = usePromptTemplates();
@@ -86,9 +88,14 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent
+        size="md"
+        className="max-h-[80vh] flex flex-col"
+        status={`${templates.length} ${templates.length === 1 ? 'template' : 'templates'}`}
+        escLabel="done"
+      >
         <DialogHeader>
-          <DialogTitle>Manage Prompt Templates</DialogTitle>
+          <DialogTitle>Prompt templates</DialogTitle>
           <DialogDescription>
             Create templates to append to your prompts when sending to terminal.
           </DialogDescription>
@@ -96,26 +103,25 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
           {/* Template list */}
-          <div className="flex-1 min-h-0 overflow-y-auto border edge-engraved rounded-none">
+          <div className="flex flex-1 min-h-0 flex-col gap-1">
+            <DialogGroup label="Templates" />
             {templates.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                No templates yet. Click "Add Template" to create one.
-              </div>
+              <DialogEmpty>No templates yet. Click "Add Template" to create one.</DialogEmpty>
             ) : (
-              <div className="divide-y">
+              <div className="-mx-3 min-h-0 overflow-y-auto">
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    className={`flex items-center justify-between p-3 hover:bg-muted/50 ${
-                      editingId === template.id ? 'bg-muted' : ''
+                    className={`flex items-center justify-between gap-3 py-1.5 pl-3.5 pr-2 ${
+                      editingId === template.id ? 'ins-row-selected' : 'hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]'
                     }`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{template.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">
+                    <div className="flex min-w-0 flex-1 items-baseline gap-3">
+                      <span className="shrink-0 truncate text-sm text-foreground">{template.title}</span>
+                      <span className="min-w-0 truncate text-xs text-muted-foreground">
                         {template.content.substring(0, 50)}
                         {template.content.length > 50 ? '...' : ''}
-                      </div>
+                      </span>
                     </div>
                     {!template.isDefault && (
                       <div className="flex items-center gap-1 ml-2">
@@ -146,9 +152,10 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
 
           {/* Add/Edit form */}
           {(isAdding || editingId) && (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-3 border edge-engraved rounded-none bg-muted/20">
-              <div className="flex flex-col gap-2">
-                <label htmlFor="template-title" className="text-sm font-medium">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+              <DialogGroup label={editingId ? 'Edit template' : 'New template'} />
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="template-title" className="ins-legend text-[10px]">
                   Title
                 </label>
                 <Input
@@ -161,8 +168,8 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                 />
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label htmlFor="template-content" className="text-sm font-medium">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="template-content" className="ins-legend text-[10px]">
                   Content
                 </label>
                 <Textarea
@@ -179,28 +186,29 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                 <p className="text-xs text-destructive">{error}</p>
               )}
 
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={handleCancel}>
+              <DialogFooter>
+                <Button type="button" variant="ghost" size="sm" onClick={handleCancel}>
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" size="sm">
                   {editingId ? 'Save Changes' : 'Add Template'}
                 </Button>
-              </div>
+              </DialogFooter>
             </form>
           )}
         </div>
 
         <DialogFooter className="flex-shrink-0">
           {!isAdding && !editingId && (
-            <Button onClick={handleStartAdd} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Template
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" onClick={handleClose}>
+                Done
+              </Button>
+              <Button size="sm" onClick={handleStartAdd}>
+                Add Template
+              </Button>
+            </>
           )}
-          <Button variant="ghost" onClick={handleClose}>
-            Done
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -3,7 +3,7 @@ import { FileDown } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { Scanner } from '../../components/instrument/Scanner';
-import { useConfirm } from '../confirm/ConfirmContext';
+import { useConfirm } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 
 /** `*_plan.md` files at the repo root, one key away from becoming plans. */

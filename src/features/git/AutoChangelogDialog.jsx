@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Checkbox } from '../../components/ui/checkbox';
+import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 
 export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targetFile, cli, onSave }) {
   const [draftEnabled, setDraftEnabled] = useState(enabled);
@@ -31,35 +31,34 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>Auto Changelog</DialogTitle>
-        </DialogHeader>
+      <DialogContent size="sm" escLabel="cancel">
+        <DialogTitle>Auto changelog</DialogTitle>
+        <DialogDescription className="sr-only">
+          Choose when an agent updates the changelog and which file it writes.
+        </DialogDescription>
 
-        <div className="space-y-4 py-2">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="changelog-enabled"
-              checked={draftEnabled}
-              onCheckedChange={setDraftEnabled}
-            />
-            <label htmlFor="changelog-enabled" className="text-sm cursor-pointer">
-              Enable auto changelog
-            </label>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <label htmlFor="changelog-enabled" className="text-sm text-foreground cursor-pointer">
+            Update the changelog automatically
+          </label>
+          <ToggleSwitch
+            checked={draftEnabled}
+            onChange={setDraftEnabled}
+            label="Update the changelog automatically"
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Trigger mode</label>
-            <div className="space-y-1.5">
+        <div className="flex flex-col gap-2" role="radiogroup" aria-label="When">
+          <DialogGroup label="When" />
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="radio"
                   name="trigger"
                   checked={draftTrigger === 'commit'}
                   onChange={() => setDraftTrigger('commit')}
-                  className="accent-primary"
+                  className="accent-[var(--ins-lamp)]"
                 />
-                On every commit
+                After every commit
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
@@ -67,23 +66,21 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
                   name="trigger"
                   checked={draftTrigger === 'merge'}
                   onChange={() => setDraftTrigger('merge')}
-                  className="accent-primary"
+                  className="accent-[var(--ins-lamp)]"
                 />
-                On merge to main/master
+                After a merge to main/master
               </label>
-            </div>
-          </div>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">CLI backend</label>
-            <div className="space-y-1.5">
+        <div className="flex flex-col gap-2" role="radiogroup" aria-label="Agent">
+          <DialogGroup label="Agent" />
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="radio"
                   name="cli-backend"
                   checked={draftCli === 'claude-code'}
                   onChange={() => setDraftCli('claude-code')}
-                  className="accent-primary"
+                  className="accent-[var(--ins-lamp)]"
                 />
                 Claude Code
               </label>
@@ -93,25 +90,23 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
                   name="cli-backend"
                   checked={draftCli === 'opencode'}
                   onChange={() => setDraftCli('opencode')}
-                  className="accent-primary"
+                  className="accent-[var(--ins-lamp)]"
                 />
                 OpenCode
               </label>
-            </div>
-          </div>
+        </div>
 
-          <div className="space-y-2">
-            <label htmlFor="changelog-target" className="text-sm text-muted-foreground">
-              Target file
-            </label>
-            <Input
-              id="changelog-target"
-              value={draftTarget}
-              onChange={(e) => setDraftTarget(e.target.value)}
-              placeholder="CHANGELOG.md"
-              className="text-sm font-mono"
-            />
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="changelog-target" className="ins-legend">
+            File
+          </label>
+          <Input
+            id="changelog-target"
+            value={draftTarget}
+            onChange={(e) => setDraftTarget(e.target.value)}
+            placeholder="CHANGELOG.md"
+            className="text-sm font-mono"
+          />
         </div>
 
         <DialogFooter>

@@ -2,15 +2,18 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogGroup,
+  DialogEmpty,
 } from './ui/dialog';
+import { PickerRow, OpenTabTag, tildePath, useOpenTabsByPath } from './ui/picker';
 import { useBookmarks } from '../features/bookmarks';
-import { FolderOpen, Layers } from 'lucide-react';
 import { LirahLockup } from './LirahMark';
 
 export function InitialProjectDialog({ open, onOpenChange, onSelectProject, workspaces, onOpenWorkspace }) {
   const { bookmarks } = useBookmarks();
+  const openTabs = useOpenTabsByPath();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selectedItemRef = useRef(null);
 
@@ -32,7 +35,7 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
       type: 'bookmark',
       id: b.id,
       name: b.name,
-      subtitle: b.path,
+      subtitle: tildePath(b.path),
       data: b,
     }));
     return [...wsItems, ...bkItems];
@@ -90,61 +93,59 @@ export function InitialProjectDialog({ open, onOpenChange, onSelectProject, work
     }
   };
 
-  const handleSkip = () => {
-    onOpenChange(false);
+  const renderRow = (item) => {
+    const index = items.indexOf(item);
+    const selected = index === selectedIndex;
+    return (
+      <PickerRow
+        key={item.id}
+        ref={selected ? selectedItemRef : null}
+        selected={selected}
+        glyph={item.type === 'workspace' ? '◇' : '★'}
+        name={item.name}
+        path={item.subtitle}
+        tag={item.type === 'bookmark' ? <OpenTabTag tab={openTabs.get(item.data.path)} /> : null}
+        onClick={() => handleSelectItem(item)}
+        onMouseMove={() => setSelectedIndex(index)}
+      />
+    );
   };
+  const wsItems = items.filter(i => i.type === 'workspace');
+  const bkItems = items.filter(i => i.type === 'bookmark');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <div className="flex justify-center pb-2">
+      <DialogContent
+        size="md"
+        hints={items.length > 0 ? [{ keys: ['↑', '↓'], label: 'move' }, { keys: ['↵'], label: 'open' }] : undefined}
+      >
+        <DialogTitle>Open project</DialogTitle>
+        <DialogDescription className="sr-only">Open a starred project or workspace.</DialogDescription>
+
+        <div className="flex justify-center py-2">
           <LirahLockup size={40} wordmarkSize={36} />
         </div>
 
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FolderOpen className="w-5 h-5" />
-            Open Project
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-none p-2 edge-engraved">
-          {items.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm opacity-50">
-              <div className="text-center">
-                <p>No starred projects yet.</p>
-                <p className="text-xs mt-2">
-                  Press Esc, open a project folder, then use the star button in the files pane header and choose Star this project.
-                </p>
+        {items.length === 0 ? (
+          <DialogEmpty>
+            No starred projects yet. Press Esc, open a project folder, then use the star button in the files pane header and choose Star this project.
+          </DialogEmpty>
+        ) : (
+          <div className="-mx-2 flex max-h-[300px] flex-col gap-3 overflow-y-auto px-2" role="listbox" aria-label="Projects">
+            {wsItems.length > 0 && (
+              <div className="flex flex-col gap-1.5" role="group" aria-label="Workspaces">
+                <DialogGroup label="workspaces" />
+                <div className="-mx-2 flex flex-col">{wsItems.map(renderRow)}</div>
               </div>
-            </div>
-          ) : (
-            items.map((item, index) => (
-              <button
-                key={item.id}
-                ref={index === selectedIndex ? selectedItemRef : null}
-                onClick={() => handleSelectItem(item)}
-                className={`flex flex-col items-start gap-1 px-4 py-2.5 text-left font-mono transition-colors rounded-sm ${
-                  index === selectedIndex
-                    ? 'ins-row-selected'
-                    : 'hover:bg-foreground/5'
-                }`}
-              >
-                <span className="font-medium flex items-center gap-2">
-                  {item.type === 'workspace' && <Layers className="w-3 h-3 opacity-50" />}
-                  {item.name}
-                </span>
-                <span className="text-xs opacity-50 truncate max-w-full">{item.subtitle}</span>
-              </button>
-            ))
-          )}
-        </div>
-
-        <div className="flex items-center gap-4 text-xs opacity-50 border-t edge-t-engraved pt-2">
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">↑↓</span> Navigate</span>
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">Enter</span> Select</span>
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">ESC</span> Close</span>
-        </div>
+            )}
+            {bkItems.length > 0 && (
+              <div className="flex flex-col gap-1.5" role="group" aria-label="Starred">
+                <DialogGroup label="starred" />
+                <div className="-mx-2 flex flex-col">{bkItems.map(renderRow)}</div>
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -16,6 +16,9 @@ import { reapOrphanedTerminals } from "./lib/terminalSessions";
 import { startAgentHookListener } from "./features/tabs/agentHookState";
 import { useAgentAttention } from "./features/tabs/useAgentAttention";
 import { markFirstRun } from "./features/tabs/firstRun";
+import { GlobalDialogOutlet } from "./features/dialogs/GlobalDialogOutlet";
+import { useDialog } from "./features/dialogs/DialogProvider";
+import { MAX_TABS } from "./features/tabs/TabContext";
 
 function App() {
   const { tabs, activeTabId, addTab, requestCloseTab, switchTab } = useTabManager();
@@ -95,18 +98,18 @@ function App() {
     });
   }, []);
 
-  // New tab handler — opens where the active tab is now, else at home dir
+  // New tab: pick the project first (current, starred, or any folder).
+  // At the tab limit, addTab shows the limit toast instead of the picker.
   const activeProjectPath = activeTab?.projectPath;
-  const handleNewTab = useCallback(async () => {
-    if (activeProjectPath) {
+  const dialog = useDialog();
+  const tabCount = tabs.length;
+  const handleNewTab = useCallback(() => {
+    if (tabCount >= MAX_TABS) {
       addTab(activeProjectPath);
       return;
     }
-    try {
-      const home = await invoke('get_home_dir');
-      if (home) addTab(home);
-    } catch { /* ignore */ }
-  }, [addTab, activeProjectPath]);
+    dialog.open('newTab', {}, null);
+  }, [addTab, activeProjectPath, tabCount, dialog]);
 
   // Global keyboard shortcuts for tab management
   useEffect(() => {
@@ -193,6 +196,8 @@ function App() {
 
         <KeyHintBar />
         <ToastContainer />
+
+        <GlobalDialogOutlet currentPath={activeProjectPath} onOpenProject={addTab} />
 
         <SplashScreen
           visible={splashVisible}

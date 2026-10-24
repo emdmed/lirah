@@ -1,10 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Check } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { PickerRow } from "@/components/ui/picker";
 
 export function CliSelectionModal({ open, onOpenChange, selectedCli, onCliChange, cliAvailability }) {
   const cliOptions = [
-    { id: 'claude-code', name: 'Claude Code' },
-    { id: 'opencode', name: 'opencode' }
+    { id: 'claude-code', name: 'Claude Code', command: 'claude' },
+    { id: 'opencode', name: 'opencode', command: 'opencode' }
   ];
 
   const handleCliSelect = (cliId) => {
@@ -14,28 +14,26 @@ export function CliSelectionModal({ open, onOpenChange, selectedCli, onCliChange
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xs">
-        <DialogHeader>
-          <DialogTitle>CLI Tool</DialogTitle>
-        </DialogHeader>
+      <DialogContent size="sm">
+        <DialogTitle>CLI tool</DialogTitle>
+        <DialogDescription className="sr-only">Choose the CLI this tab launches.</DialogDescription>
 
-        <div className="flex flex-col gap-1">
+        <div className="-mx-2 flex flex-col" role="listbox" aria-label="CLI tools">
           {cliOptions.map((option) => {
             const isAvailable = cliAvailability[option.id] ?? true;
             const isSelected = option.id === selectedCli;
 
             return (
-              <button
+              <PickerRow
                 key={option.id}
+                selected={isSelected}
                 disabled={!isAvailable}
+                glyph=""
+                name={option.name}
+                path={option.command}
+                tag={!isAvailable ? 'not installed' : isSelected ? 'in use' : null}
                 onClick={() => handleCliSelect(option.id)}
-                className={`flex items-center justify-between px-3 py-2 rounded-none text-sm text-left transition-colors ${
-                  isSelected ? 'ins-row-selected' : 'hover:bg-foreground/5'
-                } ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
-              >
-                <span>{option.name}</span>
-                {isSelected && <Check className="w-4 h-4 text-[var(--ins-lamp)]" />}
-              </button>
+              />
             );
           })}
         </div>

@@ -52,30 +52,21 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        size="sm"
+        escLabel="cancel"
+        hints={[{ keys: ['↵'], label: 'star' }]}
+      >
         <DialogHeader>
-          <DialogTitle>Star Project</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>Star project</DialogTitle>
+          <DialogDescription className="text-xs">
             Starred projects are listed when Lirah starts and in the projects palette (Ctrl+P).
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="path" className="text-sm font-medium opacity-70">
-              Path
-            </label>
-            <Input
-              id="path"
-              type="text"
-              value={currentPath || ''}
-              readOnly
-              className="opacity-60 cursor-not-allowed"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor="name" className="text-sm font-medium opacity-70">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="name" className="ins-legend">
               Name
             </label>
             <Input
@@ -87,16 +78,29 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
               autoFocus
             />
             {error && (
-              <p className="text-xs text-destructive">{error}</p>
+              <p className="text-xs text-[var(--ins-fault)]">{error}</p>
             )}
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="path" className="ins-legend">
+              Path
+            </label>
+            <Input
+              id="path"
+              type="text"
+              value={currentPath || ''}
+              readOnly
+              className="text-muted-foreground cursor-default"
+            />
+          </div>
+
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={handleCancel}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button type="submit">
-              Star Project
+            <Button type="submit" size="sm">
+              Star
             </Button>
           </DialogFooter>
         </form>

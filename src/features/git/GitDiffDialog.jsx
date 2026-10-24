@@ -3,13 +3,16 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, X, Pin, PinOff, MessageSquarePlus, Send, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pin, PinOff, MessageSquarePlus, Send, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 
 /**
- * Overlay that shows side-by-side git diff, rendered over the terminal area
+ * Side-by-side git diff in a full-size dialog: a pane that takes over the
+ * window. The file name is the legend, counts sit in the status corner and
+ * file-to-file keys in the bottom frame line.
  * @param {boolean} open - Whether overlay is visible
  * @param {function} onOpenChange - Callback when open state changes
  * @param {string} filePath - Absolute path to the file
@@ -121,13 +124,7 @@ export function GitDiffDialog({
 
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onOpenChange(false);
-        return;
-      }
-
+      // Esc is the dialog's own (Radix closes it).
       if (!hasMultipleFiles) return;
 
       switch (e.key) {
@@ -148,7 +145,7 @@ export function GitDiffDialog({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, hasMultipleFiles, goToPrevFile, goToNextFile, onOpenChange]);
+  }, [open, hasMultipleFiles, goToPrevFile, goToNextFile]);
 
   const fileName = filePath ? basename(filePath) : '';
   const relativePath = filePath && repoPath
@@ -171,37 +168,55 @@ export function GitDiffDialog({
     setNoteText('');
   };
 
-  if (!open) return null;
+  const status = (
+    <>
+      {diffResult && (
+        <span className="tabular-nums">
+          <span className="text-git-added">+{diffResult.added_lines}</span>{' '}
+          <span className="text-git-deleted">−{diffResult.deleted_lines}</span>
+        </span>
+      )}
+      {hasMultipleFiles && (
+        <span className="tabular-nums">{currentFileIndex + 1}/{changedFiles.length}</span>
+      )}
+    </>
+  );
+
+  const hints = hasMultipleFiles
+    ? [{ keys: ['^', '['], label: 'prev file' }, { keys: ['^', ']'], label: 'next file' }]
+    : [];
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b edge-engraved flex-shrink-0">
-        <div className="flex-1 min-w-0">
-          <div className="font-mono text-sm flex items-center gap-2">
-            <span className="truncate">{fileName}</span>
-            {diffResult?.is_new_file && (
-              <span className="text-xs text-git-added font-normal">(new file)</span>
-            )}
-            {diffResult?.is_deleted_file && (
-              <span className="text-xs text-git-deleted font-normal">(deleted)</span>
-            )}
-          </div>
-          <div className="font-mono text-xs text-muted-foreground truncate">
-            {relativePath}
-            {diffResult && (
-              <span className="ml-2">
-                <span className="text-git-added">+{diffResult.added_lines}</span>
-                {' '}
-                <span className="text-git-deleted">-{diffResult.deleted_lines}</span>
-              </span>
-            )}
-          </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent
+      size="full"
+      status={status}
+      hints={hints}
+      className="flex flex-col gap-0 px-0"
+      onOpenAutoFocus={(e) => {
+        // Land on the diff so arrow keys and PgUp/PgDn scroll it.
+        e.preventDefault();
+        scrollContainerRef.current?.focus();
+      }}
+    >
+      <DialogTitle>{fileName || 'Diff'}</DialogTitle>
+      <DialogDescription className="sr-only">Side-by-side diff of {relativePath}</DialogDescription>
+
+      {/* Path and file controls */}
+      <div className="flex items-center justify-between gap-2 px-3 pb-2 edge-b-engraved flex-shrink-0">
+        <div className="flex-1 min-w-0 font-mono text-xs text-muted-foreground truncate">
+          {relativePath}
+          {diffResult?.is_new_file && (
+            <span className="ml-2 text-git-added">new file</span>
+          )}
+          {diffResult?.is_deleted_file && (
+            <span className="ml-2 text-git-deleted">deleted</span>
+          )}
         </div>
 
         {/* File navigation controls */}
         {hasMultipleFiles && (
-          <div className="flex items-center gap-1 ml-4">
+          <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -209,16 +224,13 @@ export function GitDiffDialog({
                   size="icon-sm"
                   disabled={!canGoPrevFile}
                   onClick={goToPrevFile}
+                  aria-label="Previous file"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Previous file (Ctrl+[)</TooltipContent>
             </Tooltip>
-
-            <span className="text-xs text-muted-foreground px-1">
-              {currentFileIndex + 1}/{changedFiles.length}
-            </span>
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -227,6 +239,7 @@ export function GitDiffDialog({
                   size="icon-sm"
                   disabled={!canGoNextFile}
                   onClick={goToNextFile}
+                  aria-label="Next file"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -245,7 +258,8 @@ export function GitDiffDialog({
                 size="icon-sm"
                 onClick={handleTogglePin}
                 aria-pressed={pinned}
-                className={`ml-2 ${pinned ? 'text-[var(--ins-lamp)]' : ''}`}
+                aria-label={pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
+                className={pinned ? 'text-[var(--ins-lamp)]' : ''}
               >
                 {pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
               </Button>
@@ -253,22 +267,13 @@ export function GitDiffDialog({
             <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>
           </Tooltip>
         )}
-
-        {/* Close button */}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => onOpenChange(false)}
-          className="ml-2"
-        >
-          <X className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* Diff content */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-auto"
+        tabIndex={-1}
+        className="flex-1 min-h-0 overflow-auto outline-none"
       >
         {loading ? (
           <div className="flex items-center justify-center p-8">
@@ -293,7 +298,7 @@ export function GitDiffDialog({
 
       {/* Review notes: pin feedback to lines, then send it all back to the agent */}
       {annotationsEnabled && (
-        <div className="flex-shrink-0 border-t edge-engraved bg-muted/20">
+        <div className="flex-shrink-0 edge-t-engraved">
           {fileNotes.length > 0 && (
             <div className="max-h-28 overflow-y-auto px-3 pt-2">
               {fileNotes.map((n) => (
@@ -337,7 +342,7 @@ export function GitDiffDialog({
                   ? 'What should the agent change here? (Enter to pin)'
                   : 'Click a diff line (shift-click for a range) to attach a note'
               }
-              className="flex-1 min-w-0 h-7 rounded border edge-engraved bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+              className="ins-well flex-1 min-w-0 h-7 px-2 text-xs text-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1 disabled:opacity-60"
             />
             <Button
               variant="outline"
@@ -365,6 +370,7 @@ export function GitDiffDialog({
           </div>
         </div>
       )}
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }

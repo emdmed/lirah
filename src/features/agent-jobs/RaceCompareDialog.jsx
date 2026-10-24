@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
-import { ChevronLeft, ChevronRight, X, Swords } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogEmpty } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffContent } from '../git/DiffContent';
@@ -26,7 +27,7 @@ function shortLabel(job) {
  * them touched still reads as the untouched HEAD version on the other side.
  *
  * @param {Array} jobs - candidates of one race
- * @param {function} onClose - close the overlay
+ * @param {function} onClose - close the dialog
  */
 export function RaceCompareDialog({ jobs, onClose }) {
   const candidates = useMemo(() => jobs.filter((j) => j.cwd && j.changedFiles.length > 0), [jobs]);
@@ -98,10 +99,8 @@ export function RaceCompareDialog({ jobs, onClose }) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+      // Esc is the dialog's own (Radix closes it).
+      if ((e.ctrlKey || e.metaKey) && e.key === '[') {
         e.preventDefault();
         goPrev();
       } else if ((e.ctrlKey || e.metaKey) && e.key === ']') {
@@ -111,17 +110,25 @@ export function RaceCompareDialog({ jobs, onClose }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, goPrev, goNext]);
+  }, [goPrev, goNext]);
 
   const identical = !loading && sides.old === sides.new;
   const current = files[fileIndex];
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-background">
-      {/* Header: which two candidates, and which file */}
-      <div className="flex items-center justify-between gap-3 border-b edge-engraved px-3 py-2 flex-shrink-0">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <DialogContent
+      size="full"
+      status={files.length > 1 ? <span className="tabular-nums">{fileIndex + 1}/{files.length}</span> : null}
+      hints={files.length > 1 ? [{ keys: ['^', '['], label: 'prev file' }, { keys: ['^', ']'], label: 'next file' }] : []}
+      className="flex flex-col gap-0 px-0"
+    >
+      <DialogTitle>Compare race</DialogTitle>
+      <DialogDescription className="sr-only">Diff two race candidates against each other, file by file.</DialogDescription>
+
+      {/* Which two candidates, and file controls */}
+      <div className="flex items-center justify-between gap-3 edge-b-engraved px-3 pb-2 flex-shrink-0">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Swords className="h-4 w-4 shrink-0 text-primary/80" />
           <CandidatePicker
             candidates={candidates}
             value={a?.id}
@@ -139,30 +146,24 @@ export function RaceCompareDialog({ jobs, onClose }) {
 
         {files.length > 1 && (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-sm" disabled={fileIndex <= 0} onClick={goPrev}>
+            <Button variant="ghost" size="icon-sm" disabled={fileIndex <= 0} onClick={goPrev} aria-label="Previous file">
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <span className="px-1 text-xs text-muted-foreground tabular-nums">
-              {fileIndex + 1}/{files.length}
-            </span>
             <Button
               variant="ghost"
               size="icon-sm"
               disabled={fileIndex < 0 || fileIndex >= files.length - 1}
               onClick={goNext}
+              aria-label="Next file"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         )}
-
-        <Button variant="ghost" size="icon-sm" onClick={onClose}>
-          <X className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* File strip: who touched what, so single-candidate files are obvious */}
-      <div className="flex gap-1 overflow-x-auto border-b edge-engraved px-3 py-1 flex-shrink-0">
+      <div className="flex gap-1 overflow-x-auto edge-b-engraved px-3 py-1 flex-shrink-0">
         {files.map((f) => {
           const inA = a && f.ids.has(a.id);
           const inB = b && f.ids.has(b.id);
@@ -192,17 +193,13 @@ export function RaceCompareDialog({ jobs, onClose }) {
       {/* Body */}
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
         {!a || !b ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Need two candidates with changes to compare.
-          </div>
+          <DialogEmpty className="justify-center p-8">Needs two candidates with changes to compare.</DialogEmpty>
         ) : loading ? (
           <div className="flex items-center justify-center p-8">
             <Scanner size="lg" />
           </div>
         ) : !filePath ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Neither candidate changed any files.
-          </div>
+          <DialogEmpty className="justify-center p-8">Neither candidate changed any files.</DialogEmpty>
         ) : identical ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             <div className="font-mono text-xs">{filePath}</div>
@@ -222,7 +219,8 @@ export function RaceCompareDialog({ jobs, onClose }) {
           />
         )}
       </div>
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }
 
@@ -231,7 +229,7 @@ function CandidatePicker({ candidates, value, onChange, exclude }) {
     <select
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      className="h-7 min-w-0 max-w-[40%] rounded border edge-engraved bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+      className="ins-well h-7 min-w-0 max-w-[40%] px-1.5 text-xs text-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1"
     >
       {candidates.map((j) => (
         <option key={j.id} value={j.id} disabled={j.id === exclude}>

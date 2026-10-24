@@ -3,6 +3,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Keycap } from "@/components/instrument/Keycap"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -111,27 +112,53 @@ DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName
 const DropdownMenuLabel = React.forwardRef(({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={cn("px-2 py-1.5 text-sm font-semibold", inset && "pl-8", className)}
+    className={cn("ins-legend px-2 pt-2 pb-1 text-[10px] font-normal", inset && "pl-8", className)}
     {...props} />
 ))
 DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName
 
-const DropdownMenuSeparator = React.forwardRef(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.Separator
-    ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-[var(--tui-line)]", className)}
-    {...props} />
+// `star` sets a faint star in the middle of the hairline, as the chrome rows
+// separate groups. Use it only in chrome menus (the status-bar settings menu).
+const DropdownMenuSeparator = React.forwardRef(({ className, star, ...props }, ref) => (
+  star ? (
+    <DropdownMenuPrimitive.Separator
+      ref={ref}
+      className={cn("-mx-1 my-1.5 flex items-center gap-1.5", className)}
+      {...props}>
+      <span className="h-px flex-1 bg-[var(--tui-line)]" />
+      <span className="ins-sep-star" aria-hidden="true" />
+      <span className="h-px flex-1 bg-[var(--tui-line)]" />
+    </DropdownMenuPrimitive.Separator>
+  ) : (
+    <DropdownMenuPrimitive.Separator
+      ref={ref}
+      className={cn("-mx-1 my-1 h-px bg-[var(--tui-line)]", className)}
+      {...props} />
+  )
 ))
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
 
+// A shortcut at the row's end. Pass `keys` (compact keys from
+// src/lib/shortcuts.js) to draw keycaps; plain children print as text.
 const DropdownMenuShortcut = ({
   className,
+  keys,
+  children,
   ...props
 }) => {
+  if (keys?.length) {
+    return (
+      <span className={cn("ml-auto inline-flex items-center gap-[3px] pl-3", className)} {...props}>
+        {keys.map((k, i) => <Keycap key={i} size="sm">{k}</Keycap>)}
+      </span>
+    );
+  }
   return (
     <span
       className={cn("ml-auto text-xs tracking-widest opacity-60", className)}
-      {...props} />
+      {...props}>
+      {children}
+    </span>
   );
 }
 DropdownMenuShortcut.displayName = "DropdownMenuShortcut"

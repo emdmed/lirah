@@ -5,7 +5,7 @@ import { git, repoTop, worktreeAdd, worktreeRemove } from '../../lib/git';
 import { jobWorktreesDir, lirahDir } from '../../lib/lirahPaths';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../../lib/notify';
-import { useConfirm } from '../confirm/ConfirmContext';
+import { useConfirm } from '../dialogs/DialogProvider';
 
 // Split so consumers subscribe only to what they read: streamed job output
 // changes `jobs` many times a second, and ProjectTab — which only registers its

@@ -49,26 +49,22 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        size="sm"
+        escLabel="cancel"
+        status={`${files?.length || 0} file${files?.length !== 1 ? 's' : ''}`}
+        hints={[{ keys: ['↵'], label: 'save' }]}
+      >
         <DialogHeader>
-          <DialogTitle>Save Context Set</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>Save context set</DialogTitle>
+          <DialogDescription className="text-xs">
             Save the files in the current context as a named set for this project. Load it later to replace or add to a prompt's context.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="files-count" className="text-sm font-medium opacity-70">
-              Context
-            </label>
-            <div className="text-sm opacity-60">
-              {files?.length || 0} file{files?.length !== 1 ? 's' : ''} attached
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor="group-name" className="text-sm font-medium opacity-70">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="group-name" className="ins-legend">
               Set name
             </label>
             <Input
@@ -80,16 +76,16 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
               autoFocus
             />
             {error && (
-              <p className="text-xs text-destructive">{error}</p>
+              <p className="text-xs text-[var(--ins-fault)]">{error}</p>
             )}
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={handleCancel}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!files?.length}>
-              Save Set
+            <Button type="submit" size="sm" disabled={!files?.length}>
+              Save set
             </Button>
           </DialogFooter>
         </form>

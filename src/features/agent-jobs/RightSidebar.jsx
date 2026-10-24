@@ -11,7 +11,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
-import { useConfirm } from '../confirm/ConfirmContext';
+import { useConfirm } from '../dialogs/DialogProvider';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
@@ -84,7 +84,7 @@ function groupJobs(list) {
   return out;
 }
 
-export function RightSidebar({ projectPath, onNewTab }) {
+function RightSidebarPanel({ projectPath, onNewTab }) {
   const {
     jobs,
     cancelJob,
@@ -693,7 +693,6 @@ export function RightSidebar({ projectPath, onNewTab }) {
       {dialogOpen && <RunJobDialog open={dialogOpen} onOpenChange={setDialogOpen} projectPath={projectPath} />}
 
       {reviewJob && review.filePath && (
-        <div className="fixed inset-0 z-50">
           <GitDiffDialog
             open
             onOpenChange={(o) => !o && setReview(null)}
@@ -707,24 +706,19 @@ export function RightSidebar({ projectPath, onNewTab }) {
             onSendAnnotations={handleSendNotes}
             sendingAnnotations={sendingNotes}
           />
-        </div>
       )}
 
       {compareJobs.length > 1 && (
-        <div className="fixed inset-0 z-50">
           <RaceCompareDialog jobs={compareJobs} onClose={() => setCompareRaceId(null)} />
-        </div>
       )}
 
       {reportPath && (
-        <div className="fixed inset-0 z-50">
           <MarkdownViewerDialog
             open
             onOpenChange={(o) => !o && setReportPath(null)}
             filePath={reportPath}
             repoPath={projectPath}
           />
-        </div>
       )}
       </Suspense>
     </div>
@@ -733,6 +727,10 @@ export function RightSidebar({ projectPath, onNewTab }) {
 
 // Candidates of one race, boxed together so they read as alternatives to choose
 // between rather than as unrelated jobs that all want applying.
+// App re-renders for reasons of its own (tabs, attention, updates); its props
+// here are a path and a stable callback.
+export const RightSidebar = memo(RightSidebarPanel);
+
 function RaceGroup({ jobs, renderCard, onCompare }) {
   const running = jobs.filter((j) => j.status === 'running').length;
   const settled = jobs.some((j) => j.status === 'applied');

@@ -1,8 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronUp, ChevronDown, X, CaseSensitive, Regex } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { CaseSensitive, Regex } from 'lucide-react';
+import { FloatPane } from './ui/float-pane';
+import { shortcutKeys } from '../lib/shortcuts';
 
 const SEARCH_DEBOUNCE_MS = 150;
+const SEARCH_KEYS = shortcutKeys('terminal-search');
+const HINTS = [
+  { keys: ['↵'], label: 'next' },
+  { keys: ['⇧', '↵'], label: 'prev' },
+];
 
 /**
  * Search over the terminal's scrollback, driven by xterm's search addon.
@@ -93,55 +99,43 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
     : '';
 
   return (
-    <div className="ins-raised absolute right-2 top-2 z-30 flex items-center gap-1 px-1.5 py-1">
-      <input
-        ref={inputRef}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Search output"
-        className="h-6 w-44 bg-transparent px-1 font-mono text-xs focus:outline-none"
-      />
-      <span
-        className={cn(
-          'w-16 shrink-0 text-right font-mono text-[11px] tabular-nums',
-          invalid || (query && !results.count) ? 'text-destructive/80' : 'text-muted-foreground'
-        )}
-      >
-        {counter}
-      </span>
-
-      <ToggleButton active={caseSensitive} onClick={() => setCaseSensitive((v) => !v)} title="Match case">
-        <CaseSensitive className="h-3 w-3" />
-      </ToggleButton>
-      <ToggleButton active={regex} onClick={() => setRegex((v) => !v)} title="Regular expression">
-        <Regex className="h-3 w-3" />
-      </ToggleButton>
-
-      <IconButton onClick={() => find('prev')} title="Previous match (Shift+Enter)">
-        <ChevronUp className="h-3 w-3" />
-      </IconButton>
-      <IconButton onClick={() => find('next')} title="Next match (Enter)">
-        <ChevronDown className="h-3 w-3" />
-      </IconButton>
-      <IconButton onClick={onClose} title="Close (Esc)">
-        <X className="h-3 w-3" />
-      </IconButton>
-    </div>
-  );
-}
-
-function IconButton({ onClick, title, children }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      data-icon-only
-      className="ins-key ins-key-panel ins-round"
+    <FloatPane
+      title="search"
+      keys={SEARCH_KEYS}
+      status={counter ? (
+        <span className={invalid || (query && !results.count) ? 'text-[var(--ins-fault)]' : undefined}>{counter}</span>
+      ) : undefined}
+      hints={HINTS}
+      className="absolute right-2 top-2 z-30 w-72 px-2"
     >
-      {children}
-    </button>
+      <div className="flex items-center gap-1 pt-1 pb-1.5">
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="search output"
+          aria-label="Search terminal output"
+          className="ins-well h-6 min-w-0 flex-1 px-1.5 font-mono text-xs outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1"
+        />
+        <ToggleButton active={caseSensitive} onClick={() => setCaseSensitive((v) => !v)} title="Match case">
+          <CaseSensitive className="h-3 w-3" />
+        </ToggleButton>
+        <ToggleButton active={regex} onClick={() => setRegex((v) => !v)} title="Regular expression">
+          <Regex className="h-3 w-3" />
+        </ToggleButton>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ins-cap ins-round"
+          data-size="sm"
+          aria-label="Close search (Esc)"
+          title="Close (Esc)"
+        >
+          esc
+        </button>
+      </div>
+    </FloatPane>
   );
 }
 

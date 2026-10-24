@@ -3,14 +3,17 @@ import { basename } from '../utils/pathUtils';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
+  DialogGroup,
+  DialogEmpty,
 } from './ui/dialog';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { useBookmarks } from '../features/bookmarks';
-import { useConfirm } from '../features/confirm/ConfirmContext';
-import { FolderTree, Plus, X, Layers } from 'lucide-react';
+import { useConfirm } from '../features/dialogs/DialogProvider';
+import { X } from 'lucide-react';
 
 export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existingWorkspaces, onOpenWorkspace, onDeleteWorkspace }) {
   const [mode, setMode] = useState('list'); // 'list' | 'create'
@@ -62,44 +65,44 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
     onOpenChange(false);
   };
 
+  const listing = mode === 'list';
+  const status = listing
+    ? `${existingWorkspaces?.length || 0} workspace${existingWorkspaces?.length === 1 ? '' : 's'}`
+    : `${selectedProjects.length} selected · min 2`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FolderTree className="w-5 h-5" />
-            {mode === 'list' ? 'Workspaces' : 'New Workspace'}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent size="md" status={status} escLabel={listing ? 'close' : 'cancel'}>
+        <DialogTitle>{listing ? 'Workspaces' : 'New workspace'}</DialogTitle>
+        <DialogDescription className="sr-only">
+          {listing
+            ? 'Open or delete a workspace that links several starred projects.'
+            : 'Name a workspace and pick at least two starred projects to link into it.'}
+        </DialogDescription>
 
-        {mode === 'list' ? (
+        {listing ? (
           <>
-            <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto border rounded-none p-2 edge-engraved">
+            <div className="-mx-2 flex max-h-[300px] flex-col overflow-y-auto">
               {existingWorkspaces?.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-sm opacity-50">
-                  No workspaces yet.
-                </div>
+                <DialogEmpty>No workspaces yet.</DialogEmpty>
               ) : (
                 existingWorkspaces?.map(ws => (
                   <div
                     key={ws.id}
-                    className="flex items-center justify-between px-4 py-2.5 font-mono rounded-sm hover:bg-foreground/5 transition-colors"
+                    className="group flex items-center gap-3 px-2 py-1 font-mono hover:bg-foreground/5 transition-colors"
                   >
                     <button
                       onClick={() => handleOpen(ws)}
-                      className="flex flex-col items-start gap-1 text-left flex-1"
+                      className="flex min-w-0 flex-1 items-baseline gap-3 text-left"
                     >
-                      <span className="font-medium flex items-center gap-2">
-                        <Layers className="w-3 h-3 opacity-50" />
-                        {ws.name}
-                      </span>
-                      <span className="text-xs opacity-50">
-                        {ws.projects.map(p => p.name).join(', ')}
+                      <span className="shrink-0 text-sm text-foreground">{ws.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {ws.projects.map(p => p.name).join(' · ')}
                       </span>
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(ws); }}
-                      className="p-1 opacity-40 hover:opacity-100 transition-opacity"
+                      className="p-1 text-muted-foreground opacity-0 transition-opacity hover:text-[var(--ins-fault)] group-hover:opacity-100 focus-visible:opacity-100"
                       aria-label={`Delete workspace ${ws.name}`}
                     >
                       <X className="w-3 h-3" />
@@ -109,35 +112,32 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" size="sm" onClick={() => setMode('create')}>
-                <Plus className="w-3 h-3 mr-1" /> New Workspace
+              <Button size="sm" onClick={() => setMode('create')}>
+                New workspace
               </Button>
             </DialogFooter>
           </>
         ) : (
           <>
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="text-xs font-mono opacity-70 mb-1 block">Workspace Name</label>
-                <input
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="workspace-name" className="ins-legend">Name</label>
+                <Input
+                  id="workspace-name"
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="my-fullstack-app"
-                  className="w-full px-3 py-2 text-sm font-mono border edge-engraved rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="font-mono"
                   autoFocus
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-mono opacity-70 mb-1 block">
-                  Select Projects ({selectedProjects.length} selected, min 2)
-                </label>
-                <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto border rounded-none p-2 edge-engraved">
+              <div className="flex flex-col gap-1.5">
+                <DialogGroup label="Projects" />
+                <div className="-mx-2 flex max-h-[200px] flex-col overflow-y-auto" role="group" aria-label="Projects">
                   {bookmarks.length === 0 ? (
-                    <div className="text-xs opacity-50 text-center py-4">
-                      No bookmarks. Add projects as bookmarks first.
-                    </div>
+                    <DialogEmpty>No starred projects. Star projects first, then link them here.</DialogEmpty>
                   ) : (
                     bookmarks.map(bookmark => {
                       const isSelected = selectedProjects.some(p => p.path === bookmark.path);
@@ -145,17 +145,16 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                         <button
                           key={bookmark.id}
                           onClick={() => toggleProject(bookmark)}
-                          className={`flex items-center gap-2 px-3 py-2 text-left text-sm font-mono rounded-sm transition-colors ${
+                          aria-pressed={isSelected}
+                          className={`flex items-center gap-2 py-1 pl-3.5 pr-2 text-left text-sm font-mono transition-colors ${
                             isSelected
-                              ? 'ins-row-selected'
-                              : 'hover:bg-foreground/5'
+                              ? 'ins-row-selected text-foreground'
+                              : 'text-muted-foreground hover:bg-foreground/5 hover:text-foreground'
                           }`}
                         >
-                          <span className={`w-3 h-3 border rounded-sm flex items-center justify-center text-[11px] ${isSelected ? 'bg-foreground text-background' : 'edge-engraved'}`}>
-                            {isSelected ? '✓' : ''}
-                          </span>
+                          <span className="w-3 shrink-0 text-[var(--ins-lamp)]" aria-hidden="true">{isSelected ? '✓' : ''}</span>
                           <span className="truncate">{bookmark.name}</span>
-                          <span className="text-xs opacity-40 truncate ml-auto">{basename(bookmark.path)}</span>
+                          <span className="ml-auto truncate text-xs text-muted-foreground">{basename(bookmark.path)}</span>
                         </button>
                       );
                     })
@@ -164,17 +163,19 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
               </div>
 
               {selectedProjects.length >= 2 && (
-                <div className="text-xs font-mono border-t pt-2 flex flex-col gap-2">
-                  <span className="opacity-50">Descriptions (optional, included in CLAUDE.md):</span>
+                <div className="flex flex-col gap-2 text-xs font-mono">
+                  <DialogGroup label="Descriptions" />
+                  <span className="text-muted-foreground">Optional. Written into the workspace CLAUDE.md.</span>
                   {selectedProjects.map(p => (
-                    <div key={p.path} className="flex items-center gap-2 ml-2">
-                      <span className="opacity-50 shrink-0">{p.name}/</span>
-                      <input
+                    <div key={p.path} className="flex items-center gap-2">
+                      <label htmlFor={`ws-desc-${p.path}`} className="w-32 shrink-0 truncate text-muted-foreground">{p.name}/</label>
+                      <Input
+                        id={`ws-desc-${p.path}`}
                         type="text"
                         value={p.description}
                         onChange={e => updateDescription(p.path, e.target.value)}
                         placeholder="e.g. React frontend"
-                        className="flex-1 px-2 py-1 text-xs font-mono border edge-engraved rounded-none bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="h-7 flex-1 text-xs"
                       />
                     </div>
                   ))}
@@ -182,7 +183,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
               )}
             </div>
 
-            <DialogFooter className="gap-2">
+            <DialogFooter>
               {existingWorkspaces?.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={() => setMode('list')}>
                   Back
@@ -193,7 +194,7 @@ export function WorkspaceDialog({ open, onOpenChange, onCreateWorkspace, existin
                 onClick={handleCreate}
                 disabled={!name.trim() || selectedProjects.length < 2}
               >
-                Create & Open
+                Create & open
               </Button>
             </DialogFooter>
           </>

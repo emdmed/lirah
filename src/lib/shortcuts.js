@@ -104,6 +104,12 @@ export function shortcutForCommand(id) {
 
 const BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
 
+/** Compact keys of registry shortcut `id` (e.g. 'templates' → ['alt','alt']), if any. */
+export function shortcutKeys(id) {
+  const s = BY_ID.get(id);
+  return s ? compactKeys(s.keys) : null;
+}
+
 /** Whether keydown `e` is shortcut `id`. */
 export function matches(id, e) {
   return !!BY_ID.get(id)?.match?.(e);

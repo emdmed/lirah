@@ -1,15 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
-import { GitBranch, Code } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { FloatPane } from "./ui/float-pane";
+import { PickerRow } from "./ui/picker";
+import { Keycap } from "./instrument/Keycap";
+import { joinKeys } from "./instrument/FrameHints";
+import { shortcutKeys } from "../lib/shortcuts";
 
 const options = [
-  { id: 'nvim', label: 'nvim', icon: <Code className="size-4" />, command: 'nvim' },
-  { id: 'lazygit', label: 'lazygit', icon: <GitBranch className="size-4" />, command: 'lazygit' },
+  { id: 'nvim', label: 'nvim', glyph: '›', note: 'editor', command: 'nvim' },
+  { id: 'lazygit', label: 'lazygit', glyph: '±', note: 'git', command: 'lazygit' },
 ];
 
+// What terminal 2 opens with. Lives inside the pane, so it takes keys only
+// while it holds focus (it focuses itself on mount) instead of listening on
+// the whole window.
 export function SecondaryTerminalPicker({ onSelect }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const paneRef = useRef(null);
 
-  const handleKeyDown = useCallback((e) => {
+  useEffect(() => {
+    paneRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (e) => {
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
@@ -24,38 +36,39 @@ export function SecondaryTerminalPicker({ onSelect }) {
         onSelect(options[selectedIndex].command);
         break;
     }
-  }, [selectedIndex, onSelect]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+  };
 
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
-      <div
-        className="flex flex-col gap-1 border edge-engraved p-4 shadow-xs font-mono rounded-none"
-        style={{ backgroundColor: 'var(--color-input-background)' }}
+    <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
+      <FloatPane
+        ref={paneRef}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+        title="terminal 2"
+        hints={[{ keys: ['↑', '↓'], label: 'move' }, { keys: ['↵'], label: 'open' }]}
+        className="w-full max-w-[340px] px-3 pb-4 outline-none"
+        role="listbox"
+        aria-label="Open in terminal 2"
       >
-        <div className="text-sm font-semibold text-foreground mb-2">Secondary terminal</div>
-        {options.map((opt, index) => (
-          <button
-            key={opt.id}
-            className={`flex items-center gap-3 px-3 py-2 text-sm text-foreground transition-colors outline-none rounded-sm hover:bg-foreground/5 ${
-              index === selectedIndex ? 'ins-row-selected' : ''
-            }`}
-            onClick={() => onSelect(opt.command)}
-            onMouseEnter={() => setSelectedIndex(index)}
-          >
-            <span className="text-muted-foreground">{opt.icon}</span>
-            {opt.label}
-          </button>
-        ))}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 pt-2 border-t edge-t-engraved">
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">↑↓</span> Navigate</span>
-          <span><span className="px-1.5 py-0.5 bg-foreground/5 rounded-sm text-[11px]">Enter</span> Select</span>
+        <div className="flex flex-col pt-2 -mx-1">
+          {options.map((opt, index) => {
+            const keys = shortcutKeys(opt.id);
+            return (
+              <PickerRow
+                key={opt.id}
+                selected={index === selectedIndex}
+                glyph={opt.glyph}
+                name={opt.label}
+                path={opt.note}
+                tag={keys && <Keycap size="sm">{joinKeys(keys)}</Keycap>}
+                tabIndex={-1}
+                onClick={() => onSelect(opt.command)}
+                onMouseEnter={() => setSelectedIndex(index)}
+              />
+            );
+          })}
         </div>
-      </div>
+      </FloatPane>
     </div>
   );
 }

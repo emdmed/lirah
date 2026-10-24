@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, X, Pin, PinOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pin, PinOff } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
@@ -14,7 +15,9 @@ const REMARK_PLUGINS = [remarkGfm];
 const EMPTY_FILES = [];
 
 /**
- * Overlay that renders formatted markdown, displayed over the terminal area
+ * Formatted markdown in a full-size dialog: a pane that takes over the
+ * window, with the file name as its legend and file-to-file keys in the
+ * bottom frame line.
  * @param {boolean} open - Whether overlay is visible
  * @param {function} onOpenChange - Callback when open state changes
  * @param {string} filePath - Absolute path to the markdown file
@@ -33,6 +36,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const bodyRef = useRef(null);
 
   const { isPinned, togglePin } = usePinnedFiles();
   const pinned = filePath ? isPinned(filePath) : false;
@@ -79,13 +83,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
 
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onOpenChange(false);
-        return;
-      }
-
+      // Esc is the dialog's own (Radix closes it).
       if (!hasMultipleFiles) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key === '[') {
@@ -99,42 +97,51 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, hasMultipleFiles, goToPrev, goToNext, onOpenChange]);
+  }, [open, hasMultipleFiles, goToPrev, goToNext]);
 
   const fileName = filePath ? basename(filePath) : '';
   const relativePath = filePath && repoPath
     ? filePath.replace(repoPath + '/', '')
     : filePath;
 
-  if (!open) return null;
+  const hints = hasMultipleFiles
+    ? [{ keys: ['^', '['], label: 'prev file' }, { keys: ['^', ']'], label: 'next file' }]
+    : [];
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b edge-engraved flex-shrink-0">
-        <div className="flex-1 min-w-0">
-          <div className="font-mono text-sm truncate">{fileName}</div>
-          <div className="font-mono text-xs text-muted-foreground truncate">{relativePath}</div>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent
+      size="full"
+      status={hasMultipleFiles ? <span className="tabular-nums">{currentFileIndex + 1}/{markdownFiles.length}</span> : null}
+      hints={hints}
+      className="flex flex-col gap-0 px-0"
+      onOpenAutoFocus={(e) => {
+        // Land on the document so arrow keys and PgUp/PgDn scroll it.
+        e.preventDefault();
+        bodyRef.current?.focus();
+      }}
+    >
+      <DialogTitle>{fileName || 'Markdown'}</DialogTitle>
+      <DialogDescription className="sr-only">Rendered markdown of {relativePath}</DialogDescription>
+
+      {/* Path and file controls */}
+      <div className="flex items-center justify-between gap-2 px-3 pb-2 edge-b-engraved flex-shrink-0">
+        <div className="flex-1 min-w-0 font-mono text-xs text-muted-foreground truncate">{relativePath}</div>
 
         {hasMultipleFiles && (
-          <div className="flex items-center gap-1 ml-4">
+          <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" disabled={!canGoPrev} onClick={goToPrev}>
+                <Button variant="ghost" size="icon-sm" disabled={!canGoPrev} onClick={goToPrev} aria-label="Previous file">
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Previous file (Ctrl+[)</TooltipContent>
             </Tooltip>
 
-            <span className="text-xs text-muted-foreground px-1">
-              {currentFileIndex + 1}/{markdownFiles.length}
-            </span>
-
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" disabled={!canGoNext} onClick={goToNext}>
+                <Button variant="ghost" size="icon-sm" disabled={!canGoNext} onClick={goToNext} aria-label="Next file">
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
@@ -151,7 +158,8 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
                 size="icon-sm"
                 onClick={handleTogglePin}
                 aria-pressed={pinned}
-                className={`ml-2 ${pinned ? 'text-[var(--ins-lamp)]' : ''}`}
+                aria-label={pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
+                className={pinned ? 'text-[var(--ins-lamp)]' : ''}
               >
                 {pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
               </Button>
@@ -159,14 +167,10 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
             <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>
           </Tooltip>
         )}
-
-        <Button variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)} className="ml-2">
-          <X className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-auto px-8 py-6">
+      <div ref={bodyRef} tabIndex={-1} className="flex-1 min-h-0 overflow-auto px-8 py-6 outline-none">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <Scanner size="lg" />
@@ -182,6 +186,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
           </div>
         )}
       </div>
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 });

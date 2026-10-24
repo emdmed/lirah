@@ -2,15 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogGroup,
+  DialogEmpty,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Scanner } from '@/components/instrument/Scanner';
 import {
   CheckCircle2, AlertTriangle, XCircle, Download,
-  FileText, Code, GitBranch, Shield, Puzzle
 } from 'lucide-react';
 import { useToast } from '@/features/toast';
 
@@ -39,17 +40,12 @@ function StatusBadge({ status }) {
   );
 }
 
-function Section({ icon: Icon, title, children, action }) {
+// A group: legend and hairline, then bare rows (one frame per pane).
+function Section({ title, children }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Icon className="w-4 h-4 opacity-70" />
-          {title}
-        </div>
-        {action}
-      </div>
-      <div className="rounded-none border edge-engraved bg-secondary/20 p-3 space-y-1.5 text-xs">
+      <DialogGroup label={title} />
+      <div className="space-y-1.5 text-xs">
         {children}
       </div>
     </div>
@@ -152,13 +148,12 @@ export function OrchestrationDashboard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold flex items-center gap-2">
-            <Puzzle className="w-4 h-4" />
-            Orchestration
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent
+        size="md"
+        className="max-h-[80vh] overflow-y-auto"
+      >
+        <DialogTitle>Orchestration</DialogTitle>
+        <DialogDescription className="sr-only">Protocol, scripts, workflows, hooks and patterns for this project.</DialogDescription>
 
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2">
@@ -166,24 +161,18 @@ export function OrchestrationDashboard({
             <span className="text-xs opacity-60">Loading status...</span>
           </div>
         ) : !isConfigured ? (
-          <div className="py-6 text-center space-y-3">
-            <XCircle className="w-8 h-8 mx-auto opacity-30" />
-            <p className="text-sm opacity-60">
-              Orchestration is not configured for this project.
-            </p>
-            <p className="text-xs opacity-40">
-              No <code>.orchestration/</code> directory found at <code>{projectPath}</code>
-            </p>
-          </div>
+          <DialogEmpty>
+            Not set up here: no <code>.orchestration/</code> folder in <code>{projectPath}</code>.
+          </DialogEmpty>
         ) : (
           <div className="space-y-4">
             {/* Protocol Status */}
-            <Section icon={FileText} title="Protocol">
+            <Section title="Protocol">
               <StatusRow label="orchestration.md" status={orchStatus.protocol} />
             </Section>
 
             {/* Tool Scripts */}
-            <Section icon={Code} title="Tool Scripts">
+            <Section title="Tool Scripts">
               {Object.entries(orchStatus.scripts).map(([name, status]) => (
                 <StatusRow key={name} label={name} status={status} />
               ))}
@@ -193,7 +182,7 @@ export function OrchestrationDashboard({
             </Section>
 
             {/* Workflows */}
-            <Section icon={GitBranch} title="Workflows">
+            <Section title="Workflows">
               {availableWorkflows ? (
                 availableWorkflows.length > 0 ? (
                   availableWorkflows.map(wf => (
@@ -218,7 +207,7 @@ export function OrchestrationDashboard({
             </Section>
 
             {/* Hooks Status */}
-            <Section icon={Shield} title="Global Hooks">
+            <Section title="Global Hooks">
               {hooksStatus ? (
                 <>
                   {!hooksStatus.installed && (
@@ -246,7 +235,7 @@ export function OrchestrationDashboard({
             </Section>
 
             {/* Patterns */}
-            <Section icon={Puzzle} title="Patterns">
+            <Section title="Patterns">
               <StatusRow
                 label=".patterns/patterns.md"
                 status={orchStatus.patterns ? 'installed' : 'missing'}
