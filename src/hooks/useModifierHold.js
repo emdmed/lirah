@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isFocusMode } from '../lib/focusMode';
 
 const HOLD_MS = 400;
 
@@ -19,7 +20,7 @@ export function useModifierHold() {
     };
     const onKeyDown = (e) => {
       const isModifier = e.key === 'Control' || e.key === 'Shift';
-      if (!isModifier || e.altKey || e.metaKey || !e.ctrlKey) {
+      if (!isModifier || e.altKey || e.metaKey || !e.ctrlKey || isFocusMode()) {
         clear();
         return;
       }

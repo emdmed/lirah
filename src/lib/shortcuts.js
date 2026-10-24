@@ -20,6 +20,8 @@
 // useCommandPalette, useTerminal's key handler (Ctrl+F/G/Shift+F with the
 // terminal focused), useRowCursor (files pane).
 
+import { isFocusMode } from './focusMode';
+
 const mod = (e) => e.ctrlKey || e.metaKey; // Ctrl, or Cmd
 const alt = (e) => e.altKey && !e.ctrlKey && !e.metaKey; // Alt alone, Shift allowed
 const key = (k) => (e) => e.key === k;
@@ -110,7 +112,8 @@ export function shortcutKeys(id) {
   return s ? compactKeys(s.keys) : null;
 }
 
-/** Whether keydown `e` is shortcut `id`. */
+/** Whether keydown `e` is shortcut `id`. Never while nvim/lazygit has the window. */
 export function matches(id, e) {
+  if (isFocusMode()) return false;
   return !!BY_ID.get(id)?.match?.(e);
 }

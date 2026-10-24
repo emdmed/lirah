@@ -47,6 +47,7 @@ import { FileSelectionProvider } from "../file-groups";
 
 // Domain hooks
 import { useSecondaryTerminal } from "../../hooks/useSecondaryTerminal";
+import { setFocusMode } from "../../lib/focusMode";
 import { useDialogs } from "../../hooks/useDialogs";
 import { DialogScope } from "../dialogs/DialogProvider";
 import { useTerminalSettings } from "../../hooks/useTerminalSettings";
@@ -815,6 +816,21 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const closeTextarea = useCallback(() => setTextareaVisible(false), []);
   const clearCompactedProject = useCallback(() => compact.setCompactedProject(null), [compact.setCompactedProject]);
   const toggleSecondaryFullscreen = useCallback(() => secondary.setSecondaryFullscreen(f => !f), [secondary.setSecondaryFullscreen]);
+
+  // nvim/lazygit in terminal 2: whole window, Lirah keybinds off. Only the tab
+  // that turned focus mode on turns it off, then hands focus back to its shell.
+  const ownsFocusModeRef = useRef(false);
+  const handleFocusModeChange = useCallback((on) => {
+    if (on) {
+      ownsFocusModeRef.current = true;
+      setFocusMode(true);
+      secondary.setSecondaryFullscreen(true);
+    } else if (ownsFocusModeRef.current) {
+      ownsFocusModeRef.current = false;
+      setFocusMode(false);
+      requestAnimationFrame(() => terminalRef.current?.focus?.());
+    }
+  }, [secondary.setSecondaryFullscreen]);
   const handleTerminalReady = useCallback(() => setTerminalReady(true), []);
   // Sandboxing is applied at spawn, so retrying without it turns the setting
   // off and restarts this tab's shell (same path as toggleSandbox).
@@ -995,6 +1011,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               fullscreen={secondary.secondaryFullscreen}
               onToggleFullscreen={toggleSecondaryFullscreen}
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
+              onFocusModeChange={handleFocusModeChange}
               initialCommand={secondary.pendingCommand}
               isActive={isActive}
             />

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isFocusMode } from '../lib/focusMode';
 
 const LAST_PROMPT_KEY = 'nevo-terminal:last-prompt';
 
@@ -55,7 +56,7 @@ export function useTextareaShortcuts({
   useEffect(() => {
     if (!isActive) return;
     const handleKeyDown = (e) => {
-      if (secondaryTerminalFocused) return;
+      if (secondaryTerminalFocused || isFocusMode()) return;
 
       // Double-tap Alt: Clear selected template OR open dropdown
       if (e.key === 'Alt' && !e.repeat) {

@@ -6,11 +6,13 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { invoke, Channel } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getTerminalSession, rememberTerminalSession, forgetTerminalSession } from '../lib/terminalSessions';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
 import { markTerminalInput, markTerminalOutput } from '../features/tabs/terminalActivity';
+import { isFocusMode } from '../lib/focusMode';
 import '@xterm/xterm/css/xterm.css';
 
 // Smallest geometry we will ever apply. FitAddon floors its proposal at 2 cols /
@@ -99,7 +101,7 @@ function cancelRepaint(term) {
   }
 }
 
-export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true, reattachKey = null) {
+export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled = false, networkIsolation = false, projectDir = null, initialCommand = null, secondaryMode = false, isActive = true, reattachKey = null, onExit = null) {
   const [terminal, setTerminal] = useState(null);
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -241,7 +243,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     const disposable = terminal.attachCustomKeyEventHandler((event) => {
       // Scrollback search. Ctrl+F is already the file-tree search, so this takes
       // Ctrl+Shift+F — and it comes before the secondary-mode passthrough so the
-      // secondary terminal gets search too.
+      // secondary terminal gets search too. Not in focus mode: nvim and lazygit
+      // get every key.
+      if (secondaryMode && isFocusMode()) {
+        return true;
+      }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f' && event.type === 'keydown') {
         event.preventDefault();
         setSearchOpen(true);
@@ -420,6 +426,25 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       }
     };
   }, [terminal, fitAddon]);
+
+  // The shell exited on its own (e.g. `exec nvim` and the user quit nvim).
+  const onExitRef = useRef(onExit);
+  useEffect(() => { onExitRef.current = onExit; }, [onExit]);
+  useEffect(() => {
+    if (!sessionId) return;
+    let unlisten = null;
+    let disposed = false;
+    listen('terminal-exited', (event) => {
+      if (event.payload?.session_id === sessionId) onExitRef.current?.();
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [sessionId]);
 
   // Rebuild the GPU glyph atlas and repaint every cell, on the next frame.
   // refresh() alone re-runs the renderer against the *existing* atlas, so glyphs

@@ -1,11 +1,16 @@
 import { useRef, useEffect, useState, useCallback, forwardRef, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useTerminal } from '../hooks/useTerminal';
 import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { PaneLegend } from './instrument/PaneLegend';
 
-const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir, isActive = true }, ref) => {
+// Programs that take the whole window with every Lirah keybind off. They run
+// via `exec`, so quitting them ends the shell and closes terminal 2.
+const FOCUS_COMMANDS = new Set(['nvim', 'lazygit']);
+
+const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir, isActive = true, focus = false, onExit = null }, ref) => {
   const terminalRef = useRef(null);
 
   const { handleResize, sessionId, isFocused, searchAddon, searchOpen, searchDecorations, closeSearch } = useTerminal(
@@ -21,6 +26,8 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     initialCommand,
     true,  // secondaryMode
     isActive,
+    null,  // reattachKey
+    onExit,
   );
 
   useEffect(() => {
@@ -61,6 +68,14 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     };
   }, [debouncedResize]);
 
+  if (focus) {
+    return (
+      <div className="terminal-wrapper" style={{ width: '100%', flex: 1, minHeight: 0, minWidth: 0, position: 'relative', padding: '6px 8px' }}>
+        <div ref={terminalRef} style={{ width: '100%', height: '100%', overflow: 'hidden' }} />
+      </div>
+    );
+  }
+
   return (
     <div
       data-title="terminal 2"
@@ -85,8 +100,15 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
-export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange, initialCommand: initialCommandProp, isActive = true }, ref) => {
+export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange, onFocusModeChange, initialCommand: initialCommandProp, isActive = true }, ref) => {
   const [selectedCommand, setSelectedCommand] = useState(initialCommandProp || null);
+  const focus = visible && FOCUS_COMMANDS.has(selectedCommand);
+
+  useEffect(() => {
+    onFocusModeChange?.(focus);
+  }, [focus, onFocusModeChange]);
+  // Separate so a tab closed mid-session never leaves the keybinds off.
+  useEffect(() => () => onFocusModeChange?.(false), [onFocusModeChange]);
 
   // Notify parent when picker visibility changes
   useEffect(() => {
@@ -106,6 +128,27 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
       <div style={containerStyle}>
         <SecondaryTerminalPicker onSelect={setSelectedCommand} />
       </div>
+    );
+  }
+
+  if (focus) {
+    // Portaled: inactive tabs sit in a transformed wrapper, which would trap a
+    // fixed child inside the tab instead of the window.
+    return createPortal(
+      <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--ins-gutter)', visibility: isActive ? 'visible' : 'hidden' }}>
+        <SecondaryTerminalInstance
+          ref={ref}
+          theme={theme}
+          onFocusChange={onFocusChange}
+          onSessionReady={onSessionReady}
+          initialCommand={`exec ${selectedCommand}`}
+          projectDir={projectDir}
+          isActive={isActive}
+          focus
+          onExit={onClose}
+        />
+      </div>,
+      document.body,
     );
   }
 

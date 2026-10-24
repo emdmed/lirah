@@ -129,7 +129,13 @@ fn pump_output(
 /// Reader thread for an interactive terminal: raw bytes go to the session's
 /// output sink, and from there to whichever frontend is attached (xterm decodes
 /// UTF-8 itself, including sequences split across reads).
-fn spawn_output_reader(session: Arc<SessionHandle>, mut reader: Box<dyn Read + Send>) {
+/// When the child exits on its own, "terminal-exited" fires with the session id.
+fn spawn_output_reader(
+    session: Arc<SessionHandle>,
+    mut reader: Box<dyn Read + Send>,
+    app: AppHandle,
+    session_id: String,
+) {
     thread::spawn(move || {
         // Batch on a dedicated emitter thread: the reader stays tight on the
         // PTY while sends are coalesced (see batch_emit_loop).
@@ -147,6 +153,10 @@ fn spawn_output_reader(session: Arc<SessionHandle>, mut reader: Box<dyn Read + S
         let _ = emitter.join();
         if exited {
             session.output.emit(PROCESS_EXITED_NOTICE.to_vec());
+            let _ = app.emit(
+                "terminal-exited",
+                serde_json::json!({"session_id": session_id}),
+            );
         }
     });
 }
@@ -162,6 +172,7 @@ pub async fn spawn_terminal(
     sandbox_no_net: bool,
     project_dir: Option<String>,
     output: Channel,
+    app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
     // The id exists before the shell does: the shell's env carries it, so
@@ -183,7 +194,7 @@ pub async fn spawn_terminal(
         .insert(session_id.clone(), session.clone());
 
     session.output.attach(output, false);
-    spawn_output_reader(session, reader);
+    spawn_output_reader(session, reader, app, session_id.clone());
 
     Ok(serde_json::json!({
         "session_id": session_id,

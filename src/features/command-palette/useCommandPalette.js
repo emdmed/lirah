@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { isFocusMode } from '../../lib/focusMode';
 
 // Anything that takes typed text — including xterm's hidden textarea — keeps
 // its `:` so the palette never steals a keystroke from the shell or the prompt.
@@ -20,7 +21,7 @@ export function useCommandPalette({ isActive }) {
   useEffect(() => {
     if (!isActive) return;
     const onKeyDown = (e) => {
-      if (open) return;
+      if (open || isFocusMode()) return;
       const ctrlColon = (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'Semicolon';
       const bareColon = e.key === ':' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(document.activeElement);
       if (!ctrlColon && !bareColon) return;
