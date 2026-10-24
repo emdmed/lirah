@@ -54,7 +54,7 @@ export function FileNode({
       data-nav-row
       data-cursor={isCursor ? '' : undefined}
       data-selected={isSelected || undefined}
-      className={`group flex h-6 items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}
+      className={`group flex h-6 items-center gap-0.5 w-full ${isCurrentPath ? 'bg-accent/15' : ''} ${isDeleted ? 'opacity-60' : ''}`}
     >
       {/* Main file display */}
       <div

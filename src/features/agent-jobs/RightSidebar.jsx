@@ -784,9 +784,7 @@ function TabButton({ active, onClick, label, count }) {
       )}
     >
       {label}
-      {count != null && (
-        <span className={cn('tabular-nums', count > 0 ? 'text-foreground' : 'text-muted-foreground')}>{count}</span>
-      )}
+      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
     </button>
   );
 }

@@ -24,7 +24,9 @@ export const ACTIVITY = {
   working: { icon: StarLamp, color: 'text-[var(--ins-lamp)]', pulse: true },
   permission: { icon: ShieldAlert, color: 'text-[var(--ins-fault)]', pulse: true },
   done: { icon: StarOutline, color: 'text-[var(--ins-ok)]' },
-  waiting: { icon: MessageSquareMore, color: 'text-[var(--ins-warn)]' },
+  // Muted: an agent idling at its prompt is not an alarm; amber is kept for
+  // states that need the user (permission, the attention queue number).
+  waiting: { icon: MessageSquareMore, color: 'text-muted-foreground' },
   running: { icon: SquareTerminal, color: 'text-[var(--ins-lamp)]', pulse: true },
   remote: { icon: Bot, color: 'text-[var(--ins-lamp)]', pulse: true },
   idle: { icon: LensLamp, color: 'text-muted-foreground' },
@@ -126,7 +128,8 @@ export function turnSummary(turn, now) {
   if (turn.read.size) parts.push(`read ${turn.read.size}`);
   if (turn.commands) parts.push(`ran ${turn.commands}`);
   if (parts.length === 0) return null;
-  parts.push(formatAgo((turn.endedAt ?? now) - turn.startedAt));
+  // Running: how long it has been going. Ended: how long ago it finished.
+  parts.push(turn.endedAt ? `${formatAgo(now - turn.endedAt)} ago` : formatAgo(now - turn.startedAt));
   return { text: parts.join(' · '), running: !turn.endedAt };
 }
 

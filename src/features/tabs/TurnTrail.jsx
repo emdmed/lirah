@@ -11,7 +11,7 @@ export function TurnTrail({ turn, summary, root, open, onToggle, onAttach }) {
         aria-expanded={!!open}
         onClick={onToggle}
         title={open ? 'Hide files' : 'Show the files it edited'}
-        className="min-w-0 truncate font-mono tabular-nums hover:text-[var(--ins-lamp)]"
+        className="min-w-0 truncate tabular-nums hover:text-[var(--ins-lamp)]"
       >
         {summary.running ? 'this turn' : 'last turn'}: {summary.text}
       </RowAction>

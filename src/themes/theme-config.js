@@ -1212,10 +1212,10 @@ export const themes = {
     // Terminal colors - Rivendell: twilight slate, parchment, gold leaf
     terminal: {
       foreground: '#e8e2d0',      // Parchment
-      background: '#141b1e',      // Deep slate
+      background: '#182125',      // Deep slate (matches the panel face)
       cursor: '#dcb662',          // Gold leaf
-      cursorAccent: '#141b1e',    // Deep slate
-      selectionBackground: '#2f3d3a', // Moss shadow
+      cursorAccent: '#182125',    // Deep slate
+      selectionBackground: '#30344a', // Twilight over the valley
       selectionForeground: '#e8e2d0', // Parchment
 
       // Normal colors
@@ -1223,20 +1223,20 @@ export const themes = {
       red: '#e3836f',             // Rose clay
       green: '#a6c78e',           // Sage
       yellow: '#dcb662',          // Gold leaf
-      blue: '#7fa7b8',            // River
-      magenta: '#b99ac2',         // Heather
+      blue: '#73a3cc',            // River (kept apart from heather for colour-blind eyes)
+      magenta: '#c897b8',         // Heather
       cyan: '#93c3b8',            // Celadon
       white: '#c9c3b2',           // Vellum
 
       // Bright colors
-      brightBlack: '#56625f',     // Lichen
+      brightBlack: '#6b7874',     // Lichen (readable for comments)
       brightRed: '#f0998a',       // Bright rose
       brightGreen: '#bcd9a4',     // Bright sage
       brightYellow: '#ecc97c',    // Bright gold
-      brightBlue: '#9cc0cf',      // Bright river
-      brightMagenta: '#cdb2d4',   // Bright heather
-      brightCyan: '#aed6cd',      // Bright celadon
-      brightWhite: '#f1ebda',     // Bright parchment
+      brightBlue: '#94bedb',      // Bright river
+      brightMagenta: '#dab1cc',   // Bright heather
+      brightCyan: '#b4ddd6',      // Bruinen spray
+      brightWhite: '#eaf1f0',     // Waterfall silver
     },
     // UI colors
     ui: {
@@ -1248,16 +1248,17 @@ export const themes = {
       popoverForeground: 'hsl(45 34% 86%)',
       primary: 'hsl(166 29% 67%)',
       primaryForeground: 'hsl(200 20% 12%)',
-      secondary: 'hsl(199 20% 16%)',
+      secondary: 'hsl(199 20% 18%)',
       secondaryForeground: 'hsl(45 34% 86%)',
-      muted: 'hsl(199 20% 16%)',
+      muted: 'hsl(199 20% 18%)',
       mutedForeground: 'hsl(127 5% 62%)',
-      accent: 'hsl(41 64% 62%)',
+      // Twilight heather: gold is kept for lit state only.
+      accent: 'hsl(286 22% 70%)',
       accentForeground: 'hsl(200 20% 12%)',
-      destructive: 'hsl(10 67% 66%)',
+      destructive: 'hsl(8 70% 62%)',
       destructiveForeground: 'hsl(200 20% 12%)',
-      border: 'hsl(197 16% 22%)',
-      input: 'hsl(199 20% 16%)',
+      border: 'hsl(197 16% 26%)',
+      input: 'hsl(199 20% 18%)',
       inputBackground: 'hsl(200 21% 8%)',
       ring: 'hsl(41 64% 62%)',
       sidebar: 'hsl(200 20% 12%)',
@@ -1266,18 +1267,93 @@ export const themes = {
       sidebarPrimaryForeground: 'hsl(200 20% 12%)',
       sidebarAccent: 'hsl(199 20% 16%)',
       sidebarAccentForeground: 'hsl(45 34% 86%)',
-      sidebarBorder: 'hsl(197 16% 22%)',
+      sidebarBorder: 'hsl(197 16% 26%)',
       sidebarRing: 'hsl(41 64% 62%)',
-      // Instrument lamps: gold leaf lit, sage ok, amber warn, rose fault.
+      // Instrument lamps: gold leaf lit, sage ok, copper warn, rose fault.
+      // Lightness steps down ok > lamp > warn > fault so each reads apart.
       lamp: '#dcb662',
       ok: '#b8d6a0',
-      warn: '#e4b56e',
-      fault: '#dc6f5c',
+      warn: '#e5925f',
+      fault: '#e06e5c',
       // Semantic colors
-      folder: '41 64% 62%',              // Gold leaf for folder icons
+      folder: '38 32% 60%',              // Carved oak for folder icons
       gitAdded: '95 34% 67%',            // Sage for +lines
       gitDeleted: '10 67% 66%',          // Rose clay for -lines
-      treeGuide: '45 34% 86% / 0.1',    // Parchment with opacity for tree guide lines
+      treeGuide: '166 29% 67% / 0.12',  // Celadon stone lines for the tree
+    },
+  },
+  lothlorien: {
+    name: 'Lothlórien',
+    type: 'dark',
+    // Terminal colors - Lothlórien: night under the mallorn, silver bark, gold leaves
+    terminal: {
+      foreground: '#ece4c6',      // Pale mallorn silver-gold
+      background: '#15170f',      // Forest night
+      cursor: '#e3c05a',          // Mallorn gold
+      cursorAccent: '#15170f',    // Forest night
+      selectionBackground: '#2d3322', // Leaf shadow
+      selectionForeground: '#ece4c6', // Pale mallorn
+
+      // Normal colors
+      black: '#22261b',           // Bark shadow
+      red: '#d98a68',             // Autumn leaf
+      green: '#b3c978',           // Mallorn leaf
+      yellow: '#e3c05a',          // Mallorn gold
+      blue: '#8eb2a6',            // Silverlode
+      magenta: '#c6a2b2',         // Niphredil dusk
+      cyan: '#a3c9b2',            // Nimrodel
+      white: '#cfc8ae',           // Silver bark
+
+      // Bright colors
+      brightBlack: '#5f6650',     // Moss
+      brightRed: '#e8a183',       // Bright autumn
+      brightGreen: '#c8dc92',     // Bright leaf
+      brightYellow: '#f0d47a',    // Bright gold
+      brightBlue: '#a9c8be',      // Bright silverlode
+      brightMagenta: '#d8b9c6',   // Bright niphredil
+      brightCyan: '#bcdcc8',      // Bright Nimrodel
+      brightWhite: '#f6efd6',     // Elanor white
+    },
+    // UI colors
+    ui: {
+      background: 'hsl(75 18% 9%)',
+      foreground: 'hsl(46 56% 85%)',
+      card: 'hsl(75 16% 11%)',
+      cardForeground: 'hsl(46 56% 85%)',
+      popover: 'hsl(75 16% 11%)',
+      popoverForeground: 'hsl(46 56% 85%)',
+      primary: 'hsl(45 71% 62%)',
+      primaryForeground: 'hsl(75 18% 9%)',
+      secondary: 'hsl(75 15% 14%)',
+      secondaryForeground: 'hsl(46 56% 85%)',
+      muted: 'hsl(75 15% 14%)',
+      mutedForeground: 'hsl(70 9% 62%)',
+      accent: 'hsl(105 11% 74%)',
+      accentForeground: 'hsl(75 18% 9%)',
+      destructive: 'hsl(17 60% 63%)',
+      destructiveForeground: 'hsl(75 18% 9%)',
+      border: 'hsl(80 12% 20%)',
+      input: 'hsl(75 15% 14%)',
+      inputBackground: 'hsl(75 22% 6%)',
+      ring: 'hsl(45 71% 62%)',
+      sidebar: 'hsl(75 18% 9%)',
+      sidebarForeground: 'hsl(46 56% 85%)',
+      sidebarPrimary: 'hsl(45 71% 62%)',
+      sidebarPrimaryForeground: 'hsl(75 18% 9%)',
+      sidebarAccent: 'hsl(75 15% 14%)',
+      sidebarAccentForeground: 'hsl(46 56% 85%)',
+      sidebarBorder: 'hsl(80 12% 20%)',
+      sidebarRing: 'hsl(45 71% 62%)',
+      // Instrument lamps: mallorn gold lit, leaf ok, amber warn, autumn fault.
+      lamp: '#e3c05a',
+      ok: '#c8dc92',
+      warn: '#e8a960',
+      fault: '#d06a50',
+      // Semantic colors
+      folder: '45 71% 62%',              // Mallorn gold for folder icons
+      gitAdded: '76 43% 63%',            // Mallorn leaf for +lines
+      gitDeleted: '17 60% 63%',          // Autumn leaf for -lines
+      treeGuide: '46 56% 85% / 0.1',    // Silver-gold with opacity for tree guide lines
     },
   },
 };

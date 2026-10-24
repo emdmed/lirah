@@ -140,8 +140,10 @@ export const TabRow = memo(function TabRow({
               'clean'
             ) : (
               <span title={`${plural(info.files, 'file')} changed`}>
-                <span className="text-git-added">+{info.added}</span>{' '}
-                <span className="text-git-deleted">−{info.deleted}</span>
+                {info.added > 0 && <span className="text-git-added">+{info.added}</span>}
+                {info.added > 0 && info.deleted > 0 && ' '}
+                {info.deleted > 0 && <span className="text-git-deleted">−{info.deleted}</span>}
+                {!info.added && !info.deleted && plural(info.files, 'file')}
               </span>
             ))}
             {contextFill != null && <ContextMoon ratio={contextFill} />}

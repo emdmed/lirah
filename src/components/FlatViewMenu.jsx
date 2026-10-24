@@ -48,7 +48,7 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
                   data-nav-index={i}
                   data-cursor={isCursor}
                   data-nav-activate
-                  className={`p-0 cursor-pointer h-5 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
+                  className={`p-0 cursor-pointer h-5 focus-ring ${isCurrentPath ? 'bg-accent/15' : ''}`}
                 >
                   <div className="flex items-center gap-1.5 w-full text-xs">
                     <span className="w-3 shrink-0" /> {/* cursor column */}
@@ -62,7 +62,7 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
 
           return (
             <SidebarMenuItem key={item.path} className="relative my-0 p-0 w-full" style={dimStyle}>
-              <div data-nav-row data-nav-index={i} data-cursor={isCursor} className={`flex h-5 items-center gap-1.5 w-full py-0 pr-px text-xs ${isCurrentPath ? 'bg-accent' : ''} ${isDeleted ? 'opacity-60' : ''}`}>
+              <div data-nav-row data-nav-index={i} data-cursor={isCursor} className={`flex h-5 items-center gap-1.5 w-full py-0 pr-px text-xs ${isCurrentPath ? 'bg-accent/15' : ''} ${isDeleted ? 'opacity-60' : ''}`}>
                 <span className="w-3 shrink-0 text-center text-git-deleted text-[11px] font-mono">{isDeleted && 'D'}</span>
                 <div className="flex items-center justify-start min-w-0 gap-1.5 flex-1">
                   {isDeleted ? (

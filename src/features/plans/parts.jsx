@@ -72,9 +72,11 @@ const CELL = {
 export function ProgressReadout({ plan, done, total }) {
   return (
     <div className="flex items-center gap-2" role="img" aria-label={`${done} of ${total} chunks implemented`}>
-      <div className="flex h-1.5 min-w-0 flex-1 gap-px">
+      {/* Sized by its cells (24px each, shrinking when many) so the count
+          sits right after the bar instead of across the row. */}
+      <div className="flex h-1.5 min-w-0 gap-px">
         {plan.chunks.map((c) => (
-          <span key={c.id} className={cn('min-w-px max-w-6 flex-1', CELL[c.status] || CELL[CHUNK_STATUS.PENDING])} />
+          <span key={c.id} className={cn('w-6 min-w-px', CELL[c.status] || CELL[CHUNK_STATUS.PENDING])} />
         ))}
       </div>
       <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">

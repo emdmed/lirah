@@ -23,7 +23,7 @@ export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCur
       data-nav-row
       data-nav-activate
       data-cursor={isCursor ? '' : undefined}
-      className={`p-0 cursor-pointer h-6 focus-ring ${isCurrentPath ? 'bg-accent' : ''}`}
+      className={`p-0 cursor-pointer h-6 focus-ring ${isCurrentPath ? 'bg-accent/15' : ''}`}
     >
       <div className="flex items-center w-full h-full whitespace-pre" style={{ fontSize: 'var(--font-lg)' }}>
         <TreeGuide depth={depth} />
