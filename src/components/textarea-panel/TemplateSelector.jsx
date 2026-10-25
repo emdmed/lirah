@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Keycap } from "../instrument/Keycap";
@@ -35,6 +35,8 @@ export function TemplateSelector({
   selectedPatterns = NO_PATTERNS,
   onTogglePattern,
   onCreatePatterns,
+  // Off where the selected template is already shown (the context pane's chips).
+  showSelectedBadge = true,
 }) {
   const { templates } = usePromptTemplates();
 
@@ -75,7 +77,7 @@ export function TemplateSelector({
 
   return (
     <div className="flex items-center gap-1">
-      {selectedTemplate && (
+      {selectedTemplate && showSelectedBadge && (
         <Badge
           variant="outline"
           className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border-0 ${badgeStyle}`}
@@ -94,9 +96,10 @@ export function TemplateSelector({
             data-lit={activeParts.length > 0 || undefined}
             aria-label={`Instructions (${OPEN_KEYS})${activeParts.length ? `: ${activeParts.join(', ')}` : ''}`}
             title={triggerTitle}
-            className="px-1.5"
+            className="gap-1 px-1.5"
           >
-            instructions{patternCount > 0 && <span className="tube">:{patternCount}</span>}
+            <span>instructions{patternCount > 0 && <span className="tube">:{patternCount}</span>}</span>
+            <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-60 text-xs">

@@ -1,17 +1,16 @@
-import { useRef, useMemo, useState, useCallback, useEffect, Suspense, memo } from "react";
+import { useRef, useMemo, useState, useCallback, useEffect, memo } from "react";
 import { useBudgetExhausted } from "../../features/token-budget/TokenBudgetContext";
 import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
-import { lazyNamed } from "../../lib/lazyNamed";
 import { usePromptText } from "../../hooks/usePromptStore";
 
 import { ProjectToolbar } from "./ProjectToolbar";
 import { PromptToolbar } from "./PromptToolbar";
 import { PromptModeLine } from "./PromptModeLine";
 import { ContextChips } from "./ContextChips";
-import { CompactedIndicator } from "./CompactedIndicator";
 import { TextareaArea } from "./TextareaArea";
 import { PaneInfo } from "../PaneInfo";
 import { PaneLegend } from "../instrument/PaneLegend";
+import { InputModeSwitch } from "./ModeSegment";
 import { useSeededSetting } from "../../features/settings/settingsStore";
 
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
@@ -19,9 +18,6 @@ const NO_RESULTS = [];
 const NO_REPOS = [];
 const NO_PATTERN_FILES = [];
 const NO_PATTERNS = new Set();
-
-// Loaded on first open, and mounted only while open.
-const CompactSectionsDialog = lazyNamed(() => import("../../features/compact/CompactSectionsDialog"), "CompactSectionsDialog");
 
 // Memoized: the tab re-renders for branch, cwd, changelog and secondary-focus
 // changes the panel doesn't show. ProjectTab passes it stable callbacks.
@@ -43,12 +39,8 @@ export const TextareaPanel = memo(function TextareaPanel({
   projectPath,
   onLoadGroup,
   onSaveGroup,
-  onCompactProject,
-  isCompacting,
-  compactProgress,
-  compactedProject,
-  onClearCompactedProject,
-  onUpdateCompactedProject,
+  compactionEnabled = false,
+  onToggleCompaction,
   selectedElements,
   onClearElements,
   linkedRepos = NO_REPOS,
@@ -115,7 +107,6 @@ export const TextareaPanel = memo(function TextareaPanel({
 
   const fileArray = useMemo(() => Array.from(selectedFiles || new Set()), [selectedFiles]);
 
-  const [compactDialogOpen, setCompactDialogOpen] = useState(false);
   const sortedAtMentionResults = atMentionResults || NO_RESULTS;
 
   const handleKeyDown = useCallback((e) => {
@@ -184,8 +175,6 @@ export const TextareaPanel = memo(function TextareaPanel({
     setChipsOpen((prev) => !prev);
   }, [setChipsOpen]);
 
-  const openCompacted = useCallback(() => setCompactDialogOpen(true), []);
-
   // Everything below that does not read the text is memoized, so a keystroke
   // re-renders the input and the token estimate, not the toolbars and tooltips.
   const modeLine = useMemo(() => (
@@ -199,16 +188,15 @@ export const TextareaPanel = memo(function TextareaPanel({
       onClearElements={onClearElements}
       linkedRepos={linkedRepos}
       onClearRepos={onClearRepos}
-      compactedProject={compactedProject}
-      onOpenCompacted={openCompacted}
-      onClearCompacted={onClearCompactedProject}
+      compactionEnabled={compactionEnabled}
+      onToggleCompaction={onToggleCompaction}
       keepFilesAfterSend={keepFilesAfterSend}
       onToggleKeepFiles={onToggleKeepFiles}
     />
   ), [
     fileArray.length, chipsOpen, toggleChips,
     elementCount, selectedElements, currentPath, onClearElements,
-    linkedRepos, onClearRepos, compactedProject, openCompacted, onClearCompactedProject,
+    linkedRepos, onClearRepos, compactionEnabled, onToggleCompaction,
     keepFilesAfterSend, onToggleKeepFiles,
   ]);
 
@@ -226,26 +214,14 @@ export const TextareaPanel = memo(function TextareaPanel({
     ) : null
   ), [chipsOpen, fileArray.length, elementCount, selectedFiles, fileStates, selectedElements, currentPath, onSetFileState, onRemoveFile, onRemoveElement]);
 
-  const compactedIndicator = useMemo(() => (
-    <CompactedIndicator
-      compactedProject={compactedProject}
-      onClearCompactedProject={onClearCompactedProject}
-      onOpenSections={openCompacted}
-    />
-  ), [compactedProject, onClearCompactedProject, openCompacted]);
-
   const projectZone = useMemo(() => (
     <ProjectToolbar
-      onCompactProject={onCompactProject}
-      isCompacting={isCompacting}
-      compactProgress={compactProgress}
-      disabled={disabled}
       projectPath={projectPath}
       onLoadGroup={onLoadGroup}
       onSaveGroup={onSaveGroup}
       fileCount={fileArray.length}
     />
-  ), [onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileArray.length]);
+  ), [projectPath, onLoadGroup, onSaveGroup, fileArray.length]);
 
   const promptZone = useMemo(() => (
     <div className="flex items-center gap-1">
@@ -274,19 +250,6 @@ export const TextareaPanel = memo(function TextareaPanel({
     />
   );
 
-  const dialogs = useMemo(() => (
-    <Suspense fallback={null}>
-      {compactedProject && compactDialogOpen && (
-        <CompactSectionsDialog
-          open={compactDialogOpen}
-          onOpenChange={setCompactDialogOpen}
-          compactedProject={compactedProject}
-          onUpdateCompactedProject={onUpdateCompactedProject}
-        />
-      )}
-    </Suspense>
-  ), [compactedProject, compactDialogOpen, onUpdateCompactedProject]);
-
 
   // One line under the input: what the send carries (context, instructions)
   // on the left, then the project menu. Send sits on the right edge
@@ -308,7 +271,6 @@ export const TextareaPanel = memo(function TextareaPanel({
       onChange={onChange}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      compactedIndicator={compactedIndicator}
       onClearContext={onClearContext}
       sessionId={sessionId}
       handleSend={handleSend}
@@ -329,8 +291,11 @@ export const TextareaPanel = memo(function TextareaPanel({
 
   return (
     <div ref={containerRef} data-pane="3" data-title="[3] prompt" data-legend className="tui-pane flex flex-col px-2 pb-4 pt-[16px] gap-1.5">
-      <PaneLegend index={3} title="Prompt" />
-      {dialogs}
+      <PaneLegend
+        index={3}
+        title="Prompt"
+        trailing={onClose && <InputModeSwitch mode="box" onChange={onClose} />}
+      />
       {contextChips}
       {textareaArea}
       <PaneInfo>

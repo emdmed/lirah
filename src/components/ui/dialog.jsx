@@ -5,7 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 
 import { cn } from "@/lib/utils"
 import { Keycap } from "@/components/instrument/Keycap"
-import { FrameHints } from "@/components/instrument/FrameHints"
+import { FrameHints, joinKeys } from "@/components/instrument/FrameHints"
 import { Lamp } from "@/components/instrument/Lamp"
 import { DialogScopeContext } from "@/features/dialogs/dialogStore"
 

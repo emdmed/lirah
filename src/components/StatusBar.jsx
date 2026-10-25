@@ -67,6 +67,24 @@ function SandboxSwitch({ enabled, failed, onToggle }) {
   );
 }
 
+// The per-tab compaction hook: a fresh project index for the agent on each
+// prompt. Shown here while the prompt box is closed (the box has its own).
+function CompactionSwitch({ enabled, onToggle }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex items-center gap-1.5 px-1">
+          <span className="ins-legend">Index</span>
+          <ToggleSwitch checked={enabled} onChange={onToggle} label="Compaction hook" tone="ok" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {enabled ? 'Compaction: ON' : 'Compaction: OFF'} · this tab's agent gets a fresh project index to grep on each prompt (Ctrl+Shift+P)
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function NetworkSwitch({ isolated, enabled, onToggle }) {
   const tooltip = isolated && enabled ? 'Network: ISOLATED' : 'Network: ALLOWED';
   return (
@@ -271,7 +289,7 @@ export const StatusBar = memo(({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenDashboard, onOpenContextDetails, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext, onCompactContext,
-  availableUpdate
+  availableUpdate, compactionEnabled = false, onToggleCompaction,
 }) => {
   const confirm = useConfirm();
 
@@ -387,6 +405,9 @@ export const StatusBar = memo(({
               </TooltipTrigger>
               <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
             </Tooltip>
+          )}
+          {onToggleCompaction && (
+            <CompactionSwitch enabled={compactionEnabled} onToggle={onToggleCompaction} />
           )}
           <SandboxSwitch enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
           {sandboxEnabled && (

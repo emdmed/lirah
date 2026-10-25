@@ -94,7 +94,6 @@ export function buildPrompt({
   getLineCount,
   getViewModeLabel,
   selectedElements,
-  compactedProject,
   selectedPatterns,
   getPatternInstructions,
   linkedRepos,
@@ -106,18 +105,8 @@ export function buildPrompt({
   const hasFiles = files.size > 0;
   const hasTemplate = !!selectedTemplateId;
   const hasElements = elements.size > 0;
-  const hasCompactedProject = !!compactedProject?.output;
 
   const sections = [];
-
-  if (hasCompactedProject) {
-    const relativePath = compactedProject.filePath.replace(currentPath + '/', '');
-    sections.push({
-      id: 'compacted',
-      label: 'COMPACTED PROJECT',
-      body: `Grep inside ${relativePath} for relevant symbols/code before proceeding.`,
-    });
-  }
 
   if (hasTextContent) {
     sections.push({

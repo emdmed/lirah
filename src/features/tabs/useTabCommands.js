@@ -21,7 +21,9 @@ export function useTabCommands({
   themes,
   changeTheme,
   secondary,
-  onCompactProject,
+  onToggleCompaction,
+  compactionEnabled,
+  compactionAvailable,
   onAutoCommit,
   onAutoMerge,
   onLaunchCli,
@@ -72,7 +74,10 @@ export function useTabCommands({
       } },
 
       // Prompt
-      { id: 'compact', hint: 'compact the project for the prompt', run: () => onCompactProject() },
+      { id: 'compact', hint: 'compaction hook for this tab\'s agent', options: ['on', 'off'], run: (arg) => {
+        if (!compactionAvailable) throw new Error('the compaction hook is off in settings');
+        if (onOff(arg, compactionEnabled) !== compactionEnabled) onToggleCompaction();
+      } },
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));
       } },
@@ -124,7 +129,7 @@ export function useTabCommands({
   }, [tabId, projectPath, addTab, requestCloseTab, onLaunchCli, onClearContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
-    onCompactProject, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
+    onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
     toggleSandbox, toggleNetwork, onToggleGitFilter, onToggleMarkdownFilter, setSidebarOpen, setTextareaVisible,
     setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen, setAutoChangelogDialogOpen,
     setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setWorkspaceDialogOpen, setShowHelp, setSettingsOpen]);

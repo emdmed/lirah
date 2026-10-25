@@ -13,7 +13,6 @@ export function TextareaArea({
   onChange,
   onKeyDown,
   disabled,
-  compactedIndicator,
   onClearContext,
   sessionId,
   handleSend,
@@ -30,7 +29,6 @@ export function TextareaArea({
   fileStates,
   toolbar,
 }) {
-  const hasIndicators = !!compactedIndicator;
   const sortedAtMentionResults = atMentionResults || [];
   // One line until there is more to show, at any pane width.
   useAutoGrow(textareaRef, value, { maxLines: 8 });
@@ -121,11 +119,6 @@ export function TextareaArea({
           </Tooltip>
         </div>
       </div>
-      {hasIndicators && (
-        <div className="flex flex-col gap-1.5">
-          {compactedIndicator}
-        </div>
-      )}
       {atMentionActive && sortedAtMentionResults.length > 0 && (
         <AtMentionModal
           results={atMentionResults}

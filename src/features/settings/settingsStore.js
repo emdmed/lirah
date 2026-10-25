@@ -23,6 +23,10 @@ export const SETTINGS_DEFAULTS = {
   // Never applies to tabs restored at startup: that isn't a deliberate act.
   autoLaunchCli: true,
   selectedCli: 'claude-code',
+  // Lirah's agent hooks. Agent state: the agent reports working / permission /
+  // done to its tab. Compaction: lets a tab switch on the compaction hook.
+  agentStateHook: true,
+  compactionHook: true,
   autoChangelogEnabled: false,
   autoChangelogTarget: 'CHANGELOG.md',
   autoChangelogTrigger: 'commit',
@@ -34,6 +38,8 @@ export const SETTINGS_DEFAULTS = {
   viewMode: 'flat',
   // Terminal scrollback in lines (see lib/terminalPrefs.js).
   scrollback: 10000,
+  // New tabs open the full prompt box instead of the one-line context status.
+  promptBoxOnStart: false,
   // Per tab, seeded: whether the prompt's context list is open.
   contextChipsOpen: true,
   // The right sidebar: its dragged width (0 until dragged) and half-window mode.

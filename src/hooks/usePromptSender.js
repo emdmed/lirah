@@ -27,10 +27,8 @@ export function usePromptSender({
   getLineCount,
   getViewModeLabel,
   selectedElements,
-  compactedProject,
   // State setters (callbacks)
   setTextareaContent,
-  setCompactedProject,
   clearFileSelection,
   clearSelectedElements,
   selectedPatterns,
@@ -58,7 +56,6 @@ export function usePromptSender({
       getLineCount,
       getViewModeLabel,
       selectedElements,
-      compactedProject,
       selectedPatterns,
       getPatternInstructions,
       linkedRepos,
@@ -106,10 +103,9 @@ export function usePromptSender({
       if (clearLinkedRepos) clearLinkedRepos();
     }
 
-    setCompactedProject(null);
     if (clearSelectedTemplate) clearSelectedTemplate();
     if (clearPatterns) clearPatterns();
-  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, compactedProject, setCompactedProject, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate, linkedRepos, clearLinkedRepos, toastError]);
+  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate, linkedRepos, clearLinkedRepos, toastError]);
 
   return sendPrompt;
 }

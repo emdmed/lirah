@@ -19,6 +19,7 @@ import { markFirstRun } from "./features/tabs/firstRun";
 import { GlobalDialogOutlet } from "./features/dialogs/GlobalDialogOutlet";
 import { useDialog } from "./features/dialogs/DialogProvider";
 import { MAX_TABS } from "./features/tabs/TabContext";
+import { useSetting } from "./features/settings/settingsStore";
 
 function App() {
   const { tabs, activeTabId, addTab, requestCloseTab, switchTab } = useTabManager();
@@ -31,6 +32,13 @@ function App() {
 
   // Agent state reported by Claude Code / opencode hooks, for the tab lamps.
   useEffect(() => { startAgentHookListener(); }, []);
+  // opencode loads its plugins globally, so the "Agent state hook" setting
+  // installs or removes Lirah's. Claude Code's is left out per launch instead.
+  const [agentStateHook] = useSetting('agentStateHook');
+  useEffect(() => {
+    invoke('set_opencode_agent_plugin', { enabled: agentStateHook })
+      .catch((error) => console.warn('Failed to update the opencode agent plugin:', error));
+  }, [agentStateHook]);
   // Tabs whose agent is waiting on you: notifications and Alt+A to jump there.
   const { jumpToNext } = useAgentAttention({ tabs, activeTabId, switchTab });
 
@@ -186,6 +194,7 @@ function App() {
                   tabId={tab.id}
                   projectPath={tab.projectPath}
                   isActive={tab.id === activeTabId}
+                  compactionHook={!!tab.compactionHook}
                   availableUpdate={availableUpdate}
                 />
               </DevProfiler>

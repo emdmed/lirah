@@ -19,7 +19,7 @@ import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession } from "./terminalActivity";
 import { useTabContextFill } from "./tabContextFill";
 import { registerTabPrompt } from "./tabPrompts";
-import { useLinkedRepos } from "./useLinkedRepos";
+import { useLinkedRepos, unlinkRepo } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
 import { useAutoMerge } from "../git/useAutoMerge";
@@ -36,6 +36,9 @@ import { useTypeChecker } from "../../hooks/useTypeChecker";
 import { usePromptSender } from "../../hooks/usePromptSender";
 import { usePromptStore } from "../../hooks/usePromptStore";
 import { buildPrompt } from "../../hooks/buildPrompt";
+import { usePromptContextSync } from "../../hooks/usePromptContextSync";
+import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
+import { summarizeContext } from "../../components/textarea-panel/contextSummary";
 import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
@@ -51,14 +54,14 @@ import { setFocusMode } from "../../lib/focusMode";
 import { useDialogs } from "../../hooks/useDialogs";
 import { DialogScope } from "../dialogs/DialogProvider";
 import { useTerminalSettings } from "../../hooks/useTerminalSettings";
-import { useCompact } from "../compact/useCompact";
+import { useCompactionHook } from "../compact/useCompactionHook";
 import { useElementPicker } from "../file-analysis/useElementPicker";
 import { useAtMention } from "../at-mention";
 import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
 import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
-import { useSeededSetting } from "../settings/settingsStore";
+import { useSeededSetting, useSetting, getSettings } from "../settings/settingsStore";
 import { usePatterns } from "../patterns";
 import { useWorkspace } from "../../hooks/useWorkspace";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
@@ -96,7 +99,7 @@ function TabContextFillSync({ tabId, isActive, tokenUsageStore, terminalSessionI
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, availableUpdate }) {
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, compactionHook = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -142,7 +145,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
       {booted && (
         <DialogScope scope={tabId} active={isActive}>
           <FileSelectionProvider>
-            <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} availableUpdate={availableUpdate} />
+            <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} compactionHook={compactionHook} availableUpdate={availableUpdate} />
           </FileSelectionProvider>
         </DialogScope>
       )}
@@ -150,7 +153,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   );
 });
 
-function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
+function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availableUpdate }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -164,7 +167,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const searchInputRef = useRef(null);
 
   // Textarea state
-  const [textareaVisible, setTextareaVisible] = useState(true);
+  // The full prompt box, or (closed) the one-line context status in its place.
+  const [textareaVisible, setTextareaVisible] = useState(() => getSettings().promptBoxOnStart);
   // The prompt text lives in a store, not state: typing must re-render only
   // the textarea panel, not this whole tab.
   const promptStore = usePromptStore();
@@ -321,11 +325,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
 
   const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
-  const compact = useCompact({
-    currentPath,
-    allFiles: treeView.allFiles,
-    setTextareaVisible,
-  });
+  const compaction = useCompactionHook({ tabId, terminalSessionId, enabled: compactionHook });
 
   const elementPicker = useElementPicker();
 
@@ -541,9 +541,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     selectedTemplateId, getTemplateById,
     formatFileAnalysis, getLineCount, getViewModeLabel,
     selectedElements: elementPicker.selectedElements,
-    compactedProject: compact.compactedProject,
     setTextareaContent,
-    setCompactedProject: compact.setCompactedProject,
     clearFileSelection: fileSelection.clearFileSelection,
     clearSelectedElements: elementPicker.clearSelectedElements,
     selectedPatterns: patterns.selectedPatterns,
@@ -567,16 +565,67 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     getLineCount,
     getViewModeLabel,
     selectedElements: elementPicker.selectedElements,
-    compactedProject: compact.compactedProject,
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
     linkedRepos,
   }), [
     fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
-    elementPicker.selectedElements, compact.compactedProject,
+    elementPicker.selectedElements,
     patterns.selectedPatterns, patterns.getPatternInstructions, linkedRepos,
   ]);
+
+  // A prompt typed in the terminal gets the selected context too (through
+  // Lirah's Claude Code hook); afterwards the selection resets as on send.
+  const keepFilesAfterSend = settings.keepFilesAfterSend;
+  const resetContextAfterUse = useCallback(() => {
+    clearSelectedTemplate();
+    patterns.clearPatterns();
+    if (!keepFilesAfterSend) {
+      fileSelection.clearFileSelection();
+      elementPicker.clearSelectedElements();
+      clearLinkedRepos?.();
+    }
+  }, [clearSelectedTemplate, patterns.clearPatterns, keepFilesAfterSend,
+    fileSelection.clearFileSelection, elementPicker.clearSelectedElements, clearLinkedRepos]);
+  // What the context amounts to, kept by the sync hook for the "attached" line.
+  const templateTitle = selectedTemplateId ? getTemplateById(selectedTemplateId)?.title : undefined;
+  const contextSummary = useMemo(() => {
+    let elementCount = 0;
+    elementPicker.selectedElements?.forEach((els) => { elementCount += els.length; });
+    return summarizeContext({
+      fileCount: fileSelection.selectedFiles?.size || 0,
+      elementCount,
+      repoCount: linkedRepos?.length || 0,
+      templateTitle,
+      patternCount: patterns.selectedPatterns?.size || 0,
+    });
+  }, [fileSelection.selectedFiles, elementPicker.selectedElements, linkedRepos, templateTitle, patterns.selectedPatterns]);
+  const { attachedSummary } = usePromptContextSync({
+    terminalSessionId,
+    contextText: promptBase.text,
+    contextSummary,
+    onContextUsed: resetContextAfterUse,
+  });
+  // Only Claude Code with the agent-state plugin loaded attaches it itself.
+  const [agentStateHook] = useSetting('agentStateHook');
+  const hookDelivers = settings.selectedCli === 'claude-code' && agentStateHook;
+  // Other CLIs: type the context into the terminal; the user adds the prompt.
+  const insertContext = useCallback(async () => {
+    if (!terminalSessionId || !promptBase.text) return;
+    try {
+      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `${promptBase.text}\n\n` });
+      terminalRef.current?.focus?.();
+      resetContextAfterUse();
+    } catch (error) {
+      toast.error(`Context not inserted: ${error?.message || error}`);
+    }
+  }, [terminalSessionId, promptBase.text, resetContextAfterUse, toast.error]);
+  const unlinkTabRepo = useCallback((path) => unlinkRepo(tabId, path), [tabId]);
+  const openPromptBox = useCallback(() => {
+    setTextareaVisible(true);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
 
   // Keyboard shortcut hooks
   useViewModeShortcuts({
@@ -778,7 +827,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     viewMode,
     sidebarOpen: sidebar.sidebarOpen,
     searchInputRef,
-    onCompactProject: compact.handleCompactProject,
+    onToggleCompaction: compaction.toggleCompaction,
     onOpenLazygit: handleOpenLazygit,
     onAutoCommit: handleAutoCommit,
     onAutoMerge: handleAutoMerge,
@@ -843,7 +892,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   const openManageTemplates = useCallback(() => setManageTemplatesDialogOpen(true), [setManageTemplatesDialogOpen]);
   const openSaveFileGroup = useCallback(() => setSaveFileGroupDialogOpen(true), [setSaveFileGroupDialogOpen]);
   const closeTextarea = useCallback(() => setTextareaVisible(false), []);
-  const clearCompactedProject = useCallback(() => compact.setCompactedProject(null), [compact.setCompactedProject]);
   const toggleSecondaryFullscreen = useCallback(() => secondary.setSecondaryFullscreen(f => !f), [secondary.setSecondaryFullscreen]);
 
   // nvim/lazygit in terminal 2: whole window, Lirah keybinds off. Only the tab
@@ -891,7 +939,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
     themes,
     changeTheme,
     secondary,
-    onCompactProject: compact.handleCompactProject,
+    onToggleCompaction: compaction.toggleCompaction,
+    compactionEnabled: compaction.compactionEnabled,
+    compactionAvailable: compaction.compactionAvailable,
     onAutoCommit: handleAutoCommit,
     onAutoMerge: handleAutoMerge,
     onLaunchCli: launchClaude,
@@ -923,7 +973,10 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               currentPath={currentPath}
               folders={folders}
               fileWatchingEnabled={fileWatchingEnabled && isActive && !secondary.secondaryFullscreen}
-              isTextareaPanelOpen={textareaVisible}
+              // The prompt box or the context status always holds the
+              // selection, so a file click selects it (with its modify /
+              // don't-modify / example state) instead of typing its path.
+              isTextareaPanelOpen
               onNavigateParent={navigateToParent}
               onFolderClick={loadFolders}
               onAddBookmark={openAddBookmark}
@@ -942,7 +995,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
           )
         }
         textarea={
-          textareaVisible && (
+          textareaVisible ? (
             <TextareaPanel
               promptStore={promptStore}
               onChange={handleTextareaChange}
@@ -960,12 +1013,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               projectPath={currentPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
               onSaveGroup={openSaveFileGroup}
-              onCompactProject={compact.handleCompactProject}
-              isCompacting={compact.isCompacting}
-              compactProgress={compact.compactProgress}
-              compactedProject={compact.compactedProject}
-              onClearCompactedProject={clearCompactedProject}
-              onUpdateCompactedProject={compact.setCompactedProject}
+              compactionEnabled={compaction.compactionEnabled}
+              onToggleCompaction={compaction.compactionAvailable && settings.selectedCli === 'claude-code' ? compaction.toggleCompaction : undefined}
               selectedElements={elementPicker.selectedElements}
               onClearElements={elementPicker.clearSelectedElements}
               linkedRepos={linkedRepos}
@@ -991,6 +1040,39 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
               onRemoveElement={elementPicker.removeElement}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
+            />
+          ) : (
+            <ContextStatus
+              selectedFiles={fileSelection.selectedFiles}
+              fileStates={fileSelection.fileStates}
+              selectedElements={elementPicker.selectedElements}
+              currentPath={currentPath}
+              linkedRepos={linkedRepos}
+              onSetFileState={fileSelection.setFileState}
+              onRemoveFile={fileSelection.removeFileFromSelection}
+              onRemoveElement={elementPicker.removeElement}
+              onUnlinkRepo={unlinkTabRepo}
+              keepFilesAfterSend={settings.keepFilesAfterSend}
+              onToggleKeepFiles={settings.setKeepFilesAfterSend}
+              selectedTemplateId={selectedTemplateId}
+              templateTitle={templateTitle}
+              onSelectTemplate={setSelectedTemplateId}
+              onManageTemplates={openManageTemplates}
+              templateDropdownOpen={templateDropdownOpen}
+              onTemplateDropdownOpenChange={setTemplateDropdownOpen}
+              patternFiles={patterns.patternFiles}
+              selectedPatterns={patterns.selectedPatterns}
+              onTogglePattern={patterns.togglePattern}
+              onCreatePatterns={patterns.createPatterns}
+              projectPath={currentPath}
+              onLoadGroup={fileSelection.handleLoadFileGroup}
+              onSaveGroup={openSaveFileGroup}
+              promptBase={promptBase}
+              filesPaneOpen={sidebar.sidebarOpen}
+              hookDelivers={hookDelivers}
+              attachedSummary={attachedSummary}
+              onInsert={insertContext}
+              onOpenBox={openPromptBox}
             />
           )
         }
@@ -1022,6 +1104,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
             onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
             onCompactContext={handleCompactContext}
+            compactionEnabled={compaction.compactionEnabled}
+            onToggleCompaction={!textareaVisible && compaction.compactionAvailable && settings.selectedCli === 'claude-code' ? compaction.toggleCompaction : undefined}
             availableUpdate={availableUpdate}
           />
           </TabBarStatusSlot>

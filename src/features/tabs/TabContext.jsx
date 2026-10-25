@@ -144,6 +144,11 @@ export function TabProvider({ children }) {
     setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, role: role || undefined } : t)));
   }, []);
 
+  // Whether the tab's agent runs Lirah's compaction hook.
+  const setTabCompaction = useCallback((tabId, enabled) => {
+    setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, compactionHook: enabled || undefined } : t)));
+  }, []);
+
   const actions = useMemo(() => ({
     addTab,
     removeTab,
@@ -153,7 +158,8 @@ export function TabProvider({ children }) {
     updateTabPath,
     renameTab,
     setTabRole,
-  }), [addTab, removeTab, requestCloseTab, switchTab, reorderTab, updateTabPath, renameTab, setTabRole]);
+    setTabCompaction,
+  }), [addTab, removeTab, requestCloseTab, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction]);
 
   const value = useMemo(() => ({ tabs, activeTabId, ...actions }), [tabs, activeTabId, actions]);
 

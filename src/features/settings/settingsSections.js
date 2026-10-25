@@ -18,9 +18,27 @@ export const SETTINGS_ROWS = [
     words: 'auto-launch launch starred projects start cli terminal open',
   },
   {
+    id: 'agent-state-hook', section: 'agent', kind: 'toggle', key: 'agentStateHook',
+    label: 'Agent state hook',
+    hint: 'The agent tells its tab when it is working, needs permission or is done. Off: Lirah guesses from terminal output. Applies to agents launched after the change.',
+    words: 'agent state hook hooks plugin working permission done status opencode',
+  },
+  {
+    id: 'compaction-hook', section: 'agent', kind: 'toggle', key: 'compactionHook',
+    label: 'Compaction hook',
+    hint: 'Lets each Claude Code tab switch on a hook that keeps a grep-first project index fresh for its agent. Applies to agents launched after the change.',
+    words: 'compaction hook hooks index grep orchestration plugin',
+  },
+  {
     id: 'keep-context', section: 'agent', kind: 'toggle', key: 'keepFilesAfterSend',
     label: 'Keep context after send', hint: 'Attached files, elements and linked repos stay for the next prompt.',
     words: 'keep context after send files elements repos',
+  },
+  {
+    id: 'prompt-box', section: 'agent', kind: 'toggle', key: 'promptBoxOnStart',
+    label: 'Prompt box on new tabs',
+    hint: 'Off: tabs show a one-line context status and you type prompts in the terminal; Claude Code gets the selected context through Lirah\'s hook.',
+    words: 'prompt box textarea context status composer terminal type',
   },
   { id: 'theme', section: 'appearance', kind: 'custom', label: 'Theme', words: 'theme colors dark light palette' },
   {

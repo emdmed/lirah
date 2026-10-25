@@ -225,7 +225,9 @@ export function startAgentHookListener() {
     if (next === null) states.delete(sessionId);
     else states.set(sessionId, { ...next, source: payload.source || 'claude', at: now, seq: ++seq });
     if (next && isFocused(sessionId)) acked.set(sessionId, seq);
-    emit({ sessionId, prev, next: states.get(sessionId) || null, turnMs });
+    // contextUsed: the hook added the prompt box's selected context to a
+    // prompt typed in the terminal.
+    emit({ sessionId, prev, next: states.get(sessionId) || null, turnMs, contextUsed: payload.lirah_context === true });
   }).catch((e) => {
     started = false;
     console.debug('Agent hook listener unavailable:', e);

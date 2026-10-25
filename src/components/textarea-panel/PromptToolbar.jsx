@@ -4,6 +4,7 @@ import { TemplateSelector } from "./TemplateSelector";
 export function PromptToolbar({
   selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange,
   patternFiles, selectedPatterns, onTogglePattern, onCreatePatterns,
+  showSelectedBadge = true,
 }) {
   return (
     <div className="flex items-center gap-0.5">
@@ -17,6 +18,7 @@ export function PromptToolbar({
         selectedPatterns={selectedPatterns}
         onTogglePattern={onTogglePattern}
         onCreatePatterns={onCreatePatterns}
+        showSelectedBadge={showSelectedBadge}
       />
     </div>
   );

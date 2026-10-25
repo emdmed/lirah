@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '../toast/ToastContext';
+import { getSettings } from '../settings/settingsStore';
 
 const CLI_COMMANDS = {
   'claude-code': {
@@ -70,11 +71,19 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
         toastError(`Couldn't launch ${selectedCli}: "${cliConfig.check}" was not found on your PATH. Install it or pick another CLI.`);
         return;
       }
-      // Claude Code reports its state (working, needs permission, done) to
-      // the tab through Lirah's hook plugin, loaded for this session only.
+      // Lirah's hook plugins, loaded for this session only and each optional
+      // in settings. Agent state: the agent reports working / needs
+      // permission / done to the tab. Compaction: its hook only acts for tabs
+      // with compaction switched on, so that per-tab switch needs no relaunch.
       if (selectedCli === 'claude-code') {
-        const pluginDir = await invoke('get_agent_hook_plugin_dir').catch(() => null);
-        if (pluginDir) command += ` --plugin-dir '${pluginDir.replace(/'/g, "'\\''")}'`;
+        const { agentStateHook, compactionHook } = getSettings();
+        const pluginDirs = await Promise.all([
+          agentStateHook ? invoke('get_agent_hook_plugin_dir').catch(() => null) : null,
+          compactionHook ? invoke('get_compaction_plugin_dir').catch(() => null) : null,
+        ]);
+        for (const dir of pluginDirs.filter(Boolean)) {
+          command += ` --plugin-dir '${dir.replace(/'/g, "'\\''")}'`;
+        }
       }
       command += '\r';
 

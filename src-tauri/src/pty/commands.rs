@@ -260,6 +260,7 @@ pub async fn reap_detached_terminals(
         for (id, session) in orphans {
             session.terminate();
             crate::agent_hooks::remove_session_log(&id);
+            crate::compaction::forget_session(&id);
         }
         Ok(())
     })
@@ -326,6 +327,7 @@ pub async fn close_terminal(
         })
         .await?;
         crate::agent_hooks::remove_session_log(&session_id);
+        crate::compaction::forget_session(&session_id);
 
         let _ = app.emit(
             "terminal-closed",

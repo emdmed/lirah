@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const SHOW_DELAY = 350;
+// Long enough that passing over a control on the way to a click shows nothing.
+const SHOW_DELAY = 650;
 const GAP = 6;
 const EDGE = 8;
 // Holds the title while the pointer is on its element.

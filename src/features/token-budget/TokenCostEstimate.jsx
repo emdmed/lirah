@@ -56,8 +56,10 @@ export function TokenCostEstimate({ promptBase, textareaContent, projectPath }) 
 
   // Sits in the pane's bottom border (PaneInfo), a 12px strip: the readout
   // keeps the strip's size so it stays on the line instead of spilling over it.
+  // Delayed: the readout sits in the border right under the pane's controls,
+  // and an instant breakdown would open over them on the way to a click.
   return (
-    <Tooltip>
+    <Tooltip delayDuration={600}>
       <TooltipTrigger asChild>
         <span className="inline-flex items-baseline gap-1.5 font-mono cursor-default">
           <span className="tube tube-change" style={valueStyle}>

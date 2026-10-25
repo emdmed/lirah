@@ -52,7 +52,7 @@ export function SelectedFileItem({
         !isSelected && "hover:bg-muted/10"
       )}
     >
-    <div className="flex items-center gap-1">
+    <div className="flex min-w-0 items-center gap-1">
       <FileStateSelector
         value={currentState}
         onValueChange={(newState) => onSetFileState(file.absolute, newState)}
@@ -60,7 +60,7 @@ export function SelectedFileItem({
       />
       <button
         onClick={() => onRemoveFile(file.absolute)}
-        className="text-xs font-mono font-medium flex-shrink-0 hover:line-through hover:text-destructive transition-colors cursor-pointer bg-transparent border-0 p-0"
+        className="min-w-0 truncate text-left text-xs font-mono font-medium hover:line-through hover:text-destructive transition-colors cursor-pointer bg-transparent border-0 p-0"
         title={`${file.absolute} — click to remove`}
       >
         {file.name}

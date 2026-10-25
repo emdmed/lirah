@@ -30,6 +30,12 @@ pub fn user_shell() -> String {
     "powershell.exe".to_string()
 }
 
+/// The hook command that runs a Node script: `node "<path>"`. Works in the
+/// shells Claude Code runs hooks with on every platform, unlike a shebang.
+pub fn node_command(script: &std::path::Path) -> String {
+    format!("node \"{}\"", script.to_string_lossy())
+}
+
 /// `script` run by the user's login shell (`$SHELL -lc script`), so it sees
 /// the same PATH as their terminal. The caller adds cwd, env and stdio.
 pub fn login_shell_command(script: &str) -> Command {

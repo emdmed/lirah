@@ -16,6 +16,7 @@ mod watch_registry;
 mod agent_hooks;
 mod plans;
 mod util;
+mod compaction;
 
 use tauri::Manager;
 
@@ -49,6 +50,7 @@ pub fn run(initial_path: Option<String>) {
         .manage(InitialPath(initial_path))
         .setup(|app| {
             agent_hooks::start(app.handle().clone());
+            compaction::start();
             // The window starts hidden and the page shows it once its splash
             // has painted. If the page never gets that far, show it anyway.
             let handle = app.handle().clone();
@@ -104,6 +106,8 @@ pub fn run(initial_path: Option<String>) {
             typecheck::check_file_types,
             typecheck::check_project_types,
             python_parser::parse_python_skeleton,
+            compaction::get_compaction_plugin_dir,
+            compaction::set_compaction_hook,
             // Git
             fs::git::get_git_stats,
             fs::git::get_git_diff,
@@ -123,6 +127,8 @@ pub fn run(initial_path: Option<String>) {
             claude::tokens::get_all_projects_stats,
             claude::context::get_context_breakdown,
             agent_hooks::get_agent_hook_plugin_dir,
+            agent_hooks::set_opencode_agent_plugin,
+            agent_hooks::set_prompt_context,
             // Workspaces
             workspace::create_workspace,
             workspace::delete_workspace,

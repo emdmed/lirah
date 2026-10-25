@@ -1,21 +1,15 @@
-import { ChevronDown, Layers } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { CompactProjectButton } from "../../features/compact";
 import { FileGroupsMenuItems } from "../../features/file-groups";
-import { KeyChord } from "../instrument/Keycap";
 
-// Project-wide actions and the project's context sets (saved context) behind
-// one menu. A running compact surfaces as a live badge beside it, since that
-// state must stay visible.
-export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress, disabled, projectPath, onLoadGroup, onSaveGroup, fileCount }) {
+// The project's context sets (saved context) behind one menu.
+export function ProjectToolbar({ projectPath, onLoadGroup, onSaveGroup, fileCount }) {
   return (
     <div className="flex items-center gap-0.5">
       <DropdownMenu>
@@ -25,17 +19,7 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" className="w-56 text-xs">
-          <DropdownMenuItem
-            onClick={onCompactProject}
-            disabled={disabled || isCompacting}
-            className="text-[11px] py-1.5 cursor-pointer"
-          >
-            <Layers className="h-3 w-3 mr-1.5" />
-            Compact project
-            <KeyChord keys={["^", "⇧", "P"]} size="sm" className="ml-auto" />
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
+        <DropdownMenuContent align="end" side="top" className="w-56 text-xs">
           <DropdownMenuLabel
             title="Saved context for this project. Replace or add to the current context."
           >
@@ -49,9 +33,6 @@ export function ProjectToolbar({ onCompactProject, isCompacting, compactProgress
           />
         </DropdownMenuContent>
       </DropdownMenu>
-      {isCompacting && (
-        <CompactProjectButton onClick={onCompactProject} isCompacting progress={compactProgress} disabled={disabled} />
-      )}
     </div>
   );
 }

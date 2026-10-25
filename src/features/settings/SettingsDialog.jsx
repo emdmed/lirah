@@ -52,6 +52,9 @@ export function SettingsDialog({
   // The store's CLI is the default for new tabs; this tab's own CLI is
   // chosen from the status bar.
   const [defaultCli, setDefaultCli] = useSetting('selectedCli');
+  const [agentStateHook, setAgentStateHook] = useSetting('agentStateHook');
+  const [compactionHook, setCompactionHook] = useSetting('compactionHook');
+  const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
 
   const {
     showTitleBar, setShowTitleBar,
@@ -196,6 +199,9 @@ export function SettingsDialog({
                   <ChoiceRow row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli} />
                   <ToggleRow row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli} />
                   <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
+                  <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
+                  <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
+                  <ToggleRow row={ROW['compaction-hook']} value={compactionHook} onChange={setCompactionHook} />
                 </Section>
 
                 <AppearanceSection

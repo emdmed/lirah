@@ -13,7 +13,7 @@ export function useTabShortcuts({
   viewMode,
   sidebarOpen,
   searchInputRef,
-  onCompactProject,
+  onToggleCompaction,
   onOpenLazygit,
   onAutoCommit,
   onAutoMerge,
@@ -63,7 +63,7 @@ export function useTabShortcuts({
       }
       if (matches('compact', e)) {
         e.preventDefault();
-        onCompactProject();
+        onToggleCompaction();
       }
       if (matches('budget', e)) {
         e.preventDefault();
@@ -86,5 +86,5 @@ export function useTabShortcuts({
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
-    searchInputRef, onCompactProject, onOpenLazygit, onAutoCommit, onAutoMerge, onClearContext, setBudgetDialogOpen, setDashboardOpen]);
+    searchInputRef, onToggleCompaction, onOpenLazygit, onAutoCommit, onAutoMerge, onClearContext, setBudgetDialogOpen, setDashboardOpen]);
 }
