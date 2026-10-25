@@ -13,9 +13,9 @@ export const SETTINGS_ROWS = [
   },
   {
     id: 'auto-launch', section: 'agent', kind: 'toggle', key: 'autoLaunchCli',
-    label: 'Auto-launch on starred projects',
-    hint: 'Start the CLI when you open a starred project. Tabs restored at startup are left alone.',
-    words: 'auto-launch launch starred projects start cli',
+    label: 'Auto-launch agent',
+    hint: 'Start the CLI when a terminal opens or you open a starred project. Off shows a launch key instead.',
+    words: 'auto-launch launch starred projects start cli terminal open',
   },
   {
     id: 'keep-context', section: 'agent', kind: 'toggle', key: 'keepFilesAfterSend',

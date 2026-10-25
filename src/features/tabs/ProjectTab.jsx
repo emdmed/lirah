@@ -180,8 +180,14 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // Terminal ready state
   const [terminalReady, setTerminalReady] = useState(false);
 
+  // A freshly spawned shell, until its agent auto-launches. A shell reclaimed
+  // after a webview reload is left as it was.
+  const freshShellRef = useRef(null);
   // Stable callback for terminal session ready (avoids inline arrow in JSX)
-  const handleSessionReady = useCallback((id) => setTerminalSessionId(id), []);
+  const handleSessionReady = useCallback((id, { reattached = false } = {}) => {
+    freshShellRef.current = reattached ? null : id;
+    setTerminalSessionId(id);
+  }, []);
 
   // Domain hooks
   const settings = useTerminalSettings();
@@ -334,6 +340,31 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
 
+  // Every fresh shell starts the tab's agent, so a tab opens straight into it.
+  // Waits until the tab is first shown, so restoring many tabs at startup
+  // doesn't start every agent at once. Typing into the shell first cancels it.
+  const launchFresh = useStableHandler(launchClaude);
+  useEffect(() => {
+    const id = terminalSessionId;
+    if (!settings.autoLaunchCli || !isActive || !terminalReady || !id || freshShellRef.current !== id) return;
+    const cancel = (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key.length !== 1 && e.key !== 'Enter' && e.key !== 'Backspace') return;
+      if (e.target instanceof Element && e.target.closest('[data-pane="2"]')) freshShellRef.current = null;
+    };
+    window.addEventListener('keydown', cancel, true);
+    // Give the shell a moment to print its prompt.
+    const timer = setTimeout(() => {
+      if (freshShellRef.current !== id) return;
+      freshShellRef.current = null;
+      launchFresh();
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', cancel, true);
+    };
+  }, [settings.autoLaunchCli, isActive, terminalReady, terminalSessionId, launchFresh]);
+
   const orchestrationCheck = useOrchestrationCheck();
 
   const switchToClaudeMode = useCallback(() => {
@@ -362,9 +393,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
   // in the old directory, so it's relaunched in the new one — otherwise opening a
   // starred repo drops you at a bare shell and you have to press Ctrl+K yourself.
   //
-  // This is the ONLY automatic launch: opening a starred repo is a deliberate
-  // act, whereas restoring persisted tabs at startup is not, so a restored tab
-  // stays at its shell until you press Ctrl+K.
+  // A fresh shell also launches the agent on its own (see the effect below).
   // `autoLaunch: false` is for callers that run their own launch sequence.
   // The bookmarks context hands out a new updateBookmark each render.
   const updateBookmarkStable = useStableHandler(updateBookmark);
@@ -1033,14 +1062,14 @@ function ProjectTabInner({ projectPath, isActive, tabId, availableUpdate }) {
           onSandboxFailed={handleSandboxFailed}
           reattachKey={tabId}
         />
-        <LaunchAgentPrompt
+        {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}
           sessionId={terminalSessionId}
           isActive={isActive}
           selectedCli={settings.selectedCli}
           onLaunch={launchClaude}
           onChangeCli={openCliSettings}
-        />
+        />}
       </Layout>
 
       {/* The tabs pane draws each tab's context fill as a moon. */}

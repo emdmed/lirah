@@ -1187,6 +1187,22 @@ body {
     background: color-mix(in srgb, var(--ins-raised) 85%, transparent);
   }
 
+  /* Tooltip: the raised face lifted off the app by a soft drop shadow, so a
+     hint reads as instrument chrome instead of an OS popup. */
+  .ins-tip {
+    background: var(--ins-raised);
+    color: var(--color-foreground);
+    box-shadow:
+      inset 0 0 0 1px var(--ins-edge-strong),
+      0 4px 14px rgb(0 0 0 / 0.35);
+  }
+
+  :root[data-theme="light"] .ins-tip {
+    box-shadow:
+      inset 0 0 0 1px var(--ins-edge-strong),
+      0 4px 12px rgb(0 0 0 / 0.12);
+  }
+
   /* Raised face for cards and overlays. */
   .ins-raised {
     background: var(--ins-raised);

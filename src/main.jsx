@@ -11,6 +11,7 @@ import { AgentJobsProvider } from "./features/agent-jobs/AgentJobsContext";
 import { TabProvider } from "./features/tabs";
 import { PlansProvider } from "./features/plans/PlansContext";
 import { ToastProvider } from "./features/toast";
+import { TitleTooltips } from "./components/TitleTooltips";
 import { DialogProvider } from "./features/dialogs/DialogProvider";
 import { InstrumentKit } from "./dev/InstrumentKit";
 import "./index.css";
@@ -49,6 +50,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         </WatcherProvider>
         )}
         </DialogProvider>
+        <TitleTooltips />
       </ThemeProvider>
     </ToastProvider>
   </React.StrictMode>,

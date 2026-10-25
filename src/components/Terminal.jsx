@@ -5,15 +5,15 @@ import { PaneLegend } from './instrument/PaneLegend';
 
 export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null }, ref) => {
   const terminalRef = useRef(null);
-  const { handleResize, sessionId, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
+  const { handleResize, sessionId, reattached, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive, reattachKey);
 
   // Notify parent when session is ready
   useEffect(() => {
     if (sessionId && onSessionReady) {
-      onSessionReady(sessionId);
+      onSessionReady(sessionId, { reattached });
     }
-  }, [sessionId, onSessionReady]);
+  }, [sessionId, reattached, onSessionReady]);
 
   // Notify parent when terminal is fully ready
   useEffect(() => {

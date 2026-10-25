@@ -106,6 +106,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const [fitAddon, setFitAddon] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  // The shell was reclaimed after a webview reload rather than spawned.
+  const [reattached, setReattached] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [sandboxFailed, setSandboxFailed] = useState(false);
   const [searchAddon, setSearchAddon] = useState(null);
@@ -346,6 +348,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         }
         if (reattachKey) rememberTerminalSession(reattachKey, id);
         sessionIdRef.current = id;
+        setReattached(reattached);
         setSessionId(id);
 
         // Sandbox was requested but didn't come up. The owner (ProjectTab, via
@@ -785,6 +788,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   return {
     terminal,
     sessionId,
+    reattached,
     isReady,
     isFocused,
     sandboxFailed,
