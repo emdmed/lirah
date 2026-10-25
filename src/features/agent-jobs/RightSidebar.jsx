@@ -388,10 +388,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     }
   };
 
-  // Auto-expand + jump to Jobs when a new job is launched.
+  // Auto-expand + jump to Jobs when a new job is launched. Jobs restored from
+  // disk at startup were started before mount, so they keep the Tabs default.
   const prevCount = useRef(jobs.length);
+  const mountedAt = useRef(Date.now());
   useEffect(() => {
-    if (jobs.length > prevCount.current) {
+    if (jobs.length > prevCount.current && jobs.some((j) => j.startedAt >= mountedAt.current)) {
       setCollapsedOverride(null);
       setTab('jobs');
     }
