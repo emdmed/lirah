@@ -20,7 +20,7 @@ const ENGINE = join(DIR, 'compaction.js');
 const BUILD_BUDGET_MS = 6000;
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'target', 'build', 'out', 'coverage', '__pycache__', 'venv', 'bin', 'obj']);
-const SOURCE_EXT = /\.(?:[mc]?[jt]sx?|py|cs|rs|css|scss|sass|less|md)$/;
+const SOURCE_EXT = /\.(?:[mc]?[jt]sx?|py|cs|rs|sh|bash|zsh|css|scss|sass|less|md)$/;
 const SOURCE_NAMES = new Set(['package.json', 'tsconfig.json', 'jsconfig.json']);
 
 const toolsDir = (project) => join(project, '.orchestration', 'tools');

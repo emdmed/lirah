@@ -307,18 +307,22 @@ export function simplifyTypeAnnotation(paramStr) {
       i++; // skip ':'
       // Skip whitespace
       while (i < len && paramStr[i] === ' ') i++;
-      // Consume the type, respecting <> and () depth
+      // Consume the type, respecting <>, (), {} and [] depth — so an object
+      // type like `{ retry: number }` is skipped whole, not cut at its `}`
       let angleDepth = 0;
       let parenDepth = 0;
+      let braceDepth = 0;
       while (i < len) {
         const c = paramStr[i];
+        const nested = angleDepth > 0 || parenDepth > 0 || braceDepth > 0;
         if (c === '<') angleDepth++;
+        else if (c === '>' && paramStr[i - 1] === '=') { /* arrow `=>`, not a closer */ }
         else if (c === '>') { if (angleDepth > 0) angleDepth--; else break; }
         else if (c === '(') parenDepth++;
         else if (c === ')') { if (parenDepth > 0) parenDepth--; else break; }
-        else if (c === ',' && angleDepth === 0 && parenDepth === 0) break;
-        else if (c === '=' && angleDepth === 0 && parenDepth === 0) break;
-        else if (c === '}' && angleDepth === 0 && parenDepth === 0) break;
+        else if (c === '{' || c === '[') braceDepth++;
+        else if (c === '}' || c === ']') { if (braceDepth > 0) braceDepth--; else break; }
+        else if (!nested && (c === ',' || (c === '=' && paramStr[i + 1] !== '>'))) break;
         i++;
       }
       continue;

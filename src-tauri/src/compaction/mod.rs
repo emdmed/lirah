@@ -1,7 +1,7 @@
 //! Project compaction for Claude Code, through a hook, switched on per tab.
 //!
 //! `engine/` is a copy of `public/tools/compaction.js` and `parse-utils.js`
-//! from agentic-orchestration-worflows (agentic-compaction v0.0.10), the engine
+//! from agentic-orchestration-worflows (agentic-compaction v0.0.11), the engine
 //! its hooks run. To update it, copy both files over.
 //!
 //! Lirah writes the engine, `hook.js` and a Claude Code plugin under

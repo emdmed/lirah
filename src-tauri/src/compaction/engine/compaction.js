@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-// agentic-compaction v0.0.10
-// Single-file bundle — compact a JS/TS/Python/C#/Rust project into a structural skeleton
+// agentic-compaction v0.0.11
+// Single-file bundle — compact a JS/TS/Python/C#/Rust/shell project into a structural skeleton
 // Also indexes package.json (name/scripts/deps), CSS/SCSS/LESS (ids/classes),
 // and lists .md files by path with their first heading
 // Zero dependencies — uses only built-in Node.js modules
@@ -26,6 +26,122 @@ import {
 // Every constant with its line: grepping for any one of them must find it
 const formatConstants = (constants) => `const: ${constants.map(c => `${c.name}:${c.line}`).join(', ')}`;
 
+// ── Signatures ──
+// A symbol's signature is read from two aligned copies of the file: the
+// comment/string-stripped text (same length, so brackets inside strings never
+// count) for structure, and the original text for what is shown. That keeps
+// parameter types, defaults and the return type as written.
+const SIG_SCAN_LINES = 40;
+const SIG_PARAMS_MAX = 160;
+const SIG_PARAM_MAX = 60;
+const SIG_RETURN_MAX = 80;
+
+// Index just past the bracket group opening at text[at] (any of ([{<), or -1.
+// `>` in `=>` / `->` is an arrow, not a closer.
+const skipGroup = (text, at) => {
+  let depth = 0;
+  for (let k = at; k < text.length; k++) {
+    const c = text[k];
+    if ('([{<'.includes(c)) depth++;
+    else if (')]}'.includes(c) || (c === '>' && text[k - 1] !== '=' && text[k - 1] !== '-')) {
+      if (--depth === 0) return k + 1;
+    }
+  }
+  return -1;
+};
+
+// Replace long {…} groups at the top level with `{…}`, so a destructured
+// parameter or an object type stays one short, still-balanced item.
+const collapseObjects = (text) => {
+  let out = '';
+  for (let k = 0; k < text.length; k++) {
+    if (text[k] !== '{') { out += text[k]; continue; }
+    const end = skipGroup(text, k);
+    if (end === -1) return out + text.slice(k);
+    const group = text.slice(k, end);
+    out += group.length > 24 ? '{…}' : group;
+    k = end - 1;
+  }
+  return out;
+};
+
+// A long destructured parameter keeps its binding names, which are what a
+// caller passes (React props): `{ a, b = 1, c: { d } }: P` → `{ a, b, c }: P`.
+const shortenParam = (p) => {
+  if (p.length <= SIG_PARAM_MAX) return p;
+  if (p[0] !== '{') return collapseObjects(p);
+  const end = skipGroup(p, 0);
+  if (end === -1) return p;
+  const names = splitItems(p.slice(1, end - 1)).map(el => el.replace(/^\.\.\./, '').split(/\s*[:=]/)[0].trim()).filter(Boolean);
+  return `{ ${names.join(', ')} }${collapseObjects(p.slice(end))}`;
+};
+
+const tidy = (s) => s.replace(/\s+/g, ' ').replace(/\(\s/g, '(').replace(/\s\)/g, ')').trim();
+
+// Parameter text → shown form: whitespace collapsed, receiver dropped, long
+// params and lists shortened only at parameter boundaries (stays balanced).
+const formatParams = (raw, drop = []) => {
+  const parts = splitItems(tidy(raw).replace(/,\s*$/, ''))
+    .filter(p => !drop.some(d => (typeof d === 'string' ? p === d : d.test(p))))
+    .map(shortenParam);
+  let out = '';
+  for (const p of parts) {
+    const next = out ? `${out}, ${p}` : p;
+    if (next.length > SIG_PARAMS_MAX && out) return `${out}, …`;
+    out = next;
+  }
+  return out;
+};
+
+const formatReturn = (raw) => {
+  const r = tidy(raw);
+  return r.length > SIG_RETURN_MAX ? collapseObjects(r) : r;
+};
+
+// Signature starting on line `i` at character `from`: the first `(` after
+// `from` (a `<…>` generics group right there is stepped over), its balanced
+// parameter list, and — when `ret` is given (':' TS, '->' Python/Rust) — the
+// return annotation after it. The annotation ends at a top-level body/end
+// token; `arrow` makes a top-level `=>` end it (an arrow function's body).
+// Returns { params, ret, endLine } with raw (untidied) text, or null.
+const readSignature = (clean, orig, i, from, { ret = null, arrow = false } = {}) => {
+  const c = clean.slice(i, i + SIG_SCAN_LINES).join('\n');
+  const o = orig.slice(i, i + SIG_SCAN_LINES).join('\n');
+  let k = from;
+  while (k < c.length && /\s/.test(c[k])) k++;
+  if (c[k] === '<') { k = skipGroup(c, k); if (k === -1) return null; }
+  const open = c.indexOf('(', k);
+  if (open === -1) return null;
+  const close = skipGroup(c.replace(/[<>]/g, ' '), open); // only (), [], {} inside params
+  if (close === -1) return null;
+  let end = close;
+  let retText = '';
+  let r = close;
+  while (r < c.length && /[ \t\r\n]/.test(c[r])) r++;
+  if (ret && c.startsWith(ret, r)) {
+    const start = r + ret.length;
+    for (r = start; r < c.length; r++) {
+      const ch = c[r];
+      const sofar = c.slice(start, r).trim();
+      if (ch === '=' && c[r + 1] === '>') { if (arrow) break; r++; continue; }
+      if (ch === '-' && c[r + 1] === '>') { r++; continue; }
+      if (ch === ';' || (ret === '->' && ch === ':' && c[r + 1] !== ':' && c[r - 1] !== ':')) break;
+      // A line break ends a complete annotation unless the next line continues it
+      if (ch === '\n' && sofar && !/(?:[|&,<(:]|=>|->)$/.test(sofar) && !/^\s*[|&.]/.test(c.slice(r + 1))) break;
+      if (ret === '->' && /^where\b/.test(c.slice(r)) && /\s/.test(c[r - 1])) break;
+      if (ch === '{' && (ret === '->' || (sofar && !/(?:[|&,<(:]|=>)$/.test(sofar)))) break;
+      if ('([{<'.includes(ch)) {
+        const g = skipGroup(c, r);
+        if (g === -1) break;
+        r = g - 1;
+      }
+    }
+    retText = o.slice(start, r);
+    end = r;
+  }
+  return { params: o.slice(open + 1, close - 1), ret: retText, endLine: i + (c.slice(0, end).match(/\n/g) || []).length };
+};
+
 // ── Parsers: Python ──
 
 const isPythonParseable = (path) => PY_EXTENSIONS.some(ext => path.endsWith(ext));
@@ -33,15 +149,40 @@ const isPythonParseable = (path) => PY_EXTENSIONS.some(ext => path.endsWith(ext)
 const extractPythonSkeleton = (code, filePath = '') => {
   const cleaned = stripCommentsAndStrings(code, 'py');
   const lines = cleaned.split('\n');
+  const orig = code.split('\n');
   const skeleton = { imports: [], functions: [], classes: [], constants: [] };
   let pendingDecorators = [];
+  let cls = null; // { name, memberIndent } of the top-level class whose body we're in
+
+  const pushDef = (m, i, at, prefix, isMethod) => {
+    const sig = readSignature(lines, orig, i, at, { ret: '->' });
+    skeleton.functions.push({
+      name: prefix + m[2], line: i + 1, decorators: [...pendingDecorators], async: !!m[1],
+      params: sig ? formatParams(sig.params, isMethod ? ['self', 'cls'] : []) : '',
+      ret: sig ? formatReturn(sig.ret) : '',
+    });
+    pendingDecorators = [];
+    return sig ? sig.endLine : i;
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineNum = i + 1;
 
     if (/^\s*$/.test(line)) continue;
-    if (/^\s/.test(line) && !/^@/.test(line)) { pendingDecorators = []; continue; }
+    if (/^\s/.test(line)) {
+      // Members of a top-level class: `def`s (and their decorators) at the body's first indent
+      const indent = line.length - line.trimStart().length;
+      if (cls && cls.memberIndent === null) cls.memberIndent = indent;
+      if (cls && indent === cls.memberIndent) {
+        const deco = line.match(/^\s+@(\w[\w.]*)/);
+        if (deco) { pendingDecorators.push(deco[1]); continue; }
+        const def = line.match(/^\s+(async\s+)?def\s+(\w+)\s*(?=[(\[])/);
+        if (def) { i = pushDef(def, i, def[0].length, `${cls.name}.`, true); continue; }
+      }
+      pendingDecorators = []; continue;
+    }
+    cls = null;
 
     const decoratorMatch = line.match(/^@(\w[\w.]*)/);
     if (decoratorMatch) { pendingDecorators.push(decoratorMatch[1]); continue; }
@@ -67,23 +208,14 @@ const extractPythonSkeleton = (code, filePath = '') => {
       pendingDecorators = []; continue;
     }
 
-    const funcMatch = line.match(/^(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)/);
-    if (funcMatch) {
-      let params = funcMatch[2];
-      if (!line.includes(')')) {
-        let j = i + 1;
-        while (j < lines.length && !lines[j].includes(')')) { params += ' ' + lines[j].trim(); j++; }
-        if (j < lines.length) params += ' ' + lines[j].split(')')[0].trim();
-      }
-      params = params.replace(/\s+/g, ' ').trim();
-      skeleton.functions.push({ name: funcMatch[1], line: lineNum, decorators: [...pendingDecorators], params });
-      pendingDecorators = []; continue;
-    }
+    const funcMatch = line.match(/^(async\s+)?def\s+(\w+)\s*(?=[(\[])/);
+    if (funcMatch) { i = pushDef(funcMatch, i, funcMatch[0].length, '', false); continue; }
 
     const classMatch = line.match(/^class\s+(\w+)\s*(?:\(([^)]*)\))?\s*:/);
     if (classMatch) {
       const bases = classMatch[2] ? classMatch[2].split(',').map(s => s.trim()).filter(Boolean) : [];
       skeleton.classes.push({ name: classMatch[1], line: lineNum, decorators: [...pendingDecorators], bases });
+      cls = { name: classMatch[1], memberIndent: null };
       pendingDecorators = []; continue;
     }
 
@@ -117,7 +249,7 @@ const formatPythonSkeleton = (skeleton) => {
   if (skeleton.functions.length > 0) {
     for (const f of skeleton.functions) {
       const deco = f.decorators.length > 0 ? `@${f.decorators[0]} ` : '';
-      lines.push(`fn: ${deco}${f.name}(${f.params || ''}):${f.line}`);
+      lines.push(`fn: ${deco}${f.async ? 'async ' : ''}${f.name}(${f.params || ''})${f.ret ? ` -> ${f.ret}` : ''}:${f.line}`);
     }
   }
   if (skeleton.constants.length > 0) {
@@ -348,6 +480,7 @@ const extractCSharpSkeleton = (code, filePath = '') => {
             i = searchEnd;
             skeleton.functions.push({
               name, line: lineNum, attributes: [...pendingAttributes], params,
+              ret: restStr.slice(0, pos).trim(),
               async: methMods.has('async'), static: methMods.has('static'),
             });
             pendingAttributes = []; continue;
@@ -399,7 +532,7 @@ const formatCSharpSkeleton = (skeleton) => {
     for (const f of skeleton.functions) {
       const asyncPrefix = f.async ? 'async ' : '';
       const staticPrefix = f.static ? 'static ' : '';
-      lines.push(`fn: ${staticPrefix}${asyncPrefix}${f.name}(${f.params || ''}):${f.line}`);
+      lines.push(`fn: ${staticPrefix}${asyncPrefix}${f.ret ? `${formatReturn(f.ret)} ` : ''}${f.name}(${formatParams(f.params || '')}):${f.line}`);
     }
   }
   if (skeleton.constants.length > 0) {
@@ -412,41 +545,12 @@ const formatCSharpSkeleton = (skeleton) => {
 
 const isRustParseable = (path) => RS_EXTENSIONS.some(ext => path.endsWith(ext));
 
-// Split on top-level commas, ignoring commas nested in <>, (), [], {}.
-const splitTopLevel = (text) => {
-  const parts = [];
-  let depth = 0, cur = '';
-  for (const ch of text) {
-    if ('<([{'.includes(ch)) depth++;
-    else if ('>)]}'.includes(ch)) depth--;
-    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; } else cur += ch;
-  }
-  if (cur.trim()) parts.push(cur);
-  return parts.map(p => p.trim()).filter(Boolean);
-};
-
-// `fn foo<T: Bound>(a: A, mut b: B)` → "a, b" (receiver `self` dropped).
-const rustParamNames = (sig, name) => {
-  let k = sig.indexOf(name) + name.length;
-  while (k < sig.length && /\s/.test(sig[k])) k++;
-  if (sig[k] === '<') {
-    let depth = 0;
-    for (; k < sig.length; k++) {
-      if (sig[k] === '<') depth++;
-      else if (sig[k] === '>' && sig[k - 1] !== '-' && --depth === 0) { k++; break; }
-    }
-  }
-  const open = sig.indexOf('(', k);
-  if (open === -1) return '';
-  let depth = 0, close = open;
-  for (; close < sig.length; close++) {
-    if (sig[close] === '(') depth++;
-    else if (sig[close] === ')' && --depth === 0) break;
-  }
-  return splitTopLevel(sig.slice(open + 1, close))
-    .map(p => p.split(':')[0].replace(/^(mut|ref)\s+/, '').replace(/^&\s*('\w+\s+)?(mut\s+)?/, '').trim())
-    .filter(p => p && p !== 'self')
-    .join(', ');
+// `fn foo<T: Bound>(&self, a: A) -> R` → params "a: A" (receiver dropped), ret "R".
+const RS_SELF = /^(?:&\s*(?:'\w+\s+)?)?(?:mut\s+)?self\b/;
+const rustSig = (lines, orig, i, name) => {
+  const at = lines[i].search(new RegExp(`\\bfn\\s+${name}\\b`));
+  const sig = at === -1 ? null : readSignature(lines, orig, i, lines[i].indexOf(name, at) + name.length, { ret: '->' });
+  return sig ? { params: formatParams(sig.params, [RS_SELF]), ret: formatReturn(sig.ret) } : { params: '', ret: '' };
 };
 
 const RS_VIS = String.raw`(?:pub(?:\s*\([^)]*\))?\s+)?`;
@@ -458,6 +562,7 @@ const RS_USE_RE = new RegExp(`^${RS_VIS}use\\s+([^;]+);?`);
 
 const extractRustSkeleton = (code) => {
   const lines = stripCommentsAndStrings(code, 'rs').split('\n');
+  const orig = code.split('\n');
   const skeleton = { mods: [], uses: [], commands: [], functions: [], types: [], impls: [], constants: [], macros: [] };
   let depth = 0;
   let attrs = [];
@@ -494,7 +599,9 @@ const extractRustSkeleton = (code) => {
 
     let m;
     if (inImpl) {
-      if ((m = trimmed.match(RS_FN_RE)) && !isTest) block.impl.methods.push(m[3]);
+      if ((m = trimmed.match(RS_FN_RE)) && !isTest) {
+        block.impl.methods.push({ name: m[3], pub: !!m[1], async: /async/.test(m[2]), ...rustSig(lines, orig, i, m[3]), line: lineNum });
+      }
       continue;
     }
 
@@ -506,8 +613,7 @@ const extractRustSkeleton = (code) => {
       skeleton.mods.push(m[2]);
       if (m[3] === '{') openBlock({ kind: 'skip' });
     } else if ((m = trimmed.match(RS_FN_RE))) {
-      const sig = readUntilBalanced(lines, i, '(', ')').text;
-      const entry = { name: m[3], pub: !!m[1], async: /async/.test(m[2]), params: rustParamNames(sig, m[3]), line: lineNum };
+      const entry = { name: m[3], pub: !!m[1], async: /async/.test(m[2]), ...rustSig(lines, orig, i, m[3]), line: lineNum };
       if (itemAttrs.some(a => /^(tauri::)?command\b/.test(a))) skeleton.commands.push(entry);
       else skeleton.functions.push(entry);
       openBlock({ kind: 'skip' });
@@ -545,7 +651,7 @@ const COMMON_DERIVES = new Set(['Debug', 'Clone', 'Copy', 'PartialEq', 'Eq', 'Ha
 const formatRustSkeleton = (s) => {
   if (!s) return '';
   const lines = [];
-  const fmtFn = (f) => `${f.pub ? 'pub ' : ''}${f.async ? 'async ' : ''}${f.name}(${f.params}):${f.line}`;
+  const fmtFn = (f, owner = '') => `${f.pub ? 'pub ' : ''}${f.async ? 'async ' : ''}${owner}${f.name}(${f.params})${f.ret ? ` -> ${f.ret}` : ''}:${f.line}`;
   if (s.mods.length) lines.push(`mods: ${s.mods.join(', ')}`);
   if (s.uses.length) {
     // Local paths (crate::/super::/self::) are what matter for navigation; external crates are just counted.
@@ -556,7 +662,7 @@ const formatRustSkeleton = (s) => {
     parts.push(...local);
     lines.push(`uses: ${parts.join(', ')}`);
   }
-  if (s.commands.length) lines.push(`commands: ${s.commands.map(fmtFn).join(', ')}`);
+  if (s.commands.length) lines.push(`commands: ${s.commands.map(f => fmtFn(f)).join(', ')}`);
   for (const f of s.functions) lines.push(`fn: ${fmtFn(f)}`);
   if (s.types.length) {
     lines.push(`types: ${s.types.map(t => {
@@ -565,9 +671,12 @@ const formatRustSkeleton = (s) => {
       return `${t.pub ? 'pub ' : ''}${t.kind} ${t.name}${deriveTag}:${t.line}`;
     }).join(', ')}`);
   }
+  // Each method gets its own line (Type::method), so a grep for it lands on it.
+  // A trait's own line is already in types:, so only its methods are listed.
   for (const impl of s.impls) {
-    const label = impl.isTrait ? `trait ${impl.target}` : impl.trait ? `${impl.trait} for ${impl.target}` : impl.target;
-    lines.push(`impl ${label}:${impl.line}${impl.methods.length ? ` { ${impl.methods.join(', ')} }` : ''}`);
+    if (!impl.isTrait) lines.push(`impl ${impl.trait ? `${impl.trait} for ${impl.target}` : impl.target}:${impl.line}`);
+    const owner = `${impl.target.replace(/<.*$/, '')}::`;
+    for (const f of impl.methods) lines.push(`fn: ${fmtFn(f, owner)}`);
   }
   if (s.constants.length) {
     lines.push(formatConstants(s.constants));
@@ -662,6 +771,116 @@ const formatCssSkeleton = (s) => {
   return lines.join('\n');
 };
 
+// ── Shell (sh/bash/zsh) ──
+
+const SH_EXTENSIONS = ['.sh', '.bash', '.zsh'];
+const isShellParseable = (path) => SH_EXTENSIONS.some(ext => path.endsWith(ext));
+const SH_FN_RE = /^\s*(?:function\s+([A-Za-z_][\w:.-]*)\s*(?:\(\s*\))?|([A-Za-z_][\w:.-]*)\s*\(\s*\))\s*(?:[{(]|$)/;
+const SH_HEREDOC_RE = /(?<!<)<<(-?)\s*(['"]?)([A-Za-z_]\w*)\2/;
+
+// Line-by-line shell state: open quotes and heredocs carry across lines.
+// Returns the line's code outside strings/comments (strings become `0`), or
+// null when the line is heredoc body.
+const scanShellLine = (line, st) => {
+  if (st.heredoc) {
+    if ((st.heredocTabs ? line.replace(/^\t+/, '') : line).trimEnd() === st.heredoc) st.heredoc = null;
+    return null;
+  }
+  let code = '';
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (st.quote === "'") { if (c === "'") st.quote = null; continue; }
+    if (st.quote === '"') {
+      if (c === '\\') i++;
+      else if (c === '"') st.quote = null;
+      continue;
+    }
+    if (c === '\\') { i++; continue; }
+    if (c === '#' && (i === 0 || /[\s;|&(]/.test(line[i - 1]))) break;
+    if (c === "'" || c === '"') { st.quote = c; code += '0'; continue; }
+    code += c;
+  }
+  // Quoted terminators (<<'EOF') are blanked in `code`, so match them on the raw line
+  const hd = /(?<!<)<<(?!<)/.test(code) && !/\(\(/.test(code) && line.match(SH_HEREDOC_RE);
+  if (hd) { st.heredoc = hd[3]; st.heredocTabs = hd[1] === '-'; }
+  return code;
+};
+
+// Last line of the function (or `X=(` array) starting at `start`: its closing
+// `}`/`)` at or left of the header's indent, outside strings and heredocs.
+const symbolEndShell = (lines, start) => {
+  const st = { quote: null, heredoc: null };
+  const first = scanShellLine(lines[start], st) ?? '';
+  const isFn = SH_FN_RE.test(first);
+  if (!isFn && !/=\(\s*$/.test(first.trimEnd())) return null;
+  if (isFn && /[{(]\s*$/.test(first.match(SH_FN_RE)[0])) {
+    // Body opened on the header line: a one-liner if it closes there too
+    let depth = 1;
+    for (const c of first.slice(first.match(SH_FN_RE)[0].length)) {
+      if (c === '{' || c === '(') depth++;
+      else if ((c === '}' || c === ')') && --depth === 0) return start;
+    }
+  }
+  const base = lines[start].length - lines[start].trimStart().length;
+  for (let k = start + 1; k < lines.length && k < start + SPAN_SCAN_MAX; k++) {
+    const atStart = !st.quote && !st.heredoc;
+    const code = scanShellLine(lines[k], st);
+    if (!atStart || code === null) continue;
+    const t = code.trimStart();
+    if (/^[})]/.test(t) && lines[k].length - t.length <= base) return k;
+  }
+  return null;
+};
+
+// What a shell function takes: names given to $1..$9 (`local x="$1"`), `$N`
+// for positional args used without a name, and `...` when it reads "$@"/$*.
+const shellParams = (body) => {
+  const named = {};
+  let max = 0, rest = false;
+  for (const raw of body) {
+    const l = raw.replace(/'[^']*'/g, "''"); // single quotes don't expand ($1 in awk/sed scripts)
+    for (const m of l.matchAll(/\b([A-Za-z_]\w*)=["']?\$\{?([1-9])(?![\w])/g)) named[m[2]] ??= m[1];
+    for (const m of l.matchAll(/\$\{?([1-9])(?![\w])/g)) max = Math.max(max, Number(m[1]));
+    if (/\$\{?[@*]/.test(l)) rest = true;
+  }
+  const out = Array.from({ length: max }, (_, k) => named[k + 1] ?? `$${k + 1}`);
+  if (rest) out.push('...');
+  return out.join(', ');
+};
+
+const extractShellSkeleton = (code) => {
+  const lines = code.split('\n');
+  const skeleton = { sources: [], functions: [], constants: [] };
+  const seen = new Set();
+  const st = { quote: null, heredoc: null };
+  for (let i = 0; i < lines.length; i++) {
+    const atStart = !st.quote && !st.heredoc;
+    const line = scanShellLine(lines[i], st);
+    if (!atStart || line === null || !line.trim()) continue;
+    const fn = line.match(SH_FN_RE);
+    if (fn) {
+      const end = symbolEndShell(lines, i) ?? i;
+      const body = [lines[i].slice(lines[i].match(SH_FN_RE)?.[0].length ?? 0), ...lines.slice(i + 1, end + 1)];
+      skeleton.functions.push({ name: fn[1] || fn[2], line: i + 1, params: shellParams(body) });
+      continue;
+    }
+    const src = line.match(/^\s*(?:source|\.)\s/) && lines[i].match(/^\s*(?:source|\.)\s+(.+?)\s*(?:[;&|]|\s#|$)/);
+    if (src) { skeleton.sources.push(src[1].replace(/["']/g, '')); continue; }
+    const assign = line.match(/^(?:(?:export|readonly|declare(?:\s+-\w+)*|typeset(?:\s+-\w+)*)\s+)?([A-Za-z_]\w*)(?:\[[^\]]*\])?\+?=/);
+    if (assign && !seen.has(assign[1])) { seen.add(assign[1]); skeleton.constants.push({ name: assign[1], line: i + 1 }); }
+  }
+  return skeleton;
+};
+
+const formatShellSkeleton = (s) => {
+  if (!s) return '';
+  const lines = [];
+  if (s.sources.length) lines.push(`sources: ${[...new Set(s.sources)].join(', ')}`);
+  for (const f of s.functions) lines.push(`fn: ${f.name}(${f.params}):${f.line}`);
+  if (s.constants.length) lines.push(formatConstants(s.constants));
+  return lines.join('\n');
+};
+
 const isPascalCase = (name) => /^[A-Z][a-zA-Z0-9]*$/.test(name);
 
 /**
@@ -676,6 +895,12 @@ const extractJsSkeleton = (code, filePath = '') => {
   const lang = detectLanguage(filePath || '.js');
   const cleaned = stripCommentsAndStrings(code, lang);
   const lines = cleaned.split('\n');
+  const orig = code.split('\n');
+  // { params, ret, endLine } for the signature whose `(` follows character `from` of line i
+  const jsSig = (i, from, arrow = false) => {
+    const sig = readSignature(lines, orig, i, from, { ret: lang === 'ts' ? ':' : null, arrow });
+    return sig ? { params: formatParams(sig.params), ret: formatReturn(sig.ret), endLine: sig.endLine } : null;
+  };
   const skeleton = {
     imports: [], components: [], functions: [],
     hooks: { useState: [], useEffect: [], useCallback: 0, useMemo: 0, useRef: 0, custom: [] },
@@ -802,7 +1027,31 @@ const extractJsSkeleton = (code, filePath = '') => {
         const arrowProp = trimmed.match(/^([A-Za-z_$][\w$]*)\s*:\s*(async\s+)?(?:function\b[^(]*)?\(([^)]*)\)?/);
         const m = method && !/^(if|for|while|switch|return|catch)$/.test(method[2]) ? { name: method[2], async: !!method[1], params: method[3] }
           : arrowProp && /=>|function/.test(trimmed) ? { name: arrowProp[1], async: !!arrowProp[2], params: arrowProp[3] } : null;
-        if (m) skeleton.functions.push({ name: qualify(m.name), line: lineNum, params: simplifyParams(m.params ?? ''), async: m.async, exportMarker: ns.exportMarker });
+        if (m) {
+          const sig = jsSig(i, indent + trimmed.indexOf(m.name) + m.name.length, !method || !!arrowProp);
+          skeleton.functions.push({ name: qualify(m.name), line: lineNum, params: sig ? sig.params : simplifyParams(m.params ?? ''), ret: sig?.ret, async: m.async, exportMarker: ns.exportMarker });
+        }
+      }
+      continue;
+    }
+
+    // ── Class members: methods, accessors, constructor and arrow-function properties ──
+    if (ns?.cls) {
+      if (indent === ns.memberIndent) {
+        const mods = '((?:(?:public|private|protected|static|readonly|abstract|override|async|declare|accessor)\\s+)*)';
+        const method = trimmed.match(new RegExp(`^${mods}(?:(?:get|set)\\s+)?\\*?\\s*(#?[A-Za-z_$][\\w$]*)\\s*\\??\\s*(?:<[^(]*>)?\\s*\\(`));
+        const prop = trimmed.match(new RegExp(`^${mods}(#?[A-Za-z_$][\\w$]*)\\s*[?!]?\\s*(?::[^=]+)?=\\s*(async\\s+)?(?:<[^(]*>\\s*)?(?:\\(|[A-Za-z_$][\\w$]*\\s*=>)`));
+        const hit = method && !/^(if|for|while|switch|return|catch|super)$/.test(method[2]) ? { mods: method[1], name: method[2], arrow: false }
+          : prop ? { mods: prop[1] + (prop[3] || ''), name: prop[2], arrow: true } : null;
+        if (hit) {
+          const from = indent + trimmed.indexOf(hit.name, hit.mods.length) + hit.name.length;
+          const sig = jsSig(i, from, hit.arrow);
+          const single = !sig && hit.arrow ? trimmed.match(/=\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*=>/) : null;
+          skeleton.functions.push({
+            name: `${ns.name}.${hit.name}`, line: lineNum, params: sig ? sig.params : single ? single[1] : '', ret: sig?.ret,
+            async: /\basync\b/.test(hit.mods), static: /\bstatic\b/.test(hit.mods),
+          });
+        }
       }
       continue;
     }
@@ -834,9 +1083,23 @@ const extractJsSkeleton = (code, filePath = '') => {
     const classMatch = trimmed.match(/^(?:export\s+)?(?:export\s+default\s+)?(?:abstract\s+)?class\s+(\w+)/);
     if (classMatch && isTopLevel) {
       const name = qualify(classMatch[1]);
-      skeleton.classes.push({ name, line: lineNum });
+      // Header up to the body's `{`: `extends Base<T>` and `implements A, B` become the bases
+      let k = i, head = trimmed;
+      while (!lines[k].includes('{') && k + 1 < lines.length && k - i < 10) head += ' ' + lines[++k].trim();
+      const brace = head.indexOf('{');
+      const header = brace === -1 ? head : head.slice(0, brace);
+      const ext = header.match(/\bextends\s+([\w$.]+(?:\s*<[^{]*?>)?)(?=\s+implements\b|\s*$)/);
+      const impl = header.match(/\bimplements\s+(.+?)\s*$/);
+      const bases = [...(ext ? [ext[1].replace(/\s+/g, '')] : []), ...(impl ? splitItems(impl[1]).map(b => b.replace(/\s+/g, '')) : [])];
+      skeleton.classes.push({ name, line: lineNum, bases });
       if (trimmed.includes('export')) {
         exportMap.set(name, trimmed.includes('default') ? 'default' : 'named');
+      }
+      // A body that stays open past this line: index its members as Class.member
+      const bodyLine = lines[k].slice(lines[k].indexOf('{'));
+      if (brace !== -1 && (bodyLine.match(/\{/g) || []).length > (bodyLine.match(/\}/g) || []).length) {
+        i = k;
+        nsStack.push({ name, indent, memberIndent: null, cls: true });
       }
       continue;
     }
@@ -846,16 +1109,9 @@ const extractJsSkeleton = (code, filePath = '') => {
     if (funcDeclMatch && isTopLevel) {
       const isAsync = !!funcDeclMatch[1];
       const bare = funcDeclMatch[2], name = qualify(bare);
-      // Extract params
-      let paramStr = '';
-      const parenStart = line.indexOf('(');
-      if (parenStart !== -1) {
-        const balanced = readUntilBalanced(lines, i, '(', ')');
-        const match = balanced.text.match(/\(([^)]*)\)/);
-        paramStr = match ? match[1].trim() : '';
-        i = balanced.endIndex;
-      }
-      const entry = { name, line: lineNum, params: simplifyParams(paramStr), async: isAsync };
+      const sig = jsSig(i, indent + funcDeclMatch[0].length - 1);
+      if (sig) i = sig.endLine;
+      const entry = { name, line: lineNum, params: sig ? sig.params : '', ret: sig?.ret, async: isAsync };
       if (isPascalCase(bare)) {
         skeleton.components.push(entry);
         currentComponentName = name;
@@ -877,28 +1133,21 @@ const extractJsSkeleton = (code, filePath = '') => {
       const isExported = trimmed.startsWith('export');
 
       // Arrow function or function expression
-      const isArrow = /^(?:async\s+)?\(/.test(rhs) || /^(?:async\s+)?\w+\s*=>/.test(rhs);
+      const isArrow = /^(?:async\s+)?(?:<[^(=]*>\s*)?\(/.test(rhs) || /^(?:async\s+)?\w+\s*=>/.test(rhs);
       const isFuncExpr = /^(?:async\s+)?function/.test(rhs);
 
       if (isArrow || isFuncExpr) {
         const isAsync = /^async\s+/.test(rhs);
-        let paramStr = '';
-        if (isArrow && /^(?:async\s+)?\(/.test(rhs)) {
-          const fromParen = rhs.slice(rhs.indexOf('('));
-          const balanced = readUntilBalanced(lines, i, '(', ')');
-          const match = balanced.text.match(/\(([^)]*)\)/);
-          paramStr = match ? match[1].trim() : '';
-          i = balanced.endIndex;
-        } else if (isArrow) {
-          const singleParam = rhs.match(/^(?:async\s+)?(\w+)\s*=>/);
-          paramStr = singleParam ? singleParam[1] : '';
-        } else if (isFuncExpr) {
-          const balanced = readUntilBalanced(lines, i, '(', ')');
-          const match = balanced.text.match(/\(([^)]*)\)/);
-          paramStr = match ? match[1].trim() : '';
-          i = balanced.endIndex;
+        let params = '', ret = '';
+        const singleParam = rhs.match(/^(?:async\s+)?(\w+)\s*=>/);
+        if (isArrow && singleParam) {
+          params = singleParam[1];
+        } else {
+          // `(` of the params: after `async`/generics for an arrow, after `function name` otherwise
+          const sig = jsSig(i, line.length - varMatch[2].length + (isAsync ? rhs.indexOf('async') + 5 : 0), isArrow);
+          if (sig) { params = sig.params; ret = sig.ret; i = sig.endLine; }
         }
-        const entry = { name, line: lineNum, params: simplifyParams(paramStr), async: isAsync };
+        const entry = { name, line: lineNum, params, ret, async: isAsync };
         if (isPascalCase(bare)) {
           skeleton.components.push(entry);
           currentComponentName = name;
@@ -1009,7 +1258,7 @@ const formatBabelSkeleton = (skeleton) => {
       const marker = c.exportMarker || '';
       const params = c.params !== undefined ? `(${c.params})` : '';
       const hoc = c.hoc ? `(${c.hoc})` : '';
-      return `${c.name}${hoc}${params}${marker}:${c.line}`;
+      return `${c.name}${hoc}${params}${marker}${c.ret ? `: ${c.ret}` : ''}:${c.line}`;
     }).join(', ')}`);
   }
   if (skeleton.contexts?.length > 0) lines.push(`contexts: ${skeleton.contexts.map(c => `${c.name}:${c.line}`).join(', ')}`);
@@ -1017,7 +1266,8 @@ const formatBabelSkeleton = (skeleton) => {
     for (const f of skeleton.functions) {
       const marker = f.exportMarker || '';
       const asyncPrefix = f.async ? 'async ' : '';
-      lines.push(`fn: ${asyncPrefix}${f.name}(${f.params || ''})${marker}:${f.line}`);
+      const staticPrefix = f.static ? 'static ' : '';
+      lines.push(`fn: ${staticPrefix}${asyncPrefix}${f.name}(${f.params || ''})${marker}${f.ret ? `: ${f.ret}` : ''}:${f.line}`);
     }
   }
   if (skeleton.constants.length > 0) {
@@ -1034,7 +1284,7 @@ const formatBabelSkeleton = (skeleton) => {
   }
   if (hookParts.length > 0) lines.push(`hooks: ${hookParts.join(', ')}`);
   if (skeleton.namespaces?.length > 0) lines.push(`namespaces: ${skeleton.namespaces.map(n => `${n.name}:${n.line}`).join(', ')}`);
-  if (skeleton.classes.length > 0) lines.push(`classes: ${skeleton.classes.map(c => `${c.name}${c.exportMarker || ''}:${c.line}`).join(', ')}`);
+  if (skeleton.classes.length > 0) lines.push(`classes: ${skeleton.classes.map(c => `${c.name}${c.exportMarker || ''}${c.bases?.length ? ` (${c.bases.join(',')})` : ''}:${c.line}`).join(', ')}`);
   if (skeleton.interfaces.length > 0 || skeleton.types.length > 0) {
     lines.push(`types: ${[...skeleton.interfaces, ...skeleton.types].map(t => `${t.name}:${t.line}`).join(', ')}`);
   }
@@ -1314,14 +1564,14 @@ const readProjectMeta = (rootPath) => {
   return { declared };
 };
 
-// Split at top-level commas (not inside (), [], {}, <>; `=>` is not a bracket)
+// Split at top-level commas (not inside (), [], {}, <>; `=>`/`->` are not brackets)
 const splitItems = (text) => {
   const items = [];
   let depth = 0, start = 0;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if ('([{<'.includes(c)) depth++;
-    else if (')]}'.includes(c) || (c === '>' && text[i - 1] !== '=')) depth = Math.max(0, depth - 1);
+    else if (')]}'.includes(c) || (c === '>' && text[i - 1] !== '=' && text[i - 1] !== '-')) depth = Math.max(0, depth - 1);
     else if (c === ',' && depth === 0) { items.push(text.slice(start, i).trim()); start = i + 1; }
   }
   items.push(text.slice(start).trim());
@@ -1333,13 +1583,17 @@ const splitItems = (text) => {
 // target), or `path:start-end:` when the symbol spans several lines, so the Read
 // can take exactly that range. Lines with no line numbers (imports, hooks,
 // package.json fields) keep their content behind a `path: ` prefix.
-const ITEM_LINE_RE = /:(\d+)(?=$|\s)/;
+// The line number closes each item, so types inside a signature (`{ a:1 }`) never match.
+const ITEM_LINE_RE = /:(\d+)$/;
+// Each formatted line as { kind, items }: `kind: a, b` split at top-level commas.
+const parseFormattedLine = (raw) => {
+  const m = raw.match(/^([a-z][a-z ]*):\s(.*)$/);
+  return m ? { kind: m[1], items: splitItems(m[2]) } : { kind: null, items: [raw] };
+};
 const locateLines = (path, formatted, spans = {}) => {
   const out = [];
   for (const raw of formatted.split('\n')) {
-    const m = raw.match(/^([a-z][a-z ]*):\s(.*)$/);
-    const [kind, body] = m ? [m[1], m[2]] : [null, raw];
-    const items = m ? splitItems(body) : [body];
+    const { kind, items } = parseFormattedLine(raw);
     const withLine = items.filter(it => ITEM_LINE_RE.test(it));
     if (withLine.length === 0) { out.push(`${path}: ${raw}`); continue; }
     for (const it of withLine) {
@@ -1383,7 +1637,7 @@ const formatOutput = (results, projectMeta = { declared: [] }, aliasesFor = null
 
 // ── Walker ──
 
-const isIndexable = (path) => isJsParseable(path) || isPythonParseable(path) || isCSharpParseable(path) || isRustParseable(path) || isPackageJson(path) || isMarkdownParseable(path) || isCssParseable(path);
+const isIndexable = (path) => isJsParseable(path) || isShellParseable(path) || isPythonParseable(path) || isCSharpParseable(path) || isRustParseable(path) || isPackageJson(path) || isMarkdownParseable(path) || isCssParseable(path);
 
 // Filesystem walk: used outside git, or when git lists nothing usable.
 // Returns { path, relativePath } objects filtered by the per-language predicates
@@ -1582,17 +1836,19 @@ const symbolEndPython = (lines, start) => {
 };
 
 const spanLang = (path) => isPythonParseable(path) ? 'py' : isJsParseable(path) ? 'js'
-  : isCSharpParseable(path) ? 'cs' : isRustParseable(path) ? 'rs' : null;
+  : isCSharpParseable(path) ? 'cs' : isRustParseable(path) ? 'rs' : isShellParseable(path) ? 'sh' : null;
 
 // { startLine: endLine } (1-based) for every multi-line symbol named in `formatted`.
 const symbolSpans = (formatted, content, lang) => {
   const spans = {};
   if (!formatted || !lang) return spans;
   const lines = content.split('\n');
-  for (const m of formatted.matchAll(/:(\d+)(?=$|[\s,])/gm)) {
-    const start = Number(m[1]);
+  const starts = formatted.split('\n').flatMap(raw => parseFormattedLine(raw).items)
+    .map(it => it.match(ITEM_LINE_RE)).filter(Boolean).map(m => Number(m[1]));
+  for (const start of starts) {
     if (start in spans || start < 1 || start > lines.length) continue;
-    const end = lang === 'py' ? symbolEndPython(lines, start - 1) : symbolEndBrace(lines, start - 1, lang);
+    const end = lang === 'py' ? symbolEndPython(lines, start - 1)
+      : lang === 'sh' ? symbolEndShell(lines, start - 1) : symbolEndBrace(lines, start - 1, lang);
     if (end !== null && end + 1 > start) spans[start] = end + 1;
   }
   return spans;
@@ -1607,6 +1863,7 @@ function compactFile(path, content) {
     : isRustParseable(path) ? [extractRustSkeleton, formatRustSkeleton]
     : isPackageJson(path) ? [extractPackageJsonSkeleton, formatPackageJsonSkeleton]
     : isCssParseable(path) ? [extractCssSkeleton, formatCssSkeleton]
+    : isShellParseable(path) ? [extractShellSkeleton, formatShellSkeleton]
     : [extractMarkdownTitle, (sk) => sk.title];
   const skeleton = extract(content, path);
   const formatted = skeleton ? format(skeleton) : null;
@@ -1656,7 +1913,7 @@ let jsonOutput = false;
 for (const arg of args) {
   if (arg === '--json') jsonOutput = true;
   else if (arg === '--help' || arg === '-h') {
-    console.log(`Usage: node compaction.js [path] [--json]\n\nCompact a JS/TS/Python/C#/Rust project into a structural skeleton.\nAlso indexes package.json (name/scripts/deps), CSS/SCSS/LESS (ids/classes),\nand lists .md files by path with their first heading.\nIn a git repo, indexes tracked and untracked files and skips .gitignore'd ones.\nRe-parses only files changed since the last run (cache: .orchestration/tools/.compaction_cache.json).\nZero dependencies — only requires Node.js.`);
+    console.log(`Usage: node compaction.js [path] [--json]\n\nCompact a JS/TS/Python/C#/Rust/shell project into a structural skeleton.\nEach symbol is one grep-able line: path:line (or path:start-end): kind: signature.\nAlso indexes package.json (name/scripts/deps), CSS/SCSS/LESS (ids/classes),\nand lists .md files by path with their first heading.\nIn a git repo, indexes tracked and untracked files and skips .gitignore'd ones.\nRe-parses only files changed since the last run (cache: .orchestration/tools/.compaction_cache.json).\nZero dependencies — only requires Node.js.`);
     process.exit(0);
   } else if (!arg.startsWith('-')) targetPath = arg;
 }
