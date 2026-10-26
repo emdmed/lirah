@@ -3,7 +3,8 @@
 // Lirah tab running this agent has compaction switched on.
 //
 // Lirah writes this file next to the engine (compaction.js) under
-// ~/.lirah/compaction. `node hook.js --build <project> <fingerprint>` is the
+// ~/.lirah/compaction. `node hook.js --session-start` runs on SessionStart and
+// starts that build early; `node hook.js --build <project> <fingerprint>` is the
 // background build it starts for itself when a rebuild outlives the prompt.
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
@@ -59,11 +60,13 @@ function hasAttachedFiles(prompt, session) {
   return !!contextDir && ATTACHED_FILES_RE.test(readText(join(contextDir, `${session}.md`)));
 }
 
-// The guard (guard.js) keeps per-session state under sessions/<id>. Each prompt
-// re-locks its gate and lists the files the prompt names, which it lets the
-// agent open without grepping the index first. Returns the state directory.
+// The guard (guard.js) keeps per-session state under sessions/<id>. Each new
+// task re-locks its gate and lists the files the prompt names, which it lets the
+// agent open without grepping the index first. A continuation keeps all of it.
+// Returns the state directory.
 const SESSION_TTL_MS = 2 * 24 * 3600 * 1000;
-function resetGuard(payload, project) {
+const PROMPT_FILES_MAX = 20;
+function sessionState(payload) {
   const sessions = join(DIR, 'sessions');
   try {
     for (const name of readdirSync(sessions)) {
@@ -74,14 +77,62 @@ function resetGuard(payload, project) {
   const id = String(payload.session_id || 'default').replace(/[^A-Za-z0-9_-]/g, '') || 'default';
   const state = join(sessions, id);
   mkdirSync(state, { recursive: true });
-  for (const name of ['unlocked', 'attached_files']) { try { unlinkSync(join(state, name)); } catch {} }
-  const named = new Set();
-  for (const [token] of String(payload.prompt || '').matchAll(/[\w.@~/-]*[\w-]\.[A-Za-z]\w*/g)) {
-    const path = isAbsolute(token) ? resolve(token) : resolve(project, token);
-    try { if (statSync(path).isFile()) named.add(path); } catch {}
-  }
-  writeFileSync(join(state, 'prompt_files'), [...named].join('\n') + (named.size ? '\n' : ''));
   return state;
+}
+
+function resetGuard(state, prompt, project) {
+  for (const name of ['unlocked', 'attached_files']) { try { unlinkSync(join(state, name)); } catch {} }
+  writeFileSync(join(state, 'prompt_files'), promptFiles(prompt, project).map((f) => f + '\n').join(''));
+}
+
+// A short go-ahead after a task ("yes", "go ahead", "continue") is not a new
+// task: it keeps the gate open, so the agent isn't re-locked mid-task. Needs an
+// earlier prompt this session, at most 6 words, and no new identifiers (every
+// word of 3+ letters is a stop word or an action verb). From classify.sh.
+const GO_AHEAD_RE = /^\s*(yes|yeah|yep|y|ok|okay|sure|go|go ahead|continue|proceed|do it|please do|sounds good|lgtm|approved|ship it|carry on|keep going)\b/;
+const NON_IDENTIFIERS = new Set(('the a an is are was were be been being to for in on it its this that with from by at of and or not but so if do does did has have had '
+  + 'can could will would shall should may might must into than then also just only very too quite yes yeah yep okay sure ahead continue proceed please sounds '
+  + 'good lgtm approved ship carry keep going thanks fix broken error crash bug build create add implement new clean improve restructure rename refactor slow '
+  + 'optimize performance speed review check merge pull request test tests spec coverage document readme explain plan generate typo bump update change wording '
+  + 'label what how does describe tell show look read view open print list all them those these that one ones now next same way both rest').split(' '));
+function isContinuation(prompt, state) {
+  if (!existsSync(join(state, 'prompted'))) return false;
+  const text = String(prompt || '').toLowerCase().trim();
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 6 || !GO_AHEAD_RE.test(text)) return false;
+  return words.every((w) => {
+    const clean = w.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
+    return clean.length < 3 || NON_IDENTIFIERS.has(clean);
+  });
+}
+
+// Files the prompt names. A token with an extension counts when it is a path
+// that exists (project-relative or absolute), or the path suffix or basename of
+// at most 3 files git knows about ("fix ContextStatus.jsx"). Files that don't
+// exist yet (to be created) are skipped. Absolute paths.
+function promptFiles(prompt, project) {
+  const named = new Set();
+  const unresolved = [];
+  const tokens = new Set([...String(prompt || '').matchAll(/[\w.@~/-]*[\w-]\.[A-Za-z]\w{0,9}\b/g)].map((m) => m[0]));
+  for (const token of [...tokens].slice(0, 50)) {
+    const path = isAbsolute(token) ? resolve(token) : resolve(project, token);
+    let isFile = false;
+    try { isFile = statSync(path).isFile(); } catch {}
+    if (isFile) named.add(path);
+    else if (!isAbsolute(token) && !token.startsWith('~') && !token.includes('..')) unresolved.push(token.replace(/^\.\//, ''));
+  }
+  if (unresolved.length) {
+    let tracked = [];
+    try {
+      tracked = execFileSync('git', ['-C', project, 'ls-files', '--cached', '--others', '--exclude-standard'],
+        { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024, timeout: 3000 }).toString().split('\n').filter(Boolean);
+    } catch {}
+    for (const token of unresolved) {
+      const matches = tracked.filter((f) => f === token || f.endsWith('/' + token));
+      if (matches.length && matches.length <= 3) for (const m of matches) named.add(resolve(project, m));
+    }
+  }
+  return [...named].slice(0, PROMPT_FILES_MAX);
 }
 
 // Indexed source files (same rules as the orchestration repo's classify.sh):
@@ -147,22 +198,68 @@ function excludeFromGit(project) {
 }
 
 function grepHint(rel) {
-  return `GREP: grep -i -E 'term1|term2' ${rel} — use up to 8 specific identifiers or domain words from the task (not generic words like data/file/handler). Never Read or cat the artifact whole: grep it. Each hit is path:line: kind: symbol, or path:start-end: for a multi-line symbol; Read that source path at that line (for start-end, exactly that range). A 'used-by:' line names an importer with the members it uses, their lines and the enclosing function — for relative and aliased imports these are every caller, so don't re-grep to confirm them. Search source only for what the index cannot show.`;
+  return `GREP: grep -i -E 'term1|term2' ${rel} — use up to 8 specific identifiers or domain words from the task (not generic words like data/file/handler). Never Read or cat the artifact whole: it is grep-only and greps of it are capped at 60 lines. Each hit is path:line: kind: symbol, or path:start-end: for a multi-line symbol; Read that source path at that line (for start-end, exactly that range: offset start, limit end-start+1). A 'used-by:' line names an importer with the members it uses, their lines and the enclosing function — for relative and aliased imports these are every caller, so don't re-grep or Read those files just to confirm them. Search source only for what the index cannot show; if you need such a search, run it in the same command after the compaction grep.`;
+}
+
+// Shared checks: the tab has compaction on and nothing else handles the project.
+function activeProject() {
+  const session = process.env.LIRAH_PTY_SESSION;
+  if (!session || !/^[A-Za-z0-9-]+$/.test(session) || !existsSync(join(DIR, 'on', session))) return null;
+  const project = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  if (!existsSync(project)) return null;
+  // The orchestration hooks already do this for the project; don't do it twice.
+  if (existsSync(join(project, '.orchestration', 'orchestration.md'))) return null;
+  if (existsSync(join(project, '.orchestration', 'disabled'))) return null;
+  return { session, project };
+}
+
+// Is the artifact missing or behind the sources? Rebuild when there is no
+// artifact, a source is newer than it, or the set of files changed (deletes and
+// moves don't show up as newer files).
+function staleness(project) {
+  const artifact = latestArtifact(project);
+  const { fingerprint, newest } = scanSources(project);
+  const stale = !artifact || newest > artifact.mtimeMs || fingerprint !== readText(fingerprintFile(project));
+  return { stale, fingerprint };
+}
+
+// SessionStart: a new session starts with a clean guard, and the index starts
+// building in the background so the first prompt finds it fresh. A resumed or
+// compacted session keeps its guard state.
+async function sessionStart() {
+  const payload = await readPayload();
+  const active = activeProject();
+  if (!active) return;
+  const { project } = active;
+  try {
+    const state = sessionState(payload);
+    if (payload.source !== 'resume' && payload.source !== 'compact') {
+      for (const name of ['prompted', 'unlocked', 'attached_files', 'prompt_files']) { try { unlinkSync(join(state, name)); } catch {} }
+    }
+  } catch {}
+  mkdirSync(toolsDir(project), { recursive: true });
+  excludeFromGit(project);
+  const { stale, fingerprint } = staleness(project);
+  if (stale) buildInBackground(project, fingerprint);
 }
 
 async function main() {
   const payload = await readPayload();
-  const session = process.env.LIRAH_PTY_SESSION;
-  if (!session || !/^[A-Za-z0-9-]+$/.test(session) || !existsSync(join(DIR, 'on', session))) return;
-
-  const project = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  if (!existsSync(project)) return;
-  // The orchestration hooks already do this for the project; don't do it twice.
-  if (existsSync(join(project, '.orchestration', 'orchestration.md'))) return;
-  if (existsSync(join(project, '.orchestration', 'disabled'))) return;
+  const active = activeProject();
+  if (!active) return;
+  const { session, project } = active;
 
   let guardState = null;
-  try { guardState = resetGuard(payload, project); } catch {}
+  try {
+    guardState = sessionState(payload);
+    if (isContinuation(payload.prompt, guardState)) {
+      // Same task: keep the gate, the named files and an attached-files stand-down.
+      if (existsSync(join(guardState, 'attached_files'))) return;
+    } else {
+      resetGuard(guardState, payload.prompt, project);
+    }
+    writeFileSync(join(guardState, 'prompted'), '');
+  } catch {}
   if (hasAttachedFiles(payload.prompt, session)) {
     // Tells guard.js to stand down until the next prompt.
     if (guardState) try { writeFileSync(join(guardState, 'attached_files'), ''); } catch {}
@@ -175,12 +272,9 @@ async function main() {
   // A build started by an earlier prompt is usually done in well under a second.
   for (let i = 0; i < 30 && building(project); i++) sleep(100);
 
-  // Rebuild when there is no artifact, a source is newer than it, or the set of
-  // files changed (deletes and moves don't show up as newer files).
-  let artifact = latestArtifact(project);
-  const { fingerprint, newest } = scanSources(project);
   let state = 'current';
-  if (!artifact || newest > artifact.mtimeMs || fingerprint !== readText(fingerprintFile(project))) {
+  const { stale, fingerprint } = staleness(project);
+  if (stale) {
     if (!building(project) && runEngine(project, BUILD_BUDGET_MS)) {
       writeFileSync(fingerprintFile(project), fingerprint + '\n');
       state = 'refreshed';
@@ -188,8 +282,8 @@ async function main() {
       buildInBackground(project, fingerprint);
       state = 'refreshing in the background (large project); it may miss the newest edits';
     }
-    artifact = latestArtifact(project);
   }
+  const artifact = latestArtifact(project);
 
   const lines = ['<compaction-hook>'];
   if (artifact) {
@@ -207,4 +301,4 @@ async function main() {
 }
 
 // A hook that fails must never block the prompt.
-main().catch(() => {}).finally(() => process.exit(0));
+(process.argv[2] === '--session-start' ? sessionStart() : main()).catch(() => {}).finally(() => process.exit(0));

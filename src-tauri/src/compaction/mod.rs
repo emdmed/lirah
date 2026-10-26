@@ -14,6 +14,8 @@
 //! Switched on, the hook works like the compaction part of the orchestration
 //! repo's `classify.sh`: it rebuilds `.orchestration/tools/compacted_*.md`
 //! when sources changed and tells the agent to grep it before reading source.
+//! On `SessionStart` (like `maintain.sh`) it starts that build in the
+//! background, so the first prompt finds the index fresh.
 //! `guard.js` (PreToolUse) enforces that, like the repo's `guard-explore.sh`:
 //! source reads wait each prompt for one specific grep of the artifact, the
 //! artifact is never loaded whole, and greps of it are capped.
@@ -83,6 +85,9 @@ fn install() -> Result<PathBuf, String> {
     // A rebuild is capped at 6s inside the script; the rest is headroom.
     let hooks = to_json(serde_json::json!({
         "hooks": {
+            "SessionStart": [{
+                "hooks": [{ "type": "command", "command": format!("{} --session-start", crate::util::node_command(&script)), "timeout": 10 }]
+            }],
             "UserPromptSubmit": [{
                 "hooks": [{ "type": "command", "command": crate::util::node_command(&script), "timeout": 15 }]
             }],
@@ -150,15 +155,21 @@ mod tests {
 
     /// Run hook.js with an engine copy in a temp dir against a tiny project.
     fn run_hook(dir: &Path, project: &Path, session: &str) -> String {
+        run_hook_with(dir, project, session, &[], serde_json::json!({}))
+    }
+
+    fn run_hook_with(dir: &Path, project: &Path, session: &str, args: &[&str], payload: serde_json::Value) -> String {
+        use std::io::Write;
         let mut child = Command::new("node")
             .arg(dir.join("hook.js"))
+            .args(args)
             .env("LIRAH_PTY_SESSION", session)
             .env("CLAUDE_PROJECT_DIR", project)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
             .unwrap();
-        drop(child.stdin.take());
+        child.stdin.take().unwrap().write_all(payload.to_string().as_bytes()).unwrap();
         String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap()
     }
 
@@ -186,6 +197,48 @@ mod tests {
         assert!(first.contains("GREP: "));
         let second = run_hook(&dir, &project, "on-session");
         assert!(second.contains("COMPACTION: current → "), "{}", second);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn hook_keeps_the_gate_open_for_a_go_ahead_and_finds_bare_file_names() {
+        if Command::new("node").arg("--version").output().is_err() {
+            return; // no Node on this machine
+        }
+        let root = std::env::temp_dir().join(format!("lirah-continue-{}", std::process::id()));
+        let dir = root.join("engine");
+        let project = root.join("proj");
+        fs::create_dir_all(dir.join("on")).unwrap();
+        fs::create_dir_all(project.join("src/deep")).unwrap();
+        for (name, body) in [("compaction.js", COMPACTION_JS), ("parse-utils.js", PARSE_UTILS_JS), ("package.json", PACKAGE_JSON), ("hook.js", HOOK_JS)] {
+            fs::write(dir.join(name), body).unwrap();
+        }
+        fs::write(dir.join("on").join("on-session"), "").unwrap();
+        fs::write(project.join("src/deep/Widget.jsx"), "export function Widget() { return null; }\n").unwrap();
+        let has_git = Command::new("git").args(["init", "-q"]).current_dir(&project).status().map(|s| s.success()).unwrap_or(false);
+
+        let state = dir.join("sessions").join("s1");
+        let prompt = |text: &str| run_hook_with(&dir, &project, "on-session", &[], serde_json::json!({ "session_id": "s1", "prompt": text }));
+
+        prompt("fix the render bug in Widget.jsx");
+        if has_git {
+            let named = fs::read_to_string(state.join("prompt_files")).unwrap();
+            assert!(named.contains("src/deep/Widget.jsx"), "{}", named);
+        }
+        fs::write(state.join("unlocked"), "").unwrap();
+
+        prompt("yes, go ahead");
+        assert!(state.join("unlocked").exists(), "a go-ahead re-locked the gate");
+
+        prompt("yes, and also handle fetchUserProfile");
+        assert!(!state.join("unlocked").exists(), "a new identifier should start a new task");
+
+        // A new session clears the guard and the earlier prompt.
+        fs::write(state.join("unlocked"), "").unwrap();
+        run_hook_with(&dir, &project, "on-session", &["--session-start"], serde_json::json!({ "session_id": "s1", "source": "startup" }));
+        assert!(!state.join("unlocked").exists());
+        assert!(!state.join("prompted").exists());
 
         let _ = fs::remove_dir_all(&root);
     }
