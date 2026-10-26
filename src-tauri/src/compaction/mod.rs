@@ -14,6 +14,9 @@
 //! Switched on, the hook works like the compaction part of the orchestration
 //! repo's `classify.sh`: it rebuilds `.orchestration/tools/compacted_*.md`
 //! when sources changed and tells the agent to grep it before reading source.
+//! `guard.js` (PreToolUse) enforces that, like the repo's `guard-explore.sh`:
+//! source reads wait each prompt for one specific grep of the artifact, the
+//! artifact is never loaded whole, and greps of it are capped.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,6 +27,7 @@ const PARSE_UTILS_JS: &str = include_str!("engine/parse-utils.js");
 const PACKAGE_JSON: &str = "{\"type\":\"module\"}\n";
 
 const HOOK_JS: &str = include_str!("hook.js");
+const GUARD_JS: &str = include_str!("guard.js");
 
 fn compaction_dir() -> Option<PathBuf> {
     crate::util::lirah_dir().map(|d| d.join("compaction"))
@@ -61,6 +65,8 @@ fn install() -> Result<PathBuf, String> {
 
     let script = dir.join("hook.js");
     write_if_changed(&script, HOOK_JS)?;
+    let guard = dir.join("guard.js");
+    write_if_changed(&guard, GUARD_JS)?;
     // Left by builds that shipped the hook as a shell script.
     let _ = fs::remove_file(dir.join("hook.sh"));
     fs::create_dir_all(dir.join("on")).map_err(|e| e.to_string())?;
@@ -71,7 +77,7 @@ fn install() -> Result<PathBuf, String> {
         "name": "lirah-compaction",
         "version": "1.0.0",
         "author": { "name": "Lirah" },
-        "description": "Keeps a grep-first index of the project fresh and points the agent at it, for Lirah tabs with compaction on."
+        "description": "Keeps a grep-first index of the project fresh and has the agent use it before reading code, for Lirah tabs with compaction on."
     }))?;
     write_if_changed(&plugin.join(".claude-plugin").join("plugin.json"), &manifest)?;
     // A rebuild is capped at 6s inside the script; the rest is headroom.
@@ -79,6 +85,10 @@ fn install() -> Result<PathBuf, String> {
         "hooks": {
             "UserPromptSubmit": [{
                 "hooks": [{ "type": "command", "command": crate::util::node_command(&script), "timeout": 15 }]
+            }],
+            "PreToolUse": [{
+                "matcher": "Read|Glob|Grep|Bash|Agent|Task",
+                "hooks": [{ "type": "command", "command": crate::util::node_command(&guard), "timeout": 10 }]
             }]
         }
     }))?;
@@ -176,6 +186,56 @@ mod tests {
         assert!(first.contains("GREP: "));
         let second = run_hook(&dir, &project, "on-session");
         assert!(second.contains("COMPACTION: current → "), "{}", second);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Run guard.js on one tool call; returns its decision ("" = let it through).
+    fn run_guard(dir: &Path, project: &Path, tool: &str, input: serde_json::Value) -> String {
+        use std::io::Write;
+        let mut child = Command::new("node")
+            .arg(dir.join("guard.js"))
+            .env("LIRAH_PTY_SESSION", "on-session")
+            .env("CLAUDE_PROJECT_DIR", project)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let payload = serde_json::json!({ "session_id": "s1", "tool_name": tool, "tool_input": input });
+        child.stdin.take().unwrap().write_all(payload.to_string().as_bytes()).unwrap();
+        let out = String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap();
+        serde_json::from_str::<serde_json::Value>(&out)
+            .ok()
+            .and_then(|v| v["hookSpecificOutput"]["permissionDecision"].as_str().map(String::from))
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn guard_holds_source_until_the_index_is_grepped() {
+        if Command::new("node").arg("--version").output().is_err() {
+            return; // no Node on this machine
+        }
+        let root = std::env::temp_dir().join(format!("lirah-guard-{}", std::process::id()));
+        let dir = root.join("engine");
+        let project = root.join("proj");
+        fs::create_dir_all(dir.join("on")).unwrap();
+        fs::create_dir_all(project.join("src")).unwrap();
+        fs::create_dir_all(project.join(".orchestration/tools")).unwrap();
+        fs::write(dir.join("guard.js"), GUARD_JS).unwrap();
+        fs::write(dir.join("package.json"), PACKAGE_JSON).unwrap();
+        fs::write(dir.join("on").join("on-session"), "").unwrap();
+        let artifact = ".orchestration/tools/compacted_proj_1.md";
+        fs::write(project.join(artifact), "src/main.js:1: fn: startServer()\n").unwrap();
+        let read = |p: &str| serde_json::json!({ "file_path": p });
+        let bash = |c: String| serde_json::json!({ "command": c });
+
+        assert_eq!(run_guard(&dir, &project, "Read", read("src/main.js")), "deny");
+        assert_eq!(run_guard(&dir, &project, "Read", read("package.json")), "");
+        assert_eq!(run_guard(&dir, &project, "Read", read(artifact)), "deny");
+        assert_eq!(run_guard(&dir, &project, "Bash", bash(format!("grep -i 'data' {}", artifact))), "deny");
+        assert_eq!(run_guard(&dir, &project, "Bash", bash(format!("grep -i 'startServer' {}; rm -rf src", artifact))), "deny");
+        assert_eq!(run_guard(&dir, &project, "Bash", bash(format!("grep -i 'startServer' {} | head; ls", artifact))), "allow");
+        assert_eq!(run_guard(&dir, &project, "Read", read("src/main.js")), "");
 
         let _ = fs::remove_dir_all(&root);
     }
