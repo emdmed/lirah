@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { formatDuration } from '../../lib/formatDuration';
 import {
-  Check, ChevronDown, ChevronRight, ChevronUp, Eye, GitCommit, Pencil, Play, RefreshCw, RotateCcw, SkipForward, Trash2,
-  Undo2,
+  Check, CheckCheck, ChevronDown, ChevronRight, ChevronUp, Eye, GitCommit, Pencil, Play, RefreshCw, RotateCcw, SkipForward,
+  Trash2, Undo2,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Field, Prose } from './parts';
-import { CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 
@@ -35,9 +35,9 @@ const STATUS_LABEL = {
 // What the state means and what you can do about it, for the states that
 // need a word. Pending needs none.
 const STATUS_NOTE = {
-  [CHUNK_STATE.NO_COMMIT]: 'The agent finished without committing. Check again, commit all changes as this chunk, or reset it.',
+  [CHUNK_STATE.NO_COMMIT]: 'The agent finished without committing. Check again, commit all changes as this chunk, mark it done if it needed no changes, or reset it.',
   [CHUNK_STATE.FIXING]: 'Review notes sent. Waiting for the fix commit.',
-  [CHUNK_STATE.IN_PROGRESS]: 'Sent to the agent. Marked implemented when its commit lands.',
+  [CHUNK_STATE.IN_PROGRESS]: 'Sent to the agent. Marked implemented when its commit lands, or when the agent says there was nothing to commit.',
   [CHUNK_STATE.ROLLED_BACK]: 'Reverted. Implement it again or skip it.',
 };
 const statusNote = (chunk) => STATUS_NOTE[effectiveChunkState(chunk)] ?? null;
@@ -54,6 +54,8 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
   const last = plan.chunks.at(-1)?.id === chunk.id;
   const piloted = isAutopilotLive(plan.autopilot);
   const pilotChunk = piloted && chunk.id === plan.autopilot.chunkId;
+  // A paused run waits on you, so its chunk can be marked done by hand.
+  const pilotRunning = piloted && plan.autopilot.status === AUTOPILOT_STATUS.RUNNING;
   const nudged = !!plan.autopilot?.nudged;
   const onPatch = (patch) => updateChunk(repoRoot, plan.id, chunk.id, patch);
   const onMove = (delta) => moveChunk(repoRoot, plan.id, chunk.id, delta);
@@ -177,6 +179,11 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
                   <Prose text={chunk.acceptance} clamp={3} className="text-muted-foreground" />
                 </Field>
               )}
+              {chunk.result && (
+                <Field label="result">
+                  <Prose text={chunk.result} className="text-muted-foreground" />
+                </Field>
+              )}
               {chunk.commits?.length > 0 && (
                 <Field label="commits">
                   <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
@@ -205,6 +212,11 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
                     reset
                   </PanelButton>
                 </>
+              )}
+              {chunk.status === CHUNK_STATUS.IN_PROGRESS && !pilotRunning && (
+                <PanelButton icon={CheckCheck} onClick={() => pane.markDone(plan, chunk)} disabled={busy} title="Done with nothing to commit (a check, a test run)">
+                  mark done
+                </PanelButton>
               )}
               {chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.commits?.length > 0 && (
                 <>

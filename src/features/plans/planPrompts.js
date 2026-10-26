@@ -1,6 +1,6 @@
 // Prompts the plans feature sends to an agent, and parsing of what comes back.
 
-import { planGit, workPath } from './planGit';
+import { isMultiRepo, planGit, workPath } from './planGit';
 import { CHUNK_STATUS } from './planModel';
 
 // Each chunk's commits carry this trailer, so they can be found in the log no
@@ -99,9 +99,20 @@ function reposBlock(plan) {
   return `This plan spans ${cfg.repos.length} git repositories:\n${rows.join('\n')}\nWork in these folders only. Commit separately in each repository you change, each commit with the message and trailer below.`;
 }
 
-function commitInstruction(plan, chunk) {
-  return `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
-git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chunkTrailer(plan, chunk)}"`;
+/** The marker kind an agent ends its reply with when a chunk needed no commit. */
+export const STATUS_DONE = 'done';
+
+// `allowDone`: the chunk itself, which may need no file changes (a check, a
+// test run); not a fix, which always changes something.
+function commitInstruction(plan, chunk, { allowDone = false } = {}) {
+  return [
+    `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
+git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chunkTrailer(plan, chunk)}"`,
+    // A plan of several repos already says so in reposBlock.
+    !isMultiRepo(plan) && 'If you change files in another git repository, commit there too, with the same message and trailer.',
+    allowDone && `If the chunk needs no file changes (a check, a test run, an investigation), don't make an empty commit. End your reply with a line
+PLAN-STATUS: ${STATUS_DONE} — <one line on what you did or found>`,
+  ].filter(Boolean).join('\n');
 }
 
 // Under auto-pilot nobody is watching, so the agent says when it is stuck
@@ -123,7 +134,7 @@ export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
     later.length > 0 && `Coming later (don't do these now):\n${list(later)}`,
     reposBlock(plan),
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
-    `Only do this chunk. ${commitInstruction(plan, chunk)}`,
+    `Only do this chunk. ${commitInstruction(plan, chunk, { allowDone: true })}`,
     autopilot && STATUS_INSTRUCTION,
   ]
     .filter(Boolean)
@@ -156,7 +167,7 @@ export function buildNudgePrompt(plan, chunk) {
   return [
     `Chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}" isn't committed yet. Finish it if anything is left.`,
     reposBlock(plan),
-    commitInstruction(plan, chunk),
+    commitInstruction(plan, chunk, { allowDone: true }),
     STATUS_INSTRUCTION,
   ].filter(Boolean).join('\n\n');
 }
@@ -165,7 +176,7 @@ export function buildNudgePrompt(plan, chunk) {
 export function parseStatusMarker(text) {
   const lines = String(text || '').split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
-    const m = lines[i].match(/PLAN-STATUS:\s*(needs-input|blocked)\b\s*[—–:-]*\s*(.*)$/i);
+    const m = lines[i].match(/PLAN-STATUS:\s*(needs-input|blocked|done)\b\s*[—–:-]*\s*(.*)$/i);
     if (m) return { kind: m[1].toLowerCase(), message: m[2].replace(/[`*]+$/, '').trim() };
   }
   return null;

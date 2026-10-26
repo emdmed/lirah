@@ -9,20 +9,49 @@ import { chunkBases, chunkCommitsByRepo, planGit, workPath } from './planGit';
 import { CHUNK_STATUS } from './planModel';
 import { chunkCommitMessage, chunkTrailer } from './planPrompts';
 
-/** The chunk's commits since it started, by repo root (oldest first), found by its trailer. */
+// Commits a little older than the chunk's start still count: clocks and
+// commit dates are not exact.
+const SINCE_SLACK_S = 60;
+const sinceArg = (chunk) => `--since=@${Math.floor((chunk.startedAt ?? Date.now()) / 1000) - SINCE_SLACK_S}`;
+
+/**
+ * The chunk's commits since it started, by repo root (oldest first), found by
+ * its trailer. A repo that joined the plan after the chunk started has no
+ * base sha for it, so there the search goes by time.
+ */
 export async function chunkCommits(plan, chunk) {
   const bases = chunkBases(plan, chunk);
   const commitsByRepo = {};
   for (const repo of planGit(plan).repos) {
     const base = bases[repo.root];
-    if (!base) continue;
-    const out = await git(workPath(repo), [
-      'log', `${base}..HEAD`, '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
-    ]);
-    const shas = out.split('\n').map((l) => l.trim()).filter(Boolean).reverse();
+    if (!base && !chunk.startedAt) continue;
+    const shas = (await gitLines(workPath(repo), [
+      'log', base ? `${base}..HEAD` : sinceArg(chunk), '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
+    ])).reverse();
     if (shas.length > 0) commitsByRepo[repo.root] = shas;
   }
   return commitsByRepo;
+}
+
+/**
+ * The chunk's commits in repos the plan doesn't list (`roots`, e.g. the open
+ * tabs' repos), found by its trailer since it started: an agent sometimes
+ * works beyond the plan's repos. root -> { shas (oldest first), base }.
+ */
+export async function strayCommits(plan, chunk, roots) {
+  const known = new Set(planGit(plan).repos.flatMap((r) => [r.root, workPath(r)]));
+  const found = {};
+  for (const root of new Set(roots)) {
+    if (!root || known.has(root)) continue;
+    const shas = (await gitLines(root, [
+      'log', sinceArg(chunk), '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
+    ]).catch(() => [])).reverse();
+    if (shas.length === 0) continue;
+    // A root commit has no parent; the review then falls back to the commits alone.
+    const base = (await git(root, ['rev-parse', '--verify', '--quiet', `${shas[0]}^`]).catch(() => '')).trim();
+    found[root] = { shas, base };
+  }
+  return found;
 }
 
 /** Each repo's HEAD in the plan's git settings `cfg`, before a chunk starts. Throws for a repo with no commits. */

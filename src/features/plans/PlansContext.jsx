@@ -14,10 +14,10 @@ import { getTabPrompt } from '../tabs/tabPrompts';
 import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
 import {
-  captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, rollbackChunk as revertChunk,
+  captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, rollbackChunk as revertChunk, strayCommits,
 } from './planGitOps';
 import {
-  chunkBases, cleanupGit, defaultBranch, planGit, prepareGit,
+  chunkBases, cleanupGit, defaultBranch, planGit, prepareGit, withRepos,
 } from './planGit';
 import {
   buildChunkPrompt,
@@ -36,7 +36,11 @@ import {
 //
 // A plan's git settings (plan.git, see planGit.js) can add more repos, a
 // branch for the plan and worktrees; chunks are then checked, committed and
-// rolled back in every repo, each keyed by its root.
+// rolled back in every repo, each keyed by its root. A chunk's commits in an
+// open tab's repo the plan doesn't list are found too, and that repo joins it.
+//
+// A chunk that needs no commit (a check, a test run) is done when the agent
+// says so with a PLAN-STATUS: done line, or when you mark it done.
 //
 // Auto-pilot, which chains the chunks in one tab, lives in useAutopilot.js.
 
@@ -59,6 +63,20 @@ export function PlansProvider({ children }) {
   const checkingRef = useRef(new Set()); // chunk ids being checked
   const toast = useToast();
   const { tabs, switchTab } = useTabManager();
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const tabRootsRef = useRef(new Map()); // tab folder -> repo root; misses aren't kept
+
+  // The repos of the open tabs, where an agent may commit outside the plan's repos.
+  const tabRepoRoots = useCallback(async () => {
+    const cache = tabRootsRef.current;
+    const paths = [...new Set(tabsRef.current.map((t) => t.projectPath).filter(Boolean))];
+    await Promise.all(paths.filter((p) => !cache.has(p)).map(async (p) => {
+      const root = await repoTop(p).catch(() => null);
+      if (root) cache.set(p, root);
+    }));
+    return paths.map((p) => cache.get(p)).filter(Boolean);
+  }, []);
 
   // Look for the chunk's commits since it was started. Found → implemented;
   // not found while in progress → the agent stopped without committing.
@@ -69,15 +87,32 @@ export function PlansProvider({ children }) {
     checkingRef.current.add(chunkId);
     try {
       const commitsByRepo = await chunkCommits(plan, chunk);
+      const strays = await strayCommits(plan, chunk, await tabRepoRoots());
+      const strayBases = {};
+      for (const [root, { shas, base }] of Object.entries(strays)) {
+        commitsByRepo[root] = shas;
+        if (base) strayBases[root] = base;
+      }
       const commits = Object.values(commitsByRepo).flat();
       if (commits.length > 0) {
-        updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits, commitsByRepo }));
+        const strayRoots = Object.keys(strays);
+        updatePlan(repoRoot, planId, (p) => ({
+          // Repos the agent committed in join the plan: later chunks are checked, reviewed and rolled back there too.
+          ...(strayRoots.length > 0 && { git: withRepos(planGit(p), strayRoots) }),
+          chunks: p.chunks.map((c) => (c.id !== chunkId ? c : {
+            ...c,
+            ...toImplemented(c, { commits, commitsByRepo }),
+            baseShas: { ...chunkBases(p, c), ...strayBases },
+          })),
+        }));
         return { found: true, commits };
       }
-      updateChunk(repoRoot, planId, chunkId, {
-        needsCommit: chunk.status === CHUNK_STATUS.IN_PROGRESS,
-        awaitingFix: false,
-      });
+      // Read fresh: the chunk may have been marked done while git ran.
+      updatePlan(repoRoot, planId, (p) => ({
+        chunks: p.chunks.map((c) => (c.id !== chunkId ? c : {
+          ...c, needsCommit: c.status === CHUNK_STATUS.IN_PROGRESS, awaitingFix: false,
+        })),
+      }));
       return { found: false };
     } catch (e) {
       console.error('Plan chunk check failed:', e);
@@ -85,7 +120,18 @@ export function PlansProvider({ children }) {
     } finally {
       checkingRef.current.delete(chunkId);
     }
-  }, [findChunk, updateChunk]);
+  }, [findChunk, updatePlan, tabRepoRoots]);
+
+  // An in-progress chunk done with nothing to commit; `result` is what the
+  // agent said it did. Commits found first win.
+  const markChunkDone = useCallback(async (repoRoot, planId, chunkId, result = null) => {
+    const res = await checkChunk(repoRoot, planId, chunkId);
+    if (res.found || res.error) return res;
+    const { chunk } = findChunk(repoRoot, planId, chunkId);
+    if (chunk?.status !== CHUNK_STATUS.IN_PROGRESS) return res;
+    updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits: [], commitsByRepo: {}, result }));
+    return { found: false, done: true };
+  }, [checkChunk, findChunk, updateChunk]);
 
   const runSplit = useCallback(async (repoRoot, planId) => {
     const plan = findPlan(repoRoot, planId);
@@ -258,7 +304,9 @@ export function PlansProvider({ children }) {
 
   const {
     startAutopilot, resumeAutopilot, stopAutopilot, dismissAutopilot, revealRun,
-  } = useAutopilot({ stateRef, findPlan, updatePlan, checkChunk, implementChunk, sendToTab, tabs, switchTab, toast });
+  } = useAutopilot({
+    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, tabs, switchTab, toast,
+  });
 
   const actions = useMemo(() => ({
     loadRepo,
@@ -272,6 +320,7 @@ export function PlansProvider({ children }) {
     deleteChunk,
     implementChunk,
     checkChunk,
+    markChunkDone,
     commitChunk,
     rollbackChunk,
     sendFix,
@@ -287,7 +336,7 @@ export function PlansProvider({ children }) {
     ensureGit,
     removeWorktrees,
   }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk,
-    implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
+    implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
     dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees]);
 
   return (

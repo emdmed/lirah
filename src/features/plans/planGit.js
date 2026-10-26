@@ -31,6 +31,13 @@ export function planGit(plan) {
 export const workPath = (repo) => repo.workPath || repo.root;
 export const isMultiRepo = (plan) => planGit(plan).repos.length > 1;
 
+/** `cfg` plus `roots` it doesn't list yet, worked in place and already set up. */
+export function withRepos(cfg, roots) {
+  const add = roots.filter((root) => !cfg.repos.some((r) => r.root === root));
+  if (add.length === 0) return cfg;
+  return { ...cfg, repos: [...cfg.repos, ...add.map((root) => ({ root, base: '', workPath: root, prepared: true }))] };
+}
+
 /** Each repo's sha from before the chunk started (older chunks: the primary repo's only). */
 export function chunkBases(plan, chunk) {
   if (chunk.baseShas) return chunk.baseShas;

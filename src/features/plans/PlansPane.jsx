@@ -28,7 +28,7 @@ const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog'
 export function PlansPane({ projectPath }) {
   const { repoRoot, checked } = useRepoRoot(projectPath);
   const {
-    plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, commitChunk, rollbackChunk, sendFix,
+    plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix,
     sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees,
   } = usePlans(repoRoot);
   const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
@@ -85,6 +85,12 @@ export function PlansPane({ projectPath }) {
     if (res.error) throw new Error(res.error);
     if (!res.found) toast.info(`No commit for chunk ${chunk.n} yet`);
   }), [withBusy, checkChunk, repoRoot, toast]);
+
+  const handleMarkDone = useCallback((plan, chunk) => withBusy(BUSY.chunk(chunk.id), async () => {
+    const res = await markChunkDone(repoRoot, plan.id, chunk.id);
+    if (res.error) throw new Error(res.error);
+    if (res.found) toast.info(`Chunk ${chunk.n}'s commit was found`);
+  }), [withBusy, markChunkDone, repoRoot, toast]);
 
   const handleCommit = useCallback(async (plan, chunk) => {
     const ok = await confirm({
@@ -148,6 +154,7 @@ export function PlansPane({ projectPath }) {
     closePlan,
     implement: handleImplement,
     check: handleCheck,
+    markDone: handleMarkDone,
     commit: handleCommit,
     review: handleReview,
     rollback: handleRollback,
@@ -157,7 +164,7 @@ export function PlansPane({ projectPath }) {
     deletePlan: handleDeletePlan,
     addRepo: handleAddRepo,
     removeWorktrees: handleRemoveWorktrees,
-  }), [repoRoot, closePlan, handleImplement, handleCheck, handleCommit, handleReview, handleRollback, handleAutopilot,
+  }), [repoRoot, closePlan, handleImplement, handleCheck, handleMarkDone, handleCommit, handleReview, handleRollback, handleAutopilot,
     handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees]);
 
   if (!projectPath || (checked && !repoRoot)) {

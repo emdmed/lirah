@@ -9,7 +9,7 @@ import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, nextChunkId,
   planProgress, UNTITLED_PLAN,
 } from './planModel';
-import { buildNudgePrompt, parseStatusMarker } from './planPrompts';
+import { buildNudgePrompt, parseStatusMarker, STATUS_DONE } from './planPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
 import { useHookWatchdog } from './useHookWatchdog';
 
@@ -31,6 +31,12 @@ function excerpt(text, max = EXCERPT_MAX) {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
+/** The text of the last reply of the agent in `sessionId`, or null. */
+async function lastReply(sessionId) {
+  const transcriptPath = getAgentTranscript(sessionId);
+  return transcriptPath ? invoke('last_assistant_text', { transcriptPath }).catch(() => null) : null;
+}
+
 /** Is this plan's live run driven by the agent in `sessionId`? */
 const pilotedBy = (plan, sessionId) => isAutopilotLive(plan.autopilot) && getTabSession(plan.autopilot.tabId) === sessionId;
 
@@ -42,7 +48,7 @@ const inFlight = (chunk) => chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.a
  * provider's checkChunk, implementChunk and sendToTab.
  */
 export function useAutopilot({
-  stateRef, findPlan, updatePlan, checkChunk, implementChunk, sendToTab, tabs, switchTab, toast,
+  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, tabs, switchTab, toast,
 }) {
   const toastRef = useRef(toast);
   toastRef.current = toast;
@@ -193,11 +199,15 @@ export function useAutopilot({
       setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.RUNNING, nudged: false, reason: null, message: null });
       return advance(repoRoot, planId);
     }
-    const transcriptPath = getAgentTranscript(sessionId);
-    const text = transcriptPath
-      ? await invoke('last_assistant_text', { transcriptPath }).catch(() => null)
-      : null;
+    const text = await lastReply(sessionId);
     const marker = parseStatusMarker(text);
+    if (marker?.kind === STATUS_DONE) {
+      // Nothing to commit for this chunk (a check, a test run): on to the next.
+      const done = await markChunkDone(repoRoot, planId, current.id, marker.message || null);
+      if (done.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, done.error);
+      setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.RUNNING, nudged: false, reason: null, message: null });
+      return advance(repoRoot, planId);
+    }
     if (marker?.kind === HALT_REASON.BLOCKED) {
       return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.BLOCKED, marker.message || `Chunk ${current.n}: the agent is blocked.`);
     }
@@ -208,14 +218,22 @@ export function useAutopilot({
     const said = excerpt(text);
     halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.NO_COMMIT,
       `Chunk ${current.n} stopped without committing.${said ? ` Last said: "${said}"` : ''}`);
-  }, [findPlan, halt, advance, checkChunk, setAutopilot, nudge]);
+  }, [findPlan, halt, advance, checkChunk, markChunkDone, setAutopilot, nudge]);
 
   // Hook events: check chunks when a turn ends; drive auto-pilot runs.
   useEffect(() => {
+    // A chunk sent by hand: its commit, else the agent saying there was nothing to commit.
+    const settle = async (repoRoot, planId, chunk, sessionId) => {
+      const res = await checkChunk(repoRoot, planId, chunk.id);
+      if (res.found || res.error || chunk.status !== CHUNK_STATUS.IN_PROGRESS) return;
+      const marker = parseStatusMarker(await lastReply(sessionId));
+      if (marker?.kind === STATUS_DONE) markChunkDone(repoRoot, planId, chunk.id, marker.message || null);
+    };
+
     // Check the plan's chunks this session was working on (`which` of them).
-    const checkSessionChunks = (repoRoot, plan, sessionId, which) => {
+    const checkSessionChunks = (repoRoot, plan, sessionId, which, check = (chunk) => checkChunk(repoRoot, plan.id, chunk.id)) => {
       for (const chunk of plan.chunks) {
-        if (which(chunk) && getTabSession(chunk.tabId) === sessionId) checkChunk(repoRoot, plan.id, chunk.id);
+        if (which(chunk) && getTabSession(chunk.tabId) === sessionId) check(chunk);
       }
     };
 
@@ -244,7 +262,7 @@ export function useAutopilot({
       for (const [repoRoot, plans] of Object.entries(stateRef.current)) {
         for (const plan of plans) {
           if (!pilotedBy(plan, sessionId)) {
-            if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, inFlight);
+            if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, inFlight, (c) => settle(repoRoot, plan.id, c, sessionId));
             continue;
           }
           const pilotChunkId = plan.autopilot.chunkId;
@@ -254,7 +272,7 @@ export function useAutopilot({
         }
       }
     });
-  }, [stateRef, checkChunk, halt, setAutopilot, onAutopilotStop]);
+  }, [stateRef, checkChunk, markChunkDone, halt, setAutopilot, onAutopilotStop]);
 
   // A run whose tab was closed would wait forever for a Stop.
   useEffect(() => {
