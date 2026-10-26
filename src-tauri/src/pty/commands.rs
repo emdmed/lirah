@@ -366,6 +366,7 @@ pub async fn spawn_hidden_terminal(
         // Parse the command: run via shell -c
         let mut cmd = CommandBuilder::new(crate::util::user_shell());
         cmd.args(["-lc", &command]);
+        crate::util::strip_app_env(&mut cmd);
         cmd.env("TERM", "xterm-256color");
         cmd.cwd(&project_dir);
 

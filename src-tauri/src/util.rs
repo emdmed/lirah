@@ -3,6 +3,19 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Set when Lirah forced `GTK_IM_MODULE` for its own webview (see `run`). The
+/// override is ours, not the user's, so shells must not inherit it — GTK apps
+/// launched from them would lose IBus.
+pub static FORCED_SIMPLE_IM: AtomicBool = AtomicBool::new(false);
+
+/// Strip env Lirah set only for itself from a child shell's command.
+pub fn strip_app_env(cmd: &mut portable_pty::CommandBuilder) {
+    if FORCED_SIMPLE_IM.load(Ordering::Relaxed) {
+        cmd.env_remove("GTK_IM_MODULE");
+    }
+}
 
 /// The user's home folder.
 pub fn home_dir() -> Option<PathBuf> {

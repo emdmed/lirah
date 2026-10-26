@@ -192,6 +192,7 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
     }
 
     // Set TERM so the shell knows terminal capabilities (line wrapping, cursor movement, etc.)
+    crate::util::strip_app_env(&mut cmd);
     cmd.env("TERM", "xterm-256color");
     for (key, val) in &env {
         cmd.env(key, val);
@@ -221,6 +222,7 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
                 eprintln!("[sandbox] bwrap failed ({}), falling back to unsandboxed", e);
                 let mut fallback = CommandBuilder::new(&shell);
                 fallback.arg("-l");
+                crate::util::strip_app_env(&mut fallback);
                 fallback.env("TERM", "xterm-256color");
                 for (key, val) in &env {
                     fallback.env(key, val);

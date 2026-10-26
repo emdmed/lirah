@@ -37,6 +37,16 @@ pub fn run(initial_path: Option<String>) {
     #[cfg(target_os = "linux")]
     std::env::set_var("GTK_OVERLAY_SCROLLING", "0");
 
+    // With IBus active (GNOME/Ubuntu default) WebKitGTK delivers every keystroke
+    // as a composition, and xterm.js mangles it — keys arrive quoted ('a'e'…)
+    // and dead-key layouts break. GTK's built-in IM context still handles dead
+    // keys and compose. An explicit GTK_IM_MODULE (fcitx, ibus for CJK) wins.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("GTK_IM_MODULE").is_none() {
+        std::env::set_var("GTK_IM_MODULE", "gtk-im-context-simple");
+        util::FORCED_SIMPLE_IM.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
     ipc::init();
 
     tauri::Builder::default()
