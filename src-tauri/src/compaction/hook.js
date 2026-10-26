@@ -7,9 +7,9 @@
 // background build it starts for itself when a rebuild outlives the prompt.
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SELF = fileURLToPath(import.meta.url);
@@ -42,9 +42,46 @@ if (process.argv[2] === '--build') {
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const readText = (path) => { try { return readFileSync(path, 'utf8').trim(); } catch { return ''; } };
 
-async function drainStdin() {
-  // eslint-disable-next-line no-unused-vars
-  for await (const _ of process.stdin) { /* the payload isn't needed */ }
+async function readPayload() {
+  let raw = '';
+  for await (const chunk of process.stdin) raw += chunk;
+  try { return JSON.parse(raw || '{}'); } catch { return {}; }
+}
+
+// Files the user attached in Lirah (prompt box, or the context mirrored for a
+// prompt typed in the terminal by agent_state_hook.js) already say where to
+// look, so such a prompt gets no compaction and no guard. The markers are
+// buildPrompt.js's FILES and ELEMENTS sections.
+const ATTACHED_FILES_RE = /^(CAN_MODIFY|DO_NOT_MODIFY|USE_AS_EXAMPLE): |^ELEMENTS from /m;
+function hasAttachedFiles(prompt, session) {
+  if (ATTACHED_FILES_RE.test(String(prompt || ''))) return true;
+  const contextDir = process.env.LIRAH_PROMPT_CONTEXT;
+  return !!contextDir && ATTACHED_FILES_RE.test(readText(join(contextDir, `${session}.md`)));
+}
+
+// The guard (guard.js) keeps per-session state under sessions/<id>. Each prompt
+// re-locks its gate and lists the files the prompt names, which it lets the
+// agent open without grepping the index first. Returns the state directory.
+const SESSION_TTL_MS = 2 * 24 * 3600 * 1000;
+function resetGuard(payload, project) {
+  const sessions = join(DIR, 'sessions');
+  try {
+    for (const name of readdirSync(sessions)) {
+      const path = join(sessions, name);
+      if (Date.now() - statSync(path).mtimeMs > SESSION_TTL_MS) rmSync(path, { recursive: true, force: true });
+    }
+  } catch {}
+  const id = String(payload.session_id || 'default').replace(/[^A-Za-z0-9_-]/g, '') || 'default';
+  const state = join(sessions, id);
+  mkdirSync(state, { recursive: true });
+  for (const name of ['unlocked', 'attached_files']) { try { unlinkSync(join(state, name)); } catch {} }
+  const named = new Set();
+  for (const [token] of String(payload.prompt || '').matchAll(/[\w.@~/-]*[\w-]\.[A-Za-z]\w*/g)) {
+    const path = isAbsolute(token) ? resolve(token) : resolve(project, token);
+    try { if (statSync(path).isFile()) named.add(path); } catch {}
+  }
+  writeFileSync(join(state, 'prompt_files'), [...named].join('\n') + (named.size ? '\n' : ''));
+  return state;
 }
 
 // Indexed source files (same rules as the orchestration repo's classify.sh):
@@ -114,7 +151,7 @@ function grepHint(rel) {
 }
 
 async function main() {
-  await drainStdin();
+  const payload = await readPayload();
   const session = process.env.LIRAH_PTY_SESSION;
   if (!session || !/^[A-Za-z0-9-]+$/.test(session) || !existsSync(join(DIR, 'on', session))) return;
 
@@ -123,6 +160,14 @@ async function main() {
   // The orchestration hooks already do this for the project; don't do it twice.
   if (existsSync(join(project, '.orchestration', 'orchestration.md'))) return;
   if (existsSync(join(project, '.orchestration', 'disabled'))) return;
+
+  let guardState = null;
+  try { guardState = resetGuard(payload, project); } catch {}
+  if (hasAttachedFiles(payload.prompt, session)) {
+    // Tells guard.js to stand down until the next prompt.
+    if (guardState) try { writeFileSync(join(guardState, 'attached_files'), ''); } catch {}
+    return;
+  }
 
   mkdirSync(toolsDir(project), { recursive: true });
   excludeFromGit(project);
@@ -151,7 +196,7 @@ async function main() {
     const rel = relative(project, artifact.path).split('\\').join('/');
     lines.push(
       `COMPACTION: ${state} → ${rel}`,
-      "Before reading source, grep the compaction artifact for the task's identifiers and Read only the lines its hits point to.",
+      "Before reading source, grep the compaction artifact for the task's identifiers and Read only the lines its hits point to. A guard holds back source reads until you do (files the prompt names are open already).",
       grepHint(rel),
     );
   } else {
