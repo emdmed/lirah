@@ -26,6 +26,29 @@ use fs_watcher::FsWatcherStore;
 
 pub struct InitialPath(pub Option<String>);
 
+fn env_nonempty(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|v| !v.is_empty())
+}
+
+/// Promo recordings run with their own webview profile (`LIRAH_PROFILE`, a
+/// folder holding localStorage) so demo tabs never touch the user's own.
+fn recording_profile() -> Option<std::path::PathBuf> {
+    env_nonempty("LIRAH_PROFILE").map(std::path::PathBuf::from)
+}
+
+#[derive(serde::Serialize)]
+struct RecordingMode {
+    /// A theme forced for this run by `LIRAH_THEME`; shown, never saved.
+    theme: Option<String>,
+    /// Running on a recording profile: desktop notifications stay quiet.
+    quiet: bool,
+}
+
+#[tauri::command]
+fn get_recording_mode() -> RecordingMode {
+    RecordingMode { theme: env_nonempty("LIRAH_THEME"), quiet: recording_profile().is_some() }
+}
+
 #[tauri::command]
 fn get_initial_path(state: tauri::State<InitialPath>) -> Option<String> {
     state.0.clone()
@@ -59,6 +82,26 @@ pub fn run(initial_path: Option<String>) {
         .manage(agent_runner::create_agent_job_store())
         .manage(InitialPath(initial_path))
         .setup(|app| {
+            // The main window is built here rather than from the config so a
+            // recording can give it its own profile folder.
+            let config = app.config().app.windows.iter()
+                .find(|w| w.label == "main")
+                .cloned()
+                .ok_or("no main window in tauri.conf.json")?;
+            let mut window = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            if let Some(dir) = recording_profile() {
+                window = window.data_directory(dir);
+            }
+            // Recordings run on a bare X display with no window manager to size
+            // the window, so they ask for an exact size: LIRAH_WINDOW_SIZE=1280x800.
+            if let Some((w, h)) = env_nonempty("LIRAH_WINDOW_SIZE").and_then(|s| {
+                let (w, h) = s.split_once('x')?;
+                Some((w.parse::<f64>().ok()?, h.parse::<f64>().ok()?))
+            }) {
+                window = window.inner_size(w, h);
+            }
+            window.build()?;
+
             agent_hooks::start(app.handle().clone());
             compaction::start();
             // The window starts hidden and the page shows it once its splash
@@ -98,6 +141,7 @@ pub fn run(initial_path: Option<String>) {
             pty::commands::kill_pty_child_process,
             fs::cwd::get_terminal_cwd,
             get_initial_path,
+            get_recording_mode,
             // Files
             fs::directory::read_directory,
             fs::directory::read_file_content,

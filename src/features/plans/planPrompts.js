@@ -102,16 +102,58 @@ function reposBlock(plan) {
 /** The marker kind an agent ends its reply with when a chunk needed no commit. */
 export const STATUS_DONE = 'done';
 
+// Decisions a chunk made that later chunks should follow. The agent writes them
+// as `Decision:` lines in its commit body (or its reply, when there is no
+// commit); they are read back and put into every later chunk's prompt.
+const DECISION_RE = /^\s*[-*]?\s*Decision:\s*(.+?)\s*$/i;
+
+/** The `Decision:` lines of a commit body or reply, without the prefix, in order, deduplicated. */
+export function parseDecisions(text) {
+  const out = [];
+  for (const line of String(text || '').split('\n')) {
+    const m = line.match(DECISION_RE);
+    if (m && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+
+const DECISIONS_INSTRUCTION = `Between the message and the trailer, add one -m "Decision: <one line>" per choice a later chunk should know about: names, file locations, approaches you picked or rejected and why. Skip anything obvious from the code; add none if there's nothing worth passing on.`;
+
+// The newest chunks show every decision; older ones show only their first few.
+const RECENT_CHUNKS = 5;
+const OLD_CHUNK_LINES = 3;
+
+/**
+ * Decisions and results of the implemented chunks before `upTo` (all of them
+ * when null), for a later prompt. Null when there are none.
+ */
+function decisionsBlock(plan, upTo = null) {
+  const earlier = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED
+    && (upTo == null || c.n < upTo)
+    && (c.decisions?.length > 0 || c.result));
+  if (earlier.length === 0) return null;
+  const parts = earlier.map((c, i) => {
+    const lines = [...(c.decisions ?? [])];
+    if (c.result) lines.push(`(result) ${c.result}`);
+    const old = i < earlier.length - RECENT_CHUNKS && lines.length > OLD_CHUNK_LINES;
+    const shown = old ? [...lines.slice(0, OLD_CHUNK_LINES), `… ${lines.length - OLD_CHUNK_LINES} more`] : lines;
+    return `  Chunk ${c.n} (${c.title}):\n${shown.map((l) => `  - ${l}`).join('\n')}`;
+  });
+  return `Decisions from earlier chunks (follow these unless this chunk says otherwise):\n${parts.join('\n')}`;
+}
+
 // `allowDone`: the chunk itself, which may need no file changes (a check, a
 // test run); not a fix, which always changes something.
 function commitInstruction(plan, chunk, { allowDone = false } = {}) {
   return [
     `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
 git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chunkTrailer(plan, chunk)}"`,
+    DECISIONS_INSTRUCTION,
     // A plan of several repos already says so in reposBlock.
     !isMultiRepo(plan) && 'If you change files in another git repository, commit there too, with the same message and trailer.',
     allowDone && `If the chunk needs no file changes (a check, a test run, an investigation), don't make an empty commit. End your reply with a line
-PLAN-STATUS: ${STATUS_DONE} — <one line on what you did or found>`,
+PLAN-STATUS: ${STATUS_DONE} — <one line on what you did or found>
+Put any Decision: lines just above it.`,
   ].filter(Boolean).join('\n');
 }
 
@@ -132,6 +174,7 @@ export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
     plan.summary && `Plan summary: ${plan.summary}`,
     done.length > 0 && `Already implemented:\n${list(done)}`,
     later.length > 0 && `Coming later (don't do these now):\n${list(later)}`,
+    decisionsBlock(plan, chunk.n),
     reposBlock(plan),
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
     `Only do this chunk. ${commitInstruction(plan, chunk, { allowDone: true })}`,
@@ -156,6 +199,7 @@ export function buildFixPrompt(plan, chunk, notes) {
   return [
     `Review notes on chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}", which is already committed.`,
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
+    decisionsBlock(plan, chunk.n),
     reposBlock(plan),
     `Review notes (${notes.length}):\n${noteLines(notes)}`,
     `Address every note. Don't revert unrelated work. ${commitInstruction(plan, chunk)}`,
@@ -188,6 +232,7 @@ export function buildPlanFixPrompt(plan, notes) {
   return [
     `Review notes on the plan "${plan.title}", which is fully implemented and committed.`,
     plan.summary && `Plan summary: ${plan.summary}`,
+    decisionsBlock(plan),
     reposBlock(plan),
     `Review notes (${notes.length}):\n${noteLines(notes)}`,
     `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}"`,

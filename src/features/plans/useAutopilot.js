@@ -9,7 +9,7 @@ import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, nextChunkId,
   planProgress, UNTITLED_PLAN,
 } from './planModel';
-import { buildNudgePrompt, parseStatusMarker, STATUS_DONE } from './planPrompts';
+import { buildNudgePrompt, parseDecisions, parseStatusMarker, STATUS_DONE } from './planPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
 import { useHookWatchdog } from './useHookWatchdog';
 
@@ -37,6 +37,29 @@ async function lastReply(sessionId) {
   return transcriptPath ? invoke('last_assistant_text', { transcriptPath }).catch(() => null) : null;
 }
 
+// How long to wait for the agent to come back after a clear: Claude Code
+// reports its new session, opencode doesn't, so it gets a fixed pause.
+const CLEAR_TIMEOUT_MS = 10_000;
+const CLEAR_PAUSE_MS = 1_500;
+// After the new session starts, before typing into it.
+const CLEAR_SETTLE_MS = 500;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Resolves on the next SessionStart of `sessionId` (true), or false after `ms`. */
+function nextSessionStart(sessionId, ms) {
+  let unsubscribe = () => {};
+  let timer;
+  const promise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+    unsubscribe = subscribeAgentHooks((e) => {
+      // SessionStart after /clear carries source 'clear'; after a SessionEnd there is no previous state.
+      if (e.sessionId === sessionId && e.next?.state === 'waiting' && (e.next.source === 'clear' || e.prev === null)) resolve(true);
+    });
+  });
+  return { promise: promise.finally(() => { clearTimeout(timer); unsubscribe(); }), cancel: () => { clearTimeout(timer); unsubscribe(); } };
+}
+
 /** Is this plan's live run driven by the agent in `sessionId`? */
 const pilotedBy = (plan, sessionId) => isAutopilotLive(plan.autopilot) && getTabSession(plan.autopilot.tabId) === sessionId;
 
@@ -48,8 +71,11 @@ const inFlight = (chunk) => chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.a
  * provider's checkChunk, implementChunk and sendToTab.
  */
 export function useAutopilot({
-  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, tabs, switchTab, toast,
+  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, clearTabContext, tabs, switchTab, toast,
 }) {
+  // Plans whose agent is being cleared: the session ending and starting again
+  // is expected then, not something to steer the run by.
+  const clearingRef = useRef(new Set());
   const toastRef = useRef(toast);
   toastRef.current = toast;
   const tabsRef = useRef(tabs);
@@ -117,6 +143,27 @@ export function useAutopilot({
     setAutopilot(repoRoot, plan.id, { nudged: true });
   }), [sendOrHalt, sendToTab, setAutopilot]);
 
+  // Clear the agent's context in `tabId` and wait until it can take a prompt.
+  const clearContext = useCallback(async (planId, tabId) => {
+    const sessionId = getTabSession(tabId);
+    const started = nextSessionStart(sessionId, CLEAR_TIMEOUT_MS);
+    clearingRef.current.add(planId);
+    try {
+      const { reportsSessionStart } = await clearTabContext(tabId);
+      if (reportsSessionStart) await started.promise;
+      else {
+        started.cancel();
+        await sleep(CLEAR_PAUSE_MS);
+      }
+      await sleep(CLEAR_SETTLE_MS);
+    } catch (e) {
+      started.cancel();
+      throw e;
+    } finally {
+      clearingRef.current.delete(planId);
+    }
+  }, [clearTabContext]);
+
   // Send the next chunk, or finish.
   const advance = useCallback(async (repoRoot, planId) => {
     const plan = findPlan(repoRoot, planId);
@@ -132,10 +179,15 @@ export function useAutopilot({
         `${done} chunk${done === 1 ? '' : 's'}, ${commits} commit${commits === 1 ? '' : 's'}${took}.`);
       return;
     }
+    // A chunk sent earlier in the run means this isn't the first: clear first if asked.
+    const clear = plan.clearBetweenChunks && !!ap.chunkId;
     // Recorded first, so a failed send points at the chunk it was for.
     setAutopilot(repoRoot, planId, { chunkId: nextId, nudged: false });
-    await sendOrHalt(repoRoot, planId, () => implementChunk(repoRoot, planId, nextId, ap.tabId, { autopilot: true }));
-  }, [findPlan, setAutopilot, announce, implementChunk, sendOrHalt]);
+    await sendOrHalt(repoRoot, planId, async () => {
+      if (clear) await clearContext(planId, ap.tabId);
+      await implementChunk(repoRoot, planId, nextId, ap.tabId, { autopilot: true });
+    });
+  }, [findPlan, setAutopilot, announce, implementChunk, sendOrHalt, clearContext]);
 
   // Pick up where the run is: the current chunk if it is still in flight
   // (committed → move on; agent idle → nudge), else the next one.
@@ -203,7 +255,7 @@ export function useAutopilot({
     const marker = parseStatusMarker(text);
     if (marker?.kind === STATUS_DONE) {
       // Nothing to commit for this chunk (a check, a test run): on to the next.
-      const done = await markChunkDone(repoRoot, planId, current.id, marker.message || null);
+      const done = await markChunkDone(repoRoot, planId, current.id, marker.message || null, parseDecisions(text));
       if (done.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, done.error);
       setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.RUNNING, nudged: false, reason: null, message: null });
       return advance(repoRoot, planId);
@@ -226,8 +278,9 @@ export function useAutopilot({
     const settle = async (repoRoot, planId, chunk, sessionId) => {
       const res = await checkChunk(repoRoot, planId, chunk.id);
       if (res.found || res.error || chunk.status !== CHUNK_STATUS.IN_PROGRESS) return;
-      const marker = parseStatusMarker(await lastReply(sessionId));
-      if (marker?.kind === STATUS_DONE) markChunkDone(repoRoot, planId, chunk.id, marker.message || null);
+      const text = await lastReply(sessionId);
+      const marker = parseStatusMarker(text);
+      if (marker?.kind === STATUS_DONE) markChunkDone(repoRoot, planId, chunk.id, marker.message || null, parseDecisions(text));
     };
 
     // Check the plan's chunks this session was working on (`which` of them).
@@ -265,6 +318,7 @@ export function useAutopilot({
             if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, inFlight, (c) => settle(repoRoot, plan.id, c, sessionId));
             continue;
           }
+          if (clearingRef.current.has(plan.id)) continue; // Its own /clear ending and starting the session.
           const pilotChunkId = plan.autopilot.chunkId;
           steer(repoRoot, plan, sessionId, next, turnEnded);
           // Auto-pilot checks its own chunk; checking it here too would race.

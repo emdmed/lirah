@@ -61,6 +61,9 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
   const onMove = (delta) => moveChunk(repoRoot, plan.id, chunk.id, delta);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: chunk.title, details: chunk.details });
+  // The decisions passed on to later chunks, one per line while editing.
+  const [decisionsDraft, setDecisionsDraft] = useState(null);
+  const editingDecisions = decisionsDraft !== null;
   const lamp = chunkLamp(chunk);
   const skipped = chunk.status === CHUNK_STATUS.SKIPPED;
   const startable = chunk.status === CHUNK_STATUS.PENDING || chunk.status === CHUNK_STATUS.ROLLED_BACK;
@@ -75,6 +78,11 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
   const startEdit = () => {
     setDraft({ title: chunk.title, details: chunk.details });
     setEditing(true);
+  };
+  const saveDecisions = () => {
+    const lines = decisionsDraft.split('\n').map((l) => l.replace(/^\s*[-*]?\s*(Decision:\s*)?/i, '').trim()).filter(Boolean);
+    onPatch({ decisions: [...new Set(lines)] });
+    setDecisionsDraft(null);
   };
   const saveEdit = () => {
     if (draft.title.trim()) onPatch({ title: draft.title.trim(), details: draft.details });
@@ -184,6 +192,30 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
                   <Prose text={chunk.result} className="text-muted-foreground" />
                 </Field>
               )}
+              {editingDecisions ? (
+                <Field label="decisions">
+                  <textarea
+                    value={decisionsDraft}
+                    onChange={(e) => setDecisionsDraft(e.target.value)}
+                    rows={Math.max(3, (chunk.decisions?.length ?? 0) + 1)}
+                    placeholder="One per line. Later chunks get these in their prompt."
+                    className="ins-well resize-y px-1.5 py-1 text-[10px] leading-relaxed text-foreground outline-none"
+                    autoFocus
+                  />
+                  <div className="flex gap-1.5 pt-0.5">
+                    <PanelButton icon={Check} onClick={saveDecisions}>save</PanelButton>
+                    <PanelButton onClick={() => setDecisionsDraft(null)}>cancel</PanelButton>
+                  </div>
+                </Field>
+              ) : chunk.decisions?.length > 0 && (
+                <Field label="decisions">
+                  <ul className="flex flex-col gap-0.5 text-muted-foreground" title="Passed on to later chunks' prompts">
+                    {chunk.decisions.map((d) => (
+                      <li key={d} className="wrap-anywhere before:mr-1.5 before:text-faint before:content-['–']">{d}</li>
+                    ))}
+                  </ul>
+                </Field>
+              )}
               {chunk.commits?.length > 0 && (
                 <Field label="commits">
                   <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
@@ -194,7 +226,7 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
             </>
           )}
 
-          {!editing && (
+          {!editing && !editingDecisions && (
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               {/* Auto-pilot does the sending, checking and committing while it runs. */}
               {startable && !piloted && (
@@ -227,6 +259,16 @@ export function ChunkRow({ plan, chunk, open, onToggle }) {
                     roll back
                   </PanelButton>
                 </>
+              )}
+              {implemented && (
+                <PanelButton
+                  icon={Pencil}
+                  onClick={() => setDecisionsDraft((chunk.decisions ?? []).join('\n'))}
+                  disabled={busy}
+                  title="Edit the decisions passed on to later chunks"
+                >
+                  decisions
+                </PanelButton>
               )}
               {(chunk.status === CHUNK_STATUS.PENDING || skipped) && (
                 <PanelButton

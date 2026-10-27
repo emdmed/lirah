@@ -1,3 +1,4 @@
+import { getRecordingMode } from './lib/recordingMode';
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { matches } from "./lib/shortcuts";
@@ -50,20 +51,23 @@ function App() {
   useEffect(() => {
     if (!availableUpdate) return;
     const NOTIFIED_KEY = 'nevo-terminal:update-notified-version';
-    try {
-      if (localStorage.getItem(NOTIFIED_KEY) === availableUpdate.version) return;
-      localStorage.setItem(NOTIFIED_KEY, availableUpdate.version);
-    } catch { /* ignore */ }
-    toast.info(`Update available: ${availableUpdate.version}`, {
-      duration: 15000,
-      action: {
-        label: 'View Release',
-        onClick: () => {
-          import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
-            openUrl(availableUpdate.url);
-          });
+    getRecordingMode().then(({ quiet }) => {
+      if (quiet) return; // no toast over a promo recording
+      try {
+        if (localStorage.getItem(NOTIFIED_KEY) === availableUpdate.version) return;
+        localStorage.setItem(NOTIFIED_KEY, availableUpdate.version);
+      } catch { /* ignore */ }
+      toast.info(`Update available: ${availableUpdate.version}`, {
+        duration: 15000,
+        action: {
+          label: 'View Release',
+          onClick: () => {
+            import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
+              openUrl(availableUpdate.url);
+            });
+          },
         },
-      },
+      });
     });
   }, [availableUpdate, toast]);
 

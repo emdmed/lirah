@@ -7,7 +7,7 @@ import { git, gitLines } from '../../lib/git';
 import { basename } from '../../utils/pathUtils';
 import { chunkBases, chunkCommitsByRepo, planGit, workPath } from './planGit';
 import { CHUNK_STATUS } from './planModel';
-import { chunkCommitMessage, chunkTrailer } from './planPrompts';
+import { chunkCommitMessage, chunkTrailer, parseDecisions } from './planPrompts';
 
 // Commits a little older than the chunk's start still count: clocks and
 // commit dates are not exact.
@@ -52,6 +52,23 @@ export async function strayCommits(plan, chunk, roots) {
     found[root] = { shas, base };
   }
   return found;
+}
+
+/**
+ * The Decision: lines in the bodies of `commitsByRepo` (root -> shas, oldest
+ * first), in commit order, deduplicated. A root the plan doesn't list yet (a
+ * stray repo) is read in place.
+ */
+export async function commitDecisions(plan, commitsByRepo) {
+  const repos = planGit(plan).repos;
+  const out = [];
+  for (const [root, shas] of Object.entries(commitsByRepo)) {
+    if (!shas?.length) continue;
+    const repo = repos.find((r) => r.root === root);
+    const bodies = await git(repo ? workPath(repo) : root, ['show', '--no-patch', '--format=%B', ...shas]);
+    for (const d of parseDecisions(bodies)) if (!out.includes(d)) out.push(d);
+  }
+  return out;
 }
 
 /** Each repo's HEAD in the plan's git settings `cfg`, before a chunk starts. Throws for a repo with no commits. */

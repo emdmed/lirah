@@ -14,7 +14,7 @@ import { getTabPrompt } from '../tabs/tabPrompts';
 import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
 import {
-  captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, rollbackChunk as revertChunk, strayCommits,
+  captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, rollbackChunk as revertChunk, strayCommits,
 } from './planGitOps';
 import {
   chunkBases, cleanupGit, defaultBranch, planGit, prepareGit, withRepos,
@@ -43,6 +43,9 @@ import {
 // says so with a PLAN-STATUS: done line, or when you mark it done.
 //
 // Auto-pilot, which chains the chunks in one tab, lives in useAutopilot.js.
+// With plan.clearBetweenChunks it clears the agent's context before each
+// chunk after the first, so a chunk knows earlier ones only from its prompt
+// (their titles and Decision: lines) and the code.
 
 const PlansActionsContext = createContext(null);
 const PlansStateContext = createContext(null);
@@ -95,13 +98,25 @@ export function PlansProvider({ children }) {
       }
       const commits = Object.values(commitsByRepo).flat();
       if (commits.length > 0) {
+        // Only commits not read before (a fix commit on an implemented chunk):
+        // decisions you edited in the row stay as you left them.
+        const seen = new Set(chunk.status === CHUNK_STATUS.IMPLEMENTED ? chunk.commits ?? [] : []);
+        const fresh = Object.fromEntries(Object.entries(commitsByRepo)
+          .map(([root, shas]) => [root, shas.filter((sha) => !seen.has(sha))]));
+        const found = await commitDecisions(plan, fresh);
         const strayRoots = Object.keys(strays);
         updatePlan(repoRoot, planId, (p) => ({
           // Repos the agent committed in join the plan: later chunks are checked, reviewed and rolled back there too.
           ...(strayRoots.length > 0 && { git: withRepos(planGit(p), strayRoots) }),
           chunks: p.chunks.map((c) => (c.id !== chunkId ? c : {
             ...c,
-            ...toImplemented(c, { commits, commitsByRepo }),
+            ...toImplemented(c, {
+              commits,
+              commitsByRepo,
+              decisions: seen.size > 0
+                ? [...(c.decisions ?? []), ...found.filter((d) => !c.decisions?.includes(d))]
+                : found,
+            }),
             baseShas: { ...chunkBases(p, c), ...strayBases },
           })),
         }));
@@ -123,13 +138,14 @@ export function PlansProvider({ children }) {
   }, [findChunk, updatePlan, tabRepoRoots]);
 
   // An in-progress chunk done with nothing to commit; `result` is what the
-  // agent said it did. Commits found first win.
-  const markChunkDone = useCallback(async (repoRoot, planId, chunkId, result = null) => {
+  // agent said it did, `decisions` the Decision: lines of its reply. Commits
+  // found first win.
+  const markChunkDone = useCallback(async (repoRoot, planId, chunkId, result = null, decisions = []) => {
     const res = await checkChunk(repoRoot, planId, chunkId);
     if (res.found || res.error) return res;
     const { chunk } = findChunk(repoRoot, planId, chunkId);
     if (chunk?.status !== CHUNK_STATUS.IN_PROGRESS) return res;
-    updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits: [], commitsByRepo: {}, result }));
+    updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits: [], commitsByRepo: {}, result, decisions }));
     return { found: false, done: true };
   }, [checkChunk, findChunk, updateChunk]);
 
@@ -261,6 +277,13 @@ export function PlansProvider({ children }) {
     await send(text);
   }, []);
 
+  // Clears the agent's context in the tab: /clear, or /new in opencode.
+  const clearTabContext = useCallback(async (tabId) => {
+    const clear = getTabPrompt(tabId)?.clearContext;
+    if (!clear) throw new Error('That tab is closed');
+    return clear();
+  }, []);
+
   const implementChunk = useCallback(async (repoRoot, planId, chunkId, tabId, { autopilot = false } = {}) => {
     if (!findChunk(repoRoot, planId, chunkId).chunk) throw new Error('Chunk not found');
     const cfg = await ensureGit(repoRoot, planId);
@@ -305,7 +328,7 @@ export function PlansProvider({ children }) {
   const {
     startAutopilot, resumeAutopilot, stopAutopilot, dismissAutopilot, revealRun,
   } = useAutopilot({
-    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, tabs, switchTab, toast,
+    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, clearTabContext, tabs, switchTab, toast,
   });
 
   const actions = useMemo(() => ({

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { ChevronLeft, FileText, Plane, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronLeft, Eraser, FileText, Plane, RefreshCw, Trash2 } from 'lucide-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { PlanGitSection } from './PlanGitSection';
 import { ProgressReadout, Prose } from './parts';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
+  AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import { AutopilotStrip } from './AutopilotStrip';
 import { ChunkRow, DoneRun } from './ChunkRow';
@@ -39,7 +39,7 @@ function chunkSegments(chunks, open) {
 export function PlanDetail({ plan }) {
   const pane = usePlanPane();
   const { repoRoot } = pane;
-  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot } = usePlansActions();
+  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan } = usePlansActions();
   const { tabs, switchTab, addTab } = useTabManager();
   const reviewingAll = useBusy(BUSY.REVIEW_ALL);
   const settingUpGit = useBusy(BUSY.GIT_SETUP);
@@ -92,12 +92,24 @@ export function PlanDetail({ plan }) {
         {(total > 0 || canPilot) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1.5">
             {total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
+            {/* Read before each chunk, so it can change during a run. */}
+            {(canPilot || isAutopilotLive(plan.autopilot)) && (
+              <PanelButton
+                icon={Eraser}
+                latched={!!plan.clearBetweenChunks}
+                onClick={() => updatePlan(repoRoot, plan.id, { clearBetweenChunks: !plan.clearBetweenChunks })}
+                className="ml-auto"
+                title="Auto-pilot clears the agent's context (/clear, or /new in opencode) before each chunk after the first. Later chunks then know earlier ones only from the plan, their decisions and the code."
+              >
+                clear between chunks
+              </PanelButton>
+            )}
             {canPilot && (
               <PanelButton
                 icon={Plane}
                 onClick={() => pane.autopilot(plan)}
                 // The plan's one primary key: framed and lamp-lit.
-                className="ml-auto ins-key-primary"
+                className="ins-key-primary"
                 title="Implement the remaining chunks one after another, unattended"
               >
                 run on auto-pilot

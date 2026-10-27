@@ -664,21 +664,31 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
   // tab's prompt.
   const addFilesRef = useRef(fileSelection.addFiles);
   addFilesRef.current = fileSelection.addFiles;
+  const selectedCliRef = useRef(settings.selectedCli);
+  selectedCliRef.current = settings.selectedCli;
   useEffect(() => {
     if (!tabId) return;
+    // Types `text` into the terminal and submits it, like the prompt's send.
+    const send = async (text) => {
+      const sessionId = getTabSession(tabId);
+      if (!sessionId) throw new Error('This tab has no terminal yet');
+      await invoke('write_to_terminal', { sessionId, data: text });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await invoke('write_to_terminal', { sessionId, data: '\r' });
+    };
     return registerTabPrompt(tabId, {
       open: () => {
         setTextareaVisible(true);
         requestAnimationFrame(() => textareaRef.current?.focus());
       },
       addFiles: (paths) => addFilesRef.current(paths),
-      // Types `text` into the terminal and submits it, like the prompt's send.
-      send: async (text) => {
-        const sessionId = getTabSession(tabId);
-        if (!sessionId) throw new Error('This tab has no terminal yet');
-        await invoke('write_to_terminal', { sessionId, data: text });
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await invoke('write_to_terminal', { sessionId, data: '\r' });
+      send,
+      // Starts the agent on a fresh context, without focusing the terminal.
+      // Only Claude Code reports the new session (a SessionStart hook).
+      clearContext: async () => {
+        const cli = selectedCliRef.current;
+        await send(cli === 'opencode' ? '/new' : '/clear');
+        return { reportsSessionStart: cli === 'claude-code' };
       },
     });
   }, [tabId]);

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { getRecordingMode } from '../lib/recordingMode';
 import { themes, defaultTheme, loadTheme, saveTheme } from '../themes/theme-config';
 
 const ThemeContext = createContext(undefined);
@@ -7,6 +8,22 @@ export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState(() => loadTheme());
   // The first application is the startup palette, not a switch: no fade.
   const appliedOnce = useRef(false);
+  // A theme forced by LIRAH_THEME (recordings) is shown but never saved, so
+  // the user's own preference survives the run.
+  const forced = useRef(null);
+
+  useEffect(() => {
+    getRecordingMode().then(({ theme: name }) => {
+      if (!name) return;
+      if (!themes[name]) {
+        console.warn(`LIRAH_THEME "${name}" does not exist`);
+        return;
+      }
+      forced.current = name;
+      appliedOnce.current = false; // swap in place under the splash, no fade
+      setCurrentTheme(name);
+    });
+  }, []);
 
   // Apply theme to CSS variables whenever theme changes
   useEffect(() => {
@@ -50,8 +67,11 @@ export function ThemeProvider({ children }) {
 
     // Save theme preference, and its gutter colour for the boot splash
     // (index.html reads it before any module loads).
-    saveTheme(currentTheme);
-    try { localStorage.setItem('lirah-splash-bg', ui.background); } catch { /* storage unavailable */ }
+    if (forced.current !== currentTheme) {
+      forced.current = null; // a manual switch during the run is a real choice
+      saveTheme(currentTheme);
+      try { localStorage.setItem('lirah-splash-bg', ui.background); } catch { /* storage unavailable */ }
+    }
 
     return () => {
       clearTimeout(fadeTimer);

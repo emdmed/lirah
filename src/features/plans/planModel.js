@@ -138,6 +138,7 @@ export function newChunks(chunks) {
     needsCommit: false,
     awaitingFix: false,
     result: null, // what the agent said when a chunk was done with nothing to commit
+    decisions: [], // its Decision: lines, passed on to later chunks' prompts
     startedAt: null,
     doneAt: null,
   }));
@@ -187,6 +188,7 @@ export function toInProgress({ tabId, baseShas, primaryRoot, now = Date.now() })
     needsCommit: false,
     awaitingFix: false,
     result: null,
+    decisions: [],
     startedAt: now,
     doneAt: null,
   };
@@ -195,9 +197,9 @@ export function toInProgress({ tabId, baseShas, primaryRoot, now = Date.now() })
 /**
  * Its commits landed, or it was done with nothing to commit (no commits, and
  * `result` says what the agent did). A fix commit on an implemented chunk
- * keeps the first doneAt.
+ * keeps the first doneAt. `decisions` replaces the chunk's; left out, they stay.
  */
-export function toImplemented(chunk, { commits, commitsByRepo, result = null, now = Date.now() }) {
+export function toImplemented(chunk, { commits, commitsByRepo, result = null, decisions, now = Date.now() }) {
   return {
     status: CHUNK_STATUS.IMPLEMENTED,
     commits,
@@ -205,6 +207,7 @@ export function toImplemented(chunk, { commits, commitsByRepo, result = null, no
     needsCommit: false,
     awaitingFix: false,
     result,
+    decisions: decisions ?? chunk.decisions ?? [],
     doneAt: chunk.status === CHUNK_STATUS.IMPLEMENTED ? chunk.doneAt : now,
   };
 }
@@ -219,6 +222,7 @@ export function toRolledBack(revertShas) {
     needsCommit: false,
     awaitingFix: false,
     result: null,
+    decisions: [],
     doneAt: null,
   };
 }
