@@ -9,13 +9,13 @@ import {
 import { FileGroupsMenuItems } from "../../features/file-groups";
 
 // The project's context sets (saved context) behind one menu.
-export function ProjectToolbar({ projectPath, onLoadGroup, onSaveGroup, fileCount }) {
+export function ProjectToolbar({ projectPath, onLoadGroup, onSaveGroup, fileCount, label = "project" }) {
   return (
     <div className="flex items-center gap-0.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="xs" className="gap-1 px-1.5" aria-label="Project actions and context sets">
-            project
+            {label}
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>

@@ -29,6 +29,7 @@ export function useTabCommands({
   onLaunchCli,
   onOpenLazygit,
   onClearContext,
+  onInsertContext,
   toggleSandbox,
   toggleNetwork,
   onToggleGitFilter,
@@ -81,6 +82,10 @@ export function useTabCommands({
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));
       } },
+      { id: 'insert', hint: 'type the context into the terminal (CLIs without the hook)', run: () => {
+        if (!onInsertContext) throw new Error('no context to insert');
+        return onInsertContext();
+      } },
       { id: 'templates', hint: 'manage prompt templates', run: () => setManageTemplatesDialogOpen(true) },
 
       // Git
@@ -126,7 +131,7 @@ export function useTabCommands({
       commands.push({ id: 'settings', aliases: ['prefs'], hint: 'all settings', run: () => setSettingsOpen(true) });
     }
     return commands;
-  }, [tabId, projectPath, addTab, requestCloseTab, onLaunchCli, onClearContext, onOpenLazygit,
+  }, [tabId, projectPath, addTab, requestCloseTab, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,

@@ -677,8 +677,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
       await invoke('write_to_terminal', { sessionId, data: '\r' });
     };
     return registerTabPrompt(tabId, {
-      open: () => {
-        setTextareaVisible(true);
+      // Context added from elsewhere (a linked repo, another agent's edits)
+      // stays in the mode the user types in: the context pane lists it for a
+      // prompt typed in the terminal (the hook attaches it); only an open
+      // prompt box takes focus.
+      reveal: () => {
         requestAnimationFrame(() => textareaRef.current?.focus());
       },
       addFiles: (paths) => addFilesRef.current(paths),
@@ -957,6 +960,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
     onLaunchCli: launchClaude,
     onOpenLazygit: handleOpenLazygit,
     onClearContext: handleClearContext,
+    onInsertContext: promptBase.text ? insertContext : undefined,
     toggleSandbox,
     toggleNetwork,
     onToggleGitFilter: treeView.handleToggleGitFilter,

@@ -63,7 +63,7 @@ export function TabsSummaryPane() {
       return;
     }
     linkRepo(activeTabId, { path: tab.projectPath, name, role: tab.role });
-    getTabPrompt(activeTabId)?.open();
+    getTabPrompt(activeTabId)?.reveal();
   }, [activeTabId]);
 
   // Puts the files another (or this) tab's agent edited last turn into the
@@ -72,7 +72,7 @@ export function TabsSummaryPane() {
     const prompt = getTabPrompt(activeTabId);
     if (!prompt?.addFiles) return;
     prompt.addFiles(files);
-    prompt.open();
+    prompt.reveal();
     toast.success(`Attached ${plural(files.length, 'file')} to the prompt`);
   }, [activeTabId, toast]);
 
