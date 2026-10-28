@@ -85,7 +85,8 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
           command += ` --plugin-dir '${dir.replace(/'/g, "'\\''")}'`;
         }
       }
-      command += '\r';
+      // Clear the screen first so the agent starts on a clean terminal.
+      command = `clear && ${command}\r`;
 
       console.log('Launching CLI with command:', command.trim());
 

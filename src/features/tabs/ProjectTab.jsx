@@ -668,11 +668,18 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
   selectedCliRef.current = settings.selectedCli;
   useEffect(() => {
     if (!tabId) return;
-    // Types `text` into the terminal and submits it, like the prompt's send.
+    // Pastes `text` into the terminal and submits it, like the prompt's send.
+    // Long prompts (a late plan chunk runs to 30 KB) reach the agent in several
+    // reads; without paste markers it can take a later burst for the whole
+    // input and drop the start. Bracketed paste marks both ends, as a real
+    // paste would. ESC is stripped so the text can't end the paste early.
     const send = async (text) => {
       const sessionId = getTabSession(tabId);
       if (!sessionId) throw new Error('This tab has no terminal yet');
-      await invoke('write_to_terminal', { sessionId, data: text });
+      const data = terminalRef.current?.bracketedPaste?.()
+        ? `\x1b[200~${text.replace(/\x1b/g, '')}\x1b[201~`
+        : text;
+      await invoke('write_to_terminal', { sessionId, data });
       await new Promise((resolve) => setTimeout(resolve, 500));
       await invoke('write_to_terminal', { sessionId, data: '\r' });
     };

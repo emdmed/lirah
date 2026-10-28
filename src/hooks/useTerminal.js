@@ -763,7 +763,9 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       // resize events while hidden, and Ink-style renderers rely on the
       // latest size to redraw cleanly.
       handleResize({ immediate: true });
-    }
+    },
+    // Whether the program in the terminal asked for bracketed paste (DECSET 2004).
+    bracketedPaste: () => !!terminal?.modes?.bracketedPasteMode,
   }), [terminal, isReady, handleResize]);
 
   // The search addon only reports match counts when decorations are enabled, and
