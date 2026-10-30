@@ -43,6 +43,7 @@ const HOOKS_PACKAGE_JSON: &str = "{\"type\":\"module\"}\n";
 /// The `lirah` CLI (an ES module, so its folder gets the same package.json)
 /// and the sh wrapper that puts it on PATH as `lirah`.
 const LIRAH_CLI_JS: &str = include_str!("lirah_cli.js");
+const LIRAH_SKILL_MD: &str = include_str!("lirah_skill.md");
 const LIRAH_WRAPPER: &str = "#!/bin/sh\nexec node \"$(dirname \"$0\")/lirah.js\" \"$@\"\n";
 
 /// Claude Code hook events that change what a tab should show. PostToolUse
@@ -138,6 +139,12 @@ fn prompt_context_dir() -> Option<PathBuf> {
 
 fn claude_plugin_dir() -> Option<PathBuf> {
     crate::util::lirah_dir().map(|d| d.join("claude-plugin"))
+}
+
+/// The Claude Code plugin that ships the `lirah` skill. Separate from the
+/// agent-state plugin so each follows its own setting.
+fn control_plugin_dir() -> Option<PathBuf> {
+    crate::util::lirah_dir().map(|d| d.join("control").join("claude-plugin"))
 }
 
 fn cli_bin_dir() -> Option<PathBuf> {
@@ -259,6 +266,8 @@ fn install() -> Result<(), String> {
     install_cli(&lirah.join("bin")).map_err(|e| e.to_string())?;
 
     let to_json = |v: serde_json::Value| serde_json::to_string_pretty(&v).map_err(|e| e.to_string());
+    install_control_plugin(&to_json)?;
+
     let plugin = claude_plugin_dir().ok_or("No home directory")?;
     let manifest = to_json(serde_json::json!({
         "name": "lirah-agent-state",
@@ -279,6 +288,23 @@ fn install() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// The plugin that teaches Claude Code the `lirah` command, as a skill.
+fn install_control_plugin(
+    to_json: &dyn Fn(serde_json::Value) -> Result<String, String>,
+) -> Result<(), String> {
+    let plugin = control_plugin_dir().ok_or("No home directory")?;
+    let manifest = to_json(serde_json::json!({
+        "name": "lirah-control",
+        "version": "1.0.0",
+        "author": { "name": "Lirah" },
+        "description": "Teaches the agent to configure Lirah (settings, theme, tabs, startup) with the lirah command."
+    }))?;
+    write_if_changed(&plugin.join(".claude-plugin").join("plugin.json"), &manifest)
+        .map_err(|e| e.to_string())?;
+    write_if_changed(&plugin.join("skills").join("lirah").join("SKILL.md"), LIRAH_SKILL_MD)
+        .map_err(|e| e.to_string())
 }
 
 /// The `lirah` CLI: `bin/lirah` runs `bin/lirah.js` with node.
@@ -407,6 +433,15 @@ pub fn start(app: AppHandle) {
 pub fn get_agent_hook_plugin_dir() -> Option<String> {
     claude_plugin_dir()
         .filter(|p| p.join("hooks").join("hooks.json").exists())
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// The plugin directory with the `lirah` skill, passed with `--plugin-dir`
+/// when the "Agent control" setting is on.
+#[tauri::command]
+pub fn get_agent_control_plugin_dir() -> Option<String> {
+    control_plugin_dir()
+        .filter(|p| p.join("skills").join("lirah").join("SKILL.md").exists())
         .map(|p| p.to_string_lossy().into_owned())
 }
 

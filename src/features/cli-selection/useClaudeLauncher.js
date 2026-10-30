@@ -75,11 +75,13 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
       // in settings. Agent state: the agent reports working / needs
       // permission / done to the tab. Compaction: its hook only acts for tabs
       // with compaction switched on, so that per-tab switch needs no relaunch.
+      // Agent control: the skill that teaches the agent the lirah command.
       if (selectedCli === 'claude-code') {
-        const { agentStateHook, compactionHook } = getSettings();
+        const { agentStateHook, compactionHook, agentControl } = getSettings();
         const pluginDirs = await Promise.all([
           agentStateHook ? invoke('get_agent_hook_plugin_dir').catch(() => null) : null,
           compactionHook ? invoke('get_compaction_plugin_dir').catch(() => null) : null,
+          agentControl ? invoke('get_agent_control_plugin_dir').catch(() => null) : null,
         ]);
         for (const dir of pluginDirs.filter(Boolean)) {
           command += ` --plugin-dir '${dir.replace(/'/g, "'\\''")}'`;

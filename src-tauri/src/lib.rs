@@ -183,6 +183,7 @@ pub fn run(initial_path: Option<String>) {
             claude::tokens::get_all_projects_stats,
             claude::context::get_context_breakdown,
             agent_hooks::get_agent_hook_plugin_dir,
+            agent_hooks::get_agent_control_plugin_dir,
             agent_hooks::set_opencode_agent_plugin,
             agent_hooks::set_prompt_context,
             agent_control::agent_control_reply,

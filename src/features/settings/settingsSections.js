@@ -32,7 +32,7 @@ export const SETTINGS_ROWS = [
   {
     id: 'agent-control', section: 'agent', kind: 'toggle', key: 'agentControl',
     label: 'Agent control',
-    hint: 'The agent in a tab can change settings and the theme with the lirah command. Sandbox, hook and this switch ask you first.',
+    hint: 'The agent in a tab can change settings, the theme, tabs and startup projects with the lirah command, and Claude Code gets a skill that teaches it. Sandbox, hook and this switch ask you first. The skill applies to agents launched after the change.',
     words: 'agent control lirah cli command settings theme configure',
   },
   {
