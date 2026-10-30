@@ -21,6 +21,17 @@ pub struct TokenUsage {
     /// input + cache_read + cache_creation of that message's usage.
     #[serde(default)]
     pub context_tokens: u64,
+    /// The three parts of `context_tokens` (they sum to it): uncached input,
+    /// cache reads and cache writes of the most recent assistant turn.
+    #[serde(default)]
+    pub last_input_tokens: u64,
+    #[serde(default)]
+    pub last_cache_read_tokens: u64,
+    #[serde(default)]
+    pub last_cache_creation_tokens: u64,
+    /// Estimated cost (USD) of the most recent assistant turn alone.
+    #[serde(default)]
+    pub last_cost: f64,
     /// Model id of the most recent assistant turn (picks the context window).
     #[serde(default)]
     pub last_model: Option<String>,
@@ -47,6 +58,10 @@ pub struct SessionInfo {
     pub message_count: u64,
     pub timestamp: String,
     pub context_tokens: u64,
+    pub last_input_tokens: u64,
+    pub last_cache_read_tokens: u64,
+    pub last_cache_creation_tokens: u64,
+    pub last_cost: f64,
     pub last_model: Option<String>,
 }
 
@@ -221,6 +236,10 @@ fn usage_from_session(session: SessionInfo, tab_bound: bool) -> TokenUsage {
         model: session.model,
         session_file: Some(session.session_file),
         context_tokens: session.context_tokens,
+        last_input_tokens: session.last_input_tokens,
+        last_cache_read_tokens: session.last_cache_read_tokens,
+        last_cache_creation_tokens: session.last_cache_creation_tokens,
+        last_cost: session.last_cost,
         last_model: session.last_model,
         session_id: if session.session_id.is_empty() { None } else { Some(session.session_id) },
         tab_bound,
@@ -725,6 +744,19 @@ fn cache_insert(cache: &mut HashMap<PathBuf, CachedSession>, path: PathBuf, mut 
 /// Build a `SessionInfo` from the cached summary — cheap, no file I/O.
 fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
     let t = &c.totals;
+    let last = c.last_usage.as_ref();
+    let last_input = last.and_then(|u| u.input_tokens).unwrap_or(0);
+    let last_cache_read = last.and_then(|u| u.cache_read_input_tokens).unwrap_or(0);
+    let last_cache_creation = last.and_then(|u| u.cache_creation_input_tokens).unwrap_or(0);
+    let last_cost = last.map_or(0.0, |u| {
+        calculate_cost(
+            last_input,
+            u.output_tokens.unwrap_or(0),
+            last_cache_read,
+            last_cache_creation,
+            c.last_model.as_deref().unwrap_or("claude-sonnet-4-5-20250929"),
+        )
+    });
     SessionInfo {
         session_id: c.session_id.clone(),
         session_file: path.to_string_lossy().to_string(),
@@ -737,16 +769,13 @@ fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
         billable_output_tokens: t.output,
         message_count: t.messages,
         timestamp: c.timestamp.clone().unwrap_or_default(),
-        context_tokens: c.last_usage.as_ref().map(context_tokens_of).unwrap_or(0),
+        context_tokens: last_input + last_cache_read + last_cache_creation,
+        last_input_tokens: last_input,
+        last_cache_read_tokens: last_cache_read,
+        last_cache_creation_tokens: last_cache_creation,
+        last_cost,
         last_model: c.last_model.clone(),
     }
-}
-
-/// Tokens occupying the context window for one assistant turn.
-fn context_tokens_of(u: &UsageData) -> u64 {
-    u.input_tokens.unwrap_or(0)
-        + u.cache_read_input_tokens.unwrap_or(0)
-        + u.cache_creation_input_tokens.unwrap_or(0)
 }
 
 /// Read complete (newline-terminated) lines from `reader` and merge them into
@@ -885,6 +914,15 @@ mod tests {
 
         let info = build_session_info(&PathBuf::from("x.jsonl"), &state);
         assert_eq!(info.context_tokens, 3 + 1000 + 50);
+        assert_eq!(info.last_input_tokens, 3);
+        assert_eq!(info.last_cache_read_tokens, 1000);
+        assert_eq!(info.last_cache_creation_tokens, 50);
+        assert_eq!(
+            info.last_input_tokens + info.last_cache_read_tokens + info.last_cache_creation_tokens,
+            info.context_tokens
+        );
+        let expected = calculate_cost(3, 7, 1000, 50, "claude-sonnet-4-5-20250929");
+        assert!((info.last_cost - expected).abs() < 1e-12);
         assert_eq!(info.last_model.as_deref(), Some("claude-sonnet-4-5-20250929"));
         // Cumulative totals still cover both assistant messages; the
         // usage-less user line is ignored.
