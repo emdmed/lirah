@@ -96,7 +96,29 @@ export function hintBarEntries(held) {
   };
 }
 
-const BY_COMMAND = new Map(SHORTCUTS.filter((s) => s.paletteCommand).map((s) => [s.paletteCommand, s]));
+const MODIFIER_KEYS = new Set(['Ctrl', 'Shift', 'Alt']);
+// The hint bar's chords are 'ctrl' and 'ctrl+shift' (useModifierHold); Shift
+// alone never shows the bar, so 'shift' means the Ctrl+Shift chord.
+const CHORD = { ctrl: 'ctrl', shift: 'ctrl+shift', 'ctrl+shift': 'ctrl+shift', alt: 'alt' };
+
+/**
+ * The keys bound under a held modifier, as the hint bar shows them, in
+ * registry order: [{ key, label, n }]. `key` is the non-modifier key name
+ * as written in the registry ('T', '1-9', 'Enter', 'Space', '`'), `label`
+ * the hint label, `n` the 1-based position. No hint-bar entry uses Alt, so
+ * 'alt' returns [].
+ */
+export function boundKeysFor(mod) {
+  const chord = CHORD[mod];
+  if (!chord) return [];
+  return hintBarEntries(chord).held.map((s, i) => ({
+    key: s.keys.filter((k) => !MODIFIER_KEYS.has(k)).join(' '),
+    label: s.hint.label,
+    n: i + 1,
+  }));
+}
+
+const BY_COMMAND =new Map(SHORTCUTS.filter((s) => s.paletteCommand).map((s) => [s.paletteCommand, s]));
 
 /** Compact keys of the shortcut doing what palette command `id` does, if any. */
 export function shortcutForCommand(id) {
