@@ -4,10 +4,13 @@ import { Meter } from '@/components/instrument/Meter';
 import { WARN_AT, FAULT_AT } from '@/components/instrument/gauge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useSetting } from '@/features/settings/settingsStore';
 import { useTokenBudget } from './TokenBudgetContext';
+import { Fig14Budget } from './Fig14Budget';
 
 export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
-  const { getBudget, setBudget, removeBudget, currentUsage, resetAlerts } = useTokenBudget();
+  const { getBudget, setBudget, removeBudget, currentUsage, resetAlerts, projectStats } = useTokenBudget();
+  const [figures] = useSetting('figures');
 
   const [dailyLimit, setDailyLimit] = useState('');
   const [weeklyLimit, setWeeklyLimit] = useState('');
@@ -62,7 +65,7 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
 
   const cost = currentUsage.cost < 0.01 ? '<$0.01' : `$${currentUsage.cost.toFixed(2)}`;
 
-  const limitField = (id, label, value, setValue, placeholder) => (
+  const limitField = (id, label, value, setValue, placeholder, kind) => (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="ins-legend">{label}</label>
       <Input
@@ -76,7 +79,13 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
         className="text-xs tabular-nums"
       />
       {value && parseInt(value) > 0 && (
-        <Meter value={currentUsage.total} max={parseInt(value)} label={`${label} used`} />
+        <Fig14Budget
+          kind={kind}
+          limit={parseInt(value)}
+          used={currentUsage.total}
+          rows={projectStats?.daily_activity}
+          fallback={<Meter value={currentUsage.total} max={parseInt(value)} label={`${label} used`} />}
+        />
       )}
     </div>
   );
@@ -97,10 +106,11 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          {limitField('budget-daily', 'Daily limit', dailyLimit, setDailyLimit, 'e.g. 100000')}
-          {limitField('budget-weekly', 'Weekly limit', weeklyLimit, setWeeklyLimit, 'e.g. 500000')}
+          {limitField('budget-daily', 'Daily limit', dailyLimit, setDailyLimit, 'e.g. 100000', 'daily')}
+          {limitField('budget-weekly', 'Weekly limit', weeklyLimit, setWeeklyLimit, 'e.g. 500000', 'weekly')}
           <p className="text-xs text-muted-foreground">
-            Leave both empty to remove the budget. Alerts show at {WARN_AT * 100}% and {FAULT_AT * 100}%.
+            Leave both empty to remove the budget.
+            {figures !== 'full' && <> Alerts show at {WARN_AT * 100}% and {FAULT_AT * 100}%.</>}
           </p>
           {error && <p className="text-xs text-[var(--ins-fault)]" role="alert">{error}</p>}
         </div>
