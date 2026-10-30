@@ -96,6 +96,8 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
                 ".config/systemd/user",
                 ".config/environment.d",
                 ".local/bin",
+                // The `lirah` CLI, which unsandboxed tabs run too
+                ".lirah/bin",
                 // Shell configs
                 ".config/fish",
                 ".config/nushell",

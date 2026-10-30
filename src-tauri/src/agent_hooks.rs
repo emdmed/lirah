@@ -31,6 +31,7 @@ use tauri::{AppHandle, Emitter};
 pub const SESSION_ENV: &str = "LIRAH_PTY_SESSION";
 pub const EVENTS_ENV: &str = "LIRAH_AGENT_EVENTS";
 pub const PROMPT_CONTEXT_ENV: &str = "LIRAH_PROMPT_CONTEXT";
+pub const CONTROL_ENV: &str = "LIRAH_CONTROL";
 
 /// One payload line is a few hundred bytes; anything this large is not a hook
 /// payload and is skipped rather than buffered.
@@ -39,6 +40,10 @@ const MAX_LINE: usize = 64 * 1024;
 const HOOK_JS: &str = include_str!("agent_state_hook.js");
 // The hook is an ES module; this makes Node load it as one on any version.
 const HOOKS_PACKAGE_JSON: &str = "{\"type\":\"module\"}\n";
+/// The `lirah` CLI (an ES module, so its folder gets the same package.json)
+/// and the sh wrapper that puts it on PATH as `lirah`.
+const LIRAH_CLI_JS: &str = include_str!("lirah_cli.js");
+const LIRAH_WRAPPER: &str = "#!/bin/sh\nexec node \"$(dirname \"$0\")/lirah.js\" \"$@\"\n";
 
 /// Claude Code hook events that change what a tab should show. PostToolUse
 /// feeds the per-turn record of what the agent edited, read and ran.
@@ -135,16 +140,34 @@ fn claude_plugin_dir() -> Option<PathBuf> {
     crate::util::lirah_dir().map(|d| d.join("claude-plugin"))
 }
 
-/// Env vars that tie a terminal's agent hooks to its session.
+fn cli_bin_dir() -> Option<PathBuf> {
+    crate::util::lirah_dir().map(|d| d.join("bin"))
+}
+
+/// Env vars that tie a terminal's agent hooks to its session, point the
+/// `lirah` CLI at this app's control socket, and put the CLI on PATH. The
+/// sandbox clears the environment, so these reach it only through here.
 pub fn session_env(session_id: &str) -> Vec<(String, String)> {
-    match (events_dir(), prompt_context_dir()) {
-        (Some(dir), Some(context)) => vec![
-            (SESSION_ENV.to_string(), session_id.to_string()),
-            (EVENTS_ENV.to_string(), dir.to_string_lossy().into_owned()),
-            (PROMPT_CONTEXT_ENV.to_string(), context.to_string_lossy().into_owned()),
-        ],
-        _ => Vec::new(),
+    let (Some(dir), Some(context)) = (events_dir(), prompt_context_dir()) else {
+        return Vec::new();
+    };
+    let mut env = vec![
+        (SESSION_ENV.to_string(), session_id.to_string()),
+        (EVENTS_ENV.to_string(), dir.to_string_lossy().into_owned()),
+        (PROMPT_CONTEXT_ENV.to_string(), context.to_string_lossy().into_owned()),
+    ];
+    if let Some(sock) = crate::agent_control::socket_path() {
+        env.push((CONTROL_ENV.to_string(), sock.to_string_lossy().into_owned()));
     }
+    if let Some(bin) = cli_bin_dir() {
+        let bin = bin.to_string_lossy().into_owned();
+        let path = match std::env::var("PATH") {
+            Ok(p) if !p.is_empty() => format!("{bin}:{p}"),
+            _ => bin,
+        };
+        env.push(("PATH".to_string(), path));
+    }
+    env
 }
 
 /// Forget a closed terminal's event log and pending prompt context.
@@ -233,6 +256,8 @@ fn install() -> Result<(), String> {
     // Left by builds that shipped the hook as a shell script.
     let _ = fs::remove_file(hooks_dir.join("agent-state.sh"));
 
+    install_cli(&lirah.join("bin")).map_err(|e| e.to_string())?;
+
     let to_json = |v: serde_json::Value| serde_json::to_string_pretty(&v).map_err(|e| e.to_string());
     let plugin = claude_plugin_dir().ok_or("No home directory")?;
     let manifest = to_json(serde_json::json!({
@@ -253,6 +278,20 @@ fn install() -> Result<(), String> {
     write_if_changed(&plugin.join("hooks").join("hooks.json"), &hooks_json)
         .map_err(|e| e.to_string())?;
 
+    Ok(())
+}
+
+/// The `lirah` CLI: `bin/lirah` runs `bin/lirah.js` with node.
+fn install_cli(bin: &Path) -> std::io::Result<()> {
+    write_if_changed(&bin.join("lirah.js"), LIRAH_CLI_JS)?;
+    write_if_changed(&bin.join("package.json"), HOOKS_PACKAGE_JSON)?;
+    let wrapper = bin.join("lirah");
+    write_if_changed(&wrapper, LIRAH_WRAPPER)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755))?;
+    }
     Ok(())
 }
 

@@ -161,6 +161,10 @@ fn read_request(stream: &UnixStream) -> Result<Request, String> {
 }
 
 fn relay(app: &AppHandle, req: Request) -> Value {
+    // Answered here so `lirah ping` checks the socket without the frontend.
+    if req.cmd == "ping" {
+        return json!({ "ok": true, "data": "pong" });
+    }
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
     pending().lock().unwrap_or_else(|e| e.into_inner()).insert(id, tx);
