@@ -1908,10 +1908,9 @@ body {
   animation: ins-fade-in var(--ins-dur-enter) var(--ins-ease-out);
 }
 
-/* Switching tabs: the incoming workspace fades up over the gutter. */
-[data-tab-pane][data-tab-active] {
-  animation: ins-fade-in var(--ins-dur-base) var(--ins-ease-out);
-}
+/* Switching tabs has no fade: the incoming workspace appears at once. A fade
+   delayed full contrast by 180 ms on every switch, and opacity over the
+   terminal's WebGL canvas makes WebKitGTK composite every frame offscreen. */
 
 @media (prefers-reduced-motion: reduce) {
   /* Fewer, gentler: nothing travels, but fades that confirm a change stay. */

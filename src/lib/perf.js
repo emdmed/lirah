@@ -51,3 +51,22 @@ export function perfOutputWritten() {
     console.debug(`[perf] keystroke→echo over ${sorted.length}: p50 ${at(0.5)} ms, p95 ${at(0.95)} ms`);
   }
 }
+
+// Tab switch, from the switch request: "shown" when the new tab is made
+// visible, "frame-start" when the browser starts the frame that shows it, and
+// "shown-painted" once that frame is on screen. Then the same for the
+// deferred re-render of the tab contents ("tab-updated...").
+let tabSwitchPending = false;
+
+export function perfTabSwitchStart() {
+  if (!enabled) return;
+  performance.clearMarks('tab-switch');
+  performance.mark('tab-switch');
+  tabSwitchPending = true;
+}
+
+export function perfTabSwitchStep(step, { last = false } = {}) {
+  if (!enabled || !tabSwitchPending) return;
+  perfMeasure(`tab-switch:${step}`, 'tab-switch');
+  if (last) tabSwitchPending = false;
+}

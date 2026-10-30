@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo, startTransition } from "react";
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
 import { TAB_CLI_PROCESSES, tabCliProcess } from "../../lib/agentClis";
@@ -16,7 +16,8 @@ import { useBookmarks } from "../bookmarks";
 import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useBranchName } from "../git/useBranchName";
-import { registerTabSession, getTabSession } from "./terminalActivity";
+import { registerTabSession, getTabSession, getLastOutputAt } from "./terminalActivity";
+import { getAgentHookState } from "./agentHookState";
 import { useTabContextFill } from "./tabContextFill";
 import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos, unlinkRepo } from "./useLinkedRepos";
@@ -68,6 +69,8 @@ import { CommandPalette, useCommandPalette } from "../command-palette/command-pa
 import { useTabShortcuts } from "./useTabShortcuts";
 import { useTabCommands } from "./useTabCommands";
 import { useAgentJobsActions } from "../agent-jobs/AgentJobsContext";
+import { perfTabSwitchStep } from "../../lib/perf";
+import { Lamp } from "../../components/instrument/Lamp.jsx";
 
 // currentPath doubles as sidebar status text ('Waiting for terminal...',
 // 'Error loading directory') before the terminal session exists. Terminals
@@ -97,6 +100,36 @@ function TabContextFillSync({ tabId, isActive, tokenUsageStore, terminalSessionI
   return null;
 }
 
+// Boot placeholder pacing (see ProjectTabInner): how long an agent without
+// Lirah's hooks gets before we stop waiting for its SessionStart, how long its
+// output must be quiet before it counts as drawn, and the hard cap after which
+// the placeholder lifts whatever happened.
+const AGENT_START_GRACE_MS = 5_000;
+const AGENT_QUIET_MS = 400;
+const BOOT_PLACEHOLDER_MAX_MS = 20_000;
+
+// Covers a tab while it starts up on first visit: the contents mount and the
+// shell spawns, then the agent starts. Same vocabulary as the startup splash,
+// at pane scale.
+function TabBootPlaceholder({ projectPath, stage }) {
+  const name = projectPath?.split('/').filter(Boolean).pop() || 'project';
+  return (
+    <div
+      role="status"
+      aria-label={`Starting ${name}`}
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
+      style={{ backgroundColor: 'var(--ins-gutter)' }}
+    >
+      <span className="ins-legend text-foreground">{name}</span>
+      <span className="h-px w-56 bg-[var(--ins-edge)]" aria-hidden="true" />
+      <span className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+        <Lamp state="on" blink />
+        {stage === 'agent' ? 'starting agent' : 'starting shell'}
+      </span>
+    </div>
+  );
+}
+
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
 export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, compactionHook = false, availableUpdate }) {
@@ -105,55 +138,111 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   // pixels go stale, so when the tab returns the canvas blits the old frame
   // over Claude Code's new paint. We also can't use display:contents — the
   // wrapper has no box, ResizeObserver readings drift, and layout sizing
-  // depends on the grandparent. Instead: keep the tab in the flow with full
-  // dimensions, but hide it behind aria-hidden + visibility:hidden + pointer
-  // events disabled. The terminal stays sized; ResizeObserver fires once on
-  // first activation when the tab actually has the user's current viewport.
-  // All tabs share the same absolute box inside a position:relative parent.
-  // Inactive tabs keep their layout (so xterm sees real dimensions and the
-  // ResizeObserver fires a single time on the actual viewport when the tab
-  // becomes active) but are hidden via visibility + pointer-events.
+  // depends on the grandparent. Instead all tabs share the same absolute box
+  // inside a position:relative parent, keep their full dimensions (so xterm
+  // sees real sizes and fit() stays correct), and inactive ones are moved out
+  // of the viewport with a translate.
   //
-  // The translate is what stops background tabs burning CPU. xterm pauses its
-  // renderer through an IntersectionObserver on the screen element, but
-  // visibility:hidden leaves the geometry untouched, so a hidden terminal keeps
-  // intersecting and keeps painting — three tabs with agents running means three
-  // renderers going flat out for one visible terminal. Moving the box out of the
-  // viewport makes it genuinely non-intersecting, so xterm's own pause path
-  // engages and resumes with a full refresh on return. Unlike display:none the
-  // element keeps its size, so ResizeObserver readings and fit() stay correct.
+  // Off screen is also what stops background tabs burning CPU: xterm pauses
+  // its renderer through an IntersectionObserver on the screen element, so a
+  // terminal that no longer intersects stops painting, and resumes with a full
+  // refresh on return.
+  //
+  // No visibility:hidden or pointer-events:none on top: both are inherited, so
+  // flipping them restyles every element of both tabs on each switch, which
+  // held the switch frame back. Off screen, nothing can be seen or clicked
+  // anyway; aria-hidden keeps the tab out of the accessibility tree.
   const style = {
     position: 'absolute',
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
     transform: isActive ? 'none' : 'translateX(-200vw)',
-    visibility: isActive ? 'visible' : 'hidden',
-    pointerEvents: isActive ? 'auto' : 'none',
     zIndex: isActive ? 1 : 0,
   };
+
+  // The switch itself is just the style above. Re-rendering the tab contents
+  // for the new isActive (both tabs, ~25 ms each), the work that follows it
+  // (git stats, watchers, polls) and a first-visit mount all wait until the
+  // frame showing the new tab has painted, so it appears before React gets
+  // to it.
+  const [innerActive, setInnerActive] = useState(isActive);
+  useEffect(() => {
+    if (innerActive === isActive) return;
+    let timer = 0;
+    const raf = requestAnimationFrame(() => {
+      timer = setTimeout(() => startTransition(() => setInnerActive(isActive)), 0);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [isActive, innerActive]);
 
   // Restored tabs boot on first activation, not at startup: each one spawns a
   // PTY, a WebGL context and its pollers, so N persisted tabs used to cost N
   // of everything before the user looked at any but one. Once booted a tab
   // stays mounted, as before.
   const [booted, setBooted] = useState(isActive);
-  if (isActive && !booted) setBooted(true);
+  if (innerActive && !booted) setBooted(true);
+
+  // Latched once the tab is first ready (shell up, agent started and drawn);
+  // until then the placeholder covers the pane. A shell or agent that never
+  // comes up must not hide the tab for good, so the placeholder also gives up.
+  const [ready, setReady] = useState(false);
+  const [bootStage, setBootStage] = useState('shell');
+  const markReady = useCallback(() => setReady(true), []);
+  useEffect(() => {
+    if (!booted || ready) return;
+    const timer = setTimeout(markReady, BOOT_PLACEHOLDER_MAX_MS);
+    return () => clearTimeout(timer);
+  }, [booted, ready, markReady]);
+
+  const content = useMemo(() => booted && (
+    <DialogScope scope={tabId} active={innerActive}>
+      <FileSelectionProvider>
+        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} compactionHook={compactionHook} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+      </FileSelectionProvider>
+    </DialogScope>
+  ), [booted, tabId, innerActive, projectPath, compactionHook, availableUpdate, markReady]);
+
+  // Move keyboard focus right after the frame showing the new tab, ahead of the
+  // deferred render, so keys reach the tab on screen and not the hidden one.
+  // Not before that frame: focusing the terminal of a tab that was just made
+  // visible costs ~60 ms in WebKitGTK and would hold the frame back.
+  const paneRef = useRef(null);
+  useLayoutEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    if (!isActive) {
+      if (pane.contains(document.activeElement)) document.activeElement.blur();
+      return;
+    }
+    perfTabSwitchStep('shown');
+    let timer = 0;
+    const raf = requestAnimationFrame(() => {
+      perfTabSwitchStep('frame-start');
+      timer = setTimeout(() => {
+        perfTabSwitchStep('shown-painted');
+        pane.querySelector('[data-pane="2"] .xterm-helper-textarea')?.focus({ preventScroll: true });
+        perfTabSwitchStep('focused');
+      }, 0);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [isActive]);
 
   return (
-    <div style={style} aria-hidden={!isActive} data-tab-pane data-tab-active={isActive || undefined}>
-      {booted && (
-        <DialogScope scope={tabId} active={isActive}>
-          <FileSelectionProvider>
-            <ProjectTabInner projectPath={projectPath} isActive={isActive} tabId={tabId} compactionHook={compactionHook} availableUpdate={availableUpdate} />
-          </FileSelectionProvider>
-        </DialogScope>
-      )}
+    <div ref={paneRef} style={style} aria-hidden={!isActive} data-tab-pane data-tab-active={isActive || undefined}>
+      {content}
+      {!ready && <TabBootPlaceholder projectPath={projectPath} stage={bootStage} />}
     </div>
   );
 });
 
-function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availableUpdate }) {
+function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -350,7 +439,10 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
     const cancel = (e) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key.length !== 1 && e.key !== 'Enter' && e.key !== 'Backspace') return;
-      if (e.target instanceof Element && e.target.closest('[data-pane="2"]')) freshShellRef.current = null;
+      if (e.target instanceof Element && e.target.closest('[data-pane="2"]')) {
+        freshShellRef.current = null;
+        onReady?.(); // No agent coming; the shell is what there is to show.
+      }
     };
     window.addEventListener('keydown', cancel, true);
     // Give the shell a moment to print its prompt.
@@ -363,7 +455,34 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
       clearTimeout(timer);
       window.removeEventListener('keydown', cancel, true);
     };
-  }, [settings.autoLaunchCli, isActive, terminalReady, terminalSessionId, launchFresh]);
+  }, [settings.autoLaunchCli, isActive, terminalReady, terminalSessionId, launchFresh, onReady]);
+
+  // When the boot placeholder can lift. Without an agent on its way (auto-launch
+  // off, or a shell reclaimed after a reload), as soon as the shell is up.
+  // Otherwise once the agent has started — its SessionStart hook, or a few
+  // seconds for CLIs without Lirah's hooks — and its screen has stopped
+  // drawing, so the placeholder doesn't lift onto a half-painted TUI.
+  useEffect(() => {
+    const id = terminalSessionId;
+    if (!terminalReady || !id) return;
+    const agentComing = settings.autoLaunchCli && freshShellRef.current === id;
+    if (!agentComing) {
+      onReady?.();
+      return;
+    }
+    onBootStage?.('agent');
+    const startedAt = Date.now();
+    let timer = 0;
+    const check = () => {
+      const now = Date.now();
+      const started = !!getAgentHookState(id) || now - startedAt > AGENT_START_GRACE_MS;
+      const quiet = now - (getLastOutputAt(id) || 0) >= AGENT_QUIET_MS;
+      if (started && quiet) onReady?.();
+      else timer = setTimeout(check, 100);
+    };
+    check();
+    return () => clearTimeout(timer);
+  }, [terminalReady, terminalSessionId, settings.autoLaunchCli, onReady, onBootStage]);
 
   const orchestrationCheck = useOrchestrationCheck();
 
@@ -756,9 +875,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
   // and the visible canvas keeps stale pixels until the next full redraw.
   useEffect(() => {
     if (!isActive || !terminalReady) return;
+    perfTabSwitchStep('tab-updated');
     let raf1 = 0;
     let raf2 = 0;
     raf1 = requestAnimationFrame(() => {
+      setTimeout(() => perfTabSwitchStep('tab-updated-painted', { last: true }), 0);
       raf2 = requestAnimationFrame(() => {
         terminalRef.current?.resize?.();
         terminalRef.current?.focus?.();

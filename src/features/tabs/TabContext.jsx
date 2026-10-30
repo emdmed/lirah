@@ -4,6 +4,7 @@ import { useConfirm } from "../dialogs/DialogProvider";
 import { getAgentHookState } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
 import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";
+import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -49,6 +50,8 @@ export function TabProvider({ children }) {
   // appWindow.close() immediately, destroying the webview before a deferred
   // write can flush — so tab edits made right before quitting never persist.
   useEffect(() => {
+    // Parent effects run last, so this marks the end of the switch's effects.
+    perfTabSwitchStep('effects-flushed');
     saveJson(STORAGE_KEY, tabs);
     saveText(STORAGE_KEY + ':active', activeTabId || '');
   }, [tabs, activeTabId]);
@@ -111,6 +114,7 @@ export function TabProvider({ children }) {
   }, [confirm, removeTab]);
 
   const switchTab = useCallback((tabId) => {
+    if (tabId !== activeTabIdRef.current) perfTabSwitchStart();
     setActiveTabId(tabId);
   }, []);
 

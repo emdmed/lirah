@@ -37,9 +37,10 @@ const FLOW_HIGH_WATERMARK = 512 * 1024;
 const FLOW_LOW_WATERMARK = 128 * 1024;
 
 // WebGL budget. Browsers cap live contexts (~16) and evict the least recently
-// used, so a terminal that has been out of sight this long gives its context
-// back and rebuilds it when it is shown again.
-const WEBGL_IDLE_DISPOSE_MS = 30_000;
+// used. Rebuilding a context on tab return costs a visible stall, so hidden
+// terminals keep theirs until the window holds more than this many; then the
+// one hidden longest gives its context back and rebuilds it when shown again.
+const WEBGL_LIVE_BUDGET = 6;
 // A restored renderer that survives this long resets the restore budget, so a
 // few context losses spread over a long session don't strand us on the DOM
 // renderer for good.
@@ -58,6 +59,24 @@ function disposeWebgl(webgl) {
   liveWebglRenderers.delete(webgl);
   webgl.dispose();
 }
+
+// Hidden terminals still holding a WebGL context, oldest-hidden first, each
+// mapped to the function that releases its context.
+const idleWebgl = new Map(); // Terminal -> release()
+
+function trimIdleWebgl() {
+  for (const [term, release] of idleWebgl) {
+    if (liveWebglRenderers.size <= WEBGL_LIVE_BUDGET) break;
+    idleWebgl.delete(term);
+    release();
+  }
+}
+
+// Bumped when the shared atlas merges pages. A merge moves glyphs to other
+// slots, and a renderer that was paused off screen meanwhile still holds the
+// old slots — that is the case where coming back needs a full atlas clear.
+// Otherwise xterm's own refresh on resume repaints correctly.
+let atlasEpoch = 0;
 
 // Window-wide repaint coalescing. One clear already reaches every renderer, so
 // requests from any terminal in the same frame — a tab switch can raise the
@@ -128,6 +147,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   const rendererRetryResetRef = useRef(0);
   // Disposed for the WebGL budget (as opposed to lost): rebuild on activation.
   const webglSuspendedRef = useRef(false);
+  // A new renderer was attached and has not had an atlas clear yet. The atlas
+  // is cached per terminal and outlives the addon that built it, so a fresh
+  // renderer can point at pages uploaded to a context that no longer exists.
+  const atlasStaleRef = useRef(false);
   // A resize arrived while hidden; refit when shown again.
   const resizeDirtyRef = useRef(false);
   // fit() changed rows/cols since the last SIGWINCH flush, i.e. the canvas was
@@ -151,9 +174,13 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         disposeWebgl(webgl);
         setRendererLost(true);
       });
+      // Not in the addon's typings, but public on the instance.
+      webgl.onRemoveTextureAtlasCanvas?.(() => { atlasEpoch += 1; });
       term.loadAddon(webgl);
       liveWebglRenderers.add(webgl);
       webglRef.current = webgl;
+      atlasStaleRef.current = true;
+      trimIdleWebgl();
       return webgl;
     } catch (e) {
       webglRef.current = null;
@@ -456,7 +483,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   // them to be re-rasterized. The atlas is shared, so every other live renderer
   // is told too. Every caller goes through here: they can all fire for the same
   // event, and each clear costs a full re-rasterization (see requestRepaint).
-  const scheduleRepaint = useCallback(() => {
+  // Without an atlas clear there is nothing to do: xterm already runs a full
+  // refresh when it resumes on screen, and a second one costs another frame.
+  const scheduleRepaint = useCallback(({ clearAtlas = true } = {}) => {
+    if (!clearAtlas && !atlasStaleRef.current) return;
+    atlasStaleRef.current = false;
     requestRepaint(terminalInstRef.current);
   }, []);
 
@@ -492,6 +523,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     const el = terminal.element?.querySelector('.xterm-screen') || terminal.element;
     if (!el) return;
     let wasVisible = null;
+    let hiddenAtEpoch = atlasEpoch;
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const visible = entry.isIntersecting === undefined
@@ -500,7 +532,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // Only on the hidden -> visible edge; the first callback just records
         // the starting state, since a terminal that was never hidden has
         // nothing stale to repaint.
-        if (wasVisible === false && visible) scheduleRepaint();
+        if (wasVisible === false && visible) {
+          scheduleRepaint({ clearAtlas: atlasEpoch !== hiddenAtEpoch });
+        }
+        if (!visible) hiddenAtEpoch = atlasEpoch;
         wasVisible = visible;
         visibleRef.current = visible;
       }
@@ -703,9 +738,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
 
   useEffect(() => () => clearTimeout(rendererRetryResetRef.current), []);
 
-  // WebGL budget: give the context back after a while out of sight, and
-  // rebuild it when the terminal is shown again. Hidden terminals don't render
-  // (xterm pauses off-screen), so the DOM renderer costs them nothing meanwhile.
+  // WebGL budget: a hidden terminal keeps its context until the window is over
+  // budget, then the one hidden longest gives it back (see trimIdleWebgl) and
+  // rebuilds it when shown again. Hidden terminals don't render (xterm pauses
+  // off-screen), so the DOM renderer costs them nothing meanwhile.
   useEffect(() => {
     if (!terminal) return;
     if (isActive) {
@@ -715,14 +751,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       }
       return;
     }
-    const timer = setTimeout(() => {
+    idleWebgl.set(terminal, () => {
       const webgl = webglRef.current;
       if (!webgl) return;
       webglRef.current = null;
       webglSuspendedRef.current = true;
       disposeWebgl(webgl);
-    }, WEBGL_IDLE_DISPOSE_MS);
-    return () => clearTimeout(timer);
+    });
+    trimIdleWebgl();
+    return () => idleWebgl.delete(terminal);
   }, [terminal, isActive, attachWebgl, repaintUnlessHidden]);
 
   // Apply preference changes to this already-open terminal, including ones made
