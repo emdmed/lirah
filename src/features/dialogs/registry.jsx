@@ -64,6 +64,7 @@ export const TAB_DIALOGS = {
     props: (ctx) => ({
       settings: ctx.settings,
       sessionId: ctx.sessionId,
+      projectPath: ctx.currentPath,
       onToggleSandbox: ctx.toggleSandbox,
       onToggleNetwork: ctx.toggleNetwork,
       onOpenBudget: () => ctx.dialogs.setBudgetDialogOpen(true),

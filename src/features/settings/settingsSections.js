@@ -36,6 +36,10 @@ export const SETTINGS_ROWS = [
     words: 'agent control lirah cli command settings theme configure',
   },
   {
+    id: 'startup', section: 'agent', kind: 'custom', label: 'Startup',
+    words: 'startup launch open projects restore tabs session boot',
+  },
+  {
     id: 'keep-context', section: 'agent', kind: 'toggle', key: 'keepFilesAfterSend',
     label: 'Keep context after send', hint: 'Attached files, elements and linked repos stay for the next prompt.',
     words: 'keep context after send files elements repos',

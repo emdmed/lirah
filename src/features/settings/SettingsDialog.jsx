@@ -18,6 +18,7 @@ import { shortcutForCommand } from '../../lib/shortcuts';
 import { FilterContext, SECTIONS, SETTINGS_ROW as ROW } from './settingsSections';
 import { Choice, ChoiceRow, DraftField, Row, Section, StepRow, ToggleRow } from './parts';
 import { AppearanceSection } from './AppearanceSection';
+import { StartupRow } from './StartupRow';
 import { useSettingsNav } from './useSettingsNav';
 
 const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
@@ -43,7 +44,7 @@ const SANDBOX_SPEC = [
 ];
 
 export function SettingsDialog({
-  open, onOpenChange, settings, sessionId, onToggleSandbox, onToggleNetwork, onOpenBudget,
+  open, onOpenChange, settings, sessionId, projectPath, onToggleSandbox, onToggleNetwork, onOpenBudget,
 }) {
   const { currentTheme, themes } = useTheme();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
@@ -199,6 +200,7 @@ export function SettingsDialog({
                 <Section section={section('agent')} active={activeId === 'agent'}>
                   <ChoiceRow row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli} />
                   <ToggleRow row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli} />
+                  <StartupRow projectPath={projectPath} />
                   <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
                   <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
                   <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
