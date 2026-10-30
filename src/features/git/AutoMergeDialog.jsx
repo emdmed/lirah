@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { cn } from '../../lib/utils';
+import { useSetting } from '../settings/settingsStore';
+import { Fig11Merge, planCommands } from './Fig11Merge';
 
 // `git diff --name-status` letters, coloured like the auto-commit list.
 const STATUS_COLOR = {
@@ -52,18 +54,6 @@ function StepLine({ stage, failedAt }) {
   );
 }
 
-// The exact git commands confirm() will run, so nothing happens unseen.
-function planCommands({ feature, base, plan }) {
-  const where = plan.switchNeeded ? '' : `(in ${plan.mergeDir}) `;
-  const cmds = [];
-  if (plan.switchNeeded) cmds.push(`git switch ${base}`);
-  cmds.push(plan.ff
-    ? `${where}git merge --ff-only ${feature}`
-    : `${where}git merge --no-ff -m "Merge branch '${feature}' into ${base}" ${feature}`);
-  if (plan.featureWorktree) cmds.push(`git worktree remove ${plan.featureWorktree}`);
-  return cmds;
-}
-
 // Errors are a summary, a blank line, then git's own output.
 function splitError(error) {
   const text = String(error ?? '');
@@ -71,11 +61,23 @@ function splitError(error) {
   return at < 0 ? [text, ''] : [text.slice(0, at), text.slice(at + 2).trim()];
 }
 
+// "fast-forward" or "merge commit". In full figures mode FIG 11 says it instead.
+function mergeWord(plan) {
+  return (
+    <span style={{ color: plan.ff ? 'var(--ins-ok)' : 'var(--ins-warn)' }}>
+      {plan.ff ? 'fast-forward' : 'merge commit'}
+    </span>
+  );
+}
+
 export function AutoMergeDialog({ autoMerge }) {
   const { stage, feature, bases, base, setBase, plan, result, error, confirm, cancel } = autoMerge;
   const isOpen = stage !== 'idle';
   const nothingToMerge = plan && plan.commits.length === 0;
   const canMerge = stage === 'ready' && plan && !nothingToMerge;
+
+  const [figures] = useSetting('figures');
+  const drawn = figures !== 'compact';
 
   const lastStepRef = useRef(0);
   if (stage !== 'error' && stage !== 'idle') lastStepRef.current = Math.max(0, stepIndex(stage));
@@ -96,11 +98,7 @@ export function AutoMergeDialog({ autoMerge }) {
       <Scanner label={running} />
       {running}
     </>
-  ) : stage === 'ready' && plan && !nothingToMerge ? (
-    <span style={{ color: plan.ff ? 'var(--ins-ok)' : 'var(--ins-warn)' }}>
-      {plan.ff ? 'fast-forward' : 'merge commit'}
-    </span>
-  ) : null;
+  ) : stage === 'ready' && plan && !nothingToMerge && !drawn ? mergeWord(plan) : null;
   const settled = stage === 'done' || stage === 'error';
 
   return (
@@ -236,6 +234,15 @@ export function AutoMergeDialog({ autoMerge }) {
                     ))}
                   </ul>
                 </section>
+
+                {drawn && (
+                  <Fig11Merge
+                    feature={feature}
+                    base={base}
+                    plan={plan}
+                    fallback={<p className="text-xs">{mergeWord(plan)}</p>}
+                  />
+                )}
 
                 <section className="flex flex-col gap-1.5">
                   <DialogGroup label="Will run" />
