@@ -5,6 +5,7 @@ import { prepareChartData, prepareModelBreakdown, calculateEfficiencyMetrics } f
 import { exportToCSV, exportToJSON } from './exportData';
 import { DEFAULT_MODEL } from '../../config/pricing';
 import { loadJson, saveJson } from '../../lib/storage';
+import { WARN_AT, FAULT_AT } from '../../components/instrument/gauge';
 
 const STORAGE_KEY = 'lirah:token-budgets:v1';
 
@@ -36,8 +37,8 @@ function budgetStatus(budgets, path, total) {
   const limit = budgets[path]?.dailyLimit;
   if (!limit) return { status: 'none', percentage: 0 };
   const percentage = Math.min((total / limit) * 100, 100);
-  if (percentage >= 95) return { status: 'critical', percentage };
-  if (percentage >= 80) return { status: 'warning', percentage };
+  if (percentage >= FAULT_AT * 100) return { status: 'critical', percentage };
+  if (percentage >= WARN_AT * 100) return { status: 'warning', percentage };
   return { status: 'ok', percentage };
 }
 

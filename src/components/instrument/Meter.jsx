@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { clamp01, gaugeLevel } from './gauge';
+import { clamp01, gaugeLevel, WARN_AT } from './gauge';
 
 function formatCompact(n) {
   if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
@@ -16,7 +16,7 @@ const TICKS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 // fill below `warnAt` (fault still wins at 95%). The red zone stays faint
 // until the fill nears it. `size="lg"` is the status-bar gauge: a wider,
 // taller scale that stays legible at low fill.
-export function Meter({ value, max, warnAt = 0.8, label, format = formatCompact, size, readout = true, caution = false, className }) {
+export function Meter({ value, max, warnAt = WARN_AT, label, format = formatCompact, size, readout = true, caution = false, className }) {
   const ratio = max > 0 ? clamp01(value / max) : 0;
   const level = gaugeLevel(ratio, warnAt, caution);
   const pct = `${(ratio * 100).toFixed(1)}%`;

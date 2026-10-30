@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Meter } from '@/components/instrument/Meter';
+import { WARN_AT, FAULT_AT } from '@/components/instrument/gauge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTokenBudget } from './TokenBudgetContext';
@@ -99,7 +100,7 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
           {limitField('budget-daily', 'Daily limit', dailyLimit, setDailyLimit, 'e.g. 100000')}
           {limitField('budget-weekly', 'Weekly limit', weeklyLimit, setWeeklyLimit, 'e.g. 500000')}
           <p className="text-xs text-muted-foreground">
-            Leave both empty to remove the budget. Alerts show at 80% and 95%.
+            Leave both empty to remove the budget. Alerts show at {WARN_AT * 100}% and {FAULT_AT * 100}%.
           </p>
           {error && <p className="text-xs text-[var(--ins-fault)]" role="alert">{error}</p>}
         </div>

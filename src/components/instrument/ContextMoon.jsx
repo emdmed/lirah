@@ -1,12 +1,12 @@
 import { cn } from '@/lib/utils';
-import { clamp01, gaugeLevel } from './gauge';
+import { clamp01, gaugeLevel, WARN_AT } from './gauge';
 
 const R = 6;
 
 // A context-window fill as a moon phase: new when empty, waxing to full at the
 // ceiling. The lit part takes the legend colour, then warn at `warnAt` and
 // fault at 95%, like Meter. For compact rows where a full Meter won't fit.
-export function ContextMoon({ ratio, warnAt = 0.8, size = 12, className }) {
+export function ContextMoon({ ratio, warnAt = WARN_AT, size = 12, className }) {
   const f = clamp01(ratio);
   const level = gaugeLevel(f, warnAt);
   // Right half of the disc, closed by the terminator: an ellipse that bulges
