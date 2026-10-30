@@ -18,6 +18,17 @@ const errText = (err) => String((typeof err === 'string' ? err : err?.message ??
 
 const count = async (repoPath, range) => parseInt((await git(repoPath, ['rev-list', '--count', range])).trim(), 10) || 0;
 
+// `git diff --shortstat` -> { files, added, removed }. No output means no
+// changes; either count is left out by git when it is zero.
+export function parseShortstat(line = '') {
+  const num = (re) => Number(line.match(re)?.[1] ?? 0);
+  return {
+    files: num(/(\d+) files? changed/),
+    added: num(/(\d+) insertions?\(\+\)/),
+    removed: num(/(\d+) deletions?\(-\)/),
+  };
+}
+
 // Tracked changes only — untracked files are left alone, and git itself refuses
 // a switch that would overwrite one.
 const isDirty = async (repoPath) => (await dirtyCount(repoPath, { untracked: false })) > 0;
@@ -75,10 +86,14 @@ export function useAutoMerge() {
   const buildPlan = useCallback(async (featureName, baseName) => {
     const { repoPath, worktrees } = ctxRef.current;
     const seq = ++planSeqRef.current;
-    const [commits, files, behind] = await Promise.all([
+    const [commits, files, behind, diffStat] = await Promise.all([
       gitLines(repoPath, ['log', '--oneline', '--no-decorate', `${baseName}..${featureName}`]),
       gitLines(repoPath, ['diff', '--name-status', `${baseName}...${featureName}`]),
       count(repoPath, `${featureName}..${baseName}`),
+      // Optional extra for the merge figure: a failure leaves it null.
+      gitLines(repoPath, ['diff', '--shortstat', `${baseName}...${featureName}`])
+        .then((lines) => parseShortstat(lines[0]))
+        .catch(() => null),
     ]);
     if (seq !== planSeqRef.current) return;
 
@@ -96,6 +111,7 @@ export function useAutoMerge() {
         const [status, ...rest] = l.split('\t');
         return { status: status[0], path: rest[rest.length - 1] };
       }),
+      diffStat, // { files, added, removed } of base...feature, or null
       ahead: commits.length, // feature-only commits
       behind, // base-only commits since the branches split
       ff: behind === 0,
