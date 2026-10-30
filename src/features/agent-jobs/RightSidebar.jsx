@@ -23,6 +23,9 @@ import { lazyNamed } from '../../lib/lazyNamed';
 import { MAX_TABS, useTabManager } from '../tabs/TabContext';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 import { PlansPane } from '../plans/PlansPane';
+import { usePlans } from '../plans/PlansContext';
+import { useRepoRoot } from '../plans/planRepoRoot';
+import { CHUNK_STATUS } from '../plans/planModel';
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -98,6 +101,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     reviseJob,
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
+  const openPlans = useOpenPlanCount(projectPath);
   const { tabs: openTabs } = useTabManager();
   const toast = useToast();
   const confirm = useConfirm();
@@ -580,7 +584,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
-        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" />
+        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
@@ -786,9 +790,25 @@ function TabButton({ active, onClick, label, count }) {
       )}
     >
       {label}
-      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
+      <span
+        className={cn(
+          'tabular-nums leading-none px-[3px] py-px border',
+          active ? 'border-foreground text-foreground' : 'border-[var(--ins-edge-strong)] text-foreground'
+        )}
+      >
+        {String(count ?? 0).padStart(2, '0')}
+      </span>
     </button>
   );
+}
+
+// Plans in the active tab's repo that still have a chunk to do or underway.
+// A rolled-back chunk is back to to-do, so it counts as pending.
+const OPEN_CHUNK = new Set([CHUNK_STATUS.PENDING, CHUNK_STATUS.IN_PROGRESS, CHUNK_STATUS.ROLLED_BACK]);
+function useOpenPlanCount(projectPath) {
+  const { repoRoot } = useRepoRoot(projectPath);
+  const { plans } = usePlans(repoRoot);
+  return useMemo(() => (plans || []).filter((p) => p.chunks?.some((c) => OPEN_CHUNK.has(c.status))).length, [plans]);
 }
 
 // Live elapsed time for a running job. Owns its ticker so only this text
