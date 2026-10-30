@@ -5,6 +5,8 @@ import { getAgentHookState } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
 import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
+import { invoke } from "@tauri-apps/api/core";
+import { getSettings } from "../settings/settingsStore";
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -25,19 +27,53 @@ export function tabDisplayName(tab, bookmarks = []) {
 
 // `launch` asks the tab to start its agent once its shell is up, even with
 // auto-launch off; ProjectTab clears it as soon as it boots.
-function createTab(projectPath, { launch = false } = {}) {
+function createTab(projectPath, { launch = false, name } = {}) {
   return {
     id: crypto.randomUUID(),
     projectPath,
     label: projectPath.split('/').filter(Boolean).pop() || projectPath,
+    ...(name?.trim() && { customLabel: name.trim() }),
     ...(launch && { launch: true }),
   };
+}
+
+// The startup projects to open instead of restoring the saved tabs, or null
+// when the app should restore as usual.
+function startupProjectList() {
+  const { startupMode, startupProjects } = getSettings();
+  return startupMode === 'projects' && startupProjects.length > 0 ? startupProjects : null;
+}
+
+// Tabs for the startup projects whose folder still exists; the rest are named
+// in `missing`. Capped at MAX_TABS.
+async function buildStartupTabs(projects) {
+  let home = null;
+  const checked = await Promise.all(projects.map(async (p) => {
+    let path = p.path.trim();
+    if (path === '~' || path.startsWith('~/')) {
+      home ??= await invoke('get_home_dir').catch(() => null);
+      if (home) path = home + path.slice(1);
+    }
+    if (path.length > 1) path = path.replace(/\/+$/, '');
+    const exists = await invoke('path_exists', { path }).catch(() => false);
+    return { ...p, path, exists };
+  }));
+  const tabs = checked
+    .filter((p) => p.exists)
+    .slice(0, MAX_TABS)
+    .map((p) => createTab(p.path, { launch: !!p.launch, name: p.name }));
+  return { tabs, missing: checked.filter((p) => !p.exists).map((p) => p.path) };
 }
 
 export function TabProvider({ children }) {
   const toast = useToast();
   const confirm = useConfirm();
+  // In 'projects' startup mode the saved tabs are not restored: the startup
+  // projects open instead, once their folders are checked (startupPending).
+  const [startupProjects] = useState(startupProjectList);
+  const [startupPending, setStartupPending] = useState(!!startupProjects);
   const [tabs, setTabs] = useState(() => {
+    if (startupProjects) return [];
     const parsed = loadJson(STORAGE_KEY, null);
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : [];
   });
@@ -66,6 +102,27 @@ export function TabProvider({ children }) {
     tabsRef.current = tabs;
     activeTabIdRef.current = activeTabId;
   }, [tabs, activeTabId]);
+
+  // Open the startup projects. App waits on startupPending before adding the
+  // CLI path's tab (or the fallback tab when none opened).
+  useEffect(() => {
+    if (!startupProjects) return;
+    let cancelled = false;
+    buildStartupTabs(startupProjects).then(({ tabs: opened, missing }) => {
+      if (cancelled) return;
+      if (missing.length > 0) {
+        toast.warning(missing.length === 1
+          ? `Startup project not found, skipped: ${missing[0]}`
+          : `${missing.length} startup projects not found, skipped: ${missing.join(', ')}`);
+      }
+      // Set now: App's effect may addTab before this provider's ref effect runs.
+      tabsRef.current = opened;
+      setTabs(opened);
+      setActiveTabId(opened[0]?.id || null);
+      setStartupPending(false);
+    });
+    return () => { cancelled = true; };
+  }, [startupProjects, toast]);
 
   const addTab = useCallback((projectPath, options) => {
     if (tabsRef.current.length >= MAX_TABS) {
@@ -180,7 +237,10 @@ export function TabProvider({ children }) {
     setTabCompaction,
   }), [addTab, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction]);
 
-  const value = useMemo(() => ({ tabs, activeTabId, ...actions }), [tabs, activeTabId, actions]);
+  const value = useMemo(
+    () => ({ tabs, activeTabId, startupPending, openedStartup: !!startupProjects, ...actions }),
+    [tabs, activeTabId, startupPending, startupProjects, actions],
+  );
 
   return (
     <TabActionsContext.Provider value={actions}>

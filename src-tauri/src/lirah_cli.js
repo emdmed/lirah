@@ -28,6 +28,14 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah tabs close <tab>         close a tab (asks if its agent is busy)
   lirah tabs rename <tab> <name> rename a tab (empty name: automatic again)
   lirah tabs focus <tab>         switch to a tab
+  lirah startup                  show what opens at launch
+  lirah startup mode restore|projects
+                                 reopen the last tabs, or open the startup projects
+  lirah startup add <path> [--launch] [--name N]
+                                 add (or update) a startup project; --launch
+                                 starts its agent, --name names its tab
+  lirah startup remove <path>    remove a startup project
+  lirah startup clear            remove all startup projects
   lirah ping                     check that Lirah is reachable
 
   <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
@@ -148,12 +156,36 @@ function printTabs(list) {
   return table(["", "#", "NAME", "AGENT", "PATH"], rows);
 }
 
-// The absolute directory for `tabs open`, resolved against this shell's cwd.
-function tabPath(raw) {
-  if (raw === undefined || raw === "") fail("missing path: lirah tabs open <path> [--launch]");
+function printStartup(data) {
+  const lines = [`mode: ${data.mode}${data.mode === "restore" ? " (reopen the last tabs)" : " (open the startup projects)"}`];
+  if (!data.projects?.length) {
+    lines.push("no startup projects");
+    return lines.join("\n");
+  }
+  const rows = data.projects.map((p, i) => [String(i + 1), p.name || "", p.launch ? "yes" : "", p.path]);
+  return `${lines[0]}\n\n${table(["#", "NAME", "LAUNCH", "PATH"], rows)}`;
+}
+
+// An absolute path resolved against this shell's cwd, "~" expanded.
+function absolutePath(raw, usage) {
+  if (raw === undefined || raw === "" || raw === true) fail(`missing path: ${usage}`);
   let text = String(raw);
   if (text === "~" || text.startsWith("~/")) text = homedir() + text.slice(1);
-  const path = resolvePath(text);
+  return resolvePath(text);
+}
+
+// A bare --flag right before a positional swallows it as its value: put the
+// positional back and make the flag true.
+function unswallow(args, key, rest) {
+  if (args[key] !== undefined && typeof args[key] !== "boolean") {
+    rest.unshift(String(args[key]));
+    args[key] = true;
+  }
+}
+
+// The absolute directory for `tabs open` / `startup add`, which must exist.
+function tabPath(raw, usage = "lirah tabs open <path> [--launch]") {
+  const path = absolutePath(raw, usage);
   let stat;
   try {
     stat = statSync(path);
@@ -188,11 +220,7 @@ function route(cmd, positional, args) {
     switch (sub ?? "list") {
       case "list": return ["tabs.list", rest, printTabs];
       case "open": {
-        // A bare --launch before the path swallows it as its value.
-        if (args.launch !== undefined && typeof args.launch !== "boolean") {
-          rest.unshift(String(args.launch));
-          args.launch = true;
-        }
+        unswallow(args, "launch", rest);
         const [path, ...extra] = rest;
         return ["tabs.open", [tabPath(path ?? args.path), ...extra], show];
       }
@@ -200,6 +228,27 @@ function route(cmd, positional, args) {
       case "rename": return ["tabs.rename", rest, show];
       case "focus": return ["tabs.focus", rest, show];
       default: fail(`unknown tabs command "${sub}" (list, open, close, rename, focus)`);
+    }
+  }
+  if (cmd === "startup") {
+    switch (sub ?? "get") {
+      case "get":
+      case "list":
+      case "show": return ["startup.get", rest, printStartup];
+      case "mode": return ["startup.mode", rest, show];
+      case "add": {
+        const usage = "lirah startup add <path> [--launch] [--name N]";
+        unswallow(args, "launch", rest);
+        const [path, ...extra] = rest;
+        return ["startup.add", [tabPath(path ?? args.path, usage), ...extra], show];
+      }
+      case "remove":
+      case "rm": {
+        const [path, ...extra] = rest;
+        return ["startup.remove", [absolutePath(path ?? args.path, "lirah startup remove <path>"), ...extra], show];
+      }
+      case "clear": return ["startup.clear", rest, show];
+      default: fail(`unknown startup command "${sub}" (mode, add, remove, clear)`);
     }
   }
   return [cmd, positional, show];

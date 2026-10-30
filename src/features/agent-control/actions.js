@@ -219,3 +219,91 @@ export async function resolveTabPath(raw) {
   if (!(await invoke('path_exists', { path }))) throw new Error(`no such directory: ${path}`);
   return path;
 }
+
+// ── Startup ──────────────────────────────────────────────────────────────────
+// What Lirah opens at launch: 'restore' (the last session's tabs) or
+// 'projects' (startupProjects, each { path, name?, launch? }). Entries are
+// keyed by path: adding one that is already listed updates it in place.
+
+const STARTUP_MODES = ['restore', 'projects'];
+
+export function getStartup() {
+  const { startupMode, startupProjects } = getSettings();
+  return { mode: startupMode, projects: startupProjects };
+}
+
+// Store `projects` through sanitize() so the CLI can't save what a reload drops.
+function saveStartupProjects(projects) {
+  const clean = sanitize({ startupProjects: projects }).startupProjects;
+  if (clean.length !== projects.length) throw new Error('invalid startup project');
+  setSetting('startupProjects', clean);
+  return clean;
+}
+
+// Returns { mode, previous, changed } without writing.
+export function prepareStartupMode(raw) {
+  const mode = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (!STARTUP_MODES.includes(mode)) {
+    throw new Error(`startup mode must be ${STARTUP_MODES.join(' or ')}${raw ? `, not "${raw}"` : ''}`);
+  }
+  const previous = getSettings().startupMode;
+  return { mode, previous, changed: previous !== mode };
+}
+
+export function setStartupMode(raw) {
+  const plan = prepareStartupMode(raw);
+  if (plan.changed) setSetting('startupMode', plan.mode);
+  return plan;
+}
+
+// Absolute path with "~" expanded and trailing slashes dropped; no existence check.
+async function startupPath(raw, usage) {
+  if (typeof raw !== 'string' || !raw.trim()) throw new Error(`missing path: ${usage}`);
+  let path = raw.trim();
+  if (path === '~' || path.startsWith('~/')) {
+    const home = await invoke('get_home_dir');
+    path = home + path.slice(1);
+  }
+  if (!path.startsWith('/')) throw new Error(`path must be absolute, not "${raw}"`);
+  return path.length > 1 ? path.replace(/\/+$/, '') : path;
+}
+
+// Adds a directory, or updates the listed entry for it. `launch` and `name`
+// are only changed when given; an empty name clears it.
+// Returns { entry, added, projects }.
+export async function addStartupProject(raw, { launch, name } = {}) {
+  const path = await startupPath(raw, 'lirah startup add <path> [--launch] [--name N]');
+  if (!(await invoke('path_exists', { path }))) throw new Error(`no such directory: ${path}`);
+  const projects = getSettings().startupProjects;
+  const index = projects.findIndex((p) => p.path === path);
+  const entry = { ...(index === -1 ? { path } : projects[index]) };
+  if (launch !== undefined) {
+    if (launch) entry.launch = true;
+    else delete entry.launch;
+  }
+  if (name !== undefined) {
+    const label = String(name).trim();
+    if (label) entry.name = label;
+    else delete entry.name;
+  }
+  const next = index === -1
+    ? [...projects, entry]
+    : projects.map((p, i) => (i === index ? entry : p));
+  return { entry, added: index === -1, projects: saveStartupProjects(next) };
+}
+
+// Returns { removed, projects }; removed is the entry, or null if not listed.
+export async function removeStartupProject(raw) {
+  const path = await startupPath(raw, 'lirah startup remove <path>');
+  const projects = getSettings().startupProjects;
+  const removed = projects.find((p) => p.path === path) || null;
+  if (!removed) return { removed, projects };
+  return { removed, projects: saveStartupProjects(projects.filter((p) => p !== removed)) };
+}
+
+// Returns how many entries were dropped.
+export function clearStartupProjects() {
+  const count = getSettings().startupProjects.length;
+  if (count) setSetting('startupProjects', []);
+  return count;
+}

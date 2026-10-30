@@ -8,7 +8,7 @@ import { getSettings, setSetting } from '../settings/settingsStore';
 import { MAX_TABS, tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 import {
-  callerTab, getSetting, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
+  addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
 } from './actions';
 
@@ -19,7 +19,9 @@ import {
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list' };
+const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get' };
+
+const flag = (v) => (v === undefined ? undefined : v === true || v === 'true' || v === 'on' || v === 1);
 
 // `lirah settings set x 1` arrives as cmd "settings" with args._ ["set", "x", "1"];
 // a dotted cmd ("settings.set") is taken as is. Returns [cmd, positionals].
@@ -120,6 +122,40 @@ export function useAgentControl() {
         const tab = target(tabs, ref, sessionId);
         switchTab(tab.id);
         return `focused ${name(tab)}`;
+      },
+
+      // Startup: what opens at launch. startupProjects is only edited here,
+      // never through settings.set.
+      'startup.get': () => getStartup(),
+      'startup.mode': (args, [mode = args.mode]) => {
+        if (mode === undefined) return getStartup().mode;
+        const plan = setStartupMode(mode);
+        if (!plan.changed) return `startup mode is already ${plan.mode}`;
+        live.current.toast.info(`Claude set startup → ${plan.mode === 'projects' ? 'open startup projects' : 'restore last tabs'}`);
+        const { projects } = getStartup();
+        const note = plan.mode === 'projects' && projects.length === 0
+          ? ' (no startup projects yet, so the last tabs still restore; add some with `lirah startup add`)'
+          : '';
+        return `startup mode = ${plan.mode}${note}`;
+      },
+      'startup.add': async (args, [path = args.path]) => {
+        const { entry, added } = await addStartupProject(path, { launch: flag(args.launch), name: args.name });
+        const what = `${entry.path}${entry.name ? ` as "${entry.name}"` : ''}${entry.launch ? ', launching its agent' : ''}`;
+        live.current.toast.info(`Claude ${added ? 'added' : 'updated'} startup project ${entry.name || entry.path}`);
+        const note = getStartup().mode === 'projects' ? '' : ' (startup mode is restore; `lirah startup mode projects` to use it)';
+        return `${added ? 'added' : 'updated'} ${what}${note}`;
+      },
+      'startup.remove': async (args, [path = args.path]) => {
+        const { removed } = await removeStartupProject(path);
+        if (!removed) throw new Error(`not a startup project: ${path} (see \`lirah startup\`)`);
+        live.current.toast.info(`Claude removed startup project ${removed.name || removed.path}`);
+        return `removed ${removed.path}`;
+      },
+      'startup.clear': () => {
+        const count = clearStartupProjects();
+        if (!count) return 'no startup projects to clear';
+        live.current.toast.info('Claude cleared the startup projects');
+        return `cleared ${count} startup project${count === 1 ? '' : 's'}`;
       },
     };
 

@@ -1,5 +1,5 @@
 import { getRecordingMode } from './lib/recordingMode';
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { matches } from "./lib/shortcuts";
 import { useTabManager } from "./features/tabs";
@@ -24,7 +24,7 @@ import { useSetting } from "./features/settings/settingsStore";
 import { useAgentControl } from "./features/agent-control/useAgentControl";
 
 function App() {
-  const { tabs, activeTabId, addTab, requestCloseTab, switchTab } = useTabManager();
+  const { tabs, activeTabId, startupPending, openedStartup, addTab, requestCloseTab, switchTab } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
@@ -83,17 +83,29 @@ function App() {
   const [splashStep, setSplashStep] = useState('navigate');
   const [splashProjectName, setSplashProjectName] = useState('');
 
-  // Fetch CLI initial path on mount and create first tab
+  // Fetch CLI initial path on mount and create first tab. In 'projects'
+  // startup mode this waits until TabProvider has opened the startup projects;
+  // the CLI path then opens on top of them.
+  const initialTabsDone = useRef(false);
   useEffect(() => {
-    if (tabs.length > 0) {
+    if (startupPending || initialTabsDone.current) return;
+    initialTabsDone.current = true;
+    if (tabs.length > 0 && !openedStartup) {
       // Tabs restored from localStorage — nothing to do
       setInitialProjectDir(tabs[0].projectPath);
       return;
     }
     invoke('get_initial_path').then(async (path) => {
-      if (path) {
+      // A CLI path that is already a startup project focuses that tab.
+      const open = path && openedStartup && tabs.find((t) => t.projectPath === path.replace(/\/+$/, ''));
+      if (open) {
+        setInitialProjectDir(path);
+        switchTab(open.id);
+      } else if (path) {
         setInitialProjectDir(path);
         addTab(path);
+      } else if (openedStartup && tabs.length > 0) {
+        setInitialProjectDir(tabs[0].projectPath);
       } else {
         // No CLI path — use home dir as fallback, and let the tab offer the
         // project picker once its terminal is up.
@@ -109,10 +121,11 @@ function App() {
         }
       }
     }).catch(() => {
+      if (openedStartup && tabs.length > 0) return;
       setInitialProjectDir('/');
       addTab('/');
     });
-  }, []);
+  }, [startupPending]);
 
   // New tab: pick the project first (current, starred, or any folder).
   // At the tab limit, addTab shows the limit toast instead of the picker.
