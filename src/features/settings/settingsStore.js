@@ -47,6 +47,13 @@ export const SETTINGS_DEFAULTS = {
   jobsSidebarWide: false,
   // The auto-pilot confirm has shown its first-run tip.
   autopilotTipSeen: false,
+  // What opens at launch: 'restore' reopens the last session's tabs,
+  // 'projects' opens startupProjects instead.
+  startupMode: 'restore',
+  // Items are { path, name?, launch? }; launch starts the CLI in that tab.
+  startupProjects: [],
+  // The agent in a tab may drive Lirah through the `lirah` CLI.
+  agentControl: true,
 };
 
 // Pre-v1 keys, one per preference. Read once on first load to migrate; never
@@ -98,13 +105,41 @@ function readLater(raw) {
   return found;
 }
 
+const STARTUP_MODES = ['restore', 'projects'];
+
+// One startup project, cleaned: undefined if it has no usable path.
+function cleanStartupProject(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+  if (typeof item.path !== 'string' || !item.path.trim()) return undefined;
+  const out = { path: item.path };
+  if (typeof item.name === 'string') out.name = item.name;
+  if (typeof item.launch === 'boolean') out.launch = item.launch;
+  return out;
+}
+
+// Keys whose value needs more than a type check. Each returns the cleaned
+// value, or undefined to keep the default.
+const VALIDATORS = {
+  startupMode: (v) => (STARTUP_MODES.includes(v) ? v : undefined),
+  startupProjects: (v) => (Array.isArray(v)
+    ? v.map(cleanStartupProject).filter(Boolean)
+    : undefined),
+};
+
 // Keep only known keys whose type matches the default, so a corrupt or
 // hand-edited blob can't put a string where a boolean belongs.
-function sanitize(raw) {
+export function sanitize(raw) {
   const out = { ...SETTINGS_DEFAULTS };
   if (!raw || typeof raw !== 'object') return out;
   for (const key of Object.keys(SETTINGS_DEFAULTS)) {
-    if (key in raw && typeof raw[key] === typeof SETTINGS_DEFAULTS[key]) out[key] = raw[key];
+    if (!(key in raw)) continue;
+    const validate = VALIDATORS[key];
+    if (validate) {
+      const value = validate(raw[key]);
+      if (value !== undefined) out[key] = value;
+    } else if (typeof raw[key] === typeof SETTINGS_DEFAULTS[key]) {
+      out[key] = raw[key];
+    }
   }
   return out;
 }
