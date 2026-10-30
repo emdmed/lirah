@@ -27,6 +27,8 @@ import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAge
 import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
 import { ContextPeek } from '../features/token-budget/ContextPeek';
 import { Fig06Context } from './Fig06Context';
+import { Fig10Sandbox } from '../features/settings/Fig10Sandbox';
+import { useSetting } from '../features/settings/settingsStore';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -52,8 +54,12 @@ function ChangelogStatus({ status }) {
   );
 }
 
-function SandboxSwitch({ enabled, failed, onToggle }) {
+// Hover shows FIG.10 while the sandbox is on and running (figures: full);
+// the one-word state is its fallback.
+function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolation }) {
   const tooltip = enabled && failed ? 'Sandbox: FAILED' : enabled ? 'Sandbox: ON' : 'Sandbox: OFF';
+  const [figures] = useSetting('figures');
+  const drawn = enabled && !failed && figures === 'full';
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -63,7 +69,17 @@ function SandboxSwitch({ enabled, failed, onToggle }) {
           {enabled && failed && <Lamp state="fault" label="Sandbox failed" />}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
+      {drawn ? (
+        <TooltipContent side="top" className="w-[492px] max-w-[492px] px-0 py-0 text-left text-wrap">
+          <Fig10Sandbox
+            projectPath={projectPath}
+            networkIsolation={networkIsolation}
+            paper="var(--ins-raised)"
+            className="px-4 pt-2 pb-3"
+            fallback={<div className="px-2 py-1">{tooltip}</div>}
+          />
+        </TooltipContent>
+      ) : <TooltipContent>{tooltip}</TooltipContent>}
     </Tooltip>
   );
 }
@@ -374,7 +390,13 @@ export const StatusBar = memo(({
           {onToggleCompaction && (
             <CompactionSwitch enabled={compactionEnabled} onToggle={onToggleCompaction} />
           )}
-          <SandboxSwitch enabled={sandboxEnabled} failed={sandboxFailed} onToggle={handleSandboxToggle} />
+          <SandboxSwitch
+            enabled={sandboxEnabled}
+            failed={sandboxFailed}
+            onToggle={handleSandboxToggle}
+            projectPath={currentPath}
+            networkIsolation={networkIsolation}
+          />
           {sandboxEnabled && (
             <NetworkSwitch isolated={networkIsolation} enabled={sandboxEnabled} onToggle={handleNetworkToggle} />
           )}

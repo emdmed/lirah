@@ -20,6 +20,7 @@ import { Choice, ChoiceRow, DraftField, Row, Section, StepRow, ToggleRow } from 
 import { AppearanceSection } from './AppearanceSection';
 import { StartupRow } from './StartupRow';
 import { useSettingsNav } from './useSettingsNav';
+import { Fig10Sandbox } from './Fig10Sandbox';
 
 const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
 
@@ -42,6 +43,19 @@ const SANDBOX_SPEC = [
   ['cleared', 'environment variables'],
   ['not covered', 'secondary terminal, background agent jobs'],
 ];
+
+function SandboxSpecList() {
+  return (
+    <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-1 text-[11px]">
+      {SANDBOX_SPEC.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-muted-foreground">{k}</dt>
+          <dd className="text-foreground">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export function SettingsDialog({
   open, onOpenChange, settings, sessionId, projectPath, onToggleSandbox, onToggleNetwork, onOpenBudget,
@@ -286,14 +300,16 @@ export function SettingsDialog({
                         <Lamp state="fault" /> The sandbox failed to start in this tab.
                       </div>
                     )}
-                    <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-1 text-[11px]">
-                      {SANDBOX_SPEC.map(([k, v]) => (
-                        <div key={k} className="contents">
-                          <dt className="text-muted-foreground">{k}</dt>
-                          <dd className="text-foreground">{v}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                    {/* Figures: full draws FIG.10 from the live spec while the
+                        sandbox is on; the list is its fallback and what shows
+                        while it is off. */}
+                    {sandboxEnabled ? (
+                      <Fig10Sandbox
+                        projectPath={projectPath}
+                        networkIsolation={networkIsolation}
+                        fallback={<SandboxSpecList />}
+                      />
+                    ) : <SandboxSpecList />}
                   </ToggleRow>
                   <ToggleRow
                     row={ROW.network}
