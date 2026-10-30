@@ -7,18 +7,14 @@ import { Button } from '../../components/ui/button';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffContent } from '../git/DiffContent';
 import { cn } from '../../lib/utils';
+import { Fig12Race, shortLabel } from './Fig12Race';
+import { useSetting } from '../settings/settingsStore';
 
 // Path of a change relative to its candidate's worktree root.
 function relTo(job, absPath) {
   return job.cwd && absPath.startsWith(`${job.cwd}/`) ? absPath.slice(job.cwd.length + 1) : absPath;
 }
 
-// A candidate's own label is the race label plus its agent; inside the compare
-// view the race half is noise, so show the distinguishing tail.
-function shortLabel(job) {
-  const tail = job.label?.split(' · ').pop();
-  return tail || job.cli;
-}
 
 /**
  * Diff two race candidates against each other rather than each against HEAD.
@@ -30,6 +26,7 @@ function shortLabel(job) {
  * @param {function} onClose - close the dialog
  */
 export function RaceCompareDialog({ jobs, onClose }) {
+  const [figures] = useSetting('figures');
   const candidates = useMemo(() => jobs.filter((j) => j.cwd && j.changedFiles.length > 0), [jobs]);
 
   const [aId, setAId] = useState(() => candidates[0]?.id || null);
@@ -125,6 +122,13 @@ export function RaceCompareDialog({ jobs, onClose }) {
     >
       <DialogTitle>Compare race</DialogTitle>
       <DialogDescription className="sr-only">Diff two race candidates against each other, file by file.</DialogDescription>
+
+      {/* Every candidate as a lane: how long each took, what it left behind. */}
+      {figures !== 'compact' && (
+        <div className="edge-b-engraved px-3 pb-2 flex-shrink-0">
+          <Fig12Race jobs={jobs} />
+        </div>
+      )}
 
       {/* Which two candidates, and file controls */}
       <div className="flex items-center justify-between gap-3 edge-b-engraved px-3 pb-2 flex-shrink-0">

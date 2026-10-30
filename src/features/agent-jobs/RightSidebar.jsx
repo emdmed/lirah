@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
-import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
+import { getSettings, setSetting, useSeededSetting, useSetting } from '../settings/settingsStore';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -19,6 +19,7 @@ import { Keycap, KeyChord } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { jobsPaneRequest } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
+import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { MAX_TABS, useTabManager } from '../tabs/TabContext';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
@@ -436,11 +437,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 
   // One place that knows how a job card is wired, shared by the active list, the
   // race groups and the archived section.
-  const renderCard = (job, { archived = false } = {}) => (
+  const renderCard = (job, { archived = false, hideTime = false } = {}) => (
     <JobCard
       key={job.id}
       job={job}
       archived={archived}
+      hideTime={hideTime}
       selectable={!archived && isReconcilable(job)}
       selected={selected.has(job.id)}
       selectionActive={selected.size > 0}
@@ -738,6 +740,10 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 export const RightSidebar = memo(RightSidebarPanel);
 
 function RaceGroup({ jobs, renderCard, onCompare }) {
+  // Full figures draw the candidates as lanes with their durations, so the
+  // cards drop their own time.
+  const [figures] = useSetting('figures');
+  const lanes = figures !== 'compact';
   const running = jobs.filter((j) => j.status === 'running').length;
   const settled = jobs.some((j) => j.status === 'applied');
   // Comparing needs two candidates that actually produced changes.
@@ -774,7 +780,12 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
           Same prompt, separate worktrees. Keeping one applies it and discards the rest.
         </div>
       )}
-      <div className="flex flex-col p-1.5 pt-0.5">{jobs.map((job) => renderCard(job))}</div>
+      {lanes && (
+        <div className="px-2.5 pt-2.5 pb-1">
+          <Fig12Race jobs={jobs} short />
+        </div>
+      )}
+      <div className="flex flex-col p-1.5 pt-0.5">{jobs.map((job) => renderCard(job, { hideTime: lanes }))}</div>
     </div>
   );
 }
@@ -832,7 +843,7 @@ function outputRuns(output) {
   return runs;
 }
 
-const JobCard = memo(function JobCard({ job, archived, selectable, selected, selectionActive, actions }) {
+const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, selected, selectionActive, actions }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
@@ -893,9 +904,11 @@ const JobCard = memo(function JobCard({ job, archived, selectable, selected, sel
         >
           {job.label}
         </button>
-        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-          {isRunning ? <Elapsed startedAt={job.startedAt} /> : duration}
-        </span>
+        {!hideTime && (
+          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+            {isRunning ? <Elapsed startedAt={job.startedAt} /> : duration}
+          </span>
+        )}
       </div>
 
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 pr-2.5 pb-2 text-[11px]">
