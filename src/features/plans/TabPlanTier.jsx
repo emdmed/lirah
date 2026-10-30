@@ -17,35 +17,49 @@ function nowLine(plan) {
   return `chunk ${chunk.n}${chunk.awaitingFix ? ', fixing' : ''} · ${chunk.title}`;
 }
 
+// A finished auto-pilot run: it drops out of the row's live tier.
+export function isSettledPlan(plan) {
+  return plan.autopilot?.status === AUTOPILOT_STATUS.DONE && !planStatus(plan).running;
+}
+
 /**
- * A tab row's plan tier: the plan its agent is working through. Live work sits
- * in a well; a finished auto-pilot run drops to one muted line.
+ * A tab's finished plans folded into one muted line (DESIGN rule 10). One plan
+ * keeps its title; several become a count, with the titles in the tooltip.
+ */
+export function SettledPlans({ plans, onOpen }) {
+  if (plans.length === 0) return null;
+  const one = plans.length === 1 ? plans[0] : null;
+  const { done, total } = one ? planStatus(one) : {};
+  return (
+    <div className="flex min-w-0 pl-6 text-[11px] text-muted-foreground">
+      <RowAction
+        tabIndex={-1}
+        onClick={() => onOpen(plans[0].id)}
+        title={`${plans.map((p) => p.title || UNTITLED_PLAN).join('\n')}\nOpen the plan`}
+        className="min-w-0 truncate tabular-nums hover:text-[var(--ins-lamp)]"
+      >
+        {one ? `plan complete: ${one.title || UNTITLED_PLAN} · ${done}/${total}` : `${plans.length} plans complete`}
+      </RowAction>
+    </div>
+  );
+}
+
+/**
+ * A tab row's plan tier: the plan its agent is working through, in a well.
+ * Finished runs go to SettledPlans instead.
  */
 export function TabPlanTier({ plan, onOpen }) {
   const { done, total, running, tag, lampState } = planStatus(plan);
   const title = plan.title || UNTITLED_PLAN;
   const ap = plan.autopilot;
 
-  if (ap?.status === AUTOPILOT_STATUS.DONE && !running) {
-    return (
-      <div className="flex min-w-0 pl-6 text-[11px] text-muted-foreground">
-        <RowAction
-          onClick={onOpen}
-          title="Open the plan"
-          className="min-w-0 truncate font-mono tabular-nums hover:text-[var(--ins-lamp)]"
-        >
-          plan complete: {title} · {done}/{total}
-        </RowAction>
-      </div>
-    );
-  }
-
   const now = nowLine(plan);
   return (
     <RowAction
+      tabIndex={-1}
       onClick={onOpen}
       title={`${title}\nOpen the plan`}
-      className="ins-well ml-6 flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px] outline-none hover:shadow-[inset_0_0_0_1px_var(--ins-edge-strong)] focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
+      className="group/well ins-well ml-6 flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px] outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
     >
       <span className="flex h-4 min-w-0 items-center gap-2">
         {plan.split === SPLIT_STATUS.RUNNING ? (
@@ -53,11 +67,11 @@ export function TabPlanTier({ plan, onOpen }) {
         ) : (
           <Lamp state={lampState} blink={running} label={tag || (running ? 'in progress' : 'idle')} />
         )}
-        <span className="min-w-0 truncate text-foreground">{title}</span>
+        <span className="min-w-0 truncate text-foreground group-hover/well:text-[var(--ins-lamp)]">{title}</span>
         {tag && (
           <span
             className={cn(
-              'ml-auto shrink-0 text-[10px] tabular-nums',
+              'ml-auto shrink-0 tabular-nums',
               ap.status === AUTOPILOT_STATUS.RUNNING ? 'text-[var(--ins-lamp)]' : 'text-[var(--ins-warn)]',
             )}
           >
@@ -66,7 +80,7 @@ export function TabPlanTier({ plan, onOpen }) {
         )}
       </span>
       {plan.split === SPLIT_STATUS.DONE && total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
-      {now && <span className="min-w-0 truncate text-[10px] text-muted-foreground">{now}</span>}
+      {now && <span className="min-w-0 truncate text-muted-foreground">{now}</span>}
     </RowAction>
   );
 }

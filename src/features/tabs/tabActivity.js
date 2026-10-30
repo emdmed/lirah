@@ -1,7 +1,7 @@
-import { Bot, MessageSquareMore, ShieldAlert, SquareTerminal } from 'lucide-react';
+import { Bot, ShieldAlert, SquareTerminal } from 'lucide-react';
 import { formatAgo } from '../../lib/formatDuration';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
-import { LensLamp, StarLamp, StarOutline } from './ActivityGlyphs';
+import { LensLamp, StarDim, StarLamp, StarOutline } from './ActivityGlyphs';
 import { EDIT_TOOLS, getAgentHookState, getAgentTouches } from './agentHookState';
 
 // What each tab is doing, for the tabs summary pane: from its agent's hooks
@@ -15,10 +15,19 @@ const ACTIVE_MS = 2500;
 const REMOTE_MS = 2 * 60 * 1000;
 // A tab's own activity that outranks another agent working in its repo.
 export const OWN_BUSY = new Set(['working', 'permission', 'running']);
+// States where it is the user's move: the row says so in the pane's tally and
+// stays open.
+export const YOUR_TURN = new Set(['permission', 'done']);
+// States worth a full row; anything else folds to one line unless it's active.
+export const LIVE = new Set([...OWN_BUSY, ...YOUR_TURN, 'remote']);
+
+// A finished turn this old drops out of the row; the tooltip still has it.
+export const STALE_TURN_MS = 60 * 60 * 1000;
 
 // What each activity looks like: an icon (lucide, or one of the star family)
-// that names the state, and its colour. Working is a lit star, done an outlined
-// star, idle a dark lens, so a moon in the row only ever means context fill.
+// that names the state, and its colour. Working is a lit star, waiting an unlit
+// star, done an outlined star, idle a dark lens, so a moon in the row only ever
+// means context fill.
 // `pulse` marks work in progress. How long it has held is in the row tooltip.
 export const ACTIVITY = {
   working: { icon: StarLamp, color: 'text-[var(--ins-lamp)]', pulse: true },
@@ -26,7 +35,7 @@ export const ACTIVITY = {
   done: { icon: StarOutline, color: 'text-[var(--ins-ok)]' },
   // Muted: an agent idling at its prompt is not an alarm; amber is kept for
   // states that need the user (permission, the attention queue number).
-  waiting: { icon: MessageSquareMore, color: 'text-muted-foreground' },
+  waiting: { icon: StarDim, color: 'text-muted-foreground' },
   running: { icon: SquareTerminal, color: 'text-[var(--ins-lamp)]', pulse: true },
   remote: { icon: Bot, color: 'text-[var(--ins-lamp)]', pulse: true },
   idle: { icon: LensLamp, color: 'text-muted-foreground' },
@@ -126,11 +135,15 @@ export function turnSummary(turn, now) {
   const parts = [];
   if (turn.edited.size) parts.push(`edited ${turn.edited.size}`);
   if (turn.read.size) parts.push(`read ${turn.read.size}`);
-  if (turn.commands) parts.push(`ran ${turn.commands}`);
+  if (turn.commands) parts.push(`${turn.commands} ${turn.commands === 1 ? 'cmd' : 'cmds'}`);
   if (parts.length === 0) return null;
   // Running: how long it has been going. Ended: how long ago it finished.
   parts.push(turn.endedAt ? `${formatAgo(now - turn.endedAt)} ago` : formatAgo(now - turn.startedAt));
-  return { text: parts.join(' · '), running: !turn.endedAt };
+  return {
+    text: parts.join(' · '),
+    running: !turn.endedAt,
+    stale: !!turn.endedAt && now - turn.endedAt > STALE_TURN_MS,
+  };
 }
 
 export function relativeTo(path, root) {

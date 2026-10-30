@@ -13,15 +13,17 @@ export function chunkCommitMessage(plan, chunk) {
   return `plan(${plan.slug}): ${chunk.n} — ${chunk.title}`;
 }
 
+// Up to 30 characters, cut at a word boundary so a branch never ends mid-word
+// (clear-the-eval-floors, not clear-the-eval-floo).
 export function slugify(text) {
-  return (
-    String(text || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 30)
-      .replace(/-+$/, '') || 'plan'
-  );
+  const slug = String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (slug.length <= 30) return slug || 'plan';
+  const cut = slug.slice(0, 31);
+  const end = cut.lastIndexOf('-');
+  return (end > 0 ? cut.slice(0, end) : slug.slice(0, 30)).replace(/-+$/, '') || 'plan';
 }
 
 /** First `# heading` of a markdown document, if any. */

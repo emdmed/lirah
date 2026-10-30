@@ -10,6 +10,16 @@ export const StarLamp = () => <Lamp state="on" />;
 
 export const LensLamp = () => <Lamp state="off" />;
 
+// The same star, filled and unlit: an agent resting at its prompt. It is a
+// star (an agent is there) but carries no glow, unlike the working star.
+export function StarDim() {
+  return (
+    <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true">
+      <path d={STAR_OUTLINE} fill="currentColor" />
+    </svg>
+  );
+}
+
 export function StarOutline() {
   return (
     <svg width="11" height="11" viewBox="-0.5 -0.5 11 11" aria-hidden="true">

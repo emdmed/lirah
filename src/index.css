@@ -1116,8 +1116,17 @@ body {
 
   :root[data-theme="light"] .ins-lamp { --lamp-glow: 50%; }
 
+  /* Blinks by repainting the face and glow, never by animating opacity: an
+     opacity animation on a filtered element makes WebKitGTK re-composite,
+     and the whole window flickers with each step. */
   .ins-lamp[data-blink] {
-    animation: ins-blink 1s steps(1) infinite;
+    /* A variable, since the minifier drops color-mix() inside keyframes. */
+    --lamp-dim: color-mix(in srgb, var(--lamp-c) 25%, var(--ins-lamp-off));
+    animation: ins-blink-glow 1s steps(1) infinite;
+  }
+
+  .ins-lamp[data-blink]::before {
+    animation: ins-blink-face 1s steps(1) infinite;
   }
 
   /* Busy scanner (Scanner.jsx): square lamp segments, one lit cell chasing
@@ -1738,8 +1747,19 @@ body {
   text-decoration-line: none;
 }
 
-@keyframes ins-blink {
-  50% { opacity: 0.25; }
+/* Registered so the glow can step in a keyframe (see .ins-lamp[data-blink]). */
+@property --lamp-glow {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 70%;
+}
+
+@keyframes ins-blink-glow {
+  50% { --lamp-glow: 0%; }
+}
+
+@keyframes ins-blink-face {
+  50% { background-color: var(--lamp-dim); }
 }
 
 /* Soft breathing for busy placeholders and working-state icons. */
@@ -1770,7 +1790,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ins-lamp[data-blink] { animation: none; }
+  .ins-lamp[data-blink],
+  .ins-lamp[data-blink]::before { animation: none; }
   .ins-pulse { animation: none; }
   /* Still reads as "busy": every segment held half-lit. */
   .ins-scan > i {

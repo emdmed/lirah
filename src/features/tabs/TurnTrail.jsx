@@ -1,4 +1,5 @@
 import { Paperclip } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { relativeTo } from './tabActivity';
 import { RowAction } from './RowAction';
@@ -11,9 +12,13 @@ export function TurnTrail({ turn, summary, root, open, onToggle, onAttach }) {
         aria-expanded={!!open}
         onClick={onToggle}
         title={open ? 'Hide files' : 'Show the files it edited'}
-        className="min-w-0 truncate tabular-nums hover:text-[var(--ins-lamp)]"
+        tabIndex={-1}
+        className={cn(
+          'min-w-0 truncate tabular-nums hover:text-[var(--ins-lamp)]',
+          summary.running && 'text-[var(--ins-lamp)]',
+        )}
       >
-        {summary.running ? 'this turn' : 'last turn'}: {summary.text}
+        {summary.running && 'now · '}{summary.text}
       </RowAction>
       {open && (
         <div className="flex min-w-0 flex-col gap-0.5 pt-1">
@@ -24,6 +29,7 @@ export function TurnTrail({ turn, summary, root, open, onToggle, onAttach }) {
           ))}
           {turn.edited.size > 0 ? (
             <RowAction
+              tabIndex={-1}
               onClick={() => onAttach([...turn.edited])}
               title="Add these files to the current tab's prompt"
               className="flex items-center gap-1 self-start pt-0.5 hover:text-[var(--ins-lamp)]"
