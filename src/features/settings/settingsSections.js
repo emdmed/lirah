@@ -30,6 +30,12 @@ export const SETTINGS_ROWS = [
     words: 'compaction hook hooks index grep orchestration plugin',
   },
   {
+    id: 'agent-control', section: 'agent', kind: 'toggle', key: 'agentControl',
+    label: 'Agent control',
+    hint: 'The agent in a tab can change settings and the theme with the lirah command. Sandbox, hook and this switch ask you first.',
+    words: 'agent control lirah cli command settings theme configure',
+  },
+  {
     id: 'keep-context', section: 'agent', kind: 'toggle', key: 'keepFilesAfterSend',
     label: 'Keep context after send', hint: 'Attached files, elements and linked repos stay for the next prompt.',
     words: 'keep context after send files elements repos',

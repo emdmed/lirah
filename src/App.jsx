@@ -21,6 +21,7 @@ import { GlobalDialogOutlet } from "./features/dialogs/GlobalDialogOutlet";
 import { useDialog } from "./features/dialogs/DialogProvider";
 import { MAX_TABS } from "./features/tabs/TabContext";
 import { useSetting } from "./features/settings/settingsStore";
+import { useAgentControl } from "./features/agent-control/useAgentControl";
 
 function App() {
   const { tabs, activeTabId, addTab, requestCloseTab, switchTab } = useTabManager();
@@ -30,6 +31,9 @@ function App() {
 
   // Terminals from before a reload that no tab will reattach.
   useEffect(() => { reapOrphanedTerminals(); }, []);
+
+  // Requests from the `lirah` CLI in a tab: settings and theme changes.
+  useAgentControl();
 
   // Agent state reported by Claude Code / opencode hooks, for the tab lamps.
   useEffect(() => { startAgentHookListener(); }, []);

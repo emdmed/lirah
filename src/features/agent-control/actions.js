@@ -1,0 +1,156 @@
+// What the `lirah` CLI can do to settings and the theme. Plain functions over
+// the settings store: useAgentControl handles the event, the confirm and the
+// toast. Each action returns the reply data, or throws an Error whose message
+// goes back to the CLI.
+
+import { getSettings, sanitize, setSetting, SETTINGS_DEFAULTS } from '../settings/settingsStore';
+import { SETTINGS_ROWS } from '../settings/settingsSections';
+import { TAB_CLIS } from '../../lib/agentClis';
+import { SCROLLBACK_OPTIONS } from '../../lib/terminalPrefs';
+
+// Changes the user confirms first: they loosen the sandbox, change what runs
+// inside every agent, or switch this control channel itself.
+export const GUARDED_KEYS = new Set([
+  'sandboxEnabled', 'networkIsolation', 'agentStateHook', 'compactionHook', 'agentControl',
+]);
+
+// Per-tab values: the store only holds the default the next tab starts with.
+const SEEDED_KEYS = new Set(['sandboxEnabled', 'networkIsolation', 'selectedCli']);
+
+// Allowed values for choice rows, by settings key.
+const CHOICES = {
+  selectedCli: TAB_CLIS.map((c) => c.id),
+  autoCommitCli: TAB_CLIS.map((c) => c.id),
+  scrollback: SCROLLBACK_OPTIONS.map((o) => o.value),
+};
+
+// Settings the CLI may touch: those with a row in the Settings dialog.
+// startupProjects is a list, edited through its own commands.
+export const settingsSchema = Object.fromEntries(
+  SETTINGS_ROWS
+    .filter((row) => row.key && row.key in SETTINGS_DEFAULTS && row.key !== 'startupProjects')
+    .map((row) => {
+      const def = SETTINGS_DEFAULTS[row.key];
+      const type = CHOICES[row.key] ? 'choice' : typeof def === 'boolean' ? 'bool' : typeof def;
+      return [row.key, {
+        key: row.key,
+        label: row.label,
+        section: row.section,
+        type,
+        default: def,
+        ...(CHOICES[row.key] && { values: CHOICES[row.key] }),
+        ...(typeof row.hint === 'string' && { hint: row.hint }),
+        ...(GUARDED_KEYS.has(row.key) && { guarded: true }),
+        ...(SEEDED_KEYS.has(row.key) && { appliesTo: 'new tabs' }),
+      }];
+    }),
+);
+
+export function isGuarded(key) {
+  return GUARDED_KEYS.has(key);
+}
+
+function schemaFor(key) {
+  if (typeof key !== 'string' || !key) throw new Error('missing setting name (see `lirah settings list`)');
+  const entry = settingsSchema[key];
+  if (!entry) {
+    throw new Error(`unknown setting "${key}"; known: ${Object.keys(settingsSchema).join(', ')}`);
+  }
+  return entry;
+}
+
+const BOOL_WORDS = { on: true, true: true, yes: true, 1: true, off: false, false: false, no: false, 0: false };
+
+// Parse a CLI value (a string, or already JSON-parsed by the CLI) for `entry`.
+export function parseValue(entry, raw) {
+  if (raw === undefined || raw === null || raw === '') {
+    throw new Error(`missing value for ${entry.key}`);
+  }
+  if (entry.type === 'bool') {
+    if (typeof raw === 'boolean') return raw;
+    const word = String(raw).trim().toLowerCase();
+    if (word in BOOL_WORDS) return BOOL_WORDS[word];
+    throw new Error(`${entry.key} takes on/off or true/false, not "${raw}"`);
+  }
+  if (entry.type === 'choice') {
+    const numeric = typeof entry.default === 'number';
+    const value = numeric ? Number(String(raw).replace(/[,_]/g, '')) : String(raw).trim();
+    if (!entry.values.includes(value)) {
+      throw new Error(`${entry.key} must be one of ${entry.values.join(', ')}, not "${raw}"`);
+    }
+    return value;
+  }
+  if (entry.type === 'number') {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) throw new Error(`${entry.key} takes a number, not "${raw}"`);
+    return n;
+  }
+  return String(raw);
+}
+
+// The value as it would be stored, run through the same checks as a loaded
+// settings blob so the CLI can't store what a reload would drop.
+function cleaned(key, value) {
+  const out = sanitize({ [key]: value })[key];
+  if (!Object.is(out, value)) throw new Error(`invalid value for ${key}`);
+  return out;
+}
+
+export function listSettings() {
+  const current = getSettings();
+  return Object.values(settingsSchema).map((entry) => ({ ...entry, value: current[entry.key] }));
+}
+
+export function getSetting(key) {
+  const entry = schemaFor(key);
+  return getSettings()[entry.key];
+}
+
+// Parse and validate without writing, so the caller can confirm first.
+// Returns { key, value, previous, changed }.
+export function prepareSetting(key, raw) {
+  const entry = schemaFor(key);
+  const value = cleaned(entry.key, parseValue(entry, raw));
+  const previous = getSettings()[entry.key];
+  return { key: entry.key, value, previous, changed: !Object.is(previous, value) };
+}
+
+export function prepareReset(key) {
+  const entry = schemaFor(key);
+  const value = SETTINGS_DEFAULTS[entry.key];
+  const previous = getSettings()[entry.key];
+  return { key: entry.key, value, previous, changed: !Object.is(previous, value) };
+}
+
+export function setSettingValue(key, raw) {
+  const plan = prepareSetting(key, raw);
+  setSetting(plan.key, plan.value);
+  return plan;
+}
+
+export function resetSetting(key) {
+  const plan = prepareReset(key);
+  setSetting(plan.key, plan.value);
+  return plan;
+}
+
+export function listThemes(themes, currentTheme) {
+  return Object.entries(themes).map(([id, t]) => ({ id, name: t.name, current: id === currentTheme }));
+}
+
+// Accepts the theme id or its display name, case-insensitively.
+export function resolveTheme(themes, name) {
+  if (typeof name !== 'string' || !name.trim()) throw new Error('missing theme name (see `lirah theme list`)');
+  const wanted = name.trim().toLowerCase();
+  const id = Object.keys(themes).find(
+    (k) => k.toLowerCase() === wanted || themes[k].name?.toLowerCase() === wanted,
+  );
+  if (!id) throw new Error(`unknown theme "${name}"; known: ${Object.keys(themes).join(', ')}`);
+  return id;
+}
+
+export function setTheme(themes, changeTheme, name) {
+  const id = resolveTheme(themes, name);
+  changeTheme(id);
+  return id;
+}

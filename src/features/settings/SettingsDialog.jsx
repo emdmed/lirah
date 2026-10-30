@@ -55,6 +55,7 @@ export function SettingsDialog({
   const [agentStateHook, setAgentStateHook] = useSetting('agentStateHook');
   const [compactionHook, setCompactionHook] = useSetting('compactionHook');
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
+  const [agentControl, setAgentControl] = useSetting('agentControl');
 
   const {
     showTitleBar, setShowTitleBar,
@@ -202,6 +203,7 @@ export function SettingsDialog({
                   <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
                   <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
                   <ToggleRow row={ROW['compaction-hook']} value={compactionHook} onChange={setCompactionHook} />
+                  <ToggleRow row={ROW['agent-control']} value={agentControl} onChange={setAgentControl} />
                 </Section>
 
                 <AppearanceSection
