@@ -49,6 +49,173 @@ pub fn spawn_pty(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, proj
     rx.recv().map_err(|_| "PTY spawn panicked".to_string())?
 }
 
+/// Home paths bound read-only inside the sandbox (relative to $HOME), so a
+/// sandboxed agent can't plant keys, shell startup code or autostart entries.
+const PROTECTED_PATHS: &[&str] = &[
+    ".ssh",
+    ".gnupg",
+    ".bashrc",
+    ".bash_profile",
+    ".profile",
+    ".zshrc",
+    ".zprofile",
+    ".pam_environment",
+    ".gitconfig",
+    ".config/git",
+    ".config/autostart",
+    ".config/systemd/user",
+    ".config/environment.d",
+    ".local/bin",
+    // The `lirah` CLI, which unsandboxed tabs run too
+    ".lirah/bin",
+    // Shell configs
+    ".config/fish",
+    ".config/nushell",
+    // Desktop environment startup scripts
+    ".config/plasma-workspace/env",
+    ".config/hypr",
+    ".xinitrc",
+    ".xprofile",
+    // File handler and .desktop registration
+    ".config/mimeapps.list",
+    ".local/share/applications",
+];
+
+/// Env vars re-exported into the sandbox after `--clearenv` (when set).
+const PASSTHROUGH_VARS: &[&str] = &[
+    "HOME", "USER", "LOGNAME", "PATH", "SHELL", "TERM",
+    "LANG", "LC_ALL", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
+    "DISPLAY", "WAYLAND_DISPLAY",
+    // Claude Code / Node.js needs
+    "NODE_HOME", "NVM_DIR", "npm_config_prefix",
+    // API keys Claude Code needs to function
+    "ANTHROPIC_API_KEY", "CLAUDE_API_KEY",
+];
+
+/// Namespaces always unshared (net is separate: see `net_isolated`).
+const UNSHARED: &[&str] = &["uts", "ipc", "pid", "cgroup"];
+
+/// What the bwrap sandbox looks like for a tab. The bwrap args are built from
+/// this, and the UI reads it (get_sandbox_spec) to draw the sandbox.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SandboxSpec {
+    /// `/` is bound read-only.
+    pub ro_root: bool,
+    /// Writable binds, in order: home, then the project dir (if it exists).
+    pub writable: Vec<String>,
+    /// Absolute paths under home re-bound read-only (only ones that exist).
+    pub protected: Vec<String>,
+    /// /tmp is a private tmpfs.
+    pub tmp_private: bool,
+    /// Env is cleared; only `env_passthrough` (when set) and the tab's own vars come back.
+    pub cleared_env: bool,
+    /// Names (never values) of host env vars re-exported when set.
+    pub env_passthrough: Vec<String>,
+    /// Namespaces unshared besides net, e.g. ["uts", "ipc", "pid", "cgroup"].
+    pub unshare: Vec<String>,
+    /// Network namespace unshared (no network).
+    pub net_isolated: bool,
+}
+
+pub fn sandbox_spec(home: Option<&str>, project_dir: Option<&str>, no_net: bool) -> SandboxSpec {
+    let mut writable = Vec::new();
+    let mut protected = Vec::new();
+    if let Some(home) = home {
+        writable.push(home.to_string());
+        for subpath in PROTECTED_PATHS {
+            let full = format!("{}/{}", home, subpath);
+            if std::path::Path::new(&full).exists() {
+                protected.push(full);
+            }
+        }
+    }
+    // Writable: project directory (may be outside home)
+    if let Some(proj) = project_dir {
+        if std::path::Path::new(proj).is_dir() {
+            writable.push(proj.to_string());
+        }
+    }
+    SandboxSpec {
+        ro_root: true,
+        writable,
+        protected,
+        tmp_private: true,
+        cleared_env: true,
+        env_passthrough: PASSTHROUGH_VARS.iter().map(|v| v.to_string()).collect(),
+        unshare: UNSHARED.iter().map(|v| v.to_string()).collect(),
+        net_isolated: no_net,
+    }
+}
+
+/// bwrap args for `spec`, up to (not including) `-- <shell>`. `env` is the
+/// tab's own vars, set after the passthrough ones.
+fn bwrap_args(spec: &SandboxSpec, env: &[(String, String)]) -> Vec<String> {
+    let mut a: Vec<String> = Vec::new();
+    let mut push = |xs: &[&str]| a.extend(xs.iter().map(|x| x.to_string()));
+    // Clear all inherited env vars to prevent leaking secrets
+    if spec.cleared_env {
+        push(&["--clearenv"]);
+    }
+    if spec.ro_root {
+        push(&["--ro-bind", "/", "/"]);
+    }
+    push(&["--dev", "/dev"]);
+    if spec.tmp_private {
+        push(&["--tmpfs", "/tmp"]);
+    }
+    // Home is the first writable bind, then the read-only protected paths
+    // over it, then the project dir (which may be outside home).
+    let mut writable = spec.writable.iter();
+    if let Some(home) = writable.next() {
+        push(&["--bind", home, home]);
+    }
+    for full in &spec.protected {
+        push(&["--ro-bind", full, full]);
+    }
+    for dir in writable {
+        push(&["--bind", dir, dir]);
+    }
+    if spec.net_isolated {
+        push(&["--unshare-net"]);
+    }
+    for ns in &spec.unshare {
+        push(&[&format!("--unshare-{}", ns)]);
+    }
+    push(&[
+        // NOTE: deliberately no --new-session. It calls setsid() inside the
+        // sandbox, and bwrap never re-acquires a controlling terminal
+        // afterwards (no TIOCSCTTY), so the sandboxed shell ends up holding
+        // the pty slave as plain stdio with tty_nr=0 / tpgid=-1. The kernel
+        // then has no foreground process group to signal, so TIOCSWINSZ on
+        // the master — every resize_pty call — delivers SIGWINCH to nobody:
+        // a running TUI (Claude Code, vim) never learns the terminal got
+        // wider and keeps repainting at the old geometry.
+        // Its purpose is blocking TIOCSTI input injection, which buys
+        // nothing here: the pty is dedicated to this session and the
+        // sandboxed process already owns both ends of it, and TIOCSTI is
+        // disabled kernel-wide since Linux 6.2 (dev.tty.legacy_tiocsti=0).
+        "--die-with-parent",
+        // Mount /proc after --unshare-pid so it's scoped to sandbox PIDs
+        "--proc", "/proc",
+    ]);
+    // Re-export only essential env vars
+    for var in &spec.env_passthrough {
+        if let Ok(val) = std::env::var(var) {
+            push(&["--setenv", var, &val]);
+        }
+    }
+    for (key, val) in env {
+        push(&["--setenv", key, val]);
+    }
+    a
+}
+
+/// The sandbox a tab would get for `project_dir`, for the UI to draw.
+#[tauri::command]
+pub fn get_sandbox_spec(project_dir: Option<String>, no_net: bool) -> SandboxSpec {
+    sandbox_spec(crate::util::home_dir_string().as_deref(), project_dir.as_deref(), no_net)
+}
+
 fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, project_dir: Option<String>, env: Vec<(String, String)>) -> SpawnResult {
     let pty_system = NativePtySystem::default();
 
@@ -68,103 +235,9 @@ fn spawn_pty_here(rows: u16, cols: u16, sandbox: bool, sandbox_no_net: bool, pro
     // Create command: wrap in bwrap sandbox on Unix if requested
     #[cfg(target_os = "linux")]
     let mut cmd = if sandbox {
+        let spec = sandbox_spec(crate::util::home_dir_string().as_deref(), project_dir.as_deref(), sandbox_no_net);
         let mut c = CommandBuilder::new("/usr/bin/bwrap");
-        // Clear all inherited env vars to prevent leaking secrets
-        c.args(&["--clearenv"]);
-        c.args(&[
-            "--ro-bind", "/", "/",
-            "--dev", "/dev",
-            "--tmpfs", "/tmp",
-        ]);
-        // Home directory: writable by default, with sensitive paths read-only
-        if let Some(ref home) = crate::util::home_dir_string() {
-            c.args(&["--bind", home, home]);
-
-            // Sensitive paths that should be read-only inside the sandbox
-            let protected_paths = [
-                ".ssh",
-                ".gnupg",
-                ".bashrc",
-                ".bash_profile",
-                ".profile",
-                ".zshrc",
-                ".zprofile",
-                ".pam_environment",
-                ".gitconfig",
-                ".config/git",
-                ".config/autostart",
-                ".config/systemd/user",
-                ".config/environment.d",
-                ".local/bin",
-                // The `lirah` CLI, which unsandboxed tabs run too
-                ".lirah/bin",
-                // Shell configs
-                ".config/fish",
-                ".config/nushell",
-                // Desktop environment startup scripts
-                ".config/plasma-workspace/env",
-                ".config/hypr",
-                ".xinitrc",
-                ".xprofile",
-                // File handler and .desktop registration
-                ".config/mimeapps.list",
-                ".local/share/applications",
-            ];
-            for subpath in &protected_paths {
-                let full = format!("{}/{}", home, subpath);
-                if std::path::Path::new(&full).exists() {
-                    c.args(&["--ro-bind", &full, &full]);
-                }
-            }
-        }
-        // Writable: project directory (may be outside home)
-        if let Some(ref proj) = project_dir {
-            if std::path::Path::new(proj).is_dir() {
-                c.args(&["--bind", proj, proj]);
-            }
-        }
-        if sandbox_no_net {
-            c.args(&["--unshare-net"]);
-        }
-        c.args(&[
-            "--unshare-uts",
-            "--unshare-ipc",
-            "--unshare-pid",
-            "--unshare-cgroup",
-            // NOTE: deliberately no --new-session. It calls setsid() inside the
-            // sandbox, and bwrap never re-acquires a controlling terminal
-            // afterwards (no TIOCSCTTY), so the sandboxed shell ends up holding
-            // the pty slave as plain stdio with tty_nr=0 / tpgid=-1. The kernel
-            // then has no foreground process group to signal, so TIOCSWINSZ on
-            // the master — every resize_pty call — delivers SIGWINCH to nobody:
-            // a running TUI (Claude Code, vim) never learns the terminal got
-            // wider and keeps repainting at the old geometry.
-            // Its purpose is blocking TIOCSTI input injection, which buys
-            // nothing here: the pty is dedicated to this session and the
-            // sandboxed process already owns both ends of it, and TIOCSTI is
-            // disabled kernel-wide since Linux 6.2 (dev.tty.legacy_tiocsti=0).
-            "--die-with-parent",
-            // Mount /proc after --unshare-pid so it's scoped to sandbox PIDs
-            "--proc", "/proc",
-        ]);
-        // Re-export only essential env vars
-        let passthrough_vars = [
-            "HOME", "USER", "LOGNAME", "PATH", "SHELL", "TERM",
-            "LANG", "LC_ALL", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
-            "DISPLAY", "WAYLAND_DISPLAY",
-            // Claude Code / Node.js needs
-            "NODE_HOME", "NVM_DIR", "npm_config_prefix",
-            // API keys Claude Code needs to function
-            "ANTHROPIC_API_KEY", "CLAUDE_API_KEY",
-        ];
-        for var in &passthrough_vars {
-            if let Ok(val) = std::env::var(var) {
-                c.args(&["--setenv", var, &val]);
-            }
-        }
-        for (key, val) in &env {
-            c.args(&["--setenv", key, val]);
-        }
+        c.args(bwrap_args(&spec, &env));
         c.args(&["--", &shell, "-l"]);
         c
     } else {
@@ -309,4 +382,5 @@ profile bwrap /usr/bin/bwrap flags=(unconfined) {
         }
     });
 }
+
 

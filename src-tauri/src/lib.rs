@@ -141,6 +141,7 @@ pub fn run(initial_path: Option<String>) {
             pty::commands::check_pty_child_process,
             pty::commands::detect_pty_clis,
             pty::commands::kill_pty_child_process,
+            pty::manager::get_sandbox_spec,
             fs::cwd::get_terminal_cwd,
             get_initial_path,
             get_recording_mode,
