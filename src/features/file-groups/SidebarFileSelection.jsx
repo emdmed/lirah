@@ -112,7 +112,7 @@ export function SidebarFileSelection({
                 onCheckedChange={onToggleKeepFiles}
                 className="h-3.5 w-3.5"
               />
-              <label htmlFor="keep-files-sidebar" className="engraved-label cursor-pointer select-none">
+              <label htmlFor="keep-files-sidebar" className="text-[11px] font-mono leading-none text-muted-foreground hover:text-foreground cursor-pointer select-none">
                 keep
               </label>
             </div>

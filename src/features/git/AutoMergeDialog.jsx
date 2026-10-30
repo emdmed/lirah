@@ -64,6 +64,13 @@ function planCommands({ feature, base, plan }) {
   return cmds;
 }
 
+// Errors are a summary, a blank line, then git's own output.
+function splitError(error) {
+  const text = String(error ?? '');
+  const at = text.indexOf('\n\n');
+  return at < 0 ? [text, ''] : [text.slice(0, at), text.slice(at + 2).trim()];
+}
+
 export function AutoMergeDialog({ autoMerge }) {
   const { stage, feature, bases, base, setBase, plan, result, error, confirm, cancel } = autoMerge;
   const isOpen = stage !== 'idle';
@@ -159,11 +166,19 @@ export function AutoMergeDialog({ autoMerge }) {
               <Lamp state="fault" />
               Not merged
             </p>
-            {error && (
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words pl-[17px] text-xs text-muted-foreground">
-                {error}
-              </pre>
-            )}
+            {error && (() => {
+              const [summary, output] = splitError(error);
+              return (
+                <>
+                  <p className="pl-[17px] text-xs text-foreground">{summary}</p>
+                  {output && (
+                    <pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap break-words pl-[17px] text-xs text-muted-foreground">
+                      {output}
+                    </pre>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 

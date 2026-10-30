@@ -33,3 +33,17 @@ export const subscribeAutopilotToggle = autopilotToggle.subscribe;
 
 /** Whether a toggle is pending (and clears it). */
 export const takeAutopilotToggle = () => autopilotToggle.take() !== null;
+
+// The command palette's `plan next` / `plan implement`, for the open plan's
+// next chunk. Pending briefly, like the auto-pilot toggle.
+const chunkCommand = createRequest(APP_EVENTS.plansChunkCommand, {
+  pending: true,
+  ttl: 5000,
+  before: () => requestPlansPane('open'),
+});
+
+/** @param {'next' | 'implement'} action */
+export const requestPlanChunkCommand = (action) => chunkCommand.request(action);
+export const subscribePlanChunkCommand = chunkCommand.subscribe;
+/** The pending action (and clears it), or null. */
+export const takePlanChunkCommand = () => chunkCommand.take();

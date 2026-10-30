@@ -17,6 +17,19 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
   const at = pos ? `chunk ${pos.index} of ${pos.total}` : null;
   const elapsed = running && chunk?.status === CHUNK_STATUS.IN_PROGRESS && chunk.startedAt ? formatDuration(now - chunk.startedAt) : null;
   const took = ap.startedAt && ap.endedAt ? formatDuration(ap.endedAt - ap.startedAt) : null;
+  // The run as a whole: how long it has gone, and what's left after this chunk.
+  const counted = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
+  const left = counted.filter((c) => c.status !== CHUNK_STATUS.IMPLEMENTED && c.id !== chunk?.id).length;
+  const runFor = running && ap.startedAt ? formatDuration(now - ap.startedAt) : null;
+  const runLine = [runFor && `run ${runFor}`, `${left} left`].filter(Boolean).join(' · ');
+  // What a finished run leaves behind, counted.
+  const commits = plan.chunks.reduce((n, c) => n + (c.commits?.length ?? 0), 0);
+  const skipped = plan.chunks.length - counted.length;
+  const tally = [
+    `${counted.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED).length} chunks`,
+    `${commits} ${commits === 1 ? 'commit' : 'commits'}`,
+    skipped > 0 && `${skipped} skipped`,
+  ].filter(Boolean).join(' · ');
   const headline = {
     [AUTOPILOT_STATUS.RUNNING]: at ? [at, elapsed, ap.nudged && 'nudged to commit'].filter(Boolean).join(' · ') : 'starting',
     [AUTOPILOT_STATUS.PAUSED]: ['needs you', at].filter(Boolean).join(' · '),
@@ -43,25 +56,37 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
             <PanelButton icon={Check} onClick={onDismiss} title="Clear the status">dismiss</PanelButton>
           </span>
         </div>
-        {ap.message && <Prose text={ap.message} clamp={3} className="text-[10px] leading-relaxed text-muted-foreground" />}
+        {ap.status === AUTOPILOT_STATUS.DONE && (
+          <span className="pl-[calc(8px+0.5rem)] tabular-nums text-muted-foreground">{tally}</span>
+        )}
+        {ap.message && <Prose text={ap.message} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
       </div>
     );
   }
+  const stopped = ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
   return (
     <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]">
       <div className="flex min-w-0 items-center gap-2">
         <Lamp state={lamp.state} blink={lamp.blink} label={headline} />
         <span className="engraved-label shrink-0">auto-pilot</span>
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
+        <span className="ml-auto shrink-0 font-[family-name:var(--font-legend)] text-[10px] tabular-nums text-muted-foreground">{runLine}</span>
       </div>
-      {ap.message && <Prose text={ap.message} clamp={3} className="text-[10px] leading-relaxed text-muted-foreground" />}
+      {/* Why it stopped is what you came back for: full ink, more room. */}
+      {ap.message && (
+        <Prose
+          text={ap.message}
+          clamp={stopped ? 4 : 3}
+          className={stopped ? 'text-[11px] leading-relaxed text-foreground' : 'text-[11px] leading-relaxed text-muted-foreground'}
+        />
+      )}
       {ap.status === AUTOPILOT_STATUS.PAUSED && AUTO_RESUME_REASONS.has(ap.reason) && (
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
           Answer in the terminal and the run carries on by itself, or resume to nudge the agent.
         </p>
       )}
       {running && (
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
           Chunks that haven't started can still be edited, skipped or reordered.
         </p>
       )}

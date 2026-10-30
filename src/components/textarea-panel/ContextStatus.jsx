@@ -330,7 +330,9 @@ export const ContextStatus = memo(function ContextStatus({
 
       {hints.length > 0 && (
         <span
-          className="tui-pane-info left-[10px] right-auto hidden items-center gap-[9px] group-focus-within/ctx:flex"
+          // Always laid out, only shown on focus: toggling display on focus
+          // left WebKitGTK repainting the pane legend's keycap partially.
+          className="tui-pane-info left-[10px] right-auto flex invisible items-center gap-[9px] group-focus-within/ctx:visible"
           aria-hidden="true"
         >
           <FrameHints hints={hints} />
@@ -357,7 +359,8 @@ function ManifestRow({ label, children }) {
 }
 
 // Files as a tally by intent, once there are too many to list and the files
-// pane shows them: `12 files: 8 EDIT · 3 READ · 1 COPY · all in the files pane`.
+// pane shows them: `12 files: 8 EDIT · 3 READ · 1 COPY · listed in the files pane`,
+// or `19 files, all EDIT · listed in the files pane` when they share one intent.
 // Plain text: only chips are boxed, because only chips respond.
 function FileTally({ selectedFiles, fileStates }) {
   const total = selectedFiles?.size || 0;
@@ -367,6 +370,18 @@ function FileTally({ selectedFiles, fileStates }) {
     counts[state] = (counts[state] || 0) + 1;
   });
   const parts = FILE_STATE_ORDER.filter((s) => counts[s]);
+  const tone = (state) => (state === 'modify' ? 'text-foreground' : TALLY_TONE[state]);
+  if (parts.length === 1) {
+    const [state] = parts;
+    return (
+      <p className="flex flex-wrap items-center gap-x-1.5 min-h-5 text-[11px] font-mono">
+        <span className="text-foreground">{total} files, all</span>
+        <span className={cn("font-semibold tracking-[0.08em]", tone(state))}>{FILE_STATE_LABELS[state]}</span>
+        <span className="text-faint" aria-hidden="true">·</span>
+        <span className="text-muted-foreground">listed in the files pane</span>
+      </p>
+    );
+  }
   return (
     <p className="flex flex-wrap items-center gap-x-1.5 min-h-5 text-[11px] font-mono">
       <span className="text-foreground">{total} files:</span>
@@ -374,13 +389,13 @@ function FileTally({ selectedFiles, fileStates }) {
         <span key={state} className="inline-flex items-center gap-x-1.5">
           {i > 0 && <span className="text-faint" aria-hidden="true">·</span>}
           <span className="text-foreground">{counts[state]}</span>
-          <span className={cn("font-semibold tracking-[0.08em]", state === 'modify' ? 'text-foreground' : TALLY_TONE[state])}>
+          <span className={cn("font-semibold tracking-[0.08em]", tone(state))}>
             {FILE_STATE_LABELS[state]}
           </span>
         </span>
       ))}
       <span className="text-faint" aria-hidden="true">·</span>
-      <span className="text-muted-foreground">all in the files pane</span>
+      <span className="text-muted-foreground">listed in the files pane</span>
     </p>
   );
 }

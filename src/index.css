@@ -168,6 +168,28 @@
   --font-glyph: "JetBrainsMono Nerd Font", "JetBrains Mono", "DejaVu Sans Mono", "Adwaita Mono", "Noto Sans Mono", Menlo, Consolas, monospace;
 }
 
+/* Native controls follow the theme: dark lists and scrollbars in dark
+   themes. A <select> is a well with a drawn chevron, never the platform's
+   white box (WebKitGTK paints one otherwise). */
+:root { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--ins-well);
+  color: var(--color-foreground);
+  border: 0;
+  border-radius: 0;
+  padding-right: 16px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(-45deg, transparent 50%, currentColor 50%);
+  background-size: 3px 3px, 3px 3px;
+  background-position: calc(100% - 8px) 50%, calc(100% - 5px) 50%;
+  background-repeat: no-repeat;
+  text-overflow: ellipsis;
+}
+select:focus-visible { outline: 1px solid var(--ins-lamp); outline-offset: -1px; }
+select option { background-color: var(--ins-raised); color: var(--color-foreground); }
+
 /* Light themes: a gutter one step darker than the panel, not black. */
 :root[data-theme="light"] {
   --ins-gutter: color-mix(in srgb, var(--color-background) 92%, var(--color-foreground));

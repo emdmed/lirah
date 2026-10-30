@@ -19,6 +19,43 @@ export const FILE_STATE_LABELS = {
 };
 export const FILE_STATE_ORDER = ['modify', 'do-not-modify', 'use-as-example'];
 
+const STATE_TITLES = {
+  'modify': 'Agent may edit this file',
+  'do-not-modify': 'Reference only, agent must not edit',
+  'use-as-example': 'Follow this file as a pattern',
+};
+
+/**
+ * One file's intent as a single tag, for lists: the current state only, click
+ * to cycle EDIT → READ → COPY, the way the context chips do (1 / 2 / 3 set it
+ * on the selected row). EDIT is the default, so it is printed quietly and a
+ * column of them recedes; READ and COPY take their colour, so the files that
+ * differ are the ones you see.
+ */
+export function FileIntentTag({ value = 'modify', onValueChange, className }) {
+  const next = FILE_STATE_ORDER[(FILE_STATE_ORDER.indexOf(value) + 1) % FILE_STATE_ORDER.length];
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onValueChange?.(next); }}
+      disabled={!onValueChange}
+      aria-label={`${STATE_TITLES[value]}. Change to ${FILE_STATE_LABELS[next]}`}
+      title={`${FILE_STATE_LABELS[value]}: ${STATE_TITLES[value].toLowerCase()} · click to cycle EDIT → READ → COPY (1 2 3)`}
+      style={{ fontSize: 'var(--font-xs)' }}
+      className={cn(
+        "shrink-0 h-4 w-[5ch] flex items-center justify-center font-mono font-semibold leading-none tracking-[0.08em]",
+        "transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        value === 'modify'
+          ? "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+          : MODE_TOKENS[value],
+        className,
+      )}
+    >
+      {FILE_STATE_LABELS[value]}
+    </button>
+  );
+}
+
 /**
  * File state selector: three silkscreened segments on the panel.
  *

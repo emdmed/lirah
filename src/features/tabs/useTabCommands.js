@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { requestJobsPane } from '../agent-jobs/jobsPane';
-import { requestAutopilotToggle, requestPlansPane } from '../plans/plansPaneEvents';
+import { requestAutopilotToggle, requestPlanChunkCommand, requestPlansPane } from '../plans/plansPaneEvents';
 import { useWatcher } from '../watcher';
 import { useTabActions } from './TabContext';
 import { requestAttentionJump } from './useAgentAttention';
@@ -102,6 +102,10 @@ export function useTabCommands({
       { id: 'prompt', hint: 'toggle the prompt pane', run: () => setTextareaVisible(prev => !prev) },
       { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle') },
       { id: 'plans', hint: 'plans: split, implement, review, roll back', run: () => requestPlansPane('toggle') },
+      { id: 'plan', hint: 'plans: open (next) or send (implement) the open plan\'s next chunk', options: ['next', 'implement'], run: (arg) => {
+        if (arg && arg !== 'next' && arg !== 'implement') throw new Error(`no plan action "${arg}"`);
+        requestPlanChunkCommand(arg || 'next');
+      } },
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },
       { id: 'workspace', hint: 'workspaces', run: () => setWorkspaceDialogOpen(true) },

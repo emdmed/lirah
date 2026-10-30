@@ -13,6 +13,9 @@ import { currentBranch, dirtyCount, git, gitLines, repoTop } from "../../lib/git
 const PREFERRED_BASES = ['main', 'master', 'develop', 'dev'];
 const LAST_BASE_KEY = 'lirah:auto-merge:last-base';
 
+// Invoke rejects with git's stderr as a string; anything else may be an Error.
+const errText = (err) => String((typeof err === 'string' ? err : err?.message ?? err) ?? '').trim() || 'git failed without output';
+
 const count = async (repoPath, range) => parseInt((await git(repoPath, ['rev-list', '--count', range])).trim(), 10) || 0;
 
 // Tracked changes only — untracked files are left alone, and git itself refuses
@@ -47,7 +50,7 @@ export function useAutoMerge() {
   const [feature, setFeature] = useState('');
   const [bases, setBases] = useState([]);
   const [base, setBaseState] = useState('');
-  const [plan, setPlan] = useState(null); // { commits, files, ff, mergeDir, switchNeeded, featureWorktree }
+  const [plan, setPlan] = useState(null); // { commits, files, ahead, behind, ff, mergeDir, switchNeeded, featureWorktree }
   const [result, setResult] = useState(null); // { ff, notes }
   const [error, setError] = useState(null);
   const ctxRef = useRef(null); // { repoPath, repoRoot, worktrees }
@@ -93,6 +96,8 @@ export function useAutoMerge() {
         const [status, ...rest] = l.split('\t');
         return { status: status[0], path: rest[rest.length - 1] };
       }),
+      ahead: commits.length, // feature-only commits
+      behind, // base-only commits since the branches split
       ff: behind === 0,
       mergeDir,
       switchNeeded: mergeDir === repoPath,
@@ -135,14 +140,14 @@ export function useAutoMerge() {
       await buildPlan(featureName, initial);
       setStage('ready');
     } catch (err) {
-      fail(err.toString());
+      fail(`Could not read the repository.\n\n${errText(err)}`);
     }
   }, [reset, fail, buildPlan]);
 
   const setBase = useCallback((name) => {
     setBaseState(name);
     setPlan(null);
-    buildPlan(feature, name).catch(err => fail(err.toString()));
+    buildPlan(feature, name).catch(err => fail(`Could not compare ${feature} with ${name}.\n\n${errText(err)}`));
   }, [feature, buildPlan, fail]);
 
   const confirm = useCallback(async () => {
@@ -202,7 +207,7 @@ export function useAutoMerge() {
           await git(mergeDir, ['worktree', 'remove', featureWorktree]);
           notes.push(`Removed worktree ${featureWorktree}`);
         } catch (err) {
-          notes.push(`Kept worktree ${featureWorktree}: ${err.toString().trim()}`);
+          notes.push(`Kept worktree ${featureWorktree}: ${errText(err)}`);
         }
       } else if (plan.standingInFeatureWorktree) {
         notes.push(`This tab is inside the ${feature} worktree, so it was kept`);
@@ -211,7 +216,7 @@ export function useAutoMerge() {
       setResult({ ff, notes });
       setStage('done');
     } catch (err) {
-      await rollback(err.toString());
+      await rollback(`git stopped with an error — any merge in progress was aborted${switched ? `, back on ${feature}` : ''}.\n\n${errText(err)}`);
     }
   }, [stage, plan, base, feature, fail]);
 

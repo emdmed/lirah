@@ -2,13 +2,21 @@ import { useEffect, useState } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { cn } from '../../lib/utils';
 import { FolderX, SquareTerminal, X } from 'lucide-react';
-import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 import { listBranches, planGit } from './planGit';
 
-const SELECT = 'ins-well h-6 min-w-0 px-1 text-[10px] text-foreground outline-none';
+const SELECT = 'h-6 min-w-0 pl-1.5 font-mono text-[10px] text-foreground';
+
+// Long branch names lose their middle, not their end: the end is what tells
+// plan/improvement-plan-a from plan/improvement-plan-b.
+function middleTruncate(text, max = 36) {
+  if (text.length <= max) return text;
+  const keep = max - 1;
+  const head = Math.ceil(keep * 0.45);
+  return `${text.slice(0, head)}…${text.slice(text.length - (keep - head))}`;
+}
 
 function BaseSelect({ root, value, onChange }) {
   const [branches, setBranches] = useState(null);
@@ -27,7 +35,7 @@ function BaseSelect({ root, value, onChange }) {
     <select
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      className={`${SELECT} max-w-[55%]`}
+      className={`${SELECT} max-w-[60%]`}
       title="Base branch: the plan branch starts from here"
       aria-label={`Base branch for ${basename(root)}`}
     >
@@ -52,35 +60,58 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
   const showRepos = multi || (locked
     ? !!(cfg.branch || solo?.base || (cfg.worktrees && solo?.workPath && solo.workPath !== solo.root))
     : !!cfg.branch.trim());
-  const headline = locked
-    ? [cfg.branch || 'current branch', where, removed && 'removed'].filter(Boolean).join(' · ')
-    : 'set up when the first chunk is sent';
+  // Until the first chunk is sent the config is only a choice: one line with
+  // today's defaults, and the form opens when you ask for it.
+  const [editing, setEditing] = useState(false);
+  const open = !locked && editing;
+  const branch = cfg.branch.trim();
+  // The branch leads: it's the part that names this plan's work.
+  const parts = [
+    { text: branch ? middleTruncate(branch) : 'current branch', strong: !!branch },
+    { text: where },
+    multi && { text: `${cfg.repos.length} repos` },
+    locked && removed && { text: 'removed' },
+  ].filter(Boolean);
+  const headline = [branch || 'current branch', where, multi && `${cfg.repos.length} repos`, locked && removed && 'removed'].filter(Boolean).join(' · ');
 
   return (
-    // Settled config is a metadata line; only the editable form gets a well.
-    <div className={cn('flex min-w-0 flex-col gap-1.5 text-[11px]', !locked && 'ins-well px-2 py-1.5')}>
-      <div className="flex min-w-0 items-center gap-2">
-        {!locked && <Lamp state="off" label="git not set up yet" />}
-        <span className="engraved-label w-12 shrink-0">git</span>
-        <span className={cn('min-w-0 truncate', locked ? 'text-muted-foreground' : 'text-foreground')} title={headline}>{headline}</span>
+    // Settled config is a metadata line; only the open form gets a well.
+    <div className={cn('flex min-w-0 flex-col gap-1.5 text-[11px]', open && 'ins-well -mx-1 px-2 py-1.5')}>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="ins-legend w-9 shrink-0">git</span>
+        <span className="min-w-0 flex-1 truncate" title={locked ? headline : `${headline}. Set up when the first chunk is sent.`}>
+          {parts.map((part, i) => (
+            <span key={part.text} className={part.strong ? 'text-foreground' : 'text-muted-foreground'}>{i > 0 && ' · '}{part.text}</span>
+          ))}
+        </span>
+        {!locked && (
+          <PanelButton
+            onClick={() => setEditing((v) => !v)}
+            aria-expanded={open}
+            className="shrink-0"
+            title={open ? 'Close the git setup' : 'Choose worktrees, a plan branch and base branches. Applied when the first chunk is sent.'}
+          >
+            {open ? 'close' : 'set up'}
+          </PanelButton>
+        )}
       </div>
 
-      {!locked && (
+      {open && (
         <>
-          <label className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <label className="flex items-start gap-2 text-[10px] leading-snug text-muted-foreground">
             <ToggleSwitch
               checked={cfg.worktrees}
               onChange={(worktrees) => onChange({ worktrees })}
               label="Run in worktrees"
               tone="lamp"
             />
-            <span>worktrees</span>
-            <span className="min-w-0 truncate">
-              {cfg.worktrees ? '· separate checkouts, yours stays untouched' : '· switches branch in your checkout'}
+            <span className="min-w-0">
+              <span className="text-foreground">worktrees</span>
+              {cfg.worktrees ? ' · separate checkouts, yours stays untouched' : ' · off: switches branch in your checkout'}
             </span>
           </label>
           <div className="flex min-w-0 items-center gap-2">
-            <span className="engraved-label w-12 shrink-0">branch</span>
+            <span className="ins-legend w-12 shrink-0">branch</span>
             <input
               value={cfg.branch}
               onChange={(e) => onChange({ branch: e.target.value })}
@@ -93,7 +124,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         </>
       )}
 
-      {showRepos && <div className="flex min-w-0 flex-col gap-1">
+      {(open || locked) && showRepos && <div className="flex min-w-0 flex-col gap-1">
         {cfg.repos.map((repo, i) => (
           <div key={repo.root} className="flex min-w-0 flex-col gap-0.5">
             <div className="flex min-w-0 items-center gap-1.5">
@@ -128,7 +159,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         ))}
       </div>}
 
-      {!locked && candidates.length > 0 && (
+      {open && candidates.length > 0 && (
         <select
           value=""
           onChange={(e) => e.target.value && onAddRepo(e.target.value)}

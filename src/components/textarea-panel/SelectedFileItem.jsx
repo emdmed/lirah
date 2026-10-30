@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { FileStateSelector } from "./FileStateSelector";
+import { FileIntentTag } from "./FileStateSelector";
 import { Detent } from "../instrument/Detent";
 import { cn } from "@/lib/utils";
 
@@ -53,10 +53,9 @@ export function SelectedFileItem({
       )}
     >
     <div className="flex min-w-0 items-center gap-1">
-      <FileStateSelector
+      <FileIntentTag
         value={currentState}
         onValueChange={(newState) => onSetFileState(file.absolute, newState)}
-        showKeyboardHints={showKeyboardHints && isSelected}
       />
       <button
         onClick={() => onRemoveFile(file.absolute)}

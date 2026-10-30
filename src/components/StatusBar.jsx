@@ -102,10 +102,10 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
 
 // Token gauge, centred in the top row: context-window fill (or, before context
 // data arrives, the daily budget) with used / max and %. Past
-// HEAVY_CONTEXT_TOKENS the fill and readout go amber; billable and cache
-// figures live in the tooltip. Every slot has a fixed width and an idle
-// placeholder so the gauge never shifts between tabs. Click opens a summary
-// of what fills the context, with Details for the full breakdown.
+// HEAVY_CONTEXT_TOKENS the fill and readout go amber. Hover shows what fills
+// the context; click opens the actions (compact, clear, Details, metrics).
+// Every slot has a fixed width and an idle placeholder so the gauge never
+// shifts between tabs.
 // Reads usage from the tab's store itself, so a usage poll re-renders only
 // the gauge, not the status bar.
 function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onClearContext, onCompactContext }) {
@@ -114,13 +114,6 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
   const ctx = getContextFill(tokenUsage);
   const dailyLimit = getBudget(currentPath)?.dailyLimit;
   const fmt = (n) => (formatTokenCount ? formatTokenCount(n) : String(n));
-  const num = (n) => n.toLocaleString();
-
-  const billableIn = tokenUsage?.billable_input_tokens || 0;
-  const billableOut = tokenUsage?.billable_output_tokens || 0;
-  const billable = billableIn + billableOut;
-  const cacheRead = tokenUsage?.cache_read_input_tokens || 0;
-  const cacheHit = cacheRead ? Math.round((cacheRead / (cacheRead + billableIn)) * 100) : null;
 
   let legend = 'Ctx', value = 0, max = 0;
   if (ctx) {
@@ -156,7 +149,7 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
             label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}
             className={max ? undefined : 'opacity-40'}
           />
-          {/* One figure: the fill already reads as a share; % is in the tooltip. */}
+          {/* One figure: the fill already reads as a share; % is in the hover card. */}
           <span className={cn('flex items-baseline tabular-nums', pct == null ? 'tube-idle' : tone)}>
             <span className="w-[6ch] text-right">{max ? fmt(value) : '--'}</span>
             {/* The ceiling recedes so the live value leads. */}
@@ -166,62 +159,25 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
         </span>
         </DropdownMenuTrigger>
       </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <div className="grid grid-cols-[auto_auto_auto] gap-x-3 font-mono tabular-nums">
-          {ctx && (
-            <>
-              <span>context</span>
-              <span className="text-right">{num(ctx.used)} / {num(ctx.max)}</span>
-              <span className="text-right">{pct}%</span>
-              {heavy && <span className="col-span-3 text-[var(--ins-warn)]">over {num(HEAVY_CONTEXT_TOKENS)} tokens: consider clearing</span>}
-            </>
-          )}
-          {dailyLimit ? (
-            <>
-              <span>daily budget</span>
-              <span className="text-right">{num(currentUsage.total)} / {num(dailyLimit)}</span>
-              <span className="text-right">{Math.round((currentUsage.total / dailyLimit) * 100)}%</span>
-            </>
-          ) : null}
-          {billable > 0 && (
-            <>
-              <span>billable</span>
-              <span className="text-right">{num(billable)}</span>
-              <span />
-              <span className="pl-2 opacity-70">├ in</span>
-              <span className="text-right opacity-70">{num(billableIn)}</span>
-              <span />
-              <span className="pl-2 opacity-70">└ out</span>
-              <span className="text-right opacity-70">{num(billableOut)}</span>
-              <span />
-            </>
-          )}
-          {cacheRead ? (
-            <>
-              <span>cache read</span>
-              <span className="text-right">{num(cacheRead)}</span>
-              <span className="text-right">{cacheHit}% hit</span>
-              <span className="col-span-3 opacity-70">cache reads bill at ≈0.1× input</span>
-            </>
-          ) : null}
-          <span className="col-span-3 mt-1 opacity-70">click for what's in context</span>
-        </div>
-      </TooltipContent>
-    </Tooltip>
-      {/* What fills the context: a short summary, then the full dialog. */}
-      <DropdownMenuContent side="bottom" align="center" className="w-80 text-xs">
-        <DropdownMenuLabel className="flex items-baseline justify-between gap-2 text-[11px]">
-          <span>Context · this tab</span>
-          {ctx && (
-            <span className="tabular-nums normal-case tracking-normal">
+      {/* Hover: what fills the context. Mounts only while shown. */}
+      <TooltipContent side="bottom" className="w-80 max-w-80 px-0 py-0 text-left text-wrap">
+        <div className="flex items-baseline justify-between gap-2 px-2 py-1.5 text-[11px]">
+          <span className="ins-legend">Context · this tab</span>
+          {ctx ? (
+            <span className="tabular-nums">
               <span className={tone}>{fmt(ctx.used)}</span>
               <span className="text-faint"> / {fmt(ctx.max)} · </span>
               <span className={tone}>{pct}%</span>
             </span>
-          )}
-        </DropdownMenuLabel>
+          ) : dailyLimit ? (
+            <span className="tabular-nums">budget {fmt(currentUsage.total)} / {fmt(dailyLimit)}</span>
+          ) : null}
+        </div>
         <ContextPeek tokenUsage={tokenUsage} projectPath={currentPath} heavy={crowded} />
-        <DropdownMenuSeparator />
+      </TooltipContent>
+    </Tooltip>
+      {/* Click: actions on the context. */}
+      <DropdownMenuContent side="bottom" align="center" className="w-64 text-xs">
         {crowded && onCompactContext && (
           <DropdownMenuItem onClick={onCompactContext} className="cursor-pointer py-1">
             <Shrink className="mr-2 w-3 h-3" />

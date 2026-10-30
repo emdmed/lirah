@@ -8,6 +8,8 @@ export const APP_EVENTS = {
   plansFocus: 'lirah:plans-focus',
   // Start or stop auto-pilot on the plan the plans pane shows.
   plansAutopilotToggle: 'lirah:plans-autopilot-toggle',
+  // Act on the open plan's next chunk: 'next' opens it, 'implement' sends it.
+  plansChunkCommand: 'lirah:plans-chunk-command',
   // Jump to the next tab whose agent is waiting on you.
   attentionJump: 'lirah:attention-jump',
 };

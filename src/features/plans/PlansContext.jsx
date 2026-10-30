@@ -271,6 +271,16 @@ export function PlansProvider({ children }) {
     updatePlan(repoRoot, planId, (p) => ({ chunks: renumber(p.chunks.filter((c) => c.id !== chunkId)) }));
   }, [updatePlan]);
 
+  // Undo for deleteChunk: the chunk goes back at its old place.
+  const restoreChunk = useCallback((repoRoot, planId, chunk, index) => {
+    updatePlan(repoRoot, planId, (p) => {
+      if (p.chunks.some((c) => c.id === chunk.id)) return {};
+      const chunks = [...p.chunks];
+      chunks.splice(Math.min(index, chunks.length), 0, chunk);
+      return { chunks: renumber(chunks) };
+    });
+  }, [updatePlan]);
+
   const sendToTab = useCallback(async (tabId, text) => {
     const send = getTabPrompt(tabId)?.send;
     if (!send) throw new Error('That tab is closed');
@@ -341,6 +351,7 @@ export function PlansProvider({ children }) {
     updateChunk,
     moveChunk,
     deleteChunk,
+    restoreChunk,
     implementChunk,
     checkChunk,
     markChunkDone,
@@ -358,7 +369,7 @@ export function PlansProvider({ children }) {
     removePlanRepo,
     ensureGit,
     removeWorktrees,
-  }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk,
+  }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
     implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
     dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees]);
 
