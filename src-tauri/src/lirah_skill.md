@@ -19,6 +19,7 @@ description. Don't invent keys.
 lirah settings [list]          list settings: key, value, default, allowed, description
 lirah settings get <key>       print one setting's value
 lirah settings set <key> <v>   change a setting (booleans take on/off)
+                               e.g. `figures full|compact`: drawn figures or plain text
 lirah settings reset <key>     put a setting back to its default
 lirah theme [list]             list themes (* marks the current one)
 lirah theme get                print the current theme

@@ -57,6 +57,11 @@ export const SETTINGS_ROWS = [
     words: 'title bar window chrome',
   },
   {
+    id: 'figures', section: 'appearance', kind: 'choice', key: 'figures',
+    label: 'Figures', hint: 'Draw measured figures in place of lists and progress text. Compact keeps the text.',
+    words: 'figures drawings diagrams compact full calibrated',
+  },
+  {
     id: 'scrollback', section: 'terminal', kind: 'choice', key: 'scrollback',
     label: 'Scrollback', hint: 'Lines kept per terminal.',
     words: 'scrollback lines history memory buffer',

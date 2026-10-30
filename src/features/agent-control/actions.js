@@ -26,6 +26,7 @@ const CHOICES = {
   selectedCli: TAB_CLIS.map((c) => c.id),
   autoCommitCli: TAB_CLIS.map((c) => c.id),
   scrollback: SCROLLBACK_OPTIONS.map((o) => o.value),
+  figures: ['full', 'compact'],
 };
 
 // Settings the CLI may touch: those with a row in the Settings dialog.

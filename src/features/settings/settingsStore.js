@@ -54,6 +54,9 @@ export const SETTINGS_DEFAULTS = {
   startupProjects: [],
   // The agent in a tab may drive Lirah through the `lirah` CLI.
   agentControl: true,
+  // 'full' draws measured figures in place of lists and progress text;
+  // 'compact' keeps the text.
+  figures: 'full',
 };
 
 // Pre-v1 keys, one per preference. Read once on first load to migrate; never
@@ -124,6 +127,7 @@ const VALIDATORS = {
   startupProjects: (v) => (Array.isArray(v)
     ? v.map(cleanStartupProject).filter(Boolean)
     : undefined),
+  figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
 };
 
 // Keep only known keys whose type matches the default, so a corrupt or

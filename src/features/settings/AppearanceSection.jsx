@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Detent } from '../../components/instrument/Detent';
+import { useSetting } from './settingsStore';
 import { Row, Section, ToggleRow } from './parts';
 import { SECTIONS, SETTINGS_ROW } from './settingsSections';
 
@@ -56,15 +58,31 @@ function ThemeList({ themes, value, onChange }) {
   );
 }
 
-/** The Appearance section: the theme, and the window's title bar. */
+const FIGURE_OPTIONS = [
+  { value: 'full', label: 'full', title: 'Draw figures' },
+  { value: 'compact', label: 'compact', title: 'Keep the text' },
+];
+
+/** The Appearance section: the theme, the window's title bar, and figures. */
 export function AppearanceSection({ active, showTitleBar, onShowTitleBarChange }) {
   const { currentTheme, themes, changeTheme } = useTheme();
+  const [figures, setFigures] = useSetting('figures');
+  const figuresRow = SETTINGS_ROW.figures;
   return (
     <Section section={SECTIONS.find((s) => s.id === 'appearance')} active={active}>
       <Row id="theme" sectionId="appearance" label={SETTINGS_ROW.theme.label}>
         <ThemeList themes={themes} value={currentTheme} onChange={changeTheme} />
       </Row>
       <ToggleRow row={SETTINGS_ROW['title-bar']} value={showTitleBar} onChange={onShowTitleBarChange} />
+      <Row id={figuresRow.id} sectionId="appearance" label={figuresRow.label} hint={figuresRow.hint}>
+        <Detent
+          label={figuresRow.label}
+          value={figures}
+          options={FIGURE_OPTIONS}
+          onChange={setFigures}
+          className="w-40"
+        />
+      </Row>
     </Section>
   );
 }
