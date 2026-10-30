@@ -26,6 +26,7 @@ import { KeyChord } from './instrument/Keycap';
 import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAgentAttention';
 import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
 import { ContextPeek } from '../features/token-budget/ContextPeek';
+import { Fig06Context } from './Fig06Context';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -161,18 +162,26 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
       </TooltipTrigger>
       {/* Hover: what fills the context. Mounts only while shown. */}
       <TooltipContent side="bottom" className="w-80 max-w-80 px-0 py-0 text-left text-wrap">
-        <div className="flex items-baseline justify-between gap-2 px-2 py-1.5 text-[11px]">
-          <span className="ins-legend">Context · this tab</span>
-          {ctx ? (
-            <span className="tabular-nums">
-              <span className={tone}>{fmt(ctx.used)}</span>
-              <span className="text-faint"> / {fmt(ctx.max)} · </span>
-              <span className={tone}>{pct}%</span>
-            </span>
-          ) : dailyLimit ? (
-            <span className="tabular-nums">budget {fmt(currentUsage.total)} / {fmt(dailyLimit)}</span>
-          ) : null}
-        </div>
+        {/* Figures: full draws FIG.06; the one-line header is its fallback and
+            what sessions without last-turn parts show. */}
+        <Fig06Context
+          tokenUsage={tokenUsage}
+          className="px-2 pt-1.5 pb-2"
+          fallback={(
+            <div className="flex items-baseline justify-between gap-2 px-2 py-1.5 text-[11px]">
+              <span className="ins-legend">Context · this tab</span>
+              {ctx ? (
+                <span className="tabular-nums">
+                  <span className={tone}>{fmt(ctx.used)}</span>
+                  <span className="text-faint"> / {fmt(ctx.max)} · </span>
+                  <span className={tone}>{pct}%</span>
+                </span>
+              ) : dailyLimit ? (
+                <span className="tabular-nums">budget {fmt(currentUsage.total)} / {fmt(dailyLimit)}</span>
+              ) : null}
+            </div>
+          )}
+        />
         <ContextPeek tokenUsage={tokenUsage} projectPath={currentPath} heavy={crowded} />
       </TooltipContent>
     </Tooltip>
