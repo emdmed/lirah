@@ -1,4 +1,4 @@
-// What the `lirah` CLI can do to settings and the theme. Plain functions over
+// What the `lirah` CLI can do to settings, the theme and tabs. Plain functions over
 // the settings store: useAgentControl handles the event, the confirm and the
 // toast. Each action returns the reply data, or throws an Error whose message
 // goes back to the CLI.
@@ -7,6 +7,10 @@ import { getSettings, sanitize, setSetting, SETTINGS_DEFAULTS } from '../setting
 import { SETTINGS_ROWS } from '../settings/settingsSections';
 import { TAB_CLIS } from '../../lib/agentClis';
 import { SCROLLBACK_OPTIONS } from '../../lib/terminalPrefs';
+import { invoke } from '@tauri-apps/api/core';
+import { tabDisplayName } from '../tabs/TabContext';
+import { getTabSession } from '../tabs/terminalActivity';
+import { getAgentHookState } from '../tabs/agentHookState';
 
 // Changes the user confirms first: they loosen the sandbox, change what runs
 // inside every agent, or switch this control channel itself.
@@ -153,4 +157,65 @@ export function setTheme(themes, changeTheme, name) {
   const id = resolveTheme(themes, name);
   changeTheme(id);
   return id;
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+// `tabs` is the tab list in bar order; indexes shown to the CLI start at 1.
+
+export function listTabs(tabs, activeTabId, bookmarks, callerTabId) {
+  return tabs.map((tab, i) => ({
+    index: i + 1,
+    id: tab.id,
+    name: tabDisplayName(tab, bookmarks),
+    path: tab.projectPath,
+    active: tab.id === activeTabId,
+    ...(tab.id === callerTabId && { caller: true }),
+    agent: getAgentHookState(getTabSession(tab.id))?.state || null,
+  }));
+}
+
+// The tab whose terminal sent the request, or null.
+export function callerTab(tabs, sessionId) {
+  if (!sessionId) return null;
+  return tabs.find((t) => getTabSession(t.id) === sessionId) || null;
+}
+
+// A tab by "." (the caller's own), 1-based index, id, or name (case-insensitive).
+export function resolveTab(tabs, ref, { sessionId, bookmarks = [] } = {}) {
+  const text = ref === undefined || ref === null ? '' : String(ref).trim();
+  if (!text) throw new Error('missing tab: give ".", an index, an id or a name (see `lirah tabs`)');
+  if (text === '.') {
+    const own = callerTab(tabs, sessionId);
+    if (!own) throw new Error('"." needs the command to run inside a Lirah tab');
+    return own;
+  }
+  if (/^\d+$/.test(text)) {
+    const tab = tabs[Number(text) - 1];
+    if (!tab) throw new Error(`no tab ${text}; there are ${tabs.length}`);
+    return tab;
+  }
+  const byId = tabs.find((t) => t.id === text);
+  if (byId) return byId;
+  const wanted = text.toLowerCase();
+  const named = tabs.filter((t) => tabDisplayName(t, bookmarks).toLowerCase() === wanted);
+  if (named.length === 1) return named[0];
+  if (named.length > 1) {
+    throw new Error(`${named.length} tabs are named "${text}"; use an index (${named.map((t) => tabs.indexOf(t) + 1).join(', ')})`);
+  }
+  throw new Error(`no tab "${text}" (see \`lirah tabs\`)`);
+}
+
+// An absolute directory for a new tab. The CLI resolves relative paths against
+// its own cwd; "~" is expanded here too for callers that send it raw.
+export async function resolveTabPath(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) throw new Error('missing path: lirah tabs open <path>');
+  let path = raw.trim();
+  if (path === '~' || path.startsWith('~/')) {
+    const home = await invoke('get_home_dir');
+    path = home + path.slice(1);
+  }
+  if (!path.startsWith('/')) throw new Error(`path must be absolute, not "${raw}"`);
+  if (path.length > 1) path = path.replace(/\/+$/, '');
+  if (!(await invoke('path_exists', { path }))) throw new Error(`no such directory: ${path}`);
+  return path;
 }

@@ -23,11 +23,14 @@ export function tabDisplayName(tab, bookmarks = []) {
   return tab.customLabel || bookmarks.find((b) => b.path === tab.projectPath)?.name || tab.label;
 }
 
-function createTab(projectPath) {
+// `launch` asks the tab to start its agent once its shell is up, even with
+// auto-launch off; ProjectTab clears it as soon as it boots.
+function createTab(projectPath, { launch = false } = {}) {
   return {
     id: crypto.randomUUID(),
     projectPath,
     label: projectPath.split('/').filter(Boolean).pop() || projectPath,
+    ...(launch && { launch: true }),
   };
 }
 
@@ -64,12 +67,12 @@ export function TabProvider({ children }) {
     activeTabIdRef.current = activeTabId;
   }, [tabs, activeTabId]);
 
-  const addTab = useCallback((projectPath) => {
+  const addTab = useCallback((projectPath, options) => {
     if (tabsRef.current.length >= MAX_TABS) {
       toast.warning(LIMIT_MESSAGE);
       return null;
     }
-    const tab = createTab(projectPath);
+    const tab = createTab(projectPath, options);
     tabsRef.current = [...tabsRef.current, tab];
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
@@ -91,27 +94,30 @@ export function TabProvider({ children }) {
     });
   }, []);
 
-  // Close with a confirmation when the tab's agent is mid-turn or waiting on a
-  // permission prompt. Resolves true when the tab was closed.
-  const requestCloseTab = useCallback(async (tabId) => {
+  // Asks before closing a tab whose agent is mid-turn or waiting on a
+  // permission prompt. Resolves true when the tab may close.
+  const confirmCloseTab = useCallback(async (tabId) => {
     const current = tabsRef.current;
     const tab = current.find((t) => t.id === tabId);
     if (!tab || current.length < 2) return false;
     const hook = getAgentHookState(getTabSession(tabId));
-    if (hook && BUSY_STATES.has(hook.state)) {
-      const ok = await confirm({
-        title: `Close ${tab.customLabel || tab.label}?`,
-        description: hook.state === 'permission'
-          ? 'Its agent is waiting on a permission prompt. Closing the tab ends the agent and its terminal.'
-          : 'Its agent is still working. Closing the tab ends the agent and its terminal.',
-        confirmLabel: 'Close tab',
-        destructive: true,
-      });
-      if (!ok) return false;
-    }
+    if (!hook || !BUSY_STATES.has(hook.state)) return true;
+    return confirm({
+      title: `Close ${tab.customLabel || tab.label}?`,
+      description: hook.state === 'permission'
+        ? 'Its agent is waiting on a permission prompt. Closing the tab ends the agent and its terminal.'
+        : 'Its agent is still working. Closing the tab ends the agent and its terminal.',
+      confirmLabel: 'Close tab',
+      destructive: true,
+    });
+  }, [confirm]);
+
+  // Close with the confirmation above. Resolves true when the tab was closed.
+  const requestCloseTab = useCallback(async (tabId) => {
+    if (!(await confirmCloseTab(tabId))) return false;
     removeTab(tabId);
     return true;
-  }, [confirm, removeTab]);
+  }, [confirmCloseTab, removeTab]);
 
   const switchTab = useCallback((tabId) => {
     if (tabId !== activeTabIdRef.current) perfTabSwitchStart();
@@ -153,17 +159,26 @@ export function TabProvider({ children }) {
     setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, compactionHook: enabled || undefined } : t)));
   }, []);
 
+  // The tab has taken its one-shot launch request (see createTab).
+  const clearTabLaunch = useCallback((tabId) => {
+    setTabs(prev => (prev.some(t => t.id === tabId && t.launch)
+      ? prev.map(t => (t.id === tabId ? { ...t, launch: undefined } : t))
+      : prev));
+  }, []);
+
   const actions = useMemo(() => ({
     addTab,
     removeTab,
+    confirmCloseTab,
     requestCloseTab,
+    clearTabLaunch,
     switchTab,
     reorderTab,
     updateTabPath,
     renameTab,
     setTabRole,
     setTabCompaction,
-  }), [addTab, removeTab, requestCloseTab, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction]);
+  }), [addTab, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction]);
 
   const value = useMemo(() => ({ tabs, activeTabId, ...actions }), [tabs, activeTabId, actions]);
 

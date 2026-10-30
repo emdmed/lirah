@@ -7,6 +7,9 @@
 // they parse (numbers, booleans, objects), else kept as strings. A bare --flag
 // is true.
 import { connect } from "node:net";
+import { statSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve as resolvePath } from "node:path";
 
 const CLIENT_TIMEOUT_MS = 70_000; // the app gives up on its side after 60 s
 
@@ -19,7 +22,15 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah theme [list]             list themes (* marks the current one)
   lirah theme get                print the current theme
   lirah theme set <name>         switch theme (id or display name)
+  lirah tabs [list]              list tabs (* active, > this tab)
+  lirah tabs open <path> [--launch]
+                                 open a tab in <path>; --launch starts its agent
+  lirah tabs close <tab>         close a tab (asks if its agent is busy)
+  lirah tabs rename <tab> <name> rename a tab (empty name: automatic again)
+  lirah tabs focus <tab>         switch to a tab
   lirah ping                     check that Lirah is reachable
+
+  <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
 
   --json   print the reply as JSON
 Errors go to stderr and exit 1. Some changes ask the user to confirm first.
@@ -126,8 +137,35 @@ function printThemes(list) {
   return table(["", "THEME", "NAME"], list.map((t) => [t.current ? "*" : "", t.id, t.name || ""]));
 }
 
+function printTabs(list) {
+  const rows = list.map((t) => [
+    `${t.active ? "*" : ""}${t.caller ? ">" : ""}`,
+    String(t.index),
+    t.name || "",
+    t.agent || "",
+    t.path || "",
+  ]);
+  return table(["", "#", "NAME", "AGENT", "PATH"], rows);
+}
+
+// The absolute directory for `tabs open`, resolved against this shell's cwd.
+function tabPath(raw) {
+  if (raw === undefined || raw === "") fail("missing path: lirah tabs open <path> [--launch]");
+  let text = String(raw);
+  if (text === "~" || text.startsWith("~/")) text = homedir() + text.slice(1);
+  const path = resolvePath(text);
+  let stat;
+  try {
+    stat = statSync(path);
+  } catch {
+    fail(`no such directory: ${path}`);
+  }
+  if (!stat.isDirectory()) fail(`not a directory: ${path}`);
+  return path;
+}
+
 // [dispatcher cmd, positionals, human formatter] for the known commands.
-function route(cmd, positional) {
+function route(cmd, positional, args) {
   const [sub, ...rest] = positional;
   if (cmd === "settings") {
     switch (sub ?? "list") {
@@ -144,6 +182,24 @@ function route(cmd, positional) {
       case "get": return ["theme.get", rest, show];
       case "set": return ["theme.set", rest, show];
       default: fail(`unknown theme command "${sub}" (list, get, set)`);
+    }
+  }
+  if (cmd === "tabs" || cmd === "tab") {
+    switch (sub ?? "list") {
+      case "list": return ["tabs.list", rest, printTabs];
+      case "open": {
+        // A bare --launch before the path swallows it as its value.
+        if (args.launch !== undefined && typeof args.launch !== "boolean") {
+          rest.unshift(String(args.launch));
+          args.launch = true;
+        }
+        const [path, ...extra] = rest;
+        return ["tabs.open", [tabPath(path ?? args.path), ...extra], show];
+      }
+      case "close": return ["tabs.close", rest, show];
+      case "rename": return ["tabs.rename", rest, show];
+      case "focus": return ["tabs.focus", rest, show];
+      default: fail(`unknown tabs command "${sub}" (list, open, close, rename, focus)`);
     }
   }
   return [cmd, positional, show];
@@ -163,7 +219,7 @@ if (args.help || args.h) {
 const json = args.json === true;
 delete args.json;
 
-const [name, positional, format] = route(cmd, args._);
+const [name, positional, format] = route(cmd, args._, args);
 args._ = positional;
 const data = await request(name, args);
 if (json) {

@@ -203,6 +203,7 @@ function App() {
                   projectPath={tab.projectPath}
                   isActive={tab.id === activeTabId}
                   compactionHook={!!tab.compactionHook}
+                  launchOnStart={!!tab.launch}
                   availableUpdate={availableUpdate}
                 />
               </DevProfiler>

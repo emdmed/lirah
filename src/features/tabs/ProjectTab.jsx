@@ -132,7 +132,7 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, compactionHook = false, availableUpdate }) {
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, compactionHook = false, launchOnStart = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -201,10 +201,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider>
-        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} compactionHook={compactionHook} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, tabId, innerActive, projectPath, compactionHook, availableUpdate, markReady]);
+  ), [booted, tabId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -242,12 +242,19 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   );
 });
 
-function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const { bookmarks, updateBookmark } = useBookmarks();
-  const { updateTabPath } = useTabActions();
+  const { updateTabPath, clearTabLaunch } = useTabActions();
+  // A tab opened with `lirah tabs open --launch` starts its agent on its first
+  // fresh shell even with auto-launch off. Read once at mount and cleared from
+  // the tab right away, so a reload never launches it a second time.
+  const [launchRequested] = useState(launchOnStart);
+  useEffect(() => {
+    if (launchOnStart) clearTabLaunch(tabId);
+  }, [launchOnStart, clearTabLaunch, tabId]);
 
   // Core terminal state
   const [terminalSessionId, setTerminalSessionId] = useState(null);
@@ -429,13 +436,14 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
 
-  // Every fresh shell starts the tab's agent, so a tab opens straight into it.
+  // Every fresh shell starts the tab's agent, so a tab opens straight into it
+  // (with auto-launch off, only a tab opened with a launch request does).
   // Waits until the tab is first shown, so restoring many tabs at startup
   // doesn't start every agent at once. Typing into the shell first cancels it.
   const launchFresh = useStableHandler(launchClaude);
   useEffect(() => {
     const id = terminalSessionId;
-    if (!settings.autoLaunchCli || !isActive || !terminalReady || !id || freshShellRef.current !== id) return;
+    if (!(settings.autoLaunchCli || launchRequested) || !isActive || !terminalReady || !id || freshShellRef.current !== id) return;
     const cancel = (e) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key.length !== 1 && e.key !== 'Enter' && e.key !== 'Backspace') return;
@@ -455,7 +463,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
       clearTimeout(timer);
       window.removeEventListener('keydown', cancel, true);
     };
-  }, [settings.autoLaunchCli, isActive, terminalReady, terminalSessionId, launchFresh, onReady]);
+  }, [settings.autoLaunchCli, launchRequested, isActive, terminalReady, terminalSessionId, launchFresh, onReady]);
 
   // When the boot placeholder can lift. Without an agent on its way (auto-launch
   // off, or a shell reclaimed after a reload), as soon as the shell is up.
@@ -465,7 +473,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
   useEffect(() => {
     const id = terminalSessionId;
     if (!terminalReady || !id) return;
-    const agentComing = settings.autoLaunchCli && freshShellRef.current === id;
+    const agentComing = (settings.autoLaunchCli || launchRequested) && freshShellRef.current === id;
     if (!agentComing) {
       onReady?.();
       return;
@@ -482,7 +490,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, availab
     };
     check();
     return () => clearTimeout(timer);
-  }, [terminalReady, terminalSessionId, settings.autoLaunchCli, onReady, onBootStage]);
+  }, [terminalReady, terminalSessionId, settings.autoLaunchCli, launchRequested, onReady, onBootStage]);
 
   const orchestrationCheck = useOrchestrationCheck();
 
