@@ -4,6 +4,8 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { AUTOPILOT_LAMP, Prose } from './parts';
 import { useTick } from '../../hooks/useTick';
+import { useSetting } from '../settings/settingsStore';
+import { Fig09Loop } from './Fig09Loop';
 import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition } from './planModel';
 
 /** Where the auto-pilot run stands, and what you can do about it. */
@@ -11,6 +13,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
   const ap = plan.autopilot;
   const running = ap.status === AUTOPILOT_STATUS.RUNNING;
   const now = useTick(running);
+  const [figures] = useSetting('figures');
   // Counted like the progress readout: skipped chunks are left out.
   const pos = pilotPosition(plan);
   const chunk = pos?.chunk;
@@ -63,6 +66,9 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
       </div>
     );
   }
+  const runLineEl = (
+    <span className="ml-auto shrink-0 font-[family-name:var(--font-legend)] text-[10px] tabular-nums text-muted-foreground">{runLine}</span>
+  );
   const stopped = ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
   return (
     <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]">
@@ -70,8 +76,12 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
         <Lamp state={lamp.state} blink={lamp.blink} label={headline} />
         <span className="engraved-label shrink-0">auto-pilot</span>
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
-        <span className="ml-auto shrink-0 font-[family-name:var(--font-legend)] text-[10px] tabular-nums text-muted-foreground">{runLine}</span>
+        {figures === 'compact' && runLineEl}
       </div>
+      {/* Full: the loop drawing carries the run line; too narrow, the line comes back. */}
+      {figures !== 'compact' && (
+        <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} runLine={runLine} fallback={<div className="flex">{runLineEl}</div>} />
+      )}
       {/* Why it stopped is what you came back for: full ink, more room. */}
       {ap.message && (
         <Prose
