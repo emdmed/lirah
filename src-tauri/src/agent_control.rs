@@ -9,12 +9,18 @@
 //!
 //! One socket per process, so a dev build and an installed app can run side by
 //! side; sockets left by processes that are gone are removed at startup.
+//!
+//! Unix only for now: on Windows there's no socket, `socket_path` is `None`,
+//! and `start` does nothing.
+
+#![cfg_attr(not(unix), allow(dead_code, unused_imports))]
 
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
+#[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -53,6 +59,9 @@ fn control_dir() -> Option<PathBuf> {
 /// This process's control socket path. Tabs get it in their environment so the
 /// CLI talks to the app that owns the tab.
 pub fn socket_path() -> Option<PathBuf> {
+    if cfg!(not(unix)) {
+        return None;
+    }
     control_dir().map(|d| d.join(format!("{}.sock", std::process::id())))
 }
 
@@ -92,7 +101,12 @@ fn remove_stale_sockets(dir: &Path) {
     }
 }
 
+/// No control socket on Windows yet.
+#[cfg(not(unix))]
+pub fn start(_app: AppHandle) {}
+
 /// Bind the control socket and serve it on a background thread.
+#[cfg(unix)]
 pub fn start(app: AppHandle) {
     let (Some(dir), Some(path)) = (control_dir(), socket_path()) else {
         eprintln!("[agent_control] no home folder; control socket disabled");
@@ -135,6 +149,7 @@ pub fn stop() {
     }
 }
 
+#[cfg(unix)]
 fn handle(app: AppHandle, stream: UnixStream) {
     let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
     let reply = match read_request(&stream) {
@@ -148,6 +163,7 @@ fn handle(app: AppHandle, stream: UnixStream) {
     let _ = stream.flush();
 }
 
+#[cfg(unix)]
 fn read_request(stream: &UnixStream) -> Result<Request, String> {
     let mut reader = BufReader::new(stream.take(MAX_REQUEST));
     let mut line = String::new();
