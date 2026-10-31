@@ -2,7 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { JOB_CLIS } from '../../lib/agentClis';
 import { plural } from '../../lib/plural';
 import { invoke } from '@tauri-apps/api/core';
-import { git } from '../../lib/git';
+import { currentBranch, git } from '../../lib/git';
+import { useFigureCompact } from '@/components/instrument/figure';
+import { Fig26Isolation } from './Fig26Isolation';
 import { ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
 import {
   Dialog,
@@ -24,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { cn } from '../../lib/utils';
-import { getRelativePath } from '../../utils/pathUtils';
+import { basename, getRelativePath } from '../../utils/pathUtils';
 import { useFileGroups } from '../file-groups';
 import { usePromptTemplates } from '../templates';
 import { usePinnedFiles } from '../pinned-files';
@@ -87,6 +89,8 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   const [availableClis, setAvailableClis] = useState(null); // null = not probed yet
   const [useWorktree, setUseWorktree] = useState(true);
   const [isGitRepo, setIsGitRepo] = useState(true);
+  const [branch, setBranch] = useState(null); // for FIG.26's "your tree"
+  const compactFigures = useFigureCompact();
   const [instructions, setInstructions] = useState('');
 
   // Detect whether the project is inside a git repo — worktree isolation and
@@ -97,6 +101,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     git(projectPath, ['rev-parse', '--is-inside-work-tree'])
       .then(() => {
         if (!cancelled) setIsGitRepo(true);
+        return currentBranch(projectPath).then((b) => {
+          if (!cancelled) setBranch(b && b !== 'HEAD' ? b : null);
+        });
       })
       .catch(() => {
         if (!cancelled) {
@@ -252,6 +259,40 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     });
     onOpenChange(false);
   };
+
+  // Jobs are spawned with each CLI's auto-approve flag (agent_runner
+  // commands.rs), so nothing stops a tool call. Said before Run.
+  const isolationText = (
+    <>
+      <div
+        className="flex items-start gap-2.5 text-[11px] leading-snug"
+        role={useWorktree ? 'note' : 'alert'}
+      >
+        {!useWorktree && <Lamp state="warn" className="mt-[3px]" />}
+        <span className={useWorktree ? 'text-muted-foreground' : 'text-foreground'}>
+          Jobs run unattended with auto-approve: no permission prompts, and they are not
+          sandboxed.{' '}
+          {useWorktree ? (
+            'The isolated worktree keeps edits out of your working tree until you apply them.'
+          ) : (
+            <span className="text-[var(--ins-warn)]">
+              In place, the agent edits your working tree directly and can run any command.
+              Isolated worktree recommended.
+            </span>
+          )}
+        </span>
+      </div>
+
+      {candidateCount > 1 && (
+        <div className="text-[11px] leading-snug text-muted-foreground">
+          <span>
+            <span className="text-foreground">Race · {candidateCount} candidates</span> on the same
+            prompt, one worktree each. Compare the diffs and keep one; the rest are discarded.
+          </span>
+        </div>
+      )}
+    </>
+  );
 
   const isolationHint = !isGitRepo
     ? 'Not a git repository — runs in place, no diff review.'
@@ -455,35 +496,20 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             </div>
           </div>
 
-          {/* Jobs are spawned with each CLI's auto-approve flag (agent_runner
-              commands.rs), so nothing stops a tool call. Say so before Run. */}
-          <div
-            className="flex items-start gap-2.5 text-[11px] leading-snug"
-            role={useWorktree ? 'note' : 'alert'}
-          >
-            {!useWorktree && <Lamp state="warn" className="mt-[3px]" />}
-            <span className={useWorktree ? 'text-muted-foreground' : 'text-foreground'}>
-              Jobs run unattended with auto-approve: no permission prompts, and they are not
-              sandboxed.{' '}
-              {useWorktree ? (
-                'The isolated worktree keeps edits out of your working tree until you apply them.'
-              ) : (
-                <span className="text-[var(--ins-warn)]">
-                  In place, the agent edits your working tree directly and can run any command.
-                  Isolated worktree recommended.
-                </span>
-              )}
-            </span>
-          </div>
-
-          {candidateCount > 1 && (
-            <div className="text-[11px] leading-snug text-muted-foreground">
-              <span>
-                <span className="text-foreground">Race · {candidateCount} candidates</span> on the same
-                prompt, one worktree each. Compare the diffs and keep one; the rest are discarded.
-              </span>
-            </div>
-          )}
+          {/* FIG.26 draws where the job writes and the race as a sum; the
+              old sentences are its fallback. Compact keeps the warning as
+              text: it is a safety note, not a value for a tooltip. */}
+          <Fig26Isolation
+            isolated={canRace}
+            canIsolate={isGitRepo}
+            clis={[...clis]}
+            copies={copies}
+            branch={branch}
+            repo={projectPath ? basename(projectPath) : null}
+            name={name.trim() || template?.title}
+            fallback={compactFigures ? null : isolationText}
+          />
+          {compactFigures && isolationText}
 
           {overlaps.length > 0 && (
             <div className="flex items-start gap-2.5 text-[11px] leading-snug" role="alert">

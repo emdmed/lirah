@@ -17,6 +17,7 @@ import { Fig19Detail } from '../features/file-analysis/Fig19Detail';
 import { boundKeysFor } from '../lib/shortcuts';
 import { ProgressReadout } from '../features/plans/parts';
 import { Span, SpanRuler, SpanScale } from '../components/instrument/Span';
+import { Fig26Isolation } from '../features/agent-jobs/Fig26Isolation';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -289,6 +290,12 @@ const LANE_C = [
   { n: 'P6 job list', w: 256, el: () => <SpanList rows={SPAN_JOBS} /> },
   { n: 'P6 chunk rows', w: 300, el: () => <SpanList rows={SPAN_CHUNKS} /> },
   { n: 'P6 one job', w: 256, el: () => <SpanList rows={SPAN_JOBS.slice(0, 1)} /> },
+  { n: '26 race', w: 500, el: () => <Fig26Isolation isolated clis={['claude', 'codex']} copies={2} branch="main" repo="acme-api" name="add pagination" fallback={fb('race · 4 candidates')} /> },
+  { n: '26 one', w: 500, el: () => <Fig26Isolation isolated clis={['claude']} branch="main" repo="acme-api" fallback={fb('isolated worktree')} /> },
+  { n: '26 in place', w: 500, el: () => <Fig26Isolation isolated={false} clis={['claude']} branch="feat/very-long-branch-name-here" repo="acme-api" name="add pagination" fallback={fb('in place')} /> },
+  { n: '26 many', w: 500, el: () => <Fig26Isolation isolated clis={['claude', 'codex', 'gemini', 'opencode']} copies={3} branch="main" repo="nevo-terminal" fallback={fb('race · 12')} /> },
+  { n: '26 no repo', w: 500, el: () => <Fig26Isolation isolated={false} canIsolate={false} clis={['claude']} repo="scratch" fallback={fb('in place')} /> },
+  { n: '26 narrow', w: 280, el: () => <Fig26Isolation isolated clis={['claude']} branch="main" repo="acme-api" fallback={fb('isolated worktree')} /> },
 ];
 
 const SPAN_JOBS = [
