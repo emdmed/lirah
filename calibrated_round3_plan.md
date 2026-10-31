@@ -38,18 +38,18 @@ FIG 27, 28 and 30 are never reused (see `registry.js`).
 | # | Chunk | Lane | State |
 |---|-------|------|-------|
 | 1 | P0 base: compact draws marks; register FIG 23–32 | — | done |
-| 2 | P1 Meter with a printed scale | A | to do |
-| 3 | FIG 23 context sources on one ruler | A | to do |
-| 4 | FIG 24 prompt cost chain | A | to do |
-| 5 | FIG 29 spend by model | A | to do |
-| 6 | FIG 32 attached files by intent | A | to do |
-| 7 | P5 DiffBar as a dimension pair | B | to do |
-| 8 | FIG 25 diff minimap with a scale | B | to do |
-| 9 | FIG 31 subject on a character ruler | B | to do |
-| 10 | P3 Position part | B | to do |
-| 11 | P4 chunk progress as nodes everywhere | C | to do |
-| 12 | P6 durations on a shared ruler | C | to do |
-| 13 | FIG 26 where a job is allowed to write | C | to do |
+| 2 | P1 Meter with a printed scale | A | done |
+| 3 | FIG 23 context sources on one ruler | A | done |
+| 4 | FIG 24 prompt cost chain | A | done |
+| 5 | FIG 29 spend by model | A | done |
+| 6 | FIG 32 attached files by intent | A | done |
+| 7 | P5 DiffBar as a dimension pair | B | done |
+| 8 | FIG 25 diff minimap with a scale | B | done |
+| 9 | FIG 31 subject on a character ruler | B | done |
+| 10 | P3 Position part | B | done |
+| 11 | P4 chunk progress as nodes everywhere | C | done |
+| 12 | P6 durations on a shared ruler | C | done |
+| 13 | FIG 26 where a job is allowed to write | C | done |
 | 14 | P0 retrofit: compact forms for FIG 06–22 | — | to do |
 | 15 | Docs and polish | — | to do |
 

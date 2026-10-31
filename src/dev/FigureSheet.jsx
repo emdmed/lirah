@@ -334,6 +334,9 @@ function SpanList({ rows }) {
         </div>
       ))}
     </SpanScale>
+  );
+}
+
 // round 3 · lane B
 // P5 diff pair, FIG 25 diff map, FIG 31 subject ruler, P3 position. Each
 // renders in the mode the figures setting holds (localStorage
