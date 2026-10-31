@@ -1,6 +1,7 @@
 import { Fragment, useEffect } from 'react';
 import { compactCount, DiffBar } from '../components/instrument/DiffBar';
 import { Fig25DiffMap } from '../features/git/Fig25DiffMap';
+import { Fig31Subject } from '../features/git/Fig31Subject';
 import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
 import { Fig06Context } from '../components/Fig06Context';
@@ -391,6 +392,16 @@ function LaneB() {
         </LaneBCard>
         <LaneBCard title="FIG 25 narrow host" width={26}>
           <Fig25DiffMap {...MAP} marksOnly />
+        </LaneBCard>
+        <LaneBCard title="FIG 31 subject" width={640}>
+          <div className="flex flex-col gap-4">
+            <Fig31Subject subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} fallback={fb('subject 48/72')} />
+            <Fig31Subject subject="fix(terminal): paste plan prompts with bracketed paste and clear the screen on launch" max={72} fallback={fb('subject 84/72')} />
+            <Fig31Subject subject="" max={72} fallback={fb('subject 0/72')} />
+          </div>
+        </LaneBCard>
+        <LaneBCard title="FIG 31 narrow" width={170}>
+          <Fig31Subject subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} fallback={fb('subject 48/72')} />
         </LaneBCard>
       </div>
     </>
