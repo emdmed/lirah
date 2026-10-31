@@ -326,7 +326,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   const sidebar = useSidebar({ resetTypeChecker: typeChecker.resetTypeChecker });
 
   const fileSymbolsHook = useFileSymbols();
-  const { extractFileSymbols, clearFileSymbols, clearAllSymbols, isBabelParseable, formatFileAnalysis, getLineCount, getViewModeLabel } = fileSymbolsHook;
+  const { extractFileSymbols, clearFileSymbols, clearAllSymbols, isAnalyzable, formatFileAnalysis, getLineCount, getViewModeLabel } = fileSymbolsHook;
 
   const fileSelection = useFileSelection();
 
@@ -340,8 +340,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
 
   // Register symbol callbacks and currentPath with file selection context
   useEffect(() => {
-    fileSelection.registerSymbolCallbacks({ clearFileSymbols, isBabelParseable, extractFileSymbols, clearAllSymbols });
-  }, [clearFileSymbols, isBabelParseable, extractFileSymbols, clearAllSymbols]);
+    fileSelection.registerSymbolCallbacks({ clearFileSymbols, isAnalyzable, extractFileSymbols, clearAllSymbols });
+  }, [clearFileSymbols, isAnalyzable, extractFileSymbols, clearAllSymbols]);
 
   useEffect(() => {
     fileSelection.registerCurrentPath(currentPath);

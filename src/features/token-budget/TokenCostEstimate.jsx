@@ -2,15 +2,12 @@ import React, { useMemo } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useTokenBudget } from './TokenBudgetContext';
 import { estimatePromptCost, DEFAULT_MODEL } from '../../config/pricing';
+import { CHARS_PER_TOKEN, toTokens } from './estimateTokens';
 
-// ~1 token per 4 characters, the usual rule of thumb for English and code.
-const CHARS_PER_TOKEN = 4;
 // What the agent's own system prompt adds to any turn.
 const SYSTEM_OVERHEAD = 500;
 // buildPrompt joins sections with a blank line.
 const SECTION_JOIN = 2;
-
-const toTokens = (chars) => Math.ceil(chars / CHARS_PER_TOKEN);
 
 /**
  * Token estimate for the next send, measured on the payload itself.

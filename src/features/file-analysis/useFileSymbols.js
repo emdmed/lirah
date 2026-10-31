@@ -3,6 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { isBabelParseable } from './babelSupport';
 import { formatSymbolsForPrompt, formatSignaturesForPrompt, formatSkeletonForPrompt } from './babelFormat';
 import { analyzeFile } from './babelClient';
+import {
+  isPythonParseable,
+  extractSkeleton as extractPythonSkeleton,
+  formatSkeletonForPrompt as formatPythonSkeletonForPrompt,
+} from './pythonSymbolParser';
+import { toTokens } from '../token-budget/estimateTokens';
 
 // View modes for file analysis
 export const VIEW_MODES = {
@@ -11,13 +17,44 @@ export const VIEW_MODES = {
   SKELETON: 'skeleton',     // Structural overview
 };
 
+// Files whose detail-level token sizes can be measured (Babel or Python).
+const isAnalyzable = (path) => isBabelParseable(path) || isPythonParseable(path);
+
+/**
+ * Token size of a file at each detail level, measured on the exact text the
+ * prompt formatters produce (same 4-chars estimate as TokenCostEstimate).
+ * `whole` is the full file. A level the language can't produce is null.
+ */
+export function levelTokensFor(content, { symbols, signatures, skeleton } = {}) {
+  return {
+    whole: toTokens(content.length),
+    symbols: symbols ? toTokens(formatSymbolsForPrompt(symbols).length) : null,
+    signatures: signatures ? toTokens(formatSignaturesForPrompt(signatures).length) : null,
+    skeleton: skeleton ? toTokens(formatSkeletonForPrompt(skeleton).length) : null,
+  };
+}
+
+// Python has only a skeleton (Rust parser); a failed parse leaves it null.
+function pythonLevelTokensFor(content, skeleton) {
+  return {
+    whole: toTokens(content.length),
+    symbols: null,
+    signatures: null,
+    skeleton: skeleton ? toTokens(formatPythonSkeletonForPrompt(skeleton).length) : null,
+  };
+}
+
 /**
  * Hook for managing file symbol extraction state
  * @returns {Object} Symbol extraction state and methods
  */
 export function useFileSymbols() {
-  // Map<filePath, { symbols, signatures, skeleton, isParsing, error, lineCount }>
+  // Map<filePath, { symbols, signatures, skeleton, isParsing, error, lineCount, levelTokens }>
   const [fileSymbols, setFileSymbols] = useState(new Map());
+
+  // Python files: Map<filePath, { lineCount, levelTokens }>. Kept out of
+  // fileSymbols so their sidebar rows and prompt sections stay as before.
+  const [pythonLevels, setPythonLevels] = useState(new Map());
 
   // Per-file view mode override (Map<filePath, viewMode>)
   const [fileViewModes, setFileViewModes] = useState(new Map());
@@ -27,6 +64,21 @@ export function useFileSymbols() {
    * @param {string} filePath - Absolute path to the file
    */
   const extractFileSymbols = useCallback(async (filePath) => {
+    if (isPythonParseable(filePath)) {
+      try {
+        const content = await invoke('read_file_content', { path: filePath });
+        const skeleton = await extractPythonSkeleton(content, filePath);
+        const entry = {
+          lineCount: content.split('\n').length,
+          levelTokens: pythonLevelTokensFor(content, skeleton),
+        };
+        setPythonLevels(prev => new Map(prev).set(filePath, entry));
+      } catch (error) {
+        console.error('Failed to measure Python file:', filePath, error);
+      }
+      return;
+    }
+
     if (!isBabelParseable(filePath)) {
       return;
     }
@@ -41,6 +93,7 @@ export function useFileSymbols() {
         isParsing: true,
         error: null,
         lineCount: 0,
+        levelTokens: null,
       });
       return next;
     });
@@ -65,6 +118,7 @@ export function useFileSymbols() {
           isParsing: false,
           error: null,
           lineCount,
+          levelTokens: levelTokensFor(content, { symbols, signatures, skeleton }),
         });
         return next;
       });
@@ -79,6 +133,7 @@ export function useFileSymbols() {
           isParsing: false,
           error: String(error),
           lineCount: 0,
+          levelTokens: null,
         });
         return next;
       });
@@ -131,6 +186,12 @@ export function useFileSymbols() {
       next.delete(filePath);
       return next;
     });
+    setPythonLevels(prev => {
+      if (!prev.has(filePath)) return prev;
+      const next = new Map(prev);
+      next.delete(filePath);
+      return next;
+    });
   }, []);
 
   /**
@@ -139,6 +200,7 @@ export function useFileSymbols() {
   const clearAllSymbols = useCallback(() => {
     setFileSymbols(new Map());
     setFileViewModes(new Map());
+    setPythonLevels(new Map());
   }, []);
 
   /**
@@ -175,6 +237,16 @@ export function useFileSymbols() {
     const data = fileSymbols.get(filePath);
     return data?.lineCount || 0;
   }, [fileSymbols]);
+
+  /**
+   * Token size per detail level: { whole, symbols, signatures, skeleton }
+   * (null for levels the language lacks), or null while parsing/unknown.
+   */
+  const getLevelTokens = useCallback((filePath) => {
+    const data = fileSymbols.get(filePath);
+    if (data) return data.levelTokens || null;
+    return pythonLevels.get(filePath)?.levelTokens || null;
+  }, [fileSymbols, pythonLevels]);
 
   /**
    * Format file analysis for prompt output (uses appropriate mode)
@@ -225,11 +297,14 @@ export function useFileSymbols() {
     getFileViewMode,
     formatFileAnalysis,
     getViewModeLabel,
-    isBabelParseable,
+    getLevelTokens,
+    // Gate for extractFileSymbols: Babel files get full analysis, Python
+    // files only levelTokens.
+    isAnalyzable,
     VIEW_MODES,
   }), [
     fileSymbols, fileViewModes, extractFileSymbols, clearFileSymbols, clearAllSymbols,
     getSymbolsForFile, isAnyParsing, getSymbolCount, getLineCount, setFileViewMode,
-    getFileViewMode, formatFileAnalysis, getViewModeLabel, isBabelParseable,
+    getFileViewMode, formatFileAnalysis, getViewModeLabel, getLevelTokens,
   ]);
 }

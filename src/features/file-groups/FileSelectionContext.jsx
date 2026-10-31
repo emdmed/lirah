@@ -37,7 +37,7 @@ export function FileSelectionProvider({ children }) {
           nextStates.set(filePath, 'modify');
           return nextStates;
         });
-        if (symbolCallbacks?.isBabelParseable(filePath)) {
+        if (symbolCallbacks?.isAnalyzable(filePath)) {
           symbolCallbacks.extractFileSymbols(filePath);
         }
       }
@@ -56,7 +56,7 @@ export function FileSelectionProvider({ children }) {
         return nextStates;
       });
       added.forEach(p => {
-        if (symbolCallbacks?.isBabelParseable(p)) symbolCallbacks.extractFileSymbols(p);
+        if (symbolCallbacks?.isAnalyzable(p)) symbolCallbacks.extractFileSymbols(p);
       });
       return new Set([...prev, ...added]);
     });
@@ -118,7 +118,7 @@ export function FileSelectionProvider({ children }) {
     const added = incoming.filter(f => !base.has(f.absolutePath));
     if (merge && added.length === 0) return;
     added.forEach(({ absolutePath }) => {
-      if (symbolCallbacks?.isBabelParseable(absolutePath)) {
+      if (symbolCallbacks?.isAnalyzable(absolutePath)) {
         symbolCallbacks.extractFileSymbols(absolutePath);
       }
     });
