@@ -61,7 +61,7 @@ export const LeftSidebar = memo(function LeftSidebar({
   const { searchQuery, handleSearchClear } = search;
   const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, treeTruncated, displayedTreeData, expandedFolders, toggleFolder, collapseAllFolders, loadTreeData } = treeView;
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
-  const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, setFileViewMode, VIEW_MODES } = fileSymbols;
+  const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, getLevelTokens, setFileViewMode, VIEW_MODES } = fileSymbols;
 
   const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
   const { containerRef: rowsRef, registerList, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
@@ -168,6 +168,7 @@ export const LeftSidebar = memo(function LeftSidebar({
               getSymbolCount={getSymbolCount}
               getLineCount={getLineCount}
               getViewModeLabel={getViewModeLabel}
+              getLevelTokens={getLevelTokens}
               setFileViewMode={setFileViewMode}
               fileSymbols={symbols}
               VIEW_MODES={VIEW_MODES}

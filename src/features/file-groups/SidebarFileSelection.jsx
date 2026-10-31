@@ -22,6 +22,7 @@ export function SidebarFileSelection({
   getSymbolCount,
   getLineCount,
   getViewModeLabel,
+  getLevelTokens,
   setFileViewMode,
   fileSymbols,
   VIEW_MODES,
@@ -161,6 +162,7 @@ export function SidebarFileSelection({
                 viewMode={LABEL_TO_MODE[getViewModeLabel?.(file.absolute)]}
                 detailOptions={detailOptions}
                 onSetViewMode={setFileViewMode}
+                levelTokens={getLevelTokens?.(file.absolute) ?? null}
               />
             </React.Fragment>
           );

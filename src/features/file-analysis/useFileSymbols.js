@@ -12,10 +12,18 @@ import { toTokens } from '../token-budget/estimateTokens';
 
 // View modes for file analysis
 export const VIEW_MODES = {
-  SYMBOLS: 'symbols',       // Symbol list with line numbers (default for 500+ lines)
+  SYMBOLS: 'symbols',       // Symbol list with line numbers (default under 300 lines)
   SIGNATURES: 'signatures', // Function signatures only
   SKELETON: 'skeleton',     // Structural overview
 };
+
+// The level a file gets when the user hasn't picked one: skeleton for very
+// large files (800+ lines), signatures for large ones (300+), symbols below.
+export function defaultViewMode(lineCount) {
+  if (lineCount >= 800) return VIEW_MODES.SKELETON;
+  if (lineCount >= 300) return VIEW_MODES.SIGNATURES;
+  return VIEW_MODES.SYMBOLS;
+}
 
 // Files whose detail-level token sizes can be measured (Babel or Python).
 const isAnalyzable = (path) => isBabelParseable(path) || isPythonParseable(path);
@@ -163,13 +171,9 @@ export function useFileSymbols() {
     const override = fileViewModes.get(filePath);
     if (override) return override;
 
-    // Default: skeleton for very large files (800+), signatures for large (300+), symbols for smaller
     const data = fileSymbols.get(filePath);
     if (!data) return VIEW_MODES.SYMBOLS;
-
-    if (data.lineCount >= 800) return VIEW_MODES.SKELETON;
-    if (data.lineCount >= 300) return VIEW_MODES.SIGNATURES;
-    return VIEW_MODES.SYMBOLS;
+    return defaultViewMode(data.lineCount);
   }, [fileViewModes, fileSymbols]);
 
   /**
