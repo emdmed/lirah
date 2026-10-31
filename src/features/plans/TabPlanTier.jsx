@@ -2,6 +2,7 @@ import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { RowAction } from '../tabs/RowAction';
+import { Fig16Chunks } from './Fig16Chunks';
 import { ProgressReadout } from './parts';
 import { planStatus } from './PlanRow';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
@@ -79,7 +80,13 @@ export function TabPlanTier({ plan, onOpen }) {
           </span>
         )}
       </span>
-      {plan.split === SPLIT_STATUS.DONE && total > 0 && <ProgressReadout plan={plan} done={done} total={total} />}
+      {plan.split === SPLIT_STATUS.DONE && total > 0 && (
+        <Fig16Chunks
+          plan={plan}
+          label={`${done} of ${total} chunks implemented`}
+          fallback={<ProgressReadout plan={plan} done={done} total={total} />}
+        />
+      )}
       {now && <span className="min-w-0 truncate text-muted-foreground">{now}</span>}
     </RowAction>
   );

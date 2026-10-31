@@ -102,11 +102,12 @@ export function Leader({ points, dot = true, color = INK.faint }) {
 }
 
 // A dimension line: end ticks, arrowheads pointing out to the ticks, and the
-// length written into a gap in the middle. Durations, sizes, spans.
+// length written into a gap in the middle (no label: an unbroken line, for
+// callers that place the text themselves). Durations, sizes, spans.
 export function Dim({ x1, x2, y, label, color = INK.muted }) {
   const m = (x1 + x2) / 2;
-  const half = (textWidth(label) + 8) / 2;
-  const gap = x2 - x1 > half * 2 + 12;
+  const half = (textWidth(label ?? '') + 8) / 2;
+  const gap = Boolean(label) && x2 - x1 > half * 2 + 12;
   const d = [
     `M${x1} ${y - 4}V${y + 4}`,
     `M${x2} ${y - 4}V${y + 4}`,
@@ -117,7 +118,7 @@ export function Dim({ x1, x2, y, label, color = INK.muted }) {
   return (
     <g>
       <path d={d} style={{ fill: INK.faint, stroke: INK.faint, strokeWidth: STROKE.hair }} />
-      <T x={m} y={gap ? y + 3.5 : y - 6} anchor="middle" color={color}>{label}</T>
+      {label && <T x={m} y={gap ? y + 3.5 : y - 6} anchor="middle" color={color}>{label}</T>}
     </g>
   );
 }
