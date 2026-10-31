@@ -6,17 +6,9 @@ import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 import { listBranches, planGit } from './planGit';
+import { Fig21PlanGit, middleTruncate } from './Fig21PlanGit';
 
 const SELECT = 'h-6 min-w-0 pl-1.5 font-mono text-[10px] text-foreground';
-
-// Long branch names lose their middle, not their end: the end is what tells
-// plan/improvement-plan-a from plan/improvement-plan-b.
-function middleTruncate(text, max = 36) {
-  if (text.length <= max) return text;
-  const keep = max - 1;
-  const head = Math.ceil(keep * 0.45);
-  return `${text.slice(0, head)}…${text.slice(text.length - (keep - head))}`;
-}
 
 function BaseSelect({ root, value, onChange }) {
   const [branches, setBranches] = useState(null);
@@ -74,27 +66,79 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
   ].filter(Boolean);
   const headline = [branch || 'current branch', where, multi && `${cfg.repos.length} repos`, locked && removed && 'removed'].filter(Boolean).join(' · ');
 
+  const headlineRow = (
+    <div className="flex min-w-0 items-baseline gap-2">
+      <span className="ins-legend w-9 shrink-0">git</span>
+      <span className="min-w-0 flex-1 truncate" title={locked ? headline : `${headline}. Set up when the first chunk is sent.`}>
+        {parts.map((part, i) => (
+          <span key={part.text} className={part.strong ? 'text-foreground' : 'text-muted-foreground'}>{i > 0 && ' · '}{part.text}</span>
+        ))}
+      </span>
+      {!locked && (
+        <PanelButton
+          onClick={() => setEditing((v) => !v)}
+          aria-expanded={open}
+          className="shrink-0"
+          title={open ? 'Close the git setup' : 'Choose worktrees, a plan branch and base branches. Applied when the first chunk is sent.'}
+        >
+          {open ? 'close' : 'set up'}
+        </PanelButton>
+      )}
+    </div>
+  );
+  const repoRows = (
+    <div className="flex min-w-0 flex-col gap-1">
+      {cfg.repos.map((repo, i) => (
+        <div key={repo.root} className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className={cn('min-w-0 flex-1 truncate font-mono text-[10px]', locked ? 'text-muted-foreground' : 'text-foreground')} title={repo.root}>
+              {basename(repo.root)}
+              {i === 0 && multi && <span className="text-muted-foreground"> · primary</span>}
+            </span>
+            {locked ? (
+              // With no branch the headline already says "current branch".
+              (cfg.branch || repo.base) && (
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                  {cfg.branch ? `${cfg.branch} ← ${repo.base || 'HEAD'}` : repo.base}
+                </span>
+              )
+            ) : (
+              <>
+                {cfg.branch.trim() && (
+                  <BaseSelect root={repo.root} value={repo.base} onChange={(base) => onChange((c) => ({
+                    repos: c.repos.map((r) => (r.root === repo.root ? { ...r, base } : r)),
+                  }))} />
+                )}
+                {i > 0 && (
+                  <PanelButton icon={X} onClick={() => onRemoveRepo(repo.root)} title="Remove from the plan" aria-label={`Remove ${basename(repo.root)}`} />
+                )}
+              </>
+            )}
+          </div>
+          {locked && cfg.worktrees && repo.workPath && repo.workPath !== repo.root && (
+            <span className="truncate font-mono text-[10px] text-muted-foreground" title={repo.workPath}>{repo.workPath}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+  // Locked text, kept for compact figures and narrow panes.
+  const summary = (
+    <>
+      {headlineRow}
+      {showRepos && repoRows}
+    </>
+  );
+
   return (
     // Settled config is a metadata line; only the open form gets a well.
     <div className={cn('flex min-w-0 flex-col gap-1.5 text-[11px]', open && 'ins-well -mx-1 px-2 py-1.5')}>
-      <div className="flex min-w-0 items-baseline gap-2">
-        <span className="ins-legend w-9 shrink-0">git</span>
-        <span className="min-w-0 flex-1 truncate" title={locked ? headline : `${headline}. Set up when the first chunk is sent.`}>
-          {parts.map((part, i) => (
-            <span key={part.text} className={part.strong ? 'text-foreground' : 'text-muted-foreground'}>{i > 0 && ' · '}{part.text}</span>
-          ))}
-        </span>
-        {!locked && (
-          <PanelButton
-            onClick={() => setEditing((v) => !v)}
-            aria-expanded={open}
-            className="shrink-0"
-            title={open ? 'Close the git setup' : 'Choose worktrees, a plan branch and base branches. Applied when the first chunk is sent.'}
-          >
-            {open ? 'close' : 'set up'}
-          </PanelButton>
-        )}
-      </div>
+      {locked && !removed ? <Fig21PlanGit plan={plan} fallback={summary} /> : (
+        <>
+          {headlineRow}
+          {locked && showRepos && repoRows}
+        </>
+      )}
 
       {open && (
         <>
@@ -124,40 +168,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         </>
       )}
 
-      {(open || locked) && showRepos && <div className="flex min-w-0 flex-col gap-1">
-        {cfg.repos.map((repo, i) => (
-          <div key={repo.root} className="flex min-w-0 flex-col gap-0.5">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('min-w-0 flex-1 truncate font-mono text-[10px]', locked ? 'text-muted-foreground' : 'text-foreground')} title={repo.root}>
-                {basename(repo.root)}
-                {i === 0 && multi && <span className="text-muted-foreground"> · primary</span>}
-              </span>
-              {locked ? (
-                // With no branch the headline already says "current branch".
-                (cfg.branch || repo.base) && (
-                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                    {cfg.branch ? `${cfg.branch} ← ${repo.base || 'HEAD'}` : repo.base}
-                  </span>
-                )
-              ) : (
-                <>
-                  {cfg.branch.trim() && (
-                    <BaseSelect root={repo.root} value={repo.base} onChange={(base) => onChange((c) => ({
-                      repos: c.repos.map((r) => (r.root === repo.root ? { ...r, base } : r)),
-                    }))} />
-                  )}
-                  {i > 0 && (
-                    <PanelButton icon={X} onClick={() => onRemoveRepo(repo.root)} title="Remove from the plan" aria-label={`Remove ${basename(repo.root)}`} />
-                  )}
-                </>
-              )}
-            </div>
-            {locked && cfg.worktrees && repo.workPath && repo.workPath !== repo.root && (
-              <span className="truncate font-mono text-[10px] text-muted-foreground" title={repo.workPath}>{repo.workPath}</span>
-            )}
-          </div>
-        ))}
-      </div>}
+      {!locked && open && showRepos && repoRows}
 
       {open && candidates.length > 0 && (
         <select
