@@ -124,7 +124,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
       ))}
     </div>
   );
-  // Locked text, kept for compact figures and narrow panes.
+  // Locked text, kept for narrow panes.
   const summary = (
     <>
       {headlineRow}

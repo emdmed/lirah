@@ -12,7 +12,6 @@ import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAut
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { useToast } from '../toast';
-import { useSetting } from '../settings/settingsStore';
 import { basename } from '../../utils/pathUtils';
 
 const CHUNK_LAMP = {
@@ -496,8 +495,7 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
   const first = chunks[0].n;
   const last = chunks.at(-1).n;
   const ms = chunks.reduce((sum, c) => sum + (c.startedAt && c.doneAt ? c.doneAt - c.startedAt : 0), 0);
-  // Full figures: FIG.20 above already carries the time, so it isn't printed twice.
-  const [figures] = useSetting('figures');
+  // FIG.20 above already carries the time, so it isn't printed twice.
   const took = ms > 0 ? formatDuration(ms) : null;
   return (
     <div className="relative">
@@ -517,7 +515,6 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
           <span className="tabular-nums">{first}–{last}</span> implemented · {chunks.length} chunks
         </span>
         <span className="flex h-[18px] items-center gap-1.5 font-[family-name:var(--font-legend)] text-[11px] text-muted-foreground">
-          {took && figures === 'compact' && <span className="tabular-nums">{took}</span>}
           <ChevronRight aria-hidden="true" className={cn('h-3 w-3 opacity-60 group-hover:opacity-100', unfolded && 'rotate-90')} />
         </span>
       </button>

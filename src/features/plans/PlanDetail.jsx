@@ -15,7 +15,6 @@ import { Fig20Timeline } from './Fig20Timeline';
 import { Fig22FilesByChunk } from './Fig22FilesByChunk';
 import { usePlanCommitFiles } from './usePlanCommitFiles';
 import { useUncommitted } from './useUncommitted';
-import { useSetting } from '../settings/settingsStore';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
@@ -157,9 +156,8 @@ export function PlanDetail({ plan }) {
   }, [commandSeq]);
   const fileCount = new Set(plan.chunks.flatMap((c) => c.files ?? [])).size;
   // FIG 22 folds out of the "· K files" count; git runs only once it's open.
-  const [figures] = useSetting('figures');
   const [showFiles, setShowFiles] = useState(false);
-  const filesOpen = figures === 'full' && showFiles;
+  const filesOpen = showFiles;
   const commitFiles = usePlanCommitFiles(plan, filesOpen);
   const hasCommits = plan.chunks.some((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
 
@@ -319,7 +317,7 @@ export function PlanDetail({ plan }) {
           <span aria-hidden="true" className="h-px flex-1 bg-[var(--ins-edge)]" />
           <span className="font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-muted-foreground">
             {plan.chunks.length}
-            {figures === 'full' && hasCommits ? (
+            {hasCommits ? (
               <>
                 {' · '}
                 <button

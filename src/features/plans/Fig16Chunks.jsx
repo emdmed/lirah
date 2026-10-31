@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Dim, Figure, INK, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { Dim, Figure, INK, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { formatDuration } from '../../lib/formatDuration';
 import { CHUNK_STATUS } from './planModel';
 
@@ -7,14 +7,16 @@ import { CHUNK_STATUS } from './planModel';
 // in flight is the lamp star, the rest are outlined (skipped and rolled-back
 // ones struck through). A dimension over the done span gives their summed
 // working time; once two are done, a lamp dimension over the rest estimates
-// what's left at the mean pace.
+// what's left at the mean pace. Compact is the node line alone.
 
 const MIN_W = 180;
+const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 480;
 const PAD = 9; // room for the live star's points at the first node
 const DIM_Y = 37;
 const LINE_Y = 56;
 const H = 76;
+const C_H = 16; // compact: the node line, centred, room for the live star
 
 const isLive = (c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix;
 const isStruck = (c) => c.status === CHUNK_STATUS.SKIPPED || c.status === CHUNK_STATUS.ROLLED_BACK;
@@ -89,12 +91,12 @@ function Span({ x1, x2, label, color, anchor, textAt }) {
 }
 
 /** The drawing at a given width, pure so it can be rendered headless. */
-export function Fig16Drawing({ plan, width }) {
+export function Fig16Drawing({ plan, width, compact = false }) {
   const r = chunkRuler(plan);
   const count = r.nodes.length;
   const tally = `${r.done}/${r.total}`;
   const x0 = PAD;
-  const x1 = width - textWidth(tally) - 10;
+  const x1 = compact ? width - PAD : width - textWidth(tally) - 10;
   const spacing = count > 1 ? (x1 - x0) / (count - 1) : 0;
   const xAt = (i) => (count > 1 ? x0 + i * spacing : x0);
   const size = count > 1 ? Math.max(3, Math.min(8, spacing - 2)) : 8;
@@ -118,10 +120,10 @@ export function Fig16Drawing({ plan, width }) {
         <line x1={x0} x2={xAt(inkTo)} y1={LINE_Y} y2={LINE_Y} style={{ stroke: INK.fg, strokeWidth: STROKE.ink }} />
       )}
 
-      {doneX2 != null && (
+      {doneX2 != null && !compact && (
         <Span x1={x0} x2={doneX2} label={doneLabel} color={INK.muted} anchor="start" />
       )}
-      {estLabel && (
+      {estLabel && !compact && (
         <Span x1={doneX2} x2={x1} label={estLabel} color={INK.lamp} anchor="end" textAt={estAt} />
       )}
 
@@ -144,24 +146,27 @@ export function Fig16Drawing({ plan, width }) {
         );
       })}
 
-      {indexLabels(count, spacing).map((k) => (
+      {!compact && indexLabels(count, spacing).map((k) => (
         <T key={k} x={xAt(k - 1)} y={LINE_Y + 17} color={INK.faint} anchor="middle">
           {k}
         </T>
       ))}
 
-      <T x={width} y={LINE_Y + 4} anchor="end">
-        <tspan style={{ fill: r.done > 0 ? INK.fg : INK.muted }}>{r.done}</tspan>/{r.total}
-      </T>
+      {!compact && (
+        <T x={width} y={LINE_Y + 4} anchor="end">
+          <tspan style={{ fill: r.done > 0 ? INK.fg : INK.muted }}>{r.done}</tspan>/{r.total}
+        </T>
+      )}
     </g>
   );
 }
 
 /**
  * The tab plan tier's ruler, laid out at its container's width. Narrower than
- * MIN_W, or in compact figures, it shows `fallback` (the block bar).
+ * MIN_W it shows `fallback`. `label` leads the tooltip; the times follow it.
  */
 export function Fig16Chunks({ plan, label, fallback }) {
+  const compact = useFigureCompact();
   const rootRef = useRef(null);
   const [rootW, setRootW] = useState(null);
 
@@ -174,19 +179,27 @@ export function Fig16Chunks({ plan, label, fallback }) {
     return () => ro.disconnect();
   }, []);
 
-  const width = Math.max(MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 240)));
+  const width = Math.max(compact ? C_MIN_W : MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 240)));
+  const r = chunkRuler(plan);
+  const sentence = `${[
+    label || `${r.done} of ${r.total} chunks implemented`,
+    r.spent != null && `${formatDuration(r.spent)} of work`,
+    r.estimate != null && `about ${formatDuration(r.estimate)} left at this pace`,
+  ].filter(Boolean).join(', ')}.`;
 
   return (
-    <div ref={rootRef} className="min-w-0" title={label}>
+    <div ref={rootRef} className="min-w-0" title={sentence}>
       <Figure
         fig="chunks"
         viewBox={`0 0 ${width} ${H}`}
+        compactViewBox={`0 ${LINE_Y - C_H / 2} ${width} ${C_H}`}
         minWidth={MIN_W}
+        compactMinWidth={C_MIN_W}
         paper="var(--ins-well)"
-        label={label}
+        label={sentence}
         fallback={fallback}
       >
-        <Fig16Drawing plan={plan} width={width} />
+        <Fig16Drawing plan={plan} width={width} compact={compact} />
       </Figure>
     </div>
   );

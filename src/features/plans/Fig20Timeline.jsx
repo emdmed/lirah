@@ -1,8 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { DASH, Dim, Figure, INK, Leader, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { DASH, Dim, Figure, INK, Leader, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { formatDuration } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
-import { useSetting } from '../settings/settingsStore';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, planProgress } from './planModel';
 
 // FIG.20: the plan's working time, one span per implemented chunk laid end to
@@ -14,8 +13,11 @@ import { AUTOPILOT_STATUS, CHUNK_STATUS, planProgress } from './planModel';
 // written into its label, so work + idle = the total. What's still ahead
 // follows as an unmeasured dashed tail: a chunk stuck without its commit is
 // a warn square at its head, and the tail is labelled with what's left.
+// Compact keeps the spans, nodes, breaks, tail and the ruler's ticks; the
+// times, numbers and the slowest note move to the tooltip.
 
 const MIN_W = 260;
+const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 560;
 const PAD = 4;
 const DIM_Y = 30;
@@ -97,7 +99,8 @@ const fmtMin = (m) => (m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h${Stri
 const KIND_LABEL = { chunks: 'worked' };
 
 /** The drawing at a given width, pure so it can be rendered headless. */
-export function Fig20Drawing({ plan, width, now, showCount = true }) {
+export function Fig20Drawing({ plan, width, now, showCount: showCountProp = true, compact = false }) {
+  const showCount = showCountProp && !compact;
   const t = planTimeline(plan, now);
   const { spans, work } = t;
   const { done: doneN, total: totalN } = planProgress(plan);
@@ -145,7 +148,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
     ticks.push(
       <g key={i}>
         <line x1={tx} x2={tx} y1={RULER_Y} y2={RULER_Y + (isMajor ? 6 : 3)} style={{ stroke: isMajor ? INK.faint : INK.edgeStrong, strokeWidth: STROKE.hair }} />
-        {isMajor && (
+        {isMajor && !compact && (
           <T x={tx} y={RULER_Y + 17} color={INK.faint} anchor={i === 0 ? 'start' : 'middle'} halo>{i === 0 ? '0' : fmtTick(ms)}</T>
         )}
       </g>,
@@ -179,7 +182,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
   // a line of text, not a box (boxes are for live state).
   let note = null;
   let leader = null;
-  if (t.slowest) {
+  if (t.slowest && !compact) {
     const s = laid.find((l) => l.n === t.slowest.n && !l.live);
     const mid = (s.a + s.b) / 2;
     const text = `slowest · chunk ${s.n} · ${formatDuration(s.dur)}`;
@@ -211,17 +214,17 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
         {t.stuck && (
           <>
             <rect x={sx - 3} y={LINE_Y - 3} width={6} height={6} style={{ fill: INK.paper, stroke: INK.warn, strokeWidth: STROKE.ink }} />
-            <T x={sx} y={NUM_Y - 6} anchor="middle" color={INK.warn}>{t.stuck.n}</T>
+            {!compact && <T x={sx} y={NUM_Y - 6} anchor="middle" color={INK.warn}>{t.stuck.n}</T>}
           </>
         )}
-        <T x={b} y={RULER_Y + 17} anchor="end" color={INK.faint}>{leftLabel}</T>
+        {!compact && <T x={b} y={RULER_Y + 17} anchor="end" color={INK.faint}>{leftLabel}</T>}
       </g>
     );
   })() : null;
 
   return (
     <g>
-      <Dim x1={x0} x2={Math.max(xEnd, x0 + 12)} y={DIM_Y} label={dimLabel} color={INK.fg} />
+      {!compact && <Dim x1={x0} x2={Math.max(xEnd, x0 + 12)} y={DIM_Y} label={dimLabel} color={INK.fg} />}
 
       {/* The plan's start. */}
       <line x1={x0} x2={x0} y1={LINE_Y - 5} y2={LINE_Y + 5} style={{ stroke: INK.faint, strokeWidth: STROKE.hair }} />
@@ -244,7 +247,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
       {laid.filter((s) => s.broken).map((s) => (
         <g key={`b${s.n}`}>
           <title>{`idle ${formatDuration(s.gapBefore)}`}</title>
-          {breakW >= 6 && (
+          {breakW >= 6 && !compact && (
             <>
               <T x={s.a - breakW / 2} y={LINE_Y + 4} anchor="middle" color={INK.faint}>≈</T>
               <T x={s.a - breakW / 2} y={RULER_Y + 4} anchor="middle" color={INK.faint}>≈</T>
@@ -254,7 +257,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
       ))}
 
       {laid.map((s) => <Node key={`d${s.n}`} x={s.b} y={LINE_Y} state={s.live ? 'live' : 'done'} size={s.live ? 6 : 5} />)}
-      {nums}
+      {!compact && nums}
       {tail}
 
       {leader}
@@ -276,17 +279,21 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
 /** How tall the drawing is: the slowest note adds a row. */
 const heightFor = (plan, now) => (planTimeline(plan, now).slowest ? NOTE_Y + 10 : RULER_Y + 22);
 
+/** Compact: the line and the ruler's ticks. */
+const C_TOP = LINE_Y - 8;
+const C_H = RULER_Y + 8 - C_TOP;
+
 /**
  * The plan's timeline, laid out at its container's width. With no timed
- * chunk to draw, narrower than MIN_W, or in compact figures, it shows
- * `fallback`. `showCount` draws the done/total count at the line's end.
+ * chunk to draw, or narrower than MIN_W, it shows `fallback`. `showCount`
+ * draws the done/total count at the line's end.
  */
 export function Fig20Timeline({ plan, fallback, showCount = true, paper = 'var(--ins-panel)' }) {
   const rootRef = useRef(null);
   const [rootW, setRootW] = useState(null);
   const running = plan.autopilot?.status === AUTOPILOT_STATUS.RUNNING;
   const now = useTick(running);
-  const [figures] = useSetting('figures');
+  const compact = useFigureCompact();
 
   useLayoutEffect(() => {
     const el = rootRef.current;
@@ -300,32 +307,35 @@ export function Fig20Timeline({ plan, fallback, showCount = true, paper = 'var(-
   // The measured box renders even while the fallback shows, so the width is
   // known by the time the first chunk has a time to draw.
   const t = planTimeline(plan, now);
-  if (figures === 'compact' || !t.spans.length || !(t.work > 0)) {
+  if (!t.spans.length || !(t.work > 0)) {
     return <div ref={rootRef} className="min-w-0">{fallback}</div>;
   }
 
-  const width = Math.max(MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 320)));
+  const width = Math.max(compact ? C_MIN_W : MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 320)));
   const height = heightFor(plan, now);
-  const label = [
+  const { done: doneN, total: totalN } = planProgress(plan);
+  const label = `Plan timeline, ${doneN} of ${totalN} chunks: ${[
     `${KIND_LABEL[t.kind] ?? t.kind} ${formatDuration(t.total)}`,
     `${t.spans.length} chunk${t.spans.length === 1 ? '' : 's'} worked ${formatDuration(t.work)}`,
     t.idle != null && `idle ${formatDuration(t.idle)}`,
     t.slowest && `slowest chunk ${t.slowest.n}, ${formatDuration(t.slowest.dur)}`,
     t.stuck && `chunk ${t.stuck.n} has no commit yet`,
     t.left > 0 && `${t.left} left`,
-  ].filter(Boolean).join('; ');
+  ].filter(Boolean).join('; ')}.`;
 
   return (
     <div ref={rootRef} className="min-w-0" title={label}>
       <Figure
         fig="timeline"
         viewBox={`0 0 ${width} ${height}`}
+        compactViewBox={`0 ${C_TOP} ${width} ${C_H}`}
         minWidth={MIN_W}
+        compactMinWidth={C_MIN_W}
         paper={paper}
         label={label}
         fallback={fallback}
       >
-        <Fig20Drawing plan={plan} width={width} now={now} showCount={showCount} />
+        <Fig20Drawing plan={plan} width={width} now={now} showCount={showCount} compact={compact} />
       </Figure>
     </div>
   );

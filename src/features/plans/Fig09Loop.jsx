@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { DASH, Figure, INK, Node, STROKE, T } from '@/components/instrument/figure';
+import { DASH, Figure, INK, Node, STROKE, T, useFigureCompact } from '@/components/instrument/figure';
 import { getAgentHookState, subscribeAgentHooks } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON } from './planModel';
@@ -8,7 +8,8 @@ import { chunkTrailer } from './planPrompts';
 // FIG.09: the auto-pilot loop. Four stations on a circle, clockwise from the
 // top: IMPLEMENT (the agent's turn), CHECK (the commit search by trailer),
 // NUDGE (once, only when the turn ended without a commit) and NEXT (the next
-// chunk is sent). The star sits on the station the run is at.
+// chunk is sent). The star sits on the station the run is at. Compact draws
+// the same ring small, without the station names, the trailer or the count.
 
 const IMPLEMENT = 0;
 const CHECK = 1;
@@ -21,9 +22,13 @@ const H = 168;
 const R = 44;
 const CX = 160;
 const CY = 98;
+// Compact: the ring alone, small.
+const RING = { cx: CX, cy: CY, r: R };
+const C_RING = { cx: 17, cy: 17, r: 13 };
+const C_SIZE = 34;
 // Screen angles (y down), so clockwise is increasing.
 const ANGLE = [-90, 0, 90, 180];
-const at = (deg, r = R) => [CX + r * Math.cos((deg * Math.PI) / 180), CY + r * Math.sin((deg * Math.PI) / 180)];
+const at = (deg, g = RING) => [g.cx + g.r * Math.cos((deg * Math.PI) / 180), g.cy + g.r * Math.sin((deg * Math.PI) / 180)];
 
 /** The agent state in the run's tab, re-read on every hook event. */
 function useTabAgentState(tabId) {
@@ -55,11 +60,11 @@ function haltedStation(ap, chunk) {
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 // A quarter arc from station i to i+1, with a chevron at its middle.
-function Arc({ from, color, dash, width = STROKE.hair }) {
-  const [x0, y0] = at(ANGLE[from]);
-  const [x1, y1] = at(ANGLE[from] + 90);
+function Arc({ from, color, dash, width = STROKE.hair, g = RING }) {
+  const [x0, y0] = at(ANGLE[from], g);
+  const [x1, y1] = at(ANGLE[from] + 90, g);
   const mid = ANGLE[from] + 45;
-  const [mx, my] = at(mid);
+  const [mx, my] = at(mid, g);
   const rad = (mid * Math.PI) / 180;
   const tx = -Math.sin(rad);
   const ty = Math.cos(rad);
@@ -67,7 +72,7 @@ function Arc({ from, color, dash, width = STROKE.hair }) {
   return (
     <g>
       <path
-        d={`M${x0} ${y0}A${R} ${R} 0 0 1 ${x1} ${y1}`}
+        d={`M${x0} ${y0}A${g.r} ${g.r} 0 0 1 ${x1} ${y1}`}
         style={{ fill: 'none', stroke: color, strokeWidth: width, strokeDasharray: dash }}
       />
       <path d={head} style={{ fill: color }} />
@@ -84,8 +89,10 @@ function Cross({ x, y, s = 5 }) {
   );
 }
 
-/** The loop drawn for a live run; `fallback` is what compact mode or a narrow pane shows. */
+/** The loop drawn for a live run; `fallback` is what a narrow pane shows. */
 export function Fig09Loop({ plan, pos, elapsed, fallback }) {
+  const compact = useFigureCompact();
+  const g = compact ? C_RING : RING;
   const ap = plan.autopilot;
   const chunk = pos?.chunk;
   const agent = useTabAgentState(ap.tabId);
@@ -108,14 +115,14 @@ export function Fig09Loop({ plan, pos, elapsed, fallback }) {
   const arcDash = (i) => ((i === CHECK || i === NUDGE) && !ap.nudged ? DASH.medium : undefined);
 
   const stations = [IMPLEMENT, CHECK, NUDGE, NEXT].map((i) => {
-    const [x, y] = at(ANGLE[i]);
+    const [x, y] = at(ANGLE[i], g);
     let mark;
-    if (i === live) mark = <Node x={x} y={y} state="live" size={7} />;
-    else mark = <Node x={x} y={y} state={passed(i) ? 'done' : 'todo'} size={8} />;
+    if (i === live) mark = <Node x={x} y={y} state="live" size={compact ? 5 : 7} />;
+    else mark = <Node x={x} y={y} state={passed(i) ? 'done' : 'todo'} size={compact ? 5 : 8} />;
     return (
       <g key={i}>
         {mark}
-        {i === halted && <Cross x={x} y={y} />}
+        {i === halted && <Cross x={x} y={y} s={compact ? 3.5 : 5} />}
       </g>
     );
   });
@@ -126,19 +133,35 @@ export function Fig09Loop({ plan, pos, elapsed, fallback }) {
   const [bx, by] = at(ANGLE[NUDGE]);
   const [lx, ly] = at(ANGLE[NEXT]);
 
-  const label = [
+  const label = `${[
     'Auto-pilot loop',
     pos && `chunk ${pos.index} of ${pos.total}`,
+    elapsed && `${elapsed} in`,
     here != null && `${running ? 'at' : 'stopped at'} ${['implement', 'check', 'nudge', 'next'][here]}`,
-  ].filter(Boolean).join(', ');
+    ap.nudged && 'nudged once',
+  ].filter(Boolean).join(', ')}.`;
 
-  return (
-    <Figure fig="autopilot" title="AUTO-PILOT LOOP" viewBox={`0 0 ${W} ${H}`} minWidth={340} fallback={fallback} label={label} paper="var(--ins-well)">
-      <circle cx={CX} cy={CY} r={R} style={{ fill: 'none', stroke: INK.edge, strokeWidth: STROKE.hair }} />
+  const ring = (
+    <>
+      <circle cx={g.cx} cy={g.cy} r={g.r} style={{ fill: 'none', stroke: INK.edge, strokeWidth: STROKE.hair }} />
       {[IMPLEMENT, CHECK, NUDGE, NEXT].map((i) => (
-        <Arc key={i} from={i} color={arcColor(i)} dash={arcDash(i)} width={arcColor(i) === INK.fg ? STROKE.ink : STROKE.hair} />
+        <Arc key={i} g={g} from={i} color={arcColor(i)} dash={arcDash(i)} width={arcColor(i) === INK.fg ? STROKE.ink : STROKE.hair} />
       ))}
       {stations}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <Figure fig="autopilot" viewBox={`0 0 ${W} ${H}`} compactViewBox={`0 0 ${C_SIZE} ${C_SIZE}`} fallback={fallback} label={label} paper="var(--ins-well)">
+        {ring}
+      </Figure>
+    );
+  }
+
+  return (
+    <Figure fig="autopilot" title="AUTO-PILOT LOOP" viewBox={`0 0 ${W} ${H}`} compactViewBox={`0 0 ${C_SIZE} ${C_SIZE}`} minWidth={340} fallback={fallback} label={label} paper="var(--ins-well)">
+      {ring}
 
       {/* Centre: where in the plan. The strip's headline says "chunk", so the ring needn't. */}
       <T x={CX} y={CY + (elapsed ? -1 : 4)} anchor="middle" color={INK.fg}>

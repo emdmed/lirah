@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { DASH, Figure, Glow, INK, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { DASH, Figure, Glow, INK, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { shortcutKeys } from '../../lib/shortcuts';
 import { CHUNK_STATUS, planProgress } from './planModel';
@@ -9,14 +9,21 @@ import { chunkCommitsByRepo, planGit, workPath } from './planGit';
 // branch point, the plan branch above it with one filled node per chunk that
 // committed there (numbered by its Plan-Chunk), and a dotted tail to a box
 // saying where the work happens: in place or the worktree folder. Once every
-// chunk is done a lamp box says the branch is ready to merge.
+// chunk is done a lamp box says the branch is ready to merge. Compact keeps
+// the lanes, the branch point and the chunk nodes; the dotted tail ends in a
+// small empty box (lamp once ready) and the names move to the tooltip.
 
 const MIN_W = 260;
+const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 560;
 const LANE_H = 64; // branch label, branch lane, chunk numbers, base lane
 const LANE_GAP = 10;
 const MAX_LANES = 3;
 const TOP = 20; // under the FIG label
+const C_LANE_H = 18; // compact: branch lane, then base lane 12 below
+const C_LANE_GAP = 6;
+const C_TOP = 4;
+const C_END = 10; // compact end box
 
 /** Long names lose their middle, not their end: the end tells plan-a from plan-b. */
 export function middleTruncate(text, max = 36) {
@@ -74,9 +81,9 @@ function labelStep(nums, spacing) {
   return step;
 }
 
-function Lane({ lane, y, width, leftW, branch, label }) {
-  const branchY = y + 28;
-  const baseY = y + 56;
+function Lane({ lane, y, width, leftW, branch, label, compact = false, ready = false }) {
+  const branchY = y + (compact ? 4 : 28);
+  const baseY = y + (compact ? 16 : 56);
   // The base name, a gap, then the lane; the branch point sits clear of both.
   const bp = leftW + 18;
   const maxBox = Math.max(textWidth('worktree · ~/…/x') + 14, Math.floor(width * 0.55));
@@ -84,12 +91,12 @@ function Lane({ lane, y, width, leftW, branch, label }) {
   const boxText = lane.worktree
     ? `worktree · ${shortWorkPath(lane.worktree, maxChars - 'worktree · '.length)}`
     : 'in place · no worktree';
-  const boxW = textWidth(boxText) + 14;
+  const boxW = compact ? C_END : textWidth(boxText) + 14;
   const boxX = width - boxW;
 
   const n = lane.chunks.length;
   const nx0 = bp + 14;
-  const nx1 = boxX - 20;
+  const nx1 = boxX - (compact ? 12 : 20);
   const spacing = n > 1 ? Math.min(24, (nx1 - nx0) / (n - 1)) : 0;
   const xAt = (i) => nx0 + i * spacing;
   const size = n > 1 ? Math.max(3, Math.min(8, spacing - 2)) : 8;
@@ -100,18 +107,20 @@ function Lane({ lane, y, width, leftW, branch, label }) {
 
   return (
     <g>
-      <g>
-        {label.full !== label.text && <title>{label.full}</title>}
-        <T x={bp} y={y + 11} color={label.strong ? INK.fg : INK.muted}>{label.text}</T>
-      </g>
+      {!compact && (
+        <g>
+          {label.full !== label.text && <title>{label.full}</title>}
+          <T x={bp} y={y + 11} color={label.strong ? INK.fg : INK.muted}>{label.text}</T>
+        </g>
+      )}
 
       {/* Base lane and the branch point. */}
-      <T x={0} y={baseY + 4}>{middleTruncate(lane.base, Math.floor(leftW / textWidth('x')))}</T>
-      <line x1={leftW + 8} x2={width} y1={baseY} y2={baseY} style={{ stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
+      {!compact && <T x={0} y={baseY + 4}>{middleTruncate(lane.base, Math.floor(leftW / textWidth('x')))}</T>}
+      <line x1={compact ? 0 : leftW + 8} x2={width} y1={baseY} y2={baseY} style={{ stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
       {!onBase && (
         <>
           <path
-            d={`M${bp} ${baseY}V${branchY + 6}Q${bp} ${branchY} ${bp + 6} ${branchY}H${tailFrom}`}
+            d={`M${bp} ${baseY}V${branchY + (compact ? 4 : 6)}Q${bp} ${branchY} ${bp + (compact ? 4 : 6)} ${branchY}H${tailFrom}`}
             style={{ fill: 'none', stroke: INK.fg, strokeWidth: STROKE.ink }}
           />
           <Node x={bp} y={baseY} state="merge" size={7} />
@@ -129,12 +138,22 @@ function Lane({ lane, y, width, leftW, branch, label }) {
         y2={branchY}
         style={{ stroke: INK.faint, strokeWidth: STROKE.hair, strokeDasharray: DASH.sparse }}
       />
-      <OneLineBox x={boxX} y={branchY - 9.5} width={boxW} text={boxText} title={lane.worktree || lane.root} />
+      {compact ? (
+        <rect
+          x={boxX}
+          y={branchY - 4}
+          width={boxW}
+          height={8}
+          style={{ fill: INK.paper, stroke: ready ? INK.lamp : INK.edgeStrong, strokeWidth: ready ? STROKE.ink : STROKE.hair }}
+        />
+      ) : (
+        <OneLineBox x={boxX} y={branchY - 9.5} width={boxW} text={boxText} title={lane.worktree || lane.root} />
+      )}
 
       {lane.chunks.map((num, i) => (
         <g key={num}>
           <Node x={xAt(i)} y={branchY} state="done" size={size} />
-          {(i % step === 0 || i === n - 1) && (i === n - 1 || (n - 1 - i) * spacing >= textWidth(String(num)) + 5) && (
+          {!compact && (i % step === 0 || i === n - 1) && (i === n - 1 || (n - 1 - i) * spacing >= textWidth(String(num)) + 5) && (
             <T x={xAt(i)} y={branchY + 16} anchor="middle" color={INK.faint}>{num}</T>
           )}
         </g>
@@ -144,17 +163,19 @@ function Lane({ lane, y, width, leftW, branch, label }) {
 }
 
 /** The drawing and its height at a given width, pure so it can be rendered headless. */
-export function fig21Layout({ plan, width }) {
+export function fig21Layout({ plan, width, compact = false }) {
   const d = planGitLanes(plan);
   const shown = d.lanes.slice(0, MAX_LANES);
   const more = d.lanes.length - shown.length;
   // Base names keep up to 20 characters, or less in a narrow pane.
-  const leftW = Math.min(textWidth('x') * 20, Math.floor(width * 0.3), Math.max(...shown.map((l) => textWidth(l.base))));
+  const leftW = compact ? 0 : Math.min(textWidth('x') * 20, Math.floor(width * 0.3), Math.max(...shown.map((l) => textWidth(l.base))));
   const branch = d.branch || 'current branch';
   // The label starts at the branch point (leftW + 18, see Lane).
   const maxChars = Math.floor((width - leftW - 18) / textWidth('x'));
 
-  let y = TOP;
+  const laneH = compact ? C_LANE_H : LANE_H;
+  const laneGap = compact ? C_LANE_GAP : LANE_GAP;
+  let y = compact ? C_TOP : TOP;
   const parts = shown.map((lane, i) => {
     // One repo: the branch names the lane. Several: each lane is its repo,
     // and the first (the primary) also carries the branch.
@@ -170,12 +191,15 @@ export function fig21Layout({ plan, width }) {
         leftW={leftW}
         branch={d.branch}
         label={{ text: middleTruncate(text, maxChars), full: text, strong: !d.multi && !!d.branch }}
+        compact={compact}
+        ready={d.ready}
       />
     );
-    y += LANE_H + LANE_GAP;
+    y += laneH + laneGap;
     return el;
   });
-  y -= LANE_GAP;
+  y -= laneGap;
+  if (compact) return { height: y + 2, drawing: <g>{parts}</g> };
 
   if (more > 0) {
     y += 14;
@@ -200,9 +224,10 @@ export function fig21Layout({ plan, width }) {
 
 /**
  * The locked git summary as a drawing, laid out at its container's width.
- * Narrower than MIN_W, or in compact figures, it shows `fallback` (the text rows).
+ * Narrower than MIN_W it shows `fallback` (the text rows).
  */
 export function Fig21PlanGit({ plan, fallback }) {
+  const compact = useFigureCompact();
   const rootRef = useRef(null);
   const [rootW, setRootW] = useState(null);
 
@@ -215,19 +240,21 @@ export function Fig21PlanGit({ plan, fallback }) {
     return () => ro.disconnect();
   }, []);
 
-  const width = Math.max(MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 320)));
-  const { height, drawing } = fig21Layout({ plan, width });
+  const width = Math.max(compact ? C_MIN_W : MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 320)));
+  const { height, drawing } = fig21Layout({ plan, width, compact });
   const d = planGitLanes(plan);
   const label = `Plan branch ${d.branch || 'current branch'}: ${d.lanes
-    .map((l) => `${basename(l.root)} ${l.chunks.length} chunk${l.chunks.length === 1 ? '' : 's'} committed${l.worktree ? ', in a worktree' : ', in place'}`)
-    .join('; ')}${d.ready ? '; ready to merge' : ''}`;
+    .map((l) => `${basename(l.root)} off ${l.base}, ${l.chunks.length} chunk${l.chunks.length === 1 ? '' : 's'} committed${l.chunks.length ? ` (${l.chunks.join(', ')})` : ''}${l.worktree ? `, in the worktree ${l.worktree}` : ', in place'}`)
+    .join('; ')}${d.ready ? '; ready to merge' : ''}.`;
 
   return (
     <div ref={rootRef} className="min-w-0">
       <Figure
         fig="plan-git"
         viewBox={`0 0 ${width} ${height}`}
+        compactViewBox={`0 0 ${width} ${height}`}
         minWidth={MIN_W}
+        compactMinWidth={C_MIN_W}
         paper="var(--ins-panel)"
         label={label}
         fallback={fallback}

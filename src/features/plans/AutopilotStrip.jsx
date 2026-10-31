@@ -4,7 +4,6 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { AUTOPILOT_LAMP, Prose } from './parts';
 import { useTick } from '../../hooks/useTick';
-import { useSetting } from '../settings/settingsStore';
 import { Fig09Loop } from './Fig09Loop';
 import { Fig20Timeline } from './Fig20Timeline';
 import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition } from './planModel';
@@ -14,7 +13,6 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
   const ap = plan.autopilot;
   const running = ap.status === AUTOPILOT_STATUS.RUNNING;
   const now = useTick(running);
-  const [figures] = useSetting('figures');
   // Counted like the progress readout: skipped chunks are left out.
   const pos = pilotPosition(plan);
   const chunk = pos?.chunk;
@@ -38,8 +36,8 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
     [AUTOPILOT_STATUS.RUNNING]: at ? [at, elapsed, ap.nudged && 'nudged to commit'].filter(Boolean).join(' · ') : 'starting',
     [AUTOPILOT_STATUS.PAUSED]: ['needs you', at].filter(Boolean).join(' · '),
     [AUTOPILOT_STATUS.FAILED]: ['error', at].filter(Boolean).join(' · '),
-    // Full figures: the timeline below carries the run's time.
-    [AUTOPILOT_STATUS.DONE]: ['plan complete', figures === 'compact' && took && `in ${took}`].filter(Boolean).join(' '),
+    // The timeline below carries the run's time (its tooltip, in compact figures).
+    [AUTOPILOT_STATUS.DONE]: 'plan complete',
     [AUTOPILOT_STATUS.OFF]: 'off',
   }[ap.status] || ap.status;
   const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
@@ -61,7 +59,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
             <PanelButton onClick={onDismiss} title="Hide this auto-pilot status line (the plan is unchanged)">hide</PanelButton>
           </span>
         </div>
-        {ap.status === AUTOPILOT_STATUS.DONE && figures !== 'compact' && (
+        {ap.status === AUTOPILOT_STATUS.DONE && (
           <Fig20Timeline
             plan={plan}
             showCount={false}
@@ -87,8 +85,8 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
         {runLineEl}
       </div>
-      {/* Full: the loop drawing; compact or too narrow, the headline is enough. */}
-      {figures !== 'compact' && <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} fallback={null} />}
+      {/* The loop drawing; too narrow, the headline is enough. */}
+      <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} fallback={null} />
       {/* Why it stopped is what you came back for: full ink, more room. */}
       {ap.message && (
         <Prose

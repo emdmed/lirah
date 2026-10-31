@@ -1,10 +1,11 @@
-import { Box, Figure, INK, Leader, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { Box, Figure, INK, Leader, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { CHUNK_STATUS } from './planModel';
 
 // FIG.22: which chunks touched which files. Chunks run down, files across
 // (busiest first), a filled square where a chunk's commits touched the file.
 // The busiest file, if three or more chunks edit it, gets a lamp frame and a
-// note naming the chunks to review together.
+// note naming the chunks to review together. Compact is the grid alone on a
+// finer pitch, the busiest column still framed; names move to the tooltip.
 
 const MAX_COLS = 9;
 const PITCH = 14; // cell pitch, both ways
@@ -15,6 +16,8 @@ const SIN = Math.sin((ANGLE * Math.PI) / 180);
 const COS = Math.cos((ANGLE * Math.PI) / 180);
 const TOP = 26; // under the FIG label, clear of its text
 const BUSY_AT = 3;
+const C_PITCH = 8;
+const C_CELL = 5;
 
 const baseName = (p) => p.slice(p.lastIndexOf('/') + 1);
 const parentName = (p) => {
@@ -65,7 +68,8 @@ export function filesByChunk(plan, byRepo) {
 }
 
 /** The drawing, pure so it can be rendered headless. Returns { width, height, drawing }. */
-export function fig22Layout(grid) {
+export function fig22Layout(grid, compact = false) {
+  if (compact) return fig22Compact(grid);
   const { rows, cols, more, busiest } = grid;
   const labels = cols.map((c) => clip(c.label, LABEL_CHARS));
   const headerH = Math.ceil(Math.max(0, ...labels.map((l) => textWidth(l))) * SIN) + 6;
@@ -161,6 +165,40 @@ export function fig22Layout(grid) {
   return { width, height, drawing };
 }
 
+// Compact: the hairline grid and its squares on a finer pitch, no labels.
+function fig22Compact({ rows, cols, busiest }) {
+  const P = C_PITCH;
+  const gx = 1;
+  const gy = 1;
+  const gridR = gx + cols.length * P;
+  const gridB = gy + rows.length * P;
+  const cx = (i) => gx + i * P + P / 2;
+  const cy = (j) => gy + j * P + P / 2;
+  const drawing = (
+    <g>
+      {cols.map((c, i) => (
+        <line key={`v${i}`} x1={cx(i)} x2={cx(i)} y1={gy} y2={gridB} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
+      ))}
+      {rows.map((r, j) => (
+        <line key={r.id} x1={gx} x2={gridR} y1={cy(j)} y2={cy(j)} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
+      ))}
+      {rows.map((r, j) => cols.map((c, i) => (c.hits.has(r.id) ? (
+        <rect key={`${r.id}-${i}`} x={cx(i) - C_CELL / 2} y={cy(j) - C_CELL / 2} width={C_CELL} height={C_CELL} style={{ fill: INK.fg }} />
+      ) : null)))}
+      {busiest >= 0 && (
+        <rect
+          x={cx(busiest) - P / 2 + 0.5}
+          y={gy - 1}
+          width={P - 1}
+          height={gridB - gy + 2}
+          style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.ink }}
+        />
+      )}
+    </g>
+  );
+  return { width: Math.ceil(gridR + 1), height: Math.ceil(gridB + 2), drawing };
+}
+
 // Narrow hosts: the busiest files as text, each with its chunks.
 function FileList({ grid }) {
   return (
@@ -178,16 +216,22 @@ function FileList({ grid }) {
 
 /** The plan's chunk × file grid. `files` is usePlanCommitFiles(plan, true). */
 export function Fig22FilesByChunk({ plan, files }) {
+  const compact = useFigureCompact();
   const note = (text) => <div className="text-[10px] text-muted-foreground">{text}</div>;
   if (files.loading && !Object.keys(files.byRepo).length) return note('reading commits…');
   const grid = filesByChunk(plan, files.byRepo);
   if (!grid.rows.length || !grid.cols.length) return note('no chunk commits yet');
-  const { width, height, drawing } = fig22Layout(grid);
-  const label = `Files by chunk: ${grid.cols.length} busiest files across ${grid.rows.length} chunks`;
+  const { width, height, drawing } = fig22Layout(grid, compact);
+  const busy = grid.busiest >= 0 ? grid.cols[grid.busiest] : null;
+  const label = `Files by chunk, ${grid.rows.length} chunks down, the ${grid.cols.length} busiest files across: ${grid.cols
+    .map((c) => `${c.label} (${[...c.nums].sort((a, b) => a - b).join(', ')})`)
+    .join(', ')}${grid.more > 0 ? `, and ${grid.more} more files` : ''}.${busy
+    ? ` ${busy.nums.length} chunks edit ${busy.label}; review them together.` : ''}`;
   return (
     <Figure
       fig="files-by-chunk"
       viewBox={`0 0 ${width} ${height}`}
+      compactViewBox={`0 0 ${width} ${height}`}
       paper="var(--ins-panel)"
       label={label}
       fallback={<FileList grid={grid} />}
