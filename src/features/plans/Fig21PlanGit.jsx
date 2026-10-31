@@ -77,7 +77,8 @@ function labelStep(nums, spacing) {
 function Lane({ lane, y, width, leftW, branch, label }) {
   const branchY = y + 28;
   const baseY = y + 56;
-  const bp = leftW + 10;
+  // The base name, a gap, then the lane; the branch point sits clear of both.
+  const bp = leftW + 18;
   const maxBox = Math.max(textWidth('worktree · ~/…/x') + 14, Math.floor(width * 0.55));
   const maxChars = Math.floor((maxBox - 14) / textWidth('x'));
   const boxText = lane.worktree
@@ -99,11 +100,14 @@ function Lane({ lane, y, width, leftW, branch, label }) {
 
   return (
     <g>
-      <T x={bp} y={y + 11} color={label.strong ? INK.fg : INK.muted}>{label.text}</T>
+      <g>
+        {label.full !== label.text && <title>{label.full}</title>}
+        <T x={bp} y={y + 11} color={label.strong ? INK.fg : INK.muted}>{label.text}</T>
+      </g>
 
       {/* Base lane and the branch point. */}
       <T x={0} y={baseY + 4}>{middleTruncate(lane.base, Math.floor(leftW / textWidth('x')))}</T>
-      <line x1={leftW + 4} x2={width} y1={baseY} y2={baseY} style={{ stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
+      <line x1={leftW + 8} x2={width} y1={baseY} y2={baseY} style={{ stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
       {!onBase && (
         <>
           <path
@@ -144,9 +148,11 @@ export function fig21Layout({ plan, width }) {
   const d = planGitLanes(plan);
   const shown = d.lanes.slice(0, MAX_LANES);
   const more = d.lanes.length - shown.length;
-  const leftW = Math.min(textWidth('x') * 12, Math.max(...shown.map((l) => textWidth(l.base))));
+  // Base names keep up to 20 characters, or less in a narrow pane.
+  const leftW = Math.min(textWidth('x') * 20, Math.floor(width * 0.3), Math.max(...shown.map((l) => textWidth(l.base))));
   const branch = d.branch || 'current branch';
-  const maxChars = Math.floor((width - leftW - 10) / textWidth('x'));
+  // The label starts at the branch point (leftW + 18, see Lane).
+  const maxChars = Math.floor((width - leftW - 18) / textWidth('x'));
 
   let y = TOP;
   const parts = shown.map((lane, i) => {
@@ -163,7 +169,7 @@ export function fig21Layout({ plan, width }) {
         width={width}
         leftW={leftW}
         branch={d.branch}
-        label={{ text: middleTruncate(text, maxChars), strong: !d.multi && !!d.branch }}
+        label={{ text: middleTruncate(text, maxChars), full: text, strong: !d.multi && !!d.branch }}
       />
     );
     y += LANE_H + LANE_GAP;

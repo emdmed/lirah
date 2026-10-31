@@ -13,6 +13,8 @@ import { FoundPlansSection } from './FoundPlansSection';
 import { EmptyLine } from './parts';
 import { runRank, UNTITLED_PLAN } from './planModel';
 import { planGit } from './planGit';
+import { uncommittedFiles } from './planGitOps';
+import { basename } from '../../utils/pathUtils';
 import { useRepoRoot } from './planRepoRoot';
 import { subscribePlanFocus, takePlanFocus } from './plansPaneEvents';
 import { PlanDetail } from './PlanDetail';
@@ -93,9 +95,25 @@ export function PlansPane({ projectPath }) {
   }), [withBusy, markChunkDone, repoRoot, toast]);
 
   const handleCommit = useCallback(async (plan, chunk) => {
+    // Name what git add -A will sweep in, so unrelated edits aren't a surprise.
+    const files = await uncommittedFiles(plan).catch(() => null);
+    if (files && files.length === 0) {
+      toast.info(`Nothing to commit for chunk ${chunk.n}: the tree is clean. Mark it done if it needed no changes.`);
+      return;
+    }
+    const multi = files && new Set(files.map((f) => f.root)).size > 1;
+    const SHOWN = 8;
+    const list = files
+      ? `${files.slice(0, SHOWN).map((f) => `  ${multi ? `${basename(f.root)}/` : ''}${f.path}`).join('\n')}${files.length > SHOWN ? `\n  +${files.length - SHOWN} more` : ''}`
+      : null;
     const ok = await confirm({
-      title: `Commit all changes as chunk ${chunk.n}?`,
-      description: 'Stages every change in the repo (git add -A) and commits it with this chunk\'s message.',
+      title: `Commit ${files ? `${files.length} ${files.length === 1 ? 'file' : 'files'}` : 'all changes'} as chunk ${chunk.n}?`,
+      description: (
+        <span className="flex flex-col gap-2">
+          <span>Stages every change in the repo (git add -A) and commits it with this chunk&apos;s message.</span>
+          {list && <span className="block whitespace-pre font-mono text-[10px] leading-relaxed text-foreground">{list}</span>}
+        </span>
+      ),
       confirmLabel: 'Commit',
       destructive: false,
     });
@@ -104,7 +122,7 @@ export function PlansPane({ projectPath }) {
       const res = await commitChunk(repoRoot, plan.id, chunk.id);
       if (!res.found) throw new Error('Nothing was committed — are there any changes?');
     });
-  }, [confirm, withBusy, commitChunk, repoRoot]);
+  }, [confirm, withBusy, commitChunk, repoRoot, toast]);
 
   const handleRollback = useCallback(async (plan, chunk) => {
     const n = chunk.commits.length;

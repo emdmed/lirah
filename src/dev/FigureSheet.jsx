@@ -78,8 +78,31 @@ function makePlan({ allDone = false } = {}) {
   };
 }
 
+// A run that just started: chunk 1 live for 14s, nothing committed, worked in
+// place on a long base branch, fresh context per chunk.
+function makeStartPlan() {
+  const chunks = TITLES.slice(0, 12).map((title, i) => ({
+    id: `s${i + 1}`, n: i + 1, title, status: i === 0 ? 'in-progress' : 'pending',
+    startedAt: i === 0 ? NOW - 14_000 : null, doneAt: null, commits: [], commitsByRepo: {}, tabId: i === 0 ? 't1' : undefined,
+  }));
+  return {
+    id: 'p0m5', slug: 'improvement-plan', title: 'Improvement plan — agentic orchestration workflows', repoRoot: ROOT,
+    clearBetweenChunks: true, createdAt: NOW - 5 * MIN,
+    git: { worktrees: false, branch: 'plan/improvement-plan-agentic-orche', repos: [{ root: ROOT, base: 'fix/hooks-hardening', prepared: true }], workDir: ROOT, preparedAt: NOW - MIN },
+    autopilot: { status: 'running', tabId: 't1', startedAt: NOW - 15_000, nudged: false },
+    chunks,
+  };
+}
+
 const PLAN = makePlan();
+const PLAN_START = makeStartPlan();
 const PLAN_DONE = makePlan({ allDone: true });
+// Auto-pilot turned off with chunk 7 sent but never committed: the stuck state.
+const PLAN_STUCK = {
+  ...PLAN,
+  autopilot: { status: 'off', tabId: 't1', startedAt: PLAN.autopilot.startedAt },
+  chunks: PLAN.chunks.map((c) => (c.status === 'in-progress' ? { ...c, needsCommit: true } : c)),
+};
 const LIVE = PLAN.chunks.find((c) => c.status === 'in-progress');
 
 const FILES = {
@@ -156,7 +179,7 @@ const fb = (text) => <div className="font-mono text-[11px] text-muted-foreground
 // Each figure as a render function, so the narrow row can reuse it.
 const FIGS = [
   { n: 6, w: 288, paper: 'var(--ins-raised)', el: () => <Fig06Context tokenUsage={TOKEN_USAGE} fallback={fb('context 86k / 200k')} /> },
-  { n: 9, w: 400, paper: 'var(--ins-well)', el: () => <Fig09Loop plan={PLAN} pos={{ chunk: LIVE, index: 7, total: 11 }} elapsed="41m" runLine="claude · tab 2" fallback={fb('auto-pilot chunk 7/11')} /> },
+  { n: 9, w: 400, paper: 'var(--ins-well)', el: () => <Fig09Loop plan={PLAN} pos={{ chunk: LIVE, index: 7, total: 11 }} elapsed="41m" fallback={fb('auto-pilot chunk 7/11')} /> },
   { n: 10, w: 460, el: () => <Fig10Drawing spec={SPEC} tabName="nevo-terminal" paper="var(--ins-panel)" fallback={fb('sandbox: / ro, ~ rw')} /> },
   { n: 11, w: 640, el: () => <Fig11Merge feature="plan/calibrated-figures-plan-a-draw" base="main" plan={MERGE} fallback={fb('merge commit, 11 commits')} /> },
   { n: '11b', w: 640, el: () => <Fig11Merge feature="fix/glow" base="main" plan={MERGE_FF} fallback={fb('fast-forward, 4 commits')} /> },
@@ -174,7 +197,12 @@ const FIGS = [
     ),
   },
   { n: 16, w: 480, paper: 'var(--ins-well)', el: () => <Fig16Chunks plan={PLAN} label="chunks" fallback={fb('▮▮▮▮▮▮▯▯▯▯▯▯')} /> },
+  { n: '9s', w: 520, paper: 'var(--ins-well)', el: () => <Fig09Loop plan={PLAN_START} pos={{ chunk: PLAN_START.chunks[0], index: 1, total: 12 }} elapsed="14s" fallback={fb('auto-pilot chunk 1/12')} /> },
+  { n: '20s', w: 520, el: () => <Fig20Timeline plan={PLAN_START} fallback={fb('timeline: 0/12')} /> },
+  { n: '21s', w: 520, el: () => <Fig21PlanGit plan={PLAN_START} fallback={fb('plan/… · in place')} /> },
   { n: 20, w: 560, el: () => <Fig20Timeline plan={PLAN} fallback={fb('timeline: elapsed 2h')} /> },
+  { n: '20x', w: 520, el: () => <Fig20Timeline plan={PLAN_STUCK} fallback={fb('timeline: stuck')} /> },
+  { n: '20xn', w: 300, el: () => <Fig20Timeline plan={PLAN_STUCK} fallback={fb('timeline: stuck')} /> },
   { n: '20d', w: 560, el: () => <Fig20Timeline plan={PLAN_DONE} fallback={fb('timeline: complete')} /> },
   { n: 21, w: 480, el: () => <Fig21PlanGit plan={PLAN} fallback={fb('plan/… · 6 commits')} /> },
   { n: '21d', w: 480, el: () => <Fig21PlanGit plan={PLAN_DONE} fallback={fb('plan/… · ready')} /> },

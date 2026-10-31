@@ -6,17 +6,19 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Field, Prose } from './parts';
+import { FrameHints } from '../../components/instrument/FrameHints';
 import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { useToast } from '../toast';
+import { useSetting } from '../settings/settingsStore';
 import { basename } from '../../utils/pathUtils';
 
 const CHUNK_LAMP = {
   [CHUNK_STATE.NO_COMMIT]: { state: 'warn' },
   [CHUNK_STATE.IN_PROGRESS]: { state: 'on', blink: true },
   [CHUNK_STATE.FIXING]: { state: 'on', blink: true },
-  [CHUNK_STATE.IMPLEMENTED]: { state: 'ok' },
+  [CHUNK_STATE.IMPLEMENTED]: { state: 'ok', settled: true },
   [CHUNK_STATE.ROLLED_BACK]: { state: 'warn' },
 };
 const chunkLamp = (chunk) => CHUNK_LAMP[effectiveChunkState(chunk)] || { state: 'off' };
@@ -32,20 +34,46 @@ const STATUS_LABEL = {
 };
 
 // What the state means and what you can do about it, for the states that
-// need a word. Pending needs none.
+// need a word. Pending needs none. No commit gets a diagnosis instead (see
+// noCommitNote), naming the actions in the order the keys are printed.
 const STATUS_NOTE = {
-  [CHUNK_STATE.NO_COMMIT]: 'The agent finished without committing. Check again, commit all changes as this chunk, mark it done if it needed no changes, or reset it.',
   [CHUNK_STATE.FIXING]: 'Review notes sent. Waiting for the fix commit.',
   [CHUNK_STATE.IN_PROGRESS]: 'Sent to the agent. Marked implemented when its commit lands, or when the agent says there was nothing to commit.',
   [CHUNK_STATE.ROLLED_BACK]: 'Reverted. Implement it again or skip it.',
 };
 const statusNote = (chunk) => STATUS_NOTE[effectiveChunkState(chunk)] ?? null;
 
+// The stuck chunk's diagnosis, from the work tree. The keys under it say
+// what to do, so the note only says what's wrong. `files` is null while unknown.
+function noCommitNote(files) {
+  if (files == null) return 'No commit · checking the work tree…';
+  if (files.length === 0) return 'No commit · the work tree is clean.';
+  return `No commit · ${files.length} ${files.length === 1 ? 'file' : 'files'} uncommitted:`;
+}
+
+// A porcelain XY code as the Files pane shows it: a letter and its colour.
+function gitMark(code) {
+  if (code === '??' || code.includes('A')) return { letter: code === '??' ? 'U' : 'A', className: 'text-git-added', label: code === '??' ? 'untracked' : 'added' };
+  if (code.includes('D')) return { letter: 'D', className: 'text-git-deleted line-through', label: 'deleted' };
+  if (code.includes('R')) return { letter: 'R', className: 'text-[var(--color-status-warning)]', label: 'renamed' };
+  return { letter: 'M', className: 'text-[var(--color-status-warning)]', label: 'modified' };
+}
+
+// Keys for a chunk waiting on its commit, printed under it.
+const STUCK_HINTS = [
+  { keys: ['C'], label: 'commit' },
+  { keys: ['d'], label: 'done' },
+  { keys: ['c'], label: 'check' },
+  { keys: ['R'], label: 'reset' },
+];
+const FILES_SHOWN = 6;
+
 const REORDER = 'opacity-0 group-hover/chunk:opacity-100 focus-visible:opacity-100';
 
 // `primary`: the next chunk's implement may be the pane's primary key (only
 // when auto-pilot isn't offered, which is then the one).
-export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
+// `uncommitted`: the work tree's state ({ files }) for a chunk stuck on no commit.
+export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommitted = null }) {
   const pane = usePlanPane();
   const { repoRoot } = pane;
   const { updateChunk, moveChunk, deleteChunk, restoreChunk } = usePlansActions();
@@ -72,9 +100,13 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
   const implemented = chunk.status === CHUNK_STATUS.IMPLEMENTED;
   const took = implemented && chunk.startedAt && chunk.doneAt
     ? formatDuration(chunk.doneAt - chunk.startedAt) : null;
-  const note = pilotChunk && chunk.status === CHUNK_STATUS.IN_PROGRESS
-    ? 'Auto-pilot sent this chunk. It moves on to the next one when the commit lands.'
-    : statusNote(chunk);
+  const stuck = effectiveChunkState(chunk) === CHUNK_STATE.NO_COMMIT && !piloted;
+  const dirty = stuck ? uncommitted?.files ?? null : null;
+  // Auto-pilot's own chunk needs no note: the strip above says where it is.
+  const note = stuck ? noCommitNote(dirty)
+    : pilotChunk && chunk.status === CHUNK_STATUS.IN_PROGRESS ? null : statusNote(chunk);
+  // The one action the diagnosis recommends: commit a dirty tree, mark a clean one done.
+  const recommend = stuck && dirty ? (dirty.length > 0 ? 'commit' : 'done') : null;
   const lamp = chunkLamp(chunk);
 
   const startEdit = () => {
@@ -98,10 +130,19 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
   const canImplement = startable && !piloted && !busy;
   const canReview = implemented && chunk.commits?.length > 0 && !busy;
   const pending = chunk.status === CHUNK_STATUS.PENDING;
-  // Keys on the focused row: i implement, s skip, e edit, r review, x delete.
+  const handing = chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && !busy;
+  const canMarkDone = chunk.status === CHUNK_STATUS.IN_PROGRESS && !pilotRunning && !busy;
+  const resetChunk = () => onPatch({ status: CHUNK_STATUS.PENDING, needsCommit: false });
+  // Keys on the focused row: i implement, s skip, e edit, r review, x delete;
+  // on a chunk waiting for its commit, c check, C commit, d done, R reset.
   const onRowKey = (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || editing || editingDecisions) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || editing || editingDecisions) return;
+    if (e.shiftKey && e.key !== 'C' && e.key !== 'R') return;
     const act = {
+      c: handing && (() => pane.check(plan, chunk)),
+      C: handing && (() => pane.commit(plan, chunk)),
+      d: canMarkDone && (() => pane.markDone(plan, chunk)),
+      R: handing && resetChunk,
       i: canImplement && (() => pane.implement(plan, chunk)),
       s: (pending || skipped) && (() => onPatch({ status: skipped ? CHUNK_STATUS.PENDING : CHUNK_STATUS.SKIPPED })),
       e: pending && (() => {
@@ -115,11 +156,98 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
     e.preventDefault();
     act();
   };
-  const rowKeys = [canImplement && 'i', (pending || skipped) && 's', pending && 'e', canReview && 'r', pending && 'x'].filter(Boolean);
+  const rowKeys = [
+    canImplement && 'i', (pending || skipped) && 's', pending && 'e', canReview && 'r', pending && 'x',
+    handing && 'c', handing && 'Shift+C', canMarkDone && 'd', handing && 'Shift+R',
+  ].filter(Boolean);
   const saveEdit = () => {
     if (draft.title.trim()) onPatch({ title: draft.title.trim(), details: draft.details });
     setEditing(false);
   };
+
+  // A chunk in flight leads with what to do about it; others end with their keys.
+  const actionsFirst = chunk.status === CHUNK_STATUS.IN_PROGRESS;
+  const actions = (
+    <div className="flex flex-wrap items-center gap-1">
+      {/* Auto-pilot does the sending, checking and committing while it runs. */}
+      {startable && !piloted && (
+        <PanelButton
+          icon={Play}
+          onClick={() => pane.implement(plan, chunk)}
+          disabled={busy}
+          className={isNext && primary ? 'ins-key-primary' : undefined}
+          title="Send this chunk to the tab's agent"
+        >
+          implement
+        </PanelButton>
+      )}
+      {/* Printed in the order the note names them: the recommended one first. */}
+      {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && recommend !== 'done' && (
+        <PanelButton
+          onClick={() => pane.commit(plan, chunk)}
+          disabled={busy}
+          className={recommend === 'commit' ? 'ins-key-primary' : undefined}
+          title="Commit all changes as this chunk (C)"
+        >
+          commit
+        </PanelButton>
+      )}
+      {chunk.status === CHUNK_STATUS.IN_PROGRESS && !pilotRunning && (
+        <PanelButton
+          onClick={() => pane.markDone(plan, chunk)}
+          disabled={busy}
+          className={recommend === 'done' ? 'ins-key-primary' : undefined}
+          title="Done with nothing to commit: a check, a test run (d)"
+        >
+          mark done
+        </PanelButton>
+      )}
+      {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && (
+        <>
+          <PanelButton onClick={() => pane.check(plan, chunk)} disabled={busy} title="Look again for the chunk's commit (c)">check</PanelButton>
+          <PanelButton onClick={resetChunk} disabled={busy} title="Back to pending; the changes are kept (R)">
+            reset
+          </PanelButton>
+        </>
+      )}
+      {chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.commits?.length > 0 && (
+        <>
+          <PanelButton onClick={() => pane.review(plan, chunk)} disabled={busy} title="Review the chunk's diff; notes go back to the agent">review</PanelButton>
+          <PanelButton onClick={() => pane.rollback(plan, chunk)} disabled={busy} title="git revert the chunk's commits">roll back</PanelButton>
+        </>
+      )}
+      {implemented && (
+        <PanelButton
+          onClick={() => setDecisionsDraft((chunk.decisions ?? []).join('\n'))}
+          disabled={busy}
+          title="Edit the decisions passed on to later chunks"
+        >
+          decisions
+        </PanelButton>
+      )}
+      {(chunk.status === CHUNK_STATUS.PENDING || skipped) && (
+        <PanelButton
+          // Its lamp only once it is on, so it can't read as a second status.
+          {...(skipped ? { latched: true } : { 'aria-pressed': false })}
+          onClick={() => onPatch({ status: skipped ? CHUNK_STATUS.PENDING : CHUNK_STATUS.SKIPPED })}
+          title="Skipped chunks don't count toward progress"
+        >
+          skip
+        </PanelButton>
+      )}
+      {chunk.status === CHUNK_STATUS.PENDING && (
+        <>
+          <PanelButton onClick={startEdit} title="Edit the chunk's title and details">edit</PanelButton>
+          <span className="ml-auto flex gap-0.5">
+            {/* Reordering is rare: shown on hover or keyboard focus. */}
+            <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" className={REORDER} />
+            <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" className={REORDER} />
+            <PanelButton icon={Trash2} onClick={remove} title="Delete chunk (undo in the toast)" aria-label="Delete chunk" />
+          </span>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div id={`chunk-${chunk.id}`} className="group/chunk relative flex flex-col">
@@ -134,11 +262,11 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
         title={isNext ? 'Next chunk' : undefined}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
-          <Lamp state={lamp.state} blink={lamp.blink} label={status} />
+          <Lamp state={lamp.state} blink={lamp.blink} settled={lamp.settled} label={status} />
         </span>
         <span
           className={cn(
-            'text-right font-[family-name:var(--font-legend)] text-[10px] leading-[18px] tabular-nums',
+            'text-right font-[family-name:var(--font-legend)] text-[11px] leading-[18px] tabular-nums',
             isNext ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
@@ -147,13 +275,13 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
         <span
           className={cn(
             'min-w-0 leading-[18px]',
-            open ? 'font-semibold wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
+            open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
             skipped ? 'text-muted-foreground line-through' : implemented && !open ? 'text-muted-foreground' : 'text-foreground',
           )}
         >
           {chunk.title}
         </span>
-        <span className="flex h-[18px] items-center gap-1.5 font-[family-name:var(--font-legend)] text-[10px] text-muted-foreground">
+        <span className="flex h-[18px] items-center gap-1.5 font-[family-name:var(--font-legend)] text-[11px] text-muted-foreground">
           {pilotChunk && (
             <span className="text-[var(--ins-lamp)]" title={nudged ? 'Auto-pilot asked the agent to commit' : 'Auto-pilot is on this chunk'}>
               {nudged ? 'nudged' : 'auto'}
@@ -174,7 +302,24 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
       {open && (
         // Under the title, past the node and number columns.
         <div className="flex min-w-0 flex-col gap-3 pr-3 pt-1 pb-4 pl-[calc(0.75rem+14px+16px+12px)] text-[11px] leading-relaxed">
-          {note && <p className="text-[11px] leading-relaxed text-muted-foreground">{note}</p>}
+          {stuck ? (
+            // Live state is a box (DESIGN.md rule 10), matching the needs-you
+            // line at the top; it drops back to plain once the chunk resolves.
+            <div className="ins-well flex min-w-0 flex-col gap-2 px-2 py-1.5">
+              <p className="text-[11px] leading-relaxed text-foreground" role="status">{note}</p>
+              {dirty?.length > 0 && <DirtyList files={dirty} />}
+              {!editing && !editingDecisions && actions}
+              {/* Its keys, while the row has focus, like the list's. */}
+              <div className="hidden flex-wrap items-center gap-x-1 gap-y-1 text-[10px] text-muted-foreground group-focus-within/chunk:flex">
+                <FrameHints hints={STUCK_HINTS} />
+              </div>
+            </div>
+          ) : (
+            <>
+              {note && <p className="text-[11px] leading-relaxed text-muted-foreground">{note}</p>}
+              {!editing && !editingDecisions && actionsFirst && actions}
+            </>
+          )}
           {editing ? (
             <div className="flex flex-col gap-1.5">
               <Field label="title">
@@ -241,72 +386,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true }) {
             </>
           )}
 
-          {!editing && !editingDecisions && (
-            <div className="flex flex-wrap items-center gap-1">
-              {/* Auto-pilot does the sending, checking and committing while it runs. */}
-              {startable && !piloted && (
-                <PanelButton
-                  icon={Play}
-                  onClick={() => pane.implement(plan, chunk)}
-                  disabled={busy}
-                  className={isNext && primary ? 'ins-key-primary' : undefined}
-                  title="Send this chunk to the tab's agent"
-                >
-                  implement
-                </PanelButton>
-              )}
-              {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && (
-                <>
-                  <PanelButton onClick={() => pane.check(plan, chunk)} disabled={busy} title="Look for the chunk's commit">check</PanelButton>
-                  <PanelButton onClick={() => pane.commit(plan, chunk)} disabled={busy} title="Commit all changes as this chunk">commit</PanelButton>
-                  <PanelButton onClick={() => onPatch({ status: CHUNK_STATUS.PENDING, needsCommit: false })} disabled={busy} title="Back to pending (changes are kept)">
-                    reset
-                  </PanelButton>
-                </>
-              )}
-              {chunk.status === CHUNK_STATUS.IN_PROGRESS && !pilotRunning && (
-                <PanelButton onClick={() => pane.markDone(plan, chunk)} disabled={busy} title="Done with nothing to commit (a check, a test run)">
-                  mark done
-                </PanelButton>
-              )}
-              {chunk.status === CHUNK_STATUS.IMPLEMENTED && chunk.commits?.length > 0 && (
-                <>
-                  <PanelButton onClick={() => pane.review(plan, chunk)} disabled={busy} title="Review the chunk's diff; notes go back to the agent">review</PanelButton>
-                  <PanelButton onClick={() => pane.rollback(plan, chunk)} disabled={busy} title="git revert the chunk's commits">roll back</PanelButton>
-                </>
-              )}
-              {implemented && (
-                <PanelButton
-                  onClick={() => setDecisionsDraft((chunk.decisions ?? []).join('\n'))}
-                  disabled={busy}
-                  title="Edit the decisions passed on to later chunks"
-                >
-                  decisions
-                </PanelButton>
-              )}
-              {(chunk.status === CHUNK_STATUS.PENDING || skipped) && (
-                <PanelButton
-                  // Its lamp only once it is on, so it can't read as a second status.
-                  {...(skipped ? { latched: true } : { 'aria-pressed': false })}
-                  onClick={() => onPatch({ status: skipped ? CHUNK_STATUS.PENDING : CHUNK_STATUS.SKIPPED })}
-                  title="Skipped chunks don't count toward progress"
-                >
-                  skip
-                </PanelButton>
-              )}
-              {chunk.status === CHUNK_STATUS.PENDING && (
-                <>
-                  <PanelButton onClick={startEdit} title="Edit the chunk's title and details">edit</PanelButton>
-                  <span className="ml-auto flex gap-0.5">
-                    {/* Reordering is rare: shown on hover or keyboard focus. */}
-                    <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" className={REORDER} />
-                    <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" className={REORDER} />
-                    <PanelButton icon={Trash2} onClick={remove} title="Delete chunk (undo in the toast)" aria-label="Delete chunk" />
-                  </span>
-                </>
-              )}
-            </div>
-          )}
+          {!editing && !editingDecisions && !actionsFirst && actions}
         </div>
       )}
     </div>
@@ -339,6 +419,31 @@ function FileTree({ files }) {
           </li>
         );
       })}
+    </ul>
+  );
+}
+
+// The stuck chunk's uncommitted files, as the commit would take them.
+function DirtyList({ files }) {
+  const multi = new Set(files.map((f) => f.root)).size > 1;
+  const shown = files.slice(0, FILES_SHOWN);
+  return (
+    <ul className="flex min-w-0 flex-col font-mono text-[10px] leading-[16.5px]" aria-label="Uncommitted files">
+      {shown.map((f) => {
+        const path = multi ? `${basename(f.root)}/${f.path}` : f.path;
+        const mark = gitMark(f.code ?? ' M');
+        const cut = path.lastIndexOf('/') + 1;
+        return (
+          <li key={`${f.root}:${f.path}`} className="flex min-w-0 gap-1.5" title={`${mark.label}: ${path}`}>
+            <span aria-hidden="true" className={cn('w-2 shrink-0 text-center', mark.className.replace(' line-through', ''))}>{mark.letter}</span>
+            <span className="min-w-0 truncate">
+              <span className="text-muted-foreground">{path.slice(0, cut)}</span>
+              <span className={mark.className}>{path.slice(cut)}</span>
+            </span>
+          </li>
+        );
+      })}
+      {files.length > FILES_SHOWN && <li className="pl-3.5 text-muted-foreground">+{files.length - FILES_SHOWN} more</li>}
     </ul>
   );
 }
@@ -385,6 +490,9 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
   const first = chunks[0].n;
   const last = chunks.at(-1).n;
   const ms = chunks.reduce((sum, c) => sum + (c.startedAt && c.doneAt ? c.doneAt - c.startedAt : 0), 0);
+  // Full figures: FIG.20 above already carries the time, so it isn't printed twice.
+  const [figures] = useSetting('figures');
+  const took = ms > 0 ? formatDuration(ms) : null;
   return (
     <div className="relative">
       <button
@@ -393,17 +501,17 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
         onClick={onToggle}
         aria-expanded={unfolded}
         className="group grid w-full min-w-0 grid-cols-[14px_16px_minmax(0,1fr)_auto] items-start gap-x-1.5 px-3 py-[3px] text-left text-[11px] cursor-pointer hover:bg-foreground/5 outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
-        title={unfolded ? `Fold chunks ${first}–${last}` : `Show chunks ${first}–${last}`}
+        title={`${unfolded ? 'Fold' : 'Show'} chunks ${first}–${last}${took ? `; worked ${took}` : ''}`}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
-          <Lamp state="ok" label="implemented" />
+          <Lamp state="ok" settled label="implemented" />
         </span>
         <span />
         <span className="min-w-0 leading-[18px] text-muted-foreground">
           <span className="tabular-nums">{first}–{last}</span> implemented · {chunks.length} chunks
         </span>
-        <span className="flex h-[18px] items-center gap-1.5 font-[family-name:var(--font-legend)] text-[10px] text-muted-foreground">
-          {ms > 0 && <span className="tabular-nums">{formatDuration(ms)}</span>}
+        <span className="flex h-[18px] items-center gap-1.5 font-[family-name:var(--font-legend)] text-[11px] text-muted-foreground">
+          {took && figures === 'compact' && <span className="tabular-nums">{took}</span>}
           <ChevronRight aria-hidden="true" className={cn('h-3 w-3 opacity-60 group-hover:opacity-100', unfolded && 'rotate-90')} />
         </span>
       </button>

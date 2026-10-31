@@ -1114,6 +1114,9 @@ body {
     transition-duration: var(--ins-warm);
   }
 
+  /* Settled: the star keeps its colour, without the glow (glow means live). */
+  .ins-lamp[data-settled] { filter: none; }
+
   :root[data-theme="light"] :is(.ins-lamp, .fig-glow) { --lamp-glow: 50%; }
 
   /* Figure glow (kit Glow): the one lit thing in a FIG drawing, in the

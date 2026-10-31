@@ -1,5 +1,5 @@
 import { formatDuration } from '../../lib/formatDuration';
-import { Check, Eye, Play, Square, SquareTerminal } from 'lucide-react';
+import { Eye, Play, Square, SquareTerminal } from 'lucide-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { AUTOPILOT_LAMP, Prose } from './parts';
@@ -10,7 +10,7 @@ import { Fig20Timeline } from './Fig20Timeline';
 import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition } from './planModel';
 
 /** Where the auto-pilot run stands, and what you can do about it. */
-export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismiss, onGoToTab, onReviewAll }) {
+export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop, onDismiss, onGoToTab, onReviewAll }) {
   const ap = plan.autopilot;
   const running = ap.status === AUTOPILOT_STATUS.RUNNING;
   const now = useTick(running);
@@ -58,7 +58,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
                 review all
               </PanelButton>
             )}
-            <PanelButton icon={Check} onClick={onDismiss} title="Clear the status">dismiss</PanelButton>
+            <PanelButton onClick={onDismiss} title="Hide this auto-pilot status line (the plan is unchanged)">hide</PanelButton>
           </span>
         </div>
         {ap.status === AUTOPILOT_STATUS.DONE && figures !== 'compact' && (
@@ -76,7 +76,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
     );
   }
   const runLineEl = (
-    <span className="ml-auto shrink-0 font-[family-name:var(--font-legend)] text-[10px] tabular-nums text-muted-foreground">{runLine}</span>
+    <span className="ml-auto shrink-0 font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-muted-foreground">{runLine}</span>
   );
   const stopped = ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
   return (
@@ -85,12 +85,10 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
         <Lamp state={lamp.state} blink={lamp.blink} label={headline} />
         <span className="engraved-label shrink-0">auto-pilot</span>
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
-        {figures === 'compact' && runLineEl}
+        {runLineEl}
       </div>
-      {/* Full: the loop drawing carries the run line; too narrow, the line comes back. */}
-      {figures !== 'compact' && (
-        <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} runLine={runLine} fallback={<div className="flex">{runLineEl}</div>} />
-      )}
+      {/* Full: the loop drawing; compact or too narrow, the headline is enough. */}
+      {figures !== 'compact' && <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} fallback={null} />}
       {/* Why it stopped is what you came back for: full ink, more room. */}
       {ap.message && (
         <Prose
@@ -104,11 +102,6 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
           Answer in the terminal and the run carries on by itself, or resume to nudge the agent.
         </p>
       )}
-      {running && (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Chunks that haven't started can still be edited, skipped or reordered.
-        </p>
-      )}
       <div className="flex flex-wrap items-center gap-1.5">
         {tabOpen && (
           <PanelButton icon={SquareTerminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
@@ -119,6 +112,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
           </PanelButton>
         )}
         <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
+        {options && <span className="ml-auto">{options}</span>}
       </div>
     </div>
   );

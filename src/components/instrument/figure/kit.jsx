@@ -16,6 +16,7 @@ export const INK = {
   edgeStrong: 'var(--ins-edge-strong)',
   lamp: 'var(--ins-lamp)',
   ok: 'var(--ins-ok)',
+  warn: 'var(--ins-warn)',
   fault: 'var(--ins-fault)',
   paper: 'var(--fig-paper, var(--ins-panel))',
 };

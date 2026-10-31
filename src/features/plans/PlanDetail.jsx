@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Play, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronLeft, Play, RefreshCw } from 'lucide-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -13,6 +13,7 @@ import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
 import { Fig22FilesByChunk } from './Fig22FilesByChunk';
 import { usePlanCommitFiles } from './usePlanCommitFiles';
+import { useUncommitted } from './useUncommitted';
 import { useSetting } from '../settings/settingsStore';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
@@ -93,6 +94,13 @@ export function PlanDetail({ plan }) {
   const canPilot = plan.split === SPLIT_STATUS.DONE && (!plan.autopilot || plan.autopilot.status === AUTOPILOT_STATUS.DONE || plan.autopilot.status === AUTOPILOT_STATUS.OFF)
     && (!!nextId || plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS));
   const piloted = isAutopilotLive(plan.autopilot);
+  // A chunk the agent left without a commit, while nothing is running: it
+  // needs you, so the panel leads with it and auto-pilot steps back.
+  const stuck = piloted ? null : plan.chunks.find((c) => c.needsCommit) ?? null;
+  const uncommitted = useUncommitted(plan, !!stuck, stuck ? `${stuck.id}:${stuck.status}` : null);
+  const dirty = uncommitted.files;
+  // A chunk sent by hand is adopted by auto-pilot rather than sent again.
+  const handSent = piloted ? null : plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS) ?? null;
   // The chunks in flight are always open, as are the ones you open; the next
   // one opens on its own only while nothing is in flight. That's where the work is.
   const inFlight = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
@@ -154,6 +162,21 @@ export function PlanDetail({ plan }) {
   const commitFiles = usePlanCommitFiles(plan, filesOpen);
   const hasCommits = plan.chunks.some((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
 
+  // Read before each chunk, so it can change during a run.
+  const freshContext = (
+    <label
+      className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground"
+      title={`Auto-pilot clears the agent's context (/clear, or /new in opencode) before each chunk after the first. Later chunks then know earlier ones only from the plan, their decisions and the code.${piloted ? ' A change applies from the next chunk.' : ''}`}
+    >
+      <Checkbox
+        checked={!!plan.clearBetweenChunks}
+        onCheckedChange={(v) => updatePlan(repoRoot, plan.id, { clearBetweenChunks: !!v })}
+      />
+      fresh context
+      {!piloted && <span className="text-muted-foreground">· /clear before each chunk</span>}
+    </label>
+  );
+
   return (
     <div className="flex flex-col">
       <div className="flex flex-col px-3 pt-2 pb-3">
@@ -173,7 +196,7 @@ export function PlanDetail({ plan }) {
             {!started && plan.split !== SPLIT_STATUS.RUNNING && (
               <PanelButton onClick={resplit} title="Split the plan again (nothing has started yet)">re-split</PanelButton>
             )}
-            <PanelButton icon={Trash2} onClick={() => pane.deletePlan(plan)} title="Delete this plan" aria-label="Delete this plan" />
+            <PanelButton onClick={() => pane.deletePlan(plan)} title="Delete this plan (asks first)">delete</PanelButton>
           </span>
         </div>
         {showSource && (
@@ -185,6 +208,27 @@ export function PlanDetail({ plan }) {
         {/* Identity first: the title, and what the plan is for. */}
         <h3 className="mt-3 text-[13px] font-semibold leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1 text-[11px] leading-relaxed text-muted-foreground" />}
+
+        {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
+        {stuck && (
+          <button
+            type="button"
+            onClick={() => openChunk(stuck.id, { focus: true })}
+            title={`Go to chunk ${stuck.n}`}
+            className="ins-well mt-3 flex min-w-0 cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-[11px] outline-none hover:text-foreground focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
+          >
+            <Lamp state="warn" label="needs you" />
+            <span className="engraved-label shrink-0">needs you</span>
+            <span className="min-w-0 truncate tabular-nums text-foreground" role="status">
+              chunk {stuck.n} · no commit
+              <span className="text-muted-foreground">
+                {dirty == null ? '' : dirty.length > 0
+                  ? ` · ${dirty.length} uncommitted → commit`
+                  : ' · tree clean → mark done'}
+              </span>
+            </span>
+          </button>
+        )}
 
         {/* Where it stands: the route, one stop per chunk. */}
         {total > 0 && (
@@ -199,37 +243,6 @@ export function PlanDetail({ plan }) {
           </div>
         )}
 
-        {/* The run bank: the primary key, with its one option beside it. */}
-        {(canPilot || isAutopilotLive(plan.autopilot)) && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-            {canPilot && (
-              <PanelButton
-                icon={Play}
-                onClick={() => pane.autopilot(plan)}
-                // The plan's one primary key: framed and lamp-lit.
-                className="ins-key-primary"
-                title="Implement the remaining chunks one after another, unattended"
-              >
-                run on auto-pilot
-              </PanelButton>
-            )}
-            {/* Read before each chunk, so it can change during a run; then it
-                says when the change applies. */}
-            <label
-              className="flex cursor-pointer items-center gap-1.5 text-[11px] text-foreground"
-              title="Auto-pilot clears the agent's context (/clear, or /new in opencode) before each chunk after the first. Later chunks then know earlier ones only from the plan, their decisions and the code."
-            >
-              <Checkbox
-                checked={!!plan.clearBetweenChunks}
-                onCheckedChange={(v) => updatePlan(repoRoot, plan.id, { clearBetweenChunks: !!v })}
-              />
-              fresh context per chunk
-              <span className="text-muted-foreground">
-                {piloted ? '· applies from the next chunk' : '· /clear before each one'}
-              </span>
-            </label>
-          </div>
-        )}
         {plan.autopilot && (
           <div className="mt-3">
             <AutopilotStrip
@@ -241,7 +254,28 @@ export function PlanDetail({ plan }) {
               onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
               onGoToTab={() => switchTab(plan.autopilot.tabId)}
               onReviewAll={() => pane.reviewAll(plan)}
+              options={piloted ? freshContext : null}
             />
+          </div>
+        )}
+        {/* The run bank, under the run's status: the primary key, with its one
+            option beside it. During a run the option moves into the strip,
+            beside stop. While a chunk is stuck its fix is the primary key, so
+            this one steps down to a plain key. */}
+        {canPilot && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <PanelButton
+              icon={Play}
+              onClick={() => pane.autopilot(plan)}
+              // The plan's one primary key: framed and lamp-lit.
+              className={stuck ? undefined : 'ins-key-primary'}
+              title={handSent
+                ? `Adopt chunk ${handSent.n} (asking the agent to commit it if needed), then implement the rest one after another, unattended`
+                : 'Implement the remaining chunks one after another, unattended'}
+            >
+              {handSent ? `run on auto-pilot from ${handSent.n}` : 'run on auto-pilot'}
+            </PanelButton>
+            {freshContext}
           </div>
         )}
 
@@ -329,6 +363,7 @@ export function PlanDetail({ plan }) {
                 open={open.has(row.chunk.id)}
                 onToggle={() => toggle(row.chunk)}
                 primary={!canPilot}
+                uncommitted={row.chunk.id === stuck?.id ? uncommitted : null}
               />
             );
           });

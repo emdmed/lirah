@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Box, Dim, Figure, INK, Leader, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { DASH, Dim, Figure, INK, Leader, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
 import { formatDuration } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
 import { useSetting } from '../settings/settingsStore';
@@ -11,7 +11,9 @@ import { AUTOPILOT_STATUS, CHUNK_STATUS, planProgress } from './planModel';
 // measures working time only. The slowest span is drawn heavy and called out.
 // A dimension over the whole plan gives the run's wall time (auto-pilot) or
 // the summed chunk time (by hand); with a wall time, the idle remainder is
-// written beside it, so work + idle = the total.
+// written into its label, so work + idle = the total. What's still ahead
+// follows as an unmeasured dashed tail: a chunk stuck without its commit is
+// a warn square at its head, and the tail is labelled with what's left.
 
 const MIN_W = 260;
 const MAX_W = 560;
@@ -20,9 +22,10 @@ const DIM_Y = 30;
 const NUM_Y = 53;
 const LINE_Y = 61;
 const RULER_Y = 73;
-const BOX_Y = 101;
+const NOTE_Y = 103;
 const BREAK_AFTER = 2 * 60_000;
 const BREAK_W = 12;
+const IDLE_NOTE = 30_000;
 
 const timed = (c) => c.startedAt && c.doneAt && c.doneAt >= c.startedAt;
 
@@ -62,23 +65,36 @@ export function planTimeline(plan, now = Date.now()) {
   const idle = inWindow ? Math.max(0, total - work) : null;
 
   const done = spans.filter((s) => !s.live);
-  const slowest = done.length >= 2 ? done.reduce((a, s) => (s.dur > a.dur ? s : a)) : null;
-  return { spans, work, total, idle, kind, slowest, running };
+  // A look back, so it waits until auto-pilot isn't running.
+  const slowest = !running && done.length >= 2 ? done.reduce((a, s) => (s.dur > a.dur ? s : a)) : null;
+  // Ahead: a chunk sent but not committed (outside a live run), and what's left after it.
+  const stuck = liveChunk ? null : plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS) ?? null;
+  const left = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.IMPLEMENTED && c.status !== CHUNK_STATUS.SKIPPED
+    && c.id !== liveChunk?.id).length;
+  return { spans, work, total, idle, kind, slowest, running, stuck, left };
 }
 
-// Ruler steps in minutes: a minor tick and a labelled one. Every 5 min (every
-// 30 past two hours), doubled while the labels would touch.
-function rulerSteps(workMin, pxPerMin) {
-  const long = workMin > 120;
-  const minor = long ? 10 : 1;
-  let major = long ? 30 : 5;
-  while (major * pxPerMin < textWidth('1h30') + 8) major *= 2;
-  return { minor: minor * pxPerMin < 3 ? major : minor, major };
+// Ruler steps as [labelled, minor] in ms: the smallest whose labels don't
+// touch, so a 20-second run gets a seconds scale and a long one 30-minute marks.
+const SEC = 1000;
+const MINUTE = 60 * SEC;
+const STEPS = [
+  [5 * SEC, SEC], [10 * SEC, 2 * SEC], [15 * SEC, 5 * SEC], [30 * SEC, 5 * SEC],
+  [MINUTE, 10 * SEC], [2 * MINUTE, 30 * SEC], [5 * MINUTE, MINUTE], [10 * MINUTE, MINUTE],
+  [15 * MINUTE, 5 * MINUTE], [30 * MINUTE, 10 * MINUTE], [60 * MINUTE, 10 * MINUTE], [120 * MINUTE, 30 * MINUTE],
+];
+function rulerSteps(pxPerMs) {
+  const room = textWidth('1h30') + 8;
+  const [major, minor] = STEPS.find(([m]) => m * pxPerMs >= room) ?? STEPS[STEPS.length - 1];
+  return { major, minor: minor * pxPerMs < 3 ? major : minor };
 }
+
+const fmtTick = (ms) => (ms < MINUTE ? `${Math.round(ms / SEC)}s` : fmtMin(Math.round(ms / MINUTE)));
 
 const fmtMin = (m) => (m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m / 60}h`);
 
-const clip = (s, max) => (s.length <= max ? s : `${s.slice(0, Math.max(1, max - 1))}…`);
+// The dimension's word for its total: the run's wall time, or the summed work.
+const KIND_LABEL = { chunks: 'worked' };
 
 /** The drawing at a given width, pure so it can be rendered headless. */
 export function Fig20Drawing({ plan, width, now, showCount = true }) {
@@ -88,7 +104,11 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
   const count = `${doneN}/${totalN}`;
 
   const x0 = PAD;
-  const x1 = showCount ? width - textWidth(count) - 10 : width - PAD;
+  const xLimit = showCount ? width - textWidth(count) - 10 : width - PAD;
+  // The tail ahead takes a fixed share, sized to its label; spans scale into the rest.
+  const leftLabel = t.left > 0 ? `${t.left} left` : '';
+  const tailW = t.left > 0 ? Math.min(Math.max(textWidth(leftLabel) + 16, (xLimit - x0) * 0.18), (xLimit - x0) * 0.35) : 0;
+  const x1 = xLimit - tailW;
   const breaks = spans.filter((s) => s.broken).length;
   const breakW = breaks ? Math.min(BREAK_W, ((x1 - x0) * 0.3) / breaks) : 0;
   const k = work > 0 ? (x1 - x0 - breakW * breaks) / work : 0;
@@ -114,19 +134,19 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
     return x0 + ms * k + shift;
   };
 
-  // Ruler: ticks on working minutes, broken where the line breaks.
-  const workMin = work / 60_000;
-  const pxPerMin = k * 60_000;
-  const { minor, major } = rulerSteps(workMin, pxPerMin);
+  // Ruler: ticks on working time, broken where the line breaks.
+  const { minor, major } = rulerSteps(k);
+  const every = Math.round(major / minor);
   const ticks = [];
-  for (let m = 0; m <= workMin + 1e-9; m += minor) {
-    const tx = xAtWork(m * 60_000);
-    const isMajor = m % major === 0;
+  for (let i = 0; i * minor <= work; i += 1) {
+    const ms = i * minor;
+    const tx = xAtWork(ms);
+    const isMajor = i % every === 0;
     ticks.push(
-      <g key={m}>
+      <g key={i}>
         <line x1={tx} x2={tx} y1={RULER_Y} y2={RULER_Y + (isMajor ? 6 : 3)} style={{ stroke: isMajor ? INK.faint : INK.edgeStrong, strokeWidth: STROKE.hair }} />
         {isMajor && (
-          <T x={tx} y={RULER_Y + 17} color={INK.faint} anchor={m === 0 ? 'start' : 'middle'} halo>{m === 0 ? '0' : fmtMin(m)}</T>
+          <T x={tx} y={RULER_Y + 17} color={INK.faint} anchor={i === 0 ? 'start' : 'middle'} halo>{i === 0 ? '0' : fmtTick(ms)}</T>
         )}
       </g>,
     );
@@ -151,28 +171,53 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
     return <T key={`n${s.n}`} x={s.b} y={NUM_Y - 6} anchor="middle" color={s.live ? INK.lamp : INK.muted}>{s.n}</T>;
   });
 
-  const dimLabel = `${t.kind} · ${formatDuration(t.total)}`;
-  const idleText = t.idle != null && t.idle >= 1000 ? `≈ idle ${formatDuration(t.idle)}` : null;
-  const idleW = idleText ? textWidth(idleText) : 0;
+  // Idle rides on the total it is part of; a few seconds of start-up isn't worth a word.
+  const idle = t.idle != null && t.idle >= IDLE_NOTE ? ` · ${formatDuration(t.idle)} idle` : '';
+  const dimLabel = `${KIND_LABEL[t.kind] ?? t.kind} · ${formatDuration(t.total)}${idle}`;
 
-  // The slowest span's callout, under the ruler, kept clear of the idle note.
-  let box = null;
+  // The slowest span, named under the ruler: a settled fact, so a leader and
+  // a line of text, not a box (boxes are for live state).
+  let note = null;
   let leader = null;
   if (t.slowest) {
     const s = laid.find((l) => l.n === t.slowest.n && !l.live);
-    const value = `chunk ${s.n} · ${formatDuration(s.dur)}`;
-    const room = width - (idleText ? idleW + 24 : 0);
-    const prefix = 'slowest · ';
-    const maxChars = Math.max(4, Math.floor((Math.min(room, 360) - 14) / (textWidth('x') * 1.08)) - prefix.length);
-    const label = `${prefix}${clip(s.title || `chunk ${s.n}`, maxChars)}`;
-    // The legend face runs a little wider than CH; pad so text never meets the edge.
-    const bw = Math.max(textWidth(label), textWidth(value)) * 1.08 + 14;
     const mid = (s.a + s.b) / 2;
-    const bx = Math.max(0, Math.min(room - bw, mid - 12));
+    const text = `slowest · chunk ${s.n} · ${formatDuration(s.dur)}`;
+    const tw = textWidth(text);
+    // Text to the right of the elbow when it fits, else to the left.
+    const right = mid + 9 + tw <= width;
+    const elbow = right ? mid + 5 : mid - 5;
     // Drawn before the ruler, so it breaks at the minute numbers.
-    leader = <Leader points={[[mid, LINE_Y + 2], [mid, BOX_Y]]} />;
-    box = <Box x={bx} y={BOX_Y} width={bw} label={label} value={value} />;
+    leader = <Leader points={[[mid, LINE_Y + 2], [mid, NOTE_Y], [elbow, NOTE_Y]]} />;
+    note = (
+      <g>
+        <title>{s.title || `chunk ${s.n}`}</title>
+        <T x={right ? mid + 9 : mid - 9} y={NOTE_Y + 4} anchor={right ? 'start' : 'end'} color={INK.muted}>{text}</T>
+      </g>
+    );
   }
+
+  // Ahead: unmeasured, so dashed and off the ruler.
+  const tail = t.left > 0 ? (() => {
+    const a = xEnd + 2;
+    const b = xEnd + tailW;
+    // Clear of the last span's number above it.
+    const lastN = laid.length ? String(laid[laid.length - 1].n) : '';
+    const sx = xEnd + Math.max(10, (textWidth(lastN) + textWidth(String(t.stuck?.n ?? ''))) / 2 + 5);
+    return (
+      <g>
+        <title>{`${t.left} chunk${t.left === 1 ? '' : 's'} left${t.stuck ? `; chunk ${t.stuck.n} has no commit yet` : ''}`}</title>
+        <line x1={a} x2={b} y1={LINE_Y} y2={LINE_Y} style={{ stroke: INK.faint, strokeWidth: STROKE.hair, strokeDasharray: DASH.medium }} />
+        {t.stuck && (
+          <>
+            <rect x={sx - 3} y={LINE_Y - 3} width={6} height={6} style={{ fill: INK.paper, stroke: INK.warn, strokeWidth: STROKE.ink }} />
+            <T x={sx} y={NUM_Y - 6} anchor="middle" color={INK.warn}>{t.stuck.n}</T>
+          </>
+        )}
+        <T x={b} y={RULER_Y + 17} anchor="end" color={INK.faint}>{leftLabel}</T>
+      </g>
+    );
+  })() : null;
 
   return (
     <g>
@@ -210,6 +255,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
 
       {laid.map((s) => <Node key={`d${s.n}`} x={s.b} y={LINE_Y} state={s.live ? 'live' : 'done'} size={s.live ? 6 : 5} />)}
       {nums}
+      {tail}
 
       {leader}
       {segs.map(([a, b]) => (
@@ -222,14 +268,13 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
           <tspan style={{ fill: doneN > 0 ? INK.fg : INK.muted }}>{doneN}</tspan>/{totalN}
         </T>
       )}
-      {idleText && <T x={width} y={BOX_Y + 13} anchor="end" color={INK.faint}>{idleText}</T>}
-      {box}
+      {note}
     </g>
   );
 }
 
-/** How tall the drawing is: the callout box adds a row. */
-const heightFor = (plan, now) => (planTimeline(plan, now).slowest ? BOX_Y + 36 : RULER_Y + 22);
+/** How tall the drawing is: the slowest note adds a row. */
+const heightFor = (plan, now) => (planTimeline(plan, now).slowest ? NOTE_Y + 10 : RULER_Y + 22);
 
 /**
  * The plan's timeline, laid out at its container's width. With no timed
@@ -252,16 +297,22 @@ export function Fig20Timeline({ plan, fallback, showCount = true, paper = 'var(-
     return () => ro.disconnect();
   }, []);
 
+  // The measured box renders even while the fallback shows, so the width is
+  // known by the time the first chunk has a time to draw.
   const t = planTimeline(plan, now);
-  if (figures === 'compact' || !t.spans.length || !(t.work > 0)) return fallback;
+  if (figures === 'compact' || !t.spans.length || !(t.work > 0)) {
+    return <div ref={rootRef} className="min-w-0">{fallback}</div>;
+  }
 
   const width = Math.max(MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 320)));
   const height = heightFor(plan, now);
   const label = [
-    `${t.kind} ${formatDuration(t.total)}`,
+    `${KIND_LABEL[t.kind] ?? t.kind} ${formatDuration(t.total)}`,
     `${t.spans.length} chunk${t.spans.length === 1 ? '' : 's'} worked ${formatDuration(t.work)}`,
     t.idle != null && `idle ${formatDuration(t.idle)}`,
     t.slowest && `slowest chunk ${t.slowest.n}, ${formatDuration(t.slowest.dur)}`,
+    t.stuck && `chunk ${t.stuck.n} has no commit yet`,
+    t.left > 0 && `${t.left} left`,
   ].filter(Boolean).join('; ');
 
   return (

@@ -82,6 +82,20 @@ export async function captureBaseShas(cfg) {
   return baseShas;
 }
 
+/**
+ * The uncommitted changes in the plan's repos, as { root, code, path }: the
+ * porcelain XY code, and the path (renames as their new name). What `commitChunk` would commit.
+ */
+export async function uncommittedFiles(plan) {
+  const out = [];
+  for (const repo of planGit(plan).repos) {
+    // Not gitLines: trimming would eat the status column's leading space.
+    const lines = (await git(workPath(repo), ['status', '--porcelain'])).split('\n').filter((l) => l.length > 3);
+    for (const l of lines) out.push({ root: repo.root, code: l.slice(0, 2), path: l.slice(3).split(' -> ').pop().replace(/^"|"$/g, '') });
+  }
+  return out;
+}
+
 /** Commit everything in each repo with changes as this chunk. */
 export async function commitChunk(plan, chunk) {
   for (const repo of planGit(plan).repos) {

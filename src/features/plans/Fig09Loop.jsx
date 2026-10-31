@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
-import { DASH, Figure, INK, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { DASH, Figure, INK, Node, STROKE, T } from '@/components/instrument/figure';
 import { getAgentHookState, subscribeAgentHooks } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON, UNTITLED_PLAN } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON } from './planModel';
 import { chunkTrailer } from './planPrompts';
 
 // FIG.09: the auto-pilot loop. Four stations on a circle, clockwise from the
@@ -15,10 +15,11 @@ const CHECK = 1;
 const NUDGE = 2;
 const NEXT = 3;
 
-const W = 400;
-const H = 172;
+// CX leaves room for "fresh context" left of NEXT; W for the trailer right of CHECK.
+const W = 420;
+const H = 168;
 const R = 44;
-const CX = 146;
+const CX = 160;
 const CY = 98;
 // Screen angles (y down), so clockwise is increasing.
 const ANGLE = [-90, 0, 90, 180];
@@ -84,7 +85,7 @@ function Cross({ x, y, s = 5 }) {
 }
 
 /** The loop drawn for a live run; `fallback` is what compact mode or a narrow pane shows. */
-export function Fig09Loop({ plan, pos, elapsed, runLine, fallback }) {
+export function Fig09Loop({ plan, pos, elapsed, fallback }) {
   const ap = plan.autopilot;
   const chunk = pos?.chunk;
   const agent = useTabAgentState(ap.tabId);
@@ -101,10 +102,6 @@ export function Fig09Loop({ plan, pos, elapsed, runLine, fallback }) {
     ? 'fresh context'
     : pos && pos.index < pos.total ? `chunk ${pos.index + 1}` : 'finish';
   const trailer = chunk ? chunkTrailer(plan, chunk) : 'Plan-Chunk: <plan>/<chunk>';
-
-  const head = 'AUTO-PILOT · ';
-  const room = Math.floor((W - textWidth('FIG.09', 0.5) - 8) / (textWidth('x', 0.5))) - head.length;
-  const title = `${head}${clip((plan.title || UNTITLED_PLAN).toUpperCase(), room)}`;
 
   // Arcs: walked ones in ink; the nudge detour dashed when it was skipped.
   const arcColor = (i) => (ink(i) && ink((i + 1) % 4) && i !== NEXT ? INK.fg : INK.faint);
@@ -136,16 +133,16 @@ export function Fig09Loop({ plan, pos, elapsed, runLine, fallback }) {
   ].filter(Boolean).join(', ');
 
   return (
-    <Figure fig="autopilot" title={title} viewBox={`0 0 ${W} ${H}`} minWidth={330} fallback={fallback} label={label} paper="var(--ins-well)">
+    <Figure fig="autopilot" title="AUTO-PILOT LOOP" viewBox={`0 0 ${W} ${H}`} minWidth={340} fallback={fallback} label={label} paper="var(--ins-well)">
       <circle cx={CX} cy={CY} r={R} style={{ fill: 'none', stroke: INK.edge, strokeWidth: STROKE.hair }} />
       {[IMPLEMENT, CHECK, NUDGE, NEXT].map((i) => (
         <Arc key={i} from={i} color={arcColor(i)} dash={arcDash(i)} width={arcColor(i) === INK.fg ? STROKE.ink : STROKE.hair} />
       ))}
       {stations}
 
-      {/* Centre: where in the plan. */}
+      {/* Centre: where in the plan. The strip's headline says "chunk", so the ring needn't. */}
       <T x={CX} y={CY + (elapsed ? -1 : 4)} anchor="middle" color={INK.fg}>
-        {pos ? `chunk ${pos.index}/${pos.total}` : 'starting'}
+        {pos ? `${pos.index}/${pos.total}` : 'starting'}
       </T>
       {elapsed && <T x={CX} y={CY + 13} anchor="middle">{elapsed}</T>}
 
@@ -165,7 +162,6 @@ export function Fig09Loop({ plan, pos, elapsed, runLine, fallback }) {
       <T x={lx - 12} y={ly - 3} anchor="end" color={nameColor(NEXT)}>NEXT</T>
       <T x={lx - 12} y={ly + 11} anchor="end">{nextLabel}</T>
 
-      {runLine && <T x={W} y={H - 4} anchor="end" color={INK.faint}>{runLine}</T>}
     </Figure>
   );
 }
