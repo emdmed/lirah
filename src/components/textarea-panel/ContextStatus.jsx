@@ -12,6 +12,7 @@ import { PaneLegend } from "../instrument/PaneLegend";
 import { KeyChord } from "../instrument/Keycap";
 import { Lamp } from "../instrument/Lamp";
 import { FrameHints } from "../instrument/FrameHints";
+import { Fig32FilesByIntent } from "./Fig32FilesByIntent";
 
 const NO_REPOS = [];
 const NO_PATTERN_FILES = [];
@@ -170,7 +171,11 @@ export const ContextStatus = memo(function ContextStatus({
     rows.push(
       <ManifestRow key="files" label="files">
         {filesPaneOpen && fileCount > FILE_NAME_LIMIT ? (
-          <FileTally selectedFiles={selectedFiles} fileStates={fileStates} />
+          <Fig32FilesByIntent
+            selectedFiles={selectedFiles}
+            fileStates={fileStates}
+            fallback={<FileTally selectedFiles={selectedFiles} fileStates={fileStates} />}
+          />
         ) : (
           <ContextChips {...chipProps} selectedFiles={selectedFiles} selectedElements={NO_ELEMENTS} />
         )}
@@ -358,8 +363,8 @@ function ManifestRow({ label, children }) {
   );
 }
 
-// Files as a tally by intent, once there are too many to list and the files
-// pane shows them: `12 files: 8 EDIT · 3 READ · 1 COPY · listed in the files pane`,
+// FIG.32's fallback: files as a tally by intent, once there are too many to
+// list and the files pane shows them: `12 files: 8 EDIT · 3 READ · 1 COPY · listed in the files pane`,
 // or `19 files, all EDIT · listed in the files pane` when they share one intent.
 // Plain text: only chips are boxed, because only chips respond.
 function FileTally({ selectedFiles, fileStates }) {

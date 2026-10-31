@@ -26,6 +26,7 @@ import { Meter } from '../components/instrument/Meter';
 import { Fig23Sources } from '../features/token-budget/Fig23Sources';
 import { Fig24PromptCost } from '../features/token-budget/Fig24PromptCost';
 import { Fig29Spend } from '../features/token-budget/Fig29Spend';
+import { Fig32FilesByIntent } from '../components/textarea-panel/Fig32FilesByIntent';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -479,6 +480,24 @@ const SPEND_MANY = [
   { name: 'Opus 4.1', cost: 0.42, tokens: 80_000 },
   { name: 'Sonnet 4', cost: 0.18, tokens: 61_000 },
 ];
+const intentFiles = (edit, read, copy) => {
+  const files = new Set();
+  const states = new Map();
+  const add = (n, state, tag) => {
+    for (let i = 0; i < n; i++) {
+      const p = `${ROOT}/src/${tag}${i}.jsx`;
+      files.add(p);
+      if (state) states.set(p, state);
+    }
+  };
+  add(edit, null, 'e');
+  add(read, 'do-not-modify', 'r');
+  add(copy, 'use-as-example', 'c');
+  return { selectedFiles: files, fileStates: states };
+};
+const FILES_12 = intentFiles(8, 3, 1);
+const FILES_30 = intentFiles(19, 9, 2);
+const FILES_ALL = intentFiles(7, 0, 0);
 const FIGS_A = [
   { n: 'P1', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" label="Context" /></div> },
   { n: 'P1w', w: 420, el: () => <div className="px-1"><Meter value={176_000} max={200_000} size="lg" label="Context" /></div> },
@@ -489,5 +508,8 @@ const FIGS_A = [
   { n: '24n', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS.slice(0, 1).concat(PROMPT_PARTS.slice(3))} total={680} cost={0.01} budget={null} fallback={fb('~680 tok')} /> },
   { n: 29, w: 560, el: () => <Fig29Spend models={SPEND} scope="nevo-terminal" fallback={fb('$55.10 by model')} /> },
   { n: '29m', w: 560, el: () => <Fig29Spend models={SPEND_MANY} scope="nevo-terminal" fallback={fb('$55.70 by model')} /> },
+  { n: 32, w: 420, el: () => <Fig32FilesByIntent {...FILES_12} fallback={fb('12 files: 8 EDIT · 3 READ · 1 COPY')} /> },
+  { n: '32l', w: 420, el: () => <Fig32FilesByIntent {...FILES_30} fallback={fb('30 files: 19 EDIT · 9 READ · 2 COPY')} /> },
+  { n: '32a', w: 420, el: () => <Fig32FilesByIntent {...FILES_ALL} fallback={fb('7 files, all EDIT')} /> },
   { n: 'P1s', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" printed={false} label="Context" /></div> },
 ];
