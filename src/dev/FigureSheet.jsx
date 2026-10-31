@@ -15,6 +15,7 @@ import { Fig14Budget } from '../features/token-budget/Fig14Budget';
 import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
 import { Fig19Detail } from '../features/file-analysis/Fig19Detail';
 import { boundKeysFor } from '../lib/shortcuts';
+import { ProgressReadout } from '../features/plans/parts';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -257,6 +258,31 @@ export function FigureSheet() {
       <div className="flex flex-wrap items-start gap-3">
         {FIGS.map((f) => <Card key={f.n} fig={f} width={NARROW} />)}
       </div>
+
+      <div className="mb-2 mt-6 ins-legend">Round 3 · lane C</div>
+      <div className="flex flex-wrap items-start gap-3">
+        {LANE_C.map((f) => <Card key={f.n} fig={f} width={f.w} />)}
+      </div>
     </div>
   );
 }
+
+// round 3 · lane C
+const progress = (plan) => {
+  const active = plan.chunks.filter((c) => c.status !== 'skipped');
+  return { done: active.filter((c) => c.status === 'implemented').length, total: active.length };
+};
+const PLAN_LONG = {
+  ...PLAN,
+  chunks: Array.from({ length: 40 }, (_, i) => ({ id: `l${i}`, n: i + 1, status: i < 23 ? 'implemented' : i === 23 ? 'in-progress' : 'pending' })),
+};
+const PLAN_PAUSED = { ...PLAN, autopilot: { ...PLAN.autopilot, status: 'paused', chunkId: LIVE.id } };
+const P4 = (plan, paper) => () => <ProgressReadout plan={plan} {...progress(plan)} paper={paper} />;
+const LANE_C = [
+  { n: 'P4 running', w: 300, el: P4(PLAN) },
+  { n: 'P4 needs you', w: 300, el: P4(PLAN_STUCK) },
+  { n: 'P4 paused', w: 300, paper: 'var(--ins-well)', el: P4(PLAN_PAUSED, 'var(--ins-well)') },
+  { n: 'P4 done', w: 300, el: P4(PLAN_DONE) },
+  { n: 'P4 40 chunks', w: 300, el: P4(PLAN_LONG) },
+  { n: 'P4 narrow', w: 120, el: P4(PLAN_LONG) },
+];

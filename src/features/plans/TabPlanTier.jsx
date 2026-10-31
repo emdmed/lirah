@@ -84,7 +84,7 @@ export function TabPlanTier({ plan, onOpen }) {
         <Fig16Chunks
           plan={plan}
           label={`${done} of ${total} chunks implemented`}
-          fallback={<ProgressReadout plan={plan} done={done} total={total} />}
+          fallback={<ProgressReadout plan={plan} done={done} total={total} paper="var(--ins-well)" />}
         />
       )}
       {now && <span className="min-w-0 truncate text-muted-foreground">{now}</span>}
