@@ -24,6 +24,7 @@ import { Span, SpanRuler, SpanScale } from '../components/instrument/Span';
 import { Fig26Isolation } from '../features/agent-jobs/Fig26Isolation';
 import { Meter } from '../components/instrument/Meter';
 import { Fig23Sources } from '../features/token-budget/Fig23Sources';
+import { Fig24PromptCost } from '../features/token-budget/Fig24PromptCost';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -452,10 +453,28 @@ const BREAKDOWN_SMALL = {
   groups: [{ group: 'unlogged', tokens: 9_800 }, { group: 'prompts', tokens: 1_900 }, { group: 'replies', tokens: 700 }],
   items: [{ group: 'prompts', kind: 'Prompt', label: '', tokens: 1_200 }],
 };
+const PROMPT_PARTS = [
+  { id: 'typed', name: 'your prompt', tokens: 180 },
+  { id: 'files', name: 'files', detail: '4', tokens: 1_920 },
+  { id: 'template', name: 'template', detail: 'bugfix', tokens: 140 },
+  { id: 'system', name: 'agent system', tokens: 500 },
+];
+const PROMPT_MANY = [
+  { id: 'typed', name: 'your prompt', tokens: 620 },
+  { id: 'repos', name: 'linked repos', detail: '2', tokens: 90 },
+  { id: 'files', name: 'files', detail: '12', tokens: 4_300 },
+  { id: 'elements', name: 'elements', detail: '3', tokens: 760 },
+  { id: 'template', name: 'template', detail: 'refactor', tokens: 210 },
+  { id: 'patterns', name: 'patterns', detail: '2', tokens: 340 },
+  { id: 'system', name: 'agent system', tokens: 500 },
+];
 const FIGS_A = [
   { n: 'P1', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" label="Context" /></div> },
   { n: 'P1w', w: 420, el: () => <div className="px-1"><Meter value={176_000} max={200_000} size="lg" label="Context" /></div> },
   { n: 23, w: 288, paper: 'var(--ins-raised)', el: () => <Fig23Sources breakdown={BREAKDOWN} fallback={fb('sources: 5 rows')} /> },
   { n: '23s', w: 288, paper: 'var(--ins-raised)', el: () => <Fig23Sources breakdown={BREAKDOWN_SMALL} fallback={fb('sources: 3 rows')} /> },
+  { n: 24, w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS} total={2_740} cost={0.04} budget={{ limit: 150_000, used: 88_400 }} fallback={fb('~2,740 tok')} /> },
+  { n: '24m', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_MANY} total={6_820} cost={0.1} budget={{ limit: 150_000, used: 146_000 }} fallback={fb('~6,820 tok')} /> },
+  { n: '24n', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS.slice(0, 1).concat(PROMPT_PARTS.slice(3))} total={680} cost={0.01} budget={null} fallback={fb('~680 tok')} /> },
   { n: 'P1s', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" printed={false} label="Context" /></div> },
 ];

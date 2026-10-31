@@ -3,6 +3,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { useTokenBudget } from './TokenBudgetContext';
 import { estimatePromptCost, DEFAULT_MODEL } from '../../config/pricing';
 import { CHARS_PER_TOKEN, toTokens } from './estimateTokens';
+import { Fig24PromptCost } from './Fig24PromptCost';
 
 // What the agent's own system prompt adds to any turn.
 const SYSTEM_OVERHEAD = 500;
@@ -27,6 +28,7 @@ export function TokenCostEstimate({ promptBase, textareaContent, projectPath }) 
     id: s.id,
     label: s.label,
     tokens: toTokens(s.body.length),
+    count: s.count,
   })), [promptBase]);
 
   const baseChars = promptBase?.text?.length ?? 0;
@@ -68,23 +70,48 @@ export function TokenCostEstimate({ promptBase, textareaContent, projectPath }) 
           </span>
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top" className="text-xs font-mono">
-        <div className="space-y-1">
-          {textChars > 0 && <div>Your prompt: ~{toTokens(textChars).toLocaleString()}</div>}
-          {breakdown.map((s) => (
-            <div key={s.id}>{s.label.toLowerCase()}: ~{s.tokens.toLocaleString()}</div>
-          ))}
-          <div>Agent system prompt: ~{SYSTEM_OVERHEAD}</div>
-          <div className="text-muted-foreground font-sans">
-            Measured on the payload ({payloadChars.toLocaleString()} chars ÷ {CHARS_PER_TOKEN}). File contents the agent reads are not included.
-          </div>
-          {budget?.dailyLimit && (
-            <div className="pt-1 border-t border-border mt-1">
-              Remaining: {Math.max(0, budget.dailyLimit - currentUsage.total).toLocaleString()} tokens
+      <TooltipContent side="top" className="w-[396px] max-w-none py-2 text-xs font-mono">
+        {/* Figures: FIG.24 draws the payload as a dimension chain; the
+            per-section lines are its fallback. */}
+        <Fig24PromptCost
+          parts={figParts(textChars, breakdown)}
+          total={estimate}
+          cost={cost}
+          budget={budget?.dailyLimit ? { limit: budget.dailyLimit, used: currentUsage.total } : null}
+          fallback={(
+            <div className="space-y-1">
+              {textChars > 0 && <div>Your prompt: ~{toTokens(textChars).toLocaleString()}</div>}
+              {breakdown.map((s) => (
+                <div key={s.id}>{s.label.toLowerCase()}: ~{s.tokens.toLocaleString()}</div>
+              ))}
+              <div>Agent system prompt: ~{SYSTEM_OVERHEAD}</div>
+              <div className="text-muted-foreground font-sans">
+                Measured on the payload ({payloadChars.toLocaleString()} chars ÷ {CHARS_PER_TOKEN}). File contents the agent reads are not included.
+              </div>
+              {budget?.dailyLimit && (
+                <div className="pt-1 border-t border-border mt-1">
+                  Remaining: {Math.max(0, budget.dailyLimit - currentUsage.total).toLocaleString()} tokens
+                </div>
+              )}
             </div>
           )}
-        </div>
+        />
       </TooltipContent>
     </Tooltip>
   );
+}
+
+// FIG.24's parts in payload order: the typed prompt, each section (the
+// count or template title as detail), the agent's system prompt last.
+function figParts(textChars, breakdown) {
+  const parts = [];
+  if (textChars > 0) parts.push({ id: 'typed', name: 'your prompt', tokens: toTokens(textChars) });
+  for (const s of breakdown) {
+    const [head, ...rest] = s.label.split(' · ');
+    const title = rest.join(' · ');
+    const detail = title ? (title.length > 10 ? `${title.slice(0, 9)}…` : title) : s.count > 0 ? String(s.count) : undefined;
+    parts.push({ id: s.id, name: head.toLowerCase(), detail: detail?.toLowerCase(), tokens: s.tokens });
+  }
+  parts.push({ id: 'system', name: 'agent system', tokens: SYSTEM_OVERHEAD });
+  return parts;
 }
