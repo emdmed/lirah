@@ -1,5 +1,6 @@
 import { Fragment, useEffect } from 'react';
 import { compactCount, DiffBar } from '../components/instrument/DiffBar';
+import { Fig25DiffMap } from '../features/git/Fig25DiffMap';
 import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
 import { Fig06Context } from '../components/Fig06Context';
@@ -334,6 +335,30 @@ const DIFF_ROWS = [
   { host: 'auto commit', added: 1_204, removed: 388, side: 64 },
 ];
 
+// TabRow.jsx: 412 rows, four changes, one note, rows 100–160 on screen.
+const MAP = {
+  totalLines: 412,
+  chunks: [
+    { start: 33, end: 40, added: 6, removed: 2, from: 34, to: 41 },
+    { start: 117, end: 130, added: 11, removed: 0, from: 118, to: 131 },
+    { start: 259, end: 265, added: 0, removed: 4, from: 260, to: 266 },
+    { start: 339, end: 351, added: 9, removed: 3, from: 340, to: 352 },
+  ],
+  folds: [{ start: 0, end: 29 }, { start: 44, end: 113 }, { start: 134, end: 255 }, { start: 269, end: 335 }, { start: 355, end: 411 }],
+  view: { start: 100, end: 160 },
+  notes: [{ id: 'n1', row: 119, from: 120, to: 128, note: 'keep caret on rename' }],
+};
+// 40 small changes: labels for the largest, the rest counted.
+const MAP_BUSY = {
+  totalLines: 1800,
+  chunks: Array.from({ length: 40 }, (_, i) => ({
+    start: i * 44 + 10, end: i * 44 + 12 + (i % 5), added: 1 + ((i * 7) % 23), removed: (i * 3) % 5, from: i * 44 + 11, to: i * 44 + 13 + (i % 5),
+  })),
+  folds: [],
+  view: { start: 900, end: 940 },
+  notes: [{ id: 'n2', row: 400, from: 401, to: 401, note: 'this branch never runs on Windows, drop it' }],
+};
+
 function LaneBCard({ title, width, children }) {
   return (
     <div className="border border-[var(--ins-edge,#888)] p-3" style={{ width: width + 26, background: 'var(--ins-panel)' }}>
@@ -357,6 +382,15 @@ function LaneB() {
               </Fragment>
             ))}
           </div>
+        </LaneBCard>
+        <LaneBCard title="FIG 25 diff map" width={220}>
+          <Fig25DiffMap {...MAP} onJump={() => {}} onRemoveNote={() => {}} />
+        </LaneBCard>
+        <LaneBCard title="FIG 25 busy" width={220}>
+          <Fig25DiffMap {...MAP_BUSY} height={260} onJump={() => {}} onRemoveNote={() => {}} />
+        </LaneBCard>
+        <LaneBCard title="FIG 25 narrow host" width={26}>
+          <Fig25DiffMap {...MAP} marksOnly />
         </LaneBCard>
       </div>
     </>

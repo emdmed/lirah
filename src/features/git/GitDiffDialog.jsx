@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Pin, PinOff, MessageSquarePlus, Send, Trash2
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
+import { useFigureCompact } from '../../components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 
@@ -43,6 +44,7 @@ export function GitDiffDialog({
   onSendAnnotations,
   sendingAnnotations = false,
 }) {
+  const compactFigures = useFigureCompact();
   const [diffResult, setDiffResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -290,14 +292,18 @@ export function GitDiffDialog({
             isDeletedFile={diffResult.is_deleted_file}
             scrollContainerRef={scrollContainerRef}
             onSelectionChange={annotationsEnabled ? handleSelectionChange : undefined}
+            notes={fileNotes}
+            onRemoveNote={onRemoveAnnotation}
           />
         ) : null}
       </div>
 
-      {/* Review notes: pin feedback to lines, then send it all back to the agent */}
+      {/* Review notes: pin feedback to lines, then send it all back to the
+          agent. In full figures the notes hang off their lines on the diff
+          map (FIG 25); compact keeps the list. */}
       {annotationsEnabled && (
         <div className="flex-shrink-0 edge-t-engraved">
-          {fileNotes.length > 0 && (
+          {fileNotes.length > 0 && compactFigures && (
             <div className="max-h-28 overflow-y-auto px-3 pt-2">
               {fileNotes.map((n) => (
                 <div key={n.id} className="flex items-start gap-2 py-0.5 text-xs">

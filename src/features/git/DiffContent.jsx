@@ -2,8 +2,11 @@ import React, { useMemo, useState, useEffect, useRef, memo, useCallback } from '
 import { diffLines, diffWords } from 'diff';
 import { ChevronDown, Copy, Check } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { useFigureCompact } from '../../components/instrument/figure';
+import { Fig25DiffMap, MAP_COMPACT_W, MAP_W } from './Fig25DiffMap';
 
 const LINE_HEIGHT = 24;
+const MAP_WIDE_HOST = 900; // narrower diffs get the map's marks only
 const CONTEXT_LINES = 3; // Lines of context to show around changes
 const VIRTUALIZATION_BUFFER = 10; // Extra lines to render above/below viewport
 
@@ -55,7 +58,12 @@ export function DiffContent({
   // its text — the anchor a review note is pinned to. Null when nothing is
   // selected. Must be stable (useCallback) to avoid a render loop.
   onSelectionChange,
+  // Review notes on this file ({ id, fromLine, toLine, note }), drawn on the
+  // diff map; onRemoveNote(id) drops one from there.
+  notes,
+  onRemoveNote,
 }) {
+  const compact = useFigureCompact();
   const [collapsedRegions, setCollapsedRegions] = useState(new Set());
   const [selectedLines, setSelectedLines] = useState(new Set());
   const [selectionAnchor, setSelectionAnchor] = useState(null);
@@ -468,6 +476,67 @@ export function DiffContent({
     }
   }, [diffChunks, oldLines, newLines]);
 
+  // FIG 25 data: each change's size and file line range, the folds that are
+  // collapsed, the rows on screen and the notes' rows.
+  const mapChunks = useMemo(() => diffChunks.map((c) => {
+    let added = 0;
+    let removed = 0;
+    const nums = [];
+    const oldNums = [];
+    for (let i = c.start; i <= c.end; i++) {
+      const n = newLines[i];
+      const o = oldLines[i];
+      if (n?.type === 'added' || n?.type === 'modified-new') added++;
+      if (o?.type === 'removed' || o?.type === 'modified-old') removed++;
+      if (n && n.type !== 'empty' && n.lineNum) nums.push(n.lineNum);
+      if (o && o.type !== 'empty' && o.lineNum) oldNums.push(o.lineNum);
+    }
+    const side = nums.length ? nums : oldNums;
+    return { ...c, added, removed, from: side[0] ?? c.start + 1, to: side[side.length - 1] ?? c.end + 1 };
+  }), [diffChunks, oldLines, newLines]);
+
+  const mapFolds = useMemo(
+    () => collapsibleRegions.filter((r) => collapsedRegions.has(r.id)),
+    [collapsibleRegions, collapsedRegions],
+  );
+
+  const mapNotes = useMemo(() => {
+    if (!notes?.length) return [];
+    const rowOf = (lines, num) => lines.findIndex((l) => l && l.type !== 'empty' && l.lineNum === num);
+    return notes.map((n) => {
+      let row = rowOf(newLines, n.fromLine);
+      if (row < 0) row = rowOf(oldLines, n.fromLine);
+      return row < 0 ? null : { id: n.id, row, from: n.fromLine, to: n.toLine, note: n.note };
+    }).filter(Boolean);
+  }, [notes, oldLines, newLines]);
+
+  // visibleRange counts rendered rows (a fold is one row); the map needs
+  // file rows.
+  const mapView = useMemo(() => {
+    if (visibleLines.length === 0) return null;
+    const first = visibleLines[Math.min(visibleRange.start, visibleLines.length - 1)];
+    const last = visibleLines[Math.min(Math.max(visibleRange.end - 1, 0), visibleLines.length - 1)];
+    const end = last.type === 'collapsed' ? last.lineIndex + last.hiddenCount : last.lineIndex + 1;
+    return { start: first.lineIndex, end };
+  }, [visibleLines, visibleRange]);
+
+  const jumpToRow = useCallback((row) => {
+    let k = 0;
+    while (k + 1 < visibleLines.length && visibleLines[k + 1].lineIndex <= row) k++;
+    container?.scrollTo({ top: k * LINE_HEIGHT, behavior: 'smooth' });
+  }, [visibleLines, container]);
+
+  // The full map needs a wide host; a narrow one gets its marks only.
+  const rootRef = useRef(null);
+  const [wide, setWide] = useState(true);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= MAP_WIDE_HOST));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   if (!oldContent && !newContent) {
     return (
       <div className="p-4 text-center text-muted-foreground">
@@ -484,19 +553,25 @@ export function DiffContent({
   const offsetY = startIdx * LINE_HEIGHT;
 
   return (
-    <div className="flex font-mono text-sm relative">
-      {/* Minimap */}
-      <DiffMinimap
-        diffChunks={diffChunks}
-        totalLines={maxLines}
-        visibleRange={visibleRange}
-        onClickPosition={(lineIndex) => {
-          container?.scrollTo({
-            top: lineIndex * LINE_HEIGHT,
-            behavior: 'smooth'
-          });
-        }}
-      />
+    <div ref={rootRef} className="flex font-mono text-sm relative">
+      {/* FIG 25: the diff map, a line ruler with every change on it. */}
+      {mapChunks.length > 0 && (
+        <div
+          className="flex-shrink-0 self-start border-r edge-engraved px-2 pb-2"
+          style={{ position: 'sticky', top: 28, width: (wide && !compact ? MAP_W : MAP_COMPACT_W) + 16 }}
+        >
+          <Fig25DiffMap
+            totalLines={maxLines}
+            chunks={mapChunks}
+            folds={mapFolds}
+            view={mapView}
+            notes={mapNotes}
+            onJump={jumpToRow}
+            onRemoveNote={onRemoveNote}
+            marksOnly={!wide}
+          />
+        </div>
+      )}
 
       {/* Old file (left side) */}
       <div className="flex-1 border-r edge-engraved overflow-x-auto">
@@ -597,49 +672,6 @@ export function DiffContent({
 }
 
 /**
- * Minimap showing diff chunk positions
- */
-const DiffMinimap = memo(function DiffMinimap({ diffChunks, totalLines, visibleRange, onClickPosition }) {
-  const minimapHeight = 200;
-  const lineToY = (line) => (line / totalLines) * minimapHeight;
-
-  return (
-    <div
-      className="w-3 flex-shrink-0 bg-muted/20 border-r edge-engraved relative cursor-pointer"
-      style={{ height: `${minimapHeight}px`, position: 'sticky', top: '28px' }}
-      onClick={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const lineIndex = Math.floor((y / minimapHeight) * totalLines);
-        onClickPosition(lineIndex);
-      }}
-    >
-      {/* Viewport indicator */}
-      <div
-        className="absolute left-0 right-0 bg-foreground/10 border-y border-foreground/20"
-        style={{
-          top: `${lineToY(visibleRange.start)}px`,
-          height: `${Math.max(4, lineToY(visibleRange.end) - lineToY(visibleRange.start))}px`,
-        }}
-      />
-
-      {/* Diff chunk markers */}
-      {diffChunks.map((chunk, i) => (
-        <div
-          key={i}
-          className="absolute left-0.5 right-0.5 rounded-sm"
-          style={{
-            top: `${lineToY(chunk.start)}px`,
-            height: `${Math.max(2, lineToY(chunk.end + 1) - lineToY(chunk.start))}px`,
-            backgroundColor: 'rgba(152, 187, 108, 0.6)',
-          }}
-        />
-      ))}
-    </div>
-  );
-});
-
-/**
  * Collapsed region placeholder
  */
 const CollapsedRegionPlaceholder = memo(function CollapsedRegionPlaceholder({ hiddenCount, onExpand }) {
@@ -678,27 +710,27 @@ const DiffLine = memo(function DiffLine({
   let gutterColor = '';
 
   if (type === 'added') {
-    bgColor = 'rgba(152, 187, 108, 0.15)';
+    bgColor = 'color-mix(in srgb, var(--ins-ok) 15%, transparent)';
     gutterSymbol = '+';
     gutterColor = 'text-git-added';
   } else if (type === 'removed') {
-    bgColor = 'rgba(195, 64, 67, 0.15)';
+    bgColor = 'color-mix(in srgb, var(--ins-fault) 15%, transparent)';
     gutterSymbol = '-';
     gutterColor = 'text-git-deleted';
   } else if (type === 'modified-old') {
-    bgColor = 'rgba(195, 64, 67, 0.15)';
+    bgColor = 'color-mix(in srgb, var(--ins-fault) 15%, transparent)';
     gutterSymbol = '~';
     gutterColor = 'text-git-deleted';
   } else if (type === 'modified-new') {
-    bgColor = 'rgba(152, 187, 108, 0.15)';
+    bgColor = 'color-mix(in srgb, var(--ins-ok) 15%, transparent)';
     gutterSymbol = '~';
     gutterColor = 'text-git-added';
   } else if (type === 'empty') {
-    bgColor = 'rgba(128, 128, 128, 0.05)';
+    bgColor = 'color-mix(in srgb, var(--ins-faint) 8%, transparent)';
   }
 
   if (isSelected) {
-    bgColor = 'rgba(126, 156, 216, 0.25)';
+    bgColor = 'color-mix(in srgb, var(--color-status-info) 25%, transparent)';
   }
 
   // `wordDiff` is the modified line's pair, shared with the other side.
@@ -722,8 +754,8 @@ const DiffLine = memo(function DiffLine({
               className={part.highlight ? 'rounded-sm' : ''}
               style={part.highlight ? {
                 backgroundColor: type === 'modified-old'
-                  ? 'rgba(195, 64, 67, 0.3)'
-                  : 'rgba(152, 187, 108, 0.3)'
+                  ? 'color-mix(in srgb, var(--ins-fault) 30%, transparent)'
+                  : 'color-mix(in srgb, var(--ins-ok) 30%, transparent)'
               } : undefined}
             >
               {part.text}
