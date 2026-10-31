@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Pin, PinOff, MessageSquarePlus, Send, Trash2
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
+import { Position } from '../../components/instrument/Position';
 import { useFigureCompact } from '../../components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
@@ -177,7 +178,7 @@ export function GitDiffDialog({
         <DiffBar added={diffResult.added_lines} removed={diffResult.deleted_lines} side={64} />
       )}
       {hasMultipleFiles && (
-        <span className="tabular-nums">{currentFileIndex + 1}/{changedFiles.length}</span>
+        <Position index={currentFileIndex} count={changedFiles.length} />
       )}
     </>
   );

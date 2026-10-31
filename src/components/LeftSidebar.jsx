@@ -6,6 +6,7 @@ import { useFileSelection } from "../features/file-groups";
 import { usePinnedFiles } from "../features/pinned-files";
 import { useMemo, useCallback, memo } from "react";
 import { Scanner } from "./instrument/Scanner";
+import { Position } from "./instrument/Position";
 import { PaneLegend } from "./instrument/PaneLegend";
 import { useRowCursor } from "../hooks/useRowCursor";
 import {
@@ -77,7 +78,7 @@ export const LeftSidebar = memo(function LeftSidebar({
         <PaneLegend
           index={1}
           title="Files"
-          status={cursorIndex != null ? `${cursorIndex + 1}/${rowCount}` : rowCount}
+          status={cursorIndex != null && rowCount > 0 ? <Position index={cursorIndex} count={rowCount} width={48} /> : rowCount}
         />
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader

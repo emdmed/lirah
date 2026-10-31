@@ -7,6 +7,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/too
 import { ChevronLeft, ChevronRight, Pin, PinOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
+import { Position } from '../../components/instrument/Position';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 import './markdown.css';
@@ -112,7 +113,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent
       size="full"
-      status={hasMultipleFiles ? <span className="tabular-nums">{currentFileIndex + 1}/{markdownFiles.length}</span> : null}
+      status={hasMultipleFiles ? <Position index={currentFileIndex} count={markdownFiles.length} /> : null}
       hints={hints}
       className="flex flex-col gap-0 px-0"
       onOpenAutoFocus={(e) => {

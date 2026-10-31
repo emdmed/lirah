@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { CaseSensitive, Regex } from 'lucide-react';
 import { FloatPane } from './ui/float-pane';
+import { Position } from './instrument/Position';
 import { shortcutKeys } from '../lib/shortcuts';
 
 const SEARCH_DEBOUNCE_MS = 150;
@@ -102,7 +103,9 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
     <FloatPane
       title="search"
       keys={SEARCH_KEYS}
-      status={counter ? (
+      status={!invalid && results.count > 0 && results.index >= 0 ? (
+        <Position index={results.index} count={results.count} width={72} />
+      ) : counter ? (
         <span className={invalid || (query && !results.count) ? 'text-[var(--ins-fault)]' : undefined}>{counter}</span>
       ) : undefined}
       hints={HINTS}

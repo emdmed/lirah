@@ -2,6 +2,7 @@ import { Fragment, useEffect } from 'react';
 import { compactCount, DiffBar } from '../components/instrument/DiffBar';
 import { Fig25DiffMap } from '../features/git/Fig25DiffMap';
 import { Fig31Subject } from '../features/git/Fig31Subject';
+import { Position } from '../components/instrument/Position';
 import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
 import { Fig06Context } from '../components/Fig06Context';
@@ -360,6 +361,15 @@ const MAP_BUSY = {
   notes: [{ id: 'n2', row: 400, from: 401, to: 401, note: 'this branch never runs on Windows, drop it' }],
 };
 
+const POSITIONS = [
+  { host: 'diff · files', index: 2, count: 7 },
+  { host: 'race · files', index: 0, count: 2 },
+  { host: 'markdown', index: 8, count: 12 },
+  { host: 'markdown · 24', index: 23, count: 24 },
+  { host: 'search', index: 11, count: 140, width: 72 },
+  { host: 'files pane', index: 412, count: 1830, width: 48 },
+];
+
 function LaneBCard({ title, width, children }) {
   return (
     <div className="border border-[var(--ins-edge,#888)] p-3" style={{ width: width + 26, background: 'var(--ins-panel)' }}>
@@ -398,6 +408,16 @@ function LaneB() {
             <Fig31Subject subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} fallback={fb('subject 48/72')} />
             <Fig31Subject subject="fix(terminal): paste plan prompts with bracketed paste and clear the screen on launch" max={72} fallback={fb('subject 84/72')} />
             <Fig31Subject subject="" max={72} fallback={fb('subject 0/72')} />
+          </div>
+        </LaneBCard>
+        <LaneBCard title="P3 position" width={300}>
+          <div className="grid grid-cols-[110px_1fr] items-center gap-y-2">
+            {POSITIONS.map((p) => (
+              <Fragment key={p.host}>
+                <span className="text-muted-foreground">{p.host}</span>
+                <span className="flex"><Position index={p.index} count={p.count} width={p.width} /></span>
+              </Fragment>
+            ))}
           </div>
         </LaneBCard>
         <LaneBCard title="FIG 31 narrow" width={170}>

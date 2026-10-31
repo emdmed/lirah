@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogEmpty } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Scanner } from '../../components/instrument/Scanner';
+import { Position } from '../../components/instrument/Position';
 import { DiffContent } from '../git/DiffContent';
 import { cn } from '../../lib/utils';
 import { Fig12Race, shortLabel } from './Fig12Race';
@@ -116,7 +117,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
     <DialogContent
       size="full"
-      status={files.length > 1 ? <span className="tabular-nums">{fileIndex + 1}/{files.length}</span> : null}
+      status={files.length > 1 ? <Position index={fileIndex} count={files.length} /> : null}
       hints={files.length > 1 ? [{ keys: ['^', '['], label: 'prev file' }, { keys: ['^', ']'], label: 'next file' }] : []}
       className="flex flex-col gap-0 px-0"
     >
