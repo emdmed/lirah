@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Box, DASH, Figure, Glow, Hatch, INK, Leader, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
+import { CalRecipe, Calibrated } from '@/components/instrument/calibrated';
 import { tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 
 // FIG.10: what the sandbox lets this tab's terminal touch, drawn from the
-// live bwrap spec. The dashed line is the sandbox. Inside it, the system root
-// is hatched (read-only); home is clear (writable) with the protected
-// dotfiles as hatched islands; the project folder is ink-framed. Callouts on
-// the right name each region; the last one, outside the boundary, is what
-// the sandbox does not cover. Compact nests the same regions in one strip:
-// the boundary, the hatched root, home with a hatched square per protected
-// dotfile and the ink-framed project, and private /tmp; no names or callouts.
+// live bwrap spec as the calibrated section recipe. The dashed boundary is
+// the sandbox, labelled with network isolation and the unshared namespaces.
+// Inside it the system root is hatched (read-only); home is clear (writable)
+// with the protected dotfiles as closed islands; the project folder is the
+// heavy outline; private /tmp is dotted. Callouts on the right name each
+// region; the last, in lamp, is what the sandbox does not cover. Compact, or
+// narrower than the drawing, shows `fallback`.
 
 /** The bwrap spec for a tab, or null while loading or if the command fails. */
 export function useSandboxSpec(projectDir, noNet) {
@@ -34,61 +34,6 @@ function useActiveTabName() {
   return tab ? tabDisplayName(tab, bookmarks) : null;
 }
 
-const W = 460;
-const BX = 300; // boundary right edge; callouts sit past it
-const CX = 316; // callout column
-const CW = W - CX;
-const ROOT = { x: 10, inset: 14 }; // home sits 14 in from the root
-const PAD = 8;
-const ISLAND_H = 19;
-const MAX_ISLANDS = 6;
-
-const clip = (s, n) => (s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s);
-
-// Text on a hatched or dashed line gets paper behind it so it reads.
-function Plate({ x, y, text, color = INK.fg }) {
-  return (
-    <g>
-      <rect x={x - 3} y={y - 11} width={textWidth(text) + 6} height={15} style={{ fill: INK.paper }} />
-      <T x={x} y={y} color={color}>{text}</T>
-    </g>
-  );
-}
-
-// A protected dotfile: hatched rim, clear middle, its name inside.
-function Island({ x, y, name }) {
-  const w = textWidth(name) + 16;
-  return (
-    <g>
-      <Hatch x={x} y={y} width={w} height={ISLAND_H} gap={3} />
-      <rect x={x + 3} y={y + 3} width={w - 6} height={ISLAND_H - 6} style={{ fill: INK.paper }} />
-      <T x={x + 8} y={y + 13} color={INK.fg}>{name}</T>
-    </g>
-  );
-}
-
-// Islands flowed left to right, wrapping at `right`; past six, a "+k" count.
-function layoutIslands(names, x0, right, y0) {
-  const shown = names.slice(0, MAX_ISLANDS);
-  const extra = names.length - shown.length;
-  const items = [];
-  let x = x0;
-  let y = y0;
-  for (const name of shown) {
-    const w = textWidth(name) + 16;
-    if (x > x0 && x + w > right) { x = x0; y += ISLAND_H + 6; }
-    items.push({ name, x, y });
-    x += w + 6;
-  }
-  let more = null;
-  if (extra > 0) {
-    const text = `+${extra}`;
-    if (x + textWidth(text) > right) { x = x0; y += ISLAND_H + 6; }
-    more = { text, x, y: y + 13 };
-  }
-  return { items, more, bottom: names.length ? y + ISLAND_H : y0 };
-}
-
 /**
  * The sandbox drawn for this tab. `fallback` is what a narrow host or a
  * failed spec call shows. `paper` matches the host surface.
@@ -100,51 +45,96 @@ export function Fig10Sandbox({ projectPath, networkIsolation, ...rest }) {
   return <Fig10Drawing spec={spec} tabName={tabName} {...rest} />;
 }
 
-/** FIG.10 for a given spec (pure: no fetching), so it can be rendered alone. */
-export function Fig10Drawing({ spec, tabName, fallback = null, paper, className }) {
-  const compact = useFigureCompact();
+const W = 460;
+const MAX_ISLANDS = 6;
+const ISLAND_H = 17;
+const ISLAND_GAP = 6;
 
+const tw = (s) => Calibrated.textWidth(s);
+const clip = (s, px) => {
+  if (tw(s) <= px) return s;
+  let t = s;
+  while (t.length > 1 && tw(`${t}…`) > px) t = t.slice(0, -1);
+  return `${t}…`;
+};
+
+// Islands flowed left to right inside [x0, right], wrapping; past six, the
+// rest are one "+k" island (they are protected dotfiles too).
+function layoutIslands(names, x0, right, y0) {
+  const shown = names.slice(0, MAX_ISLANDS);
+  const extra = names.length - shown.length;
+  const labels = extra > 0 ? [...shown, `+${extra}`] : shown;
+  const out = [];
+  let x = x0;
+  let y = y0;
+  for (const label of labels) {
+    const w = tw(label) + 10;
+    if (x > x0 && x + w > right) { x = x0; y += ISLAND_H + ISLAND_GAP; }
+    out.push({ x, y, w, kind: 'island', label });
+    x += w + ISLAND_GAP;
+  }
+  return { islands: out, bottom: labels.length ? y + ISLAND_H : y0 };
+}
+
+/** The section-recipe data for a spec, pure. */
+export function sandboxSection(spec) {
   const [home = null, ...rest] = spec.writable ?? [];
   const project = rest[0] ?? null;
   const tilde = (p) => (home && (p === home || p.startsWith(`${home}/`)) ? `~${p.slice(home.length)}` : p);
   const projectInHome = !!(project && home && project.startsWith(`${home}/`));
   const dotfiles = (spec.protected ?? []).map((p) => tilde(p).replace(/^~\//, ''));
-
-  // Left: boundary ⊃ root ⊃ home ⊃ islands + project, then /tmp in root.
-  const bTop = 24;
-  const rootX = ROOT.x;
-  const rootW = BX - 2 * ROOT.x;
-  const rootTop = bTop + 8;
-  const homeX = rootX + ROOT.inset;
-  const homeW = rootW - 2 * ROOT.inset;
-  const homeTop = rootTop + 22;
-  const islandX = homeX + PAD;
-  const islandRight = homeX + homeW - 16; // keep a clear strip for the writable dot
-  const isl = layoutIslands(dotfiles, islandX, islandRight, homeTop + 20);
-  const projectText = project ? clip(tilde(project), Math.floor((homeW - 2 * PAD - 14) / textWidth('x'))) : '';
-  let y = isl.bottom + PAD;
-  const projectBox = project && projectInHome ? { x: islandX, y, w: homeW - 2 * PAD } : null;
-  if (projectBox) y += ISLAND_H + PAD;
-  const homeBottom = home ? Math.max(y + 2, homeTop + 30) : homeTop;
-  y = homeBottom + PAD;
-  const outsideBox = project && !projectInHome ? { x: homeX, y, w: homeW } : null;
-  if (outsideBox) y += ISLAND_H + PAD;
-  const tmpY = spec.tmp_private ? y : null;
-  if (spec.tmp_private) y += ISLAND_H + PAD;
-  const rootBottom = y + 2;
-  const bBottom = rootBottom + 8;
-
-  // Right: four callouts, leaders level with their middles.
-  const CALL_H = 32;
-  const CALL_GAP = 8;
-  const callY = (i) => rootTop + i * (CALL_H + CALL_GAP);
-  const H = Math.max(bBottom, callY(3) + CALL_H) + 2;
-
   const unshared = ['pid', 'ipc', 'uts'].filter((n) => spec.unshare?.includes(n)).join(' ');
   const kept = spec.env_passthrough?.length ?? 0;
-  const roValue = dotfiles.length ? `/ · ${dotfiles.length} dotfiles` : '/';
-  const rwValue = [home && '~', project && 'project'].filter(Boolean).join(' · ') || 'nothing';
-  const title = `SANDBOX · ${clip(tabName || 'this tab', 20)} · BUBBLEWRAP`;
+
+  const callouts = [
+    { l1: 'read-only', l2: dotfiles.length ? `/ · ${dotfiles.length} dotfiles` : '/' },
+    { l1: 'writable', l2: [home && '~', project && 'project'].filter(Boolean).join(' · ') || 'nothing' },
+    { l1: 'cleared env', l2: spec.cleared_env ? `keeps ${kept} if set` : 'inherited' },
+    { l1: 'outside', l2: 'term 2, jobs', live: true },
+  ];
+  // The recipe's callout column: as wide as the widest box, at the right edge.
+  const boxW = Math.max(112, ...callouts.map((c) => Calibrated.K.boxWidth(c.l1, c.l2)));
+  const colX = W - boxW - 2;
+  const bRight = colX - 12; // the boundary's right edge
+
+  const root = { x: 20, y: 38, right: bRight - 12 };
+  const home$ = { x: root.x + 14, y: root.y + 28, right: root.right - 14 };
+  const inner = { x: home$.x + 10, right: home$.right - 10 };
+  const regions = [];
+  let y = home$.y + 26;
+  const isl = layoutIslands(dotfiles, inner.x, inner.right, y);
+  y = isl.bottom + 8;
+  const projectLabel = project ? clip(tilde(project), inner.right - inner.x - 16) : '';
+  let projectRegion = null;
+  if (project && projectInHome) {
+    projectRegion = { x: inner.x, y, w: inner.right - inner.x, h: 40, kind: 'strong', label: projectLabel, sub: 'read-write' };
+    y += 40 + 10;
+  }
+  const homeBottom = home ? Math.max(y, home$.y + 40) : home$.y;
+  y = home ? homeBottom + 10 : home$.y;
+  if (project && !projectInHome) {
+    projectRegion = { x: home$.x, y, w: home$.right - home$.x, h: 40, kind: 'strong', label: projectLabel, sub: 'read-write' };
+    y += 40 + 10;
+  }
+  const tmp = spec.tmp_private ? { x: home$.x, y, w: tw('/tmp private') + 16, h: 22, kind: 'dotted', label: '/tmp private' } : null;
+  if (tmp) y += 22 + 10;
+  const rootBottom = y;
+
+  regions.push({ x: root.x, y: root.y, w: root.right - root.x, h: rootBottom - root.y, kind: 'hatch', label: '/ root' });
+  if (home) {
+    regions.push({ x: home$.x, y: home$.y, w: home$.right - home$.x, h: homeBottom - home$.y, kind: 'clear', label: '~ home' });
+    regions.push(...isl.islands);
+  }
+  if (projectRegion) regions.push(projectRegion);
+  if (tmp) regions.push(tmp);
+
+  // Leaders: root's right edge, home's right edge, and the boundary.
+  callouts[0].at = [root.right - 6, root.y + 12];
+  if (home) callouts[1].at = [home$.right - 6, home$.y + 30];
+  if (spec.cleared_env) callouts[2].at = [bRight, 40 + 2 * 54 + 16];
+
+  const boundary = [spec.net_isolated && 'network isolated', unshared].filter(Boolean).join(' · ');
+  const h = Math.max(rootBottom + 36, 40 + 3 * 54 + 32 + 26);
 
   const label = [
     'Sandbox for this tab',
@@ -155,184 +145,21 @@ export function Fig10Drawing({ spec, tabName, fallback = null, paper, className 
     spec.tmp_private && 'private /tmp',
     spec.cleared_env && 'environment cleared',
     spec.net_isolated && 'network isolated',
+    unshared && `unshared ${unshared}`,
     'not covered: secondary terminal, background jobs',
   ].filter(Boolean).join(', ').concat('.');
 
-  if (compact) {
-    return (
-      <Figure fig="sandbox" viewBox={`0 0 ${W} ${H}`} compactViewBox={`0 0 ${C_W} ${C_H}`} compactMinWidth={160} fallback={fallback} label={label} paper={paper} className={className}>
-        <CompactSandbox spec={spec} home={home} project={project} projectInHome={projectInHome} dotfiles={dotfiles} />
-      </Figure>
-    );
-  }
-
-  const leaderTo = (i, x) => {
-    const cy = callY(i) + CALL_H / 2;
-    return <Leader points={[[x, cy], [CX, cy]]} />;
-  };
-
-  return (
-    <Figure
-      fig="sandbox"
-      title={title}
-      viewBox={`0 0 ${W} ${H}`}
-      compactViewBox={`0 0 ${C_W} ${C_H}`}
-      minWidth={400}
-      fallback={fallback}
-      label={label}
-      paper={paper}
-      className={className}
-    >
-      {/* The sandbox boundary. */}
-      <rect
-        x={0.5}
-        y={bTop}
-        width={BX - 0.5}
-        height={bBottom - bTop}
-        style={{ fill: 'none', stroke: INK.edgeStrong, strokeWidth: STROKE.ink, strokeDasharray: DASH.medium }}
-      />
-      {spec.net_isolated && (
-        <g>
-          <rect x={BX - 132} y={bTop - 7} width={124} height={14} style={{ fill: INK.paper }} />
-          <Glow>
-            <path
-              d={`M${BX - 126} ${bTop - 4}l7 7m0 -7l-7 7`}
-              style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.emphasis }}
-            />
-          </Glow>
-          <T x={BX - 112} y={bTop + 4} color={INK.lamp}>network isolated</T>
-        </g>
-      )}
-
-      {/* Root: read-only, so hatched. */}
-      <Hatch x={rootX} y={rootTop} width={rootW} height={rootBottom - rootTop} />
-      <Plate x={rootX + 6} y={rootTop + 15} text="/ root" />
-
-      {/* Home: writable, so clear, with the protected dotfiles hatched in it. */}
-      {home && (
-        <g>
-          <rect
-            x={homeX}
-            y={homeTop}
-            width={homeW}
-            height={homeBottom - homeTop}
-            style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }}
-          />
-          <T x={homeX + PAD} y={homeTop + 13} color={INK.fg}>~ home</T>
-          {isl.items.map((it) => <Island key={it.name} {...it} />)}
-          {isl.more && <T x={isl.more.x} y={isl.more.y}>{isl.more.text}</T>}
-        </g>
-      )}
-
-      {/* The project folder, framed in ink: where the agent works. */}
-      {(projectBox || outsideBox) && (() => {
-        const b = projectBox || outsideBox;
-        return (
-          <g>
-            <rect
-              x={b.x}
-              y={b.y}
-              width={b.w}
-              height={ISLAND_H}
-              style={{ fill: INK.paper, stroke: INK.fg, strokeWidth: STROKE.ink }}
-            />
-            <T x={b.x + 7} y={b.y + 13} color={INK.fg}>{projectText}</T>
-          </g>
-        );
-      })()}
-
-      {/* Private /tmp and the unshared namespaces. */}
-      {tmpY != null && (
-        <g>
-          <rect
-            x={homeX}
-            y={tmpY}
-            width={textWidth('/tmp private') + 14}
-            height={ISLAND_H}
-            style={{ fill: INK.paper, stroke: INK.muted, strokeWidth: STROKE.hair, strokeDasharray: DASH.sparse }}
-          />
-          <T x={homeX + 7} y={tmpY + 13} color={INK.fg}>/tmp private</T>
-          {unshared && <Plate x={homeX + textWidth('/tmp private') + 28} y={tmpY + 13} text={unshared} color={INK.muted} />}
-        </g>
-      )}
-
-      {/* Callouts. */}
-      {leaderTo(0, rootX + rootW - ROOT.inset / 2)}
-      <Box x={CX} y={callY(0)} width={CW} label="read-only" value={roValue} />
-      {home && leaderTo(1, homeX + homeW - 8)}
-      <Box x={CX} y={callY(1)} width={CW} label="writable" value={rwValue} />
-      {spec.cleared_env && leaderTo(2, BX)}
-      <Box
-        x={CX}
-        y={callY(2)}
-        width={CW}
-        label="cleared env"
-        value={spec.cleared_env ? `keeps ${kept} if set` : 'inherited'}
-      />
-      <Box x={CX} y={callY(3)} width={CW} label="outside" value="term 2, jobs" valueColor={INK.lamp} stroke={INK.lamp} />
-    </Figure>
-  );
+  return { w: W, h, boundary: boundary ? { label: boundary } : {}, regions, callouts, label };
 }
 
-// Compact: the regions nested in one strip, marks only.
-const C_W = 300;
-const C_H = 40;
-const C_SQ = 8;
-
-function CompactSandbox({ spec, home, project, projectInHome, dotfiles }) {
-  const rootX = 6;
-  const rootR = C_W - 6;
-  const inner = { y: 12, h: 16 };
-  let x = rootX + 8;
-  const parts = [];
-  if (home) {
-    const shown = dotfiles.slice(0, MAX_ISLANDS);
-    const projW = project && projectInHome ? 36 : 0;
-    const homeW = 10 + shown.length * (C_SQ + 4) + (projW ? projW + 6 : 0) + 6;
-    parts.push(
-      <rect key="home" x={x} y={inner.y} width={Math.max(homeW, 40)} height={inner.h}
-        style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />,
-    );
-    let ix = x + 6;
-    shown.forEach((name) => {
-      parts.push(<Hatch key={`d${name}`} x={ix} y={inner.y + 4} width={C_SQ} height={C_SQ} gap={3} />);
-      ix += C_SQ + 4;
-    });
-    if (projW) {
-      parts.push(
-        <rect key="proj" x={ix + 2} y={inner.y + 3} width={projW} height={inner.h - 6}
-          style={{ fill: INK.paper, stroke: INK.fg, strokeWidth: STROKE.ink }} />,
-      );
-    }
-    x += Math.max(homeW, 40) + 8;
-  }
-  if (project && !projectInHome) {
-    parts.push(
-      <rect key="out" x={x} y={inner.y + 3} width={36} height={inner.h - 6}
-        style={{ fill: INK.paper, stroke: INK.fg, strokeWidth: STROKE.ink }} />,
-    );
-    x += 44;
-  }
-  if (spec.tmp_private) {
-    parts.push(
-      <rect key="tmp" x={x} y={inner.y + 3} width={22} height={inner.h - 6}
-        style={{ fill: INK.paper, stroke: INK.muted, strokeWidth: STROKE.hair, strokeDasharray: DASH.sparse }} />,
-    );
-  }
+/** FIG.10 for a given spec (pure: no fetching), so it can be rendered alone. */
+export function Fig10Drawing({ spec, tabName, fallback = null, paper, className }) {
+  const data = sandboxSection(spec);
+  const name = tabName || 'this tab';
+  const title = `sandbox · ${name.length > 20 ? `${name.slice(0, 19)}…` : name} · bubblewrap`;
   return (
-    <g>
-      <rect x={0.5} y={1} width={C_W - 1} height={C_H - 2}
-        style={{ fill: 'none', stroke: INK.edgeStrong, strokeWidth: STROKE.ink, strokeDasharray: DASH.medium }} />
-      <Hatch x={rootX} y={6} width={rootR - rootX} height={C_H - 12} />
-      {parts}
-      {spec.net_isolated && (
-        <g>
-          <rect x={C_W - 22} y={-5} width={14} height={12} style={{ fill: INK.paper }} />
-          <Glow>
-            <path d={`M${C_W - 18} ${-2}l6 6m0 -6l-6 6`} style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.emphasis }} />
-          </Glow>
-        </g>
-      )}
-    </g>
+    <div className={className} title={data.label}>
+      <CalRecipe recipe="section" title={title} data={data} minWidth={400} paper={paper} fallback={fallback} />
+    </div>
   );
 }

@@ -807,14 +807,7 @@ function TabButton({ active, onClick, label, count }) {
       )}
     >
       {label}
-      <span
-        className={cn(
-          'tabular-nums leading-none px-[3px] py-px border',
-          active ? 'border-foreground text-foreground' : 'border-[var(--ins-edge-strong)] text-foreground'
-        )}
-      >
-        {String(count ?? 0).padStart(2, '0')}
-      </span>
+      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
     </button>
   );
 }

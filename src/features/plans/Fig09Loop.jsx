@@ -1,34 +1,23 @@
 import { useSyncExternalStore } from 'react';
-import { DASH, Figure, INK, Node, STROKE, T, useFigureCompact } from '@/components/instrument/figure';
+import { CalRecipe } from '@/components/instrument/calibrated';
 import { getAgentHookState, subscribeAgentHooks } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON } from './planModel';
 import { chunkTrailer } from './planPrompts';
 
-// FIG.09: the auto-pilot loop. Four stations on a circle, clockwise from the
-// top: IMPLEMENT (the agent's turn), CHECK (the commit search by trailer),
-// NUDGE (once, only when the turn ended without a commit) and NEXT (the next
-// chunk is sent). The star sits on the station the run is at. Compact draws
-// the same ring small, without the station names, the trailer or the count.
+// FIG.09: the auto-pilot loop as the calibrated loop recipe. Four stations
+// clockwise from the top: IMPLEMENT (the agent's turn), CHECK (the commit
+// search by trailer), NUDGE (once, only when the turn ended without a commit)
+// and NEXT (the next chunk is sent). Stations already passed for this chunk
+// are done, the one the run is at is the lamp star, and a paused or failed
+// run marks where it stopped as a fault. The centre reads the chunk count.
+// Compact shows `fallback`.
 
 const IMPLEMENT = 0;
 const CHECK = 1;
 const NUDGE = 2;
 const NEXT = 3;
-
-// CX leaves room for "fresh context" left of NEXT; W for the trailer right of CHECK.
-const W = 420;
-const H = 168;
-const R = 44;
-const CX = 160;
-const CY = 98;
-// Compact: the ring alone, small.
-const RING = { cx: CX, cy: CY, r: R };
-const C_RING = { cx: 17, cy: 17, r: 13 };
-const C_SIZE = 34;
-// Screen angles (y down), so clockwise is increasing.
-const ANGLE = [-90, 0, 90, 180];
-const at = (deg, g = RING) => [g.cx + g.r * Math.cos((deg * Math.PI) / 180), g.cy + g.r * Math.sin((deg * Math.PI) / 180)];
+const MIN_W = 360; // 86% of the recipe's 420
 
 /** The agent state in the run's tab, re-read on every hook event. */
 function useTabAgentState(tabId) {
@@ -57,42 +46,15 @@ function haltedStation(ap, chunk) {
   return chunk?.status === CHUNK_STATUS.IN_PROGRESS ? IMPLEMENT : NEXT;
 }
 
-const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-
-// A quarter arc from station i to i+1, with a chevron at its middle.
-function Arc({ from, color, dash, width = STROKE.hair, g = RING }) {
-  const [x0, y0] = at(ANGLE[from], g);
-  const [x1, y1] = at(ANGLE[from] + 90, g);
-  const mid = ANGLE[from] + 45;
-  const [mx, my] = at(mid, g);
-  const rad = (mid * Math.PI) / 180;
-  const tx = -Math.sin(rad);
-  const ty = Math.cos(rad);
-  const head = `M${mx + tx * 3} ${my + ty * 3}L${mx - tx * 2 - ty * 3} ${my - ty * 2 + tx * 3}L${mx - tx * 2 + ty * 3} ${my - ty * 2 - tx * 3}Z`;
-  return (
-    <g>
-      <path
-        d={`M${x0} ${y0}A${g.r} ${g.r} 0 0 1 ${x1} ${y1}`}
-        style={{ fill: 'none', stroke: color, strokeWidth: width, strokeDasharray: dash }}
-      />
-      <path d={head} style={{ fill: color }} />
-    </g>
-  );
-}
-
-function Cross({ x, y, s = 5 }) {
-  return (
-    <path
-      d={`M${x - s} ${y - s}L${x + s} ${y + s}M${x + s} ${y - s}L${x - s} ${y + s}`}
-      style={{ stroke: INK.fault, strokeWidth: STROKE.heavy, strokeLinecap: 'round' }}
-    />
-  );
+// One station on, clockwise (NEXT wraps to the next chunk's IMPLEMENT): play
+// it as the recipe's step, the star riding the edge. Anything else redraws.
+function stepForward(a, b) {
+  if (a.at == null || b.at == null || b.at !== (a.at + 1) % 4) return null;
+  return { ...b, from: a.at, lapFrom: a.lap, dir: 1 };
 }
 
 /** The loop drawn for a live run; `fallback` is what a narrow pane shows. */
 export function Fig09Loop({ plan, pos, elapsed, fallback }) {
-  const compact = useFigureCompact();
-  const g = compact ? C_RING : RING;
   const ap = plan.autopilot;
   const chunk = pos?.chunk;
   const agent = useTabAgentState(ap.tabId);
@@ -103,35 +65,12 @@ export function Fig09Loop({ plan, pos, elapsed, fallback }) {
 
   // Passed this chunk: everything before where it is, and the nudge once sent.
   const passed = (i) => i !== here && (i === NUDGE ? ap.nudged : i < here);
-  const ink = (i) => passed(i) || i === here;
+  const state = (i) => (i === live ? 'live' : i === halted ? 'fault' : passed(i) ? 'done' : 'todo');
 
   const nextLabel = plan.clearBetweenChunks
     ? 'fresh context'
     : pos && pos.index < pos.total ? `chunk ${pos.index + 1}` : 'finish';
   const trailer = chunk ? chunkTrailer(plan, chunk) : 'Plan-Chunk: <plan>/<chunk>';
-
-  // Arcs: walked ones in ink; the nudge detour dashed when it was skipped.
-  const arcColor = (i) => (ink(i) && ink((i + 1) % 4) && i !== NEXT ? INK.fg : INK.faint);
-  const arcDash = (i) => ((i === CHECK || i === NUDGE) && !ap.nudged ? DASH.medium : undefined);
-
-  const stations = [IMPLEMENT, CHECK, NUDGE, NEXT].map((i) => {
-    const [x, y] = at(ANGLE[i], g);
-    let mark;
-    if (i === live) mark = <Node x={x} y={y} state="live" size={compact ? 5 : 7} />;
-    else mark = <Node x={x} y={y} state={passed(i) ? 'done' : 'todo'} size={compact ? 5 : 8} />;
-    return (
-      <g key={i}>
-        {mark}
-        {i === halted && <Cross x={x} y={y} s={compact ? 3.5 : 5} />}
-      </g>
-    );
-  });
-
-  const nameColor = (i) => (ink(i) ? INK.fg : INK.muted);
-  const [tx, ty] = at(ANGLE[IMPLEMENT]);
-  const [rx, ry] = at(ANGLE[CHECK]);
-  const [bx, by] = at(ANGLE[NUDGE]);
-  const [lx, ly] = at(ANGLE[NEXT]);
 
   const label = `${[
     'Auto-pilot loop',
@@ -139,52 +78,34 @@ export function Fig09Loop({ plan, pos, elapsed, fallback }) {
     elapsed && `${elapsed} in`,
     here != null && `${running ? 'at' : 'stopped at'} ${['implement', 'check', 'nudge', 'next'][here]}`,
     ap.nudged && 'nudged once',
+    `check runs git log --grep "${trailer}"`,
+    `next: ${nextLabel}`,
   ].filter(Boolean).join(', ')}.`;
 
-  const ring = (
-    <>
-      <circle cx={g.cx} cy={g.cy} r={g.r} style={{ fill: 'none', stroke: INK.edge, strokeWidth: STROKE.hair }} />
-      {[IMPLEMENT, CHECK, NUDGE, NEXT].map((i) => (
-        <Arc key={i} g={g} from={i} color={arcColor(i)} dash={arcDash(i)} width={arcColor(i) === INK.fg ? STROKE.ink : STROKE.hair} />
-      ))}
-      {stations}
-    </>
-  );
-
-  if (compact) {
-    return (
-      <Figure fig="autopilot" viewBox={`0 0 ${W} ${H}`} compactViewBox={`0 0 ${C_SIZE} ${C_SIZE}`} fallback={fallback} label={label} paper="var(--ins-well)">
-        {ring}
-      </Figure>
-    );
-  }
+  const center = [pos ? `${pos.index}/${pos.total}` : 'starting', elapsed].filter(Boolean).join(' · ');
+  const names = ['implement', 'check', 'nudge', `next · ${nextLabel}`];
+  const cmds = [undefined, 'git log --grep', undefined, undefined];
+  // Live: the recipe's step form (at = the station, one lap per chunk), so a
+  // move to the next station plays as a step. The nudge stays open unless sent.
+  // Stopped: explicit states, with a fault where it stopped.
+  const data = running
+    ? {
+      center,
+      at: live,
+      lap: pos?.index ?? 1,
+      laps: pos?.total,
+      stations: names.map((name, i) => ({ name, cmd: cmds[i], skip: i === NUDGE && !ap.nudged })),
+      label,
+    }
+    : {
+      center,
+      stations: names.map((name, i) => ({ name, cmd: cmds[i], state: state(i) })),
+      label,
+    };
 
   return (
-    <Figure fig="autopilot" title="AUTO-PILOT LOOP" viewBox={`0 0 ${W} ${H}`} compactViewBox={`0 0 ${C_SIZE} ${C_SIZE}`} minWidth={340} fallback={fallback} label={label} paper="var(--ins-well)">
-      {ring}
-
-      {/* Centre: where in the plan. The strip's headline says "chunk", so the ring needn't. */}
-      <T x={CX} y={CY + (elapsed ? -1 : 4)} anchor="middle" color={INK.fg}>
-        {pos ? `${pos.index}/${pos.total}` : 'starting'}
-      </T>
-      {elapsed && <T x={CX} y={CY + 13} anchor="middle">{elapsed}</T>}
-
-      {/* IMPLEMENT, above the top station. */}
-      <T x={tx} y={ty - 10} anchor="middle" color={nameColor(IMPLEMENT)}>
-        IMPLEMENT <tspan style={{ fill: INK.muted }}>· agent turn</tspan>
-      </T>
-      {/* CHECK, right: the search auto-pilot runs for the commit. */}
-      <T x={rx + 12} y={ry - 12} color={nameColor(CHECK)}>CHECK</T>
-      <T x={rx + 12} y={ry + 3}>$ git log --grep</T>
-      <T x={rx + 12} y={ry + 17}>{`"${clip(trailer, 27)}"`}</T>
-      {/* NUDGE, below the bottom station. */}
-      <T x={bx} y={by + 20} anchor="middle" color={nameColor(NUDGE)}>
-        NUDGE <tspan style={{ fill: INK.muted }}>· once, if no commit</tspan>
-      </T>
-      {/* NEXT, left. */}
-      <T x={lx - 12} y={ly - 3} anchor="end" color={nameColor(NEXT)}>NEXT</T>
-      <T x={lx - 12} y={ly + 11} anchor="end">{nextLabel}</T>
-
-    </Figure>
+    <div className="min-w-0" title={label}>
+      <CalRecipe recipe="loop" title="AUTO-PILOT LOOP" data={data} transition={stepForward} minWidth={MIN_W} paper="var(--ins-well)" fallback={fallback} />
+    </div>
   );
 }

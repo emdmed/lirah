@@ -1,0 +1,52 @@
+/*
+  The calibrated kit (src/vendor/calibrated) reads its own token names.
+  Inside .cal they point at Lirah's instrument tokens, so the kit's figures
+  and custom elements follow every theme. Box fills read --fig-paper so a
+  host surface (well, tooltip) can match its own background.
+*/
+.cal {
+  --fg: var(--color-foreground);
+  --title: var(--color-foreground);
+  --muted: var(--color-muted-foreground, var(--ins-legend));
+  --key: var(--color-muted-foreground, var(--ins-legend));
+  --legend: var(--ins-legend);
+  --faint: var(--ins-faint);
+  --edge: var(--ins-edge);
+  --edge-strong: var(--ins-edge-strong);
+  --live: var(--ins-lamp);
+  --ok: var(--ins-ok);
+  --fault: var(--ins-fault);
+  --bg: var(--fig-paper, var(--ins-panel));
+  --panel: var(--fig-paper, var(--ins-panel));
+  --raised: var(--ins-raised);
+  --well: var(--ins-well);
+  --glow: color-mix(in srgb, var(--ins-lamp) 55%, transparent);
+  --swipe: color-mix(in srgb, var(--ins-lamp) 16%, transparent);
+  --on-swipe: var(--color-foreground);
+  --star: var(--ins-star);
+  --fs-legend: 11px;
+  --track-legend: var(--legend-tracking);
+  --line-thin: 1px;
+  --line-thick: 1.6px;
+  min-width: 0;
+}
+
+/* Every calibrated SVG sets its labels in legend type (from calibrated.css). */
+.cal svg[data-cal] {
+  font-family: var(--font-legend);
+  font-variant-ligatures: none;
+  font-size: var(--fs-legend);
+  font-variant-numeric: tabular-nums;
+  overflow: visible;
+  text-rendering: geometricPrecision;
+}
+
+/* A recipe scales down with its pane, never above 1:1. */
+/* CalRecipe decides the floor (it falls back below it), so the kit's own
+   90% min-width doesn't push the figure out of its pane. */
+.cal-recipe {
+  min-width: 0 !important;
+  display: block;
+  width: 100%;
+  height: auto;
+}

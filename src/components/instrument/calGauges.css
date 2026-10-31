@@ -1,0 +1,34 @@
+/*
+  Fitting the calibrated <cal-meter> into Lirah's meter slots (Meter.jsx).
+  Position, DiffBar and Span draw Lirah's own row recipes at their slot size
+  (components/instrument/calibrated/recipes) and need nothing here.
+*/
+
+/* The meter sits inline, like the svg it replaced. */
+.cal-gauge {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.cal-gauge > * { overflow: visible; }
+
+/* Clip the compact drawing to a window: width/height come from inline style. */
+.cal-gauge-clip { overflow: hidden; }
+.cal-gauge-clip > * { display: block; }
+
+/*
+  Gauge tones (gaugeLevel), as Lirah's meters: the whole fill and the needle
+  amber at warn, red at fault. The element paints its fill with --fg up to
+  the alert and --fault past it, its needle with --live, and the reading
+  with --fault once over the alert; these rules repaint exactly those marks
+  (matched by the inline style the kit writes) and leave the hatched zone,
+  the alert line and the ticks alone.
+*/
+.cal-meter-tone[data-level="warn"] rect[style*="fill:var(--fg)"],
+.cal-meter-tone[data-level="warn"] rect[style*="fill:var(--fault)"] { fill: var(--ins-warn) !important; }
+.cal-meter-tone[data-level="warn"] line[style*="stroke:var(--live)"] { stroke: var(--ins-warn) !important; }
+.cal-meter-tone[data-level="warn"] [data-cal-reading] text[style*="fill:var(--fault)"] { fill: var(--ins-warn) !important; }
+
+.cal-meter-tone[data-level="fault"] rect[style*="fill:var(--fg)"] { fill: var(--ins-fault) !important; }
+.cal-meter-tone[data-level="fault"] line[style*="stroke:var(--live)"] { stroke: var(--ins-fault) !important; }

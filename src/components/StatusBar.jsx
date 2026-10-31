@@ -178,7 +178,7 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
         </DropdownMenuTrigger>
       </TooltipTrigger>
       {/* Hover: what fills the context. Mounts only while shown. */}
-      <TooltipContent side="bottom" className="w-80 max-w-80 px-0 py-0 text-left text-wrap">
+      <TooltipContent side="bottom" className="w-[416px] max-w-[416px] px-0 py-0 text-left text-wrap">
         {/* Figures: full draws FIG.06; the one-line header is its fallback and
             what sessions without last-turn parts show. */}
         <Fig06Context

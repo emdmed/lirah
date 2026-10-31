@@ -4,6 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { formatTokenCount } from './tokenCalculations';
 import { useContextBreakdown } from './useContextBreakdown';
 import { Fig23Sources } from './Fig23Sources';
+import { getContextFill } from '@/config/models';
 import { CONTEXT_GROUPS, groupColor, groupLabel, sharePct, shortLabel } from './contextGroups';
 
 const TOP_GROUPS = 5;
@@ -55,6 +56,7 @@ export function ContextPeek({ tokenUsage, projectPath, heavy }) {
           largest pieces are its fallback (no measured sources, narrow). */}
       <Fig23Sources
         breakdown={breakdown}
+        windowMax={getContextFill(tokenUsage)?.max}
         fallback={(
           <div className="flex flex-col gap-2">
             <SourceBar groups={groups} total={total} color={color} />

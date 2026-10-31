@@ -190,7 +190,7 @@ const fb = (text) => <div className="font-mono text-[11px] text-muted-foreground
 
 // Each figure as a render function, so the narrow row can reuse it.
 const FIGS = [
-  { n: 6, w: 288, paper: 'var(--ins-raised)', el: () => <Fig06Context tokenUsage={TOKEN_USAGE} fallback={fb('context 86k / 200k')} /> },
+  { n: 6, w: 400, paper: 'var(--ins-raised)', el: () => <Fig06Context tokenUsage={TOKEN_USAGE} fallback={fb('context 86k / 200k')} /> },
   { n: 9, w: 400, paper: 'var(--ins-well)', el: () => <Fig09Loop plan={PLAN} pos={{ chunk: LIVE, index: 7, total: 11 }} elapsed="41m" fallback={fb('auto-pilot chunk 7/11')} /> },
   { n: 10, w: 460, el: () => <Fig10Drawing spec={SPEC} tabName="nevo-terminal" paper="var(--ins-panel)" fallback={fb('sandbox: / ro, ~ rw')} /> },
   { n: 11, w: 640, el: () => <Fig11Merge feature="plan/calibrated-figures-plan-a-draw" base="main" plan={MERGE} fallback={fb('merge commit, 11 commits')} /> },
@@ -505,8 +505,8 @@ const FILES_ALL = intentFiles(7, 0, 0);
 const FIGS_A = [
   { n: 'P1', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" label="Context" /></div> },
   { n: 'P1w', w: 420, el: () => <div className="px-1"><Meter value={176_000} max={200_000} size="lg" label="Context" /></div> },
-  { n: 23, w: 288, paper: 'var(--ins-raised)', el: () => <Fig23Sources breakdown={BREAKDOWN} fallback={fb('sources: 5 rows')} /> },
-  { n: '23s', w: 288, paper: 'var(--ins-raised)', el: () => <Fig23Sources breakdown={BREAKDOWN_SMALL} fallback={fb('sources: 3 rows')} /> },
+  { n: 23, w: 400, paper: 'var(--ins-raised)', el: () => <Fig23Sources windowMax={200_000} breakdown={BREAKDOWN} fallback={fb('sources: 5 rows')} /> },
+  { n: '23s', w: 400, paper: 'var(--ins-raised)', el: () => <Fig23Sources windowMax={200_000} breakdown={BREAKDOWN_SMALL} fallback={fb('sources: 3 rows')} /> },
   { n: 24, w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS} total={2_740} cost={0.04} budget={{ limit: 150_000, used: 88_400 }} fallback={fb('~2,740 tok')} /> },
   { n: '24m', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_MANY} total={6_820} cost={0.1} budget={{ limit: 150_000, used: 146_000 }} fallback={fb('~6,820 tok')} /> },
   { n: '24n', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS.slice(0, 1).concat(PROMPT_PARTS.slice(3))} total={680} cost={0.01} budget={null} fallback={fb('~680 tok')} /> },

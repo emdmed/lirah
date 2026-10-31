@@ -1,22 +1,24 @@
 import { createContext, useContext, useMemo } from 'react';
-import { CH, DASH, INK, Node, Ruler, STROKE, T, useFigureCompact } from '@/components/instrument/figure';
+import { useFigureCompact } from '@/components/instrument/figure';
+import '@/components/instrument/calibrated';
 import { formatTimer } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
 import { usePageVisible } from '../../hooks/usePageVisible';
+import { useCalSvg } from './useCalSvg';
 
-// P6: a duration drawn as a dimension line. When several sit in one list they
-// share a time scale (SpanScale) and the list prints its ruler once at the top
-// (SpanRuler), so the lines compare at a glance. A running item ends in the
-// lamp star and a dashed lamp tail, redrawn at most once a second. Full draws
-// end ticks and prints the value after the line; compact keeps the line and
-// the value. Every Span has the same width, so values line up in a column
-// under the ruler.
+// P6: a duration drawn as a dimension line, by Lirah's calibrated spanRow
+// recipe (components/instrument/calibrated/recipes/spanRow.js). When several
+// sit in one list they share a time scale (SpanScale) and the list prints
+// its ruler once at the top (SpanRuler, the spanRuler recipe on the same
+// track), so the lines compare at a glance. `tone` done | live | fault |
+// muted inks the line; a running item ends in the lamp star and a dashed
+// lamp tail, redrawn at most once a second. Full draws end ticks; compact
+// keeps the line and the value. Every Span has the same width, so values
+// line up in a column under the ruler. Lines grow in when they first show.
 
 const TRACK = 60;
 const GAP = 6;
-const VALUE_W = 7 * CH; // "12m 40s"
-const H = 14;
-const TAIL = 12;
+const VALUE_W = 49; // "12m 40s" in the 7px legend face
 export const SPAN_WIDTH = TRACK + GAP + VALUE_W;
 
 // Ruler steps in seconds, shared with FIG.12's lanes.
@@ -68,29 +70,21 @@ export function SpanScale({ items, children }) {
 export function SpanRuler({ className }) {
   const scale = useContext(SpanScaleContext);
   const compact = useFigureCompact();
-  if (!scale || compact || scale.count < 2) return null;
-  const maxSecs = scale.max / 1000;
-  const ticks = Math.round(maxSecs / scale.step);
+  const show = scale && !compact && scale.count >= 2;
+  const maxSecs = scale ? scale.max / 1000 : 1;
+  const fmt = (v) => (v === 0 ? (maxSecs >= 60 ? '0m' : '0s') : fmtSecs(v));
+  const ref = useCalSvg('spanRuler', { maxSecs, step: scale?.step ?? 1, track: TRACK, w: SPAN_WIDTH, fmt });
+  if (!show) return null;
   return (
-    <div className={className} title={`Time scale for the durations below, 0 to ${fmtSecs(maxSecs)}`}>
-      <svg
-        width={SPAN_WIDTH}
-        height={22}
-        viewBox={`0 0 ${SPAN_WIDTH} 22`}
-        aria-hidden="true"
-        style={{ display: 'block', overflow: 'visible' }}
-      >
-        <Ruler x0={0.5} x1={TRACK} y={19.5} max={maxSecs} step={scale.step} labelEvery={ticks} fmt={(v) => (v === 0 ? (maxSecs >= 60 ? '0m' : '0s') : fmtSecs(v))} up />
-      </svg>
+    <div className={`cal ${className ?? ''}`} title={`Time scale for the durations below, 0 to ${fmtSecs(maxSecs)}`}>
+      <svg ref={ref} aria-hidden="true" style={{ display: 'block', overflow: 'visible' }} />
     </div>
   );
 }
 
-const TONE = { done: INK.fg, live: INK.lamp, fault: INK.fault, muted: INK.muted };
-
 /**
  * One duration. `tone` is done | live | fault | muted; live ticks itself.
- * Outside a SpanScale the line fills the track.
+ * `format` prints the value. Outside a SpanScale the line fills the track.
  */
 export function Span({ startedAt, endedAt, tone = 'done', format = formatTimer, title }) {
   const scale = useContext(SpanScaleContext);
@@ -98,49 +92,15 @@ export function Span({ startedAt, endedAt, tone = 'done', format = formatTimer, 
   const visible = usePageVisible();
   const live = tone === 'live';
   const now = useTick(live && visible);
-  if (!startedAt) return null;
-  const ms = Math.max(0, (live ? now : endedAt || now) - startedAt);
-  const max = scale?.max || ms || 1;
-  const xe = Math.max(1.5, Math.min(1, ms / max) * TRACK);
-  const y = H / 2;
-  const ink = TONE[tone] || INK.fg;
+  const ms = startedAt ? Math.max(0, (live ? now : endedAt || now) - startedAt) : 0;
   const text = format(ms);
+  const ref = useCalSvg('spanRow', {
+    ms, max: scale?.max || ms || 1, tone, text, compact, track: TRACK, gap: GAP, valueW: VALUE_W, label: title || text,
+  });
+  if (!startedAt) return null;
   return (
-    <svg
-      role="img"
-      aria-label={title || text}
-      width={SPAN_WIDTH}
-      height={H}
-      viewBox={`0 0 ${SPAN_WIDTH} ${H}`}
-      style={{ display: 'block', flexShrink: 0, overflow: 'visible' }}
-    >
-      {title && <title>{title}</title>}
-      <line
-        x1={0.5}
-        x2={xe}
-        y1={y}
-        y2={y}
-        style={{ stroke: ink, strokeWidth: live ? STROKE.emphasis : STROKE.ink }}
-      />
-      {!compact && (
-        <path
-          d={`M0.5 ${y - 3}V${y + 3}${live ? '' : `M${xe} ${y - 3}V${y + 3}`}`}
-          style={{ stroke: ink, strokeWidth: STROKE.hair }}
-        />
-      )}
-      {live && !compact && (
-        <>
-          <line
-            x1={xe}
-            x2={Math.min(TRACK, xe + TAIL)}
-            y1={y}
-            y2={y}
-            style={{ stroke: INK.lamp, strokeWidth: STROKE.hair, strokeDasharray: DASH.fine }}
-          />
-          <Node x={xe} y={y} state="live" size={5} />
-        </>
-      )}
-      <T x={TRACK + GAP} y={y + 4} color={live ? INK.lamp : INK.muted}>{text}</T>
-    </svg>
+    <span className="cal" style={{ display: 'block', flexShrink: 0 }} title={title}>
+      <svg ref={ref} style={{ display: 'block', overflow: 'visible' }} />
+    </span>
   );
 }
