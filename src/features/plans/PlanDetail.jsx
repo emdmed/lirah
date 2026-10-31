@@ -10,6 +10,7 @@ import {
   AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import { AutopilotStrip } from './AutopilotStrip';
+import { Fig20Timeline } from './Fig20Timeline';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
@@ -179,7 +180,13 @@ export function PlanDetail({ plan }) {
         {/* Where it stands: the route, one stop per chunk. */}
         {total > 0 && (
           <div className="mt-4">
-            <ProgressReadout plan={plan} done={done} total={total} />
+            {/* Full: the timeline, once a chunk has a time; until then the bar.
+                A finished run's strip draws it below, so it isn't drawn twice. */}
+            {plan.autopilot?.status === AUTOPILOT_STATUS.DONE ? (
+              <ProgressReadout plan={plan} done={done} total={total} />
+            ) : (
+              <Fig20Timeline plan={plan} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
+            )}
           </div>
         )}
 

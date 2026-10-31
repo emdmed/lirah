@@ -6,6 +6,7 @@ import { AUTOPILOT_LAMP, Prose } from './parts';
 import { useTick } from '../../hooks/useTick';
 import { useSetting } from '../settings/settingsStore';
 import { Fig09Loop } from './Fig09Loop';
+import { Fig20Timeline } from './Fig20Timeline';
 import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition } from './planModel';
 
 /** Where the auto-pilot run stands, and what you can do about it. */
@@ -37,7 +38,8 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
     [AUTOPILOT_STATUS.RUNNING]: at ? [at, elapsed, ap.nudged && 'nudged to commit'].filter(Boolean).join(' · ') : 'starting',
     [AUTOPILOT_STATUS.PAUSED]: ['needs you', at].filter(Boolean).join(' · '),
     [AUTOPILOT_STATUS.FAILED]: ['error', at].filter(Boolean).join(' · '),
-    [AUTOPILOT_STATUS.DONE]: ['plan complete', took && `in ${took}`].filter(Boolean).join(' '),
+    // Full figures: the timeline below carries the run's time.
+    [AUTOPILOT_STATUS.DONE]: ['plan complete', figures === 'compact' && took && `in ${took}`].filter(Boolean).join(' '),
     [AUTOPILOT_STATUS.OFF]: 'off',
   }[ap.status] || ap.status;
   const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
@@ -59,6 +61,13 @@ export function AutopilotStrip({ plan, tabOpen, busy, onResume, onStop, onDismis
             <PanelButton icon={Check} onClick={onDismiss} title="Clear the status">dismiss</PanelButton>
           </span>
         </div>
+        {ap.status === AUTOPILOT_STATUS.DONE && figures !== 'compact' && (
+          <Fig20Timeline
+            plan={plan}
+            showCount={false}
+            fallback={took && <span className="pl-[calc(8px+0.5rem)] tabular-nums text-muted-foreground">took {took}</span>}
+          />
+        )}
         {ap.status === AUTOPILOT_STATUS.DONE && (
           <span className="pl-[calc(8px+0.5rem)] tabular-nums text-muted-foreground">{tally}</span>
         )}
