@@ -182,7 +182,8 @@ export function Node({ x, y, state = 'todo', size = 8 }) {
 // A ruler from x0 to x1 for 0..max, a tick every `step`, numbered every
 // `labelEvery` ticks. Ticks hang down unless `up`. Numbers carry a halo:
 // draw leaders and projection lines before the ruler and they break at them.
-export function Ruler({ x0, x1, y, max, step, labelEvery = 1, fmt = String, up = false }) {
+// `numbers={false}` keeps the major ticks and drops the numbers (compact).
+export function Ruler({ x0, x1, y, max, step, labelEvery = 1, fmt = String, up = false, numbers = true }) {
   const ticks = [];
   const n = max > 0 && step > 0 ? Math.floor(max / step + 1e-9) : 0;
   for (let i = 0; i <= n; i++) {
@@ -199,7 +200,7 @@ export function Ruler({ x0, x1, y, max, step, labelEvery = 1, fmt = String, up =
           y2={y + len}
           style={{ stroke: major ? INK.faint : INK.edgeStrong, strokeWidth: STROKE.hair }}
         />
-        {major && (
+        {major && numbers && (
           <T x={x} y={up ? y - 10 : y + 17} color={INK.faint} anchor={i === 0 ? 'start' : 'middle'} halo>
             {fmt(v)}
           </T>

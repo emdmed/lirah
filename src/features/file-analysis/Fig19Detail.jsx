@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { DASH, Figure, INK, Node, Ruler, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { DASH, Figure, INK, Node, Ruler, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { middleTruncate } from '../plans/Fig21PlanGit';
 
 // FIG.19: what each detail level of a file costs. A faint line is the whole
@@ -7,9 +7,11 @@ import { middleTruncate } from '../plans/Fig21PlanGit';
 // token ruler, ending in a node, with its size and its ratio to the whole.
 // The chosen level is framed in lamp; the default for the file's size says so
 // when it isn't the chosen one. Sizes are measured on the exact text the
-// prompt sends (useFileSymbols' levelTokens).
+// prompt sends (useFileSymbols' levelTokens). Compact stacks the bars tight
+// over the ruler's ticks, the chosen one in lamp; sizes go to the tooltip.
 
 const MIN_W = 180;
+const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 360;
 const TITLE_X = textWidth('FIG.19', 0.5) + 8;
 const ROW_H = 30;
@@ -181,12 +183,45 @@ export function fig19Layout({ name, lineCount, levels, chosen, defaultLevel, wid
   };
 }
 
+const C_PITCH = 7;
+
+/** Compact: the whole-file line and one bar per level, over the ruler's ticks. */
+export function fig19Compact({ levels, chosen, defaultLevel, width }) {
+  const rows = detailRows(levels, { chosen, defaultLevel });
+  const max = Math.max(levels.whole, ...rows.map((r) => r.tokens));
+  const x0 = 1;
+  const x1 = width - 4;
+  const xAt = (v) => x0 + (v / max) * (x1 - x0);
+  const yAt = (i) => 4 + i * C_PITCH;
+  const rulerY = yAt(rows.length + 1);
+  const wholeX = xAt(levels.whole);
+  const drawing = (
+    <g>
+      <line x1={x0} x2={wholeX} y1={yAt(0)} y2={yAt(0)} style={{ stroke: INK.faint, strokeWidth: STROKE.hair }} />
+      <line x1={wholeX} x2={wholeX} y1={yAt(0) - 3} y2={rulerY} style={{ stroke: INK.edge, strokeWidth: STROKE.hair, strokeDasharray: DASH.fine }} />
+      {rows.map((r, i) => {
+        const y = yAt(i + 1);
+        const end = Math.max(x0 + 1, xAt(r.tokens));
+        return (
+          <g key={r.key}>
+            <line x1={x0} x2={end} y1={y} y2={y} style={{ stroke: r.chosen ? INK.lamp : INK.fg, strokeWidth: r.chosen ? STROKE.emphasis : STROKE.ink }} />
+            <Node x={end} y={y} state="done" size={4} />
+          </g>
+        );
+      })}
+      <Ruler x0={x0} x1={x1} y={rulerY} max={max} step={niceStep(max, x1 - x0, 44)} numbers={false} />
+    </g>
+  );
+  return { height: rulerY + 7, drawing };
+}
+
 /**
  * The file chip's detail-level figure, laid out at its container's width.
- * Renders nothing while the file is still being measured, in compact
- * figures, or narrower than MIN_W: the Detent under it says the same.
+ * Renders nothing while the file is still being measured, or narrower than
+ * MIN_W: the Detent under it says the same.
  */
 export function Fig19Detail({ name, lineCount, levels, chosen, defaultLevel, paper }) {
+  const compact = useFigureCompact();
   const rootRef = useRef(null);
   const [rootW, setRootW] = useState(null);
 
@@ -200,8 +235,9 @@ export function Fig19Detail({ name, lineCount, levels, chosen, defaultLevel, pap
   }, []);
 
   const measurable = levels?.whole > 0 && detailRows(levels).length > 0;
-  const width = Math.max(MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 240)));
+  const width = Math.max(compact ? C_MIN_W : MIN_W, Math.min(MAX_W, Math.floor(rootW ?? 240)));
   const fig = measurable ? fig19Layout({ name, lineCount, levels, chosen, defaultLevel, width }) : null;
+  const small = measurable && compact ? fig19Compact({ levels, chosen, defaultLevel, width }) : null;
 
   return (
     <div ref={rootRef} className="min-w-0 w-full">
@@ -210,12 +246,14 @@ export function Fig19Detail({ name, lineCount, levels, chosen, defaultLevel, pap
           fig="detail"
           title={fig.title}
           viewBox={`0 0 ${width} ${fig.height}`}
+          compactViewBox={small ? `0 0 ${width} ${small.height}` : undefined}
           minWidth={MIN_W}
+          compactMinWidth={C_MIN_W}
           paper={paper}
           label={fig.label}
           fallback={null}
         >
-          {fig.drawing}
+          {small ? small.drawing : fig.drawing}
         </Figure>
       )}
     </div>

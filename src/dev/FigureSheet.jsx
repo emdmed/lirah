@@ -7,7 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
 import { Fig06Context } from '../components/Fig06Context';
 import { Fig13Agents } from '../components/Fig13Agents';
-import { Fig15Drawing, Fig15Keys } from '../components/Fig15Keys';
+import { FIG15_COMPACT_VIEWBOX, Fig15Drawing, Fig15Keys } from '../components/Fig15Keys';
 import { Fig09Loop } from '../features/plans/Fig09Loop';
 import { Fig16Chunks } from '../features/plans/Fig16Chunks';
 import { Fig20Timeline } from '../features/plans/Fig20Timeline';
@@ -203,7 +203,7 @@ const FIGS = [
   { n: 15, w: 520, el: () => <Fig15Keys /> },
   {
     n: '15s', w: 520, el: () => (
-      <Figure fig="keys" title="HOLD ^⇧" viewBox={`0 0 520 ${fig15Height('ctrl+shift')}`} paper="var(--ins-panel)">
+      <Figure fig="keys" title="HOLD ^⇧" viewBox={`0 0 520 ${fig15Height('ctrl+shift')}`} compactViewBox={FIG15_COMPACT_VIEWBOX} paper="var(--ins-panel)">
         <Fig15Drawing mod="ctrl+shift" />
       </Figure>
     ),
@@ -222,7 +222,8 @@ const FIGS = [
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
 ];
 
-// Narrow copies: everything should fall back (or render nothing, FIG 19) at 170px.
+// Narrow copies: full figures fall back (or render nothing, FIG 19) at 170px;
+// compact forms with a smaller floor still draw.
 const NARROW = 170;
 
 function Card({ fig, width }) {

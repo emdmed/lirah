@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Box, DASH, Figure, Glow, Hatch, INK, Leader, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { Box, DASH, Figure, Glow, Hatch, INK, Leader, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 
@@ -9,7 +9,9 @@ import { useBookmarks } from '../bookmarks';
 // is hatched (read-only); home is clear (writable) with the protected
 // dotfiles as hatched islands; the project folder is ink-framed. Callouts on
 // the right name each region; the last one, outside the boundary, is what
-// the sandbox does not cover.
+// the sandbox does not cover. Compact nests the same regions in one strip:
+// the boundary, the hatched root, home with a hatched square per protected
+// dotfile and the ink-framed project, and private /tmp; no names or callouts.
 
 /** The bwrap spec for a tab, or null while loading or if the command fails. */
 export function useSandboxSpec(projectDir, noNet) {
@@ -88,8 +90,8 @@ function layoutIslands(names, x0, right, y0) {
 }
 
 /**
- * The sandbox drawn for this tab. `fallback` is what compact mode, a narrow
- * host or a failed spec call shows. `paper` matches the host surface.
+ * The sandbox drawn for this tab. `fallback` is what a narrow host or a
+ * failed spec call shows. `paper` matches the host surface.
  */
 export function Fig10Sandbox({ projectPath, networkIsolation, ...rest }) {
   const spec = useSandboxSpec(projectPath, networkIsolation);
@@ -100,6 +102,7 @@ export function Fig10Sandbox({ projectPath, networkIsolation, ...rest }) {
 
 /** FIG.10 for a given spec (pure: no fetching), so it can be rendered alone. */
 export function Fig10Drawing({ spec, tabName, fallback = null, paper, className }) {
+  const compact = useFigureCompact();
 
   const [home = null, ...rest] = spec.writable ?? [];
   const project = rest[0] ?? null;
@@ -153,7 +156,15 @@ export function Fig10Drawing({ spec, tabName, fallback = null, paper, className 
     spec.cleared_env && 'environment cleared',
     spec.net_isolated && 'network isolated',
     'not covered: secondary terminal, background jobs',
-  ].filter(Boolean).join(', ');
+  ].filter(Boolean).join(', ').concat('.');
+
+  if (compact) {
+    return (
+      <Figure fig="sandbox" viewBox={`0 0 ${W} ${H}`} compactViewBox={`0 0 ${C_W} ${C_H}`} compactMinWidth={160} fallback={fallback} label={label} paper={paper} className={className}>
+        <CompactSandbox spec={spec} home={home} project={project} projectInHome={projectInHome} dotfiles={dotfiles} />
+      </Figure>
+    );
+  }
 
   const leaderTo = (i, x) => {
     const cy = callY(i) + CALL_H / 2;
@@ -165,6 +176,7 @@ export function Fig10Drawing({ spec, tabName, fallback = null, paper, className 
       fig="sandbox"
       title={title}
       viewBox={`0 0 ${W} ${H}`}
+      compactViewBox={`0 0 ${C_W} ${C_H}`}
       minWidth={400}
       fallback={fallback}
       label={label}
@@ -259,5 +271,68 @@ export function Fig10Drawing({ spec, tabName, fallback = null, paper, className 
       />
       <Box x={CX} y={callY(3)} width={CW} label="outside" value="term 2, jobs" valueColor={INK.lamp} stroke={INK.lamp} />
     </Figure>
+  );
+}
+
+// Compact: the regions nested in one strip, marks only.
+const C_W = 300;
+const C_H = 40;
+const C_SQ = 8;
+
+function CompactSandbox({ spec, home, project, projectInHome, dotfiles }) {
+  const rootX = 6;
+  const rootR = C_W - 6;
+  const inner = { y: 12, h: 16 };
+  let x = rootX + 8;
+  const parts = [];
+  if (home) {
+    const shown = dotfiles.slice(0, MAX_ISLANDS);
+    const projW = project && projectInHome ? 36 : 0;
+    const homeW = 10 + shown.length * (C_SQ + 4) + (projW ? projW + 6 : 0) + 6;
+    parts.push(
+      <rect key="home" x={x} y={inner.y} width={Math.max(homeW, 40)} height={inner.h}
+        style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />,
+    );
+    let ix = x + 6;
+    shown.forEach((name) => {
+      parts.push(<Hatch key={`d${name}`} x={ix} y={inner.y + 4} width={C_SQ} height={C_SQ} gap={3} />);
+      ix += C_SQ + 4;
+    });
+    if (projW) {
+      parts.push(
+        <rect key="proj" x={ix + 2} y={inner.y + 3} width={projW} height={inner.h - 6}
+          style={{ fill: INK.paper, stroke: INK.fg, strokeWidth: STROKE.ink }} />,
+      );
+    }
+    x += Math.max(homeW, 40) + 8;
+  }
+  if (project && !projectInHome) {
+    parts.push(
+      <rect key="out" x={x} y={inner.y + 3} width={36} height={inner.h - 6}
+        style={{ fill: INK.paper, stroke: INK.fg, strokeWidth: STROKE.ink }} />,
+    );
+    x += 44;
+  }
+  if (spec.tmp_private) {
+    parts.push(
+      <rect key="tmp" x={x} y={inner.y + 3} width={22} height={inner.h - 6}
+        style={{ fill: INK.paper, stroke: INK.muted, strokeWidth: STROKE.hair, strokeDasharray: DASH.sparse }} />,
+    );
+  }
+  return (
+    <g>
+      <rect x={0.5} y={1} width={C_W - 1} height={C_H - 2}
+        style={{ fill: 'none', stroke: INK.edgeStrong, strokeWidth: STROKE.ink, strokeDasharray: DASH.medium }} />
+      <Hatch x={rootX} y={6} width={rootR - rootX} height={C_H - 12} />
+      {parts}
+      {spec.net_isolated && (
+        <g>
+          <rect x={C_W - 22} y={-5} width={14} height={12} style={{ fill: INK.paper }} />
+          <Glow>
+            <path d={`M${C_W - 18} ${-2}l6 6m0 -6l-6 6`} style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.emphasis }} />
+          </Glow>
+        </g>
+      )}
+    </g>
   );
 }

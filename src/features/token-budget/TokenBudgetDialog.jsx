@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Meter } from '@/components/instrument/Meter';
-import { WARN_AT, FAULT_AT } from '@/components/instrument/gauge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useSetting } from '@/features/settings/settingsStore';
 import { useTokenBudget } from './TokenBudgetContext';
 import { Fig14Budget } from './Fig14Budget';
 
 export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
   const { getBudget, setBudget, removeBudget, currentUsage, resetAlerts, projectStats } = useTokenBudget();
-  const [figures] = useSetting('figures');
 
   const [dailyLimit, setDailyLimit] = useState('');
   const [weeklyLimit, setWeeklyLimit] = useState('');
@@ -110,7 +107,6 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
           {limitField('budget-weekly', 'Weekly limit', weeklyLimit, setWeeklyLimit, 'e.g. 500000', 'weekly')}
           <p className="text-xs text-muted-foreground">
             Leave both empty to remove the budget.
-            {figures !== 'full' && <> Alerts show at {WARN_AT * 100}% and {FAULT_AT * 100}%.</>}
           </p>
           {error && <p className="text-xs text-[var(--ins-fault)]" role="alert">{error}</p>}
         </div>

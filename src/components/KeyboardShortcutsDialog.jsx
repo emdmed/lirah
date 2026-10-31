@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogGroup, DialogTitle } from '@/components/ui/dialog'
 import { Keycap } from './instrument/Keycap'
 import { shortcutsByCategory } from '../lib/shortcuts'
-import { useSetting } from '@/features/settings/settingsStore'
 import { Fig15Keys } from './Fig15Keys'
 
 // Built once: the list is static, see src/lib/shortcuts.js.
@@ -25,7 +24,6 @@ function KeyCombo({ keys, note, doubleTap = false, highlight = false }) {
 
 // Every shortcut, one line each: what it does, a dotted leader, the keys.
 export function KeyboardShortcutsDialog({ open, onOpenChange }) {
-  const [figures] = useSetting('figures')
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -39,7 +37,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }) {
         <DialogDescription className='sr-only'>Quick reference for all available shortcuts.</DialogDescription>
 
         <div className='flex min-h-0 flex-col gap-5 overflow-y-auto pr-2'>
-          {figures === 'full' && <Fig15Keys />}
+          <Fig15Keys />
           {SECTIONS.map(({ category, items }) => (
             <section key={category} className='flex flex-col gap-1'>
               <DialogGroup label={category} />

@@ -28,7 +28,7 @@ import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
 import { ContextPeek } from '../features/token-budget/ContextPeek';
 import { Fig06Context } from './Fig06Context';
 import { Fig10Sandbox } from '../features/settings/Fig10Sandbox';
-import { useSetting } from '../features/settings/settingsStore';
+import { useFigureCompact } from './instrument/figure';
 
 const CLI_DISPLAY = {
   'claude-code': { name: 'claude', icon: Bot },
@@ -54,12 +54,12 @@ function ChangelogStatus({ status }) {
   );
 }
 
-// Hover shows FIG.10 while the sandbox is on and running (figures: full);
-// the one-word state is its fallback.
+// Hover shows FIG.10 while the sandbox is on and running; the one-word state
+// is its fallback.
 function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolation }) {
   const tooltip = enabled && failed ? 'Sandbox: FAILED' : enabled ? 'Sandbox: ON' : 'Sandbox: OFF';
-  const [figures] = useSetting('figures');
-  const drawn = enabled && !failed && figures === 'full';
+  const compact = useFigureCompact();
+  const drawn = enabled && !failed;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -70,7 +70,7 @@ function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolatio
         </span>
       </TooltipTrigger>
       {drawn ? (
-        <TooltipContent side="top" className="w-[492px] max-w-[492px] px-0 py-0 text-left text-wrap">
+        <TooltipContent side="top" className={cn('px-0 py-0 text-left text-wrap', compact ? 'w-[332px] max-w-[332px]' : 'w-[492px] max-w-[492px]')}>
           <Fig10Sandbox
             projectPath={projectPath}
             networkIsolation={networkIsolation}

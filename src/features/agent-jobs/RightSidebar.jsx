@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
-import { getSettings, setSetting, useSeededSetting, useSetting } from '../settings/settingsStore';
+import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
@@ -128,10 +128,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
   const visibleJobs = jobs.filter((j) => !j.archived);
   const archivedJobs = jobs.filter((j) => j.archived);
-  // P6: the durations drawn in a list share one scale. With full figures race
-  // candidates draw theirs in FIG.12's lanes, so they stay off it.
-  const [figures] = useSetting('figures');
-  const spanJobs = visibleJobs.filter((j) => figures === 'compact' || !j.raceId).map(spanItem);
+  // P6: the durations drawn in a list share one scale. Race candidates draw
+  // theirs in FIG.12's lanes, so they stay off it.
+  const spanJobs = visibleJobs.filter((j) => !j.raceId).map(spanItem);
   const collapsed = collapsedOverride ?? false;
   const atTabLimit = openTabs.length >= MAX_TABS;
   const newTabTitle = atTabLimit ? `Tab limit reached (${MAX_TABS}) — close a tab first` : 'New tab (Ctrl+T)';
@@ -751,10 +750,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 export const RightSidebar = memo(RightSidebarPanel);
 
 function RaceGroup({ jobs, renderCard, onCompare }) {
-  // Full figures draw the candidates as lanes with their durations, so the
-  // cards drop their own time.
-  const [figures] = useSetting('figures');
-  const lanes = figures !== 'compact';
+  // FIG.12 draws the candidates as lanes with their durations (in its
+  // tooltip, in compact figures), so the cards drop their own time.
   const running = jobs.filter((j) => j.status === 'running').length;
   const settled = jobs.some((j) => j.status === 'applied');
   // Comparing needs two candidates that actually produced changes.
@@ -791,12 +788,10 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
           Same prompt, separate worktrees. Keeping one applies it and discards the rest.
         </div>
       )}
-      {lanes && (
-        <div className="px-2.5 pt-2.5 pb-1">
-          <Fig12Race jobs={jobs} short />
-        </div>
-      )}
-      <div className="flex flex-col p-1.5 pt-0.5">{jobs.map((job) => renderCard(job, { hideTime: lanes }))}</div>
+      <div className="px-2.5 pt-2.5 pb-1">
+        <Fig12Race jobs={jobs} short />
+      </div>
+      <div className="flex flex-col p-1.5 pt-0.5">{jobs.map((job) => renderCard(job, { hideTime: true }))}</div>
     </div>
   );
 }

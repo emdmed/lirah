@@ -4,7 +4,6 @@ import { Detent } from "../instrument/Detent";
 import { cn } from "@/lib/utils";
 import { Fig19Detail } from "@/features/file-analysis/Fig19Detail";
 import { defaultViewMode } from "@/features/file-analysis/useFileSymbols";
-import { useSetting } from "@/features/settings/settingsStore";
 
 /**
  * Individual file item in the selected files list
@@ -33,7 +32,6 @@ export function SelectedFileItem({
   const canAdjust = hasDetailLevel && !!onSetViewMode && !!detailOptions?.length;
   const [adjusting, setAdjusting] = useState(false);
   const detailButtonRef = useRef(null);
-  const [figures] = useSetting('figures');
 
   const closeDetent = (refocus) => {
     setAdjusting(false);
@@ -111,16 +109,14 @@ export function SelectedFileItem({
           if (!e.currentTarget.contains(e.relatedTarget) && e.relatedTarget !== detailButtonRef.current) closeDetent(false);
         }}
       >
-        {figures === 'full' && (
-          <Fig19Detail
-            name={file.name}
-            lineCount={lineCount}
-            levels={levelTokens}
-            chosen={viewMode}
-            defaultLevel={defaultViewMode(lineCount)}
-            paper="var(--color-sidebar, var(--ins-panel))"
-          />
-        )}
+        <Fig19Detail
+          name={file.name}
+          lineCount={lineCount}
+          levels={levelTokens}
+          chosen={viewMode}
+          defaultLevel={defaultViewMode(lineCount)}
+          paper="var(--color-sidebar, var(--ins-panel))"
+        />
         <Detent
           label={`Detail level for ${file.name}`}
           value={viewMode}

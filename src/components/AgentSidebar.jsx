@@ -4,7 +4,6 @@ import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-r
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
 import { Lamp } from './instrument/Lamp';
-import { useSetting } from '@/features/settings/settingsStore';
 import { formatElapsed, extractTaskLabel, truncate } from './agentLabels';
 import { Fig13Agents } from './Fig13Agents';
 
@@ -79,7 +78,6 @@ export function AgentCard({ agent, onDismiss, now, defaultExpanded = false }) {
 
 function TabGroup({ tabLabel, agents, onDismiss, now }) {
   const runningCount = agents.filter(a => a.status === 'running').length;
-  const [figures] = useSetting('figures');
   // FIG 13's "+k more" / "+k done earlier" open the full card list.
   const [listed, setListed] = useState(false);
 
@@ -95,7 +93,7 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
     <div className="mb-1">
       <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground">
         <span className="truncate">{tabLabel}</span>
-        {figures === 'full' && listed && (
+        {listed && (
           <button
             onClick={() => setListed(false)}
             className="ml-auto mr-2 shrink-0 font-normal normal-case tracking-normal hover:text-sidebar-foreground cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ins-lamp)]"
@@ -115,7 +113,7 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
           )}
         </span>
       </div>
-      {figures === 'full' && !listed ? (
+      {!listed ? (
         <div className="px-1">
           <Fig13Agents
             agents={agents}

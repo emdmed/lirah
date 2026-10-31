@@ -1,11 +1,13 @@
 import { plural } from '../../lib/plural';
-import { Cmd, DASH, Dim, Figure, INK, Leader, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { Cmd, DASH, Dim, Figure, INK, Leader, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 
 // FIG.11: what the merge will do to the history. The base lane on top, the
 // feature lane below it from the fork point. A fast-forward slides the base
 // pointer straight along to the feature tip; a merge commit joins the two
 // lanes at a diamond. Each numbered command sits at the node it acts on, with
-// the same numbers as the "Will run" block below the figure.
+// the same numbers as the "Will run" block below the figure. Compact keeps
+// the two lanes, their nodes and the join, closer together; the names, the
+// outcome, the counts and the commands move to the tooltip.
 
 // The exact git commands confirm() will run, so nothing happens unseen.
 export function planCommands({ feature, base, plan }) {
@@ -24,12 +26,13 @@ const LANE_X = 88; // lanes start after the branch names
 const FX = 110; // fork point: the commit both branches share
 const STEP = 22; // node spacing
 const BASE_Y = 78;
-const FEAT_Y = 124;
+const FULL_FEAT_Y = 124;
 const DIM_Y = 144;
 const ROW = [36, 56]; // command rows above the base lane
 const ROW_BELOW = 172; // command row below the feature lane
 const MAX_BEHIND = 3;
 const MAX_AHEAD = 8;
+const C_FEAT_Y = BASE_Y + 22; // compact: the lanes closer together
 
 const clip = (s, n) => (s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s);
 
@@ -59,7 +62,9 @@ function Tag({ x, y, text, color }) {
 
 /** The merge plan drawn; `fallback` is what a narrow dialog shows. */
 export function Fig11Merge({ feature, base, plan, fallback }) {
+  const compact = useFigureCompact();
   const { ff, behind = 0, ahead = plan.commits.length, diffStat } = plan;
+  const FEAT_Y = compact ? C_FEAT_Y : FULL_FEAT_Y;
 
   // Number the commands exactly as planCommands lists them.
   const cmds = planCommands({ feature, base, plan });
@@ -77,13 +82,13 @@ export function Fig11Merge({ feature, base, plan, fallback }) {
   // and the rest are counted in a gap before it.
   const hidden = Math.max(0, ahead - MAX_AHEAD);
   const more = hidden ? `… +${hidden}` : '';
-  const gapW = hidden ? textWidth(more) + 10 : 0;
+  const gapW = hidden ? (compact ? 14 : textWidth(more) + 10) : 0;
   const F0 = FX + 24;
   const featXs = Array.from({ length: Math.min(ahead, MAX_AHEAD) }, (_, j) => (
     F0 + STEP * j + (hidden && j === MAX_AHEAD - 1 ? gapW : 0)
   ));
   const tipX = featXs[featXs.length - 1] ?? F0;
-  const behindLabel = behind > 0 ? `+${behind} since branch` : '';
+  const behindLabel = behind > 0 && !compact ? `+${behind} since branch` : '';
   const behindLabelX = FX + STEP - 4;
   // The join clears the feature tip, base's last commit and its label.
   const joinX = ff ? tipX : Math.max(tipX + 40, baseLastX + 40, behindLabel ? behindLabelX + textWidth(behindLabel) + 14 : 0);
@@ -103,20 +108,27 @@ export function Fig11Merge({ feature, base, plan, fallback }) {
     : { text: `merge commit · ${clip(base, 16)} moved on`, color: INK.lamp };
 
   const H = removeCmd ? 182 : 158;
-  const label = [
+  const label = `${[
     `Merge ${feature} into ${base}`,
-    ff ? 'fast-forward' : 'merge commit',
+    ff ? `a fast-forward, ${base} didn't move` : `a merge commit, ${base} moved on`,
     plural(ahead, 'commit'),
+    stat,
     behind > 0 && `${base} has ${behind} new since the branch point`,
-  ].filter(Boolean).join(', ');
+  ].filter(Boolean).join(', ')}. Runs: ${cmds.join('; ')}.`;
+  // Compact: from the lane start to the join, the lanes only.
+  const right = Math.max(joinX, tipX, baseLastX) + 10;
+  const compactBox = `${LANE_X - 2} ${BASE_Y - 10} ${right - LANE_X + 2} ${FEAT_Y - BASE_Y + 20}`;
 
   return (
-    <Figure fig="merge" viewBox={`0 0 ${W} ${H}`} minWidth={520} fallback={fallback} label={label} paper="var(--ins-panel)">
-      <Tag x={W} y={0} text={outcome.text} color={outcome.color} />
-
-      {/* Branch names. */}
-      <T x={0} y={BASE_Y + 4} color={INK.lamp}>{baseName}</T>
-      <T x={0} y={FEAT_Y + 4} color={INK.fg}>{clip(feature, 12)}</T>
+    <Figure fig="merge" viewBox={`0 0 ${W} ${H}`} compactViewBox={compactBox} minWidth={520} compactMinWidth={160} fallback={fallback} label={label} paper="var(--ins-panel)">
+      {!compact && (
+        <>
+          <Tag x={W} y={0} text={outcome.text} color={outcome.color} />
+          {/* Branch names. */}
+          <T x={0} y={BASE_Y + 4} color={INK.lamp}>{baseName}</T>
+          <T x={0} y={FEAT_Y + 4} color={INK.fg}>{clip(feature, 12)}</T>
+        </>
+      )}
 
       {/* Base lane up to its last commit. */}
       <path
@@ -158,7 +170,7 @@ export function Fig11Merge({ feature, base, plan, fallback }) {
         d={`M${FX} ${BASE_Y}C${FX} ${FEAT_Y - 12} ${FX + 8} ${FEAT_Y} ${F0} ${FEAT_Y}H${tipX}`}
         style={{ fill: 'none', stroke: INK.fg, strokeWidth: STROKE.emphasis }}
       />
-      {hidden > 0 && (
+      {hidden > 0 && !compact && (
         <T x={(featXs[MAX_AHEAD - 2] + tipX) / 2} y={FEAT_Y - 7} anchor="middle">{more}</T>
       )}
 
@@ -168,11 +180,11 @@ export function Fig11Merge({ feature, base, plan, fallback }) {
       {featXs.map((x) => <Node key={x} x={x} y={FEAT_Y} state="done" size={7} />)}
 
       {/* How much is coming over. */}
-      {featXs.length > 1 ? (
+      {!compact && featXs.length > 1 ? (
         <Dim x1={F0} x2={tipX} y={DIM_Y} label={dimFits ? dimLabel : ''} />
       ) : null}
-      {!dimFits && <T x={tipX + 8} y={DIM_Y + 3.5}>{dimLabel}</T>}
-      {stat && (
+      {!compact && !dimFits && <T x={tipX + 8} y={DIM_Y + 3.5}>{dimLabel}</T>}
+      {stat && !compact && (
         <g>
           <Leader points={[[dimEnd + 4, DIM_Y], [statX, DIM_Y]]} dot={false} />
           <rect
@@ -187,9 +199,13 @@ export function Fig11Merge({ feature, base, plan, fallback }) {
       )}
 
       {/* The commands, at the node each one acts on. */}
-      {switchCmd && <Step x={baseLastX} y={ROW[0]} n={switchCmd.n} command={switchCmd.text} from={BASE_Y} />}
-      <Step x={joinX} y={ROW[1]} n={mergeCmd.n} command={mergeCmd.text} from={BASE_Y} />
-      {removeCmd && <Step x={tipX} y={ROW_BELOW} n={removeCmd.n} command={removeCmd.text} from={FEAT_Y} />}
+      {!compact && (
+        <>
+          {switchCmd && <Step x={baseLastX} y={ROW[0]} n={switchCmd.n} command={switchCmd.text} from={BASE_Y} />}
+          <Step x={joinX} y={ROW[1]} n={mergeCmd.n} command={mergeCmd.text} from={BASE_Y} />
+          {removeCmd && <Step x={tipX} y={ROW_BELOW} n={removeCmd.n} command={removeCmd.text} from={FEAT_Y} />}
+        </>
+      )}
     </Figure>
   );
 }

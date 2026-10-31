@@ -1,12 +1,13 @@
 import { format } from 'date-fns';
-import { Box, DASH, Figure, Hatch, INK, Leader, Node, Ruler, STROKE, T, useFigureScale } from '@/components/instrument/figure';
+import { Box, DASH, Figure, Hatch, INK, Leader, Node, Ruler, STROKE, T, useFigureCompact, useFigureScale } from '@/components/instrument/figure';
 import { FAULT_AT, WARN_AT, gaugeLevel } from '@/components/instrument/gauge';
 import { formatTokenCount } from './tokenCalculations';
 
 // FIG.14: a budget limit as a measured ruler. 0 → limit, the alert band
 // hatched from WARN_AT to the end with lines where the toasts fire, the used
 // bar ending in a node, and (daily only) a dashed lamp line projecting the
-// day's pace to 24:00.
+// day's pace to 24:00. Compact keeps the ruler's ticks, the band, the alert
+// lines, the used bar and the pace; the numbers and boxes go to the tooltip.
 
 const W = 380;
 const X0 = 0;
@@ -63,6 +64,7 @@ export function budgetPace({ rows, used, limit, now = new Date() }) {
  */
 export function Fig14Budget({ kind, limit, used, rows, fallback, now = new Date() }) {
   const scale = useFigureScale(limit, X0, X1);
+  const compact = useFigureCompact();
   if (!(limit > 0)) return fallback;
 
   const daily = kind === 'daily';
@@ -83,7 +85,8 @@ export function Fig14Budget({ kind, limit, used, rows, fallback, now = new Date(
     `${daily ? 'Daily' : 'Weekly'} budget: ${formatTokenCount(used)} of ${formatTokenCount(limit)} used (${pct(Math.min(ratio, 9.99))})`,
     pace && `at this pace ≈ ${formatTokenCount(Math.round(pace.projected))} by 24:00`,
     pace?.warnTime && `${pct(WARN_AT)} at ≈ ${hhmm(pace.warnTime)}`,
-  ].filter(Boolean).join('; ');
+    `alerts at ${pct(WARN_AT)} and ${pct(FAULT_AT)}`,
+  ].filter(Boolean).join('; ').concat('.');
 
   const paceValue = pace && [
     `≈ ${formatTokenCount(Math.round(pace.projected))}`,
@@ -91,28 +94,45 @@ export function Fig14Budget({ kind, limit, used, rows, fallback, now = new Date(
   ].filter(Boolean).join(' · ');
 
   return (
-    <Figure fig="budget" title={title} viewBox={`0 0 ${W} ${H}`} minWidth={320} fallback={fallback} label={label}>
+    <Figure
+      fig="budget"
+      title={title}
+      viewBox={`0 0 ${W} ${H}`}
+      compactViewBox={`0 ${RULER_Y - 21} ${W} 29`}
+      minWidth={320}
+      compactMinWidth={160}
+      fallback={fallback}
+      label={label}
+    >
       {/* Readout: used / limit, and the share. */}
-      <T x={X0} y={30}>
-        <tspan style={{ fill: tone }}>{formatTokenCount(used)}</tspan>
-        <tspan style={{ fill: INK.faint }}>{` / ${formatTokenCount(limit)}`}</tspan>
-      </T>
-      <T x={W} y={30} anchor="end" color={tone}>{pct(ratio)}</T>
+      {!compact && (
+        <>
+          <T x={X0} y={30}>
+            <tspan style={{ fill: tone }}>{formatTokenCount(used)}</tspan>
+            <tspan style={{ fill: INK.faint }}>{` / ${formatTokenCount(limit)}`}</tspan>
+          </T>
+          <T x={W} y={30} anchor="end" color={tone}>{pct(ratio)}</T>
+        </>
+      )}
 
       {/* The alert band and the lines where the toasts fire. */}
       <Hatch x={warnX} y={RULER_Y - 10} width={X1 - warnX} height={10} stroke={null} />
       <line x1={warnX} x2={warnX} y1={RULER_Y - 20} y2={RULER_Y} style={{ stroke: WARN, strokeWidth: STROKE.hair }} />
       <line x1={faultX} x2={faultX} y1={RULER_Y - 20} y2={RULER_Y} style={{ stroke: INK.fault, strokeWidth: STROKE.hair }} />
-      <T x={warnX - 3} y={RULER_Y - 13} anchor="end" color={WARN}>{daily ? `alert ${pct(WARN_AT)}` : pct(WARN_AT)}</T>
-      <T x={faultX + 3} y={RULER_Y - 13} color={INK.fault}>{pct(FAULT_AT)}</T>
+      {!compact && (
+        <>
+          <T x={warnX - 3} y={RULER_Y - 13} anchor="end" color={WARN}>{daily ? `alert ${pct(WARN_AT)}` : pct(WARN_AT)}</T>
+          <T x={faultX + 3} y={RULER_Y - 13} color={INK.fault}>{pct(FAULT_AT)}</T>
+        </>
+      )}
 
       {/* Leaders to the boxes, under the ruler so they break at its numbers. */}
-      <Leader points={[[usedX, RULER_Y + 7], [usedX, RULER_Y + 22], [USED_W / 2, RULER_Y + 22], [USED_W / 2, BOX_Y]]} dot={false} />
-      {pace && <Leader points={[[paceX, RULER_Y + 7], [paceX, RULER_Y + 26], [PACE_X + PACE_W / 2, RULER_Y + 26], [PACE_X + PACE_W / 2, BOX_Y]]} dot={false} />}
+      {!compact && <Leader points={[[usedX, RULER_Y + 7], [usedX, RULER_Y + 22], [USED_W / 2, RULER_Y + 22], [USED_W / 2, BOX_Y]]} dot={false} />}
+      {pace && !compact && <Leader points={[[paceX, RULER_Y + 7], [paceX, RULER_Y + 26], [PACE_X + PACE_W / 2, RULER_Y + 26], [PACE_X + PACE_W / 2, BOX_Y]]} dot={false} />}
 
       {/* Used: a bar from 0, ending in a node. */}
       <rect x={X0} y={RULER_Y - 7} width={Math.max(usedX - X0, 1)} height={6} style={{ fill: tone }} />
-      <Ruler x0={X0} x1={X1} y={RULER_Y} max={limit} step={limit / 15} labelEvery={5} fmt={formatTokenCount} />
+      <Ruler x0={X0} x1={X1} y={RULER_Y} max={limit} step={limit / 15} labelEvery={5} fmt={formatTokenCount} numbers={!compact} />
 
       {/* Pace: dashed lamp line from used to the 24:00 projection. */}
       {pace && paceX > usedX && (
@@ -125,8 +145,8 @@ export function Fig14Budget({ kind, limit, used, rows, fallback, now = new Date(
       <Node x={usedX} y={barY} state="done" size={6} />
 
       {/* Boxes: used on the left, pace on the right. */}
-      <Box x={0} y={BOX_Y} width={USED_W} label={`USED · ${hhmm(now)}`} value={formatTokenCount(used)} valueColor={tone} />
-      {pace && (
+      {!compact && <Box x={0} y={BOX_Y} width={USED_W} label={`USED · ${hhmm(now)}`} value={formatTokenCount(used)} valueColor={tone} />}
+      {pace && !compact && (
         <>
           <Box x={PACE_X} y={BOX_Y} width={PACE_W} label="AT THIS PACE BY 24:00" value={paceValue} valueColor={INK.lamp} />
           <T x={W} y={BOX_Y + 46} anchor="end" color={INK.faint}>today, all sessions</T>
