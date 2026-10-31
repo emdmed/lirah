@@ -11,6 +11,9 @@ import {
 } from './planModel';
 import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
+import { Fig22FilesByChunk } from './Fig22FilesByChunk';
+import { usePlanCommitFiles } from './usePlanCommitFiles';
+import { useSetting } from '../settings/settingsStore';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
@@ -144,6 +147,12 @@ export function PlanDetail({ plan }) {
     else pane.implement(plan, next);
   }, [commandSeq]);
   const fileCount = new Set(plan.chunks.flatMap((c) => c.files ?? [])).size;
+  // FIG 22 folds out of the "· K files" count; git runs only once it's open.
+  const [figures] = useSetting('figures');
+  const [showFiles, setShowFiles] = useState(false);
+  const filesOpen = figures === 'full' && showFiles;
+  const commitFiles = usePlanCommitFiles(plan, filesOpen);
+  const hasCommits = plan.chunks.some((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
 
   return (
     <div className="flex flex-col">
@@ -264,12 +273,34 @@ export function PlanDetail({ plan }) {
         </div>
       )}
 
+      {total > 0 && filesOpen && (
+        <div id="plan-files-by-chunk" className="px-3 py-2.5 edge-t-engraved">
+          <Fig22FilesByChunk plan={plan} files={commitFiles} />
+        </div>
+      )}
       {total > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 edge-t-engraved edge-b-engraved">
           <span className="ins-legend">chunks</span>
           <span aria-hidden="true" className="h-px flex-1 bg-[var(--ins-edge)]" />
           <span className="font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-muted-foreground">
-            {plan.chunks.length}{fileCount > 0 && ` · ${fileCount} files`}
+            {plan.chunks.length}
+            {figures === 'full' && hasCommits ? (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  aria-expanded={showFiles}
+                  aria-controls="plan-files-by-chunk"
+                  onClick={() => setShowFiles((v) => !v)}
+                  title={showFiles ? 'Hide files by chunk' : 'Show which chunks touched which files'}
+                  className="cursor-pointer tabular-nums underline decoration-dotted underline-offset-2 hover:text-foreground aria-expanded:text-foreground"
+                >
+                  {fileCount > 0 ? `${fileCount} files` : 'files'}
+                </button>
+              </>
+            ) : (
+              fileCount > 0 && ` · ${fileCount} files`
+            )}
           </span>
         </div>
       )}

@@ -34,13 +34,14 @@ function committedChunks(plan) {
  * Files each implemented chunk touched: the union of `git diff-tree` over the
  * chunk's commits in every repo. Loads only while `enabled`, so callers can
  * wait until the figure is actually shown.
- * Returns { byChunk: { [chunkId]: string[] (sorted, repo-relative) }, loading }.
+ * Returns { byChunk: { [chunkId]: string[] (sorted, repo-relative) }, byRepo, loading };
+ * byRepo is { [chunkId]: { [root]: string[] } } for callers that must tell repos apart.
  */
 export function usePlanCommitFiles(plan, enabled = true) {
   const chunks = useMemo(() => committedChunks(plan), [plan]);
   // Refetch only when the commits change, not on every plan update.
   const key = chunks.map((c) => `${c.id}=${c.repos.map(([r, s]) => `${r}:${s.join(',')}`).join(';')}`).join('|');
-  const [state, setState] = useState({ key: null, byChunk: {} });
+  const [state, setState] = useState({ key: null, byChunk: {}, byRepo: {} });
 
   useEffect(() => {
     if (!enabled) return;
@@ -48,11 +49,23 @@ export function usePlanCommitFiles(plan, enabled = true) {
     (async () => {
       const entries = await Promise.all(
         chunks.map(async (c) => {
-          const lists = await Promise.all(c.repos.flatMap(([root, shas]) => shas.map((sha) => commitFiles(root, sha))));
-          return [c.id, [...new Set(lists.flat())].sort()];
+          const perRepo = await Promise.all(
+            c.repos.map(async ([root, shas]) => {
+              const lists = await Promise.all(shas.map((sha) => commitFiles(root, sha)));
+              return [root, [...new Set(lists.flat())].sort()];
+            })
+          );
+          return [c.id, perRepo];
         })
       );
-      if (!cancelled) setState({ key, byChunk: Object.fromEntries(entries) });
+      if (cancelled) return;
+      const byChunk = {};
+      const byRepo = {};
+      for (const [id, perRepo] of entries) {
+        byChunk[id] = [...new Set(perRepo.flatMap(([, files]) => files))].sort();
+        byRepo[id] = Object.fromEntries(perRepo);
+      }
+      setState({ key, byChunk, byRepo });
     })();
     return () => {
       cancelled = true;
@@ -61,5 +74,5 @@ export function usePlanCommitFiles(plan, enabled = true) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, key]);
 
-  return { byChunk: state.byChunk, loading: enabled && state.key !== key };
+  return { byChunk: state.byChunk, byRepo: state.byRepo, loading: enabled && state.key !== key };
 }
