@@ -22,9 +22,10 @@ export function useFigureCompact() {
 // (default: the viewBox width, so 11px text stays 11px) the fallback renders
 // instead. `paper` sets --fig-paper so boxes and dots match the host surface.
 //
-// Compact mode draws too, from `compactViewBox` (marks only, no FIG label,
-// `label` as the hover tooltip). A figure without a `compactViewBox` has not
-// been given a compact form yet and shows `fallback` in compact mode.
+// Compact mode always draws: in `compactViewBox` (defaults to `viewBox`),
+// without the FIG label, with `label` as the hover tooltip. The figure reads
+// useFigureCompact() to keep its marks and drop the text. `fallback` is only
+// for a container narrower than the floor (`compactMinWidth` in compact).
 export function Figure({
   fig,
   title,
@@ -41,20 +42,17 @@ export function Figure({
   const compact = useFigureCompact();
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(null);
-  const textOnly = compact && !compactViewBox;
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
-    if (textOnly || !el) return undefined;
+    if (!el) return undefined;
     setWidth(el.getBoundingClientRect().width);
     const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [textOnly]);
+  }, []);
 
-  if (textOnly) return fallback;
-
-  const box = compact ? compactViewBox : viewBox;
+  const box = compact ? (compactViewBox ?? viewBox) : viewBox;
   const vb = parseViewBox(box);
   const floor = (compact ? compactMinWidth : minWidth) ?? vb.width;
   const tooNarrow = width != null && width < floor;

@@ -23,8 +23,8 @@ FIG 27, 28 and 30 are never reused (see `registry.js`).
     to the tooltip.
   - Mechanics (chunk 1): `Figure` takes `compactViewBox` (and optional `compactMinWidth`). With it, compact mode draws
     the children in that box, without the FIG label, with `label` as the `title` tooltip. Figures read
-    `useFigureCompact()` to decide what to drop. Without `compactViewBox`, compact still shows `fallback` (only until
-    chunk 14 converts the old figures).
+    `useFigureCompact()` to decide what to drop. `compactViewBox` defaults to `viewBox`; since chunk 14
+    every figure has a compact form and compact never swaps to `fallback`.
   - `fallback` stays for missing data and too-narrow containers.
 - Shared parts (P1, P3, P5, P6) live in `src/components/instrument/` and are plain components, not `Figure`s (no FIG
   label). They read `useFigureCompact()` for their compact form.
@@ -50,7 +50,7 @@ FIG 27, 28 and 30 are never reused (see `registry.js`).
 | 11 | P4 chunk progress as nodes everywhere | C | done |
 | 12 | P6 durations on a shared ruler | C | done |
 | 13 | FIG 26 where a job is allowed to write | C | done |
-| 14 | P0 retrofit: compact forms for FIG 06–22 | — | to do |
+| 14 | P0 retrofit: compact forms for FIG 06–22 | — | done |
 | 15 | Docs and polish | — | to do |
 
 Lanes A, B and C touch mostly separate files and run in parallel worktrees; they merge back before 14.
