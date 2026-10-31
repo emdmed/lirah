@@ -1372,6 +1372,73 @@ body {
     margin-left: -5.5px;
   }
 
+  /* P1, the printed lg meter (figures: full): numbered majors above, the
+     alert threshold raised over them, and the reading boxed below on an
+     elbow leader from the needle. Drawn in the figure kit's legend face. */
+  .ins-meter[data-printed] .ins-meter-scale {
+    margin-top: 30px;
+    margin-bottom: 44px;
+  }
+  .ins-meter[data-printed] :is(.ins-meter-nums, .ins-meter-alert, .ins-meter-callout) {
+    font-family: var(--font-legend);
+    font-size: 11px;
+    line-height: 13px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .ins-meter[data-printed] .ins-meter-zone { opacity: 1; }
+  .ins-meter-nums > span {
+    position: absolute;
+    bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+    color: var(--ins-faint);
+  }
+  .ins-meter-nums > span:first-child { transform: none; }
+  .ins-meter-alert {
+    position: absolute;
+    top: -16px;
+    bottom: 0;
+    width: 1px;
+    background: color-mix(in srgb, var(--ins-fault) 55%, transparent);
+  }
+  .ins-meter-alert > span {
+    position: absolute;
+    bottom: calc(100% + 1px);
+    left: 0;
+    transform: translateX(-50%);
+    color: var(--ins-fault);
+  }
+  .ins-meter-callout {
+    position: absolute;
+    top: 100%;
+    width: 0;
+    height: 0;
+    transition: left var(--ins-dur-enter) var(--ins-ease-out);
+  }
+  .ins-meter-callout::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    width: 9px;
+    height: 21px;
+    border-bottom: 1px solid var(--ins-faint);
+  }
+  .ins-meter-callout[data-side="right"]::before { left: 0; border-left: 1px solid var(--ins-faint); }
+  .ins-meter-callout[data-side="left"]::before { right: 0; border-right: 1px solid var(--ins-faint); }
+  .ins-meter-box {
+    position: absolute;
+    top: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 3px 7px;
+    background: var(--fig-paper, var(--ins-panel));
+    box-shadow: inset 0 0 0 1px var(--ins-edge-strong);
+    color: var(--color-muted-foreground, var(--ins-legend));
+  }
+  .ins-meter-callout[data-side="right"] .ins-meter-box { left: 9px; }
+  .ins-meter-callout[data-side="left"] .ins-meter-box { right: 9px; }
+  .ins-meter-box-value { color: var(--color-foreground); }
+
   .ins-meter-readout {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
@@ -1814,6 +1881,7 @@ body {
     background: color-mix(in srgb, var(--ins-lamp) 55%, var(--ins-lamp-off));
   }
   .ins-meter-needle,
+  .ins-meter-callout,
   .ins-meter-fill,
   .ins-meter-zone,
   .ins-switch-knob,

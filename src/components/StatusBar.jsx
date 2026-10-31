@@ -161,6 +161,7 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
             value={value}
             max={max || 1}
             size="lg"
+            printed={false}
             readout={false}
             caution={heavy}
             label={legend === 'Ctx' ? 'Context window' : 'Daily budget'}

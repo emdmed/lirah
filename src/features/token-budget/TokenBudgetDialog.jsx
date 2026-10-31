@@ -84,7 +84,7 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
           limit={parseInt(value)}
           used={currentUsage.total}
           rows={projectStats?.daily_activity}
-          fallback={<Meter value={currentUsage.total} max={parseInt(value)} label={`${label} used`} />}
+          fallback={<Meter value={currentUsage.total} max={parseInt(value)} size="lg" label={`${label} used`} />}
         />
       )}
     </div>

@@ -22,6 +22,7 @@ import { boundKeysFor } from '../lib/shortcuts';
 import { ProgressReadout } from '../features/plans/parts';
 import { Span, SpanRuler, SpanScale } from '../components/instrument/Span';
 import { Fig26Isolation } from '../features/agent-jobs/Fig26Isolation';
+import { Meter } from '../components/instrument/Meter';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -260,9 +261,14 @@ export function FigureSheet() {
         {FIGS.map((f) => <Card key={f.n} fig={f} width={f.w} />)}
       </div>
 
+      <div className="mb-2 mt-6 ins-legend">Round 3 · lane A</div>
+      <div className="flex flex-wrap items-start gap-3">
+        {FIGS_A.map((f) => <Card key={f.n} fig={f} width={f.w} />)}
+      </div>
+
       <div className="mb-2 mt-6 ins-legend">Narrow ({NARROW}px): fallbacks</div>
       <div className="flex flex-wrap items-start gap-3">
-        {FIGS.map((f) => <Card key={f.n} fig={f} width={NARROW} />)}
+        {[...FIGS, ...FIGS_A].map((f) => <Card key={f.n} fig={f} width={NARROW} />)}
       </div>
 
       <div className="mb-2 mt-6 ins-legend">Round 3 · lane C</div>
@@ -427,3 +433,9 @@ function LaneB() {
     </>
   );
 }
+// round 3 · lane A
+const FIGS_A = [
+  { n: 'P1', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" label="Context" /></div> },
+  { n: 'P1w', w: 420, el: () => <div className="px-1"><Meter value={176_000} max={200_000} size="lg" label="Context" /></div> },
+  { n: 'P1s', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" printed={false} label="Context" /></div> },
+];

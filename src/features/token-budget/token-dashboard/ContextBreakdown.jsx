@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Scanner } from '@/components/instrument/Scanner';
 import { Meter } from '@/components/instrument/Meter';
+import { useFigureCompact } from '@/components/instrument/figure';
 import { EmptyState } from '@/components/EmptyState';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatTokenCount } from '../tokenCalculations';
@@ -42,6 +43,9 @@ export function ContextBreakdown({ tokenUsage, projectPath, palette = {} }) {
   const { breakdown, loading, error } = useContextBreakdown(sessionFile, tokenUsage?.context_tokens, true);
   const [group, setGroup] = useState(null);
   const [view, setView] = useState('items');
+  // Full figures: the printed meter boxes "used / max · %", so the sentence
+  // beside it stops repeating the share.
+  const printed = !useFigureCompact();
 
   const colorOf = useMemo(() => (g) => groupColor(palette, g), [palette]);
 
@@ -87,9 +91,11 @@ export function ContextBreakdown({ tokenUsage, projectPath, palette = {} }) {
         <div className="flex items-baseline gap-3 text-xs flex-wrap">
           <span className="text-lg font-bold tabular-nums">{formatTokenCount(total)}</span>
           <span className="text-muted-foreground">
-            tokens in context{fill ? ` · ${pct(total, fill.max)} of ${formatTokenCount(fill.max)}` : ''}
+            tokens in context{fill && !printed ? ` · ${pct(total, fill.max)} of ${formatTokenCount(fill.max)}` : ''}
           </span>
-          {fill && <Meter value={total} max={fill.max} readout={false} label="Context window" className="w-40" />}
+          {fill && (printed
+            ? <Meter value={total} max={fill.max} size="lg" label="Context window" className="self-center" />
+            : <Meter value={total} max={fill.max} readout={false} label="Context window" className="w-40" />)}
           <span className="text-muted-foreground ml-auto flex items-center gap-2">
             {loading && <Scanner label="Updating" />}
             {sourceNote}
