@@ -2,6 +2,21 @@
 
 All notable changes to Lirah will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Calibrated figures** - Small measured drawings, in the manner of an engineering drawing, now explain the features that are hard to put in a sentence. Each replaces the text or progress bar it explains, and each falls back to that text in narrow panes:
+  - FIG.06 context window, split into the last turn's cache read, cache write and input, magnified in an inset
+  - FIG.09 auto-pilot loop, FIG.16 chunk ruler, FIG.20 plan timeline, FIG.21 plan branch with chunk commits and FIG.22 files by chunk
+  - FIG.10 sandbox section, FIG.11 auto-merge plan with the commands it will run, FIG.12 race lanes and FIG.13 subagent fan-out
+  - FIG.14 budget ruler with today's pace, FIG.15 keyboard plate for held modifiers, FIG.19 file detail levels with token counts
+- **Figures setting** - Settings → Appearance → Figures (`:figures full|compact`). Compact keeps the previous text-only UI.
+
+### Changed
+
+- The live star in a figure glides to its next place and takes the lamps' softer glow in light themes; reduced motion snaps it.
+
 ## [0.1.13] - 2026-02-16
 
 ### Added

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { DASH, Figure, INK, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { DASH, Figure, Glow, INK, Node, STROKE, T, textWidth } from '@/components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { shortcutKeys } from '../../lib/shortcuts';
 import { CHUNK_STATUS, planProgress } from './planModel';
@@ -182,9 +182,9 @@ export function fig21Layout({ plan, width }) {
     const w = textWidth(text) + 14;
     y += 8;
     parts.push(
-      <g key="ready" style={{ filter: `drop-shadow(0 0 3px ${INK.lamp})` }}>
+      <Glow key="ready">
         <OneLineBox x={width - w} y={y} width={w} text={text} color={INK.lamp} stroke={INK.lamp} />
-      </g>,
+      </Glow>,
     );
     y += 19;
   }

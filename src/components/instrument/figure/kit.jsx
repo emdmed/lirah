@@ -27,9 +27,10 @@ export const STROKE = { hair: 1, ink: 1.3, emphasis: 1.6, heavy: 2 };
 // Dash patterns, finest first: projection, pending, planned, out of reach.
 export const DASH = { fine: '2 3', medium: '4 3', long: '5 4', sparse: '2 4' };
 
-// Departure Mono at 11px advances about 6.6px per character. Layout uses this
+// Departure Mono at 11px advances 7px per character (its 7px pixel cell;
+// 6.6 left one-line boxes a character short). Layout uses this
 // estimate rather than measuring, so figures lay out in one pass.
-export const CH = 6.6;
+export const CH = 7;
 export const textWidth = (s, tracking = 0) => String(s).length * (CH + tracking);
 
 const LEGEND = {
@@ -38,15 +39,22 @@ const LEGEND = {
   fontVariantNumeric: 'tabular-nums',
 };
 
-// Text in the legend face. `anchor` is start | middle | end.
-export function T({ x, y, children, color = INK.muted, anchor = 'start', tracking = 0, className }) {
+// Text in the legend face. `anchor` is start | middle | end. `halo` rings the
+// glyphs in paper, so a line drawn under the text breaks around it (as
+// drawings break a leader at a dimension figure).
+export function T({ x, y, children, color = INK.muted, anchor = 'start', tracking = 0, halo = false, className }) {
   return (
     <text
       x={x}
       y={y}
       textAnchor={anchor}
       className={className}
-      style={{ ...LEGEND, fill: color, letterSpacing: tracking || undefined }}
+      style={{
+        ...LEGEND,
+        fill: color,
+        letterSpacing: tracking || undefined,
+        ...(halo && { stroke: INK.paper, strokeWidth: 4, strokeLinejoin: 'round', paintOrder: 'stroke' }),
+      }}
     >
       {children}
     </text>
@@ -123,18 +131,28 @@ export function Dim({ x1, x2, y, label, color = INK.muted }) {
   );
 }
 
+// The lamp glow, for the one lit thing in a figure. Colour and strength
+// come from index.css (.fig-glow), so light themes take the softer
+// --lamp-glow the lamps use. `live` marks the moving star (.fig-live).
+export function Glow({ live = false, style, children }) {
+  return <g className={live ? 'fig-glow fig-live' : 'fig-glow'} style={style}>{children}</g>;
+}
+
 // A state node. done: filled square; todo: outlined square; merge: diamond;
 // live: the lamp star, the only mark that glows.
 export function Node({ x, y, state = 'todo', size = 8 }) {
   const h = size / 2;
   if (state === 'live') {
+    // Drawn at the origin and moved by a CSS transform, so a redraw that
+    // moves it (a clock tick, the next step) glides over --ins-dur-base;
+    // reduced motion snaps it (index.css .fig-live).
     const r = size;
     const s = size / 4;
-    const d = `M${x} ${y - r}L${x + s} ${y - s}L${x + r} ${y}L${x + s} ${y + s}L${x} ${y + r}L${x - s} ${y + s}L${x - r} ${y}L${x - s} ${y - s}Z`;
+    const d = `M0 ${-r}L${s} ${-s}L${r} 0L${s} ${s}L0 ${r}L${-s} ${s}L${-r} 0L${-s} ${-s}Z`;
     return (
-      <g style={{ filter: `drop-shadow(0 0 4px ${INK.lamp})` }}>
+      <Glow live style={{ transform: `translate(${x}px, ${y}px)` }}>
         <path d={d} style={{ fill: INK.lamp }} />
-      </g>
+      </Glow>
     );
   }
   if (state === 'done') {
@@ -161,7 +179,8 @@ export function Node({ x, y, state = 'todo', size = 8 }) {
 }
 
 // A ruler from x0 to x1 for 0..max, a tick every `step`, numbered every
-// `labelEvery` ticks. Ticks hang down unless `up`.
+// `labelEvery` ticks. Ticks hang down unless `up`. Numbers carry a halo:
+// draw leaders and projection lines before the ruler and they break at them.
 export function Ruler({ x0, x1, y, max, step, labelEvery = 1, fmt = String, up = false }) {
   const ticks = [];
   const n = max > 0 && step > 0 ? Math.floor(max / step + 1e-9) : 0;
@@ -180,7 +199,7 @@ export function Ruler({ x0, x1, y, max, step, labelEvery = 1, fmt = String, up =
           style={{ stroke: major ? INK.faint : INK.edgeStrong, strokeWidth: STROKE.hair }}
         />
         {major && (
-          <T x={x} y={up ? y - 10 : y + 17} color={INK.faint} anchor={i === 0 ? 'start' : 'middle'}>
+          <T x={x} y={up ? y - 10 : y + 17} color={INK.faint} anchor={i === 0 ? 'start' : 'middle'} halo>
             {fmt(v)}
           </T>
         )}

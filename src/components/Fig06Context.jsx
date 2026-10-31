@@ -110,7 +110,6 @@ export function Fig06Context({ tokenUsage, fallback, className }) {
           style={{ stroke: WARN, strokeWidth: STROKE.hair }}
         />
       )}
-      <Ruler x0={X0} x1={X1} y={RULER_Y} max={max} step={max / 10} labelEvery={5} fmt={formatTokenCount} />
 
       {/* Inset: the start of the window magnified, split into the turn's parts. */}
       <Inset from={[X0, X0 + (X1 - X0) / k, RULER_Y]} box={INSET}>
@@ -125,6 +124,8 @@ export function Fig06Context({ tokenUsage, fallback, className }) {
           />
         ))}
       </Inset>
+      {/* After the inset, so its projection lines break at the numbers. */}
+      <Ruler x0={X0} x1={X1} y={RULER_Y} max={max} step={max / 10} labelEvery={5} fmt={formatTokenCount} />
       <T x={X1 + 8} y={INSET.y + INSET.height - 2}>{`× ${fmtFactor(k)}`}</T>
 
       {/* Leaders from each part to its box. */}

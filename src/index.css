@@ -1114,7 +1114,18 @@ body {
     transition-duration: var(--ins-warm);
   }
 
-  :root[data-theme="light"] .ins-lamp { --lamp-glow: 50%; }
+  :root[data-theme="light"] :is(.ins-lamp, .fig-glow) { --lamp-glow: 50%; }
+
+  /* Figure glow (kit Glow): the one lit thing in a FIG drawing, in the
+     lamp's colour and strength. .fig-live is the moving star: it glides to
+     its next place (a clock tick, the next step) like a lit legend. */
+  .fig-glow {
+    filter: drop-shadow(0 0 var(--fig-glow, 3px) color-mix(in srgb, var(--ins-lamp) var(--lamp-glow), transparent));
+  }
+  .fig-live {
+    --fig-glow: 4px;
+    transition: transform var(--ins-dur-base) var(--ins-ease-out);
+  }
 
   /* Blinks by repainting the face and glow, never by animating opacity: an
      opacity animation on a filtered element makes WebKitGTK re-composite,
@@ -1793,6 +1804,7 @@ body {
   .ins-lamp[data-blink],
   .ins-lamp[data-blink]::before { animation: none; }
   .ins-pulse { animation: none; }
+  .fig-live { transition: none; }
   /* Still reads as "busy": every segment held half-lit. */
   .ins-scan > i {
     animation: none;

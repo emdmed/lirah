@@ -106,6 +106,10 @@ export function Fig14Budget({ kind, limit, used, rows, fallback, now = new Date(
       <T x={warnX - 3} y={RULER_Y - 13} anchor="end" color={WARN}>{daily ? `alert ${pct(WARN_AT)}` : pct(WARN_AT)}</T>
       <T x={faultX + 3} y={RULER_Y - 13} color={INK.fault}>{pct(FAULT_AT)}</T>
 
+      {/* Leaders to the boxes, under the ruler so they break at its numbers. */}
+      <Leader points={[[usedX, RULER_Y + 7], [usedX, RULER_Y + 22], [USED_W / 2, RULER_Y + 22], [USED_W / 2, BOX_Y]]} dot={false} />
+      {pace && <Leader points={[[paceX, RULER_Y + 7], [paceX, RULER_Y + 26], [PACE_X + PACE_W / 2, RULER_Y + 26], [PACE_X + PACE_W / 2, BOX_Y]]} dot={false} />}
+
       {/* Used: a bar from 0, ending in a node. */}
       <rect x={X0} y={RULER_Y - 7} width={Math.max(usedX - X0, 1)} height={6} style={{ fill: tone }} />
       <Ruler x0={X0} x1={X1} y={RULER_Y} max={limit} step={limit / 15} labelEvery={5} fmt={formatTokenCount} />
@@ -121,11 +125,9 @@ export function Fig14Budget({ kind, limit, used, rows, fallback, now = new Date(
       <Node x={usedX} y={barY} state="done" size={6} />
 
       {/* Boxes: used on the left, pace on the right. */}
-      <Leader points={[[usedX, RULER_Y + 7], [usedX, RULER_Y + 22], [USED_W / 2, RULER_Y + 22], [USED_W / 2, BOX_Y]]} dot={false} />
       <Box x={0} y={BOX_Y} width={USED_W} label={`USED · ${hhmm(now)}`} value={formatTokenCount(used)} valueColor={tone} />
       {pace && (
         <>
-          <Leader points={[[paceX, RULER_Y + 7], [paceX, RULER_Y + 26], [PACE_X + PACE_W / 2, RULER_Y + 26], [PACE_X + PACE_W / 2, BOX_Y]]} dot={false} />
           <Box x={PACE_X} y={BOX_Y} width={PACE_W} label="AT THIS PACE BY 24:00" value={paceValue} valueColor={INK.lamp} />
           <T x={W} y={BOX_Y + 46} anchor="end" color={INK.faint}>today, all sessions</T>
         </>

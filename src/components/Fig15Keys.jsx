@@ -1,4 +1,4 @@
-import { Figure, INK, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { Figure, Glow, INK, STROKE, T, textWidth } from '@/components/instrument/figure';
 import { useModifierHold } from '../hooks/useModifierHold';
 import { boundKeysFor, compactKeys } from '../lib/shortcuts';
 
@@ -85,7 +85,7 @@ function ModCap({ x, y = MY, w, face, held }) {
   );
   return (
     <g>
-      {held ? <g style={{ filter: `drop-shadow(0 0 3px ${INK.lamp})` }}>{rect}</g> : rect}
+      {held ? <Glow>{rect}</Glow> : rect}
       <T x={x + 5} y={y + 15} color={held ? INK.lamp : INK.faint}>{face}</T>
     </g>
   );

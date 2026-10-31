@@ -126,7 +126,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
       <g key={m}>
         <line x1={tx} x2={tx} y1={RULER_Y} y2={RULER_Y + (isMajor ? 6 : 3)} style={{ stroke: isMajor ? INK.faint : INK.edgeStrong, strokeWidth: STROKE.hair }} />
         {isMajor && (
-          <T x={tx} y={RULER_Y + 17} color={INK.faint} anchor={m === 0 ? 'start' : 'middle'}>{m === 0 ? '0' : fmtMin(m)}</T>
+          <T x={tx} y={RULER_Y + 17} color={INK.faint} anchor={m === 0 ? 'start' : 'middle'} halo>{m === 0 ? '0' : fmtMin(m)}</T>
         )}
       </g>,
     );
@@ -157,6 +157,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
 
   // The slowest span's callout, under the ruler, kept clear of the idle note.
   let box = null;
+  let leader = null;
   if (t.slowest) {
     const s = laid.find((l) => l.n === t.slowest.n && !l.live);
     const value = `chunk ${s.n} · ${formatDuration(s.dur)}`;
@@ -168,12 +169,9 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
     const bw = Math.max(textWidth(label), textWidth(value)) * 1.08 + 14;
     const mid = (s.a + s.b) / 2;
     const bx = Math.max(0, Math.min(room - bw, mid - 12));
-    box = (
-      <g>
-        <Leader points={[[mid, LINE_Y + 2], [mid, BOX_Y]]} />
-        <Box x={bx} y={BOX_Y} width={bw} label={label} value={value} />
-      </g>
-    );
+    // Drawn before the ruler, so it breaks at the minute numbers.
+    leader = <Leader points={[[mid, LINE_Y + 2], [mid, BOX_Y]]} />;
+    box = <Box x={bx} y={BOX_Y} width={bw} label={label} value={value} />;
   }
 
   return (
@@ -213,6 +211,7 @@ export function Fig20Drawing({ plan, width, now, showCount = true }) {
       {laid.map((s) => <Node key={`d${s.n}`} x={s.b} y={LINE_Y} state={s.live ? 'live' : 'done'} size={s.live ? 6 : 5} />)}
       {nums}
 
+      {leader}
       {segs.map(([a, b]) => (
         <line key={`r${a}`} x1={a} x2={b} y1={RULER_Y} y2={RULER_Y} style={{ stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
       ))}

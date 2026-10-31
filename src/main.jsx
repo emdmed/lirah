@@ -14,6 +14,7 @@ import { ToastProvider } from "./features/toast";
 import { TitleTooltips } from "./components/TitleTooltips";
 import { DialogProvider } from "./features/dialogs/DialogProvider";
 import { InstrumentKit } from "./dev/InstrumentKit";
+import { FigureSheet } from "./dev/FigureSheet";
 import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { perfMark } from "./lib/perf";
@@ -24,13 +25,15 @@ perfMark("app:start");
 
 // `?kit` (dev only) shows the Instrument TUI component sheet instead of the app.
 const showKit = import.meta.env.DEV && new URLSearchParams(window.location.search).has("kit");
+// `?figs` (dev only) shows every FIG drawing with mock data; `&theme=<key>` picks the theme.
+const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ToastProvider>
       <ThemeProvider>
         <DialogProvider>
-        {showKit ? <InstrumentKit /> : (
+        {showKit ? <InstrumentKit /> : showFigs ? <FigureSheet /> : (
         <WatcherProvider>
           <BookmarksProvider>
             <PromptTemplatesProvider>

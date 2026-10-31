@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Box, DASH, Figure, Hatch, INK, Leader, STROKE, T, textWidth } from '@/components/instrument/figure';
+import { Box, DASH, Figure, Glow, Hatch, INK, Leader, STROKE, T, textWidth } from '@/components/instrument/figure';
 import { tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 
@@ -182,10 +182,12 @@ export function Fig10Drawing({ spec, tabName, fallback = null, paper, className 
       {spec.net_isolated && (
         <g>
           <rect x={BX - 132} y={bTop - 7} width={124} height={14} style={{ fill: INK.paper }} />
-          <path
-            d={`M${BX - 126} ${bTop - 4}l7 7m0 -7l-7 7`}
-            style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.emphasis, filter: `drop-shadow(0 0 3px ${INK.lamp})` }}
-          />
+          <Glow>
+            <path
+              d={`M${BX - 126} ${bTop - 4}l7 7m0 -7l-7 7`}
+              style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.emphasis }}
+            />
+          </Glow>
           <T x={BX - 112} y={bTop + 4} color={INK.lamp}>network isolated</T>
         </g>
       )}
