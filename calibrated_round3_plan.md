@@ -51,7 +51,7 @@ FIG 27, 28 and 30 are never reused (see `registry.js`).
 | 12 | P6 durations on a shared ruler | C | done |
 | 13 | FIG 26 where a job is allowed to write | C | done |
 | 14 | P0 retrofit: compact forms for FIG 06–22 | — | done |
-| 15 | Docs and polish | — | to do |
+| 15 | Docs and polish | — | done |
 
 Lanes A, B and C touch mostly separate files and run in parallel worktrees; they merge back before 14.
 
