@@ -1,6 +1,7 @@
 // FIG numbers are stable: once a figure ships under a number, the number
 // stays with it, so docs and commands can cite "FIG.10". Gaps are figures
-// that were drawn and dropped; never reuse them.
+// that were drawn and dropped (17, 18 unbuilt; 27, 28, 30 dropped in round
+// 3); never reuse them.
 export const FIGURES = Object.freeze({
   6: { key: 'context', title: 'CONTEXT' },
   9: { key: 'autopilot', title: 'AUTO-PILOT' },
@@ -15,6 +16,13 @@ export const FIGURES = Object.freeze({
   20: { key: 'timeline', title: 'PLAN TIMELINE' },
   21: { key: 'plan-git', title: 'PLAN GIT' },
   22: { key: 'files-by-chunk', title: 'FILES BY CHUNK' },
+  23: { key: 'context-sources', title: 'CONTEXT SOURCES' },
+  24: { key: 'prompt-cost', title: 'PROMPT COST' },
+  25: { key: 'diff-map', title: 'DIFF MAP' },
+  26: { key: 'job-isolation', title: 'WHERE IT WRITES' },
+  29: { key: 'spend-by-model', title: 'SPEND BY MODEL' },
+  31: { key: 'subject', title: 'SUBJECT' },
+  32: { key: 'files-by-intent', title: 'FILES BY INTENT' },
 });
 
 // The FIG number for a figure key, e.g. figNumber('sandbox') === 10.

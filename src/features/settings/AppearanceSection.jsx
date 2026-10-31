@@ -59,8 +59,8 @@ function ThemeList({ themes, value, onChange }) {
 }
 
 const FIGURE_OPTIONS = [
-  { value: 'full', label: 'full', title: 'Draw figures' },
-  { value: 'compact', label: 'compact', title: 'Keep the text' },
+  { value: 'full', label: 'full', title: 'Print scales, values and leaders' },
+  { value: 'compact', label: 'compact', title: 'Marks only; values in the tooltip' },
 ];
 
 /** The Appearance section: the theme, the window's title bar, and figures. */

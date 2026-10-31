@@ -54,8 +54,8 @@ export const SETTINGS_DEFAULTS = {
   startupProjects: [],
   // The agent in a tab may drive Lirah through the `lirah` CLI.
   agentControl: true,
-  // 'full' draws measured figures in place of lists and progress text;
-  // 'compact' keeps the text.
+  // 'full' draws figures with scales, boxed values and leaders; 'compact'
+  // keeps their marks only, with the values in the tooltip.
   figures: 'full',
 };
 

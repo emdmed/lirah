@@ -58,7 +58,7 @@ export const SETTINGS_ROWS = [
   },
   {
     id: 'figures', section: 'appearance', kind: 'choice', key: 'figures',
-    label: 'Figures', hint: 'Draw measured figures in place of lists and progress text. Compact keeps the text.',
+    label: 'Figures', hint: 'Full prints scales and values. Compact keeps the marks only.',
     words: 'figures drawings diagrams compact full calibrated',
   },
   {

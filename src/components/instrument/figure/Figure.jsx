@@ -8,16 +8,29 @@ function parseViewBox(viewBox) {
   return { x, y, width, height };
 }
 
-// A drawn figure, or its compact fallback. `fig` is a FIG number or key from
-// registry.js; the title defaults to the registry's. The drawing scales down
-// with its container but never above 1:1, and when the container is narrower
-// than `minWidth` (default: the viewBox width, so 11px text stays 11px) the
-// fallback renders instead. `fallback` is also what figures: compact shows.
-// `paper` sets --fig-paper so boxes and dots match the host surface.
+// True when figures: compact is set. Compact figures keep their marks
+// (nodes, spans, ticks) and drop scale numbers, boxes, leaders and the FIG
+// label; the values move to the tooltip (the figure's `label`).
+export function useFigureCompact() {
+  const [mode] = useSetting('figures');
+  return mode === 'compact';
+}
+
+// A drawn figure. `fig` is a FIG number or key from registry.js; the title
+// defaults to the registry's. The drawing scales down with its container but
+// never above 1:1, and when the container is narrower than `minWidth`
+// (default: the viewBox width, so 11px text stays 11px) the fallback renders
+// instead. `paper` sets --fig-paper so boxes and dots match the host surface.
+//
+// Compact mode draws too, from `compactViewBox` (marks only, no FIG label,
+// `label` as the hover tooltip). A figure without a `compactViewBox` has not
+// been given a compact form yet and shows `fallback` in compact mode.
 export function Figure({
   fig,
   title,
   viewBox,
+  compactViewBox,
+  compactMinWidth,
   fallback = null,
   label,
   minWidth,
@@ -25,36 +38,42 @@ export function Figure({
   className,
   children,
 }) {
-  const [mode] = useSetting('figures');
+  const compact = useFigureCompact();
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(null);
-  const compact = mode === 'compact';
+  const textOnly = compact && !compactViewBox;
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
-    if (compact || !el) return undefined;
+    if (textOnly || !el) return undefined;
     setWidth(el.getBoundingClientRect().width);
     const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [compact]);
+  }, [textOnly]);
 
-  if (compact) return fallback;
+  if (textOnly) return fallback;
 
-  const vb = parseViewBox(viewBox);
-  const floor = minWidth ?? vb.width;
+  const box = compact ? compactViewBox : viewBox;
+  const vb = parseViewBox(box);
+  const floor = (compact ? compactMinWidth : minWidth) ?? vb.width;
   const tooNarrow = width != null && width < floor;
 
   const n = typeof fig === 'number' ? fig : figNumber(fig);
   const heading = title ?? (n != null ? FIGURES[n]?.title : undefined);
 
   return (
-    <div ref={wrapRef} className={className} style={{ width: '100%', minWidth: 0 }}>
+    <div
+      ref={wrapRef}
+      className={className}
+      title={compact ? label : undefined}
+      style={{ width: '100%', minWidth: 0 }}
+    >
       {tooNarrow ? fallback : (
         <svg
           role="img"
           aria-label={label}
-          viewBox={viewBox}
+          viewBox={box}
           preserveAspectRatio="xMinYMin meet"
           style={{
             display: 'block',
@@ -65,7 +84,7 @@ export function Figure({
             '--fig-paper': paper,
           }}
         >
-          {n != null && <FigLabel n={n} title={heading} x={vb.x} y={vb.y + 11} />}
+          {n != null && !compact && <FigLabel n={n} title={heading} x={vb.x} y={vb.y + 11} />}
           {children}
         </svg>
       )}
