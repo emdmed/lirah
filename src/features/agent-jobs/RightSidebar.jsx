@@ -1,7 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, Suspense } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
-import { useTick } from '../../hooks/useTick';
 import { getSettings, setSetting, useSeededSetting, useSetting } from '../settings/settingsStore';
 import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -17,6 +16,7 @@ import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
 import { Keycap, KeyChord } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
+import { Span, SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { jobsPaneRequest } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
 import { Fig12Race } from './Fig12Race';
@@ -88,6 +88,8 @@ function groupJobs(list) {
   return out;
 }
 
+const spanItem = (j) => ({ startedAt: j.startedAt, endedAt: j.endedAt, running: j.status === 'running' });
+
 function RightSidebarPanel({ projectPath, onNewTab }) {
   const {
     jobs,
@@ -126,6 +128,10 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
   const visibleJobs = jobs.filter((j) => !j.archived);
   const archivedJobs = jobs.filter((j) => j.archived);
+  // P6: the durations drawn in a list share one scale. With full figures race
+  // candidates draw theirs in FIG.12's lanes, so they stay off it.
+  const [figures] = useSetting('figures');
+  const spanJobs = visibleJobs.filter((j) => figures === 'compact' || !j.raceId).map(spanItem);
   const collapsed = collapsedOverride ?? false;
   const atTabLimit = openTabs.length >= MAX_TABS;
   const newTabTitle = atTabLimit ? `Tab limit reached (${MAX_TABS}) — close a tab first` : 'New tab (Ctrl+T)';
@@ -649,7 +655,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                 </div>
               </div>
             ) : (
+              <SpanScale items={spanJobs}>
               <div className="flex flex-col">
+                <SpanRuler className="flex justify-end px-2.5 pt-1" />
                 {groupJobs(visibleJobs).map((entry) =>
                   entry.type === 'race' ? (
                     <RaceGroup
@@ -663,6 +671,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   )
                 )}
               </div>
+              </SpanScale>
             )}
 
             <button
@@ -687,9 +696,11 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   <span className="tabular-nums">{archivedJobs.length}</span>
                 </button>
                 {showArchived && (
-                  <div className="flex flex-col gap-1.5 px-2 pt-0.5 opacity-80">
-                    {archivedJobs.map((job) => renderCard(job, { archived: true }))}
-                  </div>
+                  <SpanScale items={archivedJobs.map(spanItem)}>
+                    <div className="flex flex-col gap-1.5 px-2 pt-0.5 opacity-80">
+                      {archivedJobs.map((job) => renderCard(job, { archived: true }))}
+                    </div>
+                  </SpanScale>
                 )}
               </div>
             )}
@@ -822,11 +833,13 @@ function useOpenPlanCount(projectPath) {
   return useMemo(() => (plans || []).filter((p) => p.chunks?.some((c) => OPEN_CHUNK.has(c.status))).length, [plans]);
 }
 
-// Live elapsed time for a running job. Owns its ticker so only this text
-// re-renders each second, not the pane or the card.
-function Elapsed({ startedAt }) {
-  const now = useTick();
-  return jobDuration(startedAt, now);
+// A job's duration line (P6): lit while running, fault when it failed, muted
+// when it was stopped. The Span owns its ticker, so only it redraws each second.
+function spanTone(status) {
+  if (status === 'running') return 'live';
+  if (status === 'failed') return 'fault';
+  if (status === 'cancelled' || status === 'interrupted') return 'muted';
+  return 'done';
 }
 
 // Consecutive lines from the same stream joined into one string, so the log
@@ -904,10 +917,13 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
         >
           {job.label}
         </button>
-        {!hideTime && (
-          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-            {isRunning ? <Elapsed startedAt={job.startedAt} /> : duration}
-          </span>
+        {!hideTime && job.startedAt && (
+          <Span
+            startedAt={job.startedAt}
+            endedAt={job.endedAt}
+            tone={spanTone(job.status)}
+            title={isRunning ? 'Running' : `Took ${duration}`}
+          />
         )}
       </div>
 

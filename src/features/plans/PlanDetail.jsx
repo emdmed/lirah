@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Play, RefreshCw } from 'lucide-react';
 import { Lamp } from '../../components/instrument/Lamp';
+import { SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { PlanGitSection } from './PlanGitSection';
@@ -347,26 +348,36 @@ export function PlanDetail({ plan }) {
             const head = { key: seg.key, run: seg.run, unfolded: unfolded.has(seg.key) };
             return head.unfolded ? [head, ...seg.run.map((chunk) => ({ key: chunk.id, chunk }))] : [head];
           });
-          return rows.map((row) => {
-            return row.run ? (
-              <DoneRun
-                key={row.key}
-                chunks={row.run}
-                unfolded={row.unfolded}
-                onToggle={() => setUnfolded((s) => (s.has(row.key) ? withoutId(s, row.key) : withId(s, row.key)))}
-              />
-            ) : (
-              <ChunkRow
-                key={row.key}
-                plan={plan}
-                chunk={row.chunk}
-                open={open.has(row.chunk.id)}
-                onToggle={() => toggle(row.chunk)}
-                primary={!canPilot}
-                uncommitted={row.chunk.id === stuck?.id ? uncommitted : null}
-              />
-            );
-          });
+          // P6: the "took" lines of the rows on show share one scale, with its
+          // ruler over the right-hand column.
+          const spans = rows
+            .filter((row) => row.chunk?.status === CHUNK_STATUS.IMPLEMENTED && row.chunk.startedAt && row.chunk.doneAt)
+            .map(({ chunk }) => ({ startedAt: chunk.startedAt, endedAt: chunk.doneAt }));
+          return (
+            <SpanScale items={spans}>
+              <SpanRuler className="flex justify-end px-3 pb-0.5" />
+              {rows.map((row) => {
+                return row.run ? (
+                  <DoneRun
+                    key={row.key}
+                    chunks={row.run}
+                    unfolded={row.unfolded}
+                    onToggle={() => setUnfolded((s) => (s.has(row.key) ? withoutId(s, row.key) : withId(s, row.key)))}
+                  />
+                ) : (
+                  <ChunkRow
+                    key={row.key}
+                    plan={plan}
+                    chunk={row.chunk}
+                    open={open.has(row.chunk.id)}
+                    onToggle={() => toggle(row.chunk)}
+                    primary={!canPilot}
+                    uncommitted={row.chunk.id === stuck?.id ? uncommitted : null}
+                  />
+                );
+              })}
+            </SpanScale>
+          );
         })()}
         {/* Keys for the list, only while it has focus. */}
         {total > 0 && (

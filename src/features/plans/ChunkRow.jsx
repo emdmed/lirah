@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
+import { Span } from '../../components/instrument/Span';
 import { Field, Prose } from './parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
@@ -288,8 +289,13 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
             </span>
           )}
           {busy ? <Scanner /> : implemented ? took && (
-            <span className="tabular-nums" title={`${status}; took ${took} from sending to commit`}>{took}</span>
-          ) : isNext && chunk.status === CHUNK_STATUS.PENDING ? (
+            <Span
+              startedAt={chunk.startedAt}
+              endedAt={chunk.doneAt}
+              format={formatDuration}
+              title={`${status}; took ${took} from sending to commit`}
+            />
+          ) :isNext && chunk.status === CHUNK_STATUS.PENDING ? (
             <span className="text-foreground">next</span>
           ) : chunk.status !== CHUNK_STATUS.PENDING ? (
             <span className="tabular-nums">{status}</span>

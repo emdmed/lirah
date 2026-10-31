@@ -16,6 +16,7 @@ import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
 import { Fig19Detail } from '../features/file-analysis/Fig19Detail';
 import { boundKeysFor } from '../lib/shortcuts';
 import { ProgressReadout } from '../features/plans/parts';
+import { Span, SpanRuler, SpanScale } from '../components/instrument/Span';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -285,4 +286,31 @@ const LANE_C = [
   { n: 'P4 done', w: 300, el: P4(PLAN_DONE) },
   { n: 'P4 40 chunks', w: 300, el: P4(PLAN_LONG) },
   { n: 'P4 narrow', w: 120, el: P4(PLAN_LONG) },
+  { n: 'P6 job list', w: 256, el: () => <SpanList rows={SPAN_JOBS} /> },
+  { n: 'P6 chunk rows', w: 300, el: () => <SpanList rows={SPAN_CHUNKS} /> },
+  { n: 'P6 one job', w: 256, el: () => <SpanList rows={SPAN_JOBS.slice(0, 1)} /> },
 ];
+
+const SPAN_JOBS = [
+  { name: 'pagination', startedAt: NOW - 30 * MIN, endedAt: NOW - 30 * MIN + 252_000 },
+  { name: 'rate-limit', startedAt: NOW - 20 * MIN, endedAt: NOW - 20 * MIN + 760_000 },
+  { name: 'docs-sweep', startedAt: NOW - 125_000, tone: 'live' },
+  { name: 'flaky test', startedAt: NOW - 9 * MIN, endedAt: NOW - 6 * MIN, tone: 'fault' },
+];
+const SPAN_CHUNKS = PLAN.chunks
+  .filter((c) => c.status === 'implemented')
+  .map((c) => ({ name: `${c.n}  ${c.title}`, startedAt: c.startedAt, endedAt: c.doneAt }));
+function SpanList({ rows }) {
+  const items = rows.map((r) => ({ startedAt: r.startedAt, endedAt: r.endedAt, running: r.tone === 'live' }));
+  return (
+    <SpanScale items={items}>
+      <SpanRuler className="flex justify-end" />
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-center gap-2 py-1 text-[11px]">
+          <span className="min-w-0 flex-1 truncate">{r.name}</span>
+          <Span startedAt={r.startedAt} endedAt={r.endedAt} tone={r.tone} />
+        </div>
+      ))}
+    </SpanScale>
+  );
+}

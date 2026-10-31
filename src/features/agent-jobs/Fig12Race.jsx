@@ -3,6 +3,7 @@ import { Figure, INK, STROKE, DASH, CH, T, Dim, Node, Ruler, textWidth } from '@
 import { formatTimer } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
 import { usePageVisible } from '../../hooks/usePageVisible';
+import { durationStep, fmtSecs } from '../../components/instrument/Span';
 
 // FIG 12: a race as lanes. One lane per candidate on a shared time scale,
 // from its start to its end (or now), with a dimension line giving its
@@ -38,17 +39,8 @@ function fit(text, chars) {
   return s.length <= chars ? s : `${s.slice(0, Math.max(1, chars - 1))}…`;
 }
 
-// Ruler steps in seconds; the first that leaves ~44px between ticks wins.
-const STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
-function rulerStep(maxSecs, width) {
-  return STEPS.find((s) => (s / maxSecs) * width >= 44) || STEPS[STEPS.length - 1];
-}
-function fmtSecs(v) {
-  if (v < 60) return `${v}s`;
-  const m = Math.floor(v / 60);
-  const s = v % 60;
-  return s ? `${m}m${s}s` : `${m}m`;
-}
+// Ruler steps and numbers come from the shared duration scale (P6, Span.jsx).
+const rulerStep = (maxSecs, width) => durationStep(maxSecs, width);
 
 function laneState(job) {
   if (job.status === 'running') return 'live';
