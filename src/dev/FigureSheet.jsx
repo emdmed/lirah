@@ -25,6 +25,7 @@ import { Fig26Isolation } from '../features/agent-jobs/Fig26Isolation';
 import { Meter } from '../components/instrument/Meter';
 import { Fig23Sources } from '../features/token-budget/Fig23Sources';
 import { Fig24PromptCost } from '../features/token-budget/Fig24PromptCost';
+import { Fig29Spend } from '../features/token-budget/Fig29Spend';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -468,6 +469,16 @@ const PROMPT_MANY = [
   { id: 'patterns', name: 'patterns', detail: '2', tokens: 340 },
   { id: 'system', name: 'agent system', tokens: 500 },
 ];
+const SPEND = [
+  { name: 'Opus 4.5', cost: 41.2, tokens: 9_820_400 },
+  { name: 'Sonnet 4.5', cost: 12.8, tokens: 6_140_200 },
+  { name: 'Haiku 4.5', cost: 1.1, tokens: 1_310_700 },
+];
+const SPEND_MANY = [
+  ...SPEND,
+  { name: 'Opus 4.1', cost: 0.42, tokens: 80_000 },
+  { name: 'Sonnet 4', cost: 0.18, tokens: 61_000 },
+];
 const FIGS_A = [
   { n: 'P1', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" label="Context" /></div> },
   { n: 'P1w', w: 420, el: () => <div className="px-1"><Meter value={176_000} max={200_000} size="lg" label="Context" /></div> },
@@ -476,5 +487,7 @@ const FIGS_A = [
   { n: 24, w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS} total={2_740} cost={0.04} budget={{ limit: 150_000, used: 88_400 }} fallback={fb('~2,740 tok')} /> },
   { n: '24m', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_MANY} total={6_820} cost={0.1} budget={{ limit: 150_000, used: 146_000 }} fallback={fb('~6,820 tok')} /> },
   { n: '24n', w: 380, paper: 'var(--ins-raised)', el: () => <Fig24PromptCost parts={PROMPT_PARTS.slice(0, 1).concat(PROMPT_PARTS.slice(3))} total={680} cost={0.01} budget={null} fallback={fb('~680 tok')} /> },
+  { n: 29, w: 560, el: () => <Fig29Spend models={SPEND} scope="nevo-terminal" fallback={fb('$55.10 by model')} /> },
+  { n: '29m', w: 560, el: () => <Fig29Spend models={SPEND_MANY} scope="nevo-terminal" fallback={fb('$55.70 by model')} /> },
   { n: 'P1s', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" printed={false} label="Context" /></div> },
 ];

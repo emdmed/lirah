@@ -24,6 +24,7 @@ import { UsageSummaryPanel } from './token-dashboard/UsageSummaryPanel';
 import { prepareChartData, calculateEfficiencyMetrics, prepareModelBreakdown, computeCost } from './dashboardData';
 import { exportToCSV, exportToJSON } from './exportData';
 import { formatCost } from './tokenCalculations';
+import { Fig29Spend } from './Fig29Spend';
 import { DEFAULT_MODEL } from '../../config/pricing';
 import { scanAllProjects, getAllSessions } from '../../utils/projectScanner';
 
@@ -321,59 +322,71 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                 </div>
 
                 <div className="flex flex-col gap-3 min-h-0 overflow-auto">
-                  <div className="bg-background rounded-none border edge-engraved p-3 shrink-0">
-                    <div className="text-xs font-medium mb-2">By Model</div>
-                    <div className="space-y-2">
-                      {modelBreakdown.map((mb, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
-                            />
-                            <span>{formatModelName(mb.model)}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium">{formatCost(mb.cost)}</div>
-                            <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
-                              {(mb.tokens / 1000).toFixed(1)}k tokens
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {modelBreakdown.length === 0 && (
-                        <EmptyState
-                          icon={BarChart3}
-                          title="No model data yet"
-                          description="Start using Claude Code to see token usage analytics by model"
-                          className="py-4"
-                        />
-                      )}
-                    </div>
-                  </div>
                   <UsageSummaryPanel sessionData={currentSessionData} tokenUsage={tokenUsage} colors={chartColors} />
                   <SessionEfficiencyPanel metrics={efficiencyMetrics} colors={chartColors} />
                 </div>
               </div>
 
+              {/* Figures: FIG.29 draws spend by model once; the "By Model"
+                  list and "Cost Breakdown" strip are its fallback. */}
               <div className="bg-background rounded-none border edge-engraved p-3 shrink-0">
-                <div className="text-xs font-medium mb-2">Cost Breakdown</div>
-                <div className="flex items-center gap-6 text-xs">
-                  {modelBreakdown.map((mb, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-xs"
-                        style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
-                      />
-                      <span className="text-muted-foreground">{formatModelName(mb.model)}:</span>
-                      <span className="font-medium">{formatCost(mb.cost)}</span>
+                <Fig29Spend
+                  models={modelBreakdown.map((mb) => ({ name: formatModelName(mb.model), cost: mb.cost, tokens: mb.tokens }))}
+                  scope={projectPath ? projectPath.split('/').filter(Boolean).pop() : undefined}
+                  fallback={(
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <div className="text-xs font-medium mb-2">By Model</div>
+                        <div className="space-y-2">
+                          {modelBreakdown.map((mb, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
+                                />
+                                <span>{formatModelName(mb.model)}</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-medium">{formatCost(mb.cost)}</div>
+                                <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
+                                  {(mb.tokens / 1000).toFixed(1)}k tokens
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {modelBreakdown.length === 0 && (
+                            <EmptyState
+                              icon={BarChart3}
+                              title="No model data yet"
+                              description="Start using Claude Code to see token usage analytics by model"
+                              className="py-4"
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium mb-2">Cost Breakdown</div>
+                        <div className="flex items-center gap-6 text-xs">
+                          {modelBreakdown.map((mb, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-xs"
+                                style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
+                              />
+                              <span className="text-muted-foreground">{formatModelName(mb.model)}:</span>
+                              <span className="font-medium">{formatCost(mb.cost)}</span>
+                            </div>
+                          ))}
+                          <div className="ml-auto flex items-center gap-2">
+                            <span className="text-muted-foreground">Total:</span>
+                            <span className="font-bold text-lg">{formatCost(totalStats.cost)}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                  <div className="ml-auto flex items-center gap-2">
-                    <span className="text-muted-foreground">Total:</span>
-                    <span className="font-bold text-lg">{formatCost(totalStats.cost)}</span>
-                  </div>
-                </div>
+                  )}
+                />
               </div>
             </>
           )}
