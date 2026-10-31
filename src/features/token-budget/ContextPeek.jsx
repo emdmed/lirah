@@ -3,14 +3,15 @@ import { Scanner } from '@/components/instrument/Scanner';
 import { useTheme } from '@/contexts/ThemeContext';
 import { formatTokenCount } from './tokenCalculations';
 import { useContextBreakdown } from './useContextBreakdown';
+import { Fig23Sources } from './Fig23Sources';
 import { CONTEXT_GROUPS, groupColor, groupLabel, sharePct, shortLabel } from './contextGroups';
 
 const TOP_GROUPS = 5;
 const TOP_ITEMS = 3;
 
 // The short version of the context breakdown, for the context meter's menu:
-// a bar of what the used context is made of, the largest sources, the three
-// largest pieces, and a verdict when the context is heavy. The meter it opens
+// FIG.23 (what the used context is made of, by source, with the largest
+// piece; as text when it can't draw), and a verdict when the context is heavy. The meter it opens
 // from already shows how full the window is. Mounts only while the menu is
 // open, so it reads the session only then.
 export function ContextPeek({ tokenUsage, projectPath, heavy }) {
@@ -50,51 +51,60 @@ export function ContextPeek({ tokenUsage, projectPath, heavy }) {
 
   return (
     <div className="px-2 pb-1 flex flex-col gap-2 font-mono tabular-nums">
-      <SourceBar groups={groups} total={total} color={color} />
+      {/* Figures: FIG.23 draws the sources on one ruler; the bar, rows and
+          largest pieces are its fallback (no measured sources, narrow). */}
+      <Fig23Sources
+        breakdown={breakdown}
+        fallback={(
+          <div className="flex flex-col gap-2">
+            <SourceBar groups={groups} total={total} color={color} />
 
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-baseline justify-between pb-0.5">
-          <span className="ins-legend">Sources</span>
-          <span className="text-faint">share of {formatTokenCount(total)} used</span>
-        </div>
-        <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-0.5">
-          {shown.map((g) => (
-            <div key={g.group} className="contents" title={CONTEXT_GROUPS[g.group]?.hint || undefined}>
-              <Swatch color={color(g.group)} />
-              <span className="truncate">{groupLabel(g.group)}</span>
-              <span className="text-muted-foreground text-right">{sharePct(g.tokens, total)}</span>
-              <span className="w-[6ch] text-right">{formatTokenCount(g.tokens)}</span>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-baseline justify-between pb-0.5">
+                <span className="ins-legend">Sources</span>
+                <span className="text-faint">share of {formatTokenCount(total)} used</span>
+              </div>
+              <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-0.5">
+                {shown.map((g) => (
+                  <div key={g.group} className="contents" title={CONTEXT_GROUPS[g.group]?.hint || undefined}>
+                    <Swatch color={color(g.group)} />
+                    <span className="truncate">{groupLabel(g.group)}</span>
+                    <span className="text-muted-foreground text-right">{sharePct(g.tokens, total)}</span>
+                    <span className="w-[6ch] text-right">{formatTokenCount(g.tokens)}</span>
+                  </div>
+                ))}
+                {rest.length > 0 && (
+                  <div className="contents text-muted-foreground" title={rest.map((g) => groupLabel(g.group)).join(', ')}>
+                    <span />
+                    <span className="truncate">+{rest.length} more</span>
+                    <span className="text-right">{sharePct(restTokens, total)}</span>
+                    <span className="w-[6ch] text-right">{formatTokenCount(restTokens)}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
-          {rest.length > 0 && (
-            <div className="contents text-muted-foreground" title={rest.map((g) => groupLabel(g.group)).join(', ')}>
-              <span />
-              <span className="truncate">+{rest.length} more</span>
-              <span className="text-right">{sharePct(restTokens, total)}</span>
-              <span className="w-[6ch] text-right">{formatTokenCount(restTokens)}</span>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {items.length > 0 && (
-        <div className="flex flex-col gap-0.5 pt-2 edge-t-engraved">
-          <span className="ins-legend pb-0.5">Largest pieces</span>
-          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-0.5">
-            {items.map((it, i) => {
-              const name = it.label ? displayLabel(it.label, projectPath) : it.kind;
-              return (
-                <div key={`${it.kind}:${it.label}:${i}`} className="contents">
-                  <Swatch color={color(it.group)} />
-                  <span className="truncate" title={it.label || it.kind}>{name}</span>
-                  <span className="text-muted-foreground truncate max-w-[12ch]">{it.label ? it.kind.toLowerCase() : ''}</span>
-                  <span className="w-[6ch] text-right">{formatTokenCount(it.tokens)}</span>
+            {items.length > 0 && (
+              <div className="flex flex-col gap-0.5 pt-2 edge-t-engraved">
+                <span className="ins-legend pb-0.5">Largest pieces</span>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-0.5">
+                  {items.map((it, i) => {
+                    const name = it.label ? displayLabel(it.label, projectPath) : it.kind;
+                    return (
+                      <div key={`${it.kind}:${it.label}:${i}`} className="contents">
+                        <Swatch color={color(it.group)} />
+                        <span className="truncate" title={it.label || it.kind}>{name}</span>
+                        <span className="text-muted-foreground truncate max-w-[12ch]">{it.label ? it.kind.toLowerCase() : ''}</span>
+                        <span className="w-[6ch] text-right">{formatTokenCount(it.tokens)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      />
 
       {heavy && shown[0] && (
         <p className="flex items-center gap-2 pt-2 edge-t-engraved text-[var(--ins-warn)]" role="status">

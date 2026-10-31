@@ -23,6 +23,7 @@ import { ProgressReadout } from '../features/plans/parts';
 import { Span, SpanRuler, SpanScale } from '../components/instrument/Span';
 import { Fig26Isolation } from '../features/agent-jobs/Fig26Isolation';
 import { Meter } from '../components/instrument/Meter';
+import { Fig23Sources } from '../features/token-budget/Fig23Sources';
 
 // Every FIG drawing with mock data, for eyeballing them across themes.
 // Mounted instead of the app when the URL carries `?figs` (dev only, see
@@ -434,8 +435,27 @@ function LaneB() {
   );
 }
 // round 3 · lane A
+const BREAKDOWN = {
+  total_tokens: 46_000,
+  groups: [
+    { group: 'results', tokens: 15_600 }, { group: 'unlogged', tokens: 9_700 }, { group: 'thinking', tokens: 8_300 },
+    { group: 'calls', tokens: 6_400 }, { group: 'reminders', tokens: 3_700 }, { group: 'replies', tokens: 1_200 },
+    { group: 'prompts', tokens: 700 }, { group: 'images', tokens: 400 },
+  ],
+  items: [
+    { group: 'results', kind: 'Read', label: `${ROOT}/src/components/TabRow.jsx`, tokens: 4_100 },
+    { group: 'results', kind: 'Bash', label: 'npm test', tokens: 2_600 },
+  ],
+};
+const BREAKDOWN_SMALL = {
+  total_tokens: 12_400,
+  groups: [{ group: 'unlogged', tokens: 9_800 }, { group: 'prompts', tokens: 1_900 }, { group: 'replies', tokens: 700 }],
+  items: [{ group: 'prompts', kind: 'Prompt', label: '', tokens: 1_200 }],
+};
 const FIGS_A = [
   { n: 'P1', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" label="Context" /></div> },
   { n: 'P1w', w: 420, el: () => <div className="px-1"><Meter value={176_000} max={200_000} size="lg" label="Context" /></div> },
+  { n: 23, w: 288, paper: 'var(--ins-raised)', el: () => <Fig23Sources breakdown={BREAKDOWN} fallback={fb('sources: 5 rows')} /> },
+  { n: '23s', w: 288, paper: 'var(--ins-raised)', el: () => <Fig23Sources breakdown={BREAKDOWN_SMALL} fallback={fb('sources: 3 rows')} /> },
   { n: 'P1s', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" printed={false} label="Context" /></div> },
 ];
