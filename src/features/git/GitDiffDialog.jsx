@@ -6,6 +6,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/too
 import { ChevronLeft, ChevronRight, Pin, PinOff, MessageSquarePlus, Send, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
+import { DiffBar } from '../../components/instrument/DiffBar';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 
@@ -171,10 +172,7 @@ export function GitDiffDialog({
   const status = (
     <>
       {diffResult && (
-        <span className="tabular-nums">
-          <span className="text-git-added">+{diffResult.added_lines}</span>{' '}
-          <span className="text-git-deleted">−{diffResult.deleted_lines}</span>
-        </span>
+        <DiffBar added={diffResult.added_lines} removed={diffResult.deleted_lines} side={64} />
       )}
       {hasMultipleFiles && (
         <span className="tabular-nums">{currentFileIndex + 1}/{changedFiles.length}</span>

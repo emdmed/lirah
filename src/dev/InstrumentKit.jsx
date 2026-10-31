@@ -116,10 +116,10 @@ export function InstrumentKit() {
 
         <section className="tui-pane px-3" data-legend>
           <PaneLegend index={5} title="Diff bars" />
-          <div className="flex flex-col gap-2 py-2">
-            <span className="flex items-center gap-2">+12 −3 <DiffBar added={12} removed={3} /></span>
-            <span className="flex items-center gap-2">+140 −60 <DiffBar added={140} removed={60} /></span>
-            <span className="flex items-center gap-2">+4200 −900 <DiffBar added={4200} removed={900} /></span>
+          <div className="flex flex-col items-start gap-2 py-2">
+            <DiffBar added={12} removed={3} />
+            <DiffBar added={140} removed={60} />
+            <DiffBar added={4200} removed={900} />
           </div>
         </section>
 

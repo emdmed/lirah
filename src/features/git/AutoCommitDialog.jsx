@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, Di
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
+import { DiffBar } from '../../components/instrument/DiffBar';
 import { cn } from '../../lib/utils';
 
 // `git status -s` style: one letter per file, coloured by kind.
@@ -191,10 +192,7 @@ export function AutoCommitDialog({ autoCommit }) {
             <span className="flex items-baseline gap-3 text-xs tabular-nums">
               <span className="text-foreground">{plural(files.length, 'file')}</span>
               {(totals.added > 0 || totals.removed > 0) && (
-                <span>
-                  <span className="text-git-added">+{totals.added}</span>{' '}
-                  <span className="text-git-deleted">−{totals.removed}</span>
-                </span>
+                <DiffBar added={totals.added} removed={totals.removed} side={64} className="self-center" />
               )}
               <StatusTally files={files} />
             </span>

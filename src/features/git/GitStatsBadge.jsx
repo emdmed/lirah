@@ -1,4 +1,5 @@
 import React from "react";
+import { compactCount, DiffBar } from "../../components/instrument/DiffBar";
 
 /**
  * Displays git statistics (added/deleted lines) for a file
@@ -29,10 +30,10 @@ export function GitStatsBadge({ stats }) {
     );
   }
 
+  // Modified: the diff pair on a short side, so the tree's rows compare.
   return (
-    <span className="inline-flex items-center text-[11px] font-mono flex-shrink-0 ml-0.5">
-      <span className="text-git-added">+{stats.added}</span>
-      <span className="text-git-deleted ml-0.5">-{stats.deleted}</span>
+    <span className="inline-flex items-center flex-shrink-0 ml-0.5">
+      <DiffBar added={stats.added} removed={stats.deleted} side={16} fmt={compactCount} />
     </span>
   );
 }

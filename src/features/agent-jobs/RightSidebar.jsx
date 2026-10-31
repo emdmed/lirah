@@ -936,11 +936,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
           </span>
         )}
         {hasStat && (
-          <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
-            <DiffBar added={stat.added} removed={stat.removed} />
-            <span style={{ color: 'var(--ins-ok)' }}>+{stat.added}</span>
-            <span style={{ color: 'var(--ins-fault)' }}>−{stat.removed}</span>
-          </span>
+          <DiffBar added={stat.added} removed={stat.removed} side={48} />
         )}
         {showStatusChip && <span style={{ color: meta.color }}>{meta.label}</span>}
         {isRunning && job.idleSecs > 0 && (

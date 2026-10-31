@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
 import { ContextMoon } from '../../components/instrument/ContextMoon';
+import { DiffBar } from '../../components/instrument/DiffBar';
 import { ACTIVITY, YOUR_TURN } from './tabActivity';
 import { RowAction } from './RowAction';
 import { RenameField } from './RenameField';
@@ -38,11 +39,10 @@ function Readout({ info, contextFill }) {
     diff = info.files === 0 ? (
       'clean'
     ) : (
-      <span title={`${plural(info.files, 'file')} changed · +${info.added} −${info.deleted}`}>
-        {info.added > 0 && <span className="text-git-added">+{compactCount(info.added)}</span>}
-        {info.added > 0 && info.deleted > 0 && ' '}
-        {info.deleted > 0 && <span className="text-git-deleted">−{compactCount(info.deleted)}</span>}
-        {!info.added && !info.deleted && plural(info.files, 'file')}
+      <span className="inline-flex" title={`${plural(info.files, 'file')} changed · +${info.added} −${info.deleted}`}>
+        {info.added || info.deleted
+          ? <DiffBar added={info.added} removed={info.deleted} side={24} fmt={compactCount} />
+          : plural(info.files, 'file')}
       </span>
     );
   }

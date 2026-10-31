@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
+import { compactCount, DiffBar } from '../components/instrument/DiffBar';
 import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
 import { Fig06Context } from '../components/Fig06Context';
@@ -265,6 +266,7 @@ export function FigureSheet() {
       <div className="flex flex-wrap items-start gap-3">
         {LANE_C.map((f) => <Card key={f.n} fig={f} width={f.w} />)}
       </div>
+      <LaneB />
     </div>
   );
 }
@@ -319,5 +321,44 @@ function SpanList({ rows }) {
         </div>
       ))}
     </SpanScale>
+// round 3 · lane B
+// P5 diff pair, FIG 25 diff map, FIG 31 subject ruler, P3 position. Each
+// renders in the mode the figures setting holds (localStorage
+// lirah:settings:v1 → figures: full | compact).
+
+const DIFF_ROWS = [
+  { host: 'job', added: 184, removed: 20, side: 48 },
+  { host: 'tab row', added: 146_812, removed: 3_020, side: 24, fmt: compactCount },
+  { host: 'file', added: 12, removed: 3, side: 16 },
+  { host: 'file', added: 0, removed: 41, side: 16 },
+  { host: 'auto commit', added: 1_204, removed: 388, side: 64 },
+];
+
+function LaneBCard({ title, width, children }) {
+  return (
+    <div className="border border-[var(--ins-edge,#888)] p-3" style={{ width: width + 26, background: 'var(--ins-panel)' }}>
+      <div className="mb-2 font-mono text-[10px] text-muted-foreground">{title} · {width}px</div>
+      {children}
+    </div>
+  );
+}
+
+function LaneB() {
+  return (
+    <>
+      <div className="mb-2 mt-6 ins-legend">Round 3 · lane B</div>
+      <div data-lane="b" className="flex flex-wrap items-start gap-3">
+        <LaneBCard title="P5 diff pair" width={360}>
+          <div className="grid grid-cols-[90px_1fr] items-center gap-y-2">
+            {DIFF_ROWS.map((r, i) => (
+              <Fragment key={i}>
+                <span className="text-muted-foreground">{r.host}</span>
+                <span className="flex"><DiffBar added={r.added} removed={r.removed} side={r.side} fmt={r.fmt} /></span>
+              </Fragment>
+            ))}
+          </div>
+        </LaneBCard>
+      </div>
+    </>
   );
 }
