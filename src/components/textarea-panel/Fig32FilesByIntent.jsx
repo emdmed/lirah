@@ -59,7 +59,7 @@ export function Fig32FilesByIntent({ selectedFiles, fileStates, fallback, classN
   });
   const title = `CONTEXT · ${total} FILES`;
   // At least as wide as the FIG label, which is tracked 0.5px.
-  const W = Math.ceil(Math.max(x - GROUP_GAP + 1, textWidth('FIG.32', 0.5) + 8 + textWidth(title, 0.5)));
+  const W = Math.ceil(Math.max(x - GROUP_GAP + 1, textWidth(title, 0.5)));
 
   const label = `${total} attached files, listed in the files pane: ${groups
     .map((g) => `${g.n} ${FILE_STATE_LABELS[g.state]}`)

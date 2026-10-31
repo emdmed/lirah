@@ -124,7 +124,7 @@ export function Fig12Race({ jobs, short = false, fallback = null }) {
   const maxSecs = span / 1000;
   const step = rulerStep(maxSecs, laneW);
 
-  const prefix = 'FIG.12 RACE ·  · ';
+  const prefix = 'RACE ·  · ';
   const tail = `${jobs.length} AGENT${jobs.length === 1 ? '' : 'S'}`;
   const room = Math.floor(width / (CH + 0.5)) - prefix.length - tail.length;
   const title = short ? '' : `RACE · ${fit(raceLabel(jobs[0]), Math.max(4, room))} · ${tail}`;

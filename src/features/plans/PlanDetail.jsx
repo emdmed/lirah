@@ -178,7 +178,7 @@ export function PlanDetail({ plan }) {
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col px-3 pt-2 pb-3">
+      <div className="flex flex-col px-3 pt-2 pb-3.5">
         <div className="flex items-center gap-1.5">
           <PanelButton icon={ChevronLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
           <span className="ml-auto flex items-center gap-1">
@@ -228,69 +228,75 @@ export function PlanDetail({ plan }) {
             </span>
           </button>
         )}
-
-        {/* Where it stands: the route, one stop per chunk. */}
-        {total > 0 && (
-          <div className="mt-4">
-            {/* Full: the timeline, once a chunk has a time; until then the bar.
-                A finished run's strip draws it below, so it isn't drawn twice. */}
-            {plan.autopilot?.status === AUTOPILOT_STATUS.DONE ? (
-              <ProgressReadout plan={plan} done={done} total={total} />
-            ) : (
-              <Fig20Timeline plan={plan} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
-            )}
-          </div>
-        )}
-
-        {plan.autopilot && (
-          <div className="mt-3">
-            <AutopilotStrip
-              plan={plan}
-              tabOpen={tabs.some((t) => t.id === plan.autopilot?.tabId)}
-              busy={reviewingAll}
-              onResume={() => pane.resume(plan)}
-              onStop={() => stopAutopilot(repoRoot, plan.id)}
-              onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
-              onGoToTab={() => switchTab(plan.autopilot.tabId)}
-              onReviewAll={() => pane.reviewAll(plan)}
-              options={piloted ? freshContext : null}
-            />
-          </div>
-        )}
-        {/* The run bank, under the run's status: the primary key, with its one
-            option beside it. During a run the option moves into the strip,
-            beside stop. While a chunk is stuck its fix is the primary key, so
-            this one steps down to a plain key. */}
-        {canPilot && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <PanelButton
-              icon={Play}
-              onClick={() => pane.autopilot(plan)}
-              // The plan's one primary key: framed and lamp-lit.
-              className={stuck ? undefined : 'ins-key-primary'}
-              title={handSent
-                ? `Adopt chunk ${handSent.n} (asking the agent to commit it if needed), then implement the rest one after another, unattended`
-                : 'Implement the remaining chunks one after another, unattended'}
-            >
-              {handSent ? `run on auto-pilot from ${handSent.n}` : 'run on auto-pilot'}
-            </PanelButton>
-            {freshContext}
-          </div>
-        )}
-
-        {/* Setup: one line under a hairline; the form opens on demand. */}
-        <div className="mt-3 pt-2.5 edge-t-engraved">
-          <PlanGitSection
-            plan={plan}
-            busy={settingUpGit}
-            onChange={(patch) => setGitConfig(repoRoot, plan.id, patch)}
-            onAddRepo={(path) => pane.addRepo(plan, path)}
-            onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
-            onOpenTab={() => addTab(planGit(plan).workDir)}
-            onRemoveWorktrees={() => pane.removeWorktrees(plan)}
-          />
-        </div>
       </div>
+
+      {/* Sections: each starts on a full-width hairline with the same padding,
+          so header, progress, git and chunks read as separate blocks. */}
+      {(total > 0 || plan.autopilot || canPilot) && (
+        <section aria-label="Progress" className="flex flex-col gap-3 px-3 pt-3 pb-3.5 edge-t-engraved">
+          {/* Where it stands: the route, one stop per chunk. */}
+          {total > 0 && (
+            <div>
+              {/* Full: the timeline, once a chunk has a time; until then the bar.
+                  A finished run's strip draws it below, so it isn't drawn twice. */}
+              {plan.autopilot?.status === AUTOPILOT_STATUS.DONE ? (
+                <ProgressReadout plan={plan} done={done} total={total} />
+              ) : (
+                <Fig20Timeline plan={plan} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
+              )}
+            </div>
+          )}
+
+          {plan.autopilot && (
+            <div>
+              <AutopilotStrip
+                plan={plan}
+                tabOpen={tabs.some((t) => t.id === plan.autopilot?.tabId)}
+                busy={reviewingAll}
+                onResume={() => pane.resume(plan)}
+                onStop={() => stopAutopilot(repoRoot, plan.id)}
+                onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
+                onGoToTab={() => switchTab(plan.autopilot.tabId)}
+                onReviewAll={() => pane.reviewAll(plan)}
+                options={piloted ? freshContext : null}
+              />
+            </div>
+          )}
+          {/* The run bank, under the run's status: the primary key, with its one
+              option beside it. During a run the option moves into the strip,
+              beside stop. While a chunk is stuck its fix is the primary key, so
+              this one steps down to a plain key. */}
+          {canPilot && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <PanelButton
+                icon={Play}
+                onClick={() => pane.autopilot(plan)}
+                // The plan's one primary key: framed and lamp-lit.
+                className={stuck ? undefined : 'ins-key-primary'}
+                title={handSent
+                  ? `Adopt chunk ${handSent.n} (asking the agent to commit it if needed), then implement the rest one after another, unattended`
+                  : 'Implement the remaining chunks one after another, unattended'}
+              >
+                {handSent ? `run on auto-pilot from ${handSent.n}` : 'run on auto-pilot'}
+              </PanelButton>
+              {freshContext}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Setup: one line under a hairline; the form opens on demand. */}
+      <section aria-label="Plan git" className="px-3 pt-3 pb-3.5 edge-t-engraved">
+        <PlanGitSection
+          plan={plan}
+          busy={settingUpGit}
+          onChange={(patch) => setGitConfig(repoRoot, plan.id, patch)}
+          onAddRepo={(path) => pane.addRepo(plan, path)}
+          onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
+          onOpenTab={() => addTab(planGit(plan).workDir)}
+          onRemoveWorktrees={() => pane.removeWorktrees(plan)}
+        />
+      </section>
 
       {plan.split === SPLIT_STATUS.RUNNING && (
         <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">

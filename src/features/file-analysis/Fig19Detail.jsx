@@ -13,7 +13,6 @@ import { middleTruncate } from '../plans/Fig21PlanGit';
 const MIN_W = 180;
 const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 360;
-const TITLE_X = textWidth('FIG.19', 0.5) + 8;
 const ROW_H = 30;
 const ROW_GAP = 6;
 const FIRST_ROW = 22;
@@ -62,9 +61,9 @@ export function detailRows(levels, { chosen, defaultLevel } = {}) {
   }));
 }
 
-/** Title text after "FIG.19", shortened to the width it has. */
+/** Title text, shortened to the width it has. */
 function titleText(name, lineCount, whole, width) {
-  const room = Math.floor((width - TITLE_X) / textWidth('x', 0.5));
+  const room = Math.floor(width / textWidth('x', 0.5));
   const NAME = name.toUpperCase();
   const size = `${fmtTokens(whole).toUpperCase()} TOK`;
   const tails = [` · ${lineCount} LINES · ${size}`, ` · ${lineCount} L · ${size}`, ` · ${lineCount} L`, ''];

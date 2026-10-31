@@ -84,7 +84,7 @@ export function fig22Layout(grid, compact = false) {
   // Rotated labels lean right past the grid; so does the "+k files" note.
   const lean = Math.max(gridR, ...labels.map((l, i) => cx(i) + textWidth(l) * COS + 4));
   const moreText = more > 0 ? `+${more} files` : null;
-  let width = Math.max(lean, moreText ? gridR + 8 + textWidth(moreText) + 4 : 0, textWidth('FIG.22  FILES BY CHUNK') + 8);
+  let width = Math.max(lean, moreText ? gridR + 8 + textWidth(moreText) + 4 : 0, textWidth('FILES BY CHUNK') + 8);
 
   let note = null;
   let height = gridB + 4;

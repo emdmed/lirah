@@ -62,18 +62,11 @@ export function T({ x, y, children, color = INK.muted, anchor = 'start', trackin
   );
 }
 
-// "FIG.06  TITLE" in the top-left corner. The number is stable across
-// releases (see registry.js), so it can be cited and opened by number.
-export function FigLabel({ n, title, x = 0, y = 11 }) {
-  const label = `FIG.${String(n).padStart(2, '0')}`;
-  return (
-    <g>
-      <T x={x} y={y} color={INK.faint} tracking={0.5}>{label}</T>
-      {title && (
-        <T x={x + textWidth(label, 0.5) + 8} y={y} tracking={0.5}>{title}</T>
-      )}
-    </g>
-  );
+// The figure's title in the top-left corner. The FIG number stays in
+// registry.js for citing and opening, but is not printed.
+export function FigLabel({ title, x = 0, y = 11 }) {
+  if (!title) return null;
+  return <T x={x} y={y} tracking={0.5}>{title}</T>;
 }
 
 // A boxed value: name on the first line, value on the second. One line is
