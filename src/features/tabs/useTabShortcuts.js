@@ -24,7 +24,7 @@ export function useTabShortcuts({
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { sidebarOpenRef.current = sidebarOpen; }, [sidebarOpen]);
 
-  const { secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand } = secondary;
+  const { secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
   const { setBudgetDialogOpen, setDashboardOpen } = dialogs;
 
   useEffect(() => {
@@ -56,6 +56,12 @@ export function useTabShortcuts({
         openWithCommand('nvim');
         return;
       }
+      if (matches('shell', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleShell();
+        return;
+      }
       if (secondaryFocused) return;
       if (matches('file-search', e) && viewModeRef.current === 'tree' && sidebarOpenRef.current) {
         e.preventDefault();
@@ -85,6 +91,6 @@ export function useTabShortcuts({
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
+  }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     searchInputRef, onToggleCompaction, onOpenLazygit, onAutoCommit, onAutoMerge, onClearContext, setBudgetDialogOpen, setDashboardOpen]);
 }
