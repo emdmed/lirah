@@ -187,7 +187,7 @@
       /* the lamp lights the merge to come: its curve, its node, the verdict and step 2 */
       g += ff ? K.rect(396, by - 4, 8, 8, 'pn', 'lv', { w: 1.3 }) : K.path(`M400 ${by - 6}L406 ${by}L400 ${by + 6}L394 ${by}Z`, 'lv', { w: 1.3, fill: 'pn' });
       for (let i = 0; i < n; i++) { const x = n > 1 ? cx0 + i * cs : cx1; if (d >= L1 + x - 110) g += K.node(x, fy, 'done'); }
-      const label = o.label || `Merge plan. ${o.branch} has ${n} ${o.noun || 'commits'}. ${o.base || 'main'} ${ff ? 'has not moved, so this is a fast-forward' : `moved on by ${o.baseAhead}, so this is a merge commit`}. Steps: ${steps.map((s, i) => `${i + 1} ${s}`).join(', ')}.`;
+      const label = o.label || `Merge plan. ${o.branch} has ${n} ${o.noun || 'commits'}. ${o.base || 'main'} ${ff ? 'has not moved, so this is a fast-forward' : `moved on by ${o.baseAhead}, so this is a merge commit`}. Steps: ${steps.filter(Boolean).map((s, i) => `${i + 1} ${s}`).join(', ')}.`;
       if (T < M.flash) return { w, h, markup: g, label };
       /* steps keep their slot (1 under the base, 2 at the merge, 3 at the tip)
          but are numbered in run order, so an empty slot doesn't leave a gap */
@@ -506,8 +506,8 @@
   function mount(svg, r) {
     if (typeof svg === 'string') svg = document.querySelector(svg);
     if (!svg) return null;
-    svg.setAttribute('width', r.w); svg.setAttribute('height', r.h);
-    svg.setAttribute('viewBox', `0 0 ${r.w} ${r.h}`);
+    C.attr(svg, 'width', r.w); C.attr(svg, 'height', r.h);
+    C.attr(svg, 'viewBox', `0 0 ${r.w} ${r.h}`);
     return C.draw(svg, r.markup, r.label);
   }
   const render = (r) => C.svg(r.w, r.h, r.markup, r.label);
@@ -540,55 +540,91 @@
     return { ...o, at: to, lap: l, from: at, lapFrom: lap, dir };
   };
 
+  /* the landing blink: two hard offs of 30ms each (two frames at 60Hz;
+     shorter and a blink can fall between frames), run as a Web Animation so
+     dropped frames can't stretch or skip it */
+  const OFF = 30, BLINK = 4 * OFF;
+  const BLINK_FRAMES = [0, 0.5].flatMap((o) => [
+    { opacity: 0.15, offset: o }, { opacity: 0.15, offset: o + 0.25 },
+    { opacity: 1, offset: o + 0.2501 }, { opacity: 1, offset: o + 0.5 },
+  ]);
+  const reduced = () => !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  /* crawl(svg) · dashed live tails (data-crawl) move one dash period every
+     1.2s: alive, never busy. Tails already crawling keep going. */
+  function crawl(svg) {
+    if (!svg.animate || reduced()) return;
+    svg._calCrawl = (svg._calCrawl || []).filter((a) => a.effect && a.effect.target && a.effect.target.isConnected);
+    svg.querySelectorAll('[data-crawl]').forEach((el) => {
+      if (svg._calCrawl.some((a) => a.effect.target === el)) return;
+      const p = (el.getAttribute('stroke-dasharray') || '2 4').split(/[\s,]+/).reduce((a, b) => a + +b, 0);
+      svg._calCrawl.push(el.animate([{ strokeDashoffset: 0 }, { strokeDashoffset: -p }], { duration: p * 200, iterations: Infinity }));
+    });
+  }
+
   /* play(svg, recipe, data) · mount a recipe and replay it: when the figure is
      half in view, a time cursor sweeps the ruler at an even pace (700ms for
      the whole scale) and the recipe redraws each frame. Lines trail the
      cursor by 110ms. A recipe with a duration (ms) sets its own length.
-     Whatever latches (data-land) blinks twice on landing,
-     and dashed live tails (data-crawl) then crawl slowly, for as long as the
-     figure is shown. The clock is a Web Animation on the svg, so playbackRate
-     and DevTools slow it like CSS motion. Reduced motion, { still: true }, a
-     recipe without an extent or no WAAPI: mount the finished figure. */
+     Each frame redraws only the parts that changed (see draw). Whatever
+     latches (data-land) blinks twice on landing, and dashed live tails
+     (data-crawl) then crawl slowly, for as long as the figure is shown. The
+     clock is a Web Animation on the svg, so playbackRate and DevTools slow
+     it like CSS motion. New data for a replay in flight goes through
+     update(), which retargets it instead of cutting it short. Reduced
+     motion, { still: true }, a recipe without an extent or no WAAPI: mount
+     the finished figure. */
   function play(svg, recipe, data, opts = {}) {
     if (typeof svg === 'string') svg = document.querySelector(svg);
     if (!svg) return null;
     if (svg._calStop) svg._calStop();
-    const ext = recipe.extent ? recipe.extent(data) : 0;
-    if (opts.still || !ext || !svg.animate || !root.IntersectionObserver ||
-      (root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches)) return mount(svg, recipe(data));
-    const TRAIL = 110, OFF = 30, BLINK = 4 * OFF, ms = recipe.duration ? recipe.duration(data) : Math.round(700 * Math.min(1, ext / (data.max || ext)));
-    const at = (e) => ext * Math.min(1, Math.max(0, e / ms));
+    const ext0 = recipe.extent ? recipe.extent(data) : 0;
+    if (opts.still || !ext0 || !svg.animate || !root.IntersectionObserver || reduced()) {
+      mount(svg, recipe(data));
+      crawl(svg);
+      return svg;
+    }
+    const TRAIL = 110, ms = recipe.duration ? recipe.duration(data) : Math.round(700 * Math.min(1, ext0 / (data.max || ext0)));
+    /* the replay draws `cur`, which update() may swap for newer data */
+    let cur = data, draw = recipe;
+    const at = (e) => {
+      const ext = draw.extent(cur) || ext0;
+      return ext * Math.min(1, Math.max(0, e / ms));
+    };
     const landed = new Map();
-    let clock = null, io = null, crawl = [];
+    let clock = null, io = null;
     const stop = () => {
       if (io) io.disconnect();
       if (clock) clock.cancel();
-      crawl.forEach((c) => c.cancel());
-      io = clock = null; crawl = []; svg._calStop = null;
+      (svg._calCrawl || []).forEach((a) => a.cancel());
+      io = clock = null; svg._calCrawl = []; svg._calStop = svg._calRetarget = null;
     };
     svg._calStop = stop;
+    svg._calRetarget = (r, d) => {
+      draw = r; cur = d;
+      if (!clock) mount(svg, draw({ ...cur, t: 0, tt: 0 }));   /* still waiting to be seen */
+    };
     const frame = () => {
       if (!clock) return;
       if (!svg.isConnected) return stop();
       const e = clock.currentTime || 0;
-      mount(svg, recipe({ ...data, t: at(e), tt: at(e - TRAIL) }));
+      mount(svg, draw({ ...cur, t: at(e), tt: at(e - TRAIL) }));
       let busy = e < ms + TRAIL;
       svg.querySelectorAll('[data-land]').forEach((g) => {
         const k = g.getAttribute('data-land');
         if (!landed.has(k)) landed.set(k, e);
         const q = e - landed.get(k);
-        if (q < BLINK) { busy = true; if (q % (2 * OFF) < OFF) g.style.opacity = '0.15'; }
+        if (q >= BLINK) return;
+        busy = true;
+        /* a group redrawn mid-blink picks the blink up where it was */
+        if (g._calLanded !== landed) { g._calLanded = landed; g.animate(BLINK_FRAMES, { duration: BLINK }).currentTime = q; }
       });
       if (busy) return requestAnimationFrame(frame);
-      clock.cancel(); clock = null;
-      mount(svg, recipe(data));
-      /* the crawl moves one dash period every 1.2s: alive, never busy */
-      crawl = [...svg.querySelectorAll('[data-crawl]')].map((el) => {
-        const p = (el.getAttribute('stroke-dasharray') || '2 4').split(/[\s,]+/).reduce((a, b) => a + +b, 0);
-        return el.animate([{ strokeDashoffset: 0 }, { strokeDashoffset: -p }], { duration: p * 200, iterations: Infinity });
-      });
+      clock.cancel(); clock = null; svg._calRetarget = null;
+      mount(svg, draw(cur));
+      crawl(svg);
     };
-    mount(svg, recipe({ ...data, t: 0, tt: 0 }));
+    mount(svg, draw({ ...cur, t: 0, tt: 0 }));
     io = new IntersectionObserver((es) => {
       if (!es.some((x) => x.isIntersecting)) return;
       io.disconnect(); io = null;
@@ -599,5 +635,19 @@
     return svg;
   }
 
-  root.Calibrated = Object.assign(C, { recipes, mount, render, play });
+  /* update(svg, recipe, data) · show new data without replaying. A replay in
+     flight, or one still waiting to be seen, carries on and lands on the new
+     data; otherwise the figure is redrawn still, keeping its crawl. Use it
+     for live values (a running clock) between replays, so a tick never cuts
+     a replay short. */
+  function update(svg, recipe, data) {
+    if (typeof svg === 'string') svg = document.querySelector(svg);
+    if (!svg) return null;
+    if (svg._calRetarget) { svg._calRetarget(recipe, data); return svg; }
+    mount(svg, recipe(data));
+    crawl(svg);
+    return svg;
+  }
+
+  root.Calibrated = Object.assign(C, { recipes, mount, render, play, update });
 })(typeof window !== 'undefined' ? window : globalThis);

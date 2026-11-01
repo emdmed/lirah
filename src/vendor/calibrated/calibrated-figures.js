@@ -266,21 +266,97 @@
 
   /* ── mounting */
 
+  /* attr(el, name, value) · sets an attribute only when it changes, so a
+     figure redrawn every frame doesn't invalidate its own style */
+  function attr(el, name, value) {
+    value = String(value);
+    if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+  }
+
+  /* parts(markup) · the markup split into its top-level elements (and any
+     text between them), or null when it can't be split cleanly */
+  function parts(s) {
+    const out = [], n = s.length;
+    let i = 0, depth = 0, start = 0;
+    while (i < n) {
+      if (s[i] !== '<') {
+        const j = s.indexOf('<', i), e = j < 0 ? n : j;
+        if (!depth) out.push(s.slice(i, e));
+        i = e;
+        continue;
+      }
+      if (s.startsWith('<!--', i)) {
+        const j = s.indexOf('-->', i);
+        if (j < 0) return null;
+        if (!depth) out.push(s.slice(i, j + 3));
+        i = j + 3;
+        continue;
+      }
+      let j = i + 1, q = '';
+      for (; j < n; j++) {
+        const c = s[j];
+        if (q) { if (c === q) q = ''; } else if (c === '"' || c === "'") q = c; else if (c === '>') break;
+      }
+      if (j >= n) return null;
+      if (s[i + 1] === '/') depth--;
+      else {
+        if (!depth) start = i;
+        if (s[j - 1] !== '/') depth++;
+      }
+      if (depth < 0) return null;
+      if (!depth) out.push(s.slice(start, j + 1));
+      i = j + 1;
+    }
+    return depth ? null : out;
+  }
+
+  /* patch(svg, markup) · sets an <svg>'s contents like innerHTML, but keeps
+     the top-level elements whose markup didn't change and parses only the
+     rest. A figure replayed frame by frame then rebuilds just what moved
+     (the line, the nodes), not the ruler and frame around it. */
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function patch(svg, markup) {
+    const next = parts(markup), prev = svg._calParts, kids = [...svg.childNodes];
+    svg._calParts = next;
+    if (!next || !prev || prev.length !== kids.length) { svg.innerHTML = markup; return svg; }
+    /* unchanged parts are reused by their markup; the rest is parsed in one go */
+    const pool = new Map();
+    prev.forEach((p, i) => { const l = pool.get(p); if (l) l.push(kids[i]); else pool.set(p, [kids[i]]); });
+    const nodes = new Array(next.length), freshAt = [];
+    let fresh = '';
+    next.forEach((p, i) => {
+      const l = pool.get(p);
+      if (l && l.length) nodes[i] = l.shift();
+      else { fresh += p; freshAt.push(i); }
+    });
+    if (freshAt.length) {
+      const scratch = document.createElementNS(SVG_NS, 'svg');
+      scratch.innerHTML = fresh;
+      /* adjacent text parts merge when parsed together: fall back to a full redraw */
+      if (scratch.childNodes.length !== freshAt.length) { svg.innerHTML = markup; return svg; }
+      const made = [...scratch.childNodes];
+      freshAt.forEach((at, k) => { nodes[at] = made[k]; });
+    }
+    pool.forEach((l) => l.forEach((node) => node.remove()));
+    nodes.forEach((node, i) => { if (svg.childNodes[i] !== node) svg.insertBefore(node, svg.childNodes[i] || null); });
+    return svg;
+  }
+
   /* draw(svg, markup, label) · fills an <svg>, marks it as a figure, sets role and label */
   function draw(svg, markup, label) {
     if (typeof svg === 'string') svg = document.querySelector(svg);
     if (!svg) return null;
-    svg.setAttribute('data-cal', '');
+    attr(svg, 'data-cal', '');
     if (!svg.getAttribute('viewBox') && svg.getAttribute('width')) {
       svg.setAttribute('viewBox', `0 0 ${svg.getAttribute('width')} ${svg.getAttribute('height')}`);
     }
     /* never shrink below 90% of natural size: legends stay ≥ 10px; the container scrolls instead */
     const nw = parseFloat(svg.getAttribute('width'));
-    if (nw > 200) svg.style.minWidth = Math.round(nw * 0.9) + 'px';
-    if (label) { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', label); }
+    const minW = Math.round(nw * 0.9) + 'px';
+    if (nw > 200 && svg.style.minWidth !== minW) svg.style.minWidth = minW;
+    if (label) { attr(svg, 'role', 'img'); attr(svg, 'aria-label', label); }
     else if (!svg.hasAttribute('aria-label')) svg.setAttribute('aria-hidden', 'true');
-    svg.innerHTML = markup;
-    return svg;
+    return patch(svg, markup);
   }
 
   /* svg(w, h, markup, label) · a complete <svg> string */
@@ -314,6 +390,6 @@
     pad(n, w = 2) { return String(n).padStart(w, '0'); },
   };
 
-  const api = { K, draw, svg, density, ink, textWidth, resetMetrics, ready, esc, id, fmt, FS, CH };
+  const api = { K, draw, patch, attr, svg, density, ink, textWidth, resetMetrics, ready, esc, id, fmt, FS, CH };
   root.Calibrated = Object.assign(root.Calibrated || {}, api);
 })(typeof window !== 'undefined' ? window : globalThis);

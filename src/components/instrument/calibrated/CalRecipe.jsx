@@ -4,9 +4,9 @@ import { Calibrated } from './kit';
 
 // A calibrated recipe (Calibrated.recipes[name]) drawn into an <svg>.
 // The first draw replays the recipe's motion once it is half in view
-// (Calibrated.play). Later data changes redraw it still (Calibrated.mount),
-// so a ticking clock doesn't sweep the figure in again (a change that lands
-// mid-replay is drawn once the replay ends), unless:
+// (Calibrated.play). Later data changes redraw it still
+// (Calibrated.update), so a ticking clock doesn't sweep the figure in again
+// and a replay in flight lands on the newest data, unless:
 //   - `transition(prev, next)` returns data to play (e.g. a loop step), or
 //   - `replayKey` changed (e.g. a chunk landed): the entry motion replays. `title` is printed
 // top-left in the app's figure label style (no FIG number). The drawing
@@ -56,10 +56,6 @@ export function CalRecipe({ recipe, data: given, transition, replayKey, title, m
   const floor = minWidth ?? fit?.min ?? Math.round(result.w * 0.9);
   const tooNarrow = compact || (width != null && width < floor);
 
-  // The newest props, for a draw that waits for a running replay to end.
-  const latest = useRef(null);
-  latest.current = { data, replayKey, draw, transition };
-  const waiting = useRef(false);
   const unmeasured = !!fit && width == null;
 
   useLayoutEffect(() => {
@@ -67,36 +63,19 @@ export function CalRecipe({ recipe, data: given, transition, replayKey, title, m
     // A fitted recipe waits for its pane's width, or the first replay would
     // run at fit.max and be cut off by the redraw at the real width.
     if (!svg || tooNarrow || unmeasured) return;
-
-    const sync = () => {
-      const { data: next, replayKey: nextKey, draw: drawNext, transition: tr } = latest.current;
-      const last = prev.current;
-      prev.current = { data: next, replayKey: nextKey };
-      const step = played.current && last.data ? tr?.(last.data, next) : null;
-      if (!played.current || nextKey !== last.replayKey) {
-        played.current = true;
-        Calibrated.play(svg, drawNext, next);
-      } else if (step) {
-        Calibrated.play(svg, drawNext, step);
-      } else {
-        svg._calStop?.();
-        Calibrated.mount(svg, drawNext(next));
-      }
-    };
-
-    // A replay in flight (its clock is a Web Animation on the svg) runs to the
-    // end; the newest data is drawn after it. Otherwise a ticking clock would
-    // cut every replay short and jump to the finished drawing.
-    const clock = svg.getAnimations?.().find((a) => a.playState === 'running');
-    if (!clock) { sync(); return; }
-    if (waiting.current) return;
-    waiting.current = true;
-    const after = () => {
-      waiting.current = false;
-      if (svgRef.current === svg && svg.isConnected) sync();
-    };
-    // The kit cancels the clock when the replay lands, so `finished` rejects.
-    clock.finished.then(after, after);
+    const last = prev.current;
+    prev.current = { data, replayKey };
+    const step = played.current && last.data ? transition?.(last.data, data) : null;
+    if (!played.current || replayKey !== last.replayKey) {
+      played.current = true;
+      Calibrated.play(svg, draw, data);
+    } else if (step) {
+      Calibrated.play(svg, draw, step);
+    } else {
+      // A replay in flight (or still waiting to be seen) carries on and lands
+      // on this data, so a ticking clock never cuts it short.
+      Calibrated.update(svg, draw, data);
+    }
     // `key` stands in for `data`: a re-render with equal data draws nothing.
   }, [draw, key, tooNarrow, unmeasured]);
 

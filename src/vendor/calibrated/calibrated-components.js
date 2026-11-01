@@ -57,12 +57,14 @@
     }
     paint({ w, h, markup, label }) {
       const svg = this.surface();
-      svg.setAttribute('width', w); svg.setAttribute('height', h);
-      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-      svg.setAttribute('role', 'img');
-      svg.setAttribute('aria-label', label);
-      if (w > 200) svg.style.minWidth = Math.round(w * 0.9) + 'px';   /* scroll, don't shrink legends */
-      svg.innerHTML = `<title>${esc(label)}</title>` + markup;
+      C.attr(svg, 'width', w); C.attr(svg, 'height', h);
+      C.attr(svg, 'viewBox', `0 0 ${w} ${h}`);
+      C.attr(svg, 'role', 'img');
+      C.attr(svg, 'aria-label', label);
+      const minW = Math.round(w * 0.9) + 'px';   /* scroll, don't shrink legends */
+      if (w > 200 && svg.style.minWidth !== minW) svg.style.minWidth = minW;
+      /* each frame of a glide swaps only the parts that moved */
+      C.patch(svg, `<title>${esc(label)}</title>` + markup);
     }
     render() { try { this.paint(this.draw(this.density === 'full')); } catch (e) { console.error(this.localName, e); } }
     disconnectedCallback() { this.halt(); }

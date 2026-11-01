@@ -6,7 +6,8 @@ import { Calibrated } from '@/components/instrument/calibrated';
  * (no wrapper, no resize logic: CalRecipe is for figures). Returns the ref
  * to put on the <svg>. The first draw plays the recipe's motion; later
  * changes play `transition(prev, next)`'s data when it returns some (a
- * glide), else redraw still, so a ticking clock doesn't replay the entry.
+ * glide), else redraw still (Calibrated.update), so a ticking clock
+ * neither replays the entry nor cuts a running one short.
  */
 export function useCalSvg(recipe, data, transition) {
   const ref = useRef(null);
@@ -26,11 +27,10 @@ export function useCalSvg(recipe, data, transition) {
       return;
     }
     const step = last && transition ? transition(last, data) : null;
+    // Otherwise redraw still; a replay in flight lands on this data instead
+    // of being cut short.
     if (step) Calibrated.play(svg, draw, step);
-    else {
-      svg._calStop?.();
-      Calibrated.mount(svg, draw(data));
-    }
+    else Calibrated.update(svg, draw, data);
     // `key` stands in for `data`.
   }, [recipe, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
