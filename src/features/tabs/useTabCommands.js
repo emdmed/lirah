@@ -45,7 +45,7 @@ export function useTabCommands({
     setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setWorkspaceDialogOpen, setShowHelp,
     setSettingsOpen } = dialogs;
   const { sandboxEnabled, networkIsolation, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend } = settings;
-  const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand } = secondary;
+  const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
   const { addTab, requestCloseTab } = useTabActions();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const { success: toastSuccess, info: toastInfo } = useToast();
@@ -110,6 +110,7 @@ export function useTabCommands({
       { id: 'merge', hint: 'merge this branch into a base branch', run: () => onAutoMerge() },
 
       // Files & panes
+      { id: 'shell', hint: 'fullscreen shell in this project', run: () => toggleShell() },
       { id: 'git', hint: 'show only git changes', run: () => onToggleGitFilter() },
       { id: 'md', hint: 'show only markdown files', run: () => onToggleMarkdownFilter() },
       { id: 'watch', hint: `file watching (${fileWatchingEnabled ? 'on' : 'off'})`, options: ['on', 'off'], run: (arg) => {
@@ -174,7 +175,7 @@ export function useTabCommands({
     }
     return commands;
   }, [tabId, projectPath, addTab, requestCloseTab, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
-    secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand,
+    secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
     toggleSandbox, toggleNetwork, onToggleGitFilter, onToggleMarkdownFilter, setSidebarOpen, setTextareaVisible,
