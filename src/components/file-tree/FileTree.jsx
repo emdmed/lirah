@@ -114,11 +114,21 @@ export const FileTree = memo(function FileTree({
       }
       result.push({ kind: 'separator', key: 'pinned-separator' });
     }
+    // Root dot-folders sort together at the end; a labelled rule heads them.
+    // Off while filtering or searching, where the list is a result, not the tree.
+    const filtering = showGitChangesOnly || showMarkdownOnly || !!searchQuery;
+    const hiddenRoots = filtering
+      ? []
+      : (displayedNodes || []).filter((n) => n.is_dir && n.name?.startsWith('.'));
+    const firstHidden = hiddenRoots[0]?.path;
     for (const { node, depth } of flattenVisibleTree(displayedNodes, expandedFolders)) {
+      if (depth === 0 && node.path === firstHidden) {
+        result.push({ kind: 'hidden-rule', key: 'hidden-rule', count: hiddenRoots.length });
+      }
       result.push({ kind: 'node', key: node.path, node, depth });
     }
     return result;
-  }, [pinnedPaths, displayedNodes, expandedFolders]);
+  }, [pinnedPaths, displayedNodes, expandedFolders, showGitChangesOnly, showMarkdownOnly, searchQuery]);
 
   const treeIsEmpty = !displayedNodes || displayedNodes.length === 0;
   const hasPinned = !!pinnedPaths && pinnedPaths.length > 0;
@@ -251,6 +261,23 @@ export const FileTree = memo(function FileTree({
           return (
             <SidebarMenuItem key={row.key} className={`${itemClass} flex items-center`} style={style} aria-hidden>
               <div className="border-t border-foreground/10 mx-1 w-full" />
+            </SidebarMenuItem>
+          );
+        }
+        if (row.kind === 'hidden-rule') {
+          return (
+            <SidebarMenuItem
+              key={row.key}
+              className={`${itemClass} flex items-center gap-1.5 px-1 select-none`}
+              style={style}
+              title="Folders whose names start with a dot"
+            >
+              <div className="flex-none w-2 border-t border-[var(--ins-edge-strong)]" aria-hidden />
+              <span className="engraved-label">hidden</span>
+              <span className="text-[var(--ins-faint)]" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }}>
+                · {row.count} {row.count === 1 ? 'folder' : 'folders'}
+              </span>
+              <div className="flex-1 border-t border-[var(--ins-edge-strong)]" aria-hidden />
             </SidebarMenuItem>
           );
         }
