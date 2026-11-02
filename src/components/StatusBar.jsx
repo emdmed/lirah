@@ -285,7 +285,11 @@ export const StatusBar = memo(({
   const handleSandboxToggle = async () => {
     if (sessionId && !(await confirm({
       title: sandboxEnabled ? 'Turn sandbox off' : 'Turn sandbox on',
-      description: <>Restarts this terminal and ends anything running in it. File system isolation will be {sandboxEnabled ? 'off' : 'on'}.</>,
+      description: 'Anything running in this terminal ends.',
+      facts: [
+        { label: 'Terminal', value: `${cliName} restarts` },
+        { label: 'Isolation', value: sandboxEnabled ? 'file system sandboxed → open' : 'file system open → sandboxed' },
+      ],
       confirmLabel: 'Restart',
     }))) return;
     onToggleSandbox();
@@ -294,7 +298,11 @@ export const StatusBar = memo(({
   const handleNetworkToggle = async () => {
     if (sessionId && !(await confirm({
       title: networkIsolation ? 'Restore network' : 'Block network',
-      description: <>Restarts this terminal and ends anything running in it. External network access will be {networkIsolation ? 'restored' : 'blocked'}.</>,
+      description: 'Anything running in this terminal ends.',
+      facts: [
+        { label: 'Terminal', value: `${cliName} restarts` },
+        { label: 'Isolation', value: networkIsolation ? 'network blocked → open' : 'network open → blocked' },
+      ],
       confirmLabel: 'Restart',
     }))) return;
     onToggleNetworkIsolation();
