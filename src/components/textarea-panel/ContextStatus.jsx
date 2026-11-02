@@ -24,6 +24,12 @@ const NO_PROMPT = '';
 // while the files pane (which lists them all) is open.
 const FILE_NAME_LIMIT = 8;
 const TYPING = 'input, textarea, select, [contenteditable="true"]';
+// The empty manifest's three ways to attach context.
+const EMPTY_STEPS = [
+  { n: '01', label: 'pick files', keys: ['alt', '1'] },
+  { n: '02', label: 'add instructions', note: 'below' },
+  { n: '03', label: "link a tab's repo", keys: ['alt', '4'] },
+];
 
 /**
  * The prompt pane without the prompt: a manifest of what Lirah appends to the
@@ -223,12 +229,28 @@ export const ContextStatus = memo(function ContextStatus({
     );
   } else {
     manifest = (
-      <div className="flex flex-col gap-1 text-[11px] font-mono leading-5">
-        <p className="text-foreground">Nothing is appended to your next prompt.</p>
-        <p className="text-muted-foreground">
-          Select files in <KeyChord keys={['alt', '1']} size="sm" className="align-middle" />, add instructions
-          below, or link another tab&apos;s repo in <KeyChord keys={['alt', '4']} size="sm" className="align-middle" />.
+      <div className="ins-blank flex flex-col gap-1 px-2.5 py-2 text-[11px] font-mono leading-5">
+        <p className="flex items-center gap-2 min-w-0">
+          <span className="ins-legend shrink-0 border border-foreground bg-[var(--ins-panel)] px-1.5 py-[3px] text-foreground">
+            nothing attached
+          </span>
+          <span className="truncate bg-[var(--ins-panel)] px-1 text-muted-foreground">Your next prompt goes as typed.</span>
         </p>
+        <ol className="flex flex-col">
+          {EMPTY_STEPS.map(({ n, label, keys, note }) => (
+            <li key={n} className="flex items-center gap-2 h-5">
+              <span className="inline-flex items-center justify-center h-4 px-1 border border-[var(--ins-edge-strong)] bg-[var(--ins-panel)] text-[10px] leading-none tabular-nums text-faint">
+                {n}
+              </span>
+              {/* Text is knocked out of the hatch so it reads at full contrast. */}
+              <span className="inline-flex items-center gap-2 bg-[var(--ins-panel)] px-1">
+                <span className="text-foreground">{label}</span>
+                {keys && <KeyChord keys={keys} size="sm" />}
+                {note && <span className="text-muted-foreground">· {note}</span>}
+              </span>
+            </li>
+          ))}
+        </ol>
       </div>
     );
   }
