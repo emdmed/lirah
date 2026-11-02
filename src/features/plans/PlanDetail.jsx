@@ -132,11 +132,8 @@ export function PlanDetail({ plan }) {
     reveal(id, opts);
   };
 
-  // Follow the run: when auto-pilot moves on, its chunk comes into view.
-  const pilotChunkId = piloted ? plan.autopilot.chunkId : null;
-  useEffect(() => {
-    if (pilotChunkId) reveal(pilotChunkId);
-  }, [pilotChunkId]);
+  // Auto-pilot moving on never scrolls the pane: the run changes chunk while
+  // you read (and as it clears context), so only your own actions scroll.
 
   // The command palette's `plan next` and `plan implement`.
   const [commandSeq, setCommandSeq] = useState(0);
