@@ -154,6 +154,7 @@ pub fn run(initial_path: Option<String>) {
             fs::commands::set_file_executable,
             fs::commands::path_exists,
             fs::commands::check_command_exists,
+            fs::commands::open_in_file_manager,
             fs::git::enable_file_watchers,
             fs::git::disable_file_watchers,
             fs::git::get_file_watchers_status,
