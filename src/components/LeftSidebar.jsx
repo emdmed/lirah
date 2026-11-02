@@ -67,6 +67,9 @@ export const LeftSidebar = memo(function LeftSidebar({
   // md and git counts for the header keys, reported by the tree.
   const [filterCounts, setFilterCounts] = useState(null);
 
+  // While md or git filtering is on, the legend reads `N of M`.
+  const filtering = viewMode === 'tree' && (showMarkdownOnly || showGitChangesOnly);
+
   const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
   const { containerRef: rowsRef, registerList, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
     useRowCursor({
@@ -81,7 +84,11 @@ export const LeftSidebar = memo(function LeftSidebar({
         <PaneLegend
           index={1}
           title="Files"
-          status={cursorIndex != null && rowCount > 0 ? <Position index={cursorIndex} count={rowCount} width={48} /> : rowCount}
+          status={
+            cursorIndex != null && rowCount > 0 ? <Position index={cursorIndex} count={rowCount} width={48} />
+            : filtering && filterCounts?.total != null ? <span className="tabular-nums">{rowCount} <span className="text-faint">of {filterCounts.total}</span></span>
+            : rowCount
+          }
         />
         <SidebarContent className="flex flex-col flex-1 min-h-0">
           <SidebarHeader

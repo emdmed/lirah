@@ -83,9 +83,17 @@ export const FileTree = memo(function FileTree({
   // What the md and git keys would show, printed beside them in the header.
   const mdCount = useMemo(() => countMarkdownFiles(nodes), [nodes]);
   const gitCount = useMemo(() => countGitChanges(gitStats, currentPath), [gitStats, currentPath]);
+  // Unfiltered row total (pinned + tree), for the legend's `N of M` while a
+  // filter is on. Only walked while filtering.
+  const filterOn = showGitChangesOnly || showMarkdownOnly;
+  const pinnedCount = pinnedPaths?.length ?? 0;
+  const total = useMemo(
+    () => (filterOn ? pinnedCount + flattenVisibleTree(nodes, expandedFolders).length : null),
+    [filterOn, pinnedCount, nodes, expandedFolders]
+  );
   useEffect(() => {
-    onFilterCounts?.({ md: mdCount, git: gitCount });
-  }, [onFilterCounts, mdCount, gitCount]);
+    onFilterCounts?.({ md: mdCount, git: gitCount, total });
+  }, [onFilterCounts, mdCount, gitCount, total]);
 
   // When showing only git changes, clicking a file should show its diff
   // instead of adding it to file selection
