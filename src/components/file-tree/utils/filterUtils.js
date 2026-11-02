@@ -114,3 +114,41 @@ export function filterTreeByMarkdown(nodes) {
 
   return filterNodes(nodes);
 }
+
+/**
+ * Counts the files `filterTreeByMarkdown` would keep, without building the tree.
+ * @param {Array} nodes - Array of tree nodes
+ * @returns {number}
+ */
+export function countMarkdownFiles(nodes) {
+  let count = 0;
+  const walk = (nodeList) => {
+    for (const node of nodeList) {
+      if (node.is_dir) {
+        if (Array.isArray(node.children)) walk(node.children);
+      } else if (node.name.endsWith('.md')) {
+        count++;
+      }
+    }
+  };
+  walk(nodes);
+  return count;
+}
+
+/**
+ * Counts changed files in the git stats that sit under `rootPath`. The stats
+ * cover the whole repository, which can be wider than the open folder.
+ * @param {Map} gitStatsMap - Map of absolute file paths to git stats
+ * @param {string} rootPath - The open folder
+ * @returns {number}
+ */
+export function countGitChanges(gitStatsMap, rootPath) {
+  if (!gitStatsMap || gitStatsMap.size === 0) return 0;
+  const root = rootPath ? rootPath.replace(/[\\/]+$/, '') : '';
+  if (!root) return gitStatsMap.size;
+  let count = 0;
+  for (const path of gitStatsMap.keys()) {
+    if (path.startsWith(root + '/') || path.startsWith(root + '\\')) count++;
+  }
+  return count;
+}

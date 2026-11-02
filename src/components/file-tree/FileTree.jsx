@@ -4,7 +4,7 @@ import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
 import { useGitStats } from "../../features/git/useGitStats";
-import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtils";
+import { filterTreeByGitChanges, filterTreeByMarkdown, countMarkdownFiles, countGitChanges } from "./utils/filterUtils";
 import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
 import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
@@ -55,6 +55,7 @@ export const FileTree = memo(function FileTree({
   cursorIndex = null,
   registerList,
   isActive = true,
+  onFilterCounts,
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
@@ -78,6 +79,13 @@ export const FileTree = memo(function FileTree({
 
     return filtered;
   }, [nodes, showGitChangesOnly, showMarkdownOnly, gitStats]);
+
+  // What the md and git keys would show, printed beside them in the header.
+  const mdCount = useMemo(() => countMarkdownFiles(nodes), [nodes]);
+  const gitCount = useMemo(() => countGitChanges(gitStats, currentPath), [gitStats, currentPath]);
+  useEffect(() => {
+    onFilterCounts?.({ md: mdCount, git: gitCount });
+  }, [onFilterCounts, mdCount, gitCount]);
 
   // When showing only git changes, clicking a file should show its diff
   // instead of adding it to file selection

@@ -6,6 +6,10 @@ import { BookmarksDropdown } from '../features/bookmarks';
 import { Keycap } from './instrument/Keycap';
 import { Scanner } from './instrument/Scanner';
 
+// A faint count after a filter key's label; nothing until the tree reports.
+const KeyCount = ({ value }) =>
+  value == null ? null : <span className="text-faint tabular-nums">{value}</span>;
+
 // Sync button face while the tree reloads.
 const SyncBusy = () => <Scanner />;
 
@@ -20,6 +24,8 @@ export function SidebarHeader({
   showMarkdownOnly,
   onToggleMarkdownFilter,
   fileWatchingEnabled,
+  mdCount,
+  gitCount,
   onAddBookmark,
   onNavigateBookmark,
   hasTerminalSession,
@@ -89,6 +95,7 @@ export function SidebarHeader({
             title={showMarkdownOnly ? "Show all files (Ctrl+M)" : "Show only markdown files (Ctrl+M)"}
           >
             md
+            <KeyCount value={mdCount} />
           </PanelButton>
           <PanelButton
             latched={showGitChangesOnly}
@@ -97,6 +104,7 @@ export function SidebarHeader({
             title={showGitChangesOnly ? "Show all files (Ctrl+G)" : "Show only git changes (Ctrl+G)"}
           >
             git
+            <KeyCount value={gitCount} />
           </PanelButton>
           {/* Printed keys have no box, so a wider step sets the icon group
               apart from the md/git filters. */}

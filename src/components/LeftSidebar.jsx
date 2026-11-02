@@ -4,7 +4,7 @@ import { FlatViewMenu } from "./FlatViewMenu";
 import { SidebarFileSelection } from "../features/file-groups";
 import { useFileSelection } from "../features/file-groups";
 import { usePinnedFiles } from "../features/pinned-files";
-import { useMemo, useCallback, memo } from "react";
+import { useMemo, useCallback, useState, memo } from "react";
 import { Scanner } from "./instrument/Scanner";
 import { Position } from "./instrument/Position";
 import { PaneLegend } from "./instrument/PaneLegend";
@@ -64,6 +64,9 @@ export const LeftSidebar = memo(function LeftSidebar({
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, getLevelTokens, setFileViewMode, VIEW_MODES } = fileSymbols;
 
+  // md and git counts for the header keys, reported by the tree.
+  const [filterCounts, setFilterCounts] = useState(null);
+
   const focusSearch = useCallback(() => searchInputRef?.current?.focus(), [searchInputRef]);
   const { containerRef: rowsRef, registerList, onKeyDown: onRowsKeyDown, onBlur: onRowsBlur, cursorIndex, rowCount } =
     useRowCursor({
@@ -97,6 +100,8 @@ export const LeftSidebar = memo(function LeftSidebar({
             showMarkdownOnly={showMarkdownOnly}
             onToggleMarkdownFilter={handleToggleMarkdownFilter}
             fileWatchingEnabled={fileWatchingEnabled}
+            mdCount={filterCounts?.md}
+            gitCount={filterCounts?.git}
             onAddBookmark={onAddBookmark}
             onNavigateBookmark={onNavigateBookmark}
             hasTerminalSession={hasTerminalSession}
@@ -153,6 +158,7 @@ export const LeftSidebar = memo(function LeftSidebar({
                     cursorIndex={cursorIndex}
                     registerList={registerList}
                     isActive={isActive}
+                    onFilterCounts={setFilterCounts}
                   />
                 )
               )}
