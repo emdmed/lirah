@@ -4,6 +4,8 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-02
+
 ### Added
 
 - **Calibrated figures** - Small measured drawings, in the manner of an engineering drawing, now explain the features that are hard to put in a sentence. Each replaces the text or progress bar it explains, and each falls back to that text in narrow panes:
@@ -17,6 +19,11 @@ All notable changes to Lirah will be documented in this file.
 
 ### Changed
 
+- **File tree** - Hidden folders sit under a labelled rule, and the md/git filter keys show how many files they match. While a filter is on, the legend reads "N of M".
+- **Empty context** - With nothing attached, the context manifest shows dashed FILES and REPOS chips that jump to the pane that fills them, and the status line reads "nothing attached · prompts go as typed".
+- **Confirm dialogs** - Confirmations can list the facts of what they act on, and destructive ones get a fault-coloured confirm button.
+- **Menus** - Destructive items sit last, below a rule, and the focused item gets an ink outline.
+- **Undo toast** - The toast's top edge drains to show the time left to undo.
 - The live star in a figure glides to its next place and takes the lamps' softer glow in light themes; reduced motion snaps it.
 
 ## [0.1.13] - 2026-02-16
