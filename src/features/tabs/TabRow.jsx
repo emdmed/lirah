@@ -7,6 +7,8 @@ import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { ACTIVITY, YOUR_TURN } from './tabActivity';
 import { RowAction } from './RowAction';
+import { Scanner } from '../../components/instrument/Scanner';
+import { Lamp } from '../../components/instrument/Lamp';
 import { RenameField } from './RenameField';
 import { RoleChip, RoleTagButton } from './RoleMenu';
 import { TurnTrail } from './TurnTrail';
@@ -32,10 +34,36 @@ function compactCount(n) {
   return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
 }
 
+// An auto commit stands in for the diff it is committing: a scanner while it
+// stages and writes the message, a lamp once the message waits for review.
+const AUTO_COMMIT = {
+  // The lit lamp in place of the scanner says the message is ready.
+  ready: { lamp: 'ok', title: 'Auto commit: message ready to review' },
+  error: { lamp: 'fault', label: ' failed', tone: 'text-[var(--ins-fault)]', title: 'Auto commit failed' },
+};
+
+function AutoCommitMark({ stage }) {
+  const settled = AUTO_COMMIT[stage];
+  if (settled) {
+    return (
+      <span className="inline-flex items-center gap-1.5" title={settled.title}>
+        <Lamp state={settled.lamp} />commit{settled.label && <span className={settled.tone}>{settled.label}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5" title="Auto commit: writing the message">
+      <Scanner label="auto committing" />commit
+    </span>
+  );
+}
+
 /** The row's right-hand readout: uncommitted lines, then the context moon. */
-function Readout({ info, contextFill }) {
+function Readout({ info, contextFill, autoCommit }) {
   let diff = null;
-  if (info?.branch) {
+  if (autoCommit && autoCommit !== 'done') {
+    diff = <AutoCommitMark stage={autoCommit} />;
+  } else if (info?.branch) {
     diff = info.files === 0 ? (
       'clean'
     ) : (
@@ -81,7 +109,7 @@ export const ROW_KEYS = [
  * (a running "since" or duration included) changes.
  */
 export const TabRow = memo(function TabRow({
-  tab, index, name, info, contextFill, activityKind, activityLabel, activitySince, workLabel, active, linked, closable, queuePos,
+  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, workLabel, active, linked, closable, queuePos,
   turn, summaryText, summaryRunning, summaryStale, trailOpen, renaming, roleMenuOpen, plans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
@@ -274,7 +302,7 @@ export const TabRow = memo(function TabRow({
               </RowAction>
             )}
           </span>
-          <Readout info={info} contextFill={contextFill} />
+          <Readout info={info} contextFill={contextFill} autoCommit={autoCommit} />
         </span>
       </div>
 

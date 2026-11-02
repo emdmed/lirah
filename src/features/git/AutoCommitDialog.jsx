@@ -125,8 +125,15 @@ function FileList({ files, className }) {
 }
 
 export function AutoCommitDialog({ autoCommit }) {
-  const { stage, files, diff, log, commitMessage, setCommitMessage, error, confirm, cancel } = autoCommit;
-  const isOpen = stage !== 'idle';
+  const { stage, hidden, hide, files, diff, log, commitMessage, setCommitMessage, error, confirm, cancel } = autoCommit;
+  const isOpen = stage !== 'idle' && !hidden;
+  // While it stages, writes or waits for review, closing only hides the
+  // dialog: the run carries on in the tab row and the status bar brings it back.
+  const backgroundable = stage === 'loading-files' || stage === 'generating-message' || stage === 'ready';
+  const dismiss = () => {
+    if (backgroundable) hide();
+    else if (stage !== 'committing') cancel();
+  };
   const canCommit = stage === 'ready' && commitMessage.trim().length > 0;
   const showWork = files.length > 0 && stage !== 'done';
   const totals = useMemo(() => diffTotals(diff), [diff]);
@@ -157,9 +164,10 @@ export function AutoCommitDialog({ autoCommit }) {
     ? [{ keys: ['↵'], label: 'commit' }, { keys: ['⇧', '↵'], label: 'new line' }]
     : undefined;
   const settled = stage === 'done' || stage === 'error';
+  const escLabel = backgroundable ? 'hide' : settled ? 'close' : 'cancel';
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) cancel(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) dismiss(); }}>
       <DialogContent
         size="lg"
         className="max-h-[85vh] flex flex-col gap-4 overflow-hidden"
@@ -167,14 +175,14 @@ export function AutoCommitDialog({ autoCommit }) {
         lamp={lamp}
         status={status}
         hints={hints}
-        escLabel={settled ? 'close' : 'cancel'}
+        escLabel={escLabel}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && canCommit) {
             e.preventDefault();
             confirm(commitMessage);
           } else if (e.key === 'Escape') {
             e.preventDefault();
-            cancel();
+            dismiss();
           }
         }}
       >

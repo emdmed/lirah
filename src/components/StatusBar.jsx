@@ -268,12 +268,20 @@ function AttentionIndicator() {
 // Memoized: StatusBar's props are all primitives/callbacks, so with stable
 // callbacks (see ProjectTab call site) it skips re-render on every keystroke
 // in the prompt textarea and on the 5s token/branch polls.
+// Status-bar chip for a finished auto commit whose dialog was hidden (the
+// tab row shows the run itself).
+const AUTO_COMMIT_CHIP = {
+  ready: { label: 'ready', lamp: 'ok' },
+  error: { label: 'failed', lamp: 'fault' },
+};
+
 export const StatusBar = memo(({
   viewMode, currentPath, sessionId, onToggleHelp,
   selectedCli, onOpenCliSettings, showTitleBar,
   sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenDashboard, onOpenContextDetails, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
+  autoCommitStage = 'idle', onShowAutoCommit,
   workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext, onCompactContext,
   availableUpdate, compactionEnabled = false, onToggleCompaction,
 }) => {
@@ -384,6 +392,19 @@ export const StatusBar = memo(({
         {/* Transient status (changelog) — only visible when active */}
         {changelogStatus && (
           <ChangelogStatus status={changelogStatus} />
+        )}
+
+        {/* A hidden auto commit: its progress, and a way back to review it. */}
+        {AUTO_COMMIT_CHIP[autoCommitStage] && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="xs" onClick={onShowAutoCommit} className="gap-1.5 px-1 h-5 lowercase before:content-none after:content-none">
+                <Lamp state={AUTO_COMMIT_CHIP[autoCommitStage].lamp} blink={AUTO_COMMIT_CHIP[autoCommitStage].blink} />
+                commit · {AUTO_COMMIT_CHIP[autoCommitStage].label}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{autoCommitStage === 'ready' ? 'Review and commit' : 'Show auto commit'}</TooltipContent>
+          </Tooltip>
         )}
 
         {/* Runtime zone: CLI, sandbox, network. Jobs live

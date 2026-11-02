@@ -7,6 +7,7 @@ import { tabDisplayName, useTabManager } from './TabContext';
 import { useTabsSummary } from './useTabsSummary';
 import { getTabSession } from './terminalActivity';
 import { getTabContextFill } from './tabContextFill';
+import { getTabAutoCommit } from './tabAutoCommit';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
 import { LIVE, OWN_BUSY, YOUR_TURN, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
@@ -170,6 +171,7 @@ export function TabsSummaryPane() {
             info={repo[tab.id]}
             // The moon is the agent's context window: no agent, no moon.
             contextFill={cli[tab.id] ? getTabContextFill(tab.id) : null}
+            autoCommit={getTabAutoCommit(tab.id)}
             activityKind={activity.kind}
             activityLabel={activity.label}
             activitySince={activity.since}

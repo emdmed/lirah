@@ -23,8 +23,12 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const [log, setLog] = useState({ branch: null, commits: [] });
   const [commitMessage, setCommitMessage] = useState('');
   const [error, setError] = useState(null);
+  // Hidden: the dialog is closed but the run goes on. A run starts hidden
+  // (the tab shows a spinner) and the dialog opens once the message is ready.
+  const [hidden, setHidden] = useState(false);
   const currentPathRef = useRef(null);
   const cancelledRef = useRef(false);
+  const autoConfirmRef = useRef(false);
 
   const reset = useCallback(() => {
     setStage('idle');
@@ -33,13 +37,19 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     setLog({ branch: null, commits: [] });
     setCommitMessage('');
     setError(null);
+    setHidden(false);
   }, []);
+
+  const hide = useCallback(() => setHidden(true), []);
+  const show = useCallback(() => setHidden(false), []);
 
   const trigger = useCallback(async (currentPath) => {
     if (!currentPath) return;
     currentPathRef.current = currentPath;
     cancelledRef.current = false;
+    autoConfirmRef.current = false;
     reset();
+    setHidden(true);
     setStage('loading-files');
 
     try {
@@ -49,6 +59,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       if (!committableFiles || committableFiles.length === 0) {
         setError('No committable files found');
         setStage('error');
+        setHidden(false);
         return;
       }
       setFiles(committableFiles);
@@ -82,10 +93,12 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       const lines = msg.split('\n').filter(l => l.trim().length > 0);
       setCommitMessage(lines.length > 0 ? lines.join('\n') : 'chore: update files');
       setStage('ready');
+      if (!autoConfirmRef.current) setHidden(false);
     } catch (err) {
       if (cancelledRef.current) return;
       setError(err.toString());
       setStage('error');
+      setHidden(false);
     }
   }, [reset, cli, customPrompt]);
 
@@ -93,6 +106,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     const repoPath = currentPathRef.current;
     if (!repoPath) return;
     setStage('committing');
+    setHidden(false);
     try {
       await git(repoPath, ['commit', '-m', editedMessage]);
       setStage('done');
@@ -115,7 +129,6 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   }, [stage, reset]);
 
   // Quick commit: if ready, commit immediately; if generating, mark for auto-commit when ready
-  const autoConfirmRef = useRef(false);
 
   const quickCommit = useCallback(() => {
     if (stage === 'ready' && commitMessage.trim()) {
@@ -133,5 +146,5 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   }
   prevStageRef.current = stage;
 
-  return { stage, files, diff, log, commitMessage, setCommitMessage, error, trigger, confirm, cancel, quickCommit };
+  return { stage, hidden, hide, show, files, diff, log, commitMessage, setCommitMessage, error, trigger, confirm, cancel, quickCommit };
 }

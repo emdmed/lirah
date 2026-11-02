@@ -19,6 +19,7 @@ import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession, getLastOutputAt } from "./terminalActivity";
 import { getAgentHookState } from "./agentHookState";
 import { useTabContextFill } from "./tabContextFill";
+import { useTabAutoCommit } from "./tabAutoCommit";
 import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos, unlinkRepo } from "./useLinkedRepos";
 import { useAutoChangelog } from "../git/useAutoChangelog";
@@ -358,6 +359,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   );
 
   const autoCommit = useAutoCommit(settings.autoCommitCli, settings.autoCommitCustomPrompt);
+  useTabAutoCommit(tabId, autoCommit.stage);
   const autoMerge = useAutoMerge();
 
   // Workspace state
@@ -913,17 +915,22 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   // several. Refs keep these callbacks stable across stage/workspace changes.
   const autoCommitStageRef = useRef(autoCommit.stage);
   const workspaceRef = useRef(workspaceHook.workspace);
+  const autoCommitHiddenRef = useRef(autoCommit.hidden);
   useEffect(() => { autoCommitStageRef.current = autoCommit.stage; }, [autoCommit.stage]);
+  useEffect(() => { autoCommitHiddenRef.current = autoCommit.hidden; }, [autoCommit.hidden]);
   useEffect(() => { workspaceRef.current = workspaceHook.workspace; }, [workspaceHook.workspace]);
 
   const { setProjectPickerAction, setProjectPickerOpen } = dialogs;
   const handleAutoCommit = useCallback(() => {
-    if (autoCommitStageRef.current !== 'idle') autoCommit.quickCommit();
+    // A finished run that was hidden comes back for review.
+    const stage = autoCommitStageRef.current;
+    if (autoCommitHiddenRef.current && (stage === 'ready' || stage === 'error')) autoCommit.show();
+    else if (autoCommitStageRef.current !== 'idle') autoCommit.quickCommit();
     else if (workspaceRef.current?.projects?.length) {
       setProjectPickerAction('autocommit');
       setProjectPickerOpen(true);
     } else autoCommit.trigger(currentPathRef.current);
-  }, [autoCommit.quickCommit, autoCommit.trigger, setProjectPickerAction, setProjectPickerOpen]);
+  }, [autoCommit.show, autoCommit.quickCommit, autoCommit.trigger, setProjectPickerAction, setProjectPickerOpen]);
 
   const autoMergeStageRef = useRef(autoMerge.stage);
   useEffect(() => { autoMergeStageRef.current = autoMerge.stage; }, [autoMerge.stage]);
@@ -1259,6 +1266,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
             changelogStatus={changelogStatus}
             onOpenSettings={openSettings}
             onAutoCommit={handleAutoCommit}
+            autoCommitStage={autoCommit.hidden ? autoCommit.stage : 'idle'}
+            onShowAutoCommit={autoCommit.show}
             onAutoMerge={handleAutoMerge}
             onToggleSandbox={toggleSandbox}
             workspace={workspaceHook.workspace}
