@@ -10,7 +10,7 @@ import { PaneLegend } from './instrument/PaneLegend';
 // via `exec`, so quitting them ends the shell and closes terminal 2.
 const FOCUS_COMMANDS = new Set(['nvim', 'lazygit']);
 
-const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir, isActive = true, focus = false, onExit = null }, ref) => {
+const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSessionReady, initialCommand, projectDir, isActive = true, focus = false, onExit = null, title = 'Terminal 2' }, ref) => {
   const terminalRef = useRef(null);
 
   const { handleResize, sessionId, isFocused, searchAddon, searchOpen, searchDecorations, closeSearch } = useTerminal(
@@ -34,9 +34,9 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
     if (sessionId && onSessionReady) onSessionReady(sessionId);
   }, [sessionId, onSessionReady]);
 
-  // Focus terminal when session is ready and initialCommand is set
+  // Focus terminal when session is ready and a command was chosen ('' = bare shell)
   useEffect(() => {
-    if (sessionId && initialCommand && ref?.current?.focus) {
+    if (sessionId && initialCommand != null && ref?.current?.focus) {
       // Small delay to ensure terminal is fully initialized
       const timer = setTimeout(() => {
         ref.current.focus();
@@ -86,7 +86,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
         }`}
       style={{ width: '100%', flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}
     >
-      <PaneLegend title="Terminal 2" lit={isFocused} />
+      <PaneLegend title={title} lit={isFocused} />
       <div className="ins-glass relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
         <div
           ref={terminalRef}
@@ -101,7 +101,7 @@ const SecondaryTerminalInstance = memo(forwardRef(({ theme, onFocusChange, onSes
 SecondaryTerminalInstance.displayName = 'SecondaryTerminalInstance';
 
 export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onFocusChange, onSessionReady, projectDir, fullscreen, onToggleFullscreen, onPickerVisibilityChange, onFocusModeChange, initialCommand: initialCommandProp, isActive = true }, ref) => {
-  const [selectedCommand, setSelectedCommand] = useState(initialCommandProp || null);
+  const [selectedCommand, setSelectedCommand] = useState(initialCommandProp ?? null);
   const focus = visible && FOCUS_COMMANDS.has(selectedCommand);
 
   useEffect(() => {
@@ -170,6 +170,9 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
         initialCommand={selectedCommand}
         projectDir={projectDir}
         isActive={isActive}
+        // A bare shell closes the pane on `exit`; nothing else runs after it.
+        onExit={selectedCommand === '' ? onClose : null}
+        title={selectedCommand === '' ? 'Shell' : 'Terminal 2'}
       />
     </div>
   );

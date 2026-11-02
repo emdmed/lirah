@@ -1057,6 +1057,18 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       requestAnimationFrame(() => terminalRef.current?.focus?.());
     }
   }, [secondary.setSecondaryFullscreen]);
+  // When a shell opened by openShell closes (Alt+T, :shell or exit), hand focus
+  // back to the agent terminal. closeSecondaryTerminal resets the mode in the
+  // same render, so remember it while the pane is open.
+  const wasShellRef = useRef(false);
+  useEffect(() => {
+    if (secondary.secondaryVisible) {
+      wasShellRef.current = secondary.secondaryMode === 'shell';
+    } else if (wasShellRef.current) {
+      wasShellRef.current = false;
+      requestAnimationFrame(() => terminalRef.current?.focus?.());
+    }
+  }, [secondary.secondaryVisible, secondary.secondaryMode]);
   const handleTerminalReady = useCallback(() => setTerminalReady(true), []);
   // Sandboxing is applied at spawn, so retrying without it turns the setting
   // off and restarts this tab's shell (same path as toggleSandbox).

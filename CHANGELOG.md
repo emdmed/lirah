@@ -12,6 +12,7 @@ All notable changes to Lirah will be documented in this file.
   - FIG.10 sandbox section, FIG.11 auto-merge plan with the commands it will run, FIG.12 race lanes and FIG.13 subagent fan-out
   - FIG.14 budget ruler with today's pace, FIG.15 keyboard plate for held modifiers, FIG.19 file detail levels with token counts
 - **Figures setting** - Settings → Appearance → Figures (`:figures full|compact`). Compact keeps the previous text-only UI.
+- **Fullscreen shell** - Alt+T opens a plain shell in the project directory as terminal 2, maximized to fill the window. Press Alt+T again, or exit the shell, to close it and return focus to the agent terminal. The shell is also in the terminal 2 picker and the palette (`:shell`). Like nvim and lazygit, terminal 2 runs unsandboxed. Inside Lirah, Alt+T no longer reaches readline's transpose-words.
 
 ### Changed
 

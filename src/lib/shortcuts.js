@@ -42,6 +42,7 @@ export const SHORTCUTS = [
   { id: 'palette', keys: ['Ctrl', ':'], description: 'Command Palette', category: 'Panes & Views', note: 'or : outside a text field', hint: { bar: 'ctrl', label: 'commands' } },
   { id: 'bookmarks', keys: ['Ctrl', 'P'], description: 'Starred projects', category: 'Panes & Views', paletteCommand: 'marks' },
   { id: 'secondary', keys: ['Ctrl', '`'], description: 'Toggle Secondary Terminal', category: 'Panes & Views', paletteCommand: 'term', match: (e) => mod(e) && e.key === '`' },
+  { id: 'shell', keys: ['Alt', 'T'], description: 'Fullscreen Shell', category: 'Panes & Views', note: 'again to close', hint: { bar: 'always', label: 'shell' }, paletteCommand: 'shell', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyT' },
   { id: 'nvim', keys: ['Alt', 'N'], description: 'Open Nvim', category: 'Panes & Views', note: 'secondary terminal', paletteCommand: 'nvim', match: (e) => alt(e) && key('n')(e) },
   { id: 'help', keys: ['Ctrl', 'H'], description: 'Toggle This Dialog', category: 'Panes & Views', hint: { bar: 'ctrl', label: 'help' }, paletteCommand: 'help', match: (e) => e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'h' },
 

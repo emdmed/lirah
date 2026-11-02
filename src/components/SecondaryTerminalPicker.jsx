@@ -6,6 +6,7 @@ import { joinKeys } from "./instrument/FrameHints";
 import { shortcutKeys } from "../lib/shortcuts";
 
 const options = [
+  { id: 'shell', label: 'shell', glyph: '$', note: 'commands', command: '' },
   { id: 'nvim', label: 'nvim', glyph: '›', note: 'editor', command: 'nvim' },
   { id: 'lazygit', label: 'lazygit', glyph: '±', note: 'git', command: 'lazygit' },
 ];
