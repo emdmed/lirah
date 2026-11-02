@@ -25,14 +25,17 @@ const NO_PROMPT = '';
 // while the files pane (which lists them all) is open.
 const FILE_NAME_LIMIT = 8;
 const TYPING = 'input, textarea, select, [contenteditable="true"]';
-// The empty manifest's three ways to attach context.
-// Empty manifest: one row like a filled one, holding ghost chips (dashed,
-// chip-sized) where the real chips will land. Each one jumps to the pane
-// that fills it.
+// Empty manifest: the filled manifest's rows, each holding a ghost chip
+// (dashed, chip-sized) where its real chips will land. Two rows fill the
+// section's 48px floor, so the pane keeps its height when context arrives.
+// A ghost jumps to the pane that fills its row.
 const GHOSTS = [
-  { label: 'pick files', keys: ['alt', '1'], pane: 1, title: 'Pick files in the files pane' },
-  { label: "link a tab's repo", keys: ['alt', '4'], pane: 4, title: "Link another tab's repo from the workspace pane" },
+  { row: 'files', label: 'pick files', keys: ['alt', '1'], shortcut: 'Alt+1', pane: 1, title: 'Pick files in the files pane' },
+  { row: 'repos', label: "link a tab's repo", keys: ['alt', '4'], shortcut: 'Alt+4', pane: 4, title: "Link another tab's repo from the workspace pane" },
 ];
+// Dashed in every state, so a ghost never passes for a real chip; hover and
+// focus brighten it, and focus adds the ring real chips use.
+const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 pl-1.5 pr-1 border border-dashed border-[var(--ins-faint)] font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground hover:border-[var(--ins-legend)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:text-foreground focus-visible:border-[var(--ins-legend)]";
 
 /**
  * The prompt pane without the prompt: a manifest of what Lirah appends to the
@@ -138,7 +141,7 @@ export const ContextStatus = memo(function ContextStatus({
     status = hookDelivers ? 'sends with your next prompt' : 'not sent · insert it, then type your prompt';
     lamp = hookDelivers ? 'on' : undefined;
   } else {
-    status = 'nothing attached';
+    status = 'nothing attached · prompts go as typed';
   }
 
   // Keep lives in the files pane's context header; here only while it's closed.
@@ -235,23 +238,22 @@ export const ContextStatus = memo(function ContextStatus({
   } else {
     manifest = (
       <dl className="flex flex-col gap-y-2">
-        <ManifestRow label="files">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {GHOSTS.map((g) => (
-              <button
-                key={g.pane}
-                type="button"
-                onClick={() => focusPane(g.pane)}
-                title={g.title}
-                className="group/ghost inline-flex items-center h-5 shrink-0 border border-dashed border-[var(--ins-edge-strong)] font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground hover:border-solid focus-visible:outline-none focus-visible:border-solid focus-visible:text-foreground"
-              >
-                <span className="h-full flex items-center px-1.5 border-r border-dashed border-[var(--ins-edge-strong)] text-faint group-hover/ghost:text-foreground" aria-hidden>+</span>
-                <span className="px-1.5">{g.label}</span>
-                <KeyChord keys={g.keys} size="sm" className="pr-1" />
-              </button>
-            ))}
-          </div>
-        </ManifestRow>
+        {GHOSTS.map((g) => (
+          <ManifestRow key={g.row} label={g.row}>
+            <button
+              type="button"
+              onClick={() => focusPane(g.pane)}
+              title={g.title}
+              aria-label={g.title}
+              aria-keyshortcuts={g.shortcut}
+              className={`group/ghost ${GHOST}`}
+            >
+              <span className="text-faint group-hover/ghost:text-foreground group-focus-visible/ghost:text-foreground" aria-hidden>+</span>
+              <span>{g.label}</span>
+              <KeyChord keys={g.keys} size="sm" />
+            </button>
+          </ManifestRow>
+        ))}
       </dl>
     );
   }
@@ -267,7 +269,7 @@ export const ContextStatus = memo(function ContextStatus({
       />
       {/* Announces pending / attached for screen readers; the legend shows it. */}
       <span className="sr-only" role="status" aria-live="polite">
-        {status && `Context ${status}`}
+        {hasContext || attachedSummary ? `Context ${status}` : 'No context attached. Prompts go as typed.'}
       </span>
 
       {/* What gets appended. A floor of two rows and a ceiling of four keep

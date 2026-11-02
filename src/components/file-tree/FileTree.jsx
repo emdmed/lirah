@@ -13,8 +13,9 @@ import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
 const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 18;
 const SEPARATOR_HEIGHT = 9;
-// The hidden-folders rule gets a full row of air: 10px above and below its label.
-const HIDDEN_RULE_HEIGHT = 38;
+// The hidden-folders rule: 1.5 rows, with the label sat low so it heads the
+// folders below it (about 18px of air above, 6px below).
+const HIDDEN_RULE_HEIGHT = 36;
 
 const rowHeight = (row) =>
   row.kind === 'separator' ? SEPARATOR_HEIGHT : row.kind === 'hidden-rule' ? HIDDEN_RULE_HEIGHT : row.kind === 'node' ? ROW_HEIGHT : HEADER_HEIGHT;
@@ -286,16 +287,18 @@ export const FileTree = memo(function FileTree({
           return (
             <SidebarMenuItem
               key={row.key}
-              className={`${itemClass} flex items-center gap-1.5 px-1 select-none`}
+              className={`${itemClass} flex items-end px-1 pb-1.5 select-none`}
               style={style}
               title="Folders whose names start with a dot"
             >
-              <div className="flex-none w-2 border-t border-[var(--ins-edge-strong)]" aria-hidden />
-              <span className="engraved-label">hidden</span>
-              <span className="text-[var(--ins-faint)]" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }}>
-                · {row.count} {row.count === 1 ? 'folder' : 'folders'}
-              </span>
-              <div className="flex-1 border-t border-[var(--ins-edge-strong)]" aria-hidden />
+              <div className="flex flex-1 items-center gap-1.5">
+                <div className="flex-none w-2 border-t border-[var(--ins-edge-strong)]" aria-hidden />
+                <span className="engraved-label">hidden</span>
+                <span className="text-[var(--ins-faint)]" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }}>
+                  · {row.count} {row.count === 1 ? 'folder' : 'folders'}
+                </span>
+                <div className="flex-1 border-t border-[var(--ins-edge-strong)]" aria-hidden />
+              </div>
             </SidebarMenuItem>
           );
         }
