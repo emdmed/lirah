@@ -96,6 +96,12 @@ for (const [key, theme] of Object.entries(themes)) {
   check('foreground on panel >= 7:1', contrast(k.fg, k.panel) >= 7, r(contrast(k.fg, k.panel)));
   check('muted on panel >= 4.5:1', contrast(k.muted, k.panel) >= 4.5, r(contrast(k.muted, k.panel)));
   check('legend on gutter >= 4.5:1', contrast(k.legend, k.gutter) >= 4.5, r(contrast(k.legend, k.gutter)));
+  // Menus: the focused item's ink outline and a destructive item's fault text.
+  check('menu focus outline (legend) on panel >= 3:1', contrast(k.legend, k.panel) >= 3, r(contrast(k.legend, k.panel)));
+  // Fault is a theme status colour, not tuned for small text; report it so a
+  // palette change can lift it, but don't fail on it.
+  const faultText = contrast(k.fault, k.panel);
+  if (faultText < 4.5) console.log(`  note fault text on panel below 4.5:1 ${r(faultText)}`);
   const dl = Math.abs(lightness(k.lamp) - lightness(k.lampOff));
   check('lamp vs lamp-off dL >= 25', dl >= 25, r(dl));
   const L = { ok: lightness(k.ok), warn: lightness(k.warn), fault: lightness(k.fault) };

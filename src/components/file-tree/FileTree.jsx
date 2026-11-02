@@ -4,7 +4,7 @@ import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TreeNode } from "./TreeNode";
 import { EmptyState } from "./EmptyState";
 import { useGitStats } from "../../features/git/useGitStats";
-import { filterTreeByGitChanges, filterTreeByMarkdown } from "./utils/filterUtils";
+import { filterTreeByGitChanges, filterTreeByMarkdown, countMarkdownFiles, countGitChanges } from "./utils/filterUtils";
 import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
 import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
@@ -13,9 +13,12 @@ import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
 const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 18;
 const SEPARATOR_HEIGHT = 9;
+// The hidden-folders rule: 1.5 rows, with the label sat low so it heads the
+// folders below it (about 18px of air above, 6px below).
+const HIDDEN_RULE_HEIGHT = 36;
 
 const rowHeight = (row) =>
-  row.kind === 'separator' ? SEPARATOR_HEIGHT : row.kind === 'node' ? ROW_HEIGHT : HEADER_HEIGHT;
+  row.kind === 'separator' ? SEPARATOR_HEIGHT : row.kind === 'hidden-rule' ? HIDDEN_RULE_HEIGHT : row.kind === 'node' ? ROW_HEIGHT : HEADER_HEIGHT;
 
 /**
  * Main FileTree component - renders a tree view of files and folders
@@ -55,6 +58,7 @@ export const FileTree = memo(function FileTree({
   cursorIndex = null,
   registerList,
   isActive = true,
+  onFilterCounts,
 }) {
   // Fetch git stats periodically with git changes callback
   const { gitStats } = useGitStats(currentPath, fileWatchingEnabled, onGitChanges);
@@ -78,6 +82,21 @@ export const FileTree = memo(function FileTree({
 
     return filtered;
   }, [nodes, showGitChangesOnly, showMarkdownOnly, gitStats]);
+
+  // What the md and git keys would show, printed beside them in the header.
+  const mdCount = useMemo(() => countMarkdownFiles(nodes), [nodes]);
+  const gitCount = useMemo(() => countGitChanges(gitStats, currentPath), [gitStats, currentPath]);
+  // Unfiltered row total (pinned + tree), for the legend's `N of M` while a
+  // filter is on. Only walked while filtering.
+  const filterOn = showGitChangesOnly || showMarkdownOnly;
+  const pinnedCount = pinnedPaths?.length ?? 0;
+  const total = useMemo(
+    () => (filterOn ? pinnedCount + flattenVisibleTree(nodes, expandedFolders).length : null),
+    [filterOn, pinnedCount, nodes, expandedFolders]
+  );
+  useEffect(() => {
+    onFilterCounts?.({ md: mdCount, git: gitCount, total });
+  }, [onFilterCounts, mdCount, gitCount, total]);
 
   // When showing only git changes, clicking a file should show its diff
   // instead of adding it to file selection
@@ -114,11 +133,21 @@ export const FileTree = memo(function FileTree({
       }
       result.push({ kind: 'separator', key: 'pinned-separator' });
     }
+    // Root dot-folders sort together at the end; a labelled rule heads them.
+    // Off while filtering or searching, where the list is a result, not the tree.
+    const filtering = showGitChangesOnly || showMarkdownOnly || !!searchQuery;
+    const hiddenRoots = filtering
+      ? []
+      : (displayedNodes || []).filter((n) => n.is_dir && n.name?.startsWith('.'));
+    const firstHidden = hiddenRoots[0]?.path;
     for (const { node, depth } of flattenVisibleTree(displayedNodes, expandedFolders)) {
+      if (depth === 0 && node.path === firstHidden) {
+        result.push({ kind: 'hidden-rule', key: 'hidden-rule', count: hiddenRoots.length });
+      }
       result.push({ kind: 'node', key: node.path, node, depth });
     }
     return result;
-  }, [pinnedPaths, displayedNodes, expandedFolders]);
+  }, [pinnedPaths, displayedNodes, expandedFolders, showGitChangesOnly, showMarkdownOnly, searchQuery]);
 
   const treeIsEmpty = !displayedNodes || displayedNodes.length === 0;
   const hasPinned = !!pinnedPaths && pinnedPaths.length > 0;
@@ -251,6 +280,25 @@ export const FileTree = memo(function FileTree({
           return (
             <SidebarMenuItem key={row.key} className={`${itemClass} flex items-center`} style={style} aria-hidden>
               <div className="border-t border-foreground/10 mx-1 w-full" />
+            </SidebarMenuItem>
+          );
+        }
+        if (row.kind === 'hidden-rule') {
+          return (
+            <SidebarMenuItem
+              key={row.key}
+              className={`${itemClass} flex items-end px-1 pb-1.5 select-none`}
+              style={style}
+              title="Folders whose names start with a dot"
+            >
+              <div className="flex flex-1 items-center gap-1.5">
+                <div className="flex-none w-2 border-t border-[var(--ins-edge-strong)]" aria-hidden />
+                <span className="engraved-label">hidden</span>
+                <span className="text-[var(--ins-faint)]" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }}>
+                  · {row.count} {row.count === 1 ? 'folder' : 'folders'}
+                </span>
+                <div className="flex-1 border-t border-[var(--ins-edge-strong)]" aria-hidden />
+              </div>
             </SidebarMenuItem>
           );
         }

@@ -11,6 +11,9 @@ import { createDialogStore, DialogScopeContext } from './dialogStore';
 //   dialog.open('settings');                 // in the current tab
 //   dialog.open('newTab', {}, null);         // app-wide
 //   const ok = await dialog.confirm({ title: 'Discard job', confirmLabel: 'discard' });
+//
+// A confirm can carry `facts: [{ label, value, tone? }]`, drawn as a key/value
+// sheet under the description; `tone: 'lamp'` marks a live value.
 
 const DialogContext = createContext(null);
 
@@ -63,11 +66,13 @@ function ConfirmDialog({ request, settle }) {
           ) : (
             <DialogDescription className="sr-only">{request.title}</DialogDescription>
           )}
+          {request.facts?.length > 0 && <ConfirmFacts facts={request.facts} />}
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => settle(false)}>Cancel</Button>
             <Button
               variant={fault ? 'destructive' : 'default'}
               size="sm"
+              className={fault ? 'ins-key-fill' : undefined}
               autoFocus
               onClick={() => settle(true)}
             >
@@ -77,6 +82,26 @@ function ConfirmDialog({ request, settle }) {
         </DialogContent>
       )}
     </Dialog>
+  );
+}
+
+// Keys in legend type, values in mono; a lamp-toned value is live state.
+function ConfirmFacts({ facts }) {
+  return (
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5 border-y border-[var(--ins-edge)] py-2">
+      {facts.map((fact, i) => (
+        <div key={`${fact.label}-${i}`} className="contents">
+          <dt className="engraved-label">{fact.label}</dt>
+          <dd
+            className={`min-w-0 break-words font-mono text-xs tabular-nums ${
+              fact.tone === 'lamp' ? 'text-[var(--ins-lamp)]' : 'text-foreground'
+            }`}
+          >
+            {fact.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

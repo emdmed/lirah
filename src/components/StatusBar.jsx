@@ -210,13 +210,6 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
             Compact (summarise and continue)
           </DropdownMenuItem>
         )}
-        {crowded && onClearContext && (
-          <DropdownMenuItem onClick={onClearContext} className="cursor-pointer py-1">
-            <Eraser className="mr-2 w-3 h-3" />
-            Clear context
-            <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
-          </DropdownMenuItem>
-        )}
         {onOpenContextDetails && (
           <DropdownMenuItem onClick={onOpenContextDetails} className="cursor-pointer py-1">
             <ScanSearch className="mr-2 w-3 h-3" />
@@ -229,6 +222,17 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
             Token Metrics
             <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
           </DropdownMenuItem>
+        )}
+        {/* Destructive last, below a rule. */}
+        {crowded && onClearContext && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem destructive onClick={onClearContext} className="cursor-pointer py-1">
+              <Eraser className="mr-2 w-3 h-3" />
+              Clear context
+              <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -285,7 +289,11 @@ export const StatusBar = memo(({
   const handleSandboxToggle = async () => {
     if (sessionId && !(await confirm({
       title: sandboxEnabled ? 'Turn sandbox off' : 'Turn sandbox on',
-      description: <>Restarts this terminal and ends anything running in it. File system isolation will be {sandboxEnabled ? 'off' : 'on'}.</>,
+      description: 'Anything running in this terminal ends.',
+      facts: [
+        { label: 'Terminal', value: `${cliName} restarts` },
+        { label: 'Isolation', value: sandboxEnabled ? 'file system sandboxed → open' : 'file system open → sandboxed' },
+      ],
       confirmLabel: 'Restart',
     }))) return;
     onToggleSandbox();
@@ -294,7 +302,11 @@ export const StatusBar = memo(({
   const handleNetworkToggle = async () => {
     if (sessionId && !(await confirm({
       title: networkIsolation ? 'Restore network' : 'Block network',
-      description: <>Restarts this terminal and ends anything running in it. External network access will be {networkIsolation ? 'restored' : 'blocked'}.</>,
+      description: 'Anything running in this terminal ends.',
+      facts: [
+        { label: 'Terminal', value: `${cliName} restarts` },
+        { label: 'Isolation', value: networkIsolation ? 'network blocked → open' : 'network open → blocked' },
+      ],
       confirmLabel: 'Restart',
     }))) return;
     onToggleNetworkIsolation();

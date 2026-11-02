@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useToast } from "../toast";
 import { useConfirm } from "../dialogs/DialogProvider";
-import { getAgentHookState } from "./agentHookState";
+import { getAgentHookState, getLastTurn } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
 import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 import { invoke } from "@tauri-apps/api/core";
 import { getSettings } from "../settings/settingsStore";
+import { formatDuration } from "../../lib/formatDuration";
+import { tildePath } from "../../components/ui/picker";
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -157,13 +159,27 @@ export function TabProvider({ children }) {
     const current = tabsRef.current;
     const tab = current.find((t) => t.id === tabId);
     if (!tab || current.length < 2) return false;
-    const hook = getAgentHookState(getTabSession(tabId));
+    const sessionId = getTabSession(tabId);
+    const hook = getAgentHookState(sessionId);
     if (!hook || !BUSY_STATES.has(hook.state)) return true;
+    const branch = await invoke('get_current_branch', { repoPath: tab.projectPath }).catch(() => null);
+    // Working counts from the turn's start (hook.at moves on every tool call);
+    // a permission wait counts from when it began.
+    const turn = getLastTurn(sessionId);
+    const start = hook.state === 'working' && turn && !turn.endedAt ? turn.startedAt : hook.at;
+    const since = formatDuration(Date.now() - start);
     return confirm({
       title: `Close ${tab.customLabel || tab.label}?`,
-      description: hook.state === 'permission'
-        ? 'Its agent is waiting on a permission prompt. Closing the tab ends the agent and its terminal.'
-        : 'Its agent is still working. Closing the tab ends the agent and its terminal.',
+      description: 'The agent and its terminal end.',
+      facts: [
+        {
+          label: 'Agent',
+          value: hook.state === 'permission' ? `waiting on permission · ${since}` : `working · ${since}`,
+          tone: 'lamp',
+        },
+        { label: 'Repo', value: tildePath(tab.projectPath) },
+        ...(branch ? [{ label: 'Branch', value: branch }] : []),
+      ],
       confirmLabel: 'Close tab',
       destructive: true,
     });

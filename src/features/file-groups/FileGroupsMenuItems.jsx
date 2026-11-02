@@ -58,9 +58,10 @@ function HoldDeleteItem({ onConfirm, onFallback }) {
   const { state, props } = useHoldToConfirm({ onConfirm, onFallback });
   return (
     <DropdownMenuItem
+      destructive
       onSelect={(e) => e.preventDefault()}
       title="Hold to delete. Shift+Enter asks first."
-      className={`${ITEM} text-destructive ins-hold`}
+      className={`${ITEM} ins-hold`}
       {...props}
     >
       <Trash2 className="h-3 w-3 mr-1.5" />
@@ -112,7 +113,11 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
   const handleAskDelete = useCallback(async (group) => {
     const ok = await confirm({
       title: `Delete context set "${group.name}"?`,
-      description: `The saved set of ${plural(group.files.length, 'file')} is removed. Your current context and the files themselves are untouched.`,
+      description: 'Only the saved set goes. Your current context and the files stay.',
+      facts: [
+        { label: 'Set', value: group.name },
+        { label: 'Files', value: plural(group.files.length, 'file') },
+      ],
       confirmLabel: 'Delete set',
       destructive: true,
     });
@@ -170,6 +175,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
                     <Pencil className="h-3 w-3 mr-1.5" />
                     Rename…
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <HoldDeleteItem
                     onConfirm={() => handleDelete(group)}
                     onFallback={() => handleAskDelete(group)}
