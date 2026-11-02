@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useToast, useToasts } from './ToastContext';
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -17,9 +17,17 @@ export function ToastContainer() {
   const { dismiss } = useToast();
   const toasts = useToasts();
 
-  if (toasts.length === 0) return null;
-
   const toast = toasts[toasts.length - 1];
+  // A toast that surfaces from the queue has already spent part of its time,
+  // so the drain starts that far in. Fixed per toast, or a re-render would
+  // shift the running animation.
+  const spent = useMemo(
+    () => (toast ? Math.min(Date.now() - toast.createdAt, toast.duration) : 0),
+    [toast?.id],
+  );
+
+  if (!toast) return null;
+
   const lamp = LAMPS[toast.type];
   const queued = toasts.length - 1;
 
@@ -28,6 +36,14 @@ export function ToastContainer() {
       className="ins-line-enter fixed left-0 right-0 bottom-0 z-[100] flex items-center gap-2.5 h-8 px-2.5 text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
       role="alert"
     >
+      {toast.action && toast.duration > 0 && (
+        <span
+          key={toast.id}
+          className="ins-drain"
+          style={{ animationDuration: `${toast.duration}ms`, animationDelay: `-${spent}ms` }}
+          aria-hidden="true"
+        />
+      )}
       {lamp ? (
         <Lamp state={lamp} label={toast.type} />
       ) : (
