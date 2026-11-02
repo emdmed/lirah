@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { plural } from '../../lib/plural';
 import { useBookmarks } from '../bookmarks';
 import { useToast } from '../toast';
@@ -85,6 +86,15 @@ export function TabsSummaryPane() {
     }
   }, [toast]);
 
+  // Opens a tab's folder in the system file manager; the active tab stays put.
+  const openFolder = useCallback(async (path) => {
+    try {
+      await invoke('open_in_file_manager', { path });
+    } catch (e) {
+      toast.error(String(e?.message ?? e));
+    }
+  }, [toast]);
+
   // Toggles another tab's repo in the active tab's prompt, so the agent knows
   // the feature spans more than one repo.
   const toggleLink = useCallback((tab, name, linked) => {
@@ -124,10 +134,11 @@ export function TabsSummaryPane() {
     cancelRename,
     toggleLink,
     copyBranch,
+    openFolder,
     attachEdits,
     toggleTrail,
     setRoleMenu: setRoleMenuId,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, attachEdits, toggleTrail]);
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail]);
 
   const kinds = [];
 
