@@ -4,6 +4,16 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-02
+
+### Changed
+
+- **Auto commit runs in the background** - Starting an auto commit no longer opens a dialog that blocks the window. The tab row shows a scanner and `commit` where the diff count sits while it stages and writes the message, so you can keep working or switch tabs. When the message is ready the scanner becomes a lit lamp and the dialog opens for review, or when you return to that tab. A failed run reads `commit failed`. Esc on the ready dialog hides it; the `commit · ready` chip in the status bar or the shortcut brings it back, and only Cancel unstages.
+
+### Fixed
+
+- **Plan pane scrolling** - Auto-pilot no longer scrolls the plan pane when it moves to the next chunk; only your own actions do.
+
 ## [0.5.7] - 2026-11-02
 
 ### Added
