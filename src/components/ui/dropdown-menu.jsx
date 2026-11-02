@@ -5,6 +5,11 @@ import { Check, ChevronRight, Circle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Keycap } from "@/components/instrument/Keycap"
 
+// Focus (keyboard and pointer) is a 1px inset ink outline, not a tint, so the
+// row keeps its colours; a destructive item stays in fault while focused.
+const FOCUS =
+  "focus:text-foreground focus:shadow-[inset_0_0_0_1px_var(--ins-legend)] data-[highlighted]:shadow-[inset_0_0_0_1px_var(--ins-legend)]"
+
 const DropdownMenu = DropdownMenuPrimitive.Root
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
@@ -21,7 +26,7 @@ const DropdownMenuSubTrigger = React.forwardRef(({ className, inset, children, .
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      "flex cursor-default select-none items-center gap-2 rounded-none px-2 py-1.5 text-sm outline-none focus:bg-[color-mix(in_srgb,var(--color-foreground)_10%,transparent)] focus:text-foreground data-[state=open]:bg-[color-mix(in_srgb,var(--color-foreground)_10%,transparent)] data-[state=open]:text-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      `flex cursor-default select-none items-center gap-2 rounded-none px-2 py-1.5 text-sm outline-none ${FOCUS} data-[state=open]:text-foreground data-[state=open]:shadow-[inset_0_0_0_1px_var(--ins-legend)] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0`,
       inset && "pl-8",
       className
     )}
@@ -59,12 +64,14 @@ const DropdownMenuContent = React.forwardRef(({ className, sideOffset = 4, ...pr
 ))
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
-const DropdownMenuItem = React.forwardRef(({ className, inset, ...props }, ref) => (
+// `destructive` draws the label and icon in fault.
+const DropdownMenuItem = React.forwardRef(({ className, inset, destructive, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-none px-2 py-1.5 text-sm outline-none focus:bg-[color-mix(in_srgb,var(--color-foreground)_10%,transparent)] focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      `relative flex cursor-default select-none items-center gap-2 rounded-none px-2 py-1.5 text-sm outline-none ${FOCUS} data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0`,
       inset && "pl-8",
+      destructive && "text-[var(--ins-fault)] focus:text-[var(--ins-fault)] [&_svg]:text-[var(--ins-fault)]",
       className
     )}
     {...props} />
@@ -75,7 +82,7 @@ const DropdownMenuCheckboxItem = React.forwardRef(({ className, children, checke
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-none py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-[color-mix(in_srgb,var(--color-foreground)_10%,transparent)] focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      `relative flex cursor-default select-none items-center rounded-none py-1.5 pl-8 pr-2 text-sm outline-none ${FOCUS} data-[disabled]:pointer-events-none data-[disabled]:opacity-50`,
       className
     )}
     checked={checked}
@@ -95,7 +102,7 @@ const DropdownMenuRadioItem = React.forwardRef(({ className, children, ...props 
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-none py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-[color-mix(in_srgb,var(--color-foreground)_10%,transparent)] focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      `relative flex cursor-default select-none items-center rounded-none py-1.5 pl-8 pr-2 text-sm outline-none ${FOCUS} data-[disabled]:pointer-events-none data-[disabled]:opacity-50`,
       className
     )}
     {...props}>
