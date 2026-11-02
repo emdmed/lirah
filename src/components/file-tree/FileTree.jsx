@@ -13,9 +13,11 @@ import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
 const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 18;
 const SEPARATOR_HEIGHT = 9;
+// The hidden-folders rule gets a full row of air: 10px above and below its label.
+const HIDDEN_RULE_HEIGHT = 38;
 
 const rowHeight = (row) =>
-  row.kind === 'separator' ? SEPARATOR_HEIGHT : row.kind === 'node' ? ROW_HEIGHT : HEADER_HEIGHT;
+  row.kind === 'separator' ? SEPARATOR_HEIGHT : row.kind === 'hidden-rule' ? HIDDEN_RULE_HEIGHT : row.kind === 'node' ? ROW_HEIGHT : HEADER_HEIGHT;
 
 /**
  * Main FileTree component - renders a tree view of files and folders

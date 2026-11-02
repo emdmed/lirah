@@ -1228,20 +1228,6 @@ body {
   /* Blank: an area left empty on purpose, drawn as a dashed hairline over a
      sparse 135° hatch. Text set on it stays legible because the hatch is the
      quietest edge tone; light themes halve it again. */
-  .ins-blank {
-    --blank-hatch: var(--ins-edge);
-    border: 1px dashed var(--ins-edge-strong);
-    background: repeating-linear-gradient(
-      135deg,
-      transparent 0 6px,
-      var(--blank-hatch) 6px 7px
-    );
-  }
-
-  :root[data-theme="light"] .ins-blank {
-    --blank-hatch: color-mix(in srgb, var(--ins-edge) 50%, var(--ins-panel));
-  }
-
   :root[data-theme="light"] .ins-well {
     box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
   }

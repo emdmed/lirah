@@ -13,6 +13,7 @@ import { KeyChord } from "../instrument/Keycap";
 import { Lamp } from "../instrument/Lamp";
 import { FrameHints } from "../instrument/FrameHints";
 import { Fig32FilesByIntent } from "./Fig32FilesByIntent";
+import { focusPane } from "../../hooks/usePaneShortcuts";
 
 const NO_REPOS = [];
 const NO_PATTERN_FILES = [];
@@ -25,10 +26,12 @@ const NO_PROMPT = '';
 const FILE_NAME_LIMIT = 8;
 const TYPING = 'input, textarea, select, [contenteditable="true"]';
 // The empty manifest's three ways to attach context.
-const EMPTY_STEPS = [
-  { n: '01', label: 'pick files', keys: ['alt', '1'] },
-  { n: '02', label: 'add instructions', note: 'below' },
-  { n: '03', label: "link a tab's repo", keys: ['alt', '4'] },
+// Empty manifest: one row like a filled one, holding ghost chips (dashed,
+// chip-sized) where the real chips will land. Each one jumps to the pane
+// that fills it.
+const GHOSTS = [
+  { label: 'pick files', keys: ['alt', '1'], pane: 1, title: 'Pick files in the files pane' },
+  { label: "link a tab's repo", keys: ['alt', '4'], pane: 4, title: "Link another tab's repo from the workspace pane" },
 ];
 
 /**
@@ -134,6 +137,8 @@ export const ContextStatus = memo(function ContextStatus({
   } else if (hasContext) {
     status = hookDelivers ? 'sends with your next prompt' : 'not sent · insert it, then type your prompt';
     lamp = hookDelivers ? 'on' : undefined;
+  } else {
+    status = 'nothing attached';
   }
 
   // Keep lives in the files pane's context header; here only while it's closed.
@@ -229,29 +234,25 @@ export const ContextStatus = memo(function ContextStatus({
     );
   } else {
     manifest = (
-      <div className="ins-blank flex flex-col gap-1 px-2.5 py-2 text-[11px] font-mono leading-5">
-        <p className="flex items-center gap-2 min-w-0">
-          <span className="ins-legend shrink-0 border border-foreground bg-[var(--ins-panel)] px-1.5 py-[3px] text-foreground">
-            nothing attached
-          </span>
-          <span className="truncate bg-[var(--ins-panel)] px-1 text-muted-foreground">Your next prompt goes as typed.</span>
-        </p>
-        <ol className="flex flex-col">
-          {EMPTY_STEPS.map(({ n, label, keys, note }) => (
-            <li key={n} className="flex items-center gap-2 h-5">
-              <span className="inline-flex items-center justify-center h-4 px-1 border border-[var(--ins-edge-strong)] bg-[var(--ins-panel)] text-[10px] leading-none tabular-nums text-faint">
-                {n}
-              </span>
-              {/* Text is knocked out of the hatch so it reads at full contrast. */}
-              <span className="inline-flex items-center gap-2 bg-[var(--ins-panel)] px-1">
-                <span className="text-foreground">{label}</span>
-                {keys && <KeyChord keys={keys} size="sm" />}
-                {note && <span className="text-muted-foreground">· {note}</span>}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
+      <dl className="flex flex-col gap-y-2">
+        <ManifestRow label="files">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {GHOSTS.map((g) => (
+              <button
+                key={g.pane}
+                type="button"
+                onClick={() => focusPane(g.pane)}
+                title={g.title}
+                className="group/ghost inline-flex items-center h-5 shrink-0 border border-dashed border-[var(--ins-edge-strong)] font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground hover:border-solid focus-visible:outline-none focus-visible:border-solid focus-visible:text-foreground"
+              >
+                <span className="h-full flex items-center px-1.5 border-r border-dashed border-[var(--ins-edge-strong)] text-faint group-hover/ghost:text-foreground" aria-hidden>+</span>
+                <span className="px-1.5">{g.label}</span>
+                <KeyChord keys={g.keys} size="sm" className="pr-1" />
+              </button>
+            ))}
+          </div>
+        </ManifestRow>
+      </dl>
     );
   }
 
