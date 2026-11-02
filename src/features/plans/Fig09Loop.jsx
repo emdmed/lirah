@@ -83,8 +83,10 @@ export function Fig09Loop({ plan, pos, elapsed, fallback }) {
   ].filter(Boolean).join(', ')}.`;
 
   const center = [pos ? `${pos.index}/${pos.total}` : 'starting', elapsed].filter(Boolean).join(' · ');
-  const names = ['implement', 'check', 'nudge', `next · ${nextLabel}`];
-  const cmds = [undefined, 'git log --grep', undefined, undefined];
+  // NEXT sits on the left with ~120px before the edge, so its target goes on
+  // the second line (like CHECK's command) instead of beside the name.
+  const names = ['implement', 'check', 'nudge', 'next'];
+  const cmds = [undefined, 'git log --grep', undefined, nextLabel];
   // Live: the recipe's step form (at = the station, one lap per chunk), so a
   // move to the next station plays as a step. The nudge stays open unless sent.
   // Stopped: explicit states, with a fault where it stopped.
