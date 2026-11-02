@@ -45,3 +45,17 @@ pub async fn set_file_executable(path: String) -> Result<(), String> {
 pub fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
+
+#[tauri::command]
+pub async fn open_in_file_manager(path: String) -> Result<(), String> {
+    crate::ipc::blocking("open_in_file_manager", move || {
+        let p = std::fs::canonicalize(&path)
+            .map_err(|e| format!("Cannot open {}: {}", path, e))?;
+        if !p.is_dir() {
+            return Err(format!("Not a folder: {}", p.display()));
+        }
+        tauri_plugin_opener::open_path(&p, None::<&str>)
+            .map_err(|e| format!("Could not open file manager: {}", e))
+    })
+    .await
+}

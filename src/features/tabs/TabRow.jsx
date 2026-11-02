@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Bot, GitBranch, Link2 } from 'lucide-react';
+import { Bot, FolderOpen, GitBranch, Link2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
@@ -63,6 +63,7 @@ export const ROW_KEYS = [
   { keys: ['↵'], label: 'switch' },
   { keys: ['l'], label: 'link' },
   { keys: ['a'], label: 'attach' },
+  { keys: ['f'], label: 'folder' },
   { keys: ['o'], label: 'plan' },
   { keys: ['t'], label: 'role' },
   { keys: ['r'], label: 'rename' },
@@ -116,6 +117,8 @@ export const TabRow = memo(function TabRow({
         return !active && run(() => actions.toggleLink(tab, name, linked));
       case 't':
         return run(() => onRoleMenu(true));
+      case 'f':
+        return run(() => actions.openFolder(tab.projectPath));
       case 'a':
         return edited && run(() => actions.attachEdits(edited));
       case 'o':
@@ -157,7 +160,7 @@ export const TabRow = memo(function TabRow({
       }}
       title={tooltip}
       aria-current={active ? 'page' : undefined}
-      aria-keyshortcuts="Enter r x l t a o"
+      aria-keyshortcuts="Enter r x l t a f o"
       data-marker="top"
       className={cn(
         'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
@@ -250,6 +253,15 @@ export const TabRow = memo(function TabRow({
                 <Link2 className="h-3 w-3" />
               </RowAction>
             )}
+            <RowAction
+              tabIndex={-1}
+              aria-label={`Open ${name} in the file manager`}
+              title="Open folder in file manager (f)"
+              onClick={() => actions.openFolder(tab.projectPath)}
+              className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
+            >
+              <FolderOpen className="h-3 w-3" />
+            </RowAction>
             {closable && (
               <RowAction
                 tabIndex={-1}
