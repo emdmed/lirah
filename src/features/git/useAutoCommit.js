@@ -1,11 +1,26 @@
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { git } from "../../lib/git";
+import { git, currentBranch } from "../../lib/git";
+
+// The branch's last few commits, newest first: { hash, time (ms), subject }.
+// A repo with no commits yet (git log fails) reads as none.
+async function recentCommits(repoPath, n = 5) {
+  try {
+    const out = await git(repoPath, ['log', `-${n}`, '--format=%h%x1f%ct%x1f%s']);
+    return out.split('\n').filter(Boolean).map((line) => {
+      const [hash, ct, subject = ''] = line.split('\x1f');
+      return { hash, time: Number(ct) * 1000, subject };
+    });
+  } catch {
+    return [];
+  }
+}
 
 export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const [stage, setStage] = useState('idle'); // idle | loading-files | generating-message | ready | committing | done | error
   const [files, setFiles] = useState([]);
   const [diff, setDiff] = useState('');
+  const [log, setLog] = useState({ branch: null, commits: [] });
   const [commitMessage, setCommitMessage] = useState('');
   const [error, setError] = useState(null);
   const currentPathRef = useRef(null);
@@ -15,6 +30,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     setStage('idle');
     setFiles([]);
     setDiff('');
+    setLog({ branch: null, commits: [] });
     setCommitMessage('');
     setError(null);
   }, []);
@@ -36,6 +52,10 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
         return;
       }
       setFiles(committableFiles);
+
+      // History the new commit lands on; never blocks the commit.
+      Promise.all([currentBranch(currentPath).catch(() => null), recentCommits(currentPath)])
+        .then(([branch, commits]) => { if (!cancelledRef.current) setLog({ branch, commits }); });
 
       // Stage the files (use -- separator and handle deleted files)
       const deleted = committableFiles.filter(f => f.status === 'deleted').map(f => f.path);
@@ -113,5 +133,5 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   }
   prevStageRef.current = stage;
 
-  return { stage, files, diff, commitMessage, setCommitMessage, error, trigger, confirm, cancel, quickCommit };
+  return { stage, files, diff, log, commitMessage, setCommitMessage, error, trigger, confirm, cancel, quickCommit };
 }

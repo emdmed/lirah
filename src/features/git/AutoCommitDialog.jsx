@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
-import { Fig31Subject } from './Fig31Subject';
+import { Fig33Log } from './Fig33Log';
 import { cn } from '../../lib/utils';
 
 // `git status -s` style: one letter per file, coloured by kind.
@@ -125,7 +125,7 @@ function FileList({ files, className }) {
 }
 
 export function AutoCommitDialog({ autoCommit }) {
-  const { stage, files, diff, commitMessage, setCommitMessage, error, confirm, cancel } = autoCommit;
+  const { stage, files, diff, log, commitMessage, setCommitMessage, error, confirm, cancel } = autoCommit;
   const isOpen = stage !== 'idle';
   const canCommit = stage === 'ready' && commitMessage.trim().length > 0;
   const showWork = files.length > 0 && stage !== 'done';
@@ -247,9 +247,11 @@ export function AutoCommitDialog({ autoCommit }) {
                 />
               )}
               {stage !== 'generating-message' && (
-                <Fig31Subject
+                <Fig33Log
                   subject={commitMessage.split('\n')[0]}
                   max={SUBJECT_MAX}
+                  commits={log.commits}
+                  branch={log.branch}
                   fallback={(
                     <span className="text-[11px] text-muted-foreground">
                       Keep the first line under {SUBJECT_MAX} characters

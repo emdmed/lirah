@@ -1,7 +1,7 @@
 import { Fragment, useEffect } from 'react';
 import { compactCount, DiffBar } from '../components/instrument/DiffBar';
 import { Fig25DiffMap } from '../features/git/Fig25DiffMap';
-import { Fig31Subject } from '../features/git/Fig31Subject';
+import { Fig33Log } from '../features/git/Fig33Log';
 import { Position } from '../components/instrument/Position';
 import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
@@ -186,6 +186,13 @@ function fig15Height(mod) {
   return Math.max(142 + 24, 34 + 12 + Math.max(0, n - 1) * 18) + 30;
 }
 
+const LOG_NOW = Date.UTC(2026, 10, 2, 12);
+const LOG = [
+  { hash: 'aefa48e', time: LOG_NOW - 40 * 60e3, subject: "fix(plans): put loop figure's next target on second line" },
+  { hash: 'a04d98e', time: LOG_NOW - 3 * 3600e3, subject: 'chore: bump version to 0.5.3' },
+  { hash: '437bbfa', time: LOG_NOW - 26 * 3600e3, subject: 'feat(calibrated): update figures in place and patch only changed svg parts' },
+  { hash: 'ab6157f', time: LOG_NOW - 2 * 86400e3, subject: 'fix(calibrated): let a running replay finish before redrawing CalRecipe' },
+];
 const fb = (text) => <div className="font-mono text-[11px] text-muted-foreground">[fallback] {text}</div>;
 
 // Each figure as a render function, so the narrow row can reuse it.
@@ -417,11 +424,11 @@ function LaneB() {
         <LaneBCard title="FIG 25 narrow host" width={26}>
           <Fig25DiffMap {...MAP} marksOnly />
         </LaneBCard>
-        <LaneBCard title="FIG 31 subject" width={640}>
+        <LaneBCard title="FIG 33 log" width={680}>
           <div className="flex flex-col gap-4">
-            <Fig31Subject subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} fallback={fb('subject 48/72')} />
-            <Fig31Subject subject="fix(terminal): paste plan prompts with bracketed paste and clear the screen on launch" max={72} fallback={fb('subject 84/72')} />
-            <Fig31Subject subject="" max={72} fallback={fb('subject 0/72')} />
+            <Fig33Log subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} commits={LOG} branch="main" now={LOG_NOW} fallback={fb('subject 48/72')} />
+            <Fig33Log subject="fix(terminal): paste plan prompts with bracketed paste and clear the screen on launch" max={72} commits={LOG} branch="main" now={LOG_NOW} fallback={fb('subject 84/72')} />
+            <Fig33Log subject="chore: initial commit" max={72} fallback={fb('subject 21/72')} />
           </div>
         </LaneBCard>
         <LaneBCard title="P3 position" width={300}>
@@ -434,8 +441,8 @@ function LaneB() {
             ))}
           </div>
         </LaneBCard>
-        <LaneBCard title="FIG 31 narrow" width={170}>
-          <Fig31Subject subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} fallback={fb('subject 48/72')} />
+        <LaneBCard title="FIG 33 narrow" width={170}>
+          <Fig33Log subject="feat(jobs): draw overlaps as a files-by-job grid" max={72} commits={LOG} fallback={fb('subject 48/72')} />
         </LaneBCard>
       </div>
     </>
