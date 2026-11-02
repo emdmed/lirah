@@ -13,6 +13,11 @@
 }
 .cal-gauge > * { overflow: visible; }
 
+/* The kit puts a <title> on its svg, which the browser shows as a native
+   tooltip on top of Lirah's own popups. Let hover pass to the wrapper
+   instead; the svg keeps its aria-label. */
+.cal-gauge svg { pointer-events: none; }
+
 /* Clip the compact drawing to a window: width/height come from inline style. */
 .cal-gauge-clip { overflow: hidden; }
 .cal-gauge-clip > * { display: block; }

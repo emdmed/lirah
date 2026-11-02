@@ -108,7 +108,7 @@ const rowsOf = (section) => Object.fromEntries(
 );
 
 export const SECTIONS = [
-  { id: 'agent', title: 'Agent', blurb: 'Which CLI starts, and what a prompt keeps after sending.' },
+  { id: 'agent', title: 'Agent', blurb: 'Which CLI starts, what a prompt keeps, and the agent hooks.' },
   { id: 'appearance', title: 'Appearance', blurb: 'Theme and window chrome.' },
   { id: 'terminal', title: 'Terminal', blurb: 'Terminal memory and the files pane.' },
   { id: 'git', title: 'Git', blurb: 'Agent-written commit messages and changelog entries.' },

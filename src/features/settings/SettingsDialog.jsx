@@ -16,7 +16,7 @@ import {
 import { TAB_CLIS } from '../../lib/agentClis';
 import { shortcutForCommand } from '../../lib/shortcuts';
 import { FilterContext, SECTIONS, SETTINGS_ROW as ROW } from './settingsSections';
-import { Choice, ChoiceRow, DraftField, Row, Section, StepRow, ToggleRow } from './parts';
+import { Choice, ChoiceRow, DraftField, Group, Row, Section, StepRow, SubRows, ToggleRow } from './parts';
 import { AppearanceSection } from './AppearanceSection';
 import { StartupRow } from './StartupRow';
 import { useSettingsNav } from './useSettingsNav';
@@ -149,7 +149,7 @@ export function SettingsDialog({
           Preferences for Lirah. Changes save right away and reach every open tab; sandbox settings apply to this tab.
         </DialogDescription>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[184px_1px_minmax(0,1fr)] gap-x-5 pt-1">
+        <div className="grid min-h-0 flex-1 grid-cols-[204px_1px_minmax(0,1fr)] gap-x-5 pt-1">
           {/* Rail: filter, then the section keys with their current state. */}
           <nav className="flex min-h-0 flex-col gap-3" aria-label="Settings sections">
             <div className="relative">
@@ -186,9 +186,12 @@ export function SettingsDialog({
                     )}
                   >
                     <Keycap size="sm" lit={selected}>{i + 1}</Keycap>
-                    <span className="flex-1 truncate">{s.title}</span>
-                    <span className="flex max-w-[64px] shrink-0 items-center truncate text-[10px] text-muted-foreground">
+                    <span className="shrink-0">{s.title}</span>
+                    {/* The readout gives way before the section name does. */}
+                    <span className="flex min-w-0 flex-1 items-center justify-end text-[10px] text-muted-foreground">
+                      <span className="truncate">
                       {filtering ? (count > 0 ? count : '') : readouts[s.id]}
+                      </span>
                     </span>
                   </button>
                 );
@@ -212,14 +215,20 @@ export function SettingsDialog({
               )}
               <div className="flex flex-col gap-8">
                 <Section section={section('agent')} active={activeId === 'agent'}>
-                  <ChoiceRow row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli} />
-                  <ToggleRow row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli} />
-                  <StartupRow projectPath={projectPath} />
-                  <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
-                  <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
-                  <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
-                  <ToggleRow row={ROW['compaction-hook']} value={compactionHook} onChange={setCompactionHook} />
-                  <ToggleRow row={ROW['agent-control']} value={agentControl} onChange={setAgentControl} />
+                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'auto-launch', 'startup']}>
+                    <ChoiceRow row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli} />
+                    <ToggleRow row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli} />
+                    <StartupRow projectPath={projectPath} />
+                  </Group>
+                  <Group label="Prompt" sectionId="agent" rows={['keep-context', 'prompt-box']}>
+                    <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
+                    <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
+                  </Group>
+                  <Group label="Integration" sectionId="agent" rows={['agent-state-hook', 'compaction-hook', 'agent-control']}>
+                    <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
+                    <ToggleRow row={ROW['compaction-hook']} value={compactionHook} onChange={setCompactionHook} />
+                    <ToggleRow row={ROW['agent-control']} value={agentControl} onChange={setAgentControl} />
+                  </Group>
                 </Section>
 
                 <AppearanceSection
@@ -266,7 +275,7 @@ export function SettingsDialog({
                   </Row>
                   <ToggleRow row={ROW.changelog} value={autoChangelogEnabled} onChange={setAutoChangelogEnabled}>
                     {autoChangelogEnabled && (
-                      <div className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5 pl-3 shadow-[inset_1px_0_0_var(--ins-edge)]">
+                      <SubRows className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5">
                         <span className="text-[11px] text-muted-foreground">Trigger</span>
                         <Choice label="Changelog trigger" value={autoChangelogTrigger} options={TRIGGER_OPTIONS} onChange={setAutoChangelogTrigger} />
                         <span className="text-[11px] text-muted-foreground">CLI</span>
@@ -279,7 +288,7 @@ export function SettingsDialog({
                           fallback="CHANGELOG.md"
                           placeholder="CHANGELOG.md"
                         />
-                      </div>
+                      </SubRows>
                     )}
                   </ToggleRow>
                 </Section>

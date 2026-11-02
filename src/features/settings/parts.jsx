@@ -4,6 +4,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { StepSlider } from '../../components/instrument/StepSlider';
+import { DialogGroup } from '../../components/ui/dialog';
 import { FilterContext, rowMatches, SECTIONS } from './settingsSections';
 
 // A section's rows. While filtering, every section with a match is shown at
@@ -19,12 +20,28 @@ export function Section({ section, active, children }) {
       aria-labelledby={filtering ? undefined : `settings-tab-${section.id}`}
       className="flex flex-col"
     >
-      <header className="mb-4 flex flex-col gap-1">
+      <header className="mb-5 flex flex-col gap-1">
         <h3 className="ins-legend text-[11px] text-foreground">{section.title}</h3>
         {!filtering && <p className="text-[11px] text-muted-foreground">{section.blurb}</p>}
       </header>
       <div className="flex flex-col gap-4">{children}</div>
     </section>
+  );
+}
+
+// A band of related rows inside a long section, under a legend and hairline.
+// Hides with its rows while filtering, so no legend is left standing alone.
+export function Group({ label, sectionId, rows, children }) {
+  const { query, filtering } = useContext(FilterContext);
+  if (filtering) {
+    const words = SECTIONS.find((s) => s.id === sectionId)?.rows ?? {};
+    if (!rows.some((id) => rowMatches(words[id] ?? '', query))) return null;
+  }
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-4 not-first:mt-4">
+      <DialogGroup label={label} />
+      {children}
+    </div>
   );
 }
 
@@ -55,9 +72,9 @@ export function Row({ id, sectionId, label, hint, control, children, htmlFor }) 
 }
 
 // Latching buttons for a one-of-n choice.
-export function Choice({ value, options, onChange, label }) {
+export function Choice({ value, options, onChange, label, className }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5">
+    <div role="radiogroup" aria-label={label} className={className ?? 'flex flex-wrap gap-1.5'}>
       {options.map((o) => (
         <PanelButton
           key={o.value}
@@ -122,11 +139,30 @@ export function StepRow({ row, value, steps, onChange, warnFrom, hint = row.hint
   );
 }
 
-/** A SETTINGS_ROWS one-of-n row. `hint` overrides the config's. */
-export function ChoiceRow({ row, value, options, onChange, hint = row.hint }) {
+/**
+ * A SETTINGS_ROWS one-of-n row. The choice sits on the label line, like a
+ * switch. `hint` overrides the config's; children sit below.
+ */
+export function ChoiceRow({ row, value, options, onChange, hint = row.hint, children }) {
   return (
-    <Row id={row.id} sectionId={row.section} label={row.label} hint={hint}>
-      <Choice label={row.choiceLabel ?? row.label} value={value} options={options} onChange={onChange} />
+    <Row
+      id={row.id}
+      sectionId={row.section}
+      label={row.label}
+      hint={hint}
+      control={<InlineChoice label={row.choiceLabel ?? row.label} value={value} options={options} onChange={onChange} />}
+    >
+      {children}
     </Row>
   );
+}
+
+/** A Choice for a row's label line: one line, no wrapping. */
+export function InlineChoice(props) {
+  return <Choice {...props} className="flex gap-1" />;
+}
+
+// Sub-settings under a row, set in by a hairline.
+export function SubRows({ className, children }) {
+  return <div className={'pl-3 shadow-[inset_1px_0_0_var(--ins-edge)] ' + (className ?? '')}>{children}</div>;
 }
