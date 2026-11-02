@@ -54,7 +54,63 @@ pub fn node_command(script: &std::path::Path) -> String {
 pub fn login_shell_command(script: &str) -> Command {
     let mut cmd = Command::new(user_shell());
     cmd.args(["-lc", script]);
+    if let Some(path) = terminal_path() {
+        cmd.env("PATH", path);
+    }
     cmd
+}
+
+/// The PATH the user's interactive terminal has. A login shell alone misses
+/// what rc files add: zsh `-l` skips ~/.zshrc and bash `-l` skips ~/.bashrc,
+/// which is where Linux installs usually put ~/.local/bin, nvm and the like.
+/// Asked once from an interactive login shell and cached; None when that
+/// shell fails or takes too long, so callers keep the inherited PATH.
+#[cfg(unix)]
+pub fn terminal_path() -> Option<&'static str> {
+    static PATH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    PATH.get_or_init(read_terminal_path).as_deref()
+}
+
+#[cfg(windows)]
+pub fn terminal_path() -> Option<&'static str> {
+    None
+}
+
+#[cfg(unix)]
+fn read_terminal_path() -> Option<String> {
+    use std::io::Read;
+    use std::process::Stdio;
+    use std::time::{Duration, Instant};
+
+    // Markers fence the value off from anything the rc files print.
+    const MARK: &str = "__LIRAH_PATH__";
+    let mut child = Command::new(user_shell())
+        .args(["-ilc", &format!("printf '{MARK}%s{MARK}' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+
+    let mut out = String::new();
+    child.stdout.take()?.read_to_string(&mut out).ok()?;
+    let start = out.find(MARK)? + MARK.len();
+    let len = out[start..].find(MARK)?;
+    let path = out[start..start + len].trim();
+    (!path.is_empty()).then(|| path.to_string())
 }
 
 /// Run `cmd` to completion. Ok(stdout) when it succeeds; otherwise Err with
