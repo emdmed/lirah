@@ -210,13 +210,6 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
             Compact (summarise and continue)
           </DropdownMenuItem>
         )}
-        {crowded && onClearContext && (
-          <DropdownMenuItem onClick={onClearContext} className="cursor-pointer py-1">
-            <Eraser className="mr-2 w-3 h-3" />
-            Clear context
-            <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
-          </DropdownMenuItem>
-        )}
         {onOpenContextDetails && (
           <DropdownMenuItem onClick={onOpenContextDetails} className="cursor-pointer py-1">
             <ScanSearch className="mr-2 w-3 h-3" />
@@ -229,6 +222,17 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
             Token Metrics
             <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
           </DropdownMenuItem>
+        )}
+        {/* Destructive last, below a rule. */}
+        {crowded && onClearContext && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem destructive onClick={onClearContext} className="cursor-pointer py-1">
+              <Eraser className="mr-2 w-3 h-3" />
+              Clear context
+              <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

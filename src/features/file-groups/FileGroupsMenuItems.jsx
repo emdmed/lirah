@@ -58,9 +58,10 @@ function HoldDeleteItem({ onConfirm, onFallback }) {
   const { state, props } = useHoldToConfirm({ onConfirm, onFallback });
   return (
     <DropdownMenuItem
+      destructive
       onSelect={(e) => e.preventDefault()}
       title="Hold to delete. Shift+Enter asks first."
-      className={`${ITEM} text-destructive ins-hold`}
+      className={`${ITEM} ins-hold`}
       {...props}
     >
       <Trash2 className="h-3 w-3 mr-1.5" />
@@ -174,6 +175,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
                     <Pencil className="h-3 w-3 mr-1.5" />
                     Rename…
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <HoldDeleteItem
                     onConfirm={() => handleDelete(group)}
                     onFallback={() => handleAskDelete(group)}
