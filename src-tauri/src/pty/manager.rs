@@ -83,7 +83,8 @@ const PROTECTED_PATHS: &[&str] = &[
 
 /// Env vars re-exported into the sandbox after `--clearenv` (when set).
 const PASSTHROUGH_VARS: &[&str] = &[
-    "HOME", "USER", "LOGNAME", "PATH", "SHELL", "TERM",
+    // TERM is not here: bwrap_args always sets it (see there).
+    "HOME", "USER", "LOGNAME", "PATH", "SHELL",
     "LANG", "LC_ALL", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
     "DISPLAY", "WAYLAND_DISPLAY",
     // Claude Code / Node.js needs
@@ -203,6 +204,14 @@ fn bwrap_args(spec: &SandboxSpec, env: &[(String, String)]) -> Vec<String> {
         if let Ok(val) = std::env::var(var) {
             push(&["--setenv", var, &val]);
         }
+    }
+    // The pty is drawn by xterm.js, so TERM must describe xterm, not the host.
+    // It can't come from passthrough: Lirah started from the dock has no TERM,
+    // and --clearenv drops the one set on the bwrap command itself. Without it
+    // zsh's line editor can't move the cursor and reprints the line on every
+    // keystroke ("gamma" shows up as "ggammagh").
+    if spec.cleared_env {
+        push(&["--setenv", "TERM", "xterm-256color"]);
     }
     for (key, val) in env {
         push(&["--setenv", key, val]);
