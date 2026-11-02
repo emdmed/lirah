@@ -115,6 +115,10 @@ export function useTabCommands({
       { id: 'watch', hint: `file watching (${fileWatchingEnabled ? 'on' : 'off'})`, options: ['on', 'off'], run: (arg) => {
         if (onOff(arg, fileWatchingEnabled) !== fileWatchingEnabled) toggleWatchers();
       } },
+      { id: 'explore', aliases: ['finder'], hint: 'open this folder in the file manager', run: () => {
+        if (!projectPath) throw new Error('no project in this tab');
+        return invoke('open_in_file_manager', { path: projectPath });
+      } },
       { id: 'files', hint: 'toggle the files pane', run: () => setSidebarOpen(prev => !prev) },
       { id: 'prompt', hint: 'toggle the prompt pane', run: () => setTextareaVisible(prev => !prev) },
       { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle') },

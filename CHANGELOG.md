@@ -11,6 +11,7 @@ All notable changes to Lirah will be documented in this file.
   - FIG.09 auto-pilot loop, FIG.16 chunk ruler, FIG.20 plan timeline, FIG.21 plan branch with chunk commits and FIG.22 files by chunk
   - FIG.10 sandbox section, FIG.11 auto-merge plan with the commands it will run, FIG.12 race lanes and FIG.13 subagent fan-out
   - FIG.14 budget ruler with today's pace, FIG.15 keyboard plate for held modifiers, FIG.19 file detail levels with token counts
+- **Open a tab's folder** - A folder button on each tab row, the `f` key on a focused row, and `:explore` (alias `:finder`) open the tab's project folder in the system file manager. The file manager runs outside the bubblewrap sandbox, like any app the desktop opens.
 - **Figures setting** - Settings → Appearance → Figures (`:figures full|compact`). Compact keeps the previous text-only UI.
 
 ### Changed
