@@ -87,7 +87,7 @@ export function TabProvider({ children }) {
   });
 
   // Persist tabs to localStorage synchronously on every change.
-  // A debounce here loses state: the custom TitleBar close button calls
+  // A debounce here loses state: the window's close button calls
   // appWindow.close() immediately, destroying the webview before a deferred
   // write can flush — so tab edits made right before quitting never persist.
   useEffect(() => {
