@@ -1,14 +1,15 @@
-use super::AgentJobStore;
+use super::{AgentJobStore, JobChild};
+use process_wrap::std::CommandWrap;
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 
 #[derive(serde::Serialize, Clone)]
@@ -114,66 +115,94 @@ struct JobIdle {
 const WATCHDOG_INTERVAL: Duration = Duration::from_secs(15);
 /// Report a job as idle after this long with no output and no CPU work.
 const IDLE_NOTICE_AFTER: Duration = Duration::from_secs(3 * 60);
-/// Kill a job idle this long. Only enforced where CPU time can be sampled:
-/// output alone can't tell a stuck job from `claude -p`, which prints nothing
-/// until it finishes.
+/// Kill a job idle this long. Output alone can't tell a stuck job from
+/// `claude -p`, which prints nothing until it finishes, so CPU use counts too.
 const IDLE_KILL_AFTER: Duration = Duration::from_secs(15 * 60);
-/// CPU time (clock ticks, usually 10 ms each) a job must burn per watchdog
-/// interval to count as working. An agent streaming a response stays well
+/// CPU a job must use, as a share of one core averaged over a watchdog
+/// interval, to count as working. An agent streaming a response stays well
 /// above this; one blocked on a prompt nobody will answer stays below it.
-const ACTIVE_CPU_TICKS: u64 = 5;
+const ACTIVE_CPU_PERCENT: f32 = 0.3;
 
-/// Total user+system CPU ticks of every process in process group `pgid`.
-#[cfg(target_os = "linux")]
-fn process_group_cpu_ticks(pgid: u32) -> Option<u64> {
-    let entries = std::fs::read_dir("/proc").ok()?;
-    let mut total = 0u64;
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let Some(pid) = name.to_str() else { continue };
-        if !pid.bytes().all(|b| b.is_ascii_digit()) {
-            continue;
+/// How long a cancelled job gets to exit before it is killed outright.
+#[cfg(unix)]
+const SOFT_STOP_GRACE: Duration = Duration::from_secs(3);
+/// How often the waiter checks whether a job has exited. It polls so that
+/// cancelling can take the job's lock in between.
+const EXIT_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+/// `root` and every process it started, by following parent links.
+fn process_tree(sys: &System, root: u32) -> HashSet<Pid> {
+    let mut tree = HashSet::from([Pid::from_u32(root)]);
+    loop {
+        let before = tree.len();
+        for (pid, process) in sys.processes() {
+            if process.parent().is_some_and(|p| tree.contains(&p)) {
+                tree.insert(*pid);
+            }
         }
-        let Ok(stat) = std::fs::read_to_string(format!("/proc/{}/stat", pid)) else {
-            continue;
-        };
-        // The command name is parenthesised and may contain spaces; the fixed
-        // fields start after the last ')'. Relative to that: [2] pgrp,
-        // [11] utime, [12] stime.
-        let Some(rest) = stat.rfind(')').map(|i| &stat[i + 1..]) else {
-            continue;
-        };
-        let fields: Vec<&str> = rest.split_whitespace().collect();
-        if fields.get(2).and_then(|g| g.parse::<u32>().ok()) != Some(pgid) {
-            continue;
+        if tree.len() == before {
+            return tree;
         }
-        let utime: u64 = fields.get(11).and_then(|v| v.parse().ok()).unwrap_or(0);
-        let stime: u64 = fields.get(12).and_then(|v| v.parse().ok()).unwrap_or(0);
-        total += utime + stime;
     }
-    Some(total)
 }
 
-#[cfg(not(target_os = "linux"))]
-fn process_group_cpu_ticks(_pgid: u32) -> Option<u64> {
-    None
+/// CPU use since the last refresh of `sys`, summed over process `root` and
+/// everything it started.
+fn process_tree_cpu_percent(sys: &mut System, root: u32) -> f32 {
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_cpu());
+    process_tree(sys, root).iter().filter_map(|pid| sys.process(*pid)).map(|p| p.cpu_usage()).sum()
 }
 
-/// SIGTERM a job's process group, then SIGKILL it if it is still there after
-/// a few seconds.
-fn kill_process_group(pid: u32) -> bool {
-    let killed = Command::new("kill")
-        .args(["-TERM", &format!("-{}", pid)])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(3));
-        let _ = Command::new("kill")
-            .args(["-KILL", &format!("-{}", pid)])
-            .status();
-    });
-    killed
+/// The tree under `root` with each process's start time, taken before the
+/// job is stopped: once a parent dies its children no longer lead back to it.
+fn snapshot_tree(root: u32) -> Vec<(Pid, u64)> {
+    let mut sys = System::new();
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+    process_tree(&sys, root)
+        .into_iter()
+        .filter_map(|pid| sys.process(pid).map(|p| (pid, p.start_time())))
+        .collect()
+}
+
+/// Kill what is left of a snapshot. The start time keeps a reused pid safe.
+fn kill_snapshot(tree: &[(Pid, u64)]) {
+    let mut sys = System::new();
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+    for (pid, started) in tree {
+        if let Some(p) = sys.process(*pid).filter(|p| p.start_time() == *started) {
+            p.kill();
+        }
+    }
+}
+
+/// Stop a job and everything it started: SIGTERM first on Unix, SIGKILL if it
+/// is still there after a few seconds; Windows has only the forced stop. Any
+/// process that left the job's group is killed from a snapshot of its tree.
+fn stop_job(child: &JobChild) -> bool {
+    let Ok(mut guard) = child.lock() else { return false };
+    let tree = snapshot_tree(guard.id());
+    #[cfg(unix)]
+    {
+        let stopped = guard.signal(15).is_ok();
+        drop(guard);
+        let child = child.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(SOFT_STOP_GRACE);
+            if let Ok(mut c) = child.lock() {
+                if matches!(c.try_wait(), Ok(None)) {
+                    let _ = c.start_kill();
+                }
+            }
+            kill_snapshot(&tree);
+        });
+        stopped
+    }
+    #[cfg(not(unix))]
+    {
+        let stopped = guard.start_kill().is_ok();
+        kill_snapshot(&tree);
+        stopped
+    }
 }
 
 /// Watch a running job for the case its spinner can't show: no output and no
@@ -183,14 +212,18 @@ fn kill_process_group(pid: u32) -> bool {
 fn watch_job(
     app: AppHandle,
     job_id: String,
-    pgid: u32,
+    child: JobChild,
     started: Instant,
     last_output_ms: Arc<AtomicU64>,
     timed_out: Arc<AtomicBool>,
     stop: Receiver<()>,
 ) {
-    let mut last_ticks = process_group_cpu_ticks(pgid);
-    let can_kill = last_ticks.is_some();
+    let pid = match child.lock() {
+        Ok(c) => c.id(),
+        Err(_) => return,
+    };
+    let mut sys = System::new();
+    process_tree_cpu_percent(&mut sys, pid);
     let mut last_active = Instant::now();
     let mut reported_idle = false;
     let mut seen_output_ms = 0;
@@ -200,12 +233,7 @@ fn watch_job(
             _ => return,
         }
         let output_ms = last_output_ms.load(Ordering::Relaxed);
-        let ticks = process_group_cpu_ticks(pgid);
-        let busy = match (last_ticks, ticks) {
-            (Some(before), Some(now)) => now.saturating_sub(before) >= ACTIVE_CPU_TICKS,
-            _ => false,
-        };
-        last_ticks = ticks;
+        let busy = process_tree_cpu_percent(&mut sys, pid) >= ACTIVE_CPU_PERCENT;
         if output_ms != seen_output_ms || busy {
             seen_output_ms = output_ms;
             last_active = Instant::now();
@@ -226,7 +254,7 @@ fn watch_job(
                 JobIdle { job_id: job_id.clone(), idle_secs: idle.as_secs() },
             );
         }
-        if can_kill && idle >= IDLE_KILL_AFTER {
+        if idle >= IDLE_KILL_AFTER {
             eprintln!(
                 "[agent-job] {} idle for {}s after {}s, killing",
                 job_id,
@@ -234,7 +262,7 @@ fn watch_job(
                 started.elapsed().as_secs()
             );
             timed_out.store(true, Ordering::SeqCst);
-            kill_process_group(pgid);
+            stop_job(&child);
             return;
         }
     }
@@ -392,17 +420,18 @@ pub async fn run_agent_job(
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        // Own process group so cancel_agent_job can kill the whole tree. Unix only:
-        // `process_group` comes from the unix CommandExt, and the group-kill in
-        // cancel_agent_job is likewise POSIX. On Windows this is a no-op.
+        let mut wrap = CommandWrap::from(cmd);
         #[cfg(unix)]
-        cmd.process_group(0);
-        let mut child = cmd
+        wrap.wrap(process_wrap::std::ProcessGroup::leader());
+        #[cfg(windows)]
+        wrap.wrap(process_wrap::std::CreationFlags(windows::Win32::System::Threading::CREATE_NO_WINDOW))
+            .wrap(process_wrap::std::JobObject);
+        let mut child = wrap
             .spawn()
             .map_err(|e| format!("Failed to spawn agent job: {}", e))?;
 
         // Feed the prompt via stdin, then close it so the CLI starts working.
-        if let Some(mut stdin) = child.stdin.take() {
+        if let Some(mut stdin) = child.stdin().take() {
             stdin
                 .write_all(prompt.as_bytes())
                 .map_err(|e| format!("Failed to write prompt to stdin: {}", e))?;
@@ -410,12 +439,14 @@ pub async fn run_agent_job(
             let _ = stdin.flush();
         }
 
-        let pid = child.id();
+        let stdout = child.stdout().take();
+        let stderr = child.stderr().take();
+        let child: JobChild = Arc::new(Mutex::new(child));
         store
             .jobs
             .lock()
             .map_err(|e| format!("Failed to lock job store: {}", e))?
-            .insert(job_id.clone(), pid);
+            .insert(job_id.clone(), child.clone());
 
         // Both readers feed one channel; a batcher thread turns it into coalesced
         // events. Every sender must be dropped for the batcher to finish, so the
@@ -431,7 +462,7 @@ pub async fn run_agent_job(
         };
 
         // Stream stdout line-by-line into the batcher.
-        let stdout_reader = child.stdout.take().map(|stdout| {
+        let stdout_reader = stdout.map(|stdout| {
             let log = log_file.clone();
             let tx = tx.clone();
             let last_output_ms = last_output_ms.clone();
@@ -449,7 +480,7 @@ pub async fn run_agent_job(
         });
 
         // Stream stderr line-by-line into the same batcher.
-        let stderr_reader = child.stderr.take().map(|stderr| {
+        let stderr_reader = stderr.map(|stderr| {
             let log = log_file.clone();
             let tx = tx.clone();
             let last_output_ms = last_output_ms.clone();
@@ -474,8 +505,9 @@ pub async fn run_agent_job(
             let app = app_handle.clone();
             let id = job_id.clone();
             let timed_out = timed_out.clone();
+            let child = child.clone();
             std::thread::spawn(move || {
-                watch_job(app, id, pid, started, last_output_ms, timed_out, stop_rx)
+                watch_job(app, id, child, started, last_output_ms, timed_out, stop_rx)
             });
         }
 
@@ -487,9 +519,13 @@ pub async fn run_agent_job(
         let store_inner = store.clone();
         let id = job_id.clone();
         std::thread::spawn(move || {
-            let exit_code = match child.wait() {
-                Ok(status) => status.code().unwrap_or(-1),
-                Err(_) => -1,
+            let exit_code = loop {
+                let polled = child.lock().map(|mut c| c.try_wait());
+                match polled {
+                    Ok(Ok(None)) => std::thread::sleep(EXIT_POLL_INTERVAL),
+                    Ok(Ok(Some(status))) => break status.code().unwrap_or(-1),
+                    _ => break -1,
+                }
             };
             drop(stop_watchdog);
             if let Some(handle) = stdout_reader {
@@ -518,7 +554,7 @@ pub async fn run_agent_job(
     .await
 }
 
-/// Cancel a running agent job by killing its process group (SIGTERM).
+/// Cancel a running agent job and everything it started.
 #[tauri::command]
 pub async fn cancel_agent_job(
     store: tauri::State<'_, Arc<AgentJobStore>>,
@@ -526,22 +562,19 @@ pub async fn cancel_agent_job(
 ) -> Result<bool, String> {
     let store = store.inner().clone();
     crate::ipc::blocking("cancel_agent_job", move || {
-        let pid = {
+        let child = {
             let jobs = store
                 .jobs
                 .lock()
                 .map_err(|e| format!("Failed to lock job store: {}", e))?;
-            jobs.get(&job_id).copied()
+            jobs.get(&job_id).cloned()
         };
 
-        let Some(pid) = pid else {
+        let Some(child) = child else {
             return Ok(false);
         };
 
-        // Negative pid targets the whole process group (see process_group(0)
-        // above); SIGKILL follows for an agent that ignores SIGTERM, so a job can
-        // never get stuck half-cancelled.
-        let killed = kill_process_group(pid);
+        let killed = stop_job(&child);
 
         if let Ok(mut jobs) = store.jobs.lock() {
             jobs.remove(&job_id);
@@ -564,4 +597,122 @@ pub fn list_running_agent_jobs(
         .lock()
         .map_err(|e| format!("Failed to lock job store: {}", e))?;
     Ok(jobs.keys().cloned().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+
+    #[cfg(windows)]
+    const LONG: &str = "ping -t 127.0.0.1";
+    #[cfg(unix)]
+    const LONG: &str = "sleep 597 & wait";
+    #[cfg(windows)]
+    const BUSY: &str = "while($true){}";
+    #[cfg(unix)]
+    const BUSY: &str = "while :; do :; done";
+    #[cfg(windows)]
+    const IDLE: &str = "Start-Sleep 600";
+    #[cfg(unix)]
+    const IDLE: &str = "sleep 600";
+
+    fn spawn_job(script: &str) -> JobChild {
+        let mut cmd = crate::util::login_shell_command(script);
+        cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        let mut wrap = CommandWrap::from(cmd);
+        #[cfg(unix)]
+        wrap.wrap(process_wrap::std::ProcessGroup::leader());
+        #[cfg(windows)]
+        wrap.wrap(process_wrap::std::CreationFlags(windows::Win32::System::Threading::CREATE_NO_WINDOW))
+            .wrap(process_wrap::std::JobObject);
+        Arc::new(Mutex::new(wrap.spawn().unwrap()))
+    }
+
+    /// Kills whatever is left of a snapshot when a test ends, pass or fail.
+    struct Cleanup(Vec<(Pid, u64)>);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            kill_snapshot(&self.0);
+        }
+    }
+
+    fn wait_until(what: &str, mut done: impl FnMut() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !done() {
+            assert!(Instant::now() < deadline, "timed out waiting for {what}");
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    fn descendants(root: u32) -> Vec<(Pid, u64)> {
+        snapshot_tree(root).into_iter().filter(|(pid, _)| pid.as_u32() != root).collect()
+    }
+
+    fn any_alive(tree: &[(Pid, u64)]) -> bool {
+        let mut sys = System::new();
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+        tree.iter().any(|(pid, started)| sys.process(*pid).is_some_and(|p| p.start_time() == *started))
+    }
+
+    #[test]
+    fn stop_job_kills_the_job_and_its_descendants() {
+        let job = spawn_job(LONG);
+        let root = job.lock().unwrap().id();
+        let mut tree = Cleanup(Vec::new());
+        wait_until("a child of the job", || {
+            tree.0 = descendants(root);
+            !tree.0.is_empty()
+        });
+
+        assert!(stop_job(&job));
+
+        wait_until("the job to exit", || job.lock().unwrap().try_wait().unwrap().is_some());
+        wait_until("its descendants to die", || !any_alive(&tree.0));
+    }
+
+    #[test]
+    fn snapshot_catches_a_child_whose_parent_died_first() {
+        #[cfg(windows)]
+        let mut parent = Command::new("cmd").args(["/c", LONG]).stdout(Stdio::null()).spawn().unwrap();
+        #[cfg(unix)]
+        let mut parent = Command::new("sh").args(["-c", LONG]).stdout(Stdio::null()).spawn().unwrap();
+        let root = parent.id();
+        let mut orphans = Cleanup(Vec::new());
+        wait_until("a child of the parent", || {
+            orphans.0 = descendants(root);
+            !orphans.0.is_empty()
+        });
+
+        parent.kill().unwrap();
+        parent.wait().unwrap();
+        assert!(any_alive(&orphans.0), "the child should outlive its parent");
+
+        kill_snapshot(&orphans.0);
+        wait_until("the orphan to die", || !any_alive(&orphans.0));
+    }
+
+    #[test]
+    fn cpu_percent_tells_a_busy_job_from_an_idle_one() {
+        let busy = spawn_job(BUSY);
+        let idle = spawn_job(IDLE);
+        let busy_pid = busy.lock().unwrap().id();
+        let idle_pid = idle.lock().unwrap().id();
+        let mut cleanup = Cleanup(Vec::new());
+        cleanup.0.extend(snapshot_tree(busy_pid));
+        cleanup.0.extend(snapshot_tree(idle_pid));
+
+        // Let the shells finish starting up; their start-up cost is not idle CPU.
+        std::thread::sleep(Duration::from_secs(3));
+        let mut sys = System::new();
+        process_tree_cpu_percent(&mut sys, busy_pid);
+        std::thread::sleep(Duration::from_secs(2));
+        let busy_cpu = process_tree_cpu_percent(&mut sys, busy_pid);
+        let idle_cpu = process_tree_cpu_percent(&mut sys, idle_pid);
+
+        assert!(busy_cpu > 20.0, "busy job used {busy_cpu}%");
+        assert!(idle_cpu < 20.0, "idle job used {idle_cpu}%");
+        stop_job(&busy);
+        stop_job(&idle);
+    }
 }

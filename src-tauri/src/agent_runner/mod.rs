@@ -1,13 +1,16 @@
 pub mod commands;
 
+use process_wrap::std::ChildWrapper;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+
+/// A running job and every process it started (process group on Unix, Job
+/// Object on Windows).
+pub type JobChild = Arc<Mutex<Box<dyn ChildWrapper>>>;
 
 /// Tracks running background agent jobs so they can be cancelled.
-/// Maps job_id -> process-group id (== the spawned shell's pid, since each
-/// job is spawned in its own process group).
 pub struct AgentJobStore {
-    pub jobs: Mutex<HashMap<String, u32>>,
+    pub jobs: Mutex<HashMap<String, JobChild>>,
 }
 
 impl AgentJobStore {

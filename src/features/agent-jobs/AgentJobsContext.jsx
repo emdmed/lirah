@@ -446,7 +446,10 @@ export function AgentJobsProvider({ children }) {
       const diffStat = job.worktreePath && changedFiles.length ? await computeDiffStat(job.cwd) : null;
       // Use the freshest job snapshot so the report captures the full output.
       const fresh = jobsRef.current.find((j) => j.id === job.id) || job;
+      const cancelled = () => jobsRef.current.find((j) => j.id === job.id)?.status !== 'running';
+      if (cancelled()) return;
       const reportPath = await writeJobReport(fresh, { changedFiles, success, exitCode, endedAt });
+      if (cancelled()) return;
       patchJob(job.id, {
         status: success ? 'done' : 'failed',
         exitCode,
@@ -639,12 +642,12 @@ export function AgentJobsProvider({ children }) {
   }, [launchJob]);
 
   const cancelJob = useCallback(async (id) => {
+    patchJob(id, { status: 'cancelled', endedAt: Date.now() });
     try {
       await invoke('cancel_agent_job', { jobId: id });
     } catch {
       // Ignore — process may have already exited.
     }
-    patchJob(id, { status: 'cancelled', endedAt: Date.now() });
   }, [patchJob]);
 
   // Apply a job's isolated worktree changes onto the current branch's working
