@@ -1,4 +1,3 @@
-import { useMemo, useRef } from 'react';
 import { plural } from '../../lib/plural';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
@@ -30,27 +29,38 @@ const stepIndex = (stage) => STEPS.findIndex((s) => s.stages.includes(stage));
 
 
 // One line: `● stage ✦ ● message ✦ ● commit`. A step's lamp is lit while it
-// runs, ok once done, fault where it failed.
-function StepLine({ stage, failedAt }) {
-  const current = stage === 'error' ? failedAt : stepIndex(stage);
+// runs, ok once done, warn where it failed but can go on, fault where it stopped.
+const STEP_LAMP = { done: 'ok', active: 'on', warn: 'warn', fault: 'fault', pending: 'off' };
+
+function stepStates(stage, failedAt, clean) {
+  // A clean tree is not a failure: nothing lights.
+  if (stage === 'error') return clean ? ['pending', 'pending', 'pending'] : ['fault', 'pending', 'pending'];
+  if (stage === 'done') return ['done', 'done', 'done'];
+  const current = stepIndex(stage);
+  const states = STEPS.map((_, i) => (i < current ? 'done' : i === current ? 'active' : 'pending'));
+  // Back in review after a failure: mark the step that failed.
+  if (stage === 'ready' && failedAt === 'commit') states[2] = 'fault';
+  if (stage === 'ready' && failedAt === 'message') states[1] = 'warn';
+  return states;
+}
+
+function StepLine({ stage, failedAt, clean }) {
+  const states = stepStates(stage, failedAt, clean);
   return (
     <ol className="flex flex-wrap items-center gap-2 text-[11px]">
       {STEPS.map((step, i) => {
-        // done | active | fault | pending
-        let state = 'pending';
-        if (i < current || stage === 'done') state = 'done';
-        else if (i === current) state = stage === 'error' ? 'fault' : 'active';
+        const state = states[i];
         const busy = state === 'active' && stage !== 'ready';
-        const lamp = { done: 'ok', active: 'on', fault: 'fault', pending: 'off' }[state];
         return (
           <li key={step.id} className="flex items-center gap-2" aria-current={state === 'active' ? 'step' : undefined}>
             {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
             <span className="flex items-center gap-1.5">
-              <Lamp state={lamp} blink={busy} />
+              <Lamp state={STEP_LAMP[state]} blink={busy} />
               <span
                 className={cn(
                   state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
                   state === 'fault' && 'text-[var(--ins-fault)]',
+                  state === 'warn' && 'text-[var(--ins-warn)]',
                 )}
               >
                 {step.label.toLowerCase()}
@@ -61,18 +71,6 @@ function StepLine({ stage, failedAt }) {
       })}
     </ol>
   );
-}
-
-// Added/removed line totals from a unified diff.
-function diffTotals(diff) {
-  let added = 0;
-  let removed = 0;
-  for (const line of (diff || '').split('\n')) {
-    if (line.startsWith('+++') || line.startsWith('---')) continue;
-    if (line[0] === '+') added++;
-    else if (line[0] === '-') removed++;
-  }
-  return { added, removed };
 }
 
 // Git's conventional subject-line limit.
@@ -124,8 +122,28 @@ function FileList({ files, className }) {
   );
 }
 
+// A failure as one line in its tone, with git's own words dimmed below it.
+function FailureLine({ title, error, tone = 'fault' }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5" role="alert">
+      <p className="flex items-center gap-2.5 text-xs" style={{ color: `var(--ins-${tone})` }}>
+        <Lamp state={tone} />
+        {title}
+      </p>
+      {error && (
+        <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words pl-[17px] text-[11px] leading-relaxed text-muted-foreground">
+          {error.trim()}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export function AutoCommitDialog({ autoCommit }) {
-  const { stage, hidden, hide, files, diff, log, commitMessage, setCommitMessage, error, confirm, cancel } = autoCommit;
+  const {
+    stage, hidden, hide, files, totals, log, commitMessage, setCommitMessage,
+    error, failedAt, hash, queued, confirm, cancel, quickCommit,
+  } = autoCommit;
   const isOpen = stage !== 'idle' && !hidden;
   // While it stages, writes or waits for review, closing only hides the
   // dialog: the run carries on in the tab row and the status bar brings it back.
@@ -135,19 +153,22 @@ export function AutoCommitDialog({ autoCommit }) {
     else if (stage !== 'committing') cancel();
   };
   const canCommit = stage === 'ready' && commitMessage.trim().length > 0;
+  // Before the message is ready, Enter queues the commit for when it is.
+  const canQueue = (stage === 'loading-files' || stage === 'generating-message') && !queued;
   const showWork = files.length > 0 && stage !== 'done';
-  const totals = useMemo(() => diffTotals(diff), [diff]);
   const subjectLength = commitMessage.split('\n')[0].length;
-
-  // Remember the step we were on, so an error lights the step where it failed.
-  const lastStepRef = useRef(0);
-  if (stage !== 'error' && stage !== 'idle') lastStepRef.current = Math.max(0, stepIndex(stage));
+  const nothingToCommit = stage === 'error' && files.length === 0 && !error;
+  const retry = stage === 'ready' && failedAt === 'commit';
 
   const working = stage === 'loading-files' || stage === 'generating-message' || stage === 'committing';
-  const lamp = working ? 'blink' : stage === 'done' ? 'ok' : stage === 'error' ? 'fault' : 'on';
+  const lamp = working ? 'blink'
+    : stage === 'done' ? 'ok'
+    : nothingToCommit ? null
+    : stage === 'error' || retry ? 'fault'
+    : 'on';
   const running = {
-    'loading-files': 'scanning the repository',
-    'generating-message': 'writing from the diff',
+    'loading-files': queued ? 'staging, commits when ready' : 'staging the changes',
+    'generating-message': queued ? 'writing, commits when ready' : 'writing from the diff',
     committing: 'committing',
   }[stage];
   const status = running ? (
@@ -160,9 +181,11 @@ export function AutoCommitDialog({ autoCommit }) {
       subject {subjectLength}/{SUBJECT_MAX}
     </span>
   ) : null;
-  const hints = stage === 'ready' || stage === 'generating-message'
-    ? [{ keys: ['↵'], label: 'commit' }, { keys: ['⇧', '↵'], label: 'new line' }]
-    : undefined;
+  const hints = stage === 'ready'
+    ? [{ keys: ['↵'], label: retry ? 'retry' : 'commit' }, { keys: ['⇧', '↵'], label: 'new line' }]
+    : canQueue
+      ? [{ keys: ['↵'], label: 'commit when ready' }]
+      : undefined;
   const settled = stage === 'done' || stage === 'error';
   const escLabel = backgroundable ? 'hide' : settled ? 'close' : 'cancel';
 
@@ -177,9 +200,10 @@ export function AutoCommitDialog({ autoCommit }) {
         hints={hints}
         escLabel={escLabel}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && canCommit) {
+          if (e.key === 'Enter' && !e.shiftKey && (canCommit || canQueue)) {
             e.preventDefault();
-            confirm(commitMessage);
+            if (canCommit) confirm(commitMessage);
+            else quickCommit();
           } else if (e.key === 'Escape') {
             e.preventDefault();
             dismiss();
@@ -193,7 +217,7 @@ export function AutoCommitDialog({ autoCommit }) {
 
         {/* Where we are, then what is about to be committed. */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <StepLine stage={stage} failedAt={lastStepRef.current} />
+          <StepLine stage={stage} failedAt={failedAt} clean={nothingToCommit} />
           {files.length > 0 ? (
             <span className="flex items-baseline gap-3 text-xs tabular-nums">
               <span className="text-foreground">{plural(files.length, 'file')}</span>
@@ -202,9 +226,7 @@ export function AutoCommitDialog({ autoCommit }) {
               )}
               <StatusTally files={files} />
             </span>
-          ) : stage !== 'loading-files' && (
-            <span className="text-xs text-muted-foreground">No changes</span>
-          )}
+          ) : null}
         </div>
 
         {/* Settled results are one line, not a box. */}
@@ -212,22 +234,21 @@ export function AutoCommitDialog({ autoCommit }) {
           <p className="flex min-w-0 items-center gap-2.5 text-sm" role="status">
             <Lamp state="ok" />
             <span className="shrink-0 text-foreground">Committed {plural(files.length, 'file')}</span>
-            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{commitMessage.split('\n')[0]}</span>
+            {hash && <span className="shrink-0 text-xs tabular-nums text-[var(--ins-lamp)]">{hash}</span>}
+            <span className="min-w-0 truncate text-xs text-muted-foreground">{commitMessage.split('\n')[0]}</span>
           </p>
         )}
 
-        {stage === 'error' && (
-          <div className="flex min-w-0 flex-col gap-1.5" role="alert">
-            <p className="flex items-center gap-2.5 text-sm text-[var(--ins-fault)]">
-              <Lamp state="fault" />
-              {files.length === 0 ? 'Nothing to commit' : 'Commit failed'}
-            </p>
-            {error && (
-              <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words pl-[17px] text-xs text-muted-foreground">
-                {error}
-              </pre>
-            )}
-          </div>
+        {/* Nothing changed is a quiet line, not a fault. */}
+        {nothingToCommit && (
+          <p className="flex items-center gap-2.5 text-sm text-muted-foreground" role="status">
+            <Lamp state="off" />
+            Nothing to commit: the working tree is clean.
+          </p>
+        )}
+
+        {stage === 'error' && !nothingToCommit && (
+          <FailureLine title="Couldn't stage the changes" error={error} />
         )}
 
         {showWork && (
@@ -235,6 +256,12 @@ export function AutoCommitDialog({ autoCommit }) {
             {/* The message is what you review, so it leads. */}
             <section className="flex flex-col gap-2">
               <DialogGroup label={<label htmlFor="autocommit-message">Commit message</label>} />
+              {retry && (
+                <FailureLine title="Git rejected the commit. Fix it and retry; the message is kept." error={error} />
+              )}
+              {stage === 'ready' && failedAt === 'message' && (
+                <FailureLine tone="warn" title="Couldn't write a message. Write one below." error={error} />
+              )}
               {stage === 'generating-message' ? (
                 <div className="ins-well flex h-32 flex-col gap-2.5 px-3 py-3" aria-hidden="true">
                   <span className="ins-pulse h-2 w-3/5 bg-foreground/10" />
@@ -248,9 +275,10 @@ export function AutoCommitDialog({ autoCommit }) {
                   id="autocommit-message"
                   value={commitMessage}
                   onChange={(e) => setCommitMessage(e.target.value)}
-                  placeholder="Summarise the change in one line, then add detail below…"
+                  placeholder="Summarise the change in one line, a blank line, then detail…"
                   className="ins-well h-32 w-full resize-none px-3 py-2.5 text-xs leading-relaxed text-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1 disabled:opacity-60"
                   disabled={stage === 'committing'}
+                  aria-invalid={retry || undefined}
                   autoFocus
                 />
               )}
@@ -294,11 +322,15 @@ export function AutoCommitDialog({ autoCommit }) {
               </Button>
               <Button
                 size="sm"
-                onClick={() => confirm(commitMessage)}
-                disabled={!canCommit}
+                onClick={() => (canCommit ? confirm(commitMessage) : quickCommit())}
+                disabled={!canCommit && !canQueue}
                 className="px-3 text-xs"
               >
-                {stage === 'committing' ? 'Committing…' : `Commit ${plural(files.length, 'file')}`}
+                {stage === 'committing' ? 'Committing…'
+                  : queued ? 'Commits when ready'
+                  : canQueue ? 'Commit when ready'
+                  : retry ? 'Retry commit'
+                  : `Commit ${plural(files.length, 'file')}`}
               </Button>
             </>
           )}

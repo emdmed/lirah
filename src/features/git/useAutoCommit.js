@@ -16,13 +16,48 @@ async function recentCommits(repoPath, n = 5) {
   }
 }
 
+// Added/removed line totals from `git diff --numstat` (binary files show `-`).
+function numstatTotals(out) {
+  let added = 0;
+  let removed = 0;
+  for (const line of out.split('\n')) {
+    const [a, r] = line.split('\t');
+    added += Number(a) || 0;
+    removed += Number(r) || 0;
+  }
+  return { added, removed };
+}
+
+// Tidy a generated message without losing its shape: trim trailing spaces,
+// collapse runs of blank lines, and keep one blank line between the subject
+// and the body so git reads the first line alone as the subject.
+export function tidyMessage(raw) {
+  const lines = (raw || '').replace(/\r/g, '').split('\n').map((l) => l.trimEnd());
+  const out = [];
+  for (const line of lines) {
+    if (!line && (!out.length || !out[out.length - 1])) continue;
+    out.push(line);
+  }
+  while (out.length && !out[out.length - 1]) out.pop();
+  if (out.length > 1 && out[1]) out.splice(1, 0, '');
+  return out.join('\n');
+}
+
 export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const [stage, setStage] = useState('idle'); // idle | loading-files | generating-message | ready | committing | done | error
   const [files, setFiles] = useState([]);
-  const [diff, setDiff] = useState('');
+  const [totals, setTotals] = useState({ added: 0, removed: 0 });
   const [log, setLog] = useState({ branch: null, commits: [] });
   const [commitMessage, setCommitMessage] = useState('');
+  // Set alongside an error: where it happened ('files' | 'message' | 'commit').
+  // Message and commit failures stay in 'ready' so the message can still be
+  // edited and committed; only 'files' settles into the error stage.
   const [error, setError] = useState(null);
+  const [failedAt, setFailedAt] = useState(null);
+  // Short hash of the commit just made, for the done line.
+  const [hash, setHash] = useState(null);
+  // Enter was pressed before the message was ready: commit as soon as it is.
+  const [queued, setQueued] = useState(false);
   // Hidden: the dialog is closed but the run goes on. A run starts hidden
   // (the tab shows a spinner) and the dialog opens once the message is ready.
   const [hidden, setHidden] = useState(false);
@@ -33,10 +68,13 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   const reset = useCallback(() => {
     setStage('idle');
     setFiles([]);
-    setDiff('');
+    setTotals({ added: 0, removed: 0 });
     setLog({ branch: null, commits: [] });
     setCommitMessage('');
     setError(null);
+    setFailedAt(null);
+    setHash(null);
+    setQueued(false);
     setHidden(false);
   }, []);
 
@@ -51,13 +89,14 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     reset();
     setHidden(true);
     setStage('loading-files');
+    let phase = 'files';
 
     try {
       // Get committable files
       const committableFiles = await invoke('get_committable_files', { repoPath: currentPath });
       if (cancelledRef.current) return;
       if (!committableFiles || committableFiles.length === 0) {
-        setError('No committable files found');
+        setFailedAt('files');
         setStage('error');
         setHidden(false);
         return;
@@ -80,8 +119,14 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
         if (cancelledRef.current) return;
       }
 
+      // Line totals of what is staged, for the header's diff bar.
+      git(currentPath, ['diff', '--cached', '--numstat'])
+        .then((out) => { if (!cancelledRef.current) setTotals(numstatTotals(out)); })
+        .catch(() => {});
+
       // Generate commit message via backend (which gets diff via git command)
       setStage('generating-message');
+      phase = 'message';
 
       const msg = await invoke('generate_commit_message', {
         projectDir: currentPath,
@@ -90,14 +135,23 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       });
       if (cancelledRef.current) return;
 
-      const lines = msg.split('\n').filter(l => l.trim().length > 0);
-      setCommitMessage(lines.length > 0 ? lines.join('\n') : 'chore: update files');
+      setCommitMessage(tidyMessage(msg) || 'chore: update files');
       setStage('ready');
       if (!autoConfirmRef.current) setHidden(false);
     } catch (err) {
       if (cancelledRef.current) return;
-      setError(err.toString());
-      setStage('error');
+      setError(String(err));
+      // Once files are staged, a failed message is not the end: open an
+      // empty message so it can be written by hand.
+      autoConfirmRef.current = false;
+      setQueued(false);
+      if (phase === 'message') {
+        setFailedAt('message');
+        setStage('ready');
+      } else {
+        setFailedAt('files');
+        setStage('error');
+      }
       setHidden(false);
     }
   }, [reset, cli, customPrompt]);
@@ -107,13 +161,21 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
     if (!repoPath) return;
     setStage('committing');
     setHidden(false);
+    setQueued(false);
+    setError(null);
+    setFailedAt(null);
     try {
       await git(repoPath, ['commit', '-m', editedMessage]);
+      const short = await git(repoPath, ['rev-parse', '--short', 'HEAD']).catch(() => '');
+      setHash(short.trim() || null);
       setStage('done');
       setTimeout(reset, 2000);
     } catch (err) {
-      setError(err.toString());
-      setStage('error');
+      // A rejected commit (a hook, a signing failure) keeps the message and
+      // the staged files, so it can be fixed and tried again.
+      setError(String(err));
+      setFailedAt('commit');
+      setStage('ready');
     }
   }, [reset]);
 
@@ -135,6 +197,7 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
       confirm(commitMessage);
     } else if (stage === 'loading-files' || stage === 'generating-message') {
       autoConfirmRef.current = true;
+      setQueued(true);
     }
   }, [stage, commitMessage, confirm]);
 
@@ -146,5 +209,5 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   }
   prevStageRef.current = stage;
 
-  return { stage, hidden, hide, show, files, diff, log, commitMessage, setCommitMessage, error, trigger, confirm, cancel, quickCommit };
+  return { stage, hidden, hide, show, files, totals, log, commitMessage, setCommitMessage, error, failedAt, hash, queued, trigger, confirm, cancel, quickCommit };
 }
