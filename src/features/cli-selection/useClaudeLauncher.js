@@ -87,7 +87,9 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
           agentControl ? invoke('get_agent_control_plugin_dir').catch(() => null) : null,
         ]);
         for (const dir of pluginDirs.filter(Boolean)) {
-          command += ` --plugin-dir '${dir.replace(/'/g, powershell ? "''" : "'\\''")}'`;
+          // PowerShell also reads the curly quotes as quote characters; doubling any of them keeps the string whole.
+          const quoted = powershell ? dir.replace(/['‘’‚‛]/g, '$&$&') : dir.replace(/'/g, "'\\''");
+          command += ` --plugin-dir '${quoted}'`;
         }
       }
       // Clear the screen first so the agent starts on a clean terminal.
