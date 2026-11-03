@@ -21,6 +21,8 @@ The script picks the latest [release](https://github.com/emdmed/lirah/releases) 
 | Arch, Manjaro, EndeavourOS, Omarchy, CachyOS | Builds from source (the AppImage has EGL issues there) and prompts for missing build tools |
 | Anything else | AppImage |
 
+To update later, run `lirah update`. It re-runs the install script and skips the install when you already have the latest release. On Debian and Ubuntu the command comes from a small launcher in `/usr/local/bin` that sits in front of the packaged `/usr/bin/lirah`.
+
 macOS (`.dmg`) and Windows (`.exe`, `.msi`) installers are on the releases page.
 
 **Optional tools:** `bwrap` (bubblewrap) for the sandbox, `lazygit` for Alt+L, `nvim` for Alt+N.

@@ -44,6 +44,61 @@ else
     SUDO="sudo"
 fi
 
+INSTALL_URL="https://raw.githubusercontent.com/$REPO/main/scripts/install.sh"
+# Records the installed release so `lirah update` can skip a rebuild when nothing changed
+VERSION_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/$APP_NAME/installed-version"
+
+# Print the block every launcher starts with: `lirah update` re-runs this install script.
+# Skipped when ./update is a directory, so `lirah update` can still open a folder named update.
+launcher_update_block() {
+    cat << EOF
+if [ "\${1:-}" = "update" ] && [ ! -d update ]; then
+    URL="$INSTALL_URL"
+    if command -v curl >/dev/null 2>&1; then
+        SCRIPT=\$(curl -fsSL "\$URL")
+    else
+        SCRIPT=\$(wget -qO- "\$URL")
+    fi || { echo "lirah update: failed to download \$URL" >&2; exit 1; }
+    LIRAH_UPDATE=1 exec bash -c "\$SCRIPT"
+fi
+EOF
+}
+
+# Write ~/.local/bin/lirah: handles `lirah update`, otherwise launches TARGET detached so the terminal can close
+write_user_launcher() {
+    TARGET="$1"
+    LAUNCHER="$HOME/.local/bin/$APP_NAME"
+    # Remove first: a leftover symlink from an older install would redirect the write,
+    # and a new file keeps a running `lirah update` reading its old copy.
+    rm -f "$LAUNCHER"
+    {
+        echo '#!/bin/bash'
+        launcher_update_block
+        echo "nohup \"$TARGET\" \"\$@\" >/dev/null 2>&1 &"
+        echo 'disown'
+    } > "$LAUNCHER"
+    chmod +x "$LAUNCHER"
+}
+
+# Write /usr/local/bin/lirah in front of the packaged /usr/bin/lirah to add `lirah update`
+write_system_launcher() {
+    TARGET="$1"
+    LAUNCHER="/usr/local/bin/$APP_NAME"
+    TMP=$(mktemp)
+    {
+        echo '#!/bin/bash'
+        echo '# Installed by the Lirah install script to add `lirah update`'
+        launcher_update_block
+        echo "exec \"$TARGET\" \"\$@\""
+    } > "$TMP"
+    # Copy then rename, so a running `lirah update` keeps reading its old copy
+    $SUDO mkdir -p /usr/local/bin
+    $SUDO cp "$TMP" "$LAUNCHER.new" && $SUDO chmod 755 "$LAUNCHER.new" && $SUDO mv -f "$LAUNCHER.new" "$LAUNCHER" \
+        || warn "Could not install $LAUNCHER; 'lirah update' will not be available"
+    rm -f "$TMP"
+    info "Run '$APP_NAME update' to install the latest release"
+}
+
 # Detect architecture
 detect_arch() {
     ARCH=$(uname -m)
@@ -188,6 +243,8 @@ install_deb() {
         error "Neither apt-get nor dpkg found"
     fi
 
+    write_system_launcher "/usr/bin/$APP_NAME"
+
     info "Installation complete!"
 }
 
@@ -259,15 +316,7 @@ install_from_source() {
     cp "$BINARY" "$INSTALL_DIR/${APP_NAME}-bin"
     chmod +x "$INSTALL_DIR/${APP_NAME}-bin"
 
-    # Create wrapper script so 'lirah' launches detached and terminal closes.
-    # Remove first: a leftover symlink from an older install would redirect the write.
-    rm -f "$INSTALL_DIR/$APP_NAME"
-    cat > "$INSTALL_DIR/$APP_NAME" << WRAPPER
-#!/bin/bash
-nohup "$INSTALL_DIR/${APP_NAME}-bin" "\$@" >/dev/null 2>&1 &
-disown
-WRAPPER
-    chmod +x "$INSTALL_DIR/$APP_NAME"
+    write_user_launcher "$INSTALL_DIR/${APP_NAME}-bin"
 
     # Create desktop entry
     DESKTOP_DIR="$HOME/.local/share/applications"
@@ -348,15 +397,7 @@ Categories=Development;Utility;
 StartupWMClass=$APP_NAME
 EOF
 
-    # Create wrapper script so 'lirah' launches detached and terminal closes.
-    # Remove first: a leftover symlink from an older install would redirect the write.
-    rm -f "$INSTALL_DIR/$APP_NAME"
-    cat > "$INSTALL_DIR/$APP_NAME" << WRAPPER
-#!/bin/bash
-nohup "$APPIMAGE_PATH" "\$@" >/dev/null 2>&1 &
-disown
-WRAPPER
-    chmod +x "$INSTALL_DIR/$APP_NAME"
+    write_user_launcher "$APPIMAGE_PATH"
 
     info "AppImage installed to: $APPIMAGE_PATH"
     info "Symlinked as: $INSTALL_DIR/$APP_NAME"
@@ -645,6 +686,19 @@ main() {
 
     get_latest_version
 
+    if [ "${LIRAH_UPDATE:-}" = "1" ] && [ -f "$VERSION_FILE" ] && [ "$(cat "$VERSION_FILE")" = "$VERSION" ]; then
+        info "$DISPLAY_NAME $VERSION is already installed, nothing to update."
+        return
+    fi
+
+    install_app
+
+    mkdir -p "$(dirname "$VERSION_FILE")"
+    echo "$VERSION" > "$VERSION_FILE"
+}
+
+# Pick the install method for this distro and architecture
+install_app() {
     # Releases only ship x86_64 Linux packages; other architectures must compile
     if [ "$ARCH" != "x86_64" ]; then
         info "No prebuilt $ARCH Linux package, building from source..."
