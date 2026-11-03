@@ -17,6 +17,8 @@ import { useTokenUsageValue } from '../features/token-budget/tokenUsageStore';
 import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
+import { WindowControls } from './WindowControls';
+import { IS_MAC } from '../utils/pathUtils';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
 import { useTabManager } from '../features/tabs/TabContext';
@@ -320,15 +322,21 @@ export const StatusBar = memo(({
     onToggleNetworkIsolation();
   };
 
+  // The header drags the window only while the window controls are on, as the
+  // old title bar did: with them off nothing in the window moves it.
+  const drag = showTitleBar ? { 'data-tauri-drag-region': true } : {};
+
   return (
     <>
     <div
       className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
+      {...drag}
     >
       {/* LEFT: maker's legend, workspace + update. Project and branch live in
-          the sidebar's TABS pane. The title bar carries the legend when shown. */}
-      <div className="flex items-center gap-3 overflow-hidden min-w-0">
-        {!showTitleBar && <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />}
+          the sidebar's TABS pane. On macOS the window controls come first, at the left. */}
+      <div className="flex items-center gap-3 overflow-hidden min-w-0" {...drag}>
+        {IS_MAC && showTitleBar && <WindowControls />}
+        <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />
         <div className="flex items-center gap-1.5 min-w-0">
           {workspace && (
             <Tooltip>
@@ -388,7 +396,7 @@ export const StatusBar = memo(({
       />
 
       {/* RIGHT: Runtime status + Settings */}
-      <div className="flex items-center justify-end gap-1.5 min-w-0">
+      <div className="flex items-center justify-end gap-1.5 min-w-0" {...drag}>
         {/* Transient status (changelog) — only visible when active */}
         {changelogStatus && (
           <ChangelogStatus status={changelogStatus} />
@@ -495,6 +503,12 @@ export const StatusBar = memo(({
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+        {!IS_MAC && showTitleBar && (
+          <>
+            <span className="ins-sep-star mx-1" aria-hidden="true" />
+            <WindowControls />
+          </>
+        )}
       </div>
     </div>
 

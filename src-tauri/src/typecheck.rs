@@ -31,7 +31,7 @@ fn get_tsc_command(file_path: &str) -> Command {
     #[cfg(not(target_os = "windows"))]
     let tsc_cmd = "tsc";
 
-    let mut cmd = Command::new(tsc_cmd);
+    let mut cmd = crate::util::hidden_command(tsc_cmd);
     cmd.arg("--noEmit");
     cmd.arg("--skipLibCheck");  // Performance optimization
     cmd.arg("--jsx").arg("react-jsx");  // Support JSX syntax
@@ -200,7 +200,7 @@ fn check_with_tsconfig(
 ) -> Result<Option<ProjectRun>, String> {
     let start_time = Instant::now();
     let config_dir = tsconfig.parent().unwrap_or(Path::new("."));
-    let output = Command::new(tsc_binary(config_dir))
+    let output = crate::util::hidden_command(tsc_binary(config_dir))
         .arg("--noEmit")
         .arg("--pretty")
         .arg("false")

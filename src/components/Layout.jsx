@@ -1,7 +1,6 @@
-export function Layout({ sidebar, children, statusBar, textarea, titleBar, secondaryTerminal }) {
+export function Layout({ sidebar, children, statusBar, textarea, secondaryTerminal }) {
   return (
     <div className="p-0 flex flex-col w-full h-full bg-[var(--ins-gutter)]">
-      {titleBar}
       {/* One gutter everywhere: 12px between frames and at the window edge.
           Frames are inset 6px top and bottom (.tui-pane), so vertical
           spacing is 6px of padding plus that inset; the sidebar's resize

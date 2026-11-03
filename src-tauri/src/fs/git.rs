@@ -72,7 +72,7 @@ pub(crate) fn read_current_branch(work_tree: &Path) -> Option<String> {
 /// A git command run in `dir`. Every git process the backend starts goes
 /// through here.
 pub(crate) fn git_command(dir: &Path) -> Command {
-    let mut cmd = Command::new("git");
+    let mut cmd = crate::util::hidden_command("git");
     cmd.current_dir(dir);
     cmd
 }

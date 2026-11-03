@@ -17,6 +17,16 @@ pub fn strip_app_env(cmd: &mut portable_pty::CommandBuilder) {
     }
 }
 
+/// A `Command` that opens no console window on Windows (`CREATE_NO_WINDOW`).
+/// Every process the backend starts must be built with this, or each spawn
+/// flashes a console. Elsewhere it is plain `Command::new`.
+pub fn hidden_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000);
+    cmd
+}
+
 /// The user's home folder.
 pub fn home_dir() -> Option<PathBuf> {
     dirs::home_dir()
@@ -49,11 +59,21 @@ pub fn node_command(script: &std::path::Path) -> String {
     format!("node \"{}\"", script.to_string_lossy())
 }
 
-/// `script` run by the user's login shell (`$SHELL -lc script`), so it sees
-/// the same PATH as their terminal. The caller adds cwd, env and stdio.
+/// "powershell" when the terminal shell is PowerShell, else "posix".
+pub fn shell_kind() -> &'static str {
+    if user_shell().to_lowercase().contains("powershell") { "powershell" } else { "posix" }
+}
+
+/// `script` run by the user's login shell (`$SHELL -lc script`; PowerShell on
+/// Windows, which has no `-l`), so it sees the same PATH as their terminal.
+/// The caller adds cwd, env and stdio.
 pub fn login_shell_command(script: &str) -> Command {
-    let mut cmd = Command::new(user_shell());
-    cmd.args(["-lc", script]);
+    let mut cmd = hidden_command(user_shell());
+    if shell_kind() == "powershell" {
+        cmd.args(["-NoProfile", "-NoLogo", "-Command", script]);
+    } else {
+        cmd.args(["-lc", script]);
+    }
     if let Some(path) = terminal_path() {
         cmd.env("PATH", path);
     }
@@ -126,4 +146,39 @@ pub fn run_capture(cmd: &mut Command) -> Result<String, String> {
         return Err(stdout);
     }
     Err(String::from_utf8_lossy(&output.stderr).to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hidden_command_runs_and_captures_output() {
+        #[cfg(windows)]
+        let mut cmd = hidden_command("cmd");
+        #[cfg(windows)]
+        cmd.args(["/C", "echo", "hi"]);
+        #[cfg(not(windows))]
+        let mut cmd = hidden_command("sh");
+        #[cfg(not(windows))]
+        cmd.args(["-c", "echo hi"]);
+        assert_eq!(run_capture(&mut cmd).unwrap().trim(), "hi");
+    }
+
+    #[test]
+    fn shell_kind_matches_the_platform() {
+        assert_eq!(shell_kind(), if cfg!(windows) { "powershell" } else { "posix" });
+    }
+
+    #[test]
+    fn login_shell_command_uses_the_flags_of_its_shell() {
+        let args: Vec<_> = login_shell_command("echo hi").get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        let want: &[&str] = if cfg!(windows) { &["-NoProfile", "-NoLogo", "-Command", "echo hi"] } else { &["-lc", "echo hi"] };
+        assert_eq!(args, want);
+    }
+
+    #[test]
+    fn hidden_command_reports_a_missing_program() {
+        assert!(run_capture(&mut hidden_command("lirah-no-such-program")).is_err());
+    }
 }

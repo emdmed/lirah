@@ -153,7 +153,7 @@ export function useTabCommands({
       { id: 'tokens', hint: 'token metrics', run: () => setDashboardOpen(true) },
       { id: 'budget', hint: 'token budget', run: () => setBudgetDialogOpen(true) },
       { id: 'changelog', hint: 'auto changelog settings', run: () => setAutoChangelogDialogOpen(true) },
-      { id: 'titlebar', hint: 'show or hide the title bar', run: () => setShowTitleBar(prev => !prev) },
+      { id: 'titlebar', hint: 'show or hide the window controls', run: () => setShowTitleBar(prev => !prev) },
       { id: 'startup', hint: 'what opens at launch: add/remove a project, or set the mode',
         options: ['add', 'remove', 'mode projects', 'mode restore'], run: async (line) => {
           const [sub = '', ...rest] = (line || '').trim().split(/\s+/);

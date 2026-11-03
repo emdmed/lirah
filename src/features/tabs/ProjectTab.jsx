@@ -6,7 +6,6 @@ import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
-import { TitleBar } from "../../components/TitleBar";
 import { LeftSidebar } from "../../components/LeftSidebar";
 import { usePromptTemplates } from "../templates";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -1180,7 +1179,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
             />
           )
         }
-        titleBar={settings.showTitleBar && <TitleBar hasTerminalSession={!!terminalSessionId} currentPath={currentPath} />}
         statusBar={
           <TabBarStatusSlot active={isActive}>
           <StatusBar
