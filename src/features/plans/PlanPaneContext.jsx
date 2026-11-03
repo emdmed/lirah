@@ -30,7 +30,7 @@ export function useBusy(key) {
 /**
  * The pane's handlers: repoRoot, closePlan, and the actions that confirm, set
  * up git or toast before calling the store (implement, check, commit, review,
- * rollback, autopilot, resume, reviewAll, deletePlan, addRepo, removeWorktrees).
+ * rollback, autopilot, resume, reviewAll, deletePlan, addRepo, removeWorktrees, reopenGit).
  */
 export function usePlanPane() {
   const ctx = useContext(PlanPaneActionsContext);

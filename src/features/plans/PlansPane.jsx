@@ -31,7 +31,7 @@ export function PlansPane({ projectPath }) {
   const { repoRoot, checked } = useRepoRoot(projectPath);
   const {
     plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix,
-    sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees,
+    sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit,
   } = usePlans(repoRoot);
   const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
   const { tabs, activeTabId, addTab } = useTabManager();
@@ -166,6 +166,25 @@ export function PlansPane({ projectPath }) {
     await withBusy(BUSY.GIT_SETUP, () => removeWorktrees(repoRoot, plan.id));
   }, [confirm, withBusy, removeWorktrees, repoRoot]);
 
+  const handleReopenGit = useCallback(async (plan) => {
+    const cfg = planGit(plan);
+    if (cfg.worktrees && !cfg.removedAt) {
+      const ok = await confirm({
+        title: 'Change the plan\'s git setup?',
+        description: 'Its worktrees are removed so they can be made again with the new setup. Uncommitted work in them is lost; the branch stays.',
+        confirmLabel: 'Remove and change',
+      });
+      if (!ok) return false;
+    }
+    try {
+      await withBusy(BUSY.GIT_SETUP, () => reopenGit(repoRoot, plan.id));
+      return true;
+    } catch (e) {
+      toast.error(`Couldn't reopen the git setup — ${e?.message || e}`);
+      return false;
+    }
+  }, [confirm, withBusy, reopenGit, repoRoot, toast]);
+
   const closePlan = useCallback(() => setOpenPlanId(null), []);
   const paneActions = useMemo(() => ({
     repoRoot,
@@ -182,8 +201,9 @@ export function PlansPane({ projectPath }) {
     deletePlan: handleDeletePlan,
     addRepo: handleAddRepo,
     removeWorktrees: handleRemoveWorktrees,
+    reopenGit: handleReopenGit,
   }), [repoRoot, closePlan, handleImplement, handleCheck, handleMarkDone, handleCommit, handleReview, handleRollback, handleAutopilot,
-    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees]);
+    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit]);
 
   if (!projectPath || (checked && !repoRoot)) {
     return <EmptyLine hint="plans track commits, so they need a git repository">not a git repo</EmptyLine>;

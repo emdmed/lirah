@@ -2,13 +2,37 @@ import { useCallback, useEffect, useState } from 'react';
 import { dirtyCount } from '../../lib/git';
 import { getSettings, setSetting } from '../settings/settingsStore';
 import { getTabSession } from '../tabs/terminalActivity';
-import { getAgentHookState } from '../tabs/agentHookState';
+import { getAgentHookState, subscribeAgentHooks } from '../tabs/agentHookState';
 import {
   AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, SPLIT_STATUS, UNTITLED_PLAN,
 } from './planModel';
 import { inWorkDir, planGit, workPath } from './planGit';
 import { subscribeAutopilotToggle, takeAutopilotToggle } from './plansPaneEvents';
 import { BUSY } from './PlanPaneContext';
+
+// How long a new tab's Claude has to report in. Long enough for a first-run
+// "trust this folder?" prompt in a fresh worktree.
+const AGENT_START_TIMEOUT_MS = 120_000;
+// After it reports in, before typing into it.
+const AGENT_SETTLE_MS = 500;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Resolves true once the agent in `tabId` is up and idle, or false after `ms`. */
+function agentStarted(tabId, ms) {
+  const ready = () => getAgentHookState(getTabSession(tabId))?.state === 'waiting';
+  if (ready()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let unsubscribe = () => {};
+    const finish = (ok) => {
+      clearTimeout(timer);
+      unsubscribe();
+      resolve(ok);
+    };
+    const timer = setTimeout(() => finish(false), ms);
+    unsubscribe = subscribeAgentHooks(() => ready() && finish(true));
+  });
+}
 
 /**
  * Sending chunks to the active tab's agent: the checks before a send, a single
@@ -48,22 +72,47 @@ export function usePlanRunActions({
     return true;
   }, [activeTabId, confirm]);
 
-  // Set up the plan's branch and worktrees, then make sure the active tab
-  // works where the plan does. False: don't send (a tab was offered instead).
-  const prepareFor = useCallback(async (plan) => {
+  // Set up the plan's branch and worktrees. Null: setup failed (already said).
+  const setUpGit = useCallback(async (plan) => {
     let cfg;
     try {
       cfg = await ensureGit(repoRoot, plan.id);
     } catch (e) {
       toast.error(`Git setup failed — ${e?.message || e}`);
-      return false;
+      return null;
     }
     if (cfg.removedAt) {
       toast.error('This plan\'s worktrees were removed');
-      return false;
+      return null;
     }
+    return cfg;
+  }, [ensureGit, repoRoot, toast]);
+
+  // The plan runs in worktrees and the active tab isn't in them.
+  const needsOwnTab = useCallback((cfg) => {
     const tabPath = tabs.find((t) => t.id === activeTabId)?.projectPath;
-    if (!cfg.worktrees || inWorkDir({ git: cfg }, tabPath)) return true;
+    return !!cfg.worktrees && !inWorkDir({ git: cfg }, tabPath);
+  }, [tabs, activeTabId]);
+
+  // Open a tab in the plan's worktrees, launch Claude there and wait for it.
+  // The new tab's id, or null.
+  const openAgentTab = useCallback(async (cfg) => {
+    const tab = addTab(cfg.workDir, { launch: true });
+    if (!tab) return null;
+    if (!(await agentStarted(tab.id, AGENT_START_TIMEOUT_MS))) {
+      toast.error('Claude didn\'t start in the new tab. Launch it there (Ctrl+K), then run auto-pilot from that tab.');
+      return null;
+    }
+    await sleep(AGENT_SETTLE_MS);
+    return tab.id;
+  }, [addTab, toast]);
+
+  // Set up git, then make sure the active tab works where the plan does.
+  // False: don't send (a tab was offered instead).
+  const prepareFor = useCallback(async (plan) => {
+    const cfg = await setUpGit(plan);
+    if (!cfg) return false;
+    if (!needsOwnTab(cfg)) return true;
     const ok = await confirm({
       title: 'This plan runs in its worktrees',
       description: `Chunks go to an agent working in ${cfg.workDir}. Open a tab there, launch Claude (Ctrl+K), then send from that tab.`,
@@ -72,7 +121,7 @@ export function usePlanRunActions({
     });
     if (ok) addTab(cfg.workDir);
     return false;
-  }, [ensureGit, repoRoot, tabs, activeTabId, confirm, addTab, toast]);
+  }, [setUpGit, needsOwnTab, confirm, addTab]);
 
   const handleImplement = useCallback(async (plan, chunk) => {
     if (!(await withBusy(BUSY.chunk(chunk.id), () => prepareFor(plan)))) return;
@@ -81,16 +130,19 @@ export function usePlanRunActions({
   }, [activeTabId, confirmSend, prepareFor, withBusy, implementChunk, repoRoot]);
 
   const handleAutopilot = useCallback(async (plan) => {
-    const clash = plans.find((p) => p.id !== plan.id && isAutopilotLive(p.autopilot) && p.autopilot.tabId === activeTabId);
+    const cfg = await setUpGit(plan);
+    if (!cfg) return;
+    // In worktrees, from a tab outside them: the run gets a tab of its own.
+    const ownTab = needsOwnTab(cfg);
+    const clash = !ownTab && plans.find((p) => p.id !== plan.id && isAutopilotLive(p.autopilot) && p.autopilot.tabId === activeTabId);
     if (clash) {
       toast.error(`"${clash.title || UNTITLED_PLAN}" is already on auto-pilot in this tab`);
       return;
     }
-    if (!(await prepareFor(plan))) return;
-    if (!(await confirmSend(plan, null))) return;
+    if (!ownTab && !(await confirmSend(plan, null))) return;
     // Changes already in the tree would be swept into the first chunk's commit.
     let dirty = 0;
-    for (const repo of planGit(plan).repos) {
+    for (const repo of planGit({ git: cfg }).repos) {
       dirty += await dirtyCount(workPath(repo)).catch(() => 0);
     }
     const firstRun = !getSettings().autopilotTipSeen;
@@ -98,7 +150,10 @@ export function usePlanRunActions({
       title: dirty ? `${dirty} uncommitted change${dirty === 1 ? '' : 's'} in the repo` : 'Run the plan on auto-pilot?',
       description: [
         dirty && 'The agent may commit them along with the first chunk. Commit or stash them first to keep chunks clean.',
-        'Chunks go to this tab\'s agent one at a time, each committed before the next. You are notified when it finishes, needs you, or hits an error.',
+        ownTab
+          ? `A new tab opens in ${cfg.workDir} and launches Claude. Chunks go to that agent one at a time, each committed before the next.`
+          : 'Chunks go to this tab\'s agent one at a time, each committed before the next.',
+        'You are notified when it finishes, needs you, or hits an error.',
         firstRun && 'Permission prompts pause the run: launch the agent with accept-edits to leave it unattended.',
       ].filter(Boolean).join(' '),
       confirmLabel: dirty ? 'Start anyway' : 'Start auto-pilot',
@@ -106,23 +161,30 @@ export function usePlanRunActions({
     });
     if (!ok) return;
     setSetting('autopilotTipSeen', true);
+    const tabId = ownTab ? await openAgentTab(cfg) : activeTabId;
+    if (!tabId) return;
     try {
-      await startAutopilot(repoRoot, plan.id, activeTabId);
+      await startAutopilot(repoRoot, plan.id, tabId);
     } catch (e) {
       toast.error(`Auto-pilot didn't start: ${e?.message || e}`);
     }
-  }, [plans, activeTabId, confirm, confirmSend, prepareFor, startAutopilot, repoRoot, toast]);
+  }, [plans, activeTabId, confirm, confirmSend, setUpGit, needsOwnTab, openAgentTab, startAutopilot, repoRoot, toast]);
 
   const handleResume = useCallback(async (plan) => {
-    // The run's own tab if it is still open, else this one.
-    const tabId = tabs.some((t) => t.id === plan.autopilot.tabId) ? plan.autopilot.tabId : activeTabId;
-    if (tabId === activeTabId && !(await prepareFor(plan))) return;
+    // The run's own tab if it is still open, else this one, else a new one in the worktrees.
+    let tabId = tabs.some((t) => t.id === plan.autopilot.tabId) ? plan.autopilot.tabId : activeTabId;
+    if (tabId === activeTabId) {
+      const cfg = await setUpGit(plan);
+      if (!cfg) return;
+      if (needsOwnTab(cfg)) tabId = await openAgentTab(cfg);
+      if (!tabId) return;
+    }
     try {
       await resumeAutopilot(repoRoot, plan.id, tabId);
     } catch (e) {
       toast.error(`Auto-pilot didn't resume: ${e?.message || e}`);
     }
-  }, [tabs, activeTabId, prepareFor, resumeAutopilot, repoRoot, toast]);
+  }, [tabs, activeTabId, setUpGit, needsOwnTab, openAgentTab, resumeAutopilot, repoRoot, toast]);
 
   // `:autopilot` from the command palette: the open plan, else the only plan
   // with a run going, else the only one with work left. The request is taken

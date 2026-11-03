@@ -292,6 +292,7 @@ export function PlanDetail({ plan }) {
           onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
           onOpenTab={() => addTab(planGit(plan).workDir)}
           onRemoveWorktrees={() => pane.removeWorktrees(plan)}
+          onReopen={started || isAutopilotLive(plan.autopilot) ? null : () => pane.reopenGit(plan)}
         />
       </section>
 

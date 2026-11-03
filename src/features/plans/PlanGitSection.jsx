@@ -39,7 +39,7 @@ function BaseSelect({ root, value, onChange }) {
 }
 
 /** How the plan uses git: worktrees or not, the branch, and each repo's base. */
-export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, onOpenTab, onRemoveWorktrees }) {
+export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, onOpenTab, onRemoveWorktrees, onReopen }) {
   const cfg = planGit(plan);
   const { bookmarks } = useBookmarks();
   const locked = !!cfg.preparedAt;
@@ -84,6 +84,18 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
           title={open ? 'Close the git setup' : 'Choose worktrees, a plan branch and base branches. Applied when the first chunk is sent.'}
         >
           {open ? 'close' : 'set up'}
+        </PanelButton>
+      )}
+      {locked && onReopen && (
+        <PanelButton
+          onClick={async () => {
+            if (await onReopen()) setEditing(true);
+          }}
+          disabled={busy}
+          className="shrink-0"
+          title="No chunk has started: change worktrees, the branch or base branches. Set up again when the first chunk is sent."
+        >
+          change
         </PanelButton>
       )}
     </div>

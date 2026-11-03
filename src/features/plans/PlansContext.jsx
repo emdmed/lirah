@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, repoTop } from '../../lib/git';
 import { shortId } from '../../lib/ids';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, newChunks, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
+  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, isAutopilotLive, newChunks, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
   toRolledBack, UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
@@ -256,6 +256,27 @@ export function PlansProvider({ children }) {
     updatePlan(repoRoot, planId, (p) => ({ git: { ...planGit(p), removedAt: Date.now() } }));
   }, [findPlan, updatePlan]);
 
+  // Unlock the git setup of a plan no chunk has started: its worktrees go (the
+  // branches stay) and the next send sets it up again from the edited choice.
+  const reopenGit = useCallback(async (repoRoot, planId) => {
+    const plan = findPlan(repoRoot, planId);
+    if (!plan || planStarted(plan) || isAutopilotLive(plan.autopilot)) return;
+    const cfg = planGit(plan);
+    if (!cfg.preparedAt && !cfg.worktreesDir) return;
+    if (!cfg.removedAt) await cleanupGit(plan);
+    updatePlan(repoRoot, planId, (p) => {
+      const { removedAt, worktreesDir, ...git } = planGit(p);
+      return {
+        git: {
+          ...git,
+          repos: git.repos.map((r) => ({ root: r.root, base: r.base, workPath: null, prepared: false })),
+          workDir: null,
+          preparedAt: null,
+        },
+      };
+    });
+  }, [findPlan, updatePlan]);
+
   const moveChunk = useCallback((repoRoot, planId, chunkId, delta) => {
     updatePlan(repoRoot, planId, (p) => {
       const i = p.chunks.findIndex((c) => c.id === chunkId);
@@ -369,9 +390,10 @@ export function PlansProvider({ children }) {
     removePlanRepo,
     ensureGit,
     removeWorktrees,
+    reopenGit,
   }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
     implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
-    dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees]);
+    dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
 
   return (
     <PlansActionsContext.Provider value={actions}>
