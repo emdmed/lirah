@@ -59,11 +59,21 @@ pub fn node_command(script: &std::path::Path) -> String {
     format!("node \"{}\"", script.to_string_lossy())
 }
 
-/// `script` run by the user's login shell (`$SHELL -lc script`), so it sees
-/// the same PATH as their terminal. The caller adds cwd, env and stdio.
+/// "powershell" when the terminal shell is PowerShell, else "posix".
+pub fn shell_kind() -> &'static str {
+    if user_shell().to_lowercase().contains("powershell") { "powershell" } else { "posix" }
+}
+
+/// `script` run by the user's login shell (`$SHELL -lc script`; PowerShell on
+/// Windows, which has no `-l`), so it sees the same PATH as their terminal.
+/// The caller adds cwd, env and stdio.
 pub fn login_shell_command(script: &str) -> Command {
     let mut cmd = hidden_command(user_shell());
-    cmd.args(["-lc", script]);
+    if shell_kind() == "powershell" {
+        cmd.args(["-NoProfile", "-NoLogo", "-Command", script]);
+    } else {
+        cmd.args(["-lc", script]);
+    }
     if let Some(path) = terminal_path() {
         cmd.env("PATH", path);
     }
@@ -153,6 +163,18 @@ mod tests {
         #[cfg(not(windows))]
         cmd.args(["-c", "echo hi"]);
         assert_eq!(run_capture(&mut cmd).unwrap().trim(), "hi");
+    }
+
+    #[test]
+    fn shell_kind_matches_the_platform() {
+        assert_eq!(shell_kind(), if cfg!(windows) { "powershell" } else { "posix" });
+    }
+
+    #[test]
+    fn login_shell_command_uses_the_flags_of_its_shell() {
+        let args: Vec<_> = login_shell_command("echo hi").get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        let want: &[&str] = if cfg!(windows) { &["-NoProfile", "-NoLogo", "-Command", "echo hi"] } else { &["-lc", "echo hi"] };
+        assert_eq!(args, want);
     }
 
     #[test]

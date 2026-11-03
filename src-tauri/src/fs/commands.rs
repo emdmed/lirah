@@ -17,6 +17,12 @@ pub async fn check_command_exists(command: String) -> Result<bool, String> {
     .await
 }
 
+/// The kind of shell the terminal runs, so the frontend can quote for it.
+#[tauri::command]
+pub fn get_shell_kind() -> &'static str {
+    crate::util::shell_kind()
+}
+
 #[tauri::command]
 pub fn get_home_dir() -> Result<String, String> {
     crate::util::home_dir_string()
