@@ -151,6 +151,7 @@ pub fn run(initial_path: Option<String>) {
             fs::directory::write_file_content,
             fs::directory::read_directory_recursive,
             fs::commands::get_home_dir,
+            fs::commands::get_shell_kind,
             fs::commands::set_file_executable,
             fs::commands::path_exists,
             fs::commands::check_command_exists,

@@ -1,5 +1,3 @@
-use std::process::Command;
-
 #[tauri::command]
 pub async fn check_command_exists(command: String) -> Result<bool, String> {
     crate::ipc::blocking("check_command_exists", move || {
@@ -9,7 +7,7 @@ pub async fn check_command_exists(command: String) -> Result<bool, String> {
         #[cfg(target_family = "windows")]
         let checker = "where";
 
-        let output = Command::new(checker)
+        let output = crate::util::hidden_command(checker)
             .arg(&command)
             .output()
             .map_err(|e| format!("Failed to check command: {}", e))?;
@@ -17,6 +15,12 @@ pub async fn check_command_exists(command: String) -> Result<bool, String> {
         Ok(output.status.success())
     })
     .await
+}
+
+/// The kind of shell the terminal runs, so the frontend can quote for it.
+#[tauri::command]
+pub fn get_shell_kind() -> &'static str {
+    crate::util::shell_kind()
 }
 
 #[tauri::command]
