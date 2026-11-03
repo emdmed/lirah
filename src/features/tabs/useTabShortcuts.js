@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { matches } from '../../lib/shortcuts';
+import { requestQuickTask } from '../tasks/tasksPaneEvents';
 
 /**
  * The tab's global keyboard shortcuts. Registered only while the tab is
@@ -54,6 +55,12 @@ export function useTabShortcuts({
         e.preventDefault();
         e.stopPropagation();
         openWithCommand('nvim');
+        return;
+      }
+      if (matches('quick-task', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        requestQuickTask();
         return;
       }
       if (matches('shell', e)) {

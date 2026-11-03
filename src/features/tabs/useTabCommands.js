@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { requestJobsPane } from '../agent-jobs/jobsPane';
 import { requestAutopilotToggle, requestPlanChunkCommand, requestPlansPane } from '../plans/plansPaneEvents';
+import { requestQuickTask, requestTasksPane } from '../tasks/tasksPaneEvents';
 import { useWatcher } from '../watcher';
 import { useTabActions } from './TabContext';
 import { requestAttentionJump } from './useAgentAttention';
@@ -128,6 +129,8 @@ export function useTabCommands({
         if (arg && arg !== 'next' && arg !== 'implement') throw new Error(`no plan action "${arg}"`);
         requestPlanChunkCommand(arg || 'next');
       } },
+      { id: 'tasks', hint: 'tasks: the project backlog and the global tasks', run: () => requestTasksPane('toggle') },
+      { id: 'task', hint: 'add a task (type it after the command to prefill)', run: (arg) => requestQuickTask(arg) },
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },
       { id: 'workspace', hint: 'workspaces', run: () => setWorkspaceDialogOpen(true) },

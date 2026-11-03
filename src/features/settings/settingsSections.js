@@ -50,6 +50,16 @@ export const SETTINGS_ROWS = [
     hint: 'Off: tabs show a one-line context status and you type prompts in the terminal; Claude Code gets the selected context through Lirah\'s hook.',
     words: 'prompt box textarea context status composer terminal type',
   },
+  {
+    id: 'plan-contexts', section: 'agent', kind: 'custom', label: 'Plan contexts',
+    words: 'plan contexts tasks backlog skill grill instructions prompt planning',
+  },
+  {
+    id: 'auto-chunk', section: 'agent', kind: 'toggle', key: 'autoChunkTaskPlans',
+    label: 'Split task plans into chunks',
+    hint: 'When an agent finishes writing the plan for a task, import it in the plans pane and split it into chunks. Off: the plan stays a file in the repo. Also picked in the plan button\'s menu. Git repos only.',
+    words: 'auto chunk split import task plans automatic',
+  },
   { id: 'theme', section: 'appearance', kind: 'custom', label: 'Theme', words: 'theme colors dark light palette' },
   {
     id: 'title-bar', section: 'appearance', kind: 'toggle', key: 'showTitleBar',

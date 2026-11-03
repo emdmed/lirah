@@ -54,6 +54,9 @@ export const SETTINGS_DEFAULTS = {
   startupProjects: [],
   // The agent in a tab may drive Lirah through the `lirah` CLI.
   agentControl: true,
+  // The plan menu's choice: a task's plan is imported and split into chunks
+  // once the agent has written it (git repos only), or left as a file.
+  autoChunkTaskPlans: true,
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',

@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { Suspense, useCallback, useState, useSyncExternalStore } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -21,6 +21,10 @@ import { AppearanceSection } from './AppearanceSection';
 import { StartupRow } from './StartupRow';
 import { useSettingsNav } from './useSettingsNav';
 import { Fig10Sandbox } from './Fig10Sandbox';
+import { lazyNamed } from '../../lib/lazyNamed';
+import { usePlanContexts } from '../tasks/planContexts';
+
+const PlanContextsDialog = lazyNamed(() => import('../tasks/PlanContextsDialog'), 'PlanContextsDialog');
 
 const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
 
@@ -71,6 +75,7 @@ export function SettingsDialog({
   const [compactionHook, setCompactionHook] = useSetting('compactionHook');
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
   const [agentControl, setAgentControl] = useSetting('agentControl');
+  const [autoChunkTaskPlans, setAutoChunkTaskPlans] = useSetting('autoChunkTaskPlans');
 
   const {
     showTitleBar, setShowTitleBar,
@@ -224,6 +229,10 @@ export function SettingsDialog({
                     <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
                     <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
                   </Group>
+                  <Group label="Tasks" sectionId="agent" rows={['plan-contexts', 'auto-chunk']}>
+                    <PlanContextsRow />
+                    <ToggleRow row={ROW['auto-chunk']} value={autoChunkTaskPlans} onChange={setAutoChunkTaskPlans} />
+                  </Group>
                   <Group label="Integration" sectionId="agent" rows={['agent-state-hook', 'compaction-hook', 'agent-control']}>
                     <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
                     <ToggleRow row={ROW['compaction-hook']} value={compactionHook} onChange={setCompactionHook} />
@@ -337,5 +346,27 @@ export function SettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// The contexts sent with a task to plan it; edited in their own dialog.
+function PlanContextsRow() {
+  const { contexts, defaultId } = usePlanContexts();
+  const [open, setOpen] = useState(false);
+  const def = contexts.find((c) => c.id === defaultId);
+  return (
+    <Row
+      id="plan-contexts"
+      sectionId="agent"
+      label={ROW['plan-contexts'].label}
+      hint={<>Sent ahead of a task when you plan it from the tasks pane. Default: <span className="text-foreground">{def?.name}</span>.</>}
+      control={<PanelButton onClick={() => setOpen(true)} className="text-xs">edit {contexts.length}</PanelButton>}
+    >
+      {open && (
+        <Suspense fallback={null}>
+          <PlanContextsDialog open onOpenChange={setOpen} />
+        </Suspense>
+      )}
+    </Row>
   );
 }

@@ -27,6 +27,9 @@ import { PlansPane } from '../plans/PlansPane';
 import { usePlans } from '../plans/PlansContext';
 import { useRepoRoot } from '../plans/planRepoRoot';
 import { CHUNK_STATUS } from '../plans/planModel';
+import { TasksPane } from '../tasks/TasksPane';
+import { useOpenTaskCount } from '../tasks/TasksContext';
+import { useProjectScope } from '../tasks/useProjectScope';
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -105,6 +108,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
+  const openTasks = useOpenTaskCount(useProjectScope(projectPath).scope);
   const { tabs: openTabs } = useTabManager();
   const toast = useToast();
   const confirm = useConfirm();
@@ -500,6 +504,18 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             <span className="text-[11px] font-bold tabular-nums">{openTabs.length}</span>
             <span className="ins-legend text-[9px] leading-none">tabs</span>
           </button>
+          <button
+            onClick={() => {
+              setCollapsedOverride(false);
+              setTab('tasks');
+            }}
+            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Show tasks (Alt+Q adds one)"
+            aria-label={`Show tasks (${openTasks} open)`}
+          >
+            <span className="text-[11px] font-bold tabular-nums">{openTasks}</span>
+            <span className="ins-legend text-[9px] leading-none">tasks</span>
+          </button>
           {onNewTab && (
             <button
               onClick={onNewTab}
@@ -592,6 +608,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
+        <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
@@ -640,6 +657,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <SubagentList />
         ) : tab === 'plans' ? (
           <PlansPane projectPath={projectPath} />
+        ) : tab === 'tasks' ? (
+          <TasksPane projectPath={projectPath} />
         ) : (
           <>
             {visibleJobs.length === 0 ? (

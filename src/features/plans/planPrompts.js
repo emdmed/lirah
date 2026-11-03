@@ -240,3 +240,19 @@ export function buildPlanFixPrompt(plan, notes) {
     `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}"`,
   ].filter(Boolean).join('\n\n');
 }
+
+/**
+ * A backlog task → a prompt asking the agent to plan it. `context` is the
+ * user's plan context (which skill or approach to use); the plan is saved at
+ * `planPath`, where the plans pane finds it and offers to import it.
+ */
+export function buildTaskPlanPrompt({ task, context, planPath, autoChunk = false }) {
+  return [
+    context?.trim(),
+    `## Task\n\n${task.title.trim()}${task.notes?.trim() ? `\n\n${task.notes.trim()}` : ''}`,
+    `Save the finished plan as markdown at ${planPath}, starting with a \`# Title\` line.`,
+    autoChunk && 'Write that file only once the plan is final: it is picked up as soon as you end your turn and split into implementation chunks.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}

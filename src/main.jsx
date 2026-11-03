@@ -10,6 +10,7 @@ import { PinnedFilesProvider } from "./features/pinned-files";
 import { AgentJobsProvider } from "./features/agent-jobs/AgentJobsContext";
 import { TabProvider } from "./features/tabs";
 import { PlansProvider } from "./features/plans/PlansContext";
+import { TasksProvider } from "./features/tasks/TasksContext";
 import { ToastProvider } from "./features/toast";
 import { TitleTooltips } from "./components/TitleTooltips";
 import { DialogProvider } from "./features/dialogs/DialogProvider";
@@ -42,7 +43,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                   <AgentJobsProvider>
                     <TabProvider>
                       <PlansProvider>
-                        <App />
+                        <TasksProvider>
+                          <App />
+                        </TasksProvider>
                       </PlansProvider>
                     </TabProvider>
                   </AgentJobsProvider>

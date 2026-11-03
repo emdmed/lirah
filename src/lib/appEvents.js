@@ -10,6 +10,8 @@ export const APP_EVENTS = {
   plansAutopilotToggle: 'lirah:plans-autopilot-toggle',
   // Act on the open plan's next chunk: 'next' opens it, 'implement' sends it.
   plansChunkCommand: 'lirah:plans-chunk-command',
+  // Open the tasks pane with the quick-add field focused.
+  tasksQuickAdd: 'lirah:tasks-quick-add',
   // Jump to the next tab whose agent is waiting on you.
   attentionJump: 'lirah:attention-jump',
 };
