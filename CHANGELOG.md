@@ -4,6 +4,15 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-03
+
+### Added
+
+- **Tasks** - A `tasks` tab in the workspace pane keeps a backlog: one list per project and a list of global tasks shared by all projects, saved in `~/.lirah/tasks`. Alt+Q (or `:task <text>`) adds one from anywhere. Tasks have notes, reorder by dragging, and can be marked done or moved between the project and the global list. The `plan` button sends a task to the active tab's agent with a plan context in front, and asks for the plan as `<title>_plan.md` at the repo root. The task then reads `planning`, `planned` once the file is written, and links to the plan once it is imported in the plans pane.
+- **Task plans split into chunks** - A task you send to plan goes straight on to the plans pane: once the agent has written the plan file and finished its turn, the plan is imported and split into chunks, with a toast to open it. The plan itself is still written with your plan context. On by default; the plan button's menu switches between *Split into chunks* and *Keep the plan file* (git repos only), and a kept file imports with `import & chunk` on the row. Sending asks first when the active tab has no agent or it is busy, so a task is never typed into a bare shell.
+- **Plan contexts** - Named instructions sent ahead of a task when you plan it, such as "Create the plan with the grill-me skill". One is the default; the arrow beside `plan` picks another. Edit them from the tasks pane or Settings → Agent → Tasks.
+- **`lirah update`** - Run `lirah update` to install the latest release, for user and system installs alike. It skips the install when the latest release is already installed.
+
 ## [0.6.0] - 2026-11-02
 
 ### Changed
