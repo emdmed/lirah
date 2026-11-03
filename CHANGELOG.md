@@ -4,6 +4,23 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-03
+
+### Added
+
+- **Choose where the first tab opens** - When Lirah starts with no tabs to restore and no folder given on the command line, it opens no tab and asks where the first one works: pick any folder, your home folder, or a starred project. It used to open a tab in your home folder and offer the project picker on top.
+- **Change an unstarted plan's git setup** - The git section of a plan no chunk has started has a `change` button. It removes the worktrees, keeps the branches and unlocks the setup, so the next send prepares it again.
+- **Auto-pilot opens its own tab** - Auto-pilot and resume open a new tab in the plan's worktrees, launch Claude there and wait for it to report in, instead of asking you to do it.
+
+### Changed
+
+- **Auto commit recovers from failures** - If the message can't be written, the dialog opens with an empty message to write by hand. If git rejects the commit (a hook, a signing failure), the message and staged files are kept and the button reads `Retry commit`. Enter before the message is ready commits as soon as it is. The done line shows the commit's short hash, and a clean working tree reads as a quiet "nothing to commit" instead of a failure.
+- **Window controls in the header** - The separate title bar is gone. Minimize, maximize and close sit in the header (at the left on macOS), and the header drags the window while they are shown. The setting is now Settings → Appearance → Window controls. The window also remembers its size, position and maximized state between launches.
+
+### Fixed
+
+- **Windows** - Spawned processes no longer flash a console window. Login shell scripts and the agent launch use PowerShell syntax, and plugin paths are quoted correctly for PowerShell.
+
 ## [0.7.0] - 2026-11-03
 
 ### Added
