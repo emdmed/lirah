@@ -18,7 +18,7 @@ import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
 import { WindowControls } from './WindowControls';
-import { IS_MAC } from '../utils/pathUtils';
+import { IS_MAC, IS_WINDOWS } from '../utils/pathUtils';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
 import { useTabManager } from '../features/tabs/TabContext';
@@ -59,15 +59,16 @@ function ChangelogStatus({ status }) {
 // Hover shows FIG.10 while the sandbox is on and running; the one-word state
 // is its fallback.
 function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolation }) {
-  const tooltip = enabled && failed ? 'Sandbox: FAILED' : enabled ? 'Sandbox: ON' : 'Sandbox: OFF';
+  const tooltip = IS_WINDOWS ? 'Sandbox: not available on Windows'
+    : enabled && failed ? 'Sandbox: FAILED' : enabled ? 'Sandbox: ON' : 'Sandbox: OFF';
   const compact = useFigureCompact();
-  const drawn = enabled && !failed;
+  const drawn = enabled && !failed && !IS_WINDOWS;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 px-1">
           <span className="ins-legend">Sandbox</span>
-          <ToggleSwitch checked={enabled} onChange={onToggle} label="Sandbox" tone="ok" />
+          <ToggleSwitch checked={enabled} onChange={onToggle} disabled={IS_WINDOWS} label="Sandbox" tone="ok" />
           {enabled && failed && <Lamp state="fault" label="Sandbox failed" />}
         </span>
       </TooltipTrigger>
@@ -105,13 +106,14 @@ function CompactionSwitch({ enabled, onToggle }) {
 }
 
 function NetworkSwitch({ isolated, enabled, onToggle }) {
-  const tooltip = isolated && enabled ? 'Network: ISOLATED' : 'Network: ALLOWED';
+  const tooltip = IS_WINDOWS ? 'Network isolation: not available on Windows'
+    : isolated && enabled ? 'Network: ISOLATED' : 'Network: ALLOWED';
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 px-1">
           <span className="ins-legend">Net</span>
-          <ToggleSwitch checked={isolated} onChange={onToggle} disabled={!enabled} label="Network isolation" tone="warn" />
+          <ToggleSwitch checked={isolated} onChange={onToggle} disabled={IS_WINDOWS || !enabled} label="Network isolation" tone="warn" />
         </span>
       </TooltipTrigger>
       <TooltipContent>{tooltip}</TooltipContent>

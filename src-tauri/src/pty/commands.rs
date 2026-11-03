@@ -179,6 +179,7 @@ pub async fn spawn_terminal(
     // agent hooks running inside can say which terminal they belong to.
     let session_id = Uuid::new_v4().to_string();
     let env = crate::agent_hooks::session_env(&session_id);
+    let sandbox = sandbox && !cfg!(windows);
     let (session, reader) = crate::ipc::blocking("spawn_terminal", move || {
         manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir, env)
     })

@@ -167,12 +167,11 @@ pub fn session_env(session_id: &str) -> Vec<(String, String)> {
         env.push((CONTROL_ENV.to_string(), sock.to_string_lossy().into_owned()));
     }
     if let Some(bin) = cli_bin_dir() {
-        let bin = bin.to_string_lossy().into_owned();
-        let path = match std::env::var("PATH") {
-            Ok(p) if !p.is_empty() => format!("{bin}:{p}"),
-            _ => bin,
-        };
-        env.push(("PATH".to_string(), path));
+        let rest = std::env::var_os("PATH").unwrap_or_default();
+        let dirs = std::iter::once(bin.clone())
+            .chain(std::env::split_paths(&rest).filter(|p| !p.as_os_str().is_empty()));
+        let path = std::env::join_paths(dirs).unwrap_or_else(|_| bin.into_os_string());
+        env.push(("PATH".to_string(), path.to_string_lossy().into_owned()));
     }
     env
 }
@@ -479,6 +478,17 @@ mod tests {
         let log = fs::read_to_string(dir.join("s1.jsonl")).unwrap();
         assert_eq!(log, "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\"}\n");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn path_starts_with_bin_then_original_entries() {
+        let env = session_env("s1");
+        let Some((_, path)) = env.iter().find(|(k, _)| k == "PATH") else { return };
+        let got: Vec<_> = std::env::split_paths(path).collect();
+        assert_eq!(got[0], cli_bin_dir().unwrap());
+        let original = std::env::var_os("PATH").unwrap_or_default();
+        let rest: Vec<_> = std::env::split_paths(&original).filter(|p| !p.as_os_str().is_empty()).collect();
+        assert_eq!(got[1..], rest[..]);
     }
 
     #[test]

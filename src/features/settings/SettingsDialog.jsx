@@ -16,6 +16,7 @@ import {
 import { TAB_CLIS } from '../../lib/agentClis';
 import { shortcutForCommand } from '../../lib/shortcuts';
 import { FilterContext, SECTIONS, SETTINGS_ROW as ROW } from './settingsSections';
+import { IS_WINDOWS } from '../../utils/pathUtils';
 import { Choice, ChoiceRow, DraftField, Group, Row, Section, StepRow, SubRows, ToggleRow } from './parts';
 import { AppearanceSection } from './AppearanceSection';
 import { StartupRow } from './StartupRow';
@@ -312,7 +313,13 @@ export function SettingsDialog({
                 </Section>
 
                 <Section section={section('sandbox')} active={activeId === 'sandbox'}>
-                  <ToggleRow row={ROW.sandbox} value={sandboxEnabled} onChange={toggleSandbox}>
+                  <ToggleRow
+                    row={ROW.sandbox}
+                    value={sandboxEnabled}
+                    onChange={toggleSandbox}
+                    disabled={IS_WINDOWS}
+                    hint={IS_WINDOWS ? 'Not available on Windows' : undefined}
+                  >
                     {sandboxEnabled && sandboxFailed && (
                       <div className="mb-2 flex items-center gap-2 text-[11px] text-[var(--ins-fault)]">
                         <Lamp state="fault" /> The sandbox failed to start in this tab.
@@ -321,7 +328,7 @@ export function SettingsDialog({
                     {/* Figures: full draws FIG.10 from the live spec while the
                         sandbox is on; the list is its fallback and what shows
                         while it is off. */}
-                    {sandboxEnabled ? (
+                    {sandboxEnabled && !IS_WINDOWS ? (
                       <Fig10Sandbox
                         projectPath={projectPath}
                         networkIsolation={networkIsolation}
@@ -333,11 +340,12 @@ export function SettingsDialog({
                     row={ROW.network}
                     value={networkIsolation}
                     onChange={toggleNetwork}
-                    disabled={!sandboxEnabled}
+                    disabled={IS_WINDOWS || !sandboxEnabled}
                     tone="warn"
-                    hint={sandboxEnabled
-                      ? 'Cut the sandboxed terminal off from the network. Restarts the terminal.'
-                      : 'Needs the sandbox on.'}
+                    hint={IS_WINDOWS ? 'Not available on Windows'
+                      : sandboxEnabled
+                        ? 'Cut the sandboxed terminal off from the network. Restarts the terminal.'
+                        : 'Needs the sandbox on.'}
                   />
                 </Section>
               </div>
