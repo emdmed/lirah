@@ -5,7 +5,6 @@ import { matches } from "./lib/shortcuts";
 import { useTabManager } from "./features/tabs";
 import { ProjectTab } from "./features/tabs/ProjectTab";
 import { TabBar } from "./features/tabs/TabBar";
-import { SplashScreen } from "./features/splash";
 import { SubagentProvider } from "./contexts/SubagentContext";
 import { RightSidebar } from "./features/agent-jobs/RightSidebar";
 import { usePaneShortcuts } from "./hooks/usePaneShortcuts";
@@ -16,7 +15,7 @@ import { DevProfiler } from "./components/DevProfiler";
 import { reapOrphanedTerminals } from "./lib/terminalSessions";
 import { startAgentHookListener } from "./features/tabs/agentHookState";
 import { useAgentAttention } from "./features/tabs/useAgentAttention";
-import { markFirstRun } from "./features/tabs/firstRun";
+import { FirstTabChooser } from "./features/tabs/FirstTabChooser";
 import { GlobalDialogOutlet } from "./features/dialogs/GlobalDialogOutlet";
 import { useDialog } from "./features/dialogs/DialogProvider";
 import { MAX_TABS } from "./features/tabs/TabContext";
@@ -75,55 +74,33 @@ function App() {
     });
   }, [availableUpdate, toast]);
 
-  // CLI initial path (e.g. `nevo /path/to/project`)
-  const [initialProjectDir, setInitialProjectDir] = useState(undefined); // undefined = not yet checked
-
-  // Splash screen state
-  const [splashVisible, setSplashVisible] = useState(false);
-  const [splashStep, setSplashStep] = useState('navigate');
-  const [splashProjectName, setSplashProjectName] = useState('');
-
   // Fetch CLI initial path on mount and create first tab. In 'projects'
   // startup mode this waits until TabProvider has opened the startup projects;
   // the CLI path then opens on top of them.
   const initialTabsDone = useRef(false);
+  const [showFirstTabChooser, setShowFirstTabChooser] = useState(false);
   useEffect(() => {
     if (startupPending || initialTabsDone.current) return;
     initialTabsDone.current = true;
     if (tabs.length > 0 && !openedStartup) {
       // Tabs restored from localStorage — nothing to do
-      setInitialProjectDir(tabs[0].projectPath);
       return;
     }
     invoke('get_initial_path').then(async (path) => {
       // A CLI path that is already a startup project focuses that tab.
       const open = path && openedStartup && tabs.find((t) => t.projectPath === path.replace(/\/+$/, ''));
       if (open) {
-        setInitialProjectDir(path);
         switchTab(open.id);
       } else if (path) {
-        setInitialProjectDir(path);
         addTab(path);
-      } else if (openedStartup && tabs.length > 0) {
-        setInitialProjectDir(tabs[0].projectPath);
-      } else {
-        // No CLI path — use home dir as fallback, and let the tab offer the
-        // project picker once its terminal is up.
-        markFirstRun();
-        try {
-          const home = await invoke('get_home_dir');
-          const fallback = home || '/';
-          setInitialProjectDir(fallback);
-          addTab(fallback);
-        } catch {
-          setInitialProjectDir('/');
-          addTab('/');
-        }
+      } else if (!(openedStartup && tabs.length > 0)) {
+        // No CLI path and nothing to restore: open no tab and let the user
+        // choose where the first one works.
+        setShowFirstTabChooser(true);
       }
     }).catch(() => {
       if (openedStartup && tabs.length > 0) return;
-      setInitialProjectDir('/');
-      addTab('/');
+      setShowFirstTabChooser(true);
     });
   }, [startupPending]);
 
@@ -190,18 +167,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [tabs, activeTabId, switchTab, requestCloseTab, handleNewTab, jumpToNext]);
 
-  // Handle project selection from initial dialog (with splash screen)
-  const handleSelectProjectForNewTab = useCallback((bookmark) => {
-    setSplashProjectName(bookmark.name);
-    setSplashStep('navigate');
-    setSplashVisible(true);
-    addTab(bookmark.path);
-    // Splash auto-closes after delay
-    setTimeout(() => {
-      setSplashStep('done');
-    }, 2000);
-  }, [addTab]);
-
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
@@ -221,6 +186,9 @@ function App() {
                 />
               </DevProfiler>
             ))}
+            {showFirstTabChooser && tabs.length === 0 && (
+              <FirstTabChooser onOpenProject={(path) => addTab(path)} />
+            )}
           </div>
           <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
         </div>
@@ -229,13 +197,6 @@ function App() {
         <ToastContainer />
 
         <GlobalDialogOutlet currentPath={activeProjectPath} onOpenProject={addTab} />
-
-        <SplashScreen
-          visible={splashVisible}
-          projectName={splashProjectName}
-          currentStep={splashStep}
-          onComplete={() => setSplashVisible(false)}
-        />
       </div>
     </SubagentProvider>
   );

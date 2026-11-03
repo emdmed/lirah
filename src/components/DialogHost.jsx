@@ -1,9 +1,7 @@
 import { Suspense, useContext } from "react";
 import { lazyNamed } from "../lib/lazyNamed";
 import { BookmarksPalette } from "../features/bookmarks/BookmarksPalette";
-import { InitialProjectDialog } from "./InitialProjectDialog";
 import { BudgetAlerts } from "../features/token-budget/useBudgetAlerts";
-import { LirahLockup } from "./LirahMark";
 import { TAB_DIALOGS } from "../features/dialogs/registry";
 import { useDialogStore, useOpenDialogs } from "../features/dialogs/DialogProvider";
 import { DialogScopeContext } from "../features/dialogs/dialogStore";
@@ -47,22 +45,6 @@ export function DialogHost(ctx) {
         onOpenChange={dialogs.setBookmarksPaletteOpen}
         onNavigate={ctx.navigateToBookmark}
       />
-      {dialogs.initialProjectDialogOpen && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center"
-          style={{ backgroundColor: 'var(--color-background, #0a0a0a)' }}
-        >
-          <LirahLockup stacked size={60} />
-        </div>
-      )}
-      <InitialProjectDialog
-        open={dialogs.initialProjectDialogOpen}
-        onOpenChange={dialogs.setInitialProjectDialogOpen}
-        onSelectProject={ctx.handleSelectProject}
-        workspaces={ctx.workspaceHook.workspaces}
-        onOpenWorkspace={ctx.handleOpenWorkspace}
-      />
-
       <WhenOpen open={elementPicker.elementPickerOpen}>
         <ElementPickerDialog
           open={elementPicker.elementPickerOpen}

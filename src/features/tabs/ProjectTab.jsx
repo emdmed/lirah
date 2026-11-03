@@ -1,9 +1,8 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo, startTransition } from "react";
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
-import { TAB_CLI_PROCESSES, tabCliProcess } from "../../lib/agentClis";
+import { TAB_CLI_PROCESSES } from "../../lib/agentClis";
 import { useToast } from "../toast/ToastContext";
-import { consumeFirstRun } from "./firstRun";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
@@ -315,13 +314,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   const patterns = usePatterns(currentPath);
 
   // Refs for current values in async callbacks
-  const foldersRef = useRef(folders);
   const currentPathRef = useRef(currentPath);
-  const terminalReadyRef = useRef(terminalReady);
 
-  useEffect(() => { foldersRef.current = folders; }, [folders]);
   useEffect(() => { currentPathRef.current = currentPath; }, [currentPath]);
-  useEffect(() => { terminalReadyRef.current = terminalReady; }, [terminalReady]);
 
   const typeChecker = useTypeChecker(currentPath, { setTextareaVisible, setTextareaContent });
   const sidebar = useSidebar({ resetTypeChecker: typeChecker.resetTypeChecker });
@@ -496,11 +491,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
 
   const orchestrationCheck = useOrchestrationCheck();
 
-  const switchToClaudeMode = useCallback(() => {
-    setViewMode('tree');
-    sidebar.setSidebarOpen(true);
-  }, [sidebar.setSidebarOpen]);
-
   // Delete orchestration folder
   const handleDeleteOrchestration = useCallback(async () => {
     if (!currentPath) return;
@@ -548,51 +538,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       toast.error(`Couldn't open ${bookmark.name || bookmark.path}: ${error?.message || error}`);
     }
   }, [terminalSessionId, viewMode, loadFolders, treeView.loadTreeData, updateBookmarkStable, terminateCliProcess, settings.autoLaunchCli, launchClaude, toast.error]);
-
-  // Handle project selection from initial dialog (with splash screen) — kept for bookmark navigation
-  const handleSelectProject = useCallback(async (bookmark) => {
-    // This path runs its own launch-and-wait sequence below.
-    await navigateToBookmark(bookmark, { autoLaunch: false });
-    await new Promise(resolve => {
-      const checkNavigation = setInterval(() => {
-        if (foldersRef.current.length > 0 && currentPathRef.current) {
-          clearInterval(checkNavigation);
-          resolve();
-        }
-      }, 50);
-      setTimeout(() => { clearInterval(checkNavigation); resolve(); }, 5000);
-    });
-    switchToClaudeMode();
-    await new Promise(resolve => {
-      const checkReady = setInterval(() => {
-        if (terminalReadyRef.current) {
-          clearInterval(checkReady);
-          resolve();
-        }
-      }, 50);
-      setTimeout(() => { clearInterval(checkReady); resolve(); }, 3000);
-    });
-    await launchClaude();
-    await new Promise(resolve => {
-      const cliName = tabCliProcess(settings.selectedCli);
-      // setTimeout chain, not setInterval: the next check is only scheduled
-      // once the previous one has answered, so checks never pile up.
-      const deadline = Date.now() + 15000;
-      const checkCli = async () => {
-        try {
-          const running = await invoke('check_pty_child_process', {
-            sessionId: terminalSessionId,
-            processName: cliName,
-          });
-          if (running) { resolve(); return; }
-        } catch { /* ignore */ }
-        if (Date.now() >= deadline) resolve();
-        else setTimeout(checkCli, 300);
-      };
-      setTimeout(checkCli, 300);
-    });
-    await new Promise(resolve => setTimeout(resolve, 1500));
-  }, [navigateToBookmark, switchToClaudeMode, launchClaude, terminalSessionId, settings.selectedCli]);
 
   // Git changes handler
   const handleGitChanges = useCallback((changes) => {
@@ -900,16 +845,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       cancelAnimationFrame(raf2);
     };
   }, [isActive, terminalReady]);
-
-  // First run (no saved tabs): offer the starred projects and workspaces once
-  // the shell is up. With none saved the picker has nothing to offer, so skip.
-  useEffect(() => {
-    if (!isActive || !terminalReady || !terminalSessionId || !workspaceHook.workspacesLoaded) return;
-    if (!consumeFirstRun()) return;
-    if (bookmarks.length > 0 || workspaceHook.workspaces.length > 0) {
-      dialogs.setInitialProjectDialogOpen(true);
-    }
-  }, [isActive, terminalReady, terminalSessionId, workspaceHook.workspacesLoaded]);
 
   // Auto-commit and lazygit ask which project first when a workspace holds
   // several. Refs keep these callbacks stable across stage/workspace changes.
@@ -1354,7 +1289,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
         secondary={secondary}
         orchestrationCheck={orchestrationCheck}
         navigateToBookmark={navigateToBookmark}
-        handleSelectProject={handleSelectProject}
         handleCreateWorkspace={handleCreateWorkspace}
         handleOpenWorkspace={handleOpenWorkspace}
         markdownFiles={markdownFiles}

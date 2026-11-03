@@ -8,7 +8,6 @@ import { useDialogStore, useOpenDialogs } from "../features/dialogs/DialogProvid
 const FLAGS = {
   addBookmarkDialogOpen: "addBookmark",
   bookmarksPaletteOpen: "bookmarks",
-  initialProjectDialogOpen: "initialProject",
   manageTemplatesDialogOpen: "templates",
   saveFileGroupDialogOpen: "saveFileGroup",
   diffDialogOpen: "gitDiff",
