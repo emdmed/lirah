@@ -63,8 +63,8 @@ export const SETTINGS_ROWS = [
   { id: 'theme', section: 'appearance', kind: 'custom', label: 'Theme', words: 'theme colors dark light palette' },
   {
     id: 'title-bar', section: 'appearance', kind: 'toggle', key: 'showTitleBar',
-    label: 'Title bar', hint: 'Window title bar above the panes.',
-    words: 'title bar window chrome',
+    label: 'Window controls', hint: 'Minimize, maximize and close buttons in the header.',
+    words: 'window controls title bar header minimize maximize close chrome',
   },
   {
     id: 'figures', section: 'appearance', kind: 'choice', key: 'figures',

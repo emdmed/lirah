@@ -73,7 +73,23 @@ pub fn run(initial_path: Option<String>) {
 
     ipc::init();
 
+    // Recordings run on a bare X display with no window manager to size the
+    // window, so they ask for an exact size: LIRAH_WINDOW_SIZE=1280x800.
+    let forced_size = env_nonempty("LIRAH_WINDOW_SIZE").and_then(|s| parse_window_size(&s));
+    // Registered before the window is built (in `setup`) so it restores the
+    // saved state. VISIBLE is left out: the page shows the window once painted.
+    // A forced size wins over the saved state, so the window is skipped then.
+    let mut window_state = tauri_plugin_window_state::Builder::default().with_state_flags(
+        tauri_plugin_window_state::StateFlags::SIZE
+            | tauri_plugin_window_state::StateFlags::POSITION
+            | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+    );
+    if forced_size.is_some() {
+        window_state = window_state.with_denylist(&["main"]);
+    }
+
     tauri::Builder::default()
+        .plugin(window_state.build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(create_state())
@@ -82,7 +98,7 @@ pub fn run(initial_path: Option<String>) {
         .manage(std::sync::Arc::new(SubagentWatcherStore::new()))
         .manage(agent_runner::create_agent_job_store())
         .manage(InitialPath(initial_path))
-        .setup(|app| {
+        .setup(move |app| {
             // The main window is built here rather than from the config so a
             // recording can give it its own profile folder.
             let config = app.config().app.windows.iter()
@@ -93,12 +109,7 @@ pub fn run(initial_path: Option<String>) {
             if let Some(dir) = recording_profile() {
                 window = window.data_directory(dir);
             }
-            // Recordings run on a bare X display with no window manager to size
-            // the window, so they ask for an exact size: LIRAH_WINDOW_SIZE=1280x800.
-            if let Some((w, h)) = env_nonempty("LIRAH_WINDOW_SIZE").and_then(|s| {
-                let (w, h) = s.split_once('x')?;
-                Some((w.parse::<f64>().ok()?, h.parse::<f64>().ok()?))
-            }) {
+            if let Some((w, h)) = forced_size {
                 window = window.inner_size(w, h);
             }
             window.build()?;
@@ -213,4 +224,27 @@ pub fn run(initial_path: Option<String>) {
                 agent_control::stop();
             }
         });
+}
+
+/// "1280x800" -> (1280.0, 800.0); None if it is not two numbers around an `x`.
+fn parse_window_size(s: &str) -> Option<(f64, f64)> {
+    let (w, h) = s.split_once('x')?;
+    Some((w.parse().ok()?, h.parse().ok()?))
+}
+
+#[cfg(test)]
+mod window_size_tests {
+    use super::parse_window_size;
+
+    #[test]
+    fn parses_width_by_height() {
+        assert_eq!(parse_window_size("1280x800"), Some((1280.0, 800.0)));
+    }
+
+    #[test]
+    fn rejects_malformed_sizes() {
+        for bad in ["", "1280", "1280x", "x800", "axb", "1280X800"] {
+            assert_eq!(parse_window_size(bad), None, "{bad}");
+        }
+    }
 }

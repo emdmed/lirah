@@ -1,4 +1,5 @@
 export const IS_WINDOWS = navigator.platform.startsWith('Win');
+export const IS_MAC = navigator.platform.startsWith('Mac');
 
 export function normalizePath(p) {
   return p ? p.replace(/\\/g, '/').replace(/\/+$/, '') : p;
