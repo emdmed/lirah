@@ -4,6 +4,20 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-04
+
+### Added
+
+- **Format a task as a user story** - A task can be rewritten by a model (Claude Haiku, no tools) into a user story with acceptance criteria. Edits you make while it runs win. Settings → Agent → Tasks has a field for your own formatting prompt; empty uses the user story. Task rows show their notes as markdown, and opening a task edits the whole text in one field.
+
+### Changed
+
+- **Sharper small text** - Legends, keycaps, menu labels and task and plan rows no longer drop below 11px, so the pixel legend face stays crisp. Text no longer uses faked bold, and the terminal uses the same font fallbacks as the rest of the app.
+
+### Fixed
+
+- **Windows** - Agent jobs and their processes stop together and report CPU, workspace projects link with a junction fallback, the terminal PATH is joined per platform, and the sandbox and its palette commands are off on Windows.
+
 ## [0.9.0] - 2026-11-04
 
 ### Added
