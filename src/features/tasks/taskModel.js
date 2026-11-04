@@ -71,3 +71,39 @@ export function reorderSubset(list, ids, from, to) {
   let next = 0;
   return list.map((t) => (shown.has(t.id) ? byId.get(order[next++]) : t));
 }
+
+/** One textarea's text → { title, notes }: the first line (a leading `#` dropped) is the title. */
+export function splitTaskText(text) {
+  const [first = '', ...rest] = String(text || '').trim().split('\n');
+  return { title: first.replace(/^#+\s*/, '').trim(), notes: rest.join('\n').trim() };
+}
+
+/** What the editor shows: the title, then the notes. */
+export const taskText = (task) => (task.notes ? `${task.title}\n\n${task.notes}` : task.title);
+
+/** What the formatter is told when the setting is empty: a user story. */
+export const DEFAULT_FORMAT_INSTRUCTIONS = [
+  'Rewrite this task as a user story:',
+  '- `As a <who>, I want <what>, so that <why>.`',
+  '- then `## Acceptance criteria` as a `- [ ]` checklist',
+  'Keep every detail, name, number and link from the task. Invent nothing; if the who or why is unclear, use the most plausible reading.',
+].join('\n');
+
+// `instructions` is the user's formatting prompt (empty: the user story). The
+// title line is always asked for: the row and parseFormatted depend on it.
+export function buildFormatPrompt(text, instructions) {
+  return [
+    instructions?.trim() || DEFAULT_FORMAT_INSTRUCTIONS,
+    'Output only markdown, nothing before or after it. The first line must be `# ` and a short title (under 60 characters).',
+    `Task:\n\n${text}`,
+  ].join('\n\n');
+}
+
+/** The model's reply → { title, notes }, or null when it holds no `# ` heading. */
+export function parseFormatted(stdout) {
+  const lines = String(stdout || '').replace(/```(markdown|md)?/g, '').split('\n');
+  const start = lines.findIndex((l) => /^#\s+\S/.test(l));
+  if (start < 0) return null;
+  const parsed = splitTaskText(lines.slice(start).join('\n'));
+  return parsed.title ? parsed : null;
+}

@@ -214,6 +214,7 @@ pub fn run(initial_path: Option<String>) {
             agent_runner::commands::list_running_agent_jobs,
             // Plans
             plans::split_plan,
+            plans::format_task,
             plans::delete_plan_file,
             plans::remove_plan_workdir,
             plans::last_assistant_text,

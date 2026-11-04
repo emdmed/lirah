@@ -59,6 +59,8 @@ export const SETTINGS_DEFAULTS = {
   // The plan menu's choice: a task's plan is imported and split into chunks
   // once the agent has written it (git repos only), or left as a file.
   autoChunkTaskPlans: true,
+  // How a model rewrites a saved task; empty = a user story (see tasks/taskModel.js).
+  taskFormatPrompt: '',
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',

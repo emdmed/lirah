@@ -2,7 +2,9 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { ArrowRightLeft, Check, ChevronDown, RotateCcw, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
-import { Input } from '../../components/ui/input';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Scanner } from '../../components/instrument/Scanner';
 import { Textarea } from '../../components/ui/textarea';
 import {
   DropdownMenu,
@@ -16,7 +18,10 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { basename } from '../../utils/pathUtils';
 import { usePlanContexts } from './planContexts';
-import { TASK_STATUS } from './taskModel';
+import { splitTaskText, TASK_STATUS, taskText } from './taskModel';
+import '../markdown/markdown.css';
+
+const REMARK_PLUGINS = [remarkGfm];
 
 const LAMP = {
   [TASK_STATUS.BACKLOG]: { state: 'off', label: 'backlog' },
@@ -28,15 +33,15 @@ const LAMP = {
 const ICON_BTN = 'flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-default';
 
 /**
- * One task. Click (or Enter on the cursor) opens it to edit the title and
- * notes; the plan button sends it to the active tab's agent with the default
+ * One task. Click (or Enter on the cursor) opens it: the story in full, a
+ * click away from editing. `formatting` is on while a model rewrites it; the plan button sends it to the active tab's agent with the default
  * plan context, its arrow picks another and what follows the plan:
  * `chunkMode` 'chunks' (import and split it) or 'file' (leave the file), null
  * outside a git repo, where only the file is possible. `drag` is
  * useDragReorder's result, null for rows that don't reorder (done tasks).
  */
 export const TaskRow = memo(function TaskRow({
-  task, index, open, cursor, drag, moveLabel, onToggleOpen, onEdit, onPlan, onDone, onMove, onRemove, onOpenPlan,
+  task, index, open, cursor, drag, formatting, moveLabel, onToggleOpen, onEdit, onPlan, onDone, onMove, onRemove, onOpenPlan,
   onEditContexts, chunkMode, onChunkMode,
 }) {
   const { contexts, defaultId } = usePlanContexts();
@@ -87,10 +92,10 @@ export const TaskRow = memo(function TaskRow({
             done ? 'text-muted-foreground line-through' : 'text-foreground',
             !open && 'line-clamp-2',
           )}
-          title={task.notes || undefined}
         >
           {task.title}
         </button>
+        {formatting && <span className="flex h-4 shrink-0 items-center"><Scanner size="sm" label="Formatting as a user story" /></span>}
         <span className={cn('flex shrink-0 items-center gap-0.5', !open && 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100')}>
           {!done && (
             <span className="flex items-center">
@@ -182,53 +187,63 @@ export const TaskRow = memo(function TaskRow({
       {open ? (
         <TaskEditor task={task} onEdit={onEdit} />
       ) : (
-        task.notes && <p className="line-clamp-2 whitespace-pre-wrap pl-5 text-[11px] leading-snug text-muted-foreground">{task.notes}</p>
+        task.notes && <TaskNotes notes={task.notes} className="max-h-10 overflow-hidden" />
       )}
     </div>
   );
 });
 
-// Title and notes, saved on blur.
-function TaskEditor({ task, onEdit }) {
-  const [title, setTitle] = useState(task.title);
-  const [notes, setNotes] = useState(task.notes);
-  useEffect(() => setTitle(task.title), [task.title]);
-  useEffect(() => setNotes(task.notes), [task.notes]);
+function TaskNotes({ notes, className }) {
+  return (
+    <div className={cn('markdown-body markdown-compact pl-5 text-muted-foreground', className)}>
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{notes}</ReactMarkdown>
+    </div>
+  );
+}
 
-  const saveTitle = () => {
-    const t = title.trim();
-    if (!t) setTitle(task.title);
-    else if (t !== task.title) onEdit(task, { title: t });
+// The story rendered; click it to edit the whole text in one field. Saved on
+// blur or Ctrl+Enter, Esc puts it back.
+function TaskEditor({ task, onEdit }) {
+  const [text, setText] = useState(null); // null: reading
+  const original = taskText(task);
+
+  const save = () => {
+    const next = splitTaskText(text);
+    setText(null);
+    if (next.title && text.trim() !== original) onEdit(task, next);
   };
-  const saveNotes = () => {
-    if (notes.trim() !== task.notes) onEdit(task, { notes: notes.trim() });
-  };
+
+  if (text === null) {
+    return (
+      <div className="flex flex-col gap-1">
+        {task.notes && <TaskNotes notes={task.notes} />}
+        <button
+          type="button"
+          onClick={() => setText(original)}
+          className="tui-btn ml-5 self-start text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          edit
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-1.5 pl-5" onKeyDown={(e) => e.stopPropagation()}>
-      <Input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={saveTitle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-          if (e.key === 'Escape') {
-            setTitle(task.title);
-            e.currentTarget.blur();
-          }
-        }}
-        aria-label="Task title"
-        className="h-7 text-xs"
-      />
+    <div className="flex flex-col gap-1 pl-5" onKeyDown={(e) => e.stopPropagation()}>
       <Textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        onBlur={saveNotes}
-        placeholder="Notes: context, links, acceptance criteria…"
-        aria-label="Task notes"
-        rows={4}
-        className="min-h-[72px] text-xs"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) e.currentTarget.blur();
+          if (e.key === 'Escape') setText(null);
+        }}
+        autoFocus
+        aria-label="Task"
+        rows={8}
+        className="min-h-[120px] text-xs"
       />
+      <span className="text-[11px] text-muted-foreground">first line is the title · Ctrl+↵ saves and reformats · Esc cancels</span>
     </div>
   );
 }

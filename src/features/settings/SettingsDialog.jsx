@@ -25,6 +25,7 @@ import { useSettingsNav } from './useSettingsNav';
 import { Fig10Sandbox } from './Fig10Sandbox';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { usePlanContexts } from '../tasks/planContexts';
+import { DEFAULT_FORMAT_INSTRUCTIONS } from '../tasks/taskModel';
 import { CLI_COMMANDS } from '../cli-selection/useClaudeLauncher';
 
 const PlanContextsDialog = lazyNamed(() => import('../tasks/PlanContextsDialog'), 'PlanContextsDialog');
@@ -79,6 +80,7 @@ export function SettingsDialog({
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
   const [agentControl, setAgentControl] = useSetting('agentControl');
   const [autoChunkTaskPlans, setAutoChunkTaskPlans] = useSetting('autoChunkTaskPlans');
+  const [taskFormatPrompt, setTaskFormatPrompt] = useSetting('taskFormatPrompt');
 
   const {
     showTitleBar, setShowTitleBar,
@@ -233,9 +235,18 @@ export function SettingsDialog({
                     <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
                     <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
                   </Group>
-                  <Group label="Tasks" sectionId="agent" rows={['plan-contexts', 'auto-chunk']}>
+                  <Group label="Tasks" sectionId="agent" rows={['plan-contexts', 'auto-chunk', 'task-format']}>
                     <PlanContextsRow />
                     <ToggleRow row={ROW['auto-chunk']} value={autoChunkTaskPlans} onChange={setAutoChunkTaskPlans} />
+                    <Row id="task-format" sectionId="agent" label={ROW['task-format'].label} htmlFor="settings-task-format" hint="Haiku rewrites each task you save with these instructions. Leave empty for a user story. The first line always becomes the title.">
+                      <DraftField
+                        id="settings-task-format"
+                        multiline
+                        value={taskFormatPrompt}
+                        onCommit={setTaskFormatPrompt}
+                        placeholder={DEFAULT_FORMAT_INSTRUCTIONS}
+                      />
+                    </Row>
                   </Group>
                   <Group label="Integration" sectionId="agent" rows={['agent-state-hook', 'compaction-hook', 'agent-control']}>
                     <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />

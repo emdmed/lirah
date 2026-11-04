@@ -8,8 +8,9 @@ import { useSetting } from '../settings/settingsStore';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
-import { Input } from '../../components/ui/input';
+import { invoke } from '@tauri-apps/api/core';
 import { Textarea } from '../../components/ui/textarea';
+import { useAutoGrow } from '../../hooks/useAutoGrow';
 import { useRowCursor } from '../../hooks/useRowCursor';
 import { basename } from '../../utils/pathUtils';
 import { useToast } from '../toast';
@@ -20,7 +21,7 @@ import { buildTaskPlanPrompt } from '../plans/planPrompts';
 import { requestPlanFocus } from '../plans/plansPaneEvents';
 import { planContext } from './planContexts';
 import { useTasks } from './TasksContext';
-import { GLOBAL, isOpen, planFileName, TASK_STATUS } from './taskModel';
+import { GLOBAL, isOpen, planFileName, splitTaskText, TASK_STATUS } from './taskModel';
 import { subscribeQuickTask, takeQuickTask } from './tasksPaneEvents';
 import { TaskRow } from './TaskRow';
 import { useProjectScope } from './useProjectScope';
@@ -35,7 +36,7 @@ export function TasksPane({ projectPath }) {
   const otherScope = view === 'global' ? projectScope : GLOBAL;
 
   const {
-    tasks, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan,
+    tasks, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask,
   } = useTasks(scope);
   const { tasks: otherTasks } = useTasks(otherScope);
   const { tabs, activeTabId } = useTabManager();
@@ -49,11 +50,29 @@ export function TasksPane({ projectPath }) {
   // Chunks live in the plans pane, which needs git.
   const autoChunk = isRepo && chunkSetting;
 
-  // Quick add: Enter saves; Shift+Enter adds notes first.
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [withNotes, setWithNotes] = useState(false);
+  // Quick add: Enter saves; Shift+Enter starts a new line.
+  const [text, setText] = useState('');
   const inputRef = useRef(null);
+  // Two lines to start, growing to six as you write; it scrolls after that.
+  useAutoGrow(inputRef, text, { maxLines: 6 });
+
+  // Saved text is rewritten as a user story in the background; these rows show it.
+  const [formatting, setFormatting] = useState(() => new Set());
+  const handleFormat = useCallback(async (id) => {
+    setFormatting((s) => new Set(s).add(id));
+    try {
+      const cwd = scope === GLOBAL ? await invoke('get_home_dir') : scope;
+      await formatTask(scope, id, cwd);
+    } catch (e) {
+      toast.error(`Couldn't format the task, kept as written: ${errorMessage(e)}`);
+    } finally {
+      setFormatting((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, [formatTask, scope, toast]);
 
   const focusQuickAdd = useCallback(() => {
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -65,7 +84,7 @@ export function TasksPane({ projectPath }) {
       const request = takeQuickTask();
       if (request === null) return;
       setView('project');
-      if (typeof request === 'string') setTitle(request);
+      if (typeof request === 'string') setText(request);
       focusQuickAdd();
     };
     take();
@@ -73,13 +92,11 @@ export function TasksPane({ projectPath }) {
   }, [focusQuickAdd]);
 
   const submit = async () => {
-    const t = title.trim();
-    if (!t || !scope) return;
-    await addTask(scope, { title: t, notes: withNotes ? notes : '' });
-    setTitle('');
-    setNotes('');
-    setWithNotes(false);
+    if (!text.trim() || !scope) return;
+    const id = await addTask(scope, splitTaskText(text));
+    setText('');
     focusQuickAdd();
+    if (id) handleFormat(id);
   };
 
   const openTasks = useMemo(() => (tasks || []).filter(isOpen), [tasks]);
@@ -126,7 +143,10 @@ export function TasksPane({ projectPath }) {
     }
   }, [tabs, activeTabId, projectScope, planTask, scope, toast, confirm, autoChunk]);
 
-  const handleEdit = useCallback((task, patch) => updateTask(scope, task.id, patch), [updateTask, scope]);
+  const handleEdit = useCallback((task, patch) => {
+    updateTask(scope, task.id, patch);
+    handleFormat(task.id);
+  }, [updateTask, scope, handleFormat]);
 
   const handleDone = useCallback((task) => {
     const back = task.status === TASK_STATUS.DONE;
@@ -211,6 +231,7 @@ export function TasksPane({ projectPath }) {
       drag={rowDrag}
       moveLabel={moveLabel}
       onToggleOpen={() => toggleOpen(task.id)}
+      formatting={formatting.has(task.id)}
       onEdit={handleEdit}
       onPlan={handlePlan}
       onDone={handleDone}
@@ -245,43 +266,27 @@ export function TasksPane({ projectPath }) {
           submit();
         }}
       >
-        <Input
+        <Textarea
           ref={inputRef}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              setWithNotes(true);
+              submit();
             } else if (e.key === 'Escape') {
               e.currentTarget.blur();
             }
           }}
           disabled={!scope}
+          rows={2}
           placeholder={view === 'global' ? 'Add a global task…' : `Add a task to ${projectName}…`}
           aria-label="New task"
-          className="h-7 text-xs"
+          className="min-h-12 resize-none py-1.5 text-xs leading-[18px]"
         />
-        {withNotes && (
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            autoFocus
-            rows={3}
-            placeholder="Notes… (Ctrl+Enter saves)"
-            aria-label="New task notes"
-            className="min-h-[56px] text-xs"
-          />
-        )}
-        {title.trim() && (
+        {text.trim() && (
           <span className="text-[11px] text-muted-foreground">
-            ↵ save · ⇧↵ {withNotes ? 'notes open' : 'add notes'}
+            ↵ save · ⇧↵ new line · formatted as a user story
           </span>
         )}
       </form>
@@ -332,7 +337,7 @@ function ScopeButton({ active, onClick, label, count }) {
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'ins-legend flex max-w-[45%] items-center gap-1 px-1.5 py-0.5 cursor-pointer',
+        'flex max-w-[45%] items-center gap-1.5 px-1.5 py-0.5 font-mono text-[11px] leading-4 cursor-pointer',
         active ? 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)]' : 'text-muted-foreground hover:text-foreground',
       )}
     >

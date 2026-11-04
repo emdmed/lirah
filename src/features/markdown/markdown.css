@@ -231,3 +231,15 @@
   border-radius: var(--radius-sm);
   color: var(--color-foreground);
 }
+
+/* Compact variant for task rows in the side pane. */
+.markdown-body.markdown-compact {
+  max-width: none;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.markdown-body.markdown-compact :is(h1, h2, h3, h4, p, ul, ol) {
+  margin: 0.4em 0;
+  font-size: 11px;
+}

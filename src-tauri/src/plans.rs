@@ -10,35 +10,50 @@ use std::process::Stdio;
 #[tauri::command]
 pub async fn split_plan(project_dir: String, prompt: String) -> Result<String, String> {
     crate::ipc::blocking("split_plan", move || {
-        let mut child = crate::util::login_shell_command("claude --print --model sonnet --allowedTools Read Grep Glob")
-            .current_dir(&project_dir)
-            .env("TERM", "xterm-256color")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to start claude: {}", e))?;
-
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(prompt.as_bytes())
-                .map_err(|e| format!("Failed to send the plan to claude: {}", e))?;
-        }
-
-        let output = child
-            .wait_with_output()
-            .map_err(|e| format!("claude failed: {}", e))?;
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        if output.status.success() {
-            return Ok(stdout);
-        }
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(format!(
-            "claude failed: {}",
-            if stderr.trim().is_empty() { stdout } else { stderr }
-        ))
+        claude_print("claude --print --model sonnet --allowedTools Read Grep Glob", &project_dir, &prompt)
     })
     .await
+}
+
+/// Rewrite a task as a user story (prompt from src/features/tasks/taskModel.js).
+/// No tools: it only reformats text. Returns raw stdout for the frontend to parse.
+#[tauri::command]
+pub async fn format_task(project_dir: String, prompt: String) -> Result<String, String> {
+    crate::ipc::blocking("format_task", move || {
+        claude_print("claude --print --model haiku", &project_dir, &prompt)
+    })
+    .await
+}
+
+/// Run a headless claude command with `prompt` on stdin; stdout on success.
+fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result<String, String> {
+    let mut child = crate::util::login_shell_command(cmd)
+        .current_dir(project_dir)
+        .env("TERM", "xterm-256color")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start claude: {}", e))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(prompt.as_bytes())
+            .map_err(|e| format!("Failed to send the prompt to claude: {}", e))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("claude failed: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    if output.status.success() {
+        return Ok(stdout);
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    Err(format!(
+        "claude failed: {}",
+        if stderr.trim().is_empty() { stdout } else { stderr }
+    ))
 }
 
 /// Delete a plan file that was imported out of a repo. Only a `.md` file

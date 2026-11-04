@@ -4,9 +4,12 @@ import { hash8 } from '../../lib/ids';
 import { lastSepIndex } from '../../utils/pathUtils';
 import { usePlansActions } from '../plans/PlansContext';
 import { buildTaskPlanPrompt } from '../plans/planPrompts';
+import { getSettings } from '../settings/settingsStore';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { planContext } from './planContexts';
-import { isOpen, newTask, planFileName, reorderSubset, TASK_STATUS } from './taskModel';
+import {
+  buildFormatPrompt, isOpen, newTask, parseFormatted, planFileName, reorderSubset, TASK_STATUS, taskText,
+} from './taskModel';
 import { useTaskStore } from './useTaskStore';
 import { useTaskPlanLinks } from './useTaskPlanLinks';
 
@@ -66,6 +69,21 @@ export function TasksProvider({ children }) {
   }, [find, loadScope, mutate]);
 
   /**
+   * Have a model rewrite the task as a user story. Edits made while it runs
+   * win: the result only lands if the task's text is still what was sent.
+   */
+  const formatTask = useCallback(async (scope, id, cwd) => {
+    const task = find(scope, id);
+    if (!task) return;
+    const sent = taskText(task);
+    const out = await invoke('format_task', { projectDir: cwd, prompt: buildFormatPrompt(sent, getSettings().taskFormatPrompt) });
+    const formatted = parseFormatted(out);
+    if (!formatted) throw new Error('the model returned no story');
+    const now = find(scope, id);
+    if (now && taskText(now) === sent) updateTask(scope, id, formatted);
+  }, [find, updateTask]);
+
+  /**
    * Send the task to the agent in `tabId` to plan, with a plan context in
    * front. The plan is to be saved in `root` as `<title>_plan.md`; with
    * `autoChunk` it is imported and split into chunks once written.
@@ -101,8 +119,8 @@ export function TasksProvider({ children }) {
   useTaskPlanLinks(tasksByScope, updateTask, importTaskPlan);
 
   const actions = useMemo(() => ({
-    loadScope, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan,
-  }), [loadScope, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan]);
+    loadScope, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask,
+  }), [loadScope, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask]);
 
   return (
     <TasksActionsContext.Provider value={actions}>
