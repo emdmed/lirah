@@ -57,9 +57,21 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah plans debug <plan> [--fix]
                                  find what's stuck or broken in a plan; --fix
                                  applies the safe repairs and checks again
+  lirah jobs [list] [--all]      this tab's repo's background jobs (--all: every repo)
+  lirah jobs run <prompt> [--cli C] [--label L]
+                                 start a background job in this tab's repo, in
+                                 an isolated worktree (asks the user first;
+                                 --cli: claude, codex, gemini, ...)
+  lirah jobs show <job> [--all]  one job's details
+  lirah jobs cancel <job> [--all]
+                                 stop a running job
+  lirah jobs apply <job> [--force] [--all]
+                                 apply a finished job's changes to its repo
+                                 (asks the user first)
   lirah ping                     check that Lirah is reachable
 
   <plan> is an index from \`lirah plans\`, an id or a title; <chunk> its number or id.
+  <job> is an index from \`lirah jobs\` or a job id.
   <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
 
   --json   print the reply as JSON
@@ -213,6 +225,51 @@ function printDebug(d) {
   return lines.join("\n");
 }
 
+// How long ago a job ended (or started, while it runs): 42s, 5m, 3h, 2d.
+function age(j) {
+  const t = j.endedAt || j.startedAt;
+  if (!t) return "-";
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+}
+
+const basename = (p) => (p || "").split("/").filter(Boolean).pop() || "";
+const jobReport = (j) => j.report || (j.log ? `${j.log} (log)` : "-");
+
+function printJobs(data) {
+  const where = data.repo || "all repos";
+  if (!data.jobs.length) return `no jobs in ${where}`;
+  const all = !data.repo;
+  const header = ["#", "ID", "STATUS", "CLI", "AGE", "FILES", ...(all ? ["REPO"] : []), "TASK", "REPORT"];
+  const rows = data.jobs.map((j) => [
+    String(j.index), j.id, j.status + (j.race ? " (race)" : ""), j.cli || "", age(j), String(j.files),
+    ...(all ? [basename(j.repo)] : []), j.label || "", jobReport(j),
+  ]);
+  return `${where}\n\n${table(header, rows)}`;
+}
+
+function printJob(j) {
+  const lines = [`${j.label || "(no label)"} (${j.id}): ${j.status}, ${j.cli}, ${age(j)}${j.race ? ", race candidate" : ""}`, ""];
+  const stat = j.diffStat ? ` (+${j.diffStat.added ?? 0} -${j.diffStat.removed ?? 0})` : "";
+  const tc = j.typecheck;
+  const typecheck = !tc ? null : tc.status === "checking" ? "checking" : `${tc.errorCount ?? 0} error(s)`;
+  const overlaps = j.overlaps?.length
+    ? j.overlaps.map((o) => `${o.index ?? o.id} "${o.label}" (${o.files.length} file${o.files.length === 1 ? "" : "s"})`).join(", ")
+    : null;
+  const fields = [
+    ["repo", j.repo], ["worktree", j.worktree || "none (ran in place, or already applied)"],
+    ["files", `${j.files}${stat}`], ["typecheck", typecheck], ["exit code", j.exitCode], ["error", j.error],
+    ["report", j.report], ["log", j.log], ["overlaps", overlaps],
+  ];
+  for (const [k, v] of fields) if (v !== null && v !== undefined && v !== "") lines.push(`${k}: ${v}`);
+  if (j.changedFiles?.length) lines.push("", ...j.changedFiles.map((f) => `  ${f}`));
+  lines.push("", "prompt:", j.prompt || "");
+  return lines.join("\n");
+}
+
 function printStartup(data) {
   const lines = [`mode: ${data.mode}${data.mode === "restore" ? " (reopen the last tabs)" : " (open the startup projects)"}`];
   if (!data.projects?.length) {
@@ -322,6 +379,18 @@ function route(cmd, positional, args) {
         return ["plans.debug", rest, printDebug];
       }
       default: fail(`unknown plans command "${sub}" (list, show, import, done, debug)`);
+    }
+  }
+  if (cmd === "jobs" || cmd === "job") {
+    unswallow(args, "all", rest);
+    switch (sub ?? "list") {
+      case "list": return ["jobs.list", [], printJobs];
+      case "run":
+      case "start": return ["jobs.run", rest, show];
+      case "show": return ["jobs.show", rest, printJob];
+      case "cancel": return ["jobs.cancel", rest, show];
+      case "apply": unswallow(args, "force", rest); return ["jobs.apply", rest, show];
+      default: fail(`unknown jobs command "${sub}" (list, run, show, cancel, apply)`);
     }
   }
   if (cmd === "tasks" || cmd === "task") {

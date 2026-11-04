@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, or to list, import or check off Lirah plans and their chunks.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -57,11 +57,23 @@ lirah plans done <plan> <chunk> [--result T]
 lirah plans debug <plan> [--fix]
                                find what's stuck or broken in a plan; --fix applies
                                the safe repairs and checks again
+lirah jobs [list] [--all]      this tab's repo's background jobs (--all: every repo)
+lirah jobs run <prompt> [--cli C] [--label L]
+                               start a background job in this tab's repo, in an
+                               isolated worktree (asks the user first)
+lirah jobs show <job> [--all]  one job's details
+lirah jobs cancel <job> [--all]
+                               stop a running job
+lirah jobs apply <job> [--force] [--all]
+                               apply a finished job's changes to its repo
+                               (asks the user first)
 lirah ping                     check that Lirah is reachable
 ```
 
 `<plan>` is an index from `lirah plans`, an id or a title; `<chunk>` is its
 number or id.
+`<job>` is an index from `lirah jobs` or a job id. An index from `lirah jobs --all`
+needs `--all` again.
 `<tab>` is `.` (this tab), an index from `lirah tabs`, a tab id or a tab name.
 Add `--json` to any command for machine-readable output. `lirah help` prints
 the full usage.
@@ -98,3 +110,18 @@ the full usage.
 - Run `lirah tasks` before adding, so you don't add a task that's already there.
 - A task title is one line; put details in `--notes` (markdown is fine). Quote
   both so the shell keeps them whole.
+- `lirah jobs` gives each job's run report path. Read the report with your file
+  tools; it has the prompt, changed files and full output. A running or cancelled
+  job has no report yet, so read its log path instead.
+- `lirah jobs apply` asks the user to confirm. It lands the changes uncommitted in
+  the repo. On `denied by user`, stop. When the typecheck blocks it, tell the user.
+  Only pass `--force` when they say so.
+- Only cancel a job when the user asks. Its worktree is kept.
+- `lirah jobs run "<prompt>"` starts a job when the user asks for work in the
+  background (or in parallel). The job's agent starts with no context, so write a
+  complete, self-contained prompt: the goal, the files, the constraints, and how to
+  verify. Quote it. Split independent work into separate jobs that touch different
+  files. The user confirms each launch; on `denied by user`, stop. Then check on it
+  with `lirah jobs show <id>`, and apply it only when the user says so.
+- You can't rerun, revise or archive jobs, or start or settle races, from the CLI.
+  Point the user to the jobs pane.

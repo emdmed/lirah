@@ -148,7 +148,7 @@ async function computeDiffStat(cwd) {
 const TYPECHECK_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/i;
 
 // Path of a job's change relative to the repo root, given its cwd (worktree).
-function relToRepo(job, p) {
+export function relToRepo(job, p) {
   return job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p;
 }
 
@@ -969,7 +969,11 @@ export function AgentJobsProvider({ children }) {
     return out;
   }, []);
 
+  /** The current job list (newest first), for agent control. */
+  const getJobs = useCallback(() => jobsRef.current, []);
+
   const actions = useMemo(() => ({
+    getJobs,
     launchJob,
     launchRace,
     pickRaceWinner,
@@ -983,7 +987,7 @@ export function AgentJobsProvider({ children }) {
     archiveJob,
     unarchiveJob,
     registerContextFiles,
-  }), [launchJob, launchRace, pickRaceWinner, reviseJob, findOverlappingJobs, cancelJob, approveJob,
+  }), [getJobs, launchJob, launchRace, pickRaceWinner, reviseJob, findOverlappingJobs, cancelJob, approveJob,
     rerunJob, reconcileJobs, discardJob, archiveJob, unarchiveJob, registerContextFiles]);
 
   return (

@@ -11,12 +11,14 @@ import { useTasksActions } from '../tasks/TasksContext';
 import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
 import { usePlansActions } from '../plans/PlansContext';
+import { relToRepo, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
 import { CHUNK_STATUS, effectiveChunkState, planProgress, planStarted } from '../plans/planModel';
 import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
 import { planGit } from '../plans/planGit';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
 import { hash8 } from '../../lib/ids';
+import { JOB_CLIS } from '../../lib/agentClis';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
@@ -29,7 +31,7 @@ import {
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list', plans: 'list' };
+const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list', plans: 'list', jobs: 'list' };
 
 const flag = (v) => (v === undefined ? undefined : v === true || v === 'true' || v === 'on' || v === 1);
 
@@ -52,9 +54,10 @@ export function useAgentControl() {
   const { bookmarks } = useBookmarks();
   const tasksActions = useTasksActions();
   const plansActions = usePlansActions();
+  const jobsActions = useAgentJobsActions();
   // The listener is set up once; it reads the latest of these through the ref.
   const live = useRef({});
-  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions };
+  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions, jobs: jobsActions };
 
   useEffect(() => {
     // Ask before a guarded change. Resolves true when allowed.
@@ -120,6 +123,45 @@ export function useAgentControl() {
         split: plan.split, autopilot: plan.autopilot?.status || 'off', file: plan.importedFrom?.path || null,
       };
     };
+
+    // Jobs: the caller tab's repo (or every repo with --all), archived ones left out, newest first.
+    const jobScope = async (args, sessionId) => {
+      const all = live.current.jobs.getJobs().filter((j) => !j.archived);
+      if (args.all === true) return { repo: null, jobs: all };
+      const repo = await projectScope(sessionId);
+      return { repo, jobs: all.filter((j) => j.repoPath === repo) };
+    };
+    // [index, job] for an index from `lirah jobs` or a job id, in the same scope.
+    const findJob = (args, jobs, ref) => {
+      const text = String(ref ?? '').trim();
+      const see = `see \`lirah jobs${args.all === true ? ' --all' : ''}\``;
+      if (!text) throw new Error(`missing job: give an index or an id (${see})`);
+      const i = /^\d+$/.test(text) ? Number(text) - 1 : jobs.findIndex((j) => j.id === text);
+      if (!jobs[i]) throw new Error(`no job "${text}" (${see})`);
+      return [i + 1, jobs[i]];
+    };
+    const jobSummary = (j, index) => ({
+      index, id: j.id, status: j.status, cli: j.cli, label: j.label,
+      repo: j.repoPath, startedAt: j.startedAt, endedAt: j.endedAt,
+      files: j.changedFiles?.length ?? 0, report: j.reportPath || null,
+      log: j.logPath || null, race: !!j.raceId,
+    });
+    // Other jobs touching this job's files, as "jobs 3, 5" indexes (or ids when out of scope).
+    const jobOverlaps = (job, jobs) => {
+      const rel = (job.changedFiles || []).map((f) => relToRepo(job, f.path));
+      return live.current.jobs.findOverlappingJobs(job.repoPath, rel)
+        .filter((o) => o.id !== job.id)
+        .map((o) => {
+          const i = jobs.findIndex((j) => j.id === o.id);
+          return { ...o, index: i === -1 ? null : i + 1 };
+        });
+    };
+    const overlapNote = (overlaps) => {
+      if (!overlaps.length) return '';
+      const refs = overlaps.map((o) => o.index ?? o.id);
+      return `job${refs.length === 1 ? '' : 's'} ${refs.join(', ')} also touch${refs.length === 1 ? 'es' : ''} these files; applying ${refs.length === 1 ? 'it' : 'them'} later may conflict`;
+    };
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
     // What diagnosePlan needs from the app for `plan`.
     const debugEnv = async (plan) => {
@@ -334,6 +376,90 @@ export function useAgentControl() {
           id: plan.id, title: plan.title || '(untitled)', found, applied, remaining,
           state: { ...state, sourceLength: source?.length ?? 0 },
         };
+      },
+
+      // Jobs: background agent jobs, as the jobs pane shows them. Rerunning,
+      // revising, archiving and races stay in the pane.
+      'jobs.list': async (args, positional, { sessionId }) => {
+        const { repo, jobs } = await jobScope(args, sessionId);
+        return { repo, jobs: jobs.map((j, i) => jobSummary(j, i + 1)) };
+      },
+      // As the Run job dialog with one agent, always in an isolated worktree; asks the user first.
+      'jobs.run': async (args, words, { sessionId }) => {
+        const prompt = (words.length ? words.join(' ') : String(args.prompt ?? '')).trim();
+        if (!prompt) throw new Error('missing prompt: lirah jobs run <prompt> [--cli C] [--label L]');
+        const cli = args.cli === undefined ? 'claude' : String(args.cli);
+        const known = JOB_CLIS.find((o) => o.value === cli);
+        if (!known) throw new Error(`unknown cli "${cli}" (${JOB_CLIS.map((o) => o.value).join(', ')})`);
+        if (!(await invoke('check_command_exists', { command: known.bin }).catch(() => true))) {
+          throw new Error(`${known.bin} is not installed`);
+        }
+        const repo = await projectScope(sessionId);
+        const oneLine = prompt.replace(/\s+/g, ' ');
+        const label = args.label === undefined ? (oneLine.length > 60 ? `${oneLine.slice(0, 57)}...` : oneLine) : String(args.label);
+        const ok = await live.current.confirm({
+          title: `Let Claude start a background ${known.label} job?`,
+          description: `"${oneLine.length > 300 ? `${oneLine.slice(0, 297)}...` : oneLine}" in ${repo}. It runs unattended with auto-approve, in an isolated worktree, so nothing lands in your tree until it's applied (outside a git repo, or if the worktree can't be made, it runs in place).`,
+          confirmLabel: 'Start job',
+        });
+        if (!ok) throw new Error('denied by user');
+        const id = await live.current.jobs.launchJob({ cli, prompt, label, repoPath: repo, useWorktree: true });
+        live.current.toast.info(`Claude started job "${label}"`);
+        return `started job ${id} (${cli}) in ${repo}; follow it with \`lirah jobs show ${id}\``;
+      },
+      'jobs.show': async (args, [ref = args.job], { sessionId }) => {
+        const { jobs } = await jobScope(args, sessionId);
+        const [index, job] = findJob(args, jobs, ref);
+        return {
+          ...jobSummary(job, index),
+          prompt: job.prompt, cwd: job.cwd, worktree: job.worktreePath || null, exitCode: job.exitCode ?? null,
+          error: job.error || null, diffStat: job.diffStat || null, typecheck: job.typecheck || null,
+          idleSecs: job.idleSecs ?? null, kind: job.kind || null,
+          changedFiles: (job.changedFiles || []).map((f) => relToRepo(job, f.path)),
+          overlaps: jobOverlaps(job, jobs),
+        };
+      },
+      'jobs.cancel': async (args, [ref = args.job], { sessionId }) => {
+        const { jobs } = await jobScope(args, sessionId);
+        const [index, job] = findJob(args, jobs, ref);
+        if (job.status !== 'running') throw new Error(`job ${index} is ${job.status}, not running`);
+        if (job.raceId) throw new Error(`job ${index} is a race candidate; cancel it in the jobs pane`);
+        await live.current.jobs.cancelJob(job.id);
+        live.current.toast.info(`Claude cancelled "${job.label}"`);
+        const kept = job.worktreePath
+          ? 'worktree kept (discard it in the jobs pane)'
+          : 'it ran in place, so its partial edits are already in the repo';
+        return `cancelled ${index}; ${kept}${job.logPath ? `; output so far: ${job.logPath}` : ''}`;
+      },
+      // As the pane's Apply button (approveJob: typecheck gate, dirty-tree prompt), after asking the user.
+      'jobs.apply': async (args, [ref = args.job], { sessionId }) => {
+        const { jobs } = await jobScope(args, sessionId);
+        const [index, job] = findJob(args, jobs, ref);
+        const n = job.changedFiles?.length ?? 0;
+        if (job.status === 'running') throw new Error(`job ${index} is running; wait for it to finish`);
+        if (job.status === 'applied') throw new Error(`job ${index} is already applied`);
+        if (!['done', 'failed', 'conflict', 'interrupted'].includes(job.status)) throw new Error(`job ${index} is ${job.status}; nothing to apply`);
+        if (!job.worktreePath) throw new Error(`job ${index} ran in place, its changes are already in the repo`);
+        if (!n) throw new Error(`job ${index} has no changes to apply`);
+        if (job.raceId) throw new Error(`job ${index} is a race candidate; pick the winner in the jobs pane`);
+        const force = args.force === true;
+        const note = overlapNote(jobOverlaps(job, jobs));
+        const ok = await live.current.confirm({
+          title: `Let Claude apply "${job.label}"?`,
+          description: [
+            `The agent in a tab asked to apply ${plural(n, 'changed file')} into ${job.repoPath} as uncommitted changes.`,
+            force && 'Typecheck skipped (--force).',
+            note && `${note[0].toUpperCase()}${note.slice(1)}.`,
+          ].filter(Boolean).join(' '),
+          confirmLabel: 'Apply',
+        });
+        if (!ok) throw new Error('denied by user');
+        const res = await live.current.jobs.approveJob(job.id, { force });
+        if (res.blocked) throw new Error(`not applied: ${plural(res.typecheck?.errorCount ?? 0, 'type error')} in the changes; fix them, or apply --force`);
+        if (res.cancelled) throw new Error('denied by user');
+        if (!res.ok) throw new Error(`apply failed: ${res.error} (a patch that doesn't apply cleanly writes nothing; the job and its worktree are kept)`);
+        live.current.toast.info(`Claude applied "${job.label}" (${plural(n, 'file')})`);
+        return `applied ${plural(n, 'file')} into ${job.repoPath} (uncommitted)${note ? `; ${note}` : ''}`;
       },
 
       'tasks.list': async (args, positional, { sessionId }) => {
