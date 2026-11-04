@@ -4,6 +4,13 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-04
+
+### Added
+
+- **Send as prompt** - The new plan dialog (now "New plan or prompt") can send the text straight to the tab's agent as a prompt, for tasks that don't need a plan. Ctrl+Enter sends, Ctrl+Shift+Enter splits into chunks. Sending is off while no agent is running in the tab, so the text is never typed into a bare shell.
+- **Claude start command** - Settings → Agent → Launch has a field for the command a tab starts Claude Code with, for setups where Lirah can't find `claude` and falls back to `npx`. The row shows the command Lirah uses now. Applies to agents launched after the change.
+
 ## [0.8.0] - 2026-11-03
 
 ### Added
