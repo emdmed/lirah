@@ -40,7 +40,7 @@ import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
 import { summarizeContext } from "../../components/textarea-panel/contextSummary";
-import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
+import { escapeShellPath, getRelativePath, normalizePath, IS_WINDOWS } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
@@ -419,6 +419,30 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     if (info?.path) await navigateToWorkspace(info.path);
     return info;
   }, [workspaceHook.openWorkspace, navigateToWorkspace]);
+
+  // Windows cannot remove a folder that a terminal uses as its cwd, so leave it first.
+  const handleDeleteWorkspace = useCallback(async (workspacePath) => {
+    const fold = (p) => (IS_WINDOWS ? normalizePath(p).toLowerCase() : normalizePath(p));
+    const isInside = (cwd) => !!cwd && (fold(cwd) === fold(workspacePath) || fold(cwd).startsWith(`${fold(workspacePath)}/`));
+    const readCwd = () => invoke('get_terminal_cwd', { sessionId: terminalSessionId });
+    try {
+      if (terminalSessionId && isInside(await readCwd())) {
+        await terminateCliProcess();
+        const root = await invoke('get_workspaces_dir');
+        await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${escapeShellPath(root)}\r` });
+        // The Windows prompt reports its cwd only when it redraws.
+        for (let i = 0; i < 10; i++) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          if (!isInside(await readCwd())) break;
+        }
+        if (viewMode === 'flat') await loadFolders();
+        else if (viewMode === 'tree') await treeView.loadTreeData();
+      }
+    } catch (error) {
+      console.error('Failed to leave the workspace folder:', error);
+    }
+    await workspaceHook.deleteWorkspace(workspacePath);
+  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData, terminateCliProcess, workspaceHook.deleteWorkspace]);
 
   const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
@@ -1355,6 +1379,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
         handleSelectProject={handleSelectProject}
         handleCreateWorkspace={handleCreateWorkspace}
         handleOpenWorkspace={handleOpenWorkspace}
+        handleDeleteWorkspace={handleDeleteWorkspace}
         markdownFiles={markdownFiles}
         viewMarkdownFile={viewMarkdownFile}
       />

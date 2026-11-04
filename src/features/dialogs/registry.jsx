@@ -113,7 +113,7 @@ export const TAB_DIALOGS = {
       onCreateWorkspace: ctx.handleCreateWorkspace,
       existingWorkspaces: ctx.workspaceHook.workspaces,
       onOpenWorkspace: ctx.handleOpenWorkspace,
-      onDeleteWorkspace: ctx.workspaceHook.deleteWorkspace,
+      onDeleteWorkspace: ctx.handleDeleteWorkspace,
     }),
   },
   projectPicker: {
