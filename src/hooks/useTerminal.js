@@ -13,6 +13,7 @@ import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
 import { markTerminalInput, markTerminalOutput } from '../features/tabs/terminalActivity';
 import { isFocusMode } from '../lib/focusMode';
+import { IS_WINDOWS } from '../utils/pathUtils';
 import '@xterm/xterm/css/xterm.css';
 
 // Smallest geometry we will ever apply. FitAddon floors its proposal at 2 cols /
@@ -381,7 +382,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         // Sandbox was requested but didn't come up. The owner (ProjectTab, via
         // Terminal's onSandboxFailed) shows the warning with a working
         // "Retry without sandbox" action, since only it can restart the shell.
-        if (sandboxEnabled && !result.sandboxed) {
+        if (sandboxEnabled && !IS_WINDOWS && !result.sandboxed) {
           setSandboxFailed(true);
         }
 

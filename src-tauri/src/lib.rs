@@ -205,6 +205,7 @@ pub fn run(initial_path: Option<String>) {
             workspace::create_workspace,
             workspace::delete_workspace,
             workspace::list_workspaces,
+            workspace::get_workspaces_dir,
             workspace::open_workspace,
             workspace::close_workspace,
             // Agent jobs

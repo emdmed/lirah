@@ -56,6 +56,11 @@ pub async fn delete_workspace(workspace_path: String, state: tauri::State<'_, Ap
 }
 
 #[tauri::command]
+pub fn get_workspaces_dir() -> String {
+    manager::workspaces_dir().to_string_lossy().into_owned()
+}
+
+#[tauri::command]
 pub async fn list_workspaces() -> Result<Vec<manager::WorkspaceInfo>, String> {
     crate::ipc::blocking("list_workspaces", move || {
         manager::list_workspaces()

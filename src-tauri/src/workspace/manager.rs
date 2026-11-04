@@ -26,10 +26,30 @@ pub struct WorkspaceInfo {
     pub projects: Vec<WorkspaceProject>,
 }
 
-fn workspaces_dir() -> PathBuf {
+pub fn workspaces_dir() -> PathBuf {
     crate::util::lirah_dir()
         .unwrap_or_else(|| PathBuf::from("/tmp").join(".lirah"))
         .join("workspaces")
+}
+
+/// Link `link` to the directory `target`. Windows only allows symlinks with
+/// Developer Mode or admin rights, so it falls back to a junction there.
+fn link_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link)
+    }
+    #[cfg(windows)]
+    {
+        std::os::windows::fs::symlink_dir(target, link).or_else(|symlink_err| {
+            junction::create(target, link).map_err(|junction_err| {
+                std::io::Error::new(
+                    junction_err.kind(),
+                    format!("symlink: {symlink_err}; junction: {junction_err}"),
+                )
+            })
+        })
+    }
 }
 
 pub fn create_workspace(name: &str, projects: Vec<(String, String, Option<String>)>) -> Result<WorkspaceInfo, String> {
@@ -50,19 +70,10 @@ pub fn create_workspace(name: &str, projects: Vec<(String, String, Option<String
             return Err(format!("Project path does not exist: {}", real_path));
         }
 
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(target, &link_path)
-            .map_err(|e| {
-                let _ = fs::remove_dir_all(&ws_dir);
-                format!("Failed to create symlink for {}: {}", project_name, e)
-            })?;
-
-        #[cfg(windows)]
-        std::os::windows::fs::symlink_dir(target, &link_path)
-            .map_err(|e| {
-                let _ = fs::remove_dir_all(&ws_dir);
-                format!("Failed to create symlink for {}: {}", project_name, e)
-            })?;
+        link_dir(target, &link_path).map_err(|e| {
+            let _ = fs::remove_dir_all(&ws_dir);
+            format!("Failed to link project {}: {}", project_name, e)
+        })?;
 
         workspace_projects.push(WorkspaceProject {
             name: project_name.clone(),
@@ -106,15 +117,29 @@ pub fn create_workspace(name: &str, projects: Vec<(String, String, Option<String
 }
 
 pub fn delete_workspace(workspace_path: &str) -> Result<(), String> {
-    let path = Path::new(workspace_path);
+    delete_workspace_in(&workspaces_dir(), workspace_path)
+}
 
-    // Verify it's actually a workspace
-    if !path.join(".lirah-workspace.json").exists() {
-        return Err("Not a valid workspace directory".to_string());
+fn delete_workspace_in(root: &Path, workspace_path: &str) -> Result<(), String> {
+    let path = Path::new(workspace_path);
+    let inside_root = match (path.canonicalize(), root.canonicalize()) {
+        (Ok(p), Ok(r)) => p.parent() == Some(r.as_path()),
+        _ => false,
+    };
+    if !inside_root {
+        return Err(format!("{workspace_path} is not a workspace of Lirah"));
     }
 
-    fs::remove_dir_all(path)
-        .map_err(|e| format!("Failed to delete workspace: {}", e))
+    let marker = path.join(".lirah-workspace.json");
+    let saved = fs::read(&marker).map_err(|_| "Not a valid workspace directory".to_string())?;
+
+    fs::remove_dir_all(path).map_err(|e| {
+        // remove_dir_all deletes the marker first; without it the leftover folder is unlisted and cannot be retried.
+        if path.exists() {
+            let _ = fs::write(&marker, saved);
+        }
+        format!("Failed to delete workspace: {}", e)
+    })
 }
 
 pub fn list_workspaces() -> Result<Vec<WorkspaceInfo>, String> {
@@ -170,4 +195,127 @@ pub fn translate_path(real_path: &str, path_map: &HashMap<String, String>) -> St
         }
     }
     real_path.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workspaces_dir_is_the_workspaces_folder_of_lirah() {
+        assert!(workspaces_dir().ends_with(".lirah/workspaces"));
+    }
+
+    /// A scratch folder holding one project, `real`, with a file in it.
+    fn scratch(name: &str) -> (PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("lirah-ws-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let real = base.join("real");
+        fs::create_dir_all(&real).unwrap();
+        fs::write(real.join("keep.txt"), "kept").unwrap();
+        (base, real)
+    }
+
+    #[test]
+    fn link_dir_makes_a_link_that_resolves_to_the_project() {
+        let (base, real) = scratch("link");
+        let link = base.join("link");
+        link_dir(&real, &link).unwrap();
+        assert_eq!(fs::read_to_string(link.join("keep.txt")).unwrap(), "kept");
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn removing_a_junction_leaves_the_project_intact() {
+        let (base, real) = scratch("junction");
+        let link = base.join("link");
+        junction::create(&real, &link).unwrap();
+        assert_eq!(fs::read_to_string(link.join("keep.txt")).unwrap(), "kept");
+
+        fs::remove_dir(&link).unwrap();
+
+        assert!(!link.exists());
+        assert!(real.join("keep.txt").exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn delete_workspace_rejects_a_folder_outside_the_workspaces_root() {
+        let (base, _) = scratch("outside");
+        let root = base.join("root");
+        fs::create_dir_all(&root).unwrap();
+        let other = base.join("other");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join(".lirah-workspace.json"), "{}").unwrap();
+
+        let err = delete_workspace_in(&root, other.to_str().unwrap()).unwrap_err();
+
+        assert!(err.contains("not a workspace of Lirah"), "{err}");
+        assert!(other.join(".lirah-workspace.json").exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_failed_delete_keeps_the_workspace_listed_and_retryable() {
+        let (base, _) = scratch("inuse");
+        let ws = base.join("ws");
+        fs::create_dir_all(&ws).unwrap();
+        fs::write(ws.join(".lirah-workspace.json"), "{}").unwrap();
+        // Killed on drop so a failing assert cannot leave it running.
+        struct Holder(std::process::Child);
+        impl Drop for Holder {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let holder = Holder(
+            std::process::Command::new("ping")
+                .args(["-t", "127.0.0.1"])
+                .current_dir(&ws)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let first = delete_workspace_in(&base, ws.to_str().unwrap());
+        let marker_kept = ws.join(".lirah-workspace.json").exists();
+        drop(holder);
+        let mut retry = delete_workspace_in(&base, ws.to_str().unwrap());
+        for _ in 0..20 {
+            if retry.is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            retry = delete_workspace_in(&base, ws.to_str().unwrap());
+        }
+
+        assert!(first.is_err());
+        assert!(marker_kept, "the failed delete should leave the marker");
+        retry.unwrap();
+        assert!(!ws.exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn delete_workspace_leaves_the_linked_projects_intact() {
+        let (base, real) = scratch("delete");
+        let ws = base.join("ws");
+        fs::create_dir_all(&ws).unwrap();
+        fs::write(ws.join(".lirah-workspace.json"), "{}").unwrap();
+        link_dir(&real, &ws.join("linked")).unwrap();
+        #[cfg(windows)]
+        junction::create(&real, ws.join("junction")).unwrap();
+
+        delete_workspace_in(&base, ws.to_str().unwrap()).unwrap();
+
+        assert!(!ws.exists());
+        assert_eq!(fs::read_to_string(real.join("keep.txt")).unwrap(), "kept");
+        let _ = fs::remove_dir_all(&base);
+    }
 }

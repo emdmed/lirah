@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useToast } from '../features/toast';
 
 export function useWorkspace() {
+  const toast = useToast();
   const [workspace, setWorkspace] = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,11 +67,14 @@ export function useWorkspace() {
       if (workspace?.path === workspacePath) {
         setWorkspace(null);
       }
-      await refreshWorkspaces();
     } catch (err) {
       console.error('Failed to delete workspace:', err);
+      const hint = String(err).includes('not a workspace of Lirah') ? '' : ' Close the terminals open in this workspace and try again.';
+      toast.error(`${err}.${hint}`);
+    } finally {
+      await refreshWorkspaces();
     }
-  }, [workspace, refreshWorkspaces]);
+  }, [workspace, refreshWorkspaces, toast]);
 
   return {
     workspace,
