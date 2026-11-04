@@ -33,6 +33,12 @@ export function TasksProvider({ children }) {
     return task.id;
   }, [loadScope, mutate]);
 
+  /** A scope's tasks, loaded first if needed. */
+  const getTasks = useCallback(async (scope) => {
+    await loadScope(scope);
+    return stateRef.current[scope] || [];
+  }, [loadScope, stateRef]);
+
   const updateTask = useCallback((scope, id, patch) => {
     mutate(scope, (list) => list.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t)));
   }, [mutate]);
@@ -119,8 +125,8 @@ export function TasksProvider({ children }) {
   useTaskPlanLinks(tasksByScope, updateTask, importTaskPlan);
 
   const actions = useMemo(() => ({
-    loadScope, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask,
-  }), [loadScope, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask]);
+    loadScope, getTasks, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask,
+  }), [loadScope, getTasks, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask]);
 
   return (
     <TasksActionsContext.Provider value={actions}>

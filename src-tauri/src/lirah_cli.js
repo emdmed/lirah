@@ -36,9 +36,18 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  starts its agent, --name names its tab
   lirah startup remove <path>    remove a startup project
   lirah startup clear            remove all startup projects
+  lirah tasks [list] [--global] list this tab's project tasks (--global: global)
   lirah tasks add <title> [--notes N] [--global]
                                  add a task to this tab's project list
                                  (--global: the global list)
+  lirah tasks done|reopen <id>   mark a task done, or not done again
+  lirah tasks edit <id> [--title T] [--notes N]
+                                 change a task's title or notes
+  lirah tasks remove <id>        delete a task (the user can undo)
+  lirah tasks move <id>          move between this project's list and the
+                                 global list
+                                 Task commands take --global to work on the
+                                 global list instead of this tab's project.
   lirah ping                     check that Lirah is reachable
 
   <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
@@ -159,6 +168,13 @@ function printTabs(list) {
   return table(["", "#", "NAME", "AGENT", "PATH"], rows);
 }
 
+function printTasks(data) {
+  const where = data.scope === "global" ? "global list" : data.scope;
+  if (!data.tasks.length) return `no tasks in ${where}`;
+  const rows = data.tasks.map((t) => [t.id, t.status, t.title]);
+  return `${where}\n\n${table(["ID", "STATUS", "TITLE"], rows)}`;
+}
+
 function printStartup(data) {
   const lines = [`mode: ${data.mode}${data.mode === "restore" ? " (reopen the last tabs)" : " (open the startup projects)"}`];
   if (!data.projects?.length) {
@@ -255,12 +271,28 @@ function route(cmd, positional, args) {
     }
   }
   if (cmd === "tasks" || cmd === "task") {
-    switch (sub ?? "add") {
+    switch (sub ?? "list") {
+      case "list": {
+        unswallow(args, "global", rest);
+        return ["tasks.list", [], printTasks];
+      }
       case "add": {
         unswallow(args, "global", rest);
         return ["tasks.add", rest, show];
       }
-      default: fail(`unknown tasks command "${sub}" (add)`);
+      case "done":
+      case "reopen":
+      case "edit":
+      case "remove":
+      case "move": {
+        unswallow(args, "global", rest);
+        return [`tasks.${sub}`, rest, show];
+      }
+      case "rm": {
+        unswallow(args, "global", rest);
+        return ["tasks.remove", rest, show];
+      }
+      default: fail(`unknown tasks command "${sub}" (list, add, done, reopen, edit, remove, move)`);
     }
   }
   return [cmd, positional, show];

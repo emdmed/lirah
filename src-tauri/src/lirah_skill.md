@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, or add a task to Lirah's task list.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, or to list, add, finish, edit, delete or move tasks in Lirah's task list.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -37,9 +37,17 @@ lirah startup add <path> [--launch] [--name N]
                                add (or update) a startup project
 lirah startup remove <path>    remove a startup project
 lirah startup clear            remove all startup projects
+lirah tasks [list] [--global] list this tab's project tasks (--global: global)
+                               --json includes each task's notes
 lirah tasks add <title> [--notes N] [--global]
                                add a task to this tab's project list
                                (--global: the global list)
+lirah tasks done|reopen <id>   mark a task done, or not done again
+lirah tasks edit <id> [--title T] [--notes N]
+                               change a task's title or notes (--notes replaces them)
+lirah tasks remove <id>        delete a task (the user can undo from a toast)
+lirah tasks move <id>          move between this project's list and the global list
+                               task commands take --global to act on the global list
 lirah ping                     check that Lirah is reachable
 ```
 
@@ -60,5 +68,7 @@ the full usage.
 - For startup projects to open at launch, the mode must be `projects`:
   `lirah startup mode projects`.
 - Paths are resolved against your current directory.
+- Task ids come from `lirah tasks`. Only delete a task when the user asks.
+- Run `lirah tasks` before adding, so you don't add a task that's already there.
 - A task title is one line; put details in `--notes` (markdown is fine). Quote
   both so the shell keeps them whole.

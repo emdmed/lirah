@@ -8,7 +8,7 @@ import { getSettings, setSetting } from '../settings/settingsStore';
 import { MAX_TABS, tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 import { useTasksActions } from '../tasks/TasksContext';
-import { GLOBAL, splitTaskText } from '../tasks/taskModel';
+import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
@@ -22,7 +22,7 @@ import {
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'add' };
+const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list' };
 
 const flag = (v) => (v === undefined ? undefined : v === true || v === 'true' || v === 'on' || v === 1);
 
@@ -43,10 +43,10 @@ export function useAgentControl() {
   const theme = useTheme();
   const tabManager = useTabManager();
   const { bookmarks } = useBookmarks();
-  const { addTask } = useTasksActions();
+  const tasksActions = useTasksActions();
   // The listener is set up once; it reads the latest of these through the ref.
   const live = useRef({});
-  live.current = { toast, confirm, theme, tabManager, bookmarks, addTask };
+  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions };
 
   useEffect(() => {
     // Ask before a guarded change. Resolves true when allowed.
@@ -72,6 +72,22 @@ export function useAgentControl() {
 
     const name = (tab) => tabDisplayName(tab, live.current.bookmarks);
     const target = (tabs, ref, sessionId) => resolveTab(tabs, ref, { sessionId, bookmarks: live.current.bookmarks });
+
+    const projectScope = async (sessionId) => {
+      const tab = callerTab(live.current.tabManager.tabs, sessionId);
+      if (!tab) throw new Error("can't tell which tab this is; pass --global for the global list");
+      return (await resolveRepoRoot(tab.projectPath).catch(() => null)) || tab.projectPath;
+    };
+    const taskScope = (args, sessionId) => (args.global === true ? GLOBAL : projectScope(sessionId));
+    const where = (scope) => (scope === GLOBAL ? 'the global list' : scope);
+    // [scope, task] for an id from `lirah tasks`, in the list --global picks.
+    const findTask = async (args, id, sessionId) => {
+      if (!id) throw new Error('missing task id (see `lirah tasks`)');
+      const scope = await taskScope(args, sessionId);
+      const task = (await live.current.tasks.getTasks(scope)).find((t) => t.id === id);
+      if (!task) throw new Error(`no task ${id} in ${where(scope)} (see \`lirah tasks${scope === GLOBAL ? ' --global' : ''}\`)`);
+      return [scope, task];
+    };
 
     const handlers = {
       'settings.list': () => listSettings(),
@@ -162,20 +178,69 @@ export function useAgentControl() {
         return `cleared ${count} startup project${count === 1 ? '' : 's'}`;
       },
 
-      // Tasks: into the caller tab's project list (as the tasks pane scopes it), or --global.
+      // Tasks: the caller tab's project list (as the tasks pane scopes it), or --global.
+      'tasks.list': async (args, positional, { sessionId }) => {
+        const scope = await taskScope(args, sessionId);
+        const tasks = await live.current.tasks.getTasks(scope);
+        return {
+          scope: scope === GLOBAL ? 'global' : scope,
+          tasks: tasks.map(({ id, title, notes, status }) => ({ id, title, notes, status })),
+        };
+      },
       'tasks.add': async (args, words, { sessionId }) => {
         const fields = splitTaskText(words.length ? words.join(' ') : String(args.title ?? ''));
         if (args.notes !== undefined) fields.notes = [fields.notes, String(args.notes)].filter(Boolean).join('\n\n');
         if (!fields.title) throw new Error('missing title: lirah tasks add <title> [--notes N] [--global]');
-        let scope = GLOBAL;
-        if (args.global !== true) {
-          const tab = callerTab(live.current.tabManager.tabs, sessionId);
-          if (!tab) throw new Error("can't tell which tab this is; pass --global for the global list");
-          scope = (await resolveRepoRoot(tab.projectPath).catch(() => null)) || tab.projectPath;
-        }
-        const id = await live.current.addTask(scope, fields);
+        const scope = await taskScope(args, sessionId);
+        const id = await live.current.tasks.addTask(scope, fields);
         live.current.toast.info(`Claude added task "${fields.title}"`);
-        return `added task ${id} to ${scope === GLOBAL ? 'the global list' : scope}`;
+        return `added task ${id} to ${where(scope)}`;
+      },
+      'tasks.done': async (args, [id = args.id], { sessionId }) => {
+        const [scope, task] = await findTask(args, id, sessionId);
+        if (task.status === TASK_STATUS.DONE) return `${id} is already done`;
+        live.current.tasks.updateTask(scope, id, { status: TASK_STATUS.DONE });
+        live.current.toast.info(`Claude marked "${task.title}" done`);
+        return `${id} done`;
+      },
+      'tasks.reopen': async (args, [id = args.id], { sessionId }) => {
+        const [scope, task] = await findTask(args, id, sessionId);
+        if (task.status !== TASK_STATUS.DONE) return `${id} is not done (${task.status})`;
+        // As the pane's done toggle: back to planned if it had a plan.
+        const status = task.planPath ? TASK_STATUS.PLANNED : TASK_STATUS.BACKLOG;
+        live.current.tasks.updateTask(scope, id, { status });
+        live.current.toast.info(`Claude reopened "${task.title}"`);
+        return `${id} ${status}`;
+      },
+      'tasks.edit': async (args, [id = args.id], { sessionId }) => {
+        const [scope, task] = await findTask(args, id, sessionId);
+        const patch = {};
+        if (args.title !== undefined) patch.title = String(args.title).trim();
+        if (args.notes !== undefined) patch.notes = String(args.notes).trim();
+        if (!Object.keys(patch).length) throw new Error('nothing to change: lirah tasks edit <id> [--title T] [--notes N]');
+        if (patch.title === '') throw new Error("a task's title can't be empty");
+        live.current.tasks.updateTask(scope, id, patch);
+        live.current.toast.info(`Claude edited "${patch.title || task.title}"`);
+        return `edited ${id}`;
+      },
+      'tasks.remove': async (args, [id = args.id], { sessionId }) => {
+        const [scope, task] = await findTask(args, id, sessionId);
+        const { removeTask, restoreTask } = live.current.tasks;
+        const removed = removeTask(scope, id);
+        if (!removed) throw new Error(`no task ${id}`);
+        live.current.toast.info(`Claude deleted "${task.title}"`, {
+          duration: 8000,
+          action: { label: 'undo', onClick: () => restoreTask(scope, removed.task, removed.index) },
+        });
+        return `removed ${id}`;
+      },
+      // Between this tab's project list and the global list; --global moves from global.
+      'tasks.move': async (args, [id = args.id], { sessionId }) => {
+        const [from, task] = await findTask(args, id, sessionId);
+        const to = from === GLOBAL ? await projectScope(sessionId) : GLOBAL;
+        await live.current.tasks.moveToScope(from, to, id);
+        live.current.toast.info(`Claude moved "${task.title}" to ${to === GLOBAL ? 'global tasks' : 'this project'}`);
+        return `moved ${id} to ${where(to)}`;
       },
     };
 
