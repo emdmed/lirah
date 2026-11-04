@@ -8,6 +8,7 @@ import { useTabActions } from './TabContext';
 import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
 import { useToast } from '../toast/ToastContext';
+import { IS_WINDOWS } from '../../utils/pathUtils';
 import {
   addStartupProject, getStartup, removeStartupProject, setStartupMode,
 } from '../agent-control/actions';
@@ -142,9 +143,11 @@ export function useTabCommands({
         changeTheme(name);
       } },
       { id: 'sandbox', hint: 'sandbox the terminal (restarts it)', options: ['on', 'off'], run: (arg) => {
+        if (IS_WINDOWS) throw new Error('the sandbox is not available on Windows');
         if (onOff(arg, sandboxEnabled) !== sandboxEnabled) toggleSandbox();
       } },
       { id: 'net', hint: 'isolate network in the sandbox', options: ['on', 'off'], run: (arg) => {
+        if (IS_WINDOWS) throw new Error('the sandbox is not available on Windows');
         if (!sandboxEnabled) throw new Error('sandbox is off');
         // "net on" means network allowed, i.e. isolation off.
         const wantIsolated = arg === 'off' ? true : arg === 'on' ? false : !networkIsolation;
