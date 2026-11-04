@@ -7,6 +7,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getSettings, setSetting } from '../settings/settingsStore';
 import { MAX_TABS, tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
+import { useTasksActions } from '../tasks/TasksContext';
+import { GLOBAL, splitTaskText } from '../tasks/taskModel';
+import { resolveRepoRoot } from '../plans/planRepoRoot';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
@@ -19,7 +22,7 @@ import {
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get' };
+const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'add' };
 
 const flag = (v) => (v === undefined ? undefined : v === true || v === 'true' || v === 'on' || v === 1);
 
@@ -40,9 +43,10 @@ export function useAgentControl() {
   const theme = useTheme();
   const tabManager = useTabManager();
   const { bookmarks } = useBookmarks();
+  const { addTask } = useTasksActions();
   // The listener is set up once; it reads the latest of these through the ref.
   const live = useRef({});
-  live.current = { toast, confirm, theme, tabManager, bookmarks };
+  live.current = { toast, confirm, theme, tabManager, bookmarks, addTask };
 
   useEffect(() => {
     // Ask before a guarded change. Resolves true when allowed.
@@ -156,6 +160,22 @@ export function useAgentControl() {
         if (!count) return 'no startup projects to clear';
         live.current.toast.info('Claude cleared the startup projects');
         return `cleared ${count} startup project${count === 1 ? '' : 's'}`;
+      },
+
+      // Tasks: into the caller tab's project list (as the tasks pane scopes it), or --global.
+      'tasks.add': async (args, words, { sessionId }) => {
+        const fields = splitTaskText(words.length ? words.join(' ') : String(args.title ?? ''));
+        if (args.notes !== undefined) fields.notes = [fields.notes, String(args.notes)].filter(Boolean).join('\n\n');
+        if (!fields.title) throw new Error('missing title: lirah tasks add <title> [--notes N] [--global]');
+        let scope = GLOBAL;
+        if (args.global !== true) {
+          const tab = callerTab(live.current.tabManager.tabs, sessionId);
+          if (!tab) throw new Error("can't tell which tab this is; pass --global for the global list");
+          scope = (await resolveRepoRoot(tab.projectPath).catch(() => null)) || tab.projectPath;
+        }
+        const id = await live.current.addTask(scope, fields);
+        live.current.toast.info(`Claude added task "${fields.title}"`);
+        return `added task ${id} to ${scope === GLOBAL ? 'the global list' : scope}`;
       },
     };
 

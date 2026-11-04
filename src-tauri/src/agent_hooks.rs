@@ -298,7 +298,7 @@ fn install_control_plugin(
         "name": "lirah-control",
         "version": "1.0.0",
         "author": { "name": "Lirah" },
-        "description": "Teaches the agent to configure Lirah (settings, theme, tabs, startup) with the lirah command."
+        "description": "Teaches the agent to configure Lirah (settings, theme, tabs, startup) and add tasks with the lirah command."
     }))?;
     write_if_changed(&plugin.join(".claude-plugin").join("plugin.json"), &manifest)
         .map_err(|e| e.to_string())?;

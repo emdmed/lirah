@@ -36,6 +36,9 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  starts its agent, --name names its tab
   lirah startup remove <path>    remove a startup project
   lirah startup clear            remove all startup projects
+  lirah tasks add <title> [--notes N] [--global]
+                                 add a task to this tab's project list
+                                 (--global: the global list)
   lirah ping                     check that Lirah is reachable
 
   <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
@@ -249,6 +252,15 @@ function route(cmd, positional, args) {
       }
       case "clear": return ["startup.clear", rest, show];
       default: fail(`unknown startup command "${sub}" (mode, add, remove, clear)`);
+    }
+  }
+  if (cmd === "tasks" || cmd === "task") {
+    switch (sub ?? "add") {
+      case "add": {
+        unswallow(args, "global", rest);
+        return ["tasks.add", rest, show];
+      }
+      default: fail(`unknown tasks command "${sub}" (add)`);
     }
   }
   return [cmd, positional, show];

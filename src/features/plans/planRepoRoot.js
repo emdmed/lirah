@@ -4,7 +4,7 @@ import { repoTop } from '../../lib/git';
 import { planWorktreeOwner } from './planGit';
 
 // A tab inside a plan's worktrees shows the plans of the repo that owns them.
-async function resolveRepoRoot(projectPath) {
+export async function resolveRepoRoot(projectPath) {
   const home = await invoke('get_home_dir').catch(() => null);
   const owner = home ? await planWorktreeOwner(home, projectPath) : null;
   if (owner) return owner;
