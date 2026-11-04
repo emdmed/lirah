@@ -4,6 +4,17 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-04
+
+### Added
+
+- **Workspaces are groups of tabs** - The Workspace pane's legend lists your workspaces: click one to switch, double-click to rename, + to add, × to remove (it asks, then closes its tabs). Alt+W cycles them, and the `workspace <name>` command switches or adds one. Each workspace lists only its own tabs and comes back to the tab you were on; tabs in the other workspaces keep running, and a green dot marks a workspace whose agent is waiting on you. Your open tabs start in a workspace called `main`.
+- **Agents manage tasks, plans and jobs** - The `lirah` CLI in a tab gains `lirah tasks` (add, list, done, reopen, edit, remove, move), `lirah plans` (list, import, finish, debug) and `lirah jobs` (list, show, run, cancel, apply).
+
+### Removed
+
+- **Symlink workspaces** - The old workspaces that linked several projects into one folder are gone, with the project picker before lazygit, auto-commit and auto-merge. Folders already in `~/.lirah/workspaces` are left on disk.
+
 ## [0.10.0] - 2026-11-04
 
 ### Added
