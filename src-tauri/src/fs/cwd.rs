@@ -25,7 +25,7 @@ pub async fn get_terminal_cwd(
     let state = state.inner().clone();
     crate::ipc::blocking("get_terminal_cwd", move || {
         // Copy what we need and release the global lock before touching /proc.
-        let (pid, sandboxed, path_map) = {
+        let (pid, sandboxed) = {
             let state_lock = state
                 .lock()
                 .map_err(|e| format!("Failed to lock state: {}", e))?;
@@ -38,13 +38,9 @@ pub async fn get_terminal_cwd(
                 .child
                 .process_id()
                 .ok_or_else(|| "Failed to get process ID".to_string())?;
-            let path_map = state_lock
-                .workspace_context
-                .as_ref()
-                .map(|ctx| ctx.path_map.clone());
-            (pid, session.sandboxed, path_map)
+            (pid, session.sandboxed)
         };
-        process_cwd(pid, sandboxed, path_map.as_ref())
+        process_cwd(pid, sandboxed)
     })
     .await
 }
@@ -53,7 +49,6 @@ pub async fn get_terminal_cwd(
 fn process_cwd(
     pid: u32,
     sandboxed: bool,
-    path_map: Option<&std::collections::HashMap<String, String>>,
 ) -> Result<String, String> {
     #[cfg(target_os = "linux")]
     {
@@ -67,15 +62,9 @@ fn process_cwd(
 
         // On Linux, read /proc/[pid]/cwd symlink
         let cwd_link = format!("/proc/{}/cwd", target_pid);
-        let real_path = fs::read_link(&cwd_link)
+        fs::read_link(&cwd_link)
             .map(|p| p.to_string_lossy().to_string())
-            .map_err(|e| format!("Failed to read cwd from /proc: {}", e))?;
-
-        // If workspace is active, translate real path to workspace-relative symlink path
-        match path_map {
-            Some(map) => Ok(crate::workspace::manager::translate_path(&real_path, map)),
-            None => Ok(real_path),
-        }
+            .map_err(|e| format!("Failed to read cwd from /proc: {}", e))
     }
 
     #[cfg(target_os = "windows")]

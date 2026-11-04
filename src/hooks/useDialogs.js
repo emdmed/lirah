@@ -18,8 +18,6 @@ const FLAGS = {
   dashboardOpen: "tokens",
   contextDetailsOpen: "contextBreakdown",
   autoChangelogDialogOpen: "autoChangelog",
-  workspaceDialogOpen: "workspace",
-  projectPickerOpen: "projectPicker",
   orchestrationDashboardOpen: "orchestration",
   markdownViewerOpen: "markdown",
 };
@@ -33,7 +31,6 @@ export function useDialogs(scope) {
   // What a dialog opens on, set just before it opens.
   const [diffFilePath, setDiffFilePath] = useState(null);
   const [markdownFilePath, setMarkdownFilePath] = useState(null);
-  const [projectPickerAction, setProjectPickerAction] = useState(null);
 
   const setters = useMemo(() => {
     const out = {};
@@ -56,7 +53,6 @@ export function useDialogs(scope) {
       ...setters,
       diffFilePath, setDiffFilePath,
       markdownFilePath, setMarkdownFilePath,
-      projectPickerAction, setProjectPickerAction,
     };
-  }, [open, setters, diffFilePath, markdownFilePath, projectPickerAction]);
+  }, [open, setters, diffFilePath, markdownFilePath]);
 }

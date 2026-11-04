@@ -49,7 +49,7 @@ function tally(kinds) {
 }
 
 export function TabsSummaryPane() {
-  const { tabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
+  const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
   const { bookmarks } = useBookmarks();
@@ -145,7 +145,10 @@ export function TabsSummaryPane() {
 
   return (
     <div className="group/list flex flex-col" onKeyDown={onListKey}>
-      {tabs.map((tab, index) => {
+      {workspaceTabs.length === 0 && (
+        <span className="px-3 pt-2 text-[11px] text-muted-foreground">No tabs in this workspace yet.</span>
+      )}
+      {workspaceTabs.map((tab, index) => {
         const work = remote[tab.id];
         const workFrom = work && tabs.find((t) => t.id === work.fromTabId);
         const workLabel = workFrom && remoteLabel(work, tabName(workFrom));

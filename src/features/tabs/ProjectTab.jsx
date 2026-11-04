@@ -39,7 +39,7 @@ import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
 import { summarizeContext } from "../../components/textarea-panel/contextSummary";
-import { escapeShellPath, getRelativePath, normalizePath, IS_WINDOWS } from "../../utils/pathUtils";
+import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
@@ -63,7 +63,6 @@ import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
 import { useSeededSetting, useSetting, getSettings } from "../settings/settingsStore";
 import { usePatterns } from "../patterns";
-import { useWorkspace } from "../../hooks/useWorkspace";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
 import { useTabShortcuts } from "./useTabShortcuts";
 import { useTabCommands } from "./useTabCommands";
@@ -356,9 +355,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   useTabAutoCommit(tabId, autoCommit.stage);
   const autoMerge = useAutoMerge();
 
-  // Workspace state
-  const workspaceHook = useWorkspace();
-
   const sidebarSearch = useSidebarSearch();
 
   const treeView = useTreeView({
@@ -385,62 +381,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       } catch { /* ignore errors */ }
     }
   }, [terminalSessionId]);
-
-  // Workspace navigation
-  const navigateToWorkspace = useCallback(async (workspacePath) => {
-    if (!terminalSessionId) return;
-    try {
-      await terminateCliProcess();
-      const safePath = escapeShellPath(workspacePath);
-      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${safePath}\r` });
-      await new Promise(resolve => setTimeout(resolve, 100));
-      await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-      if (viewMode === 'flat') await loadFolders();
-      else if (viewMode === 'tree') await treeView.loadTreeData();
-    } catch (error) {
-      console.error('Failed to navigate to workspace:', error);
-      toast.error(`Couldn't open workspace: ${error?.message || error}`);
-    }
-  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData, terminateCliProcess, toast.error]);
-
-  const handleCreateWorkspace = useCallback(async (name, projects) => {
-    const info = await workspaceHook.createWorkspace(name, projects);
-    if (info?.path) await navigateToWorkspace(info.path);
-    return info;
-  }, [workspaceHook.createWorkspace, navigateToWorkspace]);
-
-  const handleOpenWorkspace = useCallback(async (workspacePath) => {
-    const info = await workspaceHook.openWorkspace(workspacePath);
-    if (info?.path) await navigateToWorkspace(info.path);
-    return info;
-  }, [workspaceHook.openWorkspace, navigateToWorkspace]);
-
-  // Windows cannot remove a folder that a terminal uses as its cwd, so leave it first.
-  const handleDeleteWorkspace = useCallback(async (workspacePath) => {
-    const fold = (p) => (IS_WINDOWS ? normalizePath(p).toLowerCase() : normalizePath(p));
-    const isInside = (cwd) => !!cwd && (fold(cwd) === fold(workspacePath) || fold(cwd).startsWith(`${fold(workspacePath)}/`));
-    const readCwd = () => invoke('get_terminal_cwd', { sessionId: terminalSessionId });
-    try {
-      if (terminalSessionId && isInside(await readCwd())) {
-        await terminateCliProcess();
-        const root = await invoke('get_workspaces_dir');
-        // Ctrl-C first so a half-typed line or a running command does not swallow the cd.
-        await invoke('write_to_terminal', { sessionId: terminalSessionId, data: '\x03' });
-        await new Promise(resolve => setTimeout(resolve, 150));
-        await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${escapeShellPath(root)}\r` });
-        // The Windows prompt reports its cwd only when it redraws.
-        for (let i = 0; i < 10; i++) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-          if (!isInside(await readCwd())) break;
-        }
-        if (viewMode === 'flat') await loadFolders();
-        else if (viewMode === 'tree') await treeView.loadTreeData();
-      }
-    } catch (error) {
-      console.error('Failed to leave the workspace folder:', error);
-    }
-    await workspaceHook.deleteWorkspace(workspacePath);
-  }, [terminalSessionId, viewMode, loadFolders, treeView?.loadTreeData, terminateCliProcess, workspaceHook.deleteWorkspace]);
 
   const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
 
@@ -872,45 +812,30 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     };
   }, [isActive, terminalReady]);
 
-  // Auto-commit and lazygit ask which project first when a workspace holds
-  // several. Refs keep these callbacks stable across stage/workspace changes.
+  // Refs keep these callbacks stable across stage changes.
   const autoCommitStageRef = useRef(autoCommit.stage);
-  const workspaceRef = useRef(workspaceHook.workspace);
   const autoCommitHiddenRef = useRef(autoCommit.hidden);
   useEffect(() => { autoCommitStageRef.current = autoCommit.stage; }, [autoCommit.stage]);
   useEffect(() => { autoCommitHiddenRef.current = autoCommit.hidden; }, [autoCommit.hidden]);
-  useEffect(() => { workspaceRef.current = workspaceHook.workspace; }, [workspaceHook.workspace]);
 
-  const { setProjectPickerAction, setProjectPickerOpen } = dialogs;
   const handleAutoCommit = useCallback(() => {
     // A finished run that was hidden comes back for review.
     const stage = autoCommitStageRef.current;
     if (autoCommitHiddenRef.current && (stage === 'ready' || stage === 'error')) autoCommit.show();
     else if (autoCommitStageRef.current !== 'idle') autoCommit.quickCommit();
-    else if (workspaceRef.current?.projects?.length) {
-      setProjectPickerAction('autocommit');
-      setProjectPickerOpen(true);
-    } else autoCommit.trigger(currentPathRef.current);
-  }, [autoCommit.show, autoCommit.quickCommit, autoCommit.trigger, setProjectPickerAction, setProjectPickerOpen]);
+    else autoCommit.trigger(currentPathRef.current);
+  }, [autoCommit.show, autoCommit.quickCommit, autoCommit.trigger]);
 
   const autoMergeStageRef = useRef(autoMerge.stage);
   useEffect(() => { autoMergeStageRef.current = autoMerge.stage; }, [autoMerge.stage]);
   const handleAutoMerge = useCallback(() => {
     if (autoMergeStageRef.current !== 'idle') return;
-    if (workspaceRef.current?.projects?.length) {
-      setProjectPickerAction('automerge');
-      setProjectPickerOpen(true);
-    } else autoMerge.trigger(currentPathRef.current);
-  }, [autoMerge.trigger, setProjectPickerAction, setProjectPickerOpen]);
+    autoMerge.trigger(currentPathRef.current);
+  }, [autoMerge.trigger]);
 
   const handleOpenLazygit = useCallback(() => {
-    if (workspaceRef.current?.projects?.length) {
-      setProjectPickerAction('lazygit');
-      setProjectPickerOpen(true);
-    } else {
-      secondary.openWithCommand('lazygit');
-    }
-  }, [secondary.openWithCommand, setProjectPickerAction, setProjectPickerOpen]);
+    secondary.openWithCommand('lazygit');
+  }, [secondary.openWithCommand]);
 
   // Types a slash command into the tab's CLI and presses Enter.
   const sendCliCommand = useCallback(async (command) => {
@@ -997,14 +922,13 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     atMention.setAtMentionQuery(null);
   }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery]);
   const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setContextDetailsOpen, setSettingsOpen,
-    setWorkspaceDialogOpen, setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
+    setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
     setSaveFileGroupDialogOpen } = dialogs;
   const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [setShowHelp]);
   const openCliSettings = useCallback(() => setCliSelectionModalOpen(true), [setCliSelectionModalOpen]);
   const openDashboard = useCallback(() => setDashboardOpen(true), [setDashboardOpen]);
   const openContextDetails = useCallback(() => setContextDetailsOpen(true), [setContextDetailsOpen]);
   const openSettings = useCallback(() => setSettingsOpen(true), [setSettingsOpen]);
-  const openWorkspaceDialog = useCallback(() => setWorkspaceDialogOpen(true), [setWorkspaceDialogOpen]);
   const openAddBookmark = useCallback(() => setAddBookmarkDialogOpen(true), [setAddBookmarkDialogOpen]);
   const openManageTemplates = useCallback(() => setManageTemplatesDialogOpen(true), [setManageTemplatesDialogOpen]);
   const openSaveFileGroup = useCallback(() => setSaveFileGroupDialogOpen(true), [setSaveFileGroupDialogOpen]);
@@ -1230,9 +1154,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
             onShowAutoCommit={autoCommit.show}
             onAutoMerge={handleAutoMerge}
             onToggleSandbox={toggleSandbox}
-            workspace={workspaceHook.workspace}
-            onOpenWorkspaceDialog={openWorkspaceDialog}
-            onCloseWorkspace={workspaceHook.closeWorkspace}
             onClearContext={handleClearContext}
             onCompactContext={handleCompactContext}
             compactionEnabled={compaction.compactionEnabled}
@@ -1310,13 +1231,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
         projectStats={projectStats}
         refreshProjectStats={refreshProjectStats}
         theme={theme}
-        workspaceHook={workspaceHook}
         secondary={secondary}
         orchestrationCheck={orchestrationCheck}
         navigateToBookmark={navigateToBookmark}
-        handleCreateWorkspace={handleCreateWorkspace}
-        handleOpenWorkspace={handleOpenWorkspace}
-        handleDeleteWorkspace={handleDeleteWorkspace}
         markdownFiles={markdownFiles}
         viewMarkdownFile={viewMarkdownFile}
       />

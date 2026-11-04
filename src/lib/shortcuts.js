@@ -34,6 +34,7 @@ export const SHORTCUTS = [
   { id: 'tab-close', keys: ['Ctrl', 'W'], description: 'Close Tab', category: 'Tabs', note: 'when more than one is open', hint: { bar: 'ctrl', label: 'close tab' }, paletteCommand: 'close', match: (e) => mod(e) && e.key === 'w' && !e.shiftKey && !e.altKey },
   { id: 'tab-next', keys: ['Ctrl', 'Tab'], description: 'Next Tab', category: 'Tabs', note: '+Shift for previous', match: (e) => mod(e) && e.key === 'Tab' },
   { id: 'tab-goto', keys: ['Ctrl', '1-9'], description: 'Go to Tab N', category: 'Tabs', hint: { bar: 'ctrl', label: 'go to tab' }, match: (e) => mod(e) && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9' },
+  { id: 'workspace-next', keys: ['Alt', 'W'], description: 'Next Workspace', category: 'Tabs', note: '+Shift for previous', match: (e) => alt(e) && e.code === 'KeyW' },
   { id: 'attention-jump', keys: ['Alt', 'A'], description: 'Jump to Agent Waiting on You', category: 'Tabs', note: 'repeat for the next', paletteCommand: 'waiting', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyA' },
 
   // Panes & views

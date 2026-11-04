@@ -23,7 +23,7 @@ import { useSetting } from "./features/settings/settingsStore";
 import { useAgentControl } from "./features/agent-control/useAgentControl";
 
 function App() {
-  const { tabs, activeTabId, startupPending, openedStartup, addTab, requestCloseTab, switchTab } = useTabManager();
+  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, openedStartup, addTab, requestCloseTab, switchTab, switchWorkspace } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
@@ -77,13 +77,16 @@ function App() {
   // Fetch CLI initial path on mount and create first tab. In 'projects'
   // startup mode this waits until TabProvider has opened the startup projects;
   // the CLI path then opens on top of them.
+  // Once the first tabs are settled, a workspace with no tab (a new one, or
+  // the first run) shows the chooser for where its first tab works.
   const initialTabsDone = useRef(false);
   const [showFirstTabChooser, setShowFirstTabChooser] = useState(false);
   useEffect(() => {
     if (startupPending || initialTabsDone.current) return;
     initialTabsDone.current = true;
     if (tabs.length > 0 && !openedStartup) {
-      // Tabs restored from localStorage — nothing to do
+      // Tabs restored from localStorage — nothing to open
+      setShowFirstTabChooser(true);
       return;
     }
     invoke('get_initial_path').then(async (path) => {
@@ -93,15 +96,8 @@ function App() {
         switchTab(open.id);
       } else if (path) {
         addTab(path);
-      } else if (!(openedStartup && tabs.length > 0)) {
-        // No CLI path and nothing to restore: open no tab and let the user
-        // choose where the first one works.
-        setShowFirstTabChooser(true);
       }
-    }).catch(() => {
-      if (openedStartup && tabs.length > 0) return;
-      setShowFirstTabChooser(true);
-    });
+    }).catch(() => {}).finally(() => setShowFirstTabChooser(true));
   }, [startupPending]);
 
   // New tab: pick the project first (current, starred, or any folder).
@@ -121,21 +117,32 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl+Tab: next tab; Ctrl+Shift+Tab: previous tab
+      // Both count within the active workspace.
       if (matches('tab-next', e)) {
-        if (tabs.length === 0) return;
+        if (workspaceTabs.length === 0) return;
         e.preventDefault();
-        const idx = tabs.findIndex(t => t.id === activeTabId);
-        const step = e.shiftKey ? tabs.length - 1 : 1;
-        switchTab(tabs[(idx + step) % tabs.length].id);
+        const idx = workspaceTabs.findIndex(t => t.id === activeTabId);
+        const step = e.shiftKey ? workspaceTabs.length - 1 : 1;
+        switchTab(workspaceTabs[(idx + step) % workspaceTabs.length].id);
         return;
       }
       // Ctrl+1-9: switch to tab N
       if (matches('tab-goto', e)) {
         const tabIdx = parseInt(e.key, 10) - 1;
-        if (tabIdx < tabs.length) {
+        if (tabIdx < workspaceTabs.length) {
           e.preventDefault();
-          switchTab(tabs[tabIdx].id);
+          switchTab(workspaceTabs[tabIdx].id);
         }
+        return;
+      }
+      // Alt+W: next workspace; Alt+Shift+W: previous
+      if (matches('workspace-next', e)) {
+        if (workspaces.length < 2) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
+        const step = e.shiftKey ? workspaces.length - 1 : 1;
+        switchWorkspace(workspaces[(idx + step) % workspaces.length].id);
         return;
       }
       // Alt+A: next tab whose agent is waiting on you
@@ -165,7 +172,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, activeTabId, switchTab, requestCloseTab, handleNewTab, jumpToNext]);
+  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext]);
 
   return (
     <SubagentProvider tabs={tabs}>
@@ -186,7 +193,7 @@ function App() {
                 />
               </DevProfiler>
             ))}
-            {showFirstTabChooser && tabs.length === 0 && (
+            {showFirstTabChooser && workspaceTabs.length === 0 && (
               <FirstTabChooser onOpenProject={(path) => addTab(path)} />
             )}
           </div>

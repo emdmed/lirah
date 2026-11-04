@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 // Inline rename: Enter commits, Escape cancels, blur commits. An empty name
 // (or the automatic one) goes back to automatic naming.
-export function RenameField({ initial, onCommit, onCancel }) {
+export function RenameField({ initial, onCommit, onCancel, label = 'Tab name' }) {
   const ref = useRef(null);
   const done = useRef(false);
   useEffect(() => {
@@ -19,7 +19,7 @@ export function RenameField({ initial, onCommit, onCancel }) {
     <input
       ref={ref}
       defaultValue={initial}
-      aria-label="Tab name"
+      aria-label={label}
       spellCheck={false}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}

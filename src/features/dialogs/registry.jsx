@@ -2,7 +2,6 @@ import { lazyNamed } from "@/lib/lazyNamed";
 import { AddBookmarkDialog } from "@/features/bookmarks/AddBookmarkDialog";
 import { SaveFileGroupDialog } from "@/features/file-groups/SaveFileGroupDialog";
 import { CliSelectionModal } from "@/features/cli-selection/CliSelectionModal";
-import { WorkspaceProjectPicker } from "@/components/WorkspaceProjectPicker";
 import { useTokenUsageValue } from "@/features/token-budget/tokenUsageStore";
 
 // Every dialog a tab can open, by id. `props(ctx, entry)` builds the dialog's
@@ -23,7 +22,6 @@ const TokenDashboard = lazyNamed(() => import("@/features/token-budget/TokenDash
 const ContextBreakdownDialog = lazyNamed(() => import("@/features/token-budget/ContextBreakdownDialog"), "ContextBreakdownDialog");
 const AutoChangelogDialog = lazyNamed(() => import("@/features/git/AutoChangelogDialog"), "AutoChangelogDialog");
 const OrchestrationDashboard = lazyNamed(() => import("@/components/OrchestrationDashboard"), "OrchestrationDashboard");
-const WorkspaceDialog = lazyNamed(() => import("@/components/WorkspaceDialog"), "WorkspaceDialog");
 const SettingsDialog = lazyNamed(() => import("@/features/settings/SettingsDialog"), "SettingsDialog");
 const GitDiffDialog = lazyNamed(() => import("@/features/git/GitDiffDialog"), "GitDiffDialog");
 const MarkdownViewerDialog = lazyNamed(() => import("@/features/markdown/MarkdownViewerDialog"), "MarkdownViewerDialog");
@@ -106,38 +104,6 @@ export const TAB_DIALOGS = {
       projectPath: ctx.currentPath,
       theme: ctx.theme,
     }),
-  },
-  workspace: {
-    Component: WorkspaceDialog,
-    props: (ctx) => ({
-      onCreateWorkspace: ctx.handleCreateWorkspace,
-      existingWorkspaces: ctx.workspaceHook.workspaces,
-      onOpenWorkspace: ctx.handleOpenWorkspace,
-      onDeleteWorkspace: ctx.handleDeleteWorkspace,
-    }),
-  },
-  projectPicker: {
-    Component: WorkspaceProjectPicker,
-    when: (ctx) => !!ctx.workspaceHook.workspace?.projects,
-    props: ({ dialogs, workspaceHook, secondary, autoCommit, autoMerge }) => {
-      const done = () => {
-        dialogs.setProjectPickerOpen(false);
-        dialogs.setProjectPickerAction(null);
-      };
-      return {
-        projects: workspaceHook.workspace.projects,
-        action: dialogs.projectPickerAction,
-        onSelect: (project) => {
-          const action = dialogs.projectPickerAction;
-          done();
-          const path = project.real_path || project.path;
-          if (action === "lazygit") secondary.openWithCommand("lazygit", path);
-          else if (action === "autocommit") autoCommit.trigger(path);
-          else if (action === "automerge") autoMerge.trigger(path);
-        },
-        onOpenChange: (open) => { if (!open) done(); },
-      };
-    },
   },
   orchestration: {
     Component: OrchestrationDashboard,

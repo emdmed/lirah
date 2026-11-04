@@ -8,7 +8,6 @@ mod typecheck;
 mod python_parser;
 mod commit_watcher;
 mod claude;
-mod workspace;
 mod fs_watcher;
 mod agent_runner;
 mod ipc;
@@ -201,13 +200,6 @@ pub fn run(initial_path: Option<String>) {
             agent_hooks::set_opencode_agent_plugin,
             agent_hooks::set_prompt_context,
             agent_control::agent_control_reply,
-            // Workspaces
-            workspace::create_workspace,
-            workspace::delete_workspace,
-            workspace::list_workspaces,
-            workspace::get_workspaces_dir,
-            workspace::open_workspace,
-            workspace::close_workspace,
             // Agent jobs
             agent_runner::commands::run_agent_job,
             agent_runner::commands::cancel_agent_job,

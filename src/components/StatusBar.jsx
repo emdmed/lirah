@@ -1,7 +1,7 @@
 import { useMemo, memo } from 'react';
 import {
   Keyboard, Bot, Terminal, BarChart3, Settings, GitCommitHorizontal,
-  Layers, X, GitMerge, ScanSearch, Shrink, Eraser
+  GitMerge, ScanSearch, Shrink, Eraser
 } from 'lucide-react';
 import { Scanner } from './instrument/Scanner';
 import { Button } from './ui/button';
@@ -286,7 +286,7 @@ export const StatusBar = memo(({
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenDashboard, onOpenContextDetails, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
   autoCommitStage = 'idle', onShowAutoCommit,
-  workspace, onOpenWorkspaceDialog, onCloseWorkspace, onClearContext, onCompactContext,
+  onClearContext, onCompactContext,
   availableUpdate, compactionEnabled = false, onToggleCompaction,
 }) => {
   const confirm = useConfirm();
@@ -334,26 +334,11 @@ export const StatusBar = memo(({
       className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
       {...drag}
     >
-      {/* LEFT: maker's legend, workspace + update. Project and branch live in
+      {/* LEFT: maker's legend + update. Project and branch live in
           the sidebar's TABS pane. On macOS the window controls come first, at the left. */}
       <div className="flex items-center gap-3 overflow-hidden min-w-0" {...drag}>
         {IS_MAC && showTitleBar && <WindowControls />}
         <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />
-        <div className="flex items-center gap-1.5 min-w-0">
-          {workspace && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="xs" onClick={onOpenWorkspaceDialog} className="gap-1.5 px-1.5 h-5 before:content-none after:content-none">
-                  <span className="ins-legend">Ws</span>
-                  <span className="opacity-70">{workspace.name}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Workspace: {workspace.projects.map(p => p.name).join(' + ')}
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
 
         <AttentionIndicator />
         <AutopilotIndicator />
@@ -488,20 +473,6 @@ export const StatusBar = memo(({
                 Keyboard Shortcuts
                 <DropdownMenuShortcut keys={shortcutForCommand('help')} />
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator star />
-            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onOpenWorkspaceDialog} className="cursor-pointer py-1">
-                <Layers className="mr-2 w-3 h-3" />
-                {workspace ? `Workspace: ${workspace.name}` : 'Workspaces…'}
-              </DropdownMenuItem>
-              {workspace && (
-                <DropdownMenuItem onClick={onCloseWorkspace} className="cursor-pointer py-1">
-                  <X className="mr-2 w-3 h-3" />
-                  Close Workspace
-                </DropdownMenuItem>
-              )}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

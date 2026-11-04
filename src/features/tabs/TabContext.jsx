@@ -16,6 +16,7 @@ const TabContext = createContext(null);
 const TabActionsContext = createContext(null);
 
 const STORAGE_KEY = 'nevo-terminal:tabs';
+const WORKSPACES_KEY = 'nevo-terminal:workspaces';
 export const MAX_TABS = 8;
 const LIMIT_MESSAGE = `Tab limit reached (${MAX_TABS}) — close a tab first`;
 // Agent states where closing the tab would kill work in flight.
@@ -27,12 +28,29 @@ export function tabDisplayName(tab, bookmarks = []) {
   return tab.customLabel || bookmarks.find((b) => b.path === tab.projectPath)?.name || tab.label;
 }
 
+// A workspace is a named group of tabs. Tabs of the other workspaces stay
+// mounted and keep running; only the active workspace's tabs are listed.
+function createWorkspace(name) {
+  return { id: crypto.randomUUID(), name };
+}
+
+// Saved workspaces, with one to start from; saved tabs from before workspaces
+// (or of a workspace that is gone) join the first one.
+function loadWorkspaces(tabs) {
+  const saved = loadJson(WORKSPACES_KEY, null);
+  const workspaces = Array.isArray(saved) && saved.length > 0 ? saved : [createWorkspace('main')];
+  const ids = new Set(workspaces.map((w) => w.id));
+  const placed = tabs.map((t) => (ids.has(t.workspaceId) ? t : { ...t, workspaceId: workspaces[0].id }));
+  return { workspaces, tabs: placed };
+}
+
 // `launch` asks the tab to start its agent once its shell is up, even with
 // auto-launch off; ProjectTab clears it as soon as it boots.
-function createTab(projectPath, { launch = false, name } = {}) {
+function createTab(projectPath, { launch = false, name, workspaceId } = {}) {
   return {
     id: crypto.randomUUID(),
     projectPath,
+    workspaceId,
     label: projectPath.split('/').filter(Boolean).pop() || projectPath,
     ...(name?.trim() && { customLabel: name.trim() }),
     ...(launch && { launch: true }),
@@ -48,7 +66,7 @@ function startupProjectList() {
 
 // Tabs for the startup projects whose folder still exists; the rest are named
 // in `missing`. Capped at MAX_TABS.
-async function buildStartupTabs(projects) {
+async function buildStartupTabs(projects, workspaceId) {
   let home = null;
   const checked = await Promise.all(projects.map(async (p) => {
     let path = p.path.trim();
@@ -63,7 +81,7 @@ async function buildStartupTabs(projects) {
   const tabs = checked
     .filter((p) => p.exists)
     .slice(0, MAX_TABS)
-    .map((p) => createTab(p.path, { launch: !!p.launch, name: p.name }));
+    .map((p) => createTab(p.path, { launch: !!p.launch, name: p.name, workspaceId }));
   return { tabs, missing: checked.filter((p) => !p.exists).map((p) => p.path) };
 }
 
@@ -74,17 +92,24 @@ export function TabProvider({ children }) {
   // projects open instead, once their folders are checked (startupPending).
   const [startupProjects] = useState(startupProjectList);
   const [startupPending, setStartupPending] = useState(!!startupProjects);
-  const [tabs, setTabs] = useState(() => {
-    if (startupProjects) return [];
-    const parsed = loadJson(STORAGE_KEY, null);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [];
+  const [initial] = useState(() => {
+    const parsed = startupProjects ? [] : loadJson(STORAGE_KEY, null);
+    return loadWorkspaces(Array.isArray(parsed) ? parsed : []);
   });
+  const [tabs, setTabs] = useState(initial.tabs);
+  const [workspaces, setWorkspaces] = useState(initial.workspaces);
 
   const [activeTabId, setActiveTabId] = useState(() => {
     const stored = loadText(STORAGE_KEY + ':active');
     if (stored && tabs.find(t => t.id === stored)) return stored;
     return tabs[0]?.id || null;
   });
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => {
+    const stored = loadText(WORKSPACES_KEY + ':active');
+    const fromTab = tabs.find((t) => t.id === activeTabId)?.workspaceId;
+    return fromTab || (workspaces.some((w) => w.id === stored) ? stored : workspaces[0].id);
+  });
+  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId), [tabs, activeWorkspaceId]);
 
   // Persist tabs to localStorage synchronously on every change.
   // A debounce here loses state: the window's close button calls
@@ -95,22 +120,36 @@ export function TabProvider({ children }) {
     perfTabSwitchStep('effects-flushed');
     saveJson(STORAGE_KEY, tabs);
     saveText(STORAGE_KEY + ':active', activeTabId || '');
-  }, [tabs, activeTabId]);
+    saveJson(WORKSPACES_KEY, workspaces);
+    saveText(WORKSPACES_KEY + ':active', activeWorkspaceId);
+  }, [tabs, activeTabId, workspaces, activeWorkspaceId]);
 
   // Latest values for the actions below, so they can stay referentially stable.
   const tabsRef = useRef(tabs);
   const activeTabIdRef = useRef(activeTabId);
+  const workspacesRef = useRef(workspaces);
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => {
     tabsRef.current = tabs;
     activeTabIdRef.current = activeTabId;
-  }, [tabs, activeTabId]);
+    workspacesRef.current = workspaces;
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  }, [tabs, activeTabId, workspaces, activeWorkspaceId]);
+
+  // Each workspace comes back to the tab it was on.
+  useEffect(() => {
+    if (!activeTabId) return;
+    setWorkspaces((prev) => (prev.some((w) => w.id === activeWorkspaceId && w.lastTabId !== activeTabId)
+      ? prev.map((w) => (w.id === activeWorkspaceId ? { ...w, lastTabId: activeTabId } : w))
+      : prev));
+  }, [activeTabId, activeWorkspaceId]);
 
   // Open the startup projects. App waits on startupPending before adding the
   // CLI path's tab (or the fallback tab when none opened).
   useEffect(() => {
     if (!startupProjects) return;
     let cancelled = false;
-    buildStartupTabs(startupProjects).then(({ tabs: opened, missing }) => {
+    buildStartupTabs(startupProjects, activeWorkspaceIdRef.current).then(({ tabs: opened, missing }) => {
       if (cancelled) return;
       if (missing.length > 0) {
         toast.warning(missing.length === 1
@@ -131,7 +170,7 @@ export function TabProvider({ children }) {
       toast.warning(LIMIT_MESSAGE);
       return null;
     }
-    const tab = createTab(projectPath, options);
+    const tab = createTab(projectPath, { ...options, workspaceId: activeWorkspaceIdRef.current });
     tabsRef.current = [...tabsRef.current, tab];
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
@@ -144,10 +183,13 @@ export function TabProvider({ children }) {
       if (idx === -1) return prev;
       const next = prev.filter(t => t.id !== tabId);
       if (next.length === 0) return prev; // Don't remove last tab here; lifecycle handles it
-      // If removing active tab, switch to adjacent
+      // If removing the active tab, switch to the adjacent one in its
+      // workspace; the workspace may be left empty.
       if (tabId === activeTabIdRef.current) {
-        const newIdx = Math.min(idx, next.length - 1);
-        setActiveTabId(next[newIdx].id);
+        const ws = prev[idx].workspaceId;
+        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws);
+        const after = next.slice(idx).filter((t) => t.workspaceId === ws);
+        setActiveTabId((after[0] || before[before.length - 1])?.id || null);
       }
       return next;
     });
@@ -192,17 +234,86 @@ export function TabProvider({ children }) {
     return true;
   }, [confirmCloseTab, removeTab]);
 
+  // A tab in another workspace (Alt+A, a plan's tab) brings its workspace along.
   const switchTab = useCallback((tabId) => {
     if (tabId !== activeTabIdRef.current) perfTabSwitchStart();
+    const ws = tabsRef.current.find((t) => t.id === tabId)?.workspaceId;
+    if (ws) setActiveWorkspaceId(ws);
     setActiveTabId(tabId);
   }, []);
 
+  const switchWorkspace = useCallback((workspaceId) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    if (!ws || workspaceId === activeWorkspaceIdRef.current) return;
+    const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
+    const tabId = (own.find((t) => t.id === ws.lastTabId) || own[0])?.id || null;
+    if (tabId) perfTabSwitchStart();
+    activeWorkspaceIdRef.current = workspaceId;
+    setActiveWorkspaceId(workspaceId);
+    setActiveTabId(tabId);
+  }, []);
+
+  // A new, empty workspace, switched to.
+  const addWorkspace = useCallback((name) => {
+    const ws = createWorkspace(name?.trim() || `ws ${workspacesRef.current.length + 1}`);
+    workspacesRef.current = [...workspacesRef.current, ws];
+    setWorkspaces((prev) => [...prev, ws]);
+    activeWorkspaceIdRef.current = ws.id;
+    setActiveWorkspaceId(ws.id);
+    setActiveTabId(null);
+    return ws;
+  }, []);
+
+  // Switch to the workspace with this name, adding it when there is none.
+  const openWorkspace = useCallback((name) => {
+    const want = name.trim().toLowerCase();
+    const found = workspacesRef.current.find((w) => w.name.toLowerCase() === want);
+    if (found) switchWorkspace(found.id);
+    else addWorkspace(name);
+  }, [switchWorkspace, addWorkspace]);
+
+  const renameWorkspace = useCallback((workspaceId, name) => {
+    if (!name?.trim()) return;
+    setWorkspaces((prev) => prev.map((w) => (w.id === workspaceId ? { ...w, name: name.trim() } : w)));
+  }, []);
+
+  // Removes a workspace and closes its tabs, after asking when it has any.
+  // The last workspace stays. Resolves true when it was removed.
+  const removeWorkspace = useCallback(async (workspaceId) => {
+    const list = workspacesRef.current;
+    const ws = list.find((w) => w.id === workspaceId);
+    if (!ws || list.length < 2) return false;
+    const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
+    if (own.length > 0 && !(await confirm({
+      title: `Remove workspace ${ws.name}?`,
+      description: `Its ${own.length === 1 ? 'tab closes' : `${own.length} tabs close`}, with their terminals and agents.`,
+      facts: own.map((t) => ({ label: 'Tab', value: t.customLabel || t.label })),
+      confirmLabel: 'Remove workspace',
+      destructive: true,
+    }))) return false;
+    if (workspaceId === activeWorkspaceIdRef.current) {
+      const i = list.indexOf(ws);
+      switchWorkspace((list[i + 1] || list[i - 1]).id);
+    }
+    const gone = new Set(own.map((t) => t.id));
+    tabsRef.current = tabsRef.current.filter((t) => !gone.has(t.id));
+    setTabs((prev) => prev.filter((t) => !gone.has(t.id)));
+    workspacesRef.current = list.filter((w) => w.id !== workspaceId);
+    setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId));
+    return true;
+  }, [confirm, switchWorkspace]);
+
+  // Indexes count within the active workspace, as the TABS pane lists them.
   const reorderTab = useCallback((fromIndex, toIndex) => {
+    const ws = activeWorkspaceIdRef.current;
     setTabs(prev => {
-      if (fromIndex === toIndex || !prev[fromIndex] || toIndex < 0 || toIndex >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      const shown = prev.filter((t) => t.workspaceId === ws);
+      const moved = shown[fromIndex];
+      const target = shown[toIndex];
+      if (!moved || !target || moved === target) return prev;
+      const next = prev.filter((t) => t !== moved);
+      const at = next.indexOf(target);
+      next.splice(fromIndex < toIndex ? at + 1 : at, 0, moved);
       return next;
     });
   }, []);
@@ -251,11 +362,18 @@ export function TabProvider({ children }) {
     renameTab,
     setTabRole,
     setTabCompaction,
-  }), [addTab, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction]);
+    switchWorkspace,
+    addWorkspace,
+    openWorkspace,
+    renameWorkspace,
+    removeWorkspace,
+  }), [addTab, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
+    switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace]);
 
+  // `tabs` is every tab, of all workspaces; `workspaceTabs` the active one's.
   const value = useMemo(
-    () => ({ tabs, activeTabId, startupPending, openedStartup: !!startupProjects, ...actions }),
-    [tabs, activeTabId, startupPending, startupProjects, actions],
+    () => ({ tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, openedStartup: !!startupProjects, ...actions }),
+    [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, startupProjects, actions],
   );
 
   return (

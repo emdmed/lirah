@@ -23,6 +23,7 @@ import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { MAX_TABS, useTabManager } from '../tabs/TabContext';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
+import { WorkspaceRow } from '../tabs/WorkspaceRow';
 import { PlansPane } from '../plans/PlansPane';
 import { usePlans } from '../plans/PlansContext';
 import { useRepoRoot } from '../plans/planRepoRoot';
@@ -109,7 +110,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
   const openTasks = useOpenTaskCount(useProjectScope(projectPath).scope);
-  const { tabs: openTabs } = useTabManager();
+  const { tabs: openTabs, workspaceTabs } = useTabManager();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -499,9 +500,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             }}
             className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
             title="Show tabs"
-            aria-label={`Show tabs (${openTabs.length} open)`}
+            aria-label={`Show tabs (${workspaceTabs.length} in this workspace)`}
           >
-            <span className="text-[11px] tabular-nums">{openTabs.length}</span>
+            <span className="text-[11px] tabular-nums">{workspaceTabs.length}</span>
             <span className="ins-legend text-[11px] leading-none">tabs</span>
           </button>
           <button
@@ -573,6 +574,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         lamp={runningJobs + totalActiveCount > 0 ? 'on' : undefined}
         trailing={
           <>
+            <WorkspaceRow />
             <KeyChord keys={['alt', '4']} size="sm" />
             <button
               onClick={toggleWide}
@@ -605,7 +607,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
       <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
-        <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={openTabs.length} />
+        <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={workspaceTabs.length} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />

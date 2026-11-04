@@ -99,7 +99,7 @@ The bundles land in `src-tauri/target/release/bundle/`. To open a directory at s
 
 ### Projects
 - **Starred projects** (Ctrl+P) open from a searchable palette.
-- **Workspaces** group several repos into one folder of symlinks with a generated `CLAUDE.md`.
+- **Workspaces** are named groups of tabs, switched from the top of the TABS pane or with Alt+W. Tabs in the other workspaces keep running.
 
 ### Everything else
 - `:` opens a vim-style command line with fuzzy matching and argument completion.
@@ -156,7 +156,7 @@ npm run check:bundle          # Startup JS size budget (run npm run build first)
 - `src/features/*`: one folder per feature (tabs, agent-jobs, plans, token-budget, compact, bookmarks, settings and so on).
 - `src/hooks`, `src/components`, `src/lib`: shared hooks, UI primitives and the shortcut registry.
 - `src/themes/theme-config.js`: every theme's terminal and UI colours.
-- `src-tauri/src`: the Rust backend. It covers the PTY, file system and file watcher, git, agent runner and hooks, plans, Claude session and token parsing, and workspaces.
+- `src-tauri/src`: the Rust backend. It covers the PTY, file system and file watcher, git, agent runner and hooks, plans, and Claude session and token parsing.
 
 Product and design notes are in [PRODUCT.md](PRODUCT.md) and [DESIGN.md](DESIGN.md).
 
