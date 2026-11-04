@@ -54,11 +54,11 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
 
   return (
     <div className="flex flex-col edge-b-engraved pb-1">
-      <div className="flex items-center gap-2 px-3 pt-2.5 text-[10px] text-muted-foreground">
+      <div className="flex items-center gap-2 px-3 pt-2.5 text-[11px] text-muted-foreground">
         <span className="engraved-label">found in repo</span>
         <span className="font-mono tabular-nums">{files.length}</span>
       </div>
-      <div className="px-3 pb-1 text-[10px] text-muted-foreground"># plan files at the repo root</div>
+      <div className="px-3 pb-1 text-[11px] text-muted-foreground"># plan files at the repo root</div>
       {files.map((file) => {
         const changed = file.state === 'changed';
         const title = titleBeyondName(file.title, file.name);
@@ -66,7 +66,7 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
           <div key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-foreground" title={file.title || file.name}>{title || file.name}</span>
-              <span className="truncate text-[10px] text-muted-foreground" title={file.path}>
+              <span className="truncate text-[11px] text-muted-foreground" title={file.path}>
                 {file.name}{changed && ' · changed since import'}
               </span>
             </div>

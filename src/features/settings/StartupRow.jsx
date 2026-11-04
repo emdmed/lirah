@@ -49,7 +49,7 @@ export function StartupRow({ projectPath }) {
                     {p.name && <span className="text-foreground">{p.name} </span>}
                     <span className={p.name ? 'text-muted-foreground' : 'text-foreground'}>{p.path}</span>
                   </span>
-                  {p.launch && <span className="shrink-0 text-[10px] text-muted-foreground">launch</span>}
+                  {p.launch && <span className="shrink-0 text-[11px] text-muted-foreground">launch</span>}
                   <PanelButton
                     icon={X}
                     aria-label={`Remove ${p.name || p.path} from startup projects`}

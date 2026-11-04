@@ -236,7 +236,7 @@ export const TabRow = memo(function TabRow({
               text={name}
               className={cn(
                 'text-xs',
-                active ? 'font-semibold text-foreground' : compact ? 'font-medium text-muted-foreground' : 'font-medium text-foreground/80',
+                active ? 'text-foreground' : compact ? 'text-muted-foreground' : 'text-foreground/80',
               )}
             />
           </span>

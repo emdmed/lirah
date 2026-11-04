@@ -240,7 +240,7 @@ function Card({ fig, width }) {
       className="border border-[var(--ins-edge,#888)] p-3"
       style={{ width: width + 26, background: fig.paper ?? 'var(--ins-panel)' }}
     >
-      <div className="mb-1 font-mono text-[10px] text-muted-foreground">FIG {fig.n} · {width}px</div>
+      <div className="mb-1 font-mono text-[11px] text-muted-foreground">FIG {fig.n} · {width}px</div>
       {fig.el()}
     </div>
   );
@@ -394,7 +394,7 @@ const POSITIONS = [
 function LaneBCard({ title, width, children }) {
   return (
     <div className="border border-[var(--ins-edge,#888)] p-3" style={{ width: width + 26, background: 'var(--ins-panel)' }}>
-      <div className="mb-2 font-mono text-[10px] text-muted-foreground">{title} · {width}px</div>
+      <div className="mb-2 font-mono text-[11px] text-muted-foreground">{title} · {width}px</div>
       {children}
     </div>
   );

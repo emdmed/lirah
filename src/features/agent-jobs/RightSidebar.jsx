@@ -480,12 +480,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               <Lamp key={j.id} {...jobLamp(j.status)} label={`${j.label}: ${j.status}`} />
             ))}
             {visibleJobs.length > railJobs.length && (
-              <span className="text-[10px] tabular-nums text-muted-foreground">+{visibleJobs.length - railJobs.length}</span>
+              <span className="text-[11px] tabular-nums text-muted-foreground">+{visibleJobs.length - railJobs.length}</span>
             )}
           </div>
         )}
         {totalActiveCount > 0 && (
-          <span className="text-[11px] font-bold tabular-nums text-muted-foreground" title="Active agents">
+          <span className="text-[11px] tabular-nums text-muted-foreground" title="Active agents">
             {totalActiveCount}
           </span>
         )}
@@ -501,8 +501,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             title="Show tabs"
             aria-label={`Show tabs (${openTabs.length} open)`}
           >
-            <span className="text-[11px] font-bold tabular-nums">{openTabs.length}</span>
-            <span className="ins-legend text-[9px] leading-none">tabs</span>
+            <span className="text-[11px] tabular-nums">{openTabs.length}</span>
+            <span className="ins-legend text-[11px] leading-none">tabs</span>
           </button>
           <button
             onClick={() => {
@@ -513,8 +513,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             title="Show tasks (Alt+Q adds one)"
             aria-label={`Show tasks (${openTasks} open)`}
           >
-            <span className="text-[11px] font-bold tabular-nums">{openTasks}</span>
-            <span className="ins-legend text-[9px] leading-none">tasks</span>
+            <span className="text-[11px] tabular-nums">{openTasks}</span>
+            <span className="ins-legend text-[11px] leading-none">tasks</span>
           </button>
           {onNewTab && (
             <button
@@ -525,7 +525,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               aria-label={atTabLimit ? newTabTitle : 'New tab'}
             >
               <span className="text-[11px] leading-none">+</span>
-              <span className="ins-legend text-[9px] leading-none">tab</span>
+              <span className="ins-legend text-[11px] leading-none">tab</span>
             </button>
           )}
           <button
@@ -539,7 +539,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             aria-label="New background job"
           >
             <span className="text-[11px] leading-none">+</span>
-            <span className="ins-legend text-[9px] leading-none">job</span>
+            <span className="ins-legend text-[11px] leading-none">job</span>
           </button>
         </div>
       </div>
@@ -630,7 +630,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             <button
               onClick={handleReconcile}
               disabled={reconciling}
-              className="flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)] disabled:opacity-60 cursor-pointer"
+              className="flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)] disabled:opacity-60 cursor-pointer"
               title="Merge the selected jobs with an agent that resolves conflicts and verifies the combined result"
             >
               {reconciling ? <Scanner /> : <GitMerge className="h-3 w-3" />}
@@ -983,7 +983,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
       {/* Loud conflict record for a reconcile job: which files 2+ jobs edited. */}
       {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
         <div className="mb-2 mx-2.5 border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
-          <div className="flex items-center gap-1 font-medium text-[var(--color-status-warning)]">
+          <div className="flex items-center gap-1 text-[var(--color-status-warning)]">
             <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
             {job.overlaps?.length > 0
               ? `${job.overlaps.length} file${job.overlaps.length === 1 ? '' : 's'} edited by multiple jobs`
@@ -1123,7 +1123,7 @@ function PrimaryAction({ icon: Icon, label, onClick, variant = 'outline', title,
       title={title}
       disabled={disabled}
       className={cn(
-        'flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-1 text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
+        'flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-1 text-[11px] cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
         variant === 'primary' && 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)]',
         variant === 'outline' && 'border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent',
         variant === 'danger' && 'border border-destructive/40 text-destructive hover:bg-destructive/10'

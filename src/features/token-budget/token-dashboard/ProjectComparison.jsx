@@ -101,7 +101,7 @@ export function ProjectComparison({ projects, totals, colors }) {
             key={p.path}
             className="flex items-center gap-2 px-3 py-2 border-b edge-engraved hover:bg-muted/20 text-xs font-mono"
           >
-            <div className="flex-1 min-w-[120px] truncate font-medium">{p.name}</div>
+            <div className="flex-1 min-w-[120px] truncate">{p.name}</div>
             <div className="w-20 text-right text-muted-foreground">{formatTokenCount(p.totalTokens)}</div>
             <div className="w-16 text-right">{formatCost(p.totalCost)}</div>
             <div className="w-16 text-right text-muted-foreground">{p.sessionCount}</div>
@@ -119,7 +119,7 @@ export function ProjectComparison({ projects, totals, colors }) {
 
         {/* Totals row */}
         {sorted.length > 0 && totals && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 text-xs font-mono font-bold sticky bottom-0">
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 text-xs font-mono sticky bottom-0">
             <div className="flex-1 min-w-[120px]">Total</div>
             <div className="w-20 text-right">{formatTokenCount(totals.allProjectsTokens)}</div>
             <div className="w-16 text-right">{formatCost(totals.allProjectsCost)}</div>

@@ -91,7 +91,7 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
 
   return (
     <div className="mb-1">
-      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between text-muted-foreground">
+      <div className="px-2 py-1 text-[11px] uppercase tracking-wider flex items-center justify-between text-muted-foreground">
         <span className="truncate">{tabLabel}</span>
         {listed && (
           <button
@@ -253,7 +253,7 @@ export function AgentSidebar() {
         </button>
         {totalActiveCount > 0 && (
           <span
-            className="text-[11px] font-bold tabular-nums"
+            className="text-[11px] tabular-nums"
             style={{ color: 'var(--color-status-success)' }}
           >
             {totalActiveCount}
@@ -276,10 +276,10 @@ export function AgentSidebar() {
       <div className="flex items-center justify-between px-2 py-1.5 shrink-0 border-b border-b-sidebar-border">
         <div className="flex items-center gap-1.5">
           <Bot size={12} className="text-muted-foreground" />
-          <span className="text-xs font-medium">Agents</span>
+          <span className="text-xs">Agents</span>
           {totalActiveCount > 0 && (
             <span
-              className="inline-flex items-center justify-center px-1 py-px rounded text-[11px] font-bold min-w-[16px] tabular-nums"
+              className="inline-flex items-center justify-center px-1 py-px rounded text-[11px] min-w-[16px] tabular-nums"
               style={{
                 backgroundColor: 'color-mix(in srgb, var(--color-status-success) 20%, transparent)',
                 color: 'var(--color-status-success)',

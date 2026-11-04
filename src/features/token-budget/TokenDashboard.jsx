@@ -306,7 +306,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
               <div className="flex-1 grid grid-cols-3 gap-3 min-h-0">
                 <div className="col-span-2 bg-background rounded-none border edge-engraved p-3 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2 shrink-0">
-                    <div className="text-xs font-medium">Token Usage Over Time</div>
+                    <div className="text-xs">Token Usage Over Time</div>
                     <Button
                       variant={showCacheTokens ? 'default' : 'outline'}
                       size="sm"
@@ -336,7 +336,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                   fallback={(
                     <div className="flex flex-col gap-3">
                       <div>
-                        <div className="text-xs font-medium mb-2">By Model</div>
+                        <div className="text-xs mb-2">By Model</div>
                         <div className="space-y-2">
                           {modelBreakdown.map((mb, idx) => (
                             <div key={idx} className="flex items-center justify-between text-xs">
@@ -348,7 +348,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                                 <span>{formatModelName(mb.model)}</span>
                               </div>
                               <div className="text-right">
-                                <div className="font-medium">{formatCost(mb.cost)}</div>
+                                <div>{formatCost(mb.cost)}</div>
                                 <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
                                   {(mb.tokens / 1000).toFixed(1)}k tokens
                                 </div>
@@ -366,7 +366,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs font-medium mb-2">Cost Breakdown</div>
+                        <div className="text-xs mb-2">Cost Breakdown</div>
                         <div className="flex items-center gap-6 text-xs">
                           {modelBreakdown.map((mb, idx) => (
                             <div key={idx} className="flex items-center gap-2">
@@ -375,12 +375,12 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                                 style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
                               />
                               <span className="text-muted-foreground">{formatModelName(mb.model)}:</span>
-                              <span className="font-medium">{formatCost(mb.cost)}</span>
+                              <span>{formatCost(mb.cost)}</span>
                             </div>
                           ))}
                           <div className="ml-auto flex items-center gap-2">
                             <span className="text-muted-foreground">Total:</span>
-                            <span className="font-bold text-lg">{formatCost(totalStats.cost)}</span>
+                            <span className="text-lg">{formatCost(totalStats.cost)}</span>
                           </div>
                         </div>
                       </div>

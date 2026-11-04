@@ -406,7 +406,7 @@ function FileTally({ selectedFiles, fileStates }) {
     return (
       <p className="flex flex-wrap items-center gap-x-1.5 min-h-5 text-[11px] font-mono">
         <span className="text-foreground">{total} files, all</span>
-        <span className={cn("font-semibold tracking-[0.08em]", tone(state))}>{FILE_STATE_LABELS[state]}</span>
+        <span className={cn("tracking-[0.08em]", tone(state))}>{FILE_STATE_LABELS[state]}</span>
         <span className="text-faint" aria-hidden="true">·</span>
         <span className="text-muted-foreground">listed in the files pane</span>
       </p>
@@ -419,7 +419,7 @@ function FileTally({ selectedFiles, fileStates }) {
         <span key={state} className="inline-flex items-center gap-x-1.5">
           {i > 0 && <span className="text-faint" aria-hidden="true">·</span>}
           <span className="text-foreground">{counts[state]}</span>
-          <span className={cn("font-semibold tracking-[0.08em]", tone(state))}>
+          <span className={cn("tracking-[0.08em]", tone(state))}>
             {FILE_STATE_LABELS[state]}
           </span>
         </span>

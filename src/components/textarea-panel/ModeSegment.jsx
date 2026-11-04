@@ -7,7 +7,7 @@ import { Lamp } from "../instrument/Lamp";
 const SEGMENT = "gap-1 font-mono font-normal before:content-none after:content-none aria-pressed:bg-transparent aria-pressed:text-foreground";
 // sm: the prompt box's mode line. md: the context pane's controls, on the
 // app's 24px / 11px control scale.
-const SEGMENT_SIZE = { sm: "h-4 px-1 text-[10px]", md: "h-6 px-1.5 text-[11px]" };
+const SEGMENT_SIZE = { sm: "h-4 px-1 text-[11px]", md: "h-6 px-1.5 text-[11px]" };
 
 /**
  * One segment of the prompt mode line. A button (a key that stays down while
@@ -57,7 +57,7 @@ export function ModeClear({ onClick, label }) {
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="h-4 w-4 p-0 text-[10px] font-mono text-muted-foreground hover:text-foreground before:content-none after:content-none"
+      className="h-4 w-4 p-0 text-[11px] font-mono text-muted-foreground hover:text-foreground before:content-none after:content-none"
     >
       ×
     </Button>
@@ -66,7 +66,7 @@ export function ModeClear({ onClick, label }) {
 
 // The `·` between segments.
 export function ModeSep({ size = "sm" }) {
-  return <span className={cn(size === "md" ? "text-[11px]" : "text-[10px]", "text-faint select-none")} aria-hidden="true">·</span>;
+  return <span className={cn(size === "md" ? "text-[11px]" : "text-[11px]", "text-faint select-none")} aria-hidden="true">·</span>;
 }
 
 const INPUT_MODES = [

@@ -178,7 +178,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
           </div>
         ) : error ? (
           <div className="p-4 text-center text-destructive">
-            <p className="font-medium">Failed to load file</p>
+            <p>Failed to load file</p>
             <p className="text-xs mt-1 text-muted-foreground">{error}</p>
           </div>
         ) : (

@@ -43,7 +43,7 @@ function RenameField({ initialName, onSubmit, onCancel }) {
         aria-label="Context set name"
         className="ins-well w-full h-6 px-1.5 text-[11px] font-mono bg-transparent outline-none"
       />
-      <div className="pt-1 text-[10px] text-muted-foreground">Enter to save · Esc to cancel</div>
+      <div className="pt-1 text-[11px] text-muted-foreground">Enter to save · Esc to cancel</div>
     </div>
   );
 }

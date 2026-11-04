@@ -80,7 +80,7 @@ export function TemplateSelector({
       {selectedTemplate && showSelectedBadge && (
         <Badge
           variant="outline"
-          className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap font-semibold border-0 ${badgeStyle}`}
+          className={`text-[11px] px-1.5 py-0 h-4.5 gap-0.5 cursor-pointer hover:bg-opacity-20 whitespace-nowrap border-0 ${badgeStyle}`}
           onClick={() => onSelectTemplate(null)}
           title={`Click to clear template  ·  ${OPEN_KEYS}`}
         >

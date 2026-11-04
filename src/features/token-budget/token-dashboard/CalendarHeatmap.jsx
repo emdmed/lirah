@@ -155,7 +155,7 @@ export function CalendarHeatmap({ sessions, onDayClick, colors }) {
           className="fixed z-50 bg-popover text-popover-foreground border edge-engraved rounded-none px-2 py-1 font-mono pointer-events-none shadow-lg"
           style={{ left: tooltip.x + 10, top: tooltip.y - 40, fontSize: 'var(--font-xs)' }}
         >
-          <div className="font-medium">{tooltip.date}</div>
+          <div>{tooltip.date}</div>
           <div>{tooltip.tokens.toLocaleString()} tokens ({tooltip.count} session{tooltip.count !== 1 ? 's' : ''})</div>
           <div>${tooltip.cost.toFixed(2)}</div>
         </div>

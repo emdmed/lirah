@@ -43,7 +43,7 @@ export function FileIntentTag({ value = 'modify', onValueChange, className }) {
       title={`${FILE_STATE_LABELS[value]}: ${STATE_TITLES[value].toLowerCase()} · click to cycle EDIT → READ → COPY (1 2 3)`}
       style={{ fontSize: 'var(--font-xs)' }}
       className={cn(
-        "shrink-0 h-4 w-[5ch] flex items-center justify-center font-mono font-semibold leading-none tracking-[0.08em]",
+        "shrink-0 h-4 w-[5ch] flex items-center justify-center font-mono leading-none tracking-[0.08em]",
         "transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         value === 'modify'
           ? "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
@@ -117,7 +117,7 @@ export function FileStateSelector({ value, onValueChange, className, showKeyboar
             style={{ fontSize: 'var(--font-xs)' }}
             className={cn(
               "!h-4 !px-1 flex items-center justify-center relative rounded-none !border-0",
-              "font-mono font-semibold leading-none tracking-[0.08em] transition-colors",
+              "font-mono leading-none tracking-[0.08em] transition-colors",
               isActive
                 ? MODE_TOKENS[state.value]
                 : "text-faint hover:text-muted-foreground"
@@ -125,7 +125,7 @@ export function FileStateSelector({ value, onValueChange, className, showKeyboar
           >
             {state.label}
             {showKeyboardHints && (
-              <span className="absolute -top-1.5 -right-0.5 text-[0.45rem] font-mono opacity-40 bg-background px-0.5">
+              <span className="absolute -top-1.5 -right-0.5 text-[11px] font-mono opacity-40 bg-background px-0.5">
                 {state.keyHint}
               </span>
             )}

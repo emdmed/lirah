@@ -9,7 +9,7 @@ import { listBranches, planGit } from './planGit';
 import { AUTOPILOT_STATUS } from './planModel';
 import { Fig21PlanGit, middleTruncate } from './Fig21PlanGit';
 
-const SELECT = 'h-6 min-w-0 pl-1.5 font-mono text-[10px] text-foreground';
+const SELECT = 'h-6 min-w-0 pl-1.5 font-mono text-[11px] text-foreground';
 
 function BaseSelect({ root, value, onChange }) {
   const [branches, setBranches] = useState(null);
@@ -105,14 +105,14 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
       {cfg.repos.map((repo, i) => (
         <div key={repo.root} className="flex min-w-0 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className={cn('min-w-0 flex-1 truncate font-mono text-[10px]', locked ? 'text-muted-foreground' : 'text-foreground')} title={repo.root}>
+            <span className={cn('min-w-0 flex-1 truncate font-mono text-[11px]', locked ? 'text-muted-foreground' : 'text-foreground')} title={repo.root}>
               {basename(repo.root)}
               {i === 0 && multi && <span className="text-muted-foreground"> · primary</span>}
             </span>
             {locked ? (
               // With no branch the headline already says "current branch".
               (cfg.branch || repo.base) && (
-                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                   {cfg.branch ? `${cfg.branch} ← ${repo.base || 'HEAD'}` : repo.base}
                 </span>
               )
@@ -130,7 +130,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
             )}
           </div>
           {locked && cfg.worktrees && repo.workPath && repo.workPath !== repo.root && (
-            <span className="truncate font-mono text-[10px] text-muted-foreground" title={repo.workPath}>{repo.workPath}</span>
+            <span className="truncate font-mono text-[11px] text-muted-foreground" title={repo.workPath}>{repo.workPath}</span>
           )}
         </div>
       ))}
@@ -157,7 +157,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
 
       {open && (
         <>
-          <label className="flex items-start gap-2 text-[10px] leading-snug text-muted-foreground">
+          <label className="flex items-start gap-2 text-[11px] leading-snug text-muted-foreground">
             <ToggleSwitch
               checked={cfg.worktrees}
               onChange={(worktrees) => onChange({ worktrees })}
@@ -176,7 +176,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
               onChange={(e) => onChange({ branch: e.target.value })}
               placeholder={cfg.worktrees ? 'required' : 'empty: stay on the current branch'}
               spellCheck={false}
-              className="ins-well h-6 min-w-0 flex-1 px-1.5 font-mono text-[10px] text-foreground outline-none"
+              className="ins-well h-6 min-w-0 flex-1 px-1.5 font-mono text-[11px] text-foreground outline-none"
               aria-label="Branch for the plan, in every repo"
             />
           </div>

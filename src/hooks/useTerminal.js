@@ -198,7 +198,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: '"Typestar OCR", "Source Code Pro", Menlo, Monaco, "Courier New", monospace',
+      fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace',
       theme: theme,
       allowProposedApi: true,
       // User-configurable; xterm's 1000-line default loses most of an agent turn.

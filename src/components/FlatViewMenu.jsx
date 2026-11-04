@@ -28,7 +28,7 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
   return (
     <SidebarMenu ref={menuRef}>
       {folders.length === 0 ? (
-        <div className="p-1 opacity-50 text-[0.7rem]">
+        <div className="p-1 opacity-50 text-[11px]">
           empty folder
         </div>
       ) : (
@@ -53,7 +53,7 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
                   <div className="flex items-center gap-1.5 w-full text-xs">
                     <span className="w-3 shrink-0" /> {/* cursor column */}
                     <Folder className="w-3 h-3 shrink-0 text-muted-foreground" />
-                    <span className="truncate font-semibold text-foreground" title={item.name}>{item.name}</span>
+                    <span className="truncate text-foreground" title={item.name}>{item.name}</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>

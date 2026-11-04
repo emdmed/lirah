@@ -222,7 +222,7 @@ export function AutoMergeDialog({ autoMerge }) {
                   <ul className="max-h-[14vh] overflow-y-auto pt-1">
                     {plan.files.map((f) => (
                       <li key={f.path} className="flex items-baseline gap-3 py-[2px] text-xs">
-                        <span className="w-3 shrink-0 text-center font-semibold" style={{ color: STATUS_COLOR[f.status] }}>
+                        <span className="w-3 shrink-0 text-center" style={{ color: STATUS_COLOR[f.status] }}>
                           {f.status}
                         </span>
                         <span className="min-w-0 truncate text-muted-foreground">{f.path}</span>

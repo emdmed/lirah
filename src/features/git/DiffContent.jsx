@@ -575,7 +575,7 @@ export function DiffContent({
 
       {/* Old file (left side) */}
       <div className="flex-1 border-r edge-engraved overflow-x-auto">
-        <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground border-b edge-engraved z-10">
+        <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs text-muted-foreground border-b edge-engraved z-10">
           {oldLabel || (isNewFile ? '(new file)' : 'HEAD')}
         </div>
         <div
@@ -623,7 +623,7 @@ export function DiffContent({
 
       {/* New file (right side) */}
       <div className="flex-1 overflow-x-auto">
-        <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs font-semibold text-muted-foreground border-b edge-engraved z-10">
+        <div className="sticky top-0 bg-muted/50 px-3 py-1 text-xs text-muted-foreground border-b edge-engraved z-10">
           {newLabel || (isDeletedFile ? '(deleted)' : 'Working Tree')}
         </div>
         <div

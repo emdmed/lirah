@@ -126,7 +126,7 @@ export function FirstTabChooser({ onOpenProject }) {
           </div>
         </div>
 
-        <div className="flex justify-center gap-4 text-[10px]">
+        <div className="flex justify-center gap-4 text-[11px]">
           <KeyChord keys={['↑', '↓']} label="move" />
           <KeyChord keys={['↵']} label="open" />
         </div>

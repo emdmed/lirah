@@ -196,7 +196,7 @@ export function SettingsDialog({
                     <Keycap size="sm" lit={selected}>{i + 1}</Keycap>
                     <span className="shrink-0">{s.title}</span>
                     {/* The readout gives way before the section name does. */}
-                    <span className="flex min-w-0 flex-1 items-center justify-end text-[10px] text-muted-foreground">
+                    <span className="flex min-w-0 flex-1 items-center justify-end text-[11px] text-muted-foreground">
                       <span className="truncate">
                       {filtering ? (count > 0 ? count : '') : readouts[s.id]}
                       </span>
@@ -206,7 +206,7 @@ export function SettingsDialog({
               })}
             </div>
 
-            <p className="mt-auto text-[10px] leading-snug text-muted-foreground">
+            <p className="mt-auto text-[11px] leading-snug text-muted-foreground">
               Saved as you change them, in every open tab. Sandbox applies to this tab only.
             </p>
           </nav>

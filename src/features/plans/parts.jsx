@@ -40,7 +40,7 @@ export function Prose({ text, clamp, className }) {
       {long && (
         <button
           onClick={() => setFull((v) => !v)}
-          className="tui-btn self-start text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="tui-btn self-start text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
           aria-expanded={full}
         >
           {full ? 'less' : 'more'}
@@ -131,7 +131,7 @@ export function ProgressReadout({ plan, done, total, paper }) {
   return (
     <div ref={ref} className="min-w-0" title={label}>
       {tooNarrow ? (
-        <span className="font-mono text-[10px] tabular-nums text-muted-foreground" role="img" aria-label={label}>
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground" role="img" aria-label={label}>
           <span className={done > 0 ? 'text-foreground' : undefined}>{done}</span>/{total}{' '}chunks
         </span>
       ) : (

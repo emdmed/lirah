@@ -860,7 +860,7 @@ body {
 }
 
 .tui-dialog-group > .ins-legend {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .tui-dialog-group::after {
@@ -947,7 +947,7 @@ body {
     background: var(--ins-raised);
     color: var(--color-foreground);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -958,7 +958,7 @@ body {
     height: 14px;
     min-width: 14px;
     padding: 0 3px;
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .ins-cap[data-lit] {
@@ -1733,7 +1733,7 @@ body {
     top: 21px;
     transform: translateX(-50%);
     color: var(--color-muted-foreground);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 12px;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;

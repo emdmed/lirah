@@ -96,7 +96,7 @@ export function ModelInsights({ sessions, projects, colors }) {
       <div className="grid grid-cols-2 gap-3 shrink-0">
         {/* Donut */}
         <div className="bg-background rounded-none border edge-engraved p-3">
-          <div className="text-xs font-medium mb-2">Model Distribution</div>
+          <div className="text-xs mb-2">Model Distribution</div>
           {pieData.length > 0 ? (
             <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
@@ -145,7 +145,7 @@ export function ModelInsights({ sessions, projects, colors }) {
 
         {/* Cost analysis */}
         <div className="bg-background rounded-none border edge-engraved p-3">
-          <div className="text-xs font-medium mb-2">Cost Analysis</div>
+          <div className="text-xs mb-2">Cost Analysis</div>
           <div className="space-y-2">
             {modelData.map((m, i) => (
               <div key={m.name} className="flex items-center justify-between text-xs font-mono">
@@ -156,13 +156,13 @@ export function ModelInsights({ sessions, projects, colors }) {
                     {totalCost > 0 ? Math.round((m.cost / totalCost) * 100) : 0}%
                   </span>
                 </div>
-                <span className="font-medium">{formatCost(m.cost)}</span>
+                <span>{formatCost(m.cost)}</span>
               </div>
             ))}
           </div>
           <div className="border-t edge-engraved mt-3 pt-2 flex items-center justify-between text-xs font-mono">
             <span className="text-muted-foreground">Total</span>
-            <span className="font-bold" style={{ fontSize: 'var(--font-sm)' }}>{formatCost(totalCost)}</span>
+            <span style={{ fontSize: 'var(--font-sm)' }}>{formatCost(totalCost)}</span>
           </div>
           <div className="mt-3 space-y-1">
             {modelData.map(m => (
@@ -176,7 +176,7 @@ export function ModelInsights({ sessions, projects, colors }) {
 
       {/* Recommendations */}
       <div className="flex-1 bg-background rounded-none border edge-engraved p-3 overflow-auto">
-        <div className="text-xs font-medium mb-2">Optimization Recommendations</div>
+        <div className="text-xs mb-2">Optimization Recommendations</div>
         <div className="space-y-2">
           {recommendations.map((r, i) => (
             <div key={i} className="flex items-start gap-2 text-xs font-mono">

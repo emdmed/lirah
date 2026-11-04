@@ -89,7 +89,7 @@ function StatusTally({ files }) {
         .filter(({ code }) => counts[code])
         .map(({ code, color }) => (
           <span key={code} className="text-muted-foreground">
-            {counts[code]} <span className="font-semibold" style={{ color }}>{code}</span>
+            {counts[code]} <span style={{ color }}>{code}</span>
           </span>
         ))}
     </span>
@@ -110,7 +110,7 @@ function FileList({ files, className }) {
             className="flex items-baseline gap-3 px-3 py-1 text-xs hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]"
             title={`${f.status} — ${f.path}`}
           >
-            <span className="w-3 shrink-0 text-center font-semibold" style={{ color }}>{code}</span>
+            <span className="w-3 shrink-0 text-center" style={{ color }}>{code}</span>
             <span className="min-w-0 truncate">
               <span className="text-muted-foreground">{dir}</span>
               <span className="text-foreground">{base}</span>

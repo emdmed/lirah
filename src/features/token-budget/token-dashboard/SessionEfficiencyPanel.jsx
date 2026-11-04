@@ -8,7 +8,7 @@ function StatRow({ icon: Icon, label, value, color }) {
       <Icon size={12} style={{ color }} />
       <div className="flex-1 flex justify-between items-center text-xs font-mono">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{value}</span>
+        <span>{value}</span>
       </div>
     </div>
   );
@@ -19,7 +19,7 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
     return (
       <Card className="bg-background edge-engraved h-full font-mono">
         <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-medium">Efficiency</CardTitle>
+          <CardTitle className="text-xs">Efficiency</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-muted-foreground text-xs text-center py-4">
@@ -46,7 +46,7 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
   return (
     <Card className="bg-background edge-engraved h-full flex flex-col font-mono">
       <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-xs font-medium">Efficiency</CardTitle>
+        <CardTitle className="text-xs">Efficiency</CardTitle>
       </CardHeader>
       <CardContent className="pt-0 px-3 pb-3 flex-1 flex flex-col">
         <div className="space-y-0.5">
@@ -59,7 +59,7 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
         <div className="mt-auto pt-2 border-t edge-engraved">
           <div className="text-muted-foreground" style={{ fontSize: 'var(--font-xs)' }}>
             <span>Est. Monthly:</span>{' '}
-            <span className="font-bold">
+            <span>
               {formatCost(estimatedMonthlyCost)}
             </span>
           </div>

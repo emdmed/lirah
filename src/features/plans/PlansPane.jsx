@@ -125,7 +125,7 @@ export function PlansPane({ projectPath }) {
       description: (
         <span className="flex flex-col gap-2">
           <span>Stages every change in the repo (git add -A) and commits it with this chunk&apos;s message.</span>
-          {list && <span className="block whitespace-pre font-mono text-[10px] leading-relaxed text-foreground">{list}</span>}
+          {list && <span className="block whitespace-pre font-mono text-[11px] leading-relaxed text-foreground">{list}</span>}
         </span>
       ),
       confirmLabel: 'Commit',
@@ -241,7 +241,7 @@ export function PlansPane({ projectPath }) {
             </EmptyLine>
           ) : (
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 text-[10px] text-muted-foreground edge-b-engraved">
+              <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground edge-b-engraved">
                 <span className="engraved-label">plans</span>
                 <span className="font-mono tabular-nums">{plans.length}</span>
               </div>

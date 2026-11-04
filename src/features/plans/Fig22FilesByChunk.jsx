@@ -64,7 +64,7 @@ export function filesByChunk(plan, byRepo) {
 // Narrow hosts: the busiest files as text, each with its chunks.
 function FileList({ grid }) {
   return (
-    <ul className="flex flex-col gap-0.5 font-[family-name:var(--font-legend)] text-[10px] text-muted-foreground">
+    <ul className="flex flex-col gap-0.5 font-[family-name:var(--font-legend)] text-[11px] text-muted-foreground">
       {grid.cols.map((c) => (
         <li key={`${c.root}\0${c.path}`} className="flex min-w-0 gap-2" title={c.path}>
           <span className="min-w-0 truncate text-foreground">{c.label}</span>
@@ -78,7 +78,7 @@ function FileList({ grid }) {
 
 /** The plan's chunk × file grid. `files` is usePlanCommitFiles(plan, true). */
 export function Fig22FilesByChunk({ plan, files }) {
-  const note = (text) => <div className="text-[10px] text-muted-foreground">{text}</div>;
+  const note = (text) => <div className="text-[11px] text-muted-foreground">{text}</div>;
   if (files.loading && !Object.keys(files.byRepo).length) return note('reading commits…');
   const grid = filesByChunk(plan, files.byRepo);
   if (!grid.rows.length || !grid.cols.length) return note('no chunk commits yet');

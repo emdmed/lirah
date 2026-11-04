@@ -97,7 +97,7 @@ export const TaskRow = memo(function TaskRow({
               <button
                 type="button"
                 onClick={() => onPlan(task, defaultId)}
-                className="tui-btn px-1 text-[10px] text-muted-foreground hover:text-[var(--ins-lamp)] cursor-pointer"
+                className="tui-btn px-1 text-[11px] text-muted-foreground hover:text-[var(--ins-lamp)] cursor-pointer"
                 title={`Send to the active tab's agent to plan, with the default plan context${chunkMode === 'chunks' ? ', then split it into chunks' : ''}`}
               >
                 plan
@@ -130,7 +130,7 @@ export const TaskRow = memo(function TaskRow({
                   {contexts.map((c) => (
                     <DropdownMenuItem key={c.id} onSelect={() => onPlan(task, c.id)} className="cursor-pointer text-xs">
                       <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                      {c.id === defaultId && <span className="text-[10px] text-muted-foreground">default</span>}
+                      {c.id === defaultId && <span className="text-[11px] text-muted-foreground">default</span>}
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />
@@ -162,7 +162,7 @@ export const TaskRow = memo(function TaskRow({
       </div>
 
       {(task.status === TASK_STATUS.PLANNING || task.status === TASK_STATUS.PLANNED) && task.planPath && (
-        <div className="flex min-w-0 items-center gap-2 pl-5 text-[10px] text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-2 pl-5 text-[11px] text-muted-foreground">
           <span className="truncate" title={task.planPath}>
             {task.status === TASK_STATUS.PLANNING ? 'waiting for ' : ''}{basename(task.planPath)}
             {task.status === TASK_STATUS.PLANNING && task.autoChunk ? ', then chunks' : ''}
@@ -171,7 +171,7 @@ export const TaskRow = memo(function TaskRow({
             <button
               type="button"
               onClick={() => onOpenPlan(task)}
-              className="tui-btn ml-auto shrink-0 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+              className="tui-btn ml-auto shrink-0 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
             >
               {task.planId ? 'open plan' : 'import & chunk'}
             </button>
@@ -182,7 +182,7 @@ export const TaskRow = memo(function TaskRow({
       {open ? (
         <TaskEditor task={task} onEdit={onEdit} />
       ) : (
-        task.notes && <p className="line-clamp-2 whitespace-pre-wrap pl-5 text-[10px] leading-snug text-muted-foreground">{task.notes}</p>
+        task.notes && <p className="line-clamp-2 whitespace-pre-wrap pl-5 text-[11px] leading-snug text-muted-foreground">{task.notes}</p>
       )}
     </div>
   );

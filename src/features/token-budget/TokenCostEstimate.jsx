@@ -85,7 +85,7 @@ export function TokenCostEstimate({ promptBase, textareaContent, projectPath }) 
                 <div key={s.id}>{s.label.toLowerCase()}: ~{s.tokens.toLocaleString()}</div>
               ))}
               <div>Agent system prompt: ~{SYSTEM_OVERHEAD}</div>
-              <div className="text-muted-foreground font-sans">
+              <div className="text-muted-foreground">
                 Measured on the payload ({payloadChars.toLocaleString()} chars ÷ {CHARS_PER_TOKEN}). File contents the agent reads are not included.
               </div>
               {budget?.dailyLimit && (

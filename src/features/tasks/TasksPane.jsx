@@ -225,13 +225,13 @@ export function TasksPane({ projectPath }) {
 
   return (
     <div ref={containerRef} tabIndex={-1} onKeyDown={onPaneKey} onBlur={onBlur} className="flex flex-col outline-none">
-      <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[10px]">
+      <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
         <ScopeButton active={view === 'project'} onClick={() => setView('project')} label={projectName} count={projectCount} />
         <ScopeButton active={view === 'global'} onClick={() => setView('global')} label="global" count={globalCount} />
         <button
           type="button"
           onClick={() => setContextsOpen(true)}
-          className="tui-btn ml-auto text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="tui-btn ml-auto text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
           title="Edit the plan contexts sent with a task"
         >
           contexts
@@ -280,7 +280,7 @@ export function TasksPane({ projectPath }) {
           />
         )}
         {title.trim() && (
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[11px] text-muted-foreground">
             ↵ save · ⇧↵ {withNotes ? 'notes open' : 'add notes'}
           </span>
         )}
@@ -306,7 +306,7 @@ export function TasksPane({ projectPath }) {
                 type="button"
                 onClick={() => setShowDone((v) => !v)}
                 aria-expanded={showDone}
-                className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer edge-b-engraved"
+                className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer edge-b-engraved"
               >
                 {showDone ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 <span className="engraved-label">done</span>

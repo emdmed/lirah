@@ -155,7 +155,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <DialogGroup label={editingId ? 'Edit template' : 'New template'} />
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="template-title" className="ins-legend text-[10px]">
+                <label htmlFor="template-title" className="ins-legend text-[11px]">
                   Title
                 </label>
                 <Input
@@ -169,7 +169,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="template-content" className="ins-legend text-[10px]">
+                <label htmlFor="template-content" className="ins-legend text-[11px]">
                   Content
                 </label>
                 <Textarea

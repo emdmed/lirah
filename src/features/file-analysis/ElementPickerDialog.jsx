@@ -376,7 +376,7 @@ export function ElementPickerDialog({
                       >
                         {allSelected ? 'none' : 'all'}
                       </Button>
-                      <span className="ins-legend text-[10px]">
+                      <span className="ins-legend text-[11px]">
                         {group.type}
                       </span>
                       <span className="text-[11px] tabular-nums text-muted-foreground">

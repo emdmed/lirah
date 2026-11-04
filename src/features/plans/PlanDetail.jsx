@@ -196,13 +196,13 @@ export function PlanDetail({ plan }) {
           </span>
         </div>
         {showSource && (
-          <pre id="plan-source" className="ins-well mt-2 max-h-72 overflow-auto whitespace-pre-wrap wrap-anywhere px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
+          <pre id="plan-source" className="ins-well mt-2 max-h-72 overflow-auto whitespace-pre-wrap wrap-anywhere px-2 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
             {plan.source}
           </pre>
         )}
 
         {/* Identity first: the title, and what the plan is for. */}
-        <h3 className="mt-3 text-[13px] font-semibold leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
+        <h3 className="mt-3 text-[13px] leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1 text-[11px] leading-relaxed text-muted-foreground" />}
 
         {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
@@ -305,7 +305,7 @@ export function PlanDetail({ plan }) {
       {plan.split === SPLIT_STATUS.FAILED && (
         <div className="flex flex-col items-start gap-1.5 px-3 py-2.5 text-[11px]">
           <span className="flex items-center gap-2 text-foreground"><Lamp state="fault" /> split failed</span>
-          <span className="break-words text-[10px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
+          <span className="break-words text-[11px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
           <PanelButton icon={RefreshCw} onClick={resplit}>re-split</PanelButton>
         </div>
       )}
@@ -383,7 +383,7 @@ export function PlanDetail({ plan }) {
         })()}
         {/* Keys for the list, only while it has focus. */}
         {total > 0 && (
-          <div className="hidden flex-wrap items-center gap-x-1 gap-y-1 px-3 pt-2 text-[10px] text-muted-foreground group-focus-within/list:flex">
+          <div className="hidden flex-wrap items-center gap-x-1 gap-y-1 px-3 pt-2 text-[11px] text-muted-foreground group-focus-within/list:flex">
             <FrameHints hints={LIST_HINTS} />
           </div>
         )}

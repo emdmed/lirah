@@ -8,7 +8,7 @@ const CHIP = "inline-flex items-center shrink-0 max-w-full edge-engraved font-mo
 // sm: the prompt box. md: the context pane, where the tag (click to cycle)
 // and the × sit side by side and need 20px to be hit apart.
 const SIZES = {
-  sm: { chip: "h-4 text-[10px]", tag: "h-4 px-1", remove: "h-4 w-4", list: "max-h-[76px]" },
+  sm: { chip: "h-4 text-[11px]", tag: "h-4 px-1", remove: "h-4 w-4", list: "max-h-[76px]" },
   md: { chip: "h-5 text-[11px]", tag: "h-5 px-1.5", remove: "h-5 w-5 text-[13px]", list: "max-h-[68px]" },
 };
 // EDIT is the default intent: printed in ink, so colour marks only the
@@ -58,7 +58,7 @@ export function ContextChips({
 
   if (files.length === 0 && elements.length === 0 && extras.length === 0) {
     return (
-      <p className="px-1 text-[10px] font-mono text-muted-foreground">
+      <p className="px-1 text-[11px] font-mono text-muted-foreground">
         No context. Select files in the sidebar or type @ to mention one.
       </p>
     );
@@ -76,7 +76,7 @@ export function ContextChips({
               disabled={!onSetFileState}
               aria-label={`${name}: ${FILE_STATE_LABELS[state]}. Change to ${FILE_STATE_LABELS[next]}`}
               title={onSetFileState ? `${FILE_STATE_LABELS[state]} · click to cycle ${FILE_STATE_ORDER.map((s) => FILE_STATE_LABELS[s]).join(' → ')}` : undefined}
-              className={cn(sz.tag, "font-semibold tracking-[0.08em] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", state === DEFAULT_STATE ? DEFAULT_TAG : MODE_TOKENS[state])}
+              className={cn(sz.tag, "tracking-[0.08em] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", state === DEFAULT_STATE ? DEFAULT_TAG : MODE_TOKENS[state])}
             >
               {FILE_STATE_LABELS[state]}
             </button>

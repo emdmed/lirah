@@ -30,7 +30,7 @@ function Section({ title, aside, className, children }) {
   return (
     <div className={cn('bg-background rounded-none edge-engraved p-3 flex flex-col min-h-0', className)}>
       <div className="flex items-center justify-between mb-2 shrink-0 gap-2">
-        <div className="text-xs font-medium">{title}</div>
+        <div className="text-xs">{title}</div>
         {aside}
       </div>
       {children}
@@ -89,7 +89,7 @@ export function ContextBreakdown({ tokenUsage, projectPath, palette = {} }) {
       {/* Summary */}
       <div className="shrink-0 flex flex-col gap-2">
         <div className="flex items-baseline gap-3 text-xs flex-wrap">
-          <span className="text-lg font-bold tabular-nums">{formatTokenCount(total)}</span>
+          <span className="text-lg tabular-nums">{formatTokenCount(total)}</span>
           <span className="text-muted-foreground">
             tokens in context{fill && !printed ? ` · ${pct(total, fill.max)} of ${formatTokenCount(fill.max)}` : ''}
           </span>
@@ -122,7 +122,7 @@ export function ContextBreakdown({ tokenUsage, projectPath, palette = {} }) {
         {/* Sources + tools */}
         <div className="flex flex-col gap-3 min-h-0">
           <Section title="By source" aside={group && (
-            <button type="button" className="ins-key ins-key-panel ins-round text-[10px] px-1.5" onClick={() => setGroup(null)}>all</button>
+            <button type="button" className="ins-key ins-key-panel ins-round text-[11px] px-1.5" onClick={() => setGroup(null)}>all</button>
           )}>
             <div className="flex flex-col">
               {breakdown.groups.map((g) => {

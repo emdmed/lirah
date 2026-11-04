@@ -16,13 +16,13 @@ function CustomTooltip({ active, payload, label, colors }) {
 
   return (
     <div className="bg-background border edge-engraved rounded-none shadow-lg p-2 text-xs font-mono">
-      <p className="font-medium mb-1">{label}</p>
+      <p className="mb-1">{label}</p>
       <div className="space-y-0.5">
         {payload.map((entry, index) => (
           <div key={index} className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
             <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-medium">
+            <span>
               {formatTokenCount(entry.value)}
             </span>
           </div>

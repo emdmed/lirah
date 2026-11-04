@@ -25,7 +25,7 @@ export function LinkedReposIndicator({ linkedRepos, onClear }) {
               </div>
             );
           })}
-          <div className="mt-1 text-muted-foreground font-sans">Link more from the tabs pane</div>
+          <div className="mt-1 text-muted-foreground">Link more from the tabs pane</div>
         </TooltipContent>
       </Tooltip>
       {onClear && <ModeClear onClick={onClear} label="Unlink repos from this prompt" />}

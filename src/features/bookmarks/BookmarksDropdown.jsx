@@ -57,7 +57,7 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
                 onSelect={() => handleNavigate(bookmark)}
                 className="flex flex-col items-start gap-0.5 h-auto py-2 cursor-pointer relative pr-8"
               >
-                <span className="text-xs font-medium truncate w-full">
+                <span className="text-xs truncate w-full">
                   {bookmark.name}
                 </span>
                 <span className="text-[11px] opacity-50 truncate w-full">

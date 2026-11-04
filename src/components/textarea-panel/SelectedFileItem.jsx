@@ -62,7 +62,7 @@ export function SelectedFileItem({
       />
       <button
         onClick={() => onRemoveFile(file.absolute)}
-        className="min-w-0 truncate text-left text-xs font-mono font-medium hover:line-through hover:text-destructive transition-colors cursor-pointer bg-transparent border-0 p-0"
+        className="min-w-0 truncate text-left text-xs font-mono hover:line-through hover:text-destructive transition-colors cursor-pointer bg-transparent border-0 p-0"
         title={`${file.absolute} — click to remove`}
       >
         {file.name}

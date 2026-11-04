@@ -315,7 +315,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
               {dirty?.length > 0 && <DirtyList files={dirty} />}
               {!editing && !editingDecisions && actions}
               {/* Its keys, while the row has focus, like the list's. */}
-              <div className="hidden flex-wrap items-center gap-x-1 gap-y-1 text-[10px] text-muted-foreground group-focus-within/chunk:flex">
+              <div className="hidden flex-wrap items-center gap-x-1 gap-y-1 text-[11px] text-muted-foreground group-focus-within/chunk:flex">
                 <FrameHints hints={STUCK_HINTS} />
               </div>
             </div>
@@ -340,7 +340,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
                   value={draft.details}
                   onChange={(e) => setDraft((d) => ({ ...d, details: e.target.value }))}
                   rows={8}
-                  className="ins-well resize-y px-1.5 py-1 text-[10px] leading-relaxed text-foreground outline-none"
+                  className="ins-well resize-y px-1.5 py-1 text-[11px] leading-relaxed text-foreground outline-none"
                 />
               </Field>
               <div className="flex gap-1.5 pt-0.5">
@@ -367,7 +367,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
                       onChange={(e) => setDecisionsDraft(e.target.value)}
                       rows={Math.max(3, (chunk.decisions?.length ?? 0) + 1)}
                       placeholder="One per line. Later chunks get these in their prompt."
-                      className="ins-well w-full resize-y px-1.5 py-1 text-[10px] leading-relaxed text-foreground outline-none"
+                      className="ins-well w-full resize-y px-1.5 py-1 text-[11px] leading-relaxed text-foreground outline-none"
                       autoFocus
                     />
                     <div className="flex gap-1.5 pt-1">
@@ -412,7 +412,7 @@ function Spec({ label, children }) {
 // list, so no tree guides: they would draw nesting that isn't there.
 function FileTree({ files }) {
   return (
-    <ul className="flex min-w-0 flex-col font-mono text-[10px] leading-[16.5px]">
+    <ul className="flex min-w-0 flex-col font-mono text-[11px] leading-[16.5px]">
       {files.map((f) => {
         const cut = f.lastIndexOf('/') + 1;
         return (
@@ -433,7 +433,7 @@ function DirtyList({ files }) {
   const multi = new Set(files.map((f) => f.root)).size > 1;
   const shown = files.slice(0, FILES_SHOWN);
   return (
-    <ul className="flex min-w-0 flex-col font-mono text-[10px] leading-[16.5px]" aria-label="Uncommitted files">
+    <ul className="flex min-w-0 flex-col font-mono text-[11px] leading-[16.5px]" aria-label="Uncommitted files">
       {shown.map((f) => {
         const path = multi ? `${basename(f.root)}/${f.path}` : f.path;
         const mark = gitMark(f.code ?? ' M');
@@ -462,7 +462,7 @@ function CheckCommand({ text }) {
   const [, cmd, rest] = m;
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <code className="ins-well block select-text whitespace-pre-wrap wrap-anywhere px-1.5 py-1 font-mono text-[10px] leading-relaxed text-foreground">
+      <code className="ins-well block select-text whitespace-pre-wrap wrap-anywhere px-1.5 py-1 font-mono text-[11px] leading-relaxed text-foreground">
         <span aria-hidden="true" className="text-muted-foreground">$ </span>{cmd}
       </code>
       {rest && <Prose text={rest} clamp={3} className="text-muted-foreground" />}
@@ -476,10 +476,10 @@ function CommitList({ chunk }) {
   const byRepo = Object.entries(chunk.commitsByRepo ?? {}).filter(([, shas]) => shas?.length > 0);
   const line = (shas) => shas.map((c) => c.slice(0, 7)).join(' · ');
   if (byRepo.length < 2) {
-    return <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{line(chunk.commits)}</span>;
+    return <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{line(chunk.commits)}</span>;
   }
   return (
-    <ul className="flex flex-col font-mono text-[10px] tabular-nums">
+    <ul className="flex flex-col font-mono text-[11px] tabular-nums">
       {byRepo.map(([root, shas]) => (
         <li key={root} className="min-w-0 truncate" title={root}>
           <span className="text-foreground">{basename(root)}</span>

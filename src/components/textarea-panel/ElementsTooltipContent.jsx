@@ -20,7 +20,7 @@ export function ElementsTooltipContent({ selectedElements, currentPath }) {
     <div className="flex flex-col gap-2">
       {fileEntries.map(({ path, elements }) => (
         <div key={path}>
-          <div className="text-primary font-medium mb-1">{path}</div>
+          <div className="text-primary mb-1">{path}</div>
           <div className="flex flex-col gap-0.5 pl-2 border-l border-border/30">
             {elements.map(el => {
               const lineInfo = el.line === el.endLine ? `${el.line}` : `${el.line}-${el.endLine}`;

@@ -43,7 +43,7 @@ export function AutoCommitConfigDialog({ open, onOpenChange, cli, customPrompt, 
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span className="text-sm font-medium">Settings saved successfully!</span>
+              <span className="text-sm">Settings saved successfully!</span>
             </div>
           )}
           <div className="space-y-2">

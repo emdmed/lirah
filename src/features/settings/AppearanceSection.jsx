@@ -33,7 +33,7 @@ function ThemeList({ themes, value, onChange }) {
     <div role="radiogroup" aria-label="Theme" className="flex flex-col gap-3">
       {groups.map((g) => (
         <div key={g.label} className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{g.label}</span>
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{g.label}</span>
           <div className="grid grid-cols-2 gap-x-2">
             {g.items.map(([id, t]) => (
               <button

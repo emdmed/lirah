@@ -402,7 +402,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                         <span className="text-muted-foreground">{f.relativePath.slice(0, slash + 1)}</span>
                         <span className="text-foreground">{f.relativePath.slice(slash + 1)}</span>
                       </span>
-                      <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground" title={`From ${meta.label}`}>
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={`From ${meta.label}`}>
                         <Icon className="h-2.5 w-2.5" aria-hidden="true" />
                         {meta.label}
                       </span>
