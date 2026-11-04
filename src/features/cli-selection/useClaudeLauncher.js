@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '../toast/ToastContext';
 import { getSettings } from '../settings/settingsStore';
 
-const CLI_COMMANDS = {
+export const CLI_COMMANDS = {
   'claude-code': {
     check: 'claude',
     fallback: 'npx @anthropic-ai/claude-code',
@@ -64,8 +64,12 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
       // PowerShell 5.1 has no `&&` and escapes ' as '' inside single quotes.
       const powershell = await invoke('get_shell_kind').then((k) => k === 'powershell', () => false);
 
+      // A custom start command (settings) wins: PATH detection fails on some setups and falls back to npx.
+      const custom = selectedCli === 'claude-code' ? getSettings().claudeCommand?.trim() : '';
       let command;
-      if (cliExists) {
+      if (custom) {
+        command = custom;
+      } else if (cliExists) {
         command = cliConfig.command;
       } else if (cliConfig.fallback) {
         command = cliConfig.fallback;

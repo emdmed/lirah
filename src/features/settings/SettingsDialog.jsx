@@ -1,4 +1,5 @@
-import { Suspense, useCallback, useState, useSyncExternalStore } from 'react';
+import { Suspense, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -23,6 +24,7 @@ import { useSettingsNav } from './useSettingsNav';
 import { Fig10Sandbox } from './Fig10Sandbox';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { usePlanContexts } from '../tasks/planContexts';
+import { CLI_COMMANDS } from '../cli-selection/useClaudeLauncher';
 
 const PlanContextsDialog = lazyNamed(() => import('../tasks/PlanContextsDialog'), 'PlanContextsDialog');
 
@@ -220,8 +222,9 @@ export function SettingsDialog({
               )}
               <div className="flex flex-col gap-8">
                 <Section section={section('agent')} active={activeId === 'agent'}>
-                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'auto-launch', 'startup']}>
+                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'auto-launch', 'startup']}>
                     <ChoiceRow row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli} />
+                    <ClaudeCommandRow />
                     <ToggleRow row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli} />
                     <StartupRow projectPath={projectPath} />
                   </Group>
@@ -367,6 +370,49 @@ function PlanContextsRow() {
           <PlanContextsDialog open onOpenChange={setOpen} />
         </Suspense>
       )}
+    </Row>
+  );
+}
+
+// The command a tab starts Claude Code with, and what Lirah would run now
+// when it's left empty (claude, or npx when claude isn't on PATH).
+function ClaudeCommandRow() {
+  const [claudeCommand, setClaudeCommand] = useSetting('claudeCommand');
+  const custom = claudeCommand.trim();
+  const [found, setFound] = useState(null); // is `claude` on PATH; null while checking
+  useEffect(() => {
+    if (custom) return;
+    let live = true;
+    invoke('check_command_exists', { command: CLI_COMMANDS['claude-code'].check })
+      .then((ok) => live && setFound(ok), () => live && setFound(false));
+    return () => { live = false; };
+  }, [custom]);
+  const cfg = CLI_COMMANDS['claude-code'];
+  const now = custom || (found == null ? null : found ? cfg.command : cfg.fallback);
+  return (
+    <Row
+      id="claude-command"
+      sectionId="agent"
+      label={ROW['claude-command'].label}
+      htmlFor="settings-claude-command"
+      hint={(
+        <>
+          How a tab starts Claude Code; Lirah adds its plugin flags after it. Applies to agents launched after the
+          change. Leave empty to use claude, or npx when claude isn&apos;t found.
+          <span className="mt-1 block">
+            Now: {now ? <code className="text-foreground">{now}</code> : 'checking…'}
+            {!custom && found === false && ' (claude was not found on PATH)'}
+          </span>
+        </>
+      )}
+    >
+      <DraftField
+        id="settings-claude-command"
+        value={claudeCommand}
+        onCommit={setClaudeCommand}
+        placeholder="claude"
+        spellCheck={false}
+      />
     </Row>
   );
 }

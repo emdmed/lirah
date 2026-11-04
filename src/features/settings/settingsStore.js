@@ -23,6 +23,8 @@ export const SETTINGS_DEFAULTS = {
   // Never applies to tabs restored at startup: that isn't a deliberate act.
   autoLaunchCli: true,
   selectedCli: 'claude-code',
+  // Command that starts Claude Code in a tab; empty = `claude`, or npx when it isn't on PATH.
+  claudeCommand: '',
   // Lirah's agent hooks. Agent state: the agent reports working / permission /
   // done to its tab. Compaction: lets a tab switch on the compaction hook.
   agentStateHook: true,

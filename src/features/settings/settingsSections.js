@@ -12,6 +12,10 @@ export const SETTINGS_ROWS = [
     words: 'default cli claude code opencode agent new tabs',
   },
   {
+    id: 'claude-command', section: 'agent', kind: 'custom', label: 'Claude start command',
+    words: 'claude start command launch npx path binary executable custom',
+  },
+  {
     id: 'auto-launch', section: 'agent', kind: 'toggle', key: 'autoLaunchCli',
     label: 'Auto-launch agent',
     hint: 'Start the CLI when a terminal opens or you open a starred project. Off shows a launch key instead.',

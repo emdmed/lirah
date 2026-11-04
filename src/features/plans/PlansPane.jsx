@@ -22,6 +22,9 @@ import { BUSY, PlanPaneProvider } from './PlanPaneContext';
 import { PlanRow } from './PlanRow';
 import { usePlanRunActions } from './usePlanRunActions';
 import { usePlanReview } from './usePlanReview';
+import { getTabPrompt } from '../tabs/tabPrompts';
+import { getTabSession } from '../tabs/terminalActivity';
+import { useCliRunning } from '../tabs/useTabsSummary';
 
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
 const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog');
@@ -81,6 +84,17 @@ export function PlansPane({ projectPath }) {
       toast.error(`Couldn't create the plan: ${e?.message || e}`);
     }
   }, [createPlan, repoRoot, toast]);
+
+  // Only into a running agent: in a bare shell the pasted lines would run as commands.
+  const activeSession = getTabSession(activeTabId);
+  const agentRunning = useCliRunning(activeSession, newOpen);
+  const sendBlocked = !activeSession ? 'this tab has no terminal yet'
+    : !agentRunning ? 'no agent is running in this tab' : null;
+  const handleSendPrompt = useCallback(async (text) => {
+    const send = getTabPrompt(activeTabId)?.send;
+    if (!send) throw new Error('This tab has no terminal yet');
+    await send(text);
+  }, [activeTabId]);
 
   const handleCheck = useCallback((plan, chunk) => withBusy(BUSY.chunk(chunk.id), async () => {
     const res = await checkChunk(repoRoot, plan.id, chunk.id);
@@ -243,7 +257,7 @@ export function PlansPane({ projectPath }) {
       )}
 
       <Suspense fallback={null}>
-        {newOpen && <NewPlanDialog open onOpenChange={setNewOpen} onCreate={handleCreate} />}
+        {newOpen && <NewPlanDialog open onOpenChange={setNewOpen} onCreate={handleCreate} onSendPrompt={handleSendPrompt} sendBlocked={sendBlocked} />}
         {diffProps && (
           <GitDiffDialog {...diffProps} />
         )}
