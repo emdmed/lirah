@@ -483,7 +483,7 @@ mod tests {
     #[test]
     fn path_starts_with_bin_then_original_entries() {
         let env = session_env("s1");
-        let Some((_, path)) = env.iter().find(|(k, _)| k == "PATH") else { return };
+        let (_, path) = env.iter().find(|(k, _)| k == "PATH").expect("session_env sets PATH");
         let got: Vec<_> = std::env::split_paths(path).collect();
         assert_eq!(got[0], cli_bin_dir().unwrap());
         let original = std::env::var_os("PATH").unwrap_or_default();

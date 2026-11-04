@@ -69,7 +69,8 @@ export function useWorkspace() {
       }
     } catch (err) {
       console.error('Failed to delete workspace:', err);
-      toast.error(`${err}. Close the terminals open in this workspace and try again.`);
+      const hint = String(err).includes('not a workspace of Lirah') ? '' : ' Close the terminals open in this workspace and try again.';
+      toast.error(`${err}.${hint}`);
     } finally {
       await refreshWorkspaces();
     }

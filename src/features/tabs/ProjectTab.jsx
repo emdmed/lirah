@@ -429,6 +429,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       if (terminalSessionId && isInside(await readCwd())) {
         await terminateCliProcess();
         const root = await invoke('get_workspaces_dir');
+        // Ctrl-C first so a half-typed line or a running command does not swallow the cd.
+        await invoke('write_to_terminal', { sessionId: terminalSessionId, data: '\x03' });
+        await new Promise(resolve => setTimeout(resolve, 150));
         await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `cd ${escapeShellPath(root)}\r` });
         // The Windows prompt reports its cwd only when it redraws.
         for (let i = 0; i < 10; i++) {

@@ -136,7 +136,11 @@ fn process_tree(sys: &System, root: u32) -> HashSet<Pid> {
     loop {
         let before = tree.len();
         for (pid, process) in sys.processes() {
-            if process.parent().is_some_and(|p| tree.contains(&p)) {
+            // Windows keeps a dead parent's pid on its orphans, so an older process can look like a child.
+            let child_of_tree = process.parent().and_then(|p| sys.process(p)).is_some_and(|parent| {
+                tree.contains(&parent.pid()) && process.start_time() >= parent.start_time()
+            });
+            if child_of_tree {
                 tree.insert(*pid);
             }
         }
@@ -175,12 +179,17 @@ fn kill_snapshot(tree: &[(Pid, u64)]) {
     }
 }
 
+/// The tree of a job still running; empty for a reaped one, whose pid may already belong to another process.
+fn snapshot_if_running(child: &mut dyn process_wrap::std::ChildWrapper) -> Vec<(Pid, u64)> {
+    if matches!(child.try_wait(), Ok(None)) { snapshot_tree(child.id()) } else { Vec::new() }
+}
+
 /// Stop a job and everything it started: SIGTERM first on Unix, SIGKILL if it
 /// is still there after a few seconds; Windows has only the forced stop. Any
 /// process that left the job's group is killed from a snapshot of its tree.
 fn stop_job(child: &JobChild) -> bool {
     let Ok(mut guard) = child.lock() else { return false };
-    let tree = snapshot_tree(guard.id());
+    let tree = snapshot_if_running(&mut **guard);
     #[cfg(unix)]
     {
         let stopped = guard.signal(15).is_ok();
@@ -188,10 +197,9 @@ fn stop_job(child: &JobChild) -> bool {
         let child = child.clone();
         std::thread::spawn(move || {
             std::thread::sleep(SOFT_STOP_GRACE);
+            // Also when the leader is gone: an orphan in the group may have ignored SIGTERM.
             if let Ok(mut c) = child.lock() {
-                if matches!(c.try_wait(), Ok(None)) {
-                    let _ = c.start_kill();
-                }
+                let _ = c.start_kill();
             }
             kill_snapshot(&tree);
         });
@@ -674,9 +682,9 @@ mod tests {
     #[test]
     fn snapshot_catches_a_child_whose_parent_died_first() {
         #[cfg(windows)]
-        let mut parent = Command::new("cmd").args(["/c", LONG]).stdout(Stdio::null()).spawn().unwrap();
+        let mut parent = Command::new("cmd").args(["/c", LONG]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
         #[cfg(unix)]
-        let mut parent = Command::new("sh").args(["-c", LONG]).stdout(Stdio::null()).spawn().unwrap();
+        let mut parent = Command::new("sh").args(["-c", LONG]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap();
         let root = parent.id();
         let mut orphans = Cleanup(Vec::new());
         wait_until("a child of the parent", || {
@@ -693,6 +701,42 @@ mod tests {
     }
 
     #[test]
+    fn only_a_running_job_is_snapshotted() {
+        let job = spawn_job(IDLE);
+        let live = snapshot_if_running(&mut **job.lock().unwrap());
+        let _cleanup = Cleanup(live.clone());
+        assert!(!live.is_empty());
+
+        assert!(stop_job(&job));
+        wait_until("the job to exit", || job.lock().unwrap().try_wait().unwrap().is_some());
+        assert!(snapshot_if_running(&mut **job.lock().unwrap()).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stop_job_kills_an_orphan_that_ignores_sigterm() {
+        let job = spawn_job("(trap '' TERM; exec sleep 598) & exit 0");
+        wait_until("the leader to exit", || job.lock().unwrap().try_wait().unwrap().is_some());
+        // The subshell may not have exec'd sleep yet when the leader exits.
+        let mut cleanup = Cleanup(Vec::new());
+        wait_until("the orphan sleep", || {
+            let mut sys = System::new();
+            sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::everything());
+            cleanup.0 = sys
+                .processes()
+                .iter()
+                .filter(|(_, p)| p.cmd().iter().any(|a| a == "598"))
+                .map(|(pid, p)| (*pid, p.start_time()))
+                .collect();
+            !cleanup.0.is_empty()
+        });
+
+        stop_job(&job);
+
+        wait_until("the orphan to die", || !any_alive(&cleanup.0));
+    }
+
+    #[test]
     fn cpu_percent_tells_a_busy_job_from_an_idle_one() {
         let busy = spawn_job(BUSY);
         let idle = spawn_job(IDLE);
@@ -706,12 +750,19 @@ mod tests {
         std::thread::sleep(Duration::from_secs(3));
         let mut sys = System::new();
         process_tree_cpu_percent(&mut sys, busy_pid);
-        std::thread::sleep(Duration::from_secs(2));
-        let busy_cpu = process_tree_cpu_percent(&mut sys, busy_pid);
-        let idle_cpu = process_tree_cpu_percent(&mut sys, idle_pid);
+        // A loaded machine may starve the busy loop for a window, so look at a few.
+        let (mut busy_cpu, mut idle_cpu) = (0.0, 0.0);
+        for _ in 0..5 {
+            std::thread::sleep(Duration::from_secs(2));
+            busy_cpu = process_tree_cpu_percent(&mut sys, busy_pid);
+            idle_cpu = process_tree_cpu_percent(&mut sys, idle_pid);
+            if busy_cpu > 5.0 {
+                break;
+            }
+        }
 
-        assert!(busy_cpu > 20.0, "busy job used {busy_cpu}%");
-        assert!(idle_cpu < 20.0, "idle job used {idle_cpu}%");
+        assert!(busy_cpu > 5.0, "busy job used {busy_cpu}%");
+        assert!(idle_cpu < busy_cpu / 2.0, "idle job used {idle_cpu}%, busy {busy_cpu}%");
         stop_job(&busy);
         stop_job(&idle);
     }

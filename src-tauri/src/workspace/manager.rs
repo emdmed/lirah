@@ -117,15 +117,29 @@ pub fn create_workspace(name: &str, projects: Vec<(String, String, Option<String
 }
 
 pub fn delete_workspace(workspace_path: &str) -> Result<(), String> {
-    let path = Path::new(workspace_path);
+    delete_workspace_in(&workspaces_dir(), workspace_path)
+}
 
-    // Verify it's actually a workspace
-    if !path.join(".lirah-workspace.json").exists() {
-        return Err("Not a valid workspace directory".to_string());
+fn delete_workspace_in(root: &Path, workspace_path: &str) -> Result<(), String> {
+    let path = Path::new(workspace_path);
+    let inside_root = match (path.canonicalize(), root.canonicalize()) {
+        (Ok(p), Ok(r)) => p.parent() == Some(r.as_path()),
+        _ => false,
+    };
+    if !inside_root {
+        return Err(format!("{workspace_path} is not a workspace of Lirah"));
     }
 
-    fs::remove_dir_all(path)
-        .map_err(|e| format!("Failed to delete workspace: {}", e))
+    let marker = path.join(".lirah-workspace.json");
+    let saved = fs::read(&marker).map_err(|_| "Not a valid workspace directory".to_string())?;
+
+    fs::remove_dir_all(path).map_err(|e| {
+        // remove_dir_all deletes the marker first; without it the leftover folder is unlisted and cannot be retried.
+        if path.exists() {
+            let _ = fs::write(&marker, saved);
+        }
+        format!("Failed to delete workspace: {}", e)
+    })
 }
 
 pub fn list_workspaces() -> Result<Vec<WorkspaceInfo>, String> {
@@ -227,6 +241,68 @@ mod tests {
     }
 
     #[test]
+    fn delete_workspace_rejects_a_folder_outside_the_workspaces_root() {
+        let (base, _) = scratch("outside");
+        let root = base.join("root");
+        fs::create_dir_all(&root).unwrap();
+        let other = base.join("other");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join(".lirah-workspace.json"), "{}").unwrap();
+
+        let err = delete_workspace_in(&root, other.to_str().unwrap()).unwrap_err();
+
+        assert!(err.contains("not a workspace of Lirah"), "{err}");
+        assert!(other.join(".lirah-workspace.json").exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_failed_delete_keeps_the_workspace_listed_and_retryable() {
+        let (base, _) = scratch("inuse");
+        let ws = base.join("ws");
+        fs::create_dir_all(&ws).unwrap();
+        fs::write(ws.join(".lirah-workspace.json"), "{}").unwrap();
+        // Killed on drop so a failing assert cannot leave it running.
+        struct Holder(std::process::Child);
+        impl Drop for Holder {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let holder = Holder(
+            std::process::Command::new("ping")
+                .args(["-t", "127.0.0.1"])
+                .current_dir(&ws)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let first = delete_workspace_in(&base, ws.to_str().unwrap());
+        let marker_kept = ws.join(".lirah-workspace.json").exists();
+        drop(holder);
+        let mut retry = delete_workspace_in(&base, ws.to_str().unwrap());
+        for _ in 0..20 {
+            if retry.is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            retry = delete_workspace_in(&base, ws.to_str().unwrap());
+        }
+
+        assert!(first.is_err());
+        assert!(marker_kept, "the failed delete should leave the marker");
+        retry.unwrap();
+        assert!(!ws.exists());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
     fn delete_workspace_leaves_the_linked_projects_intact() {
         let (base, real) = scratch("delete");
         let ws = base.join("ws");
@@ -236,7 +312,7 @@ mod tests {
         #[cfg(windows)]
         junction::create(&real, ws.join("junction")).unwrap();
 
-        delete_workspace(ws.to_str().unwrap()).unwrap();
+        delete_workspace_in(&base, ws.to_str().unwrap()).unwrap();
 
         assert!(!ws.exists());
         assert_eq!(fs::read_to_string(real.join("keep.txt")).unwrap(), "kept");
