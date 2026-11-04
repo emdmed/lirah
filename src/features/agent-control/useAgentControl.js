@@ -10,6 +10,13 @@ import { useBookmarks } from '../bookmarks';
 import { useTasksActions } from '../tasks/TasksContext';
 import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
+import { usePlansActions } from '../plans/PlansContext';
+import { CHUNK_STATUS, effectiveChunkState, planProgress, planStarted } from '../plans/planModel';
+import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
+import { planGit } from '../plans/planGit';
+import { getAgentHookState } from '../tabs/agentHookState';
+import { getTabSession } from '../tabs/terminalActivity';
+import { hash8 } from '../../lib/ids';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
@@ -22,7 +29,7 @@ import {
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list' };
+const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list', plans: 'list' };
 
 const flag = (v) => (v === undefined ? undefined : v === true || v === 'true' || v === 'on' || v === 1);
 
@@ -44,9 +51,10 @@ export function useAgentControl() {
   const tabManager = useTabManager();
   const { bookmarks } = useBookmarks();
   const tasksActions = useTasksActions();
+  const plansActions = usePlansActions();
   // The listener is set up once; it reads the latest of these through the ref.
   const live = useRef({});
-  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions };
+  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions };
 
   useEffect(() => {
     // Ask before a guarded change. Resolves true when allowed.
@@ -87,6 +95,76 @@ export function useAgentControl() {
       const task = (await live.current.tasks.getTasks(scope)).find((t) => t.id === id);
       if (!task) throw new Error(`no task ${id} in ${where(scope)} (see \`lirah tasks${scope === GLOBAL ? ' --global' : ''}\`)`);
       return [scope, task];
+    };
+
+    // Plans: the caller tab's repo, as the plans pane shows it.
+    const findPlan = (plans, ref) => {
+      const text = String(ref ?? '').trim();
+      if (!text) throw new Error('missing plan: give an index, an id or a title (see `lirah plans`)');
+      const byIndex = /^\d+$/.test(text) ? plans[Number(text) - 1] : null;
+      const plan = byIndex || plans.find((p) => p.id === text)
+        || plans.find((p) => (p.title || '').toLowerCase() === text.toLowerCase());
+      if (!plan) throw new Error(`no plan "${text}" (see \`lirah plans\`)`);
+      return plan;
+    };
+    const findChunk = (plan, ref) => {
+      const text = String(ref ?? '').trim();
+      const chunk = plan.chunks.find((c) => c.id === text || String(c.n) === text);
+      if (!chunk) throw new Error(`no chunk "${text}" in ${plan.title || plan.id} (see \`lirah plans show\`)`);
+      return chunk;
+    };
+    const planSummary = (plan, index) => {
+      const { done, total } = planProgress(plan);
+      return {
+        index, id: plan.id, title: plan.title || '(untitled)', done, total,
+        split: plan.split, autopilot: plan.autopilot?.status || 'off', file: plan.importedFrom?.path || null,
+      };
+    };
+
+    // What diagnosePlan needs from the app for `plan`.
+    const debugEnv = async (plan) => {
+      const cfg = planGit(plan);
+      const paths = (cfg.worktrees ? cfg.repos || [] : []).map((r) => r.workPath).filter(Boolean);
+      const exists = await Promise.all(paths.map((path) => invoke('path_exists', { path }).catch(() => true)));
+      let fileHash;
+      if (plan.importedFrom?.path) {
+        const there = await invoke('path_exists', { path: plan.importedFrom.path }).catch(() => true);
+        fileHash = there ? await invoke('read_file_content', { path: plan.importedFrom.path }).then(hash8).catch(() => undefined) : null;
+      }
+      return {
+        tabIds: new Set(live.current.tabManager.tabs.map((t) => t.id)),
+        agentState: (tabId) => getAgentHookState(getTabSession(tabId))?.state ?? null,
+        missingPaths: new Set(paths.filter((_, i) => !exists[i])),
+        fileHash,
+      };
+    };
+
+    // Apply one finding's fix; returns what happened, for the reply.
+    const applyFix = async (repo, plan, f) => {
+      const { runSplit, checkChunk, updateChunk, replaceSource } = live.current.plans;
+      const chunk = plan.chunks.find((c) => c.n === f.chunk);
+      switch (f.fix) {
+        case DEBUG_FIX.RESPLIT:
+          runSplit(repo, plan.id); // runs in the background; debug again to see the result
+          return 'splitting again';
+        case DEBUG_FIX.RECHECK:
+        case DEBUG_FIX.RESET: {
+          const res = await checkChunk(repo, plan.id, chunk.id);
+          if (res.error) return `chunk ${chunk.n}: commit check failed: ${res.error}`;
+          if (res.found) return `chunk ${chunk.n}: found ${res.commits.length} commit(s), now implemented`;
+          if (f.fix === DEBUG_FIX.RECHECK) return `chunk ${chunk.n}: no commits yet`;
+          updateChunk(repo, plan.id, chunk.id, PENDING_PATCH);
+          return `chunk ${chunk.n}: no commits; back to pending`;
+        }
+        case DEBUG_FIX.REIMPORT: {
+          const path = plan.importedFrom.path;
+          const source = await invoke('read_file_content', { path });
+          replaceSource(repo, plan.id, { source, importedFrom: { path, hash: hash8(source) } });
+          return 're-imported the edited plan file; splitting again';
+        }
+        default:
+          return null;
+      }
     };
 
     const handlers = {
@@ -179,6 +257,85 @@ export function useAgentControl() {
       },
 
       // Tasks: the caller tab's project list (as the tasks pane scopes it), or --global.
+      'plans.list': async (args, positional, { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plans = await live.current.plans.getPlans(repo);
+        return { repo, plans: plans.map((p, i) => planSummary(p, i + 1)) };
+      },
+      'plans.show': async (args, [ref = args.plan], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plans = await live.current.plans.getPlans(repo);
+        const plan = findPlan(plans, ref);
+        return {
+          ...planSummary(plan, plans.indexOf(plan) + 1),
+          summary: plan.summary || '',
+          chunks: plan.chunks.map((c) => ({ n: c.n, id: c.id, state: effectiveChunkState(c), title: c.title || '' })),
+        };
+      },
+      // A *_plan.md file → a plan, split into chunks; as the pane's import offer.
+      'plans.import': async (args, [path = args.path], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const source = await invoke('read_file_content', { path });
+        if (!source.trim()) throw new Error(`${path} is empty`);
+        const importedFrom = { path, hash: hash8(source) };
+        const { getPlans, createPlan, replaceSource } = live.current.plans;
+        const existing = (await getPlans(repo)).find((p) => p.importedFrom?.path === path);
+        if (existing?.importedFrom.hash === importedFrom.hash) return `already imported as ${existing.id}`;
+        let id;
+        if (existing && !planStarted(existing)) {
+          replaceSource(repo, existing.id, { source, importedFrom });
+          id = existing.id;
+        } else {
+          id = await createPlan(repo, { source, importedFrom });
+        }
+        live.current.toast.info(`Claude imported plan ${path.split('/').pop()}`);
+        return `${existing && id === existing.id ? 'updated' : 'imported'} ${id}; splitting into chunks (see \`lirah plans show ${id}\`)`;
+      },
+      // As the pane's "mark done": commits since the chunk started win, else it's done with nothing to commit.
+      'plans.done': async (args, [planRef = args.plan, chunkRef = args.chunk], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plan = findPlan(await live.current.plans.getPlans(repo), planRef);
+        const chunk = findChunk(plan, chunkRef);
+        if (chunk.status === CHUNK_STATUS.IMPLEMENTED) return `chunk ${chunk.n} is already implemented`;
+        if (chunk.status !== CHUNK_STATUS.IN_PROGRESS) {
+          throw new Error(`chunk ${chunk.n} is ${chunk.status}; only a chunk in progress (sent from the plans pane) can be marked done`);
+        }
+        const result = args.result === undefined ? null : String(args.result);
+        const res = await live.current.plans.markChunkDone(repo, plan.id, chunk.id, result);
+        if (res.error) throw new Error(`couldn't check the chunk's commits: ${res.error}`);
+        live.current.toast.info(`Claude marked chunk ${chunk.n} of ${plan.title || 'a plan'} done`);
+        return res.found ? `chunk ${chunk.n} implemented (${res.commits.length} commit${res.commits.length === 1 ? '' : 's'})` : `chunk ${chunk.n} done with nothing to commit`;
+      },
+
+      // Stuck or broken states of a plan; --fix applies the safe repairs, then checks again.
+      'plans.debug': async (args, [ref = args.plan], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const { getPlans } = live.current.plans;
+        let plan = findPlan(await getPlans(repo), ref);
+        const found = diagnosePlan(plan, await debugEnv(plan));
+        const applied = [];
+        if (args.fix === true) {
+          for (const f of found.filter((x) => x.fix)) {
+            try {
+              const what = await applyFix(repo, plan, f);
+              if (what) {
+                applied.push(what);
+                live.current.toast.info(`Claude fixed ${plan.title || 'a plan'}: ${what}`);
+              }
+            } catch (e) {
+              applied.push(`${f.code}: fix failed: ${e?.message || e}`);
+            }
+            plan = (await getPlans(repo)).find((p) => p.id === plan.id) || plan;
+          }
+        }
+        const remaining = args.fix === true ? diagnosePlan(plan, await debugEnv(plan)) : found;
+        const { source, ...state } = plan;
+        return {
+          id: plan.id, title: plan.title || '(untitled)', found, applied, remaining,
+          state: { ...state, sourceLength: source?.length ?? 0 },
+        };
+      },
+
       'tasks.list': async (args, positional, { sessionId }) => {
         const scope = await taskScope(args, sessionId);
         const tasks = await live.current.tasks.getTasks(scope);

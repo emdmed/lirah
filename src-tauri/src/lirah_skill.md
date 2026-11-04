@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, or to list, add, finish, edit, delete or move tasks in Lirah's task list.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, or to list, import or check off Lirah plans and their chunks.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -48,9 +48,20 @@ lirah tasks edit <id> [--title T] [--notes N]
 lirah tasks remove <id>        delete a task (the user can undo from a toast)
 lirah tasks move <id>          move between this project's list and the global list
                                task commands take --global to act on the global list
+lirah plans [list]             list this tab's repo plans and their progress
+lirah plans show <plan>        a plan's chunks and their state
+lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+lirah plans done <plan> <chunk> [--result T]
+                               mark the chunk in progress done; --result says what
+                               was done when there's nothing to commit
+lirah plans debug <plan> [--fix]
+                               find what's stuck or broken in a plan; --fix applies
+                               the safe repairs and checks again
 lirah ping                     check that Lirah is reachable
 ```
 
+`<plan>` is an index from `lirah plans`, an id or a title; `<chunk>` is its
+number or id.
 `<tab>` is `.` (this tab), an index from `lirah tabs`, a tab id or a tab name.
 Add `--json` to any command for machine-readable output. `lirah help` prints
 the full usage.
@@ -68,6 +79,21 @@ the full usage.
 - For startup projects to open at launch, the mode must be `projects`:
   `lirah startup mode projects`.
 - Paths are resolved against your current directory.
+- After writing a `*_plan.md` the user wants run in Lirah, import it with
+  `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
+- When you finish the plan chunk you were sent, commit, then run
+  `lirah plans done <plan> <chunk>`. With nothing to commit, pass `--result`.
+- When a plan looks stuck or broken, debug it:
+  1. `lirah plans debug <plan>` to see what's wrong.
+  2. `lirah plans debug <plan> --fix`, which applies the safe repairs and checks again.
+     A fix that needs you (e.g. committing a chunk's work) is in its hint; do it, then
+     debug again. Don't roll back, delete or re-send chunks unless the user asks.
+  3. If problems remain, read `lirah plans debug <plan> --json` (it has the plan's
+     stored state) and look for the cause. Fix it if you can with these commands.
+  4. If it still can't be fixed, add one task with a short problem explanation:
+     `lirah tasks add "Plan <title>: <the problem in a few words>" --notes "..."`,
+     with notes saying what's wrong, what you tried, and the plan and chunk ids.
+     Tell the user. Don't edit Lirah's plans.json by hand.
 - Task ids come from `lirah tasks`. Only delete a task when the user asks.
 - Run `lirah tasks` before adding, so you don't add a task that's already there.
 - A task title is one line; put details in `--notes` (markdown is fine). Quote

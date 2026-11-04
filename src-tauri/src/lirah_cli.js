@@ -48,8 +48,18 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  global list
                                  Task commands take --global to work on the
                                  global list instead of this tab's project.
+  lirah plans [list]             list this tab's repo plans and their progress
+  lirah plans show <plan>        a plan's chunks and their state
+  lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+  lirah plans done <plan> <chunk> [--result T]
+                                 mark the chunk in progress done; --result says
+                                 what was done when there's nothing to commit
+  lirah plans debug <plan> [--fix]
+                                 find what's stuck or broken in a plan; --fix
+                                 applies the safe repairs and checks again
   lirah ping                     check that Lirah is reachable
 
+  <plan> is an index from \`lirah plans\`, an id or a title; <chunk> its number or id.
   <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
 
   --json   print the reply as JSON
@@ -175,6 +185,34 @@ function printTasks(data) {
   return `${where}\n\n${table(["ID", "STATUS", "TITLE"], rows)}`;
 }
 
+function printPlans(data) {
+  if (!data.plans.length) return `no plans in ${data.repo}`;
+  const rows = data.plans.map((p) => [
+    String(p.index), p.id, `${p.done}/${p.total}`, p.split === "done" ? "" : `split ${p.split}`,
+    p.autopilot === "off" ? "" : p.autopilot, p.title,
+  ]);
+  return `${data.repo}\n\n${table(["#", "ID", "DONE", "SPLIT", "AUTOPILOT", "TITLE"], rows)}`;
+}
+
+function printPlan(p) {
+  const head = `${p.title} (${p.id}): ${p.done}/${p.total} done${p.split === "done" ? "" : `, split ${p.split}`}${p.autopilot === "off" ? "" : `, autopilot ${p.autopilot}`}`;
+  const lines = [head];
+  if (p.summary) lines.push("", p.summary);
+  if (p.chunks.length) lines.push("", table(["#", "ID", "STATE", "TITLE"], p.chunks.map((c) => [String(c.n), c.id, c.state, c.title])));
+  return lines.join("\n");
+}
+
+function printDebug(d) {
+  const item = (f) => `- [${f.code}] ${f.problem}${f.fix ? ` (fix: ${f.fix})` : ""}${f.hint ? `\n  ${f.hint}` : ""}`;
+  const lines = [`${d.title} (${d.id})`];
+  if (d.applied.length) lines.push("", "applied:", ...d.applied.map((a) => `- ${a}`));
+  const left = d.remaining;
+  lines.push("", left.length ? (d.applied.length ? "still wrong:" : "found:") : "no problems found", ...left.map(item));
+  if (!d.applied.length && left.some((f) => f.fix)) lines.push("", "run again with --fix to apply the fixes");
+  lines.push("", "--json prints the plan's stored state too");
+  return lines.join("\n");
+}
+
 function printStartup(data) {
   const lines = [`mode: ${data.mode}${data.mode === "restore" ? " (reopen the last tabs)" : " (open the startup projects)"}`];
   if (!data.projects?.length) {
@@ -268,6 +306,22 @@ function route(cmd, positional, args) {
       }
       case "clear": return ["startup.clear", rest, show];
       default: fail(`unknown startup command "${sub}" (mode, add, remove, clear)`);
+    }
+  }
+  if (cmd === "plans" || cmd === "plan") {
+    switch (sub ?? "list") {
+      case "list": return ["plans.list", rest, printPlans];
+      case "show": return ["plans.show", rest, printPlan];
+      case "import": {
+        const [path, ...extra] = rest;
+        return ["plans.import", [absolutePath(path ?? args.path, "lirah plans import <file>"), ...extra], show];
+      }
+      case "done": return ["plans.done", rest, show];
+      case "debug": {
+        unswallow(args, "fix", rest);
+        return ["plans.debug", rest, printDebug];
+      }
+      default: fail(`unknown plans command "${sub}" (list, show, import, done, debug)`);
     }
   }
   if (cmd === "tasks" || cmd === "task") {

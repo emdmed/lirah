@@ -177,6 +177,12 @@ export function PlansProvider({ children }) {
     }
   }, [findPlan, updatePlan]);
 
+  /** A repo's plans, loaded first if needed. */
+  const getPlans = useCallback(async (repoRoot) => {
+    await loadRepo(repoRoot);
+    return stateRef.current[repoRoot] || [];
+  }, [loadRepo, stateRef]);
+
   const createPlan = useCallback(async (repoRoot, { source, importedFrom = null }) => {
     await loadRepo(repoRoot);
     const title = markdownTitle(source);
@@ -364,6 +370,7 @@ export function PlansProvider({ children }) {
 
   const actions = useMemo(() => ({
     loadRepo,
+    getPlans,
     createPlan,
     replaceSource,
     runSplit,
@@ -391,7 +398,7 @@ export function PlansProvider({ children }) {
     ensureGit,
     removeWorktrees,
     reopenGit,
-  }), [loadRepo, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
+  }), [loadRepo, getPlans, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
     implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
     dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
 
