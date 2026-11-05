@@ -4,6 +4,17 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-06
+
+### Added
+
+- **A plan's whole life, idea to merged** - Each plan now shows its stage: planned, building, implemented, PR open or merged. The plan detail draws a short lifecycle line (idea → planned → building → … → merged) with how long each step took, and links the PR when there is one (found with `gh`). Merge is detected from the plan's commit trailers on the base branch, so it works for merges, rebases and squash merges. When a plan is merged, its task is marked done.
+- **Revise and re-chunk a plan** - "revise" in the plan detail sends your notes to the agent in the tab, which edits only the plan file. "re-chunk" splits the plan again from its file while keeping the chunks already done. Agents get the same with `lirah plans revise` and `lirah plans rechunk`, and `lirah plans` lists each plan's stage.
+
+### Changed
+
+- **Auto commit no longer pops up** - When the commit message is ready, the dialog stays closed. The tab shows a green "commit" lamp and the status bar a "commit · ready" chip; click the chip or run auto commit again to review and commit.
+
 ## [0.12.0] - 2026-11-05
 
 ### Added
