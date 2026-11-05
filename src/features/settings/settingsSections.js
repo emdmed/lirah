@@ -40,6 +40,10 @@ export const SETTINGS_ROWS = [
     words: 'agent control lirah cli command settings theme configure',
   },
   {
+    id: 'plugins', section: 'agent', kind: 'custom', label: 'Plugins',
+    words: 'plugins plugin skills tools folder prompt scripts wrapper cli',
+  },
+  {
     id: 'startup', section: 'agent', kind: 'custom', label: 'Startup',
     words: 'startup launch open projects restore tabs session boot',
   },

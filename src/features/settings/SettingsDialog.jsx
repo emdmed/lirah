@@ -21,6 +21,7 @@ import { IS_WINDOWS } from '../../utils/pathUtils';
 import { Choice, ChoiceRow, DraftField, Group, Row, Section, StepRow, SubRows, ToggleRow } from './parts';
 import { AppearanceSection } from './AppearanceSection';
 import { StartupRow } from './StartupRow';
+import { PluginsRow } from './PluginsRow';
 import { useSettingsNav } from './useSettingsNav';
 import { Fig10Sandbox } from './Fig10Sandbox';
 import { lazyNamed } from '../../lib/lazyNamed';
@@ -248,10 +249,11 @@ export function SettingsDialog({
                       />
                     </Row>
                   </Group>
-                  <Group label="Integration" sectionId="agent" rows={['agent-state-hook', 'compaction-hook', 'agent-control']}>
+                  <Group label="Integration" sectionId="agent" rows={['agent-state-hook', 'compaction-hook', 'agent-control', 'plugins']}>
                     <ToggleRow row={ROW['agent-state-hook']} value={agentStateHook} onChange={setAgentStateHook} />
                     <ToggleRow row={ROW['compaction-hook']} value={compactionHook} onChange={setCompactionHook} />
                     <ToggleRow row={ROW['agent-control']} value={agentControl} onChange={setAgentControl} />
+                    <PluginsRow />
                   </Group>
                 </Section>
 

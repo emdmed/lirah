@@ -90,10 +90,17 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
           compactionHook ? invoke('get_compaction_plugin_dir').catch(() => null) : null,
           agentControl ? invoke('get_agent_control_plugin_dir').catch(() => null) : null,
         ]);
-        for (const dir of pluginDirs.filter(Boolean)) {
-          // PowerShell also reads the curly quotes as quote characters; doubling any of them keeps the string whole.
-          const quoted = powershell ? dir.replace(/['‘’‚‛]/g, '$&$&') : dir.replace(/'/g, "'\\''");
-          command += ` --plugin-dir '${quoted}'`;
+        // PowerShell also reads the curly quotes as quote characters; doubling any of them keeps the string whole.
+        const quote = (v) => `'${powershell ? v.replace(/['‘’‚‛]/g, '$&$&') : v.replace(/'/g, "'\\''")}'`;
+        for (const dir of pluginDirs.filter(Boolean)) command += ` --plugin-dir ${quote(dir)}`;
+        // User plugins: rebuilt each launch from their folder; a broken one is skipped, not fatal.
+        for (const p of (getSettings().plugins || []).filter((x) => x.enabled)) {
+          try {
+            const dir = await invoke('install_user_plugin', { id: p.id, name: p.name, folder: p.folder, prompt: p.prompt });
+            command += ` --plugin-dir ${quote(dir)} --add-dir ${quote(p.folder)}`;
+          } catch (e) {
+            toastError(`Plugin ${p.name}: ${e?.message || e}`);
+          }
         }
       }
       // Clear the screen first so the agent starts on a clean terminal.

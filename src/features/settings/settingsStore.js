@@ -56,6 +56,9 @@ export const SETTINGS_DEFAULTS = {
   startupProjects: [],
   // The agent in a tab may drive Lirah through the `lirah` CLI.
   agentControl: true,
+  // Folders of tools and skills given to Claude Code, each with a prompt.
+  // Items are { id, name, folder, prompt, enabled } (see PluginsRow).
+  plugins: [],
   // The plan menu's choice: a task's plan is imported and split into chunks
   // once the agent has written it (git repos only), or left as a file.
   autoChunkTaskPlans: true,
@@ -127,6 +130,20 @@ function cleanStartupProject(item) {
   return out;
 }
 
+// One user plugin, cleaned: undefined if it has no folder.
+function cleanPlugin(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+  if (typeof item.folder !== 'string' || !item.folder.trim()) return undefined;
+  const base = item.folder.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'plugin';
+  return {
+    id: typeof item.id === 'string' && item.id ? item.id : base,
+    name: typeof item.name === 'string' && item.name.trim() ? item.name : base,
+    folder: item.folder,
+    prompt: typeof item.prompt === 'string' ? item.prompt : '',
+    enabled: item.enabled !== false,
+  };
+}
+
 // Keys whose value needs more than a type check. Each returns the cleaned
 // value, or undefined to keep the default.
 const VALIDATORS = {
@@ -134,6 +151,7 @@ const VALIDATORS = {
   startupProjects: (v) => (Array.isArray(v)
     ? v.map(cleanStartupProject).filter(Boolean)
     : undefined),
+  plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
 };
 
