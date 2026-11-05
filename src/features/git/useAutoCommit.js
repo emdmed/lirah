@@ -59,7 +59,8 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
   // Enter was pressed before the message was ready: commit as soon as it is.
   const [queued, setQueued] = useState(false);
   // Hidden: the dialog is closed but the run goes on. A run starts hidden
-  // (the tab shows a spinner) and the dialog opens once the message is ready.
+  // (the tab shows a spinner, then a ready lamp) and the dialog opens only when
+  // asked: the status-bar chip or auto commit again.
   const [hidden, setHidden] = useState(false);
   const currentPathRef = useRef(null);
   const cancelledRef = useRef(false);
@@ -137,7 +138,6 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
 
       setCommitMessage(tidyMessage(msg) || 'chore: update files');
       setStage('ready');
-      if (!autoConfirmRef.current) setHidden(false);
     } catch (err) {
       if (cancelledRef.current) return;
       setError(String(err));
