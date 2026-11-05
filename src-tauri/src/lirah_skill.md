@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -48,9 +48,13 @@ lirah tasks edit <id> [--title T] [--notes N]
 lirah tasks remove <id>        delete a task (the user can undo from a toast)
 lirah tasks move <id>          move between this project's list and the global list
                                task commands take --global to act on the global list
-lirah plans [list]             list this tab's repo plans and their progress
+lirah plans [list]             list this tab's repo plans, their progress and stage
+                               (planned, building, implemented, PR #N, merged)
 lirah plans show <plan>        a plan's chunks and their state
 lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+lirah plans revise <plan> <notes>
+                               the plan's file and a prompt to change it as asked
+lirah plans rechunk <plan>     split the plan again from its file; done chunks stay
 lirah plans done <plan> <chunk> [--result T]
                                mark the chunk in progress done; --result says what
                                was done when there's nothing to commit
@@ -93,6 +97,9 @@ the full usage.
 - Paths are resolved against your current directory.
 - After writing a `*_plan.md` the user wants run in Lirah, import it with
   `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
+- When the user wants a plan changed: `lirah plans revise <plan> "<what to change>"`,
+  edit only the file it names, then `lirah plans rechunk <plan>`. Don't implement
+  anything while revising.
 - When you finish the plan chunk you were sent, commit, then run
   `lirah plans done <plan> <chunk>`. With nothing to commit, pass `--result`.
 - When a plan looks stuck or broken, debug it:

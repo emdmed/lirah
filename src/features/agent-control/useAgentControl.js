@@ -12,7 +12,8 @@ import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
 import { usePlansActions } from '../plans/PlansContext';
 import { relToRepo, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
-import { CHUNK_STATUS, effectiveChunkState, planProgress, planStarted } from '../plans/planModel';
+import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage } from '../plans/planModel';
+import { buildPlanRevisePrompt } from '../plans/planPrompts';
 import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
 import { planGit } from '../plans/planGit';
 import { getAgentHookState } from '../tabs/agentHookState';
@@ -121,6 +122,7 @@ export function useAgentControl() {
       return {
         index, id: plan.id, title: plan.title || '(untitled)', done, total,
         split: plan.split, autopilot: plan.autopilot?.status || 'off', file: plan.importedFrom?.path || null,
+        stage: planStage(plan), pr: plan.pr ?? null, merged: plan.merged ?? null,
       };
     };
 
@@ -324,14 +326,31 @@ export function useAgentControl() {
         const existing = (await getPlans(repo)).find((p) => p.importedFrom?.path === path);
         if (existing?.importedFrom.hash === importedFrom.hash) return `already imported as ${existing.id}`;
         let id;
-        if (existing && !planStarted(existing)) {
-          replaceSource(repo, existing.id, { source, importedFrom });
+        if (existing) {
+          replaceSource(repo, existing.id, { source, importedFrom }); // keeps the chunks already done
           id = existing.id;
         } else {
           id = await createPlan(repo, { source, importedFrom });
         }
         live.current.toast.info(`Claude imported plan ${path.split('/').pop()}`);
         return `${existing && id === existing.id ? 'updated' : 'imported'} ${id}; splitting into chunks (see \`lirah plans show ${id}\`)`;
+      },
+      // The plan's file and what to change in it, for the calling agent to edit; then plans.rechunk.
+      'plans.revise': async (args, [ref = args.plan, ...words], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plan = findPlan(await live.current.plans.getPlans(repo), ref);
+        const notes = words.join(' ').trim() || String(args.notes ?? '').trim();
+        if (!notes) throw new Error('say what should change: lirah plans revise <plan> <notes>');
+        const path = await live.current.plans.ensurePlanFile(repo, plan.id);
+        return `${buildPlanRevisePrompt(plan, notes, path)}\n\nWhen the file is updated, run \`lirah plans rechunk ${plan.id}\`.`;
+      },
+      // As the pane's re-chunk: the plan's file as it is now, the chunks already done kept.
+      'plans.rechunk': async (args, [ref = args.plan], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plan = findPlan(await live.current.plans.getPlans(repo), ref);
+        await live.current.plans.rechunk(repo, plan.id);
+        live.current.toast.info(`Claude re-chunked ${plan.title || 'a plan'}`);
+        return `re-chunking ${plan.id} (see \`lirah plans show ${plan.id}\`)`;
       },
       // As the pane's "mark done": commits since the chunk started win, else it's done with nothing to commit.
       'plans.done': async (args, [planRef = args.plan, chunkRef = args.chunk], { sessionId }) => {

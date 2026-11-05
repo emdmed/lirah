@@ -8,6 +8,7 @@ import { createContext, useContext } from 'react';
 export const BUSY = Object.freeze({
   REVIEW_ALL: 'review-all', // gathering the whole plan's diff
   GIT_SETUP: 'git-setup', // changing the git settings
+  REVISE: 'revise', // sending change requests for the plan's file
   chunk: (chunkId) => `chunk:${chunkId}`, // an action on one chunk
 });
 
@@ -30,7 +31,8 @@ export function useBusy(key) {
 /**
  * The pane's handlers: repoRoot, closePlan, and the actions that confirm, set
  * up git or toast before calling the store (implement, check, commit, review,
- * rollback, autopilot, resume, reviewAll, deletePlan, addRepo, removeWorktrees, reopenGit).
+ * rollback, autopilot, resume, reviewAll, deletePlan, addRepo, removeWorktrees, reopenGit,
+ * revise, rechunk).
  */
 export function usePlanPane() {
   const ctx = useContext(PlanPaneActionsContext);

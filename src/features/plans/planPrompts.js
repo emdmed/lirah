@@ -32,7 +32,8 @@ export function markdownTitle(source) {
   return m ? m[1].trim() : null;
 }
 
-export function buildSplitPrompt(source) {
+/** `done`: chunks already finished (a re-chunk of a started plan); only the rest is split. */
+export function buildSplitPrompt(source, done = []) {
   return `You are splitting an implementation plan into small, ordered chunks. A coding agent will implement each chunk on its own and commit it, so every chunk must be one coherent, reviewable change.
 
 You may read the codebase (Read, Grep, Glob) to size the chunks correctly. Do not modify anything.
@@ -51,7 +52,10 @@ Reply with ONLY a JSON object, no markdown fences, no commentary:
 The plan:
 <plan>
 ${source}
-</plan>`;
+</plan>${done.length ? `
+
+These chunks are already implemented or skipped. Don't repeat them: return only the work the plan still needs on top of them.
+${done.map((c) => `- ${c.n}. ${c.title}`).join('\n')}` : ''}`;
 }
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -238,6 +242,18 @@ export function buildPlanFixPrompt(plan, notes) {
     reposBlock(plan),
     `Review notes (${notes.length}):\n${noteLines(notes)}`,
     `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}"`,
+  ].filter(Boolean).join('\n\n');
+}
+
+/** Your change requests for the plan's file, which the agent edits and nothing else. */
+export function buildPlanRevisePrompt(plan, notes, path) {
+  const done = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED || c.status === CHUNK_STATUS.SKIPPED);
+  return [
+    `Revise the implementation plan "${plan.title}" in ${path}.`,
+    done.length > 0 && `Already done (${done.length} of ${plan.chunks.length} chunks), keep it as done and build on it:\n${done.map((c) => `- ${c.n}. ${c.title} (${c.status})`).join('\n')}`,
+    decisionsBlock(plan),
+    `Changes I want:\n${notes.trim()}`,
+    `Edit only ${path}. Don't implement anything and don't commit. I'll re-chunk the plan from the file once you're done.`,
   ].filter(Boolean).join('\n\n');
 }
 

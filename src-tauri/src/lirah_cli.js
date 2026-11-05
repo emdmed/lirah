@@ -51,6 +51,11 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah plans [list]             list this tab's repo plans and their progress
   lirah plans show <plan>        a plan's chunks and their state
   lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+  lirah plans revise <plan> <notes>
+                                 the plan's file and a prompt to change it as
+                                 asked; edit the file, then re-chunk
+  lirah plans rechunk <plan>     split the plan again from its file; chunks
+                                 already done stay
   lirah plans done <plan> <chunk> [--result T]
                                  mark the chunk in progress done; --result says
                                  what was done when there's nothing to commit
@@ -200,14 +205,19 @@ function printTasks(data) {
 function printPlans(data) {
   if (!data.plans.length) return `no plans in ${data.repo}`;
   const rows = data.plans.map((p) => [
-    String(p.index), p.id, `${p.done}/${p.total}`, p.split === "done" ? "" : `split ${p.split}`,
+    String(p.index), p.id, `${p.done}/${p.total}`, stageText(p), p.split === "done" ? "" : `split ${p.split}`,
     p.autopilot === "off" ? "" : p.autopilot, p.title,
   ]);
-  return `${data.repo}\n\n${table(["#", "ID", "DONE", "SPLIT", "AUTOPILOT", "TITLE"], rows)}`;
+  return `${data.repo}\n\n${table(["#", "ID", "DONE", "STAGE", "SPLIT", "AUTOPILOT", "TITLE"], rows)}`;
+}
+
+// planned, building, implemented, PR #12 (open), merged
+function stageText(p) {
+  return p.stage === "pr-open" && p.pr ? `PR #${p.pr.number}` : p.stage;
 }
 
 function printPlan(p) {
-  const head = `${p.title} (${p.id}): ${p.done}/${p.total} done${p.split === "done" ? "" : `, split ${p.split}`}${p.autopilot === "off" ? "" : `, autopilot ${p.autopilot}`}`;
+  const head = `${p.title} (${p.id}): ${stageText(p)}, ${p.done}/${p.total} done${p.split === "done" ? "" : `, split ${p.split}`}${p.autopilot === "off" ? "" : `, autopilot ${p.autopilot}`}`;
   const lines = [head];
   if (p.summary) lines.push("", p.summary);
   if (p.chunks.length) lines.push("", table(["#", "ID", "STATE", "TITLE"], p.chunks.map((c) => [String(c.n), c.id, c.state, c.title])));
@@ -374,11 +384,13 @@ function route(cmd, positional, args) {
         return ["plans.import", [absolutePath(path ?? args.path, "lirah plans import <file>"), ...extra], show];
       }
       case "done": return ["plans.done", rest, show];
+      case "revise": return ["plans.revise", rest, show];
+      case "rechunk": return ["plans.rechunk", rest, show];
       case "debug": {
         unswallow(args, "fix", rest);
         return ["plans.debug", rest, printDebug];
       }
-      default: fail(`unknown plans command "${sub}" (list, show, import, done, debug)`);
+      default: fail(`unknown plans command "${sub}" (list, show, import, revise, rechunk, done, debug)`);
     }
   }
   if (cmd === "jobs" || cmd === "job") {

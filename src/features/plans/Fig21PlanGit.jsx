@@ -2,7 +2,7 @@ import { CalRecipe } from '@/components/instrument/calibrated';
 import { FIGURES, figNumber } from '@/components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { shortcutKeys } from '../../lib/shortcuts';
-import { CHUNK_STATUS, planProgress } from './planModel';
+import { CHUNK_STATUS, planProgress, shortDate } from './planModel';
 import { chunkCommitsByRepo, planGit, workPath } from './planGit';
 
 // FIG.21: where a plan's commits went, as the calibrated merge recipe, one
@@ -58,7 +58,7 @@ export function planGitLanes(plan) {
 }
 
 /** One repo lane as merge-recipe data. */
-function laneData(d, lane, i, progress) {
+function laneData(d, lane, i, progress, plan) {
   const branch = d.branch || 'current branch';
   // One repo: the branch names the lane. Several: each lane is its repo,
   // and the first (the primary) also carries the branch.
@@ -73,7 +73,9 @@ function laneData(d, lane, i, progress) {
     files: lane.worktree
       ? ['worktree', shortWorkPath(lane.worktree, BOX_CHARS)]
       : ['in place', 'no worktree'],
-    verdict: d.ready ? ['ready', `${keys} to merge`] : ['merge', `${progress.done}/${progress.total} chunks`],
+    verdict: plan.merged ? ['merged', shortDate(plan.merged.at)]
+      : plan.pr?.state === 'OPEN' ? [`PR #${plan.pr.number}`, 'open']
+        : d.ready ? ['ready', `${keys} to merge`] : ['merge', `${progress.done}/${progress.total} chunks`],
     label: `${basename(lane.root)}: ${name} off ${lane.base}, ${lane.chunks.length} chunk${lane.chunks.length === 1 ? '' : 's'} committed${lane.chunks.length ? ` (${lane.chunks.join(', ')})` : ''}${lane.worktree ? `, in the worktree ${lane.worktree}` : ', in place'}${d.ready ? ', ready to merge' : ''}.`,
   };
 }
@@ -92,7 +94,7 @@ export function Fig21PlanGit({ plan, fallback }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       {shown.map((lane, i) => {
-        const data = laneData(d, lane, i, progress);
+        const data = laneData(d, lane, i, progress, plan);
         return (
           <div key={lane.root} className="min-w-0" title={data.label}>
             <CalRecipe recipe="merge" replayKey={lane.chunks.length} title={i === 0 ? FIGURES[figNumber('plan-git')].title : undefined} data={data} minWidth={MIN_W} fallback={i === 0 ? fallback : null} />

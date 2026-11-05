@@ -46,6 +46,15 @@ export const SPLIT_STATUS = Object.freeze({
   FAILED: 'failed',
 });
 
+/** Where a plan is in its life, furthest first reached last. Derived, never stored. */
+export const PLAN_STAGE = Object.freeze({
+  PLANNED: 'planned',
+  BUILDING: 'building',
+  IMPLEMENTED: 'implemented',
+  PR_OPEN: 'pr-open',
+  MERGED: 'merged',
+});
+
 /** A chunk's status with its flags folded in. Derived for display, never stored. */
 export const CHUNK_STATE = Object.freeze({
   ...CHUNK_STATUS,
@@ -91,6 +100,37 @@ export function planProgress(plan) {
 export function planStarted(plan) {
   return plan.chunks.some((c) => c.status !== CHUNK_STATUS.PENDING && c.status !== CHUNK_STATUS.SKIPPED);
 }
+
+/** The furthest stage the plan has reached (plan.merged and plan.pr are saved by planLifecycle.js). */
+export function planStage(plan) {
+  if (plan.merged) return PLAN_STAGE.MERGED;
+  if (plan.pr?.state === 'OPEN') return PLAN_STAGE.PR_OPEN;
+  const { done, total } = planProgress(plan);
+  if (total > 0 && done === total) return PLAN_STAGE.IMPLEMENTED;
+  return planStarted(plan) ? PLAN_STAGE.BUILDING : PLAN_STAGE.PLANNED;
+}
+
+/**
+ * The dated stages the plan went through, oldest first: `idea` when its task
+ * (if any) was created, then each PLAN_STAGE it reached.
+ */
+export function planLifecycle(plan, task = null) {
+  const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
+  const starts = active.map((c) => c.startedAt).filter(Boolean);
+  const { done, total } = planProgress(plan);
+  const dones = active.map((c) => c.doneAt).filter(Boolean);
+  return [
+    task?.createdAt && { stage: 'idea', at: task.createdAt },
+    { stage: PLAN_STAGE.PLANNED, at: plan.createdAt },
+    starts.length > 0 && { stage: PLAN_STAGE.BUILDING, at: Math.min(...starts) },
+    total > 0 && done === total && dones.length > 0 && { stage: PLAN_STAGE.IMPLEMENTED, at: Math.max(...dones) },
+    plan.pr?.createdAt && { stage: PLAN_STAGE.PR_OPEN, at: Date.parse(plan.pr.createdAt) },
+    plan.merged?.at && { stage: PLAN_STAGE.MERGED, at: plan.merged.at },
+  ].filter(Boolean);
+}
+
+/** A stage's date as the plan views show it: 5 Nov. */
+export const shortDate = (at) => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
 // The chunk to do next: the first one not yet implemented or skipped.
 export function nextChunkId(plan) {

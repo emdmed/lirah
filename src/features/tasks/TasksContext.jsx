@@ -158,3 +158,12 @@ export function useOpenTaskCount(scope) {
   const { tasks } = useTasks(scope);
   return useMemo(() => (tasks || []).filter(isOpen).length, [tasks]);
 }
+
+/** The loaded task that `planId` was planned for, or null. */
+export function useTaskForPlan(planId) {
+  const tasksByScope = useContext(TasksStateContext);
+  return useMemo(
+    () => Object.values(tasksByScope || {}).flat().find((t) => t.planId === planId) ?? null,
+    [tasksByScope, planId]
+  );
+}

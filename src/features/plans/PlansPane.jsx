@@ -9,6 +9,7 @@ import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { usePlans } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
+import { usePlanLifecycleSync } from './planLifecycle';
 import { FoundPlansSection } from './FoundPlansSection';
 import { EmptyLine } from './parts';
 import { runRank, UNTITLED_PLAN } from './planModel';
@@ -24,6 +25,7 @@ import { usePlanRunActions } from './usePlanRunActions';
 import { usePlanReview } from './usePlanReview';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { getTabSession } from '../tabs/terminalActivity';
+import { getAgentHookState } from '../tabs/agentHookState';
 import { useCliRunning } from '../tabs/useTabsSummary';
 
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -34,8 +36,10 @@ export function PlansPane({ projectPath }) {
   const { repoRoot, checked } = useRepoRoot(projectPath);
   const {
     plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix,
-    sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit,
+    sendPlanFix, startAutopilot, resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit, updatePlan,
+    sendPlanRevise, rechunk,
   } = usePlans(repoRoot);
+  usePlanLifecycleSync(repoRoot, plans, updatePlan);
   const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
   const { tabs, activeTabId, addTab } = useTabManager();
   const confirm = useConfirm();
@@ -199,6 +203,28 @@ export function PlansPane({ projectPath }) {
     }
   }, [confirm, withBusy, reopenGit, repoRoot, toast]);
 
+  // Typed into the active tab's terminal, so ask first when no agent is there.
+  const handleRevise = useCallback(async (plan, notes) => {
+    if (!getAgentHookState(getTabSession(activeTabId))) {
+      const ok = await confirm({
+        title: 'No agent detected in this tab',
+        description: 'The change requests are typed into this tab\'s terminal. Launch Claude there first (Ctrl+K), or send anyway if it is already running.',
+        confirmLabel: 'Send anyway',
+        destructive: false,
+      });
+      if (!ok) return false;
+    }
+    const sent = await withBusy(BUSY.REVISE, async () => {
+      await sendPlanRevise(repoRoot, plan.id, notes, activeTabId);
+      return true;
+    });
+    if (sent) toast.success('Sent. Re-chunk once the agent has updated the plan file.');
+    return !!sent;
+  }, [activeTabId, confirm, withBusy, sendPlanRevise, repoRoot, toast]);
+
+  const handleRechunk = useCallback((plan) => withBusy(BUSY.REVISE, () => rechunk(repoRoot, plan.id)),
+    [withBusy, rechunk, repoRoot]);
+
   const closePlan = useCallback(() => setOpenPlanId(null), []);
   const paneActions = useMemo(() => ({
     repoRoot,
@@ -216,8 +242,10 @@ export function PlansPane({ projectPath }) {
     addRepo: handleAddRepo,
     removeWorktrees: handleRemoveWorktrees,
     reopenGit: handleReopenGit,
+    revise: handleRevise,
+    rechunk: handleRechunk,
   }), [repoRoot, closePlan, handleImplement, handleCheck, handleMarkDone, handleCommit, handleReview, handleRollback, handleAutopilot,
-    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit]);
+    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit, handleRevise, handleRechunk]);
 
   if (!projectPath || (checked && !repoRoot)) {
     return <EmptyLine hint="plans track commits, so they need a git repository">not a git repo</EmptyLine>;

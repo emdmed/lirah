@@ -212,6 +212,7 @@ pub fn run(initial_path: Option<String>) {
             plans::delete_plan_file,
             plans::remove_plan_workdir,
             plans::last_assistant_text,
+            plans::gh_pr_for_branch,
         ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

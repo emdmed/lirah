@@ -8,8 +8,11 @@ import { PlanGitSection } from './PlanGitSection';
 import { ProgressReadout, Prose } from './parts';
 import { Checkbox } from '../../components/ui/checkbox';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, planProgress, planStarted, SPLIT_STATUS, UNTITLED_PLAN,
+  AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, PLAN_STAGE, planLifecycle, shortDate, planProgress, planStarted, SPLIT_STATUS,
+  UNTITLED_PLAN,
 } from './planModel';
+import { formatAgo } from '../../lib/formatDuration';
+import { useTaskForPlan } from '../tasks/TasksContext';
 import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
 import { Fig22FilesByChunk } from './Fig22FilesByChunk';
@@ -109,6 +112,10 @@ export function PlanDetail({ plan }) {
   const [closed, setClosed] = useState(() => new Set());
   const open = new Set([...auto.filter((c) => !closed.has(closeKey(c))).map((c) => c.id), ...opened]);
   const [showSource, setShowSource] = useState(false);
+  const [showRevise, setShowRevise] = useState(false);
+  const [reviseNotes, setReviseNotes] = useState('');
+  const revising = useBusy(BUSY.REVISE);
+  const chunkInFlight = plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
   // Folded runs of finished chunks you've opened back up, by first chunk id.
   const [unfolded, setUnfolded] = useState(() => new Set());
   const started = planStarted(plan);
@@ -189,8 +196,25 @@ export function PlanDetail({ plan }) {
             >
               source
             </PanelButton>
-            {!started && plan.split !== SPLIT_STATUS.RUNNING && (
-              <PanelButton onClick={resplit} title="Split the plan again (nothing has started yet)">re-split</PanelButton>
+            <PanelButton
+              aria-pressed={showRevise}
+              data-latched={showRevise || undefined}
+              aria-controls="plan-revise"
+              onClick={() => setShowRevise((v) => !v)}
+              title="Ask the agent in this tab to change the plan file"
+            >
+              revise
+            </PanelButton>
+            {plan.split !== SPLIT_STATUS.RUNNING && (
+              <PanelButton
+                onClick={() => pane.rechunk(plan)}
+                disabled={revising || chunkInFlight || piloted}
+                title={chunkInFlight || piloted ? 'Not while a chunk or auto-pilot is running'
+                  : started ? 'Split what isn\'t done yet again, from the plan file as it is now; finished chunks stay'
+                    : 'Split the plan again, from its file as it is now'}
+              >
+                {started ? 're-chunk' : 're-split'}
+              </PanelButton>
             )}
             <PanelButton onClick={() => pane.deletePlan(plan)} title="Delete this plan (asks first)">delete</PanelButton>
           </span>
@@ -201,9 +225,40 @@ export function PlanDetail({ plan }) {
           </pre>
         )}
 
+        {showRevise && (
+          <form
+            id="plan-revise"
+            className="mt-2 flex flex-col gap-1.5"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!reviseNotes.trim()) return;
+              if (await pane.revise(plan, reviseNotes)) {
+                setReviseNotes('');
+                setShowRevise(false);
+              }
+            }}
+          >
+            <textarea
+              aria-label="What should change in the plan"
+              value={reviseNotes}
+              onChange={(e) => setReviseNotes(e.target.value)}
+              rows={4}
+              placeholder="what should change in the plan? the agent edits only the plan file"
+              className="ins-well resize-y px-1.5 py-1 text-[11px] leading-relaxed text-foreground outline-none"
+              autoFocus
+            />
+            <div className="flex gap-1.5">
+              <PanelButton type="submit" disabled={!reviseNotes.trim() || revising}>send to agent</PanelButton>
+              <PanelButton onClick={() => setShowRevise(false)}>cancel</PanelButton>
+            </div>
+          </form>
+        )}
+
         {/* Identity first: the title, and what the plan is for. */}
         <h3 className="mt-3 text-[13px] leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1 text-[11px] leading-relaxed text-muted-foreground" />}
+
+        <LifecycleLine plan={plan} />
 
         {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
         {stuck && (
@@ -389,5 +444,33 @@ export function PlanDetail({ plan }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** idea 3 Nov ─2d→ planned 5 Nov ─1h→ building …: each stage reached, with the time it took to get there. */
+function LifecycleLine({ plan }) {
+  const stops = planLifecycle(plan, useTaskForPlan(plan.id));
+  const openPr = () => import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(plan.pr.url));
+  return (
+    <p aria-label="Plan lifecycle" className="mt-2 flex flex-wrap items-baseline gap-x-1 text-[11px] tabular-nums text-muted-foreground">
+      {stops.map((s, i) => (
+        <span key={s.stage} className="whitespace-nowrap">
+          {i > 0 && <span className="opacity-70">─{formatAgo(s.at - stops[i - 1].at)}→ </span>}
+          {s.stage === PLAN_STAGE.PR_OPEN && plan.pr?.url ? (
+            <button type="button" onClick={openPr} className="cursor-pointer text-foreground underline-offset-2 hover:underline" title={plan.pr.url}>
+              PR #{plan.pr.number}
+            </button>
+          ) : (
+            <span className={i === stops.length - 1 ? 'text-foreground' : undefined}>{s.stage}</span>
+          )}{' '}
+          {shortDate(s.at)}
+        </span>
+      ))}
+      {plan.revisions?.length > 0 && (
+        <span className="whitespace-nowrap opacity-70" title={plan.revisions.map((r) => shortDate(r.at)).join(', ')}>
+          · revised {plan.revisions.length}×
+        </span>
+      )}
+    </p>
   );
 }

@@ -3,7 +3,7 @@ import { errorMessage } from '../../lib/errorMessage';
 import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, repoTop } from '../../lib/git';
-import { shortId } from '../../lib/ids';
+import { hash8, shortId } from '../../lib/ids';
 import {
   AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, isAutopilotLive, newChunks, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
   toRolledBack, UNTITLED_PLAN,
@@ -23,6 +23,7 @@ import {
   buildChunkPrompt,
   buildFixPrompt,
   buildPlanFixPrompt,
+  buildPlanRevisePrompt,
   buildSplitPrompt,
   markdownTitle,
   parseSplitResult,
@@ -152,9 +153,14 @@ export function PlansProvider({ children }) {
   const runSplit = useCallback(async (repoRoot, planId) => {
     const plan = findPlan(repoRoot, planId);
     if (!plan) return;
+    // A started plan keeps its finished chunks; only the rest is split again.
+    const kept = planStarted(plan)
+      ? plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED || c.status === CHUNK_STATUS.SKIPPED)
+      : [];
+    const keptIds = new Set(kept.map((c) => c.id));
     updatePlan(repoRoot, planId, { split: SPLIT_STATUS.RUNNING, splitError: null });
     try {
-      const out = await invoke('split_plan', { projectDir: repoRoot, prompt: buildSplitPrompt(plan.source) });
+      const out = await invoke('split_plan', { projectDir: repoRoot, prompt: buildSplitPrompt(plan.source, kept) });
       const result = parseSplitResult(out);
       updatePlan(repoRoot, planId, (p) => {
         const title = p.title || result.title || UNTITLED_PLAN;
@@ -167,7 +173,7 @@ export function PlansProvider({ children }) {
           slug,
           git: gitCfg,
           summary: result.summary,
-          chunks: newChunks(result.chunks),
+          chunks: renumber([...p.chunks.filter((c) => keptIds.has(c.id)), ...newChunks(result.chunks)]),
           split: SPLIT_STATUS.DONE,
           splitError: null,
         };
@@ -207,11 +213,48 @@ export function PlansProvider({ children }) {
     return plan.id;
   }, [loadRepo, mutate, runSplit]);
 
-  // A plan file edited after import: take the new text and split it again.
+  // A plan file edited after import: take the new text and split it again,
+  // keeping the chunks already done. Not while a chunk or a run is in flight.
   const replaceSource = useCallback((repoRoot, planId, { source, importedFrom }) => {
-    updatePlan(repoRoot, planId, { source, importedFrom, chunks: [], autopilot: null });
+    const plan = findPlan(repoRoot, planId);
+    if (!plan) throw new Error('Plan not found');
+    if (isAutopilotLive(plan.autopilot)) throw new Error('Stop auto-pilot before re-chunking');
+    const busy = plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
+    if (busy) throw new Error(`Chunk ${busy.n} is in progress; finish or roll it back before re-chunking`);
+    updatePlan(repoRoot, planId, (p) => ({
+      source,
+      importedFrom,
+      autopilot: null,
+      ...(!planStarted(p) && { chunks: [] }),
+      revisions: [...(p.revisions ?? []), { at: Date.now(), hash: hash8(source) }],
+    }));
     runSplit(repoRoot, planId);
-  }, [updatePlan, runSplit]);
+  }, [findPlan, updatePlan, runSplit]);
+
+  // The plan's file, written from plan.source first if the plan was pasted in.
+  const ensurePlanFile = useCallback(async (repoRoot, planId) => {
+    const plan = findPlan(repoRoot, planId);
+    if (!plan) throw new Error('Plan not found');
+    const known = plan.importedFrom?.path;
+    if (known && await invoke('path_exists', { path: known }).catch(() => false)) return known;
+    let path = known || `${repoRoot}/${plan.slug}_plan.md`;
+    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${repoRoot}/${plan.slug}-${plan.id}_plan.md`;
+    await invoke('write_file_content', { path, content: plan.source });
+    updatePlan(repoRoot, planId, { importedFrom: { path, hash: hash8(plan.source) } });
+    return path;
+  }, [findPlan, updatePlan]);
+
+  // Re-chunk from the plan's file as it is now (plan.source when there's no file).
+  const rechunk = useCallback(async (repoRoot, planId) => {
+    const plan = findPlan(repoRoot, planId);
+    if (!plan) throw new Error('Plan not found');
+    const path = plan.importedFrom?.path;
+    const source = path ? await invoke('read_file_content', { path }).catch(() => null) : null;
+    replaceSource(repoRoot, planId, {
+      source: source ?? plan.source,
+      importedFrom: source != null ? { path, hash: hash8(source) } : plan.importedFrom ?? null,
+    });
+  }, [findPlan, replaceSource]);
 
   // Its worktrees go with it (uncommitted work in them too); branches stay.
   const deletePlan = useCallback(async (repoRoot, planId) => {
@@ -339,6 +382,12 @@ export function PlansProvider({ children }) {
   }, [findChunk, sendToTab, updateChunk]);
 
   // Review notes on the whole plan's diff: one fix commit, not tied to a chunk.
+  // Change requests for the plan's file; you re-chunk once the agent is done.
+  const sendPlanRevise = useCallback(async (repoRoot, planId, notes, tabId) => {
+    const path = await ensurePlanFile(repoRoot, planId);
+    await sendToTab(tabId, buildPlanRevisePrompt(findPlan(repoRoot, planId), notes, path));
+  }, [ensurePlanFile, findPlan, sendToTab]);
+
   const sendPlanFix = useCallback(async (repoRoot, planId, notes, tabId) => {
     const plan = findPlan(repoRoot, planId);
     if (!plan || notes.length === 0) return;
@@ -373,6 +422,8 @@ export function PlansProvider({ children }) {
     getPlans,
     createPlan,
     replaceSource,
+    rechunk,
+    ensurePlanFile,
     runSplit,
     deletePlan,
     updatePlan,
@@ -387,6 +438,7 @@ export function PlansProvider({ children }) {
     rollbackChunk,
     sendFix,
     sendPlanFix,
+    sendPlanRevise,
     startAutopilot,
     resumeAutopilot,
     stopAutopilot,
@@ -398,7 +450,7 @@ export function PlansProvider({ children }) {
     ensureGit,
     removeWorktrees,
     reopenGit,
-  }), [loadRepo, getPlans, createPlan, replaceSource, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
+  }), [loadRepo, getPlans, createPlan, replaceSource, rechunk, ensurePlanFile, sendPlanRevise, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
     implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
     dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
 
