@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-05
+
+### Added
+
+- **Plugins: bring your own tools and skills** - Settings → Agent → Plugins takes a folder (say, a CLI wrapper and some skills) and a prompt that says how to use it. Each Claude Code launch loads the folder's skills, tells the agent the folder's path, its scripts and your prompt at session start, and gives it access to the folder. Each plugin has its own on/off switch, and edits in the folder show up in the next session.
+
 ## [0.11.0] - 2026-11-04
 
 ### Added
