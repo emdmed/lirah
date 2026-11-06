@@ -18,7 +18,6 @@ import { useAgentAttention } from "./features/tabs/useAgentAttention";
 import { FirstTabChooser } from "./features/tabs/FirstTabChooser";
 import { GlobalDialogOutlet } from "./features/dialogs/GlobalDialogOutlet";
 import { useDialog } from "./features/dialogs/DialogProvider";
-import { MAX_TABS } from "./features/tabs/TabContext";
 import { useSetting } from "./features/settings/settingsStore";
 import { useAgentControl } from "./features/agent-control/useAgentControl";
 
@@ -101,17 +100,11 @@ function App() {
   }, [startupPending]);
 
   // New tab: pick the project first (current, starred, or any folder).
-  // At the tab limit, addTab shows the limit toast instead of the picker.
   const activeProjectPath = activeTab?.projectPath;
   const dialog = useDialog();
-  const tabCount = tabs.length;
   const handleNewTab = useCallback(() => {
-    if (tabCount >= MAX_TABS) {
-      addTab(activeProjectPath);
-      return;
-    }
     dialog.open('newTab', {}, null);
-  }, [addTab, activeProjectPath, tabCount, dialog]);
+  }, [dialog]);
 
   // Global keyboard shortcuts for tab management
   useEffect(() => {
@@ -190,11 +183,13 @@ function App() {
                   isActive={tab.id === activeTabId}
                   compactionHook={!!tab.compactionHook}
                   launchOnStart={!!tab.launch}
+                  background={!!tab.background}
+                  master={!!tab.master}
                   availableUpdate={availableUpdate}
                 />
               </DevProfiler>
             ))}
-            {showFirstTabChooser && workspaceTabs.length === 0 && (
+            {showFirstTabChooser && workspaceTabs.length === 0 && !activeTab?.master && (
               <FirstTabChooser onOpenProject={(path) => addTab(path)} />
             )}
           </div>

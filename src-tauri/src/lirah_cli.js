@@ -31,12 +31,20 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah theme [list]             list themes (* marks the current one)
   lirah theme get                print the current theme
   lirah theme set <name>         switch theme (id or display name)
-  lirah tabs [list]              list tabs (* active, > this tab)
+  lirah tabs [list]              list this workspace's tabs (* active, > this tab)
   lirah tabs open <path> [--launch]
                                  open a tab in <path>; --launch starts its agent
   lirah tabs close <tab>         close a tab (asks if its agent is busy)
   lirah tabs rename <tab> <name> rename a tab (empty name: automatic again)
   lirah tabs focus <tab>         switch to a tab
+  lirah tabs master              whether you are the workspace's master (orchestrating) terminal
+  lirah tabs note <tab> <text>   set a tab's one-line purpose (empty: clear it)
+  lirah tabs show <tab>          a tab's note, branch, agent state and last reply
+  lirah tabs send <tab> <prompt> send a prompt to a tab's agent without switching to it
+                                 ("-" reads the prompt from stdin; boots the tab if needed)
+  lirah tabs wait <tab> [--timeout 50]
+                                 wait for its turn to end and print its last reply
+                                 (exit 2 while still working: run it again)
   lirah startup                  show what opens at launch
   lirah startup mode restore|projects
                                  reopen the last tabs, or open the startup projects
@@ -209,8 +217,23 @@ function printTabs(list) {
     t.name || "",
     t.agent || "",
     t.path || "",
+    t.note || "",
   ]);
-  return table(["", "#", "NAME", "AGENT", "PATH"], rows);
+  return table(["", "#", "NAME", "AGENT", "PATH", "NOTE"], rows);
+}
+
+function printTab(t) {
+  const rows = [["name", `${t.index} ${t.name}`], ["note", t.note], ["path", t.path],
+    ["role", t.role], ["branch", t.branch], ["agent", t.agent]].filter(([, v]) => v);
+  const head = rows.map(([k, v]) => `${k.padEnd(7)}${v}`).join("\n");
+  return t.lastReply ? `${head}\nlast reply:\n${t.lastReply}` : head;
+}
+
+// Exit 2 while the tab is still working, so a caller loops on it.
+function printWait(w) {
+  if (w.done) return w.reply || `(${w.state}, no reply text)`;
+  process.exitCode = 2;
+  return `still ${w.state === "permission" ? "waiting on a permission prompt" : w.state || "starting"}; run it again`;
 }
 
 function printTasks(data) {
@@ -369,7 +392,16 @@ function route(cmd, positional, args) {
       case "close": return ["tabs.close", rest, show];
       case "rename": return ["tabs.rename", rest, show];
       case "focus": return ["tabs.focus", rest, show];
-      default: fail(`unknown tabs command "${sub}" (list, open, close, rename, focus)`);
+      case "master": return ["tabs.master", rest, show];
+      case "note": return ["tabs.note", rest, show];
+      case "show": return ["tabs.show", rest, printTab];
+      case "send": {
+        const [tab, ...words] = rest;
+        const prompt = words.length === 1 && words[0] === "-" ? readFileSync(0, "utf8") : words.join(" ");
+        return ["tabs.send", [tab, prompt], show];
+      }
+      case "wait": return ["tabs.wait", rest, printWait];
+      default: fail(`unknown tabs command "${sub}" (list, open, close, rename, focus, master, note, show, send, wait)`);
     }
   }
   if (cmd === "startup") {
@@ -933,4 +965,4 @@ if (json) {
   const text = format(data);
   if (text !== "") process.stdout.write(text + "\n");
 }
-process.exit(0);
+process.exit(process.exitCode ?? 0);

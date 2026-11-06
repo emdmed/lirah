@@ -41,8 +41,9 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
     checkAvailability();
   }, [terminalSessionId]);
 
-  // resumeId: a claude conversation to continue (claude-code only).
-  const launchCli = useCallback(async ({ resumeId } = {}) => {
+  // resumeId: a claude conversation to continue; systemPrompt: appended to
+  // claude's system prompt (both claude-code only).
+  const launchCli = useCallback(async ({ resumeId, systemPrompt } = {}) => {
     if (!terminalSessionId) {
       console.warn('Terminal session not ready, cannot launch CLI');
       toastError('Terminal is still starting. Try launching again in a moment.');
@@ -90,6 +91,7 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
         const quote = (v) => `'${powershell ? v.replace(/['‘’‚‛]/g, '$&$&') : v.replace(/'/g, "'\\''")}'`;
         if (base) command += ` --plugin-dir ${quote(base)}`;
         if (resumeId) command += ` --resume ${quote(resumeId)}`;
+        if (systemPrompt) command += ` --append-system-prompt ${quote(systemPrompt)}`;
         // User plugins: rebuilt each launch from their folder; a broken one is skipped, not fatal.
         for (const p of (getSettings().plugins || []).filter((x) => x.enabled)) {
           try {

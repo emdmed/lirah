@@ -133,7 +133,12 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, availableUpdate }) {
+// Tells the master terminal's agent what it is for; the lirah skill has the how.
+const MASTER_PROMPT = 'You are this Lirah workspace\'s master agent. The tabs listed by `lirah tabs` are your workers: '
+  + 'the user asks you for work and you hand it to them with `lirah tabs send` and collect it with `lirah tabs wait`, '
+  + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the master terminal" section.';
+
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -184,8 +189,9 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   // PTY, a WebGL context and its pollers, so N persisted tabs used to cost N
   // of everything before the user looked at any but one. Once booted a tab
   // stays mounted, as before.
-  const [booted, setBooted] = useState(isActive);
-  if (innerActive && !booted) setBooted(true);
+  // A background tab (woken by the master agent) boots without being shown.
+  const [booted, setBooted] = useState(isActive || background);
+  if ((innerActive || background) && !booted) setBooted(true);
 
   // Latched once the tab is first ready (shell up, agent started and drawn);
   // until then the placeholder covers the pane. A shell or agent that never
@@ -204,10 +210,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider initialFiles={draft?.files}>
-        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, draft, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -245,7 +251,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   );
 });
 
-function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -254,7 +260,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   // A tab opened with `lirah tabs open --launch` starts its agent on its first
   // fresh shell even with auto-launch off. Read once at mount and cleared from
   // the tab right away, so a reload never launches it a second time.
-  const [launchRequested] = useState(launchOnStart);
+  // A background boot always starts the agent: the master is waiting to send it work.
+  const [launchRequested] = useState(launchOnStart || background);
   useEffect(() => {
     if (launchOnStart) clearTabLaunch(tabId);
   }, [launchOnStart, clearTabLaunch, tabId]);
@@ -436,13 +443,15 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     const transcript = settings.selectedCli === 'claude-code' ? getTabTranscript(tabId) : null;
     const resume = transcript && await invoke('path_exists', { path: transcript }).catch(() => false);
     const resumeId = resume ? transcript.split(/[\\/]/).pop().replace(/\.jsonl$/, '') : null;
-    return launchClaude({ resumeId });
+    return launchClaude({ resumeId, systemPrompt: master ? MASTER_PROMPT : undefined });
   });
 
   useEffect(() => {
     const id = terminalSessionId;
-    if (!(settings.autoLaunchCli || launchRequested) || !isActive || !terminalReady || !id || freshShellRef.current !== id) return;
+    if (!(settings.autoLaunchCli || launchRequested) || !(isActive || background) || !terminalReady || !id || freshShellRef.current !== id) return;
     const cancel = (e) => {
+      // Keys typed in another tab (the master) must not cancel a background launch.
+      if (!isActive) return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key.length !== 1 && e.key !== 'Enter' && e.key !== 'Backspace') return;
       if (e.target instanceof Element && e.target.closest('[data-pane="2"]')) {
@@ -461,7 +470,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
       clearTimeout(timer);
       window.removeEventListener('keydown', cancel, true);
     };
-  }, [settings.autoLaunchCli, launchRequested, isActive, terminalReady, terminalSessionId, launchFresh, onReady]);
+  }, [settings.autoLaunchCli, launchRequested, isActive, background, terminalReady, terminalSessionId, launchFresh, onReady]);
 
   // When the boot placeholder can lift. Without an agent on its way (auto-launch
   // off, or a shell reclaimed after a reload), as soon as the shell is up.

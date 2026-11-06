@@ -171,6 +171,7 @@ export function listTabs(tabs, activeTabId, bookmarks, callerTabId) {
     path: tab.projectPath,
     active: tab.id === activeTabId,
     ...(tab.id === callerTabId && { caller: true }),
+    ...(tab.note && { note: tab.note }),
     agent: getAgentHookState(getTabSession(tab.id))?.state || null,
   }));
 }

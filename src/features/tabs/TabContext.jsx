@@ -15,8 +15,6 @@ import { tildePath } from "../../components/ui/picker";
 const TabContext = createContext(null);
 const TabActionsContext = createContext(null);
 
-export const MAX_TABS = 8;
-const LIMIT_MESSAGE = `Tab limit reached (${MAX_TABS}) — close a tab first`;
 // Agent states where closing the tab would kill work in flight.
 const BUSY_STATES = new Set(['working', 'permission']);
 
@@ -41,9 +39,23 @@ function loadWorkspaces(saved, tabs) {
   return { workspaces, tabs: placed };
 }
 
+// The workspace's master terminal: a tab of its own, kept out of the tab list,
+// whose agent orchestrates the workspace's tabs. Null until first opened.
+export function masterTabOf(tabs, workspaceId) {
+  return tabs.find((t) => t.workspaceId === workspaceId && t.master) || null;
+}
+
+// The deepest folder holding all of these paths ("/" at worst).
+function commonFolder(paths) {
+  const parts = paths.map((p) => p.split('/').filter(Boolean));
+  const shared = [];
+  for (let i = 0; parts.every((p) => i < p.length && p[i] === parts[0][i]); i++) shared.push(parts[0][i]);
+  return `/${shared.join('/')}`;
+}
+
 // `launch` asks the tab to start its agent once its shell is up, even with
 // auto-launch off; ProjectTab clears it as soon as it boots.
-function createTab(projectPath, { launch = false, name, workspaceId } = {}) {
+function createTab(projectPath, { launch = false, name, workspaceId, master = false } = {}) {
   return {
     id: crypto.randomUUID(),
     projectPath,
@@ -51,6 +63,7 @@ function createTab(projectPath, { launch = false, name, workspaceId } = {}) {
     label: projectPath.split('/').filter(Boolean).pop() || projectPath,
     ...(name?.trim() && { customLabel: name.trim() }),
     ...(launch && { launch: true }),
+    ...(master && { master: true }),
   };
 }
 
@@ -62,7 +75,7 @@ function startupProjectList() {
 }
 
 // Tabs for the startup projects whose folder still exists; the rest are named
-// in `missing`. Capped at MAX_TABS.
+// in `missing`.
 async function buildStartupTabs(projects, workspaceId) {
   let home = null;
   const checked = await Promise.all(projects.map(async (p) => {
@@ -77,7 +90,6 @@ async function buildStartupTabs(projects, workspaceId) {
   }));
   const tabs = checked
     .filter((p) => p.exists)
-    .slice(0, MAX_TABS)
     .map((p) => createTab(p.path, { launch: !!p.launch, name: p.name, workspaceId }));
   return { tabs, missing: checked.filter((p) => !p.exists).map((p) => p.path) };
 }
@@ -106,7 +118,7 @@ export function TabProvider({ children }) {
     const fromTab = tabs.find((t) => t.id === activeTabId)?.workspaceId;
     return fromTab || (workspaces.some((w) => w.id === stored) ? stored : workspaces[0].id);
   });
-  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId), [tabs, activeWorkspaceId]);
+  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId && !t.master), [tabs, activeWorkspaceId]);
 
   // Persist to workspaces/ (debounced; fileStore flushes on window close).
   // The active tab is saved as its workspace's activeTabId.
@@ -157,17 +169,13 @@ export function TabProvider({ children }) {
     return () => { cancelled = true; };
   }, [startupProjects, toast]);
 
-  const addTab = useCallback((projectPath, options) => {
-    if (tabsRef.current.length >= MAX_TABS) {
-      toast.warning(LIMIT_MESSAGE);
-      return null;
-    }
+  const addTab = useCallback((projectPath, options = {}) => {
     const tab = createTab(projectPath, { ...options, workspaceId: activeWorkspaceIdRef.current });
     tabsRef.current = [...tabsRef.current, tab];
     setTabs(prev => [...prev, tab]);
-    setActiveTabId(tab.id);
+    if (options.focus !== false) setActiveTabId(tab.id);
     return tab;
-  }, [toast]);
+  }, []);
 
   const removeTab = useCallback((tabId) => {
     setTabs(prev => {
@@ -179,8 +187,8 @@ export function TabProvider({ children }) {
       // workspace; the workspace may be left empty.
       if (tabId === activeTabIdRef.current) {
         const ws = prev[idx].workspaceId;
-        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws);
-        const after = next.slice(idx).filter((t) => t.workspaceId === ws);
+        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws && !t.master);
+        const after = next.slice(idx).filter((t) => t.workspaceId === ws && !t.master);
         setActiveTabId((after[0] || before[before.length - 1])?.id || null);
       }
       return next;
@@ -238,7 +246,7 @@ export function TabProvider({ children }) {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     if (!ws || workspaceId === activeWorkspaceIdRef.current) return;
     const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
-    const tabId = (own.find((t) => t.id === ws.activeTabId) || own[0])?.id || null;
+    const tabId = (own.find((t) => t.id === ws.activeTabId) || own.find((t) => !t.master))?.id || null;
     if (tabId) perfTabSwitchStart();
     activeWorkspaceIdRef.current = workspaceId;
     setActiveWorkspaceId(workspaceId);
@@ -347,8 +355,44 @@ export function TabProvider({ children }) {
       : prev));
   }, []);
 
+  // A one-line purpose for the tab, read by the master agent (`lirah tabs note`).
+  const setTabNote = useCallback((tabId, note) => {
+    setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, note: note?.trim() || undefined } : t)));
+  }, []);
+
+  // Boots a tab's terminal and agent without showing it (the master sends it
+  // work). Not saved, so restored tabs still boot on first view.
+  const wakeTab = useCallback((tabId) => {
+    setTabs(prev => (prev.some(t => t.id === tabId && !t.background)
+      ? prev.map(t => (t.id === tabId ? { ...t, background: true } : t))
+      : prev));
+  }, []);
+
+  // Shows the active workspace's master terminal, opening it on first use in
+  // the folder holding all its tabs' projects (home when it has none), so its
+  // agent can read every repo.
+  const openMaster = useCallback(async () => {
+    const ws = activeWorkspaceIdRef.current;
+    const existing = masterTabOf(tabsRef.current, ws);
+    if (existing) {
+      setActiveTabId(existing.id);
+      return existing;
+    }
+    const paths = tabsRef.current.filter((t) => t.workspaceId === ws).map((t) => t.projectPath);
+    const home = await invoke('get_home_dir').catch(() => '/');
+    const path = paths.length ? commonFolder(paths) : home;
+    const tab = createTab(path === '/' ? home : path, { launch: true, name: 'master', workspaceId: ws, master: true });
+    tabsRef.current = [...tabsRef.current, tab];
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+    return tab;
+  }, []);
+
   const actions = useMemo(() => ({
     addTab,
+    setTabNote,
+    wakeTab,
+    openMaster,
     removeTab,
     confirmCloseTab,
     requestCloseTab,
@@ -364,7 +408,7 @@ export function TabProvider({ children }) {
     openWorkspace,
     renameWorkspace,
     removeWorkspace,
-  }), [addTab, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
+  }), [addTab, setTabNote, wakeTab, openMaster, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
     switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace]);
 
   // `tabs` is every tab, of all workspaces; `workspaceTabs` the active one's.

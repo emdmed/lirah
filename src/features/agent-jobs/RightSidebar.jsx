@@ -21,7 +21,8 @@ import { jobsPaneRequest } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
 import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
-import { MAX_TABS, useTabManager } from '../tabs/TabContext';
+import { useTabManager } from '../tabs/TabContext';
+import { MasterStrip } from '../tabs/MasterStrip';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 import { WorkspaceRow } from '../tabs/WorkspaceRow';
 import { PlansPane } from '../plans/PlansPane';
@@ -108,7 +109,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
-  const { tabs: openTabs, workspaceTabs, activeWorkspaceId } = useTabManager();
+  const { workspaceTabs, activeWorkspaceId } = useTabManager();
   const openTasks = useOpenTaskCount(activeWorkspaceId);
   const toast = useToast();
   const confirm = useConfirm();
@@ -136,8 +137,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   // theirs in FIG.12's lanes, so they stay off it.
   const spanJobs = visibleJobs.filter((j) => !j.raceId).map(spanItem);
   const collapsed = collapsedOverride ?? false;
-  const atTabLimit = openTabs.length >= MAX_TABS;
-  const newTabTitle = atTabLimit ? `Tab limit reached (${MAX_TABS}) — close a tab first` : 'New tab (Ctrl+T)';
+  const newTabTitle = 'New tab (Ctrl+T)';
 
   useEffect(() => {
     const onRequest = (e) => {
@@ -519,10 +519,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           {onNewTab && (
             <button
               onClick={onNewTab}
-              disabled={atTabLimit}
               className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground"
               title={newTabTitle}
-              aria-label={atTabLimit ? newTabTitle : 'New tab'}
+              aria-label="New tab"
             >
               <span className="text-[11px] leading-none">+</span>
               <span className="ins-legend text-[11px] leading-none">tab</span>
@@ -602,6 +601,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         title="Drag to resize"
       />
 
+      <MasterStrip />
+
       {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
@@ -617,9 +618,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <PanelButton
             icon={Plus}
             onClick={onNewTab}
-            disabled={atTabLimit}
             title={newTabTitle}
-            aria-label={atTabLimit ? newTabTitle : 'New tab'}
+            aria-label="New tab"
             className="ml-auto self-center"
           />
         )}

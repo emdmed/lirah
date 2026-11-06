@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its master tab (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -28,12 +28,20 @@ lirah settings reset <key>     put a setting back to its default
 lirah theme [list]             list themes (* marks the current one)
 lirah theme get                print the current theme
 lirah theme set <name>         switch theme (id or display name)
-lirah tabs [list]              list tabs (* active, > this tab)
+lirah tabs [list]              list this workspace's tabs (* active, > this tab)
 lirah tabs open <path> [--launch]
                                open a tab in <path>; --launch starts its agent
 lirah tabs close <tab>         close a tab (asks if its agent is busy)
 lirah tabs rename <tab> <name> rename a tab (empty name: automatic again)
 lirah tabs focus <tab>         switch to a tab
+lirah tabs master              whether you are the workspace's master (orchestrating) terminal
+lirah tabs note <tab> <text>   set a tab's one-line purpose (empty: clear it)
+lirah tabs show <tab>          a tab's note, branch, agent state and last reply
+lirah tabs send <tab> <prompt> send a prompt to a tab's agent without switching to it
+                               ("-" reads the prompt from stdin; boots the tab if needed)
+lirah tabs wait <tab> [--timeout 50]
+                               wait for its turn to end and print its last reply
+                               (exit 2 while still working: run it again)
 lirah startup                  show what opens at launch
 lirah startup mode restore|projects
                                reopen the last tabs, or open the startup projects
@@ -85,6 +93,27 @@ needs `--all` again.
 `<tab>` is `.` (this tab), an index from `lirah tabs`, a tab id or a tab name.
 Add `--json` to any command for machine-readable output. `lirah help` prints
 the full usage.
+
+## Orchestrating from the master terminal
+
+Each workspace has a master terminal, opened from the crown in the Workspace
+pane. It is not one of the tabs in `lirah tabs`; `lirah tabs master` tells you
+whether you are it. If you are, the user drives the workspace from here and the
+tabs are your workers:
+
+- Learn the workers first. For a tab with no NOTE, read its repo's AGENTS.md,
+  CLAUDE.md and README yourself (whichever exist), then save what it is for with
+  `lirah tabs note <tab> "<one line>"`. Ask the user only if it is still unclear.
+  Never send a worker a prompt just to find out what it is.
+- Dispatch with `lirah tabs send <tab> -` and the prompt on stdin (a heredoc).
+  Write a self-contained prompt: the worker hasn't seen this conversation.
+- Collect with `lirah tabs wait <tab>`. Exit 2 means it is still working: run it
+  again. Fan out to several tabs first, then wait on each. `lirah tabs show <tab>`
+  tells you what a worker is on.
+- Stay in the master: never `lirah tabs focus` unless the user asks. A tab you
+  open with `lirah tabs open` stays in the background too. Tell the
+  user what each worker did, from its reply.
+- If a wait reports a permission prompt, tell the user which tab needs them.
 
 ## Without the app
 
