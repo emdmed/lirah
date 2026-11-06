@@ -35,6 +35,8 @@ import { useTokenUsageValue } from "../token-budget/tokenUsageStore";
 import { useTypeChecker } from "../../hooks/useTypeChecker";
 import { usePromptSender } from "../../hooks/usePromptSender";
 import { usePromptStore } from "../../hooks/usePromptStore";
+import { usePromptDraft } from "../../hooks/usePromptDraft";
+import { getDraft } from "../../lib/promptDrafts";
 import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
@@ -188,6 +190,8 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   const [ready, setReady] = useState(false);
   const [bootStage, setBootStage] = useState('shell');
   const markReady = useCallback(() => setReady(true), []);
+  // The unsent prompt this tab was left with (lib/promptDrafts).
+  const [draft] = useState(() => getDraft(tabId));
   useEffect(() => {
     if (!booted || ready) return;
     const timer = setTimeout(markReady, BOOT_PLACEHOLDER_MAX_MS);
@@ -196,11 +200,11 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
 
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
-      <FileSelectionProvider>
-        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+      <FileSelectionProvider initialFiles={draft?.files}>
+        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -238,7 +242,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   );
 });
 
-function ProjectTabInner({ projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -263,7 +267,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, workspaceId, compaction
   const [textareaVisible, setTextareaVisible] = useState(() => getSettings().promptBoxOnStart);
   // The prompt text lives in a store, not state: typing must re-render only
   // the textarea panel, not this whole tab.
-  const promptStore = usePromptStore();
+  const promptStore = usePromptStore(draft?.text);
   const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
   const { linkedRepos, clearLinkedRepos } = useLinkedRepos(tabId);
@@ -337,6 +341,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, workspaceId, compaction
   useEffect(() => {
     fileSelection.registerCurrentPath(currentPath);
   }, [currentPath]);
+
+  usePromptDraft(tabId, draft, {
+    promptStore, linkedRepos, isAnalyzable, extractFileSymbols,
+    selectedFiles: fileSelection.selectedFiles, fileStates: fileSelection.fileStates,
+  });
 
   const secondary = useSecondaryTerminal(terminalRef);
 

@@ -1,33 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { isFocusMode } from '../lib/focusMode';
 
-const LAST_PROMPT_KEY = 'nevo-terminal:last-prompt';
+// The last prompt sent, for Ctrl+Shift+Z. Memory only: unsent text survives a
+// restart as the tab's draft (lib/promptDrafts).
+let lastPrompt = null;
 
-/**
- * Save prompt to localStorage before clearing
- * @param {string} prompt - The prompt content to save
- */
 export const saveLastPrompt = (prompt) => {
-  if (!prompt?.trim()) return;
-  try {
-    localStorage.setItem(LAST_PROMPT_KEY, prompt);
-  } catch (error) {
-    console.warn('Failed to save last prompt:', error);
-  }
+  if (prompt?.trim()) lastPrompt = prompt;
 };
 
-/**
- * Restore last prompt from localStorage
- * @returns {string|null} - The last saved prompt or null
- */
-export const getLastPrompt = () => {
-  try {
-    return localStorage.getItem(LAST_PROMPT_KEY);
-  } catch (error) {
-    console.warn('Failed to get last prompt:', error);
-    return null;
-  }
-};
+export const getLastPrompt = () => lastPrompt;
 
 export function useTextareaShortcuts({
   textareaVisible,

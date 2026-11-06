@@ -40,8 +40,15 @@ it('migrates from localStorage, then restores the same state from files', async 
   }
   first.setWorkspaceData('w2', 'pins', []);
   first.setWorkspaceData('w2', 'terminalSessions', { b: 's1', gone: 's2' });
+  const drafts = await import('./promptDrafts.js');
+  drafts.saveDraft('b', { text: 'hi', files: [{ path: '/y/f.js', state: 'read' }] });
+  drafts.saveDraft('a', { text: 'x' });
+  drafts.saveDraft('a', { text: '' }); // empty: entry removed
+  first.setWorkspaceData('w2', 'drafts', { ...first.getWorkspaceData('w2', 'drafts'), gone: { text: 'z' } });
   await (await import('./fileStore.js')).flush();
   expect(disk.get('workspaces/w2/workspace.json').terminalSessions).toEqual({ b: 's1' }); // closed tab dropped
+  expect(disk.get('workspaces/w2/workspace.json').drafts).toEqual({ b: { text: 'hi', files: [{ path: '/y/f.js', state: 'read' }], repos: [] } });
+  expect(disk.get('workspaces/w1/workspace.json').drafts).toEqual({});
 
   vi.resetModules();
   for (const k of Object.keys(ls)) delete ls[k]; // files alone must be enough
@@ -55,6 +62,7 @@ it('migrates from localStorage, then restores the same state from files', async 
   expect(second.getWorkspaceData('w1', 'pins')).toHaveLength(1);
   expect(second.getWorkspaceData('w2', 'pins')).toEqual([]); // per workspace, not re-seeded
   expect(second.getWorkspaceData('w2', 'terminalSessions')).toEqual({ b: 's1' });
+  expect((await import('./promptDrafts.js')).getDraft('b')).toEqual({ text: 'hi', files: [{ path: '/y/f.js', state: 'read' }], repos: [] });
 });
 
 it('workspaceListStore seeds the active workspace once and writes only live, changed lists', async () => {

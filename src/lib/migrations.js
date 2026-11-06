@@ -2,6 +2,8 @@
 // lists the ones done; the old files are never changed and stay as a backup.
 import { list, load, save } from './fileStore';
 import { getSavedWorkspaces } from './workspaceStore';
+import { getDraft, saveDraft } from './promptDrafts';
+import { loadText } from './storage';
 
 const MARKER = 'migrations.json';
 
@@ -47,7 +49,16 @@ async function repoFilesToWorkspaces(state) {
   }
 }
 
-const MIGRATIONS = { repoFilesToWorkspaces };
+// The old global last prompt becomes the active tab's draft text, unless it has some.
+function lastPromptToDraft({ tabs, activeTabId }) {
+  const text = loadText('nevo-terminal:last-prompt');
+  const tabId = activeTabId ?? tabs[0]?.id;
+  if (!text?.trim() || !tabId) return;
+  const draft = getDraft(tabId) ?? {};
+  if (!draft.text) saveDraft(tabId, { ...draft, text });
+}
+
+const MIGRATIONS = { repoFilesToWorkspaces, lastPromptToDraft };
 
 /** Run the migrations not done yet. Call after initWorkspaces, before the task and plan stores load. */
 export async function runMigrations() {

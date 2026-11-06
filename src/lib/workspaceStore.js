@@ -1,6 +1,6 @@
 // Workspaces and their tabs, persisted under ~/.lirah/workspaces:
 //   index.json            { workspaces: [id, ...], activeWorkspaceId }
-//   <id>/workspace.json   { id, name, activeTabId, tabs: [...], pins, budgets, terminalSessions, overrides }
+//   <id>/workspace.json   { id, name, activeTabId, tabs: [...], pins, budgets, terminalSessions, overrides, drafts }
 // The old localStorage keys only seed a missing index and are left as a backup.
 // pins, budgets and terminalSessions are per-workspace data owned by other modules
 // (getWorkspaceData/setWorkspaceData); old global pins and budgets seed every
@@ -21,6 +21,7 @@ const EXTRAS = {
   budgets: () => ({ budgets: {}, alertStates: {} }),
   terminalSessions: () => ({}), // tabId -> PTY session id, for reattach after a reload
   overrides: () => ({}), // settings this workspace sets over settings.json (see getEffectiveSettings)
+  drafts: () => ({}), // tabId -> unsent prompt (see promptDrafts.js)
 };
 
 let saved = { workspaces: [], tabs: [], activeTabId: null, activeWorkspaceId: null };
@@ -44,8 +45,8 @@ function fromLocalStorage() {
 async function fromFiles(index) {
   const ids = Array.isArray(index.workspaces) ? index.workspaces : [];
   const docs = (await Promise.all(ids.map((id) => load(wsFile(id))))).filter(Boolean);
-  for (const d of docs) extras.set(d.id, { pins: d.pins, budgets: d.budgets, terminalSessions: d.terminalSessions, overrides: d.overrides });
-  const workspaces = docs.map(({ version, revision, tabs, pins, budgets, terminalSessions, overrides, ...w }) => w);
+  for (const d of docs) extras.set(d.id, { pins: d.pins, budgets: d.budgets, terminalSessions: d.terminalSessions, overrides: d.overrides, drafts: d.drafts });
+  const workspaces = docs.map(({ version, revision, tabs, pins, budgets, terminalSessions, overrides, drafts, ...w }) => w);
   const tabs = docs.flatMap((d) => (Array.isArray(d.tabs) ? d.tabs : []).map((t) => ({ ...t, workspaceId: d.id })));
   const active = workspaces.find((w) => w.id === index.activeWorkspaceId);
   const activeTabId = active?.activeTabId ?? tabs.find((t) => t.workspaceId === active?.id)?.id ?? null;
@@ -128,15 +129,16 @@ export function saveWorkspaces(state) {
   for (const w of workspaces) {
     const own = tabs.filter((t) => t.workspaceId === w.id).map(({ workspaceId, ...t }) => t);
     const ids = new Set(own.map((t) => t.id));
-    // Sessions of closed tabs are dropped here.
-    const terminalSessions = Object.fromEntries(Object.entries(getWorkspaceData(w.id, 'terminalSessions')).filter(([tabId]) => ids.has(tabId)));
+    // Sessions and drafts of closed tabs are dropped here.
+    const openTabsOnly = (key) => Object.fromEntries(Object.entries(getWorkspaceData(w.id, key)).filter(([tabId]) => ids.has(tabId)));
     saveIfChanged(wsFile(w.id), {
       ...w,
       tabs: own,
       pins: getWorkspaceData(w.id, 'pins'),
       budgets: getWorkspaceData(w.id, 'budgets'),
-      terminalSessions,
+      terminalSessions: openTabsOnly('terminalSessions'),
       overrides: getWorkspaceData(w.id, 'overrides'),
+      drafts: openTabsOnly('drafts'),
     });
   }
   saveIfChanged(INDEX, { workspaces: workspaces.map((w) => w.id), activeWorkspaceId });
