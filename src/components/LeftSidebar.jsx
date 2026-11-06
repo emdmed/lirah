@@ -38,11 +38,9 @@ export const LeftSidebar = memo(function LeftSidebar({
   onAddBookmark,
   onNavigateBookmark,
   hasTerminalSession,
-  onSendToTerminal,
   onViewDiff,
   onViewMarkdown,
   onGitChanges,
-  onOpenElementPicker,
   keepFilesAfterSend,
   onToggleKeepFiles,
   isActive = true,
@@ -141,7 +139,6 @@ export const LeftSidebar = memo(function LeftSidebar({
                     showGitChangesOnly={showGitChangesOnly}
                     showMarkdownOnly={showMarkdownOnly}
                     onToggle={toggleFolder}
-                    onSendToTerminal={onSendToTerminal}
                     onViewDiff={onViewDiff}
                     onViewMarkdown={onViewMarkdown}
                     selectedFiles={selectedFiles}
@@ -156,7 +153,6 @@ export const LeftSidebar = memo(function LeftSidebar({
                     onCheckFileTypes={checkFileTypes}
                     fileWatchingEnabled={fileWatchingEnabled}
                     onGitChanges={onGitChanges}
-                    onOpenElementPicker={onOpenElementPicker}
                     onClearSearch={handleSearchClear}
                     onToggleGitFilter={handleToggleGitFilter}
                     onToggleMarkdownFilter={handleToggleMarkdownFilter}

@@ -39,7 +39,7 @@ import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
 import { summarizeContext } from "../../components/textarea-panel/contextSummary";
-import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
+import { escapeShellPath } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
@@ -55,7 +55,6 @@ import { useDialogs } from "../../hooks/useDialogs";
 import { DialogScope } from "../dialogs/DialogProvider";
 import { useTerminalSettings } from "../../hooks/useTerminalSettings";
 import { useCompactionHook } from "../compact/useCompactionHook";
-import { useElementPicker } from "../file-analysis/useElementPicker";
 import { useAtMention } from "../at-mention";
 import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
@@ -386,7 +385,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
 
   const compaction = useCompactionHook({ tabId, terminalSessionId, enabled: compactionHook });
 
-  const elementPicker = useElementPicker();
 
   const atMention = useAtMention({
     search: sidebarSearch.search,
@@ -543,19 +541,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     return paths;
   }, [treeView.treeData, dialogs.markdownViewerOpen]);
 
-  // Send file path to terminal
-  const sendFileToTerminal = useCallback(async (absolutePath) => {
-    if (!terminalSessionId) return;
-    try {
-      const relativePath = getRelativePath(absolutePath, currentPath);
-      const escapedPath = escapeShellPath(relativePath);
-      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `${escapedPath} ` });
-      terminalRef.current?.focus?.();
-    } catch (error) {
-      console.error('Failed to send file to terminal:', absolutePath, error);
-    }
-  }, [terminalSessionId, currentPath]);
-
   // Handle textarea changes (detect @ mentions)
   const handleTextareaChange = useCallback((newValue) => {
     setTextareaContent(newValue);
@@ -580,10 +565,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     keepFilesAfterSend: settings.keepFilesAfterSend,
     selectedTemplateId, getTemplateById,
     formatFileAnalysis, getLineCount, getViewModeLabel,
-    selectedElements: elementPicker.selectedElements,
     setTextareaContent,
     clearFileSelection: fileSelection.clearFileSelection,
-    clearSelectedElements: elementPicker.clearSelectedElements,
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
     clearPatterns: patterns.clearPatterns,
@@ -604,14 +587,12 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     formatFileAnalysis,
     getLineCount,
     getViewModeLabel,
-    selectedElements: elementPicker.selectedElements,
     selectedPatterns: patterns.selectedPatterns,
     getPatternInstructions: patterns.getPatternInstructions,
     linkedRepos,
   }), [
     fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
-    elementPicker.selectedElements,
     patterns.selectedPatterns, patterns.getPatternInstructions, linkedRepos,
   ]);
 
@@ -623,24 +604,20 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     patterns.clearPatterns();
     if (!keepFilesAfterSend) {
       fileSelection.clearFileSelection();
-      elementPicker.clearSelectedElements();
       clearLinkedRepos?.();
     }
   }, [clearSelectedTemplate, patterns.clearPatterns, keepFilesAfterSend,
-    fileSelection.clearFileSelection, elementPicker.clearSelectedElements, clearLinkedRepos]);
+    fileSelection.clearFileSelection, clearLinkedRepos]);
   // What the context amounts to, kept by the sync hook for the "attached" line.
   const templateTitle = selectedTemplateId ? getTemplateById(selectedTemplateId)?.title : undefined;
   const contextSummary = useMemo(() => {
-    let elementCount = 0;
-    elementPicker.selectedElements?.forEach((els) => { elementCount += els.length; });
     return summarizeContext({
       fileCount: fileSelection.selectedFiles?.size || 0,
-      elementCount,
       repoCount: linkedRepos?.length || 0,
       templateTitle,
       patternCount: patterns.selectedPatterns?.size || 0,
     });
-  }, [fileSelection.selectedFiles, elementPicker.selectedElements, linkedRepos, templateTitle, patterns.selectedPatterns]);
+  }, [fileSelection.selectedFiles, linkedRepos, templateTitle, patterns.selectedPatterns]);
   const { attachedSummary } = usePromptContextSync({
     terminalSessionId,
     contextText: promptBase.text,
@@ -1037,11 +1014,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onNavigateBookmark={navigateToBookmark}
               hasTerminalSession={!!terminalSessionId}
               sandboxEnabled={settings.sandboxEnabled}
-              onSendToTerminal={sendFileToTerminal}
               onViewDiff={viewFileDiff}
               onViewMarkdown={viewMarkdownFile}
               onGitChanges={handleGitChanges}
-              onOpenElementPicker={elementPicker.handleOpenElementPicker}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
               isActive={isActive}
@@ -1069,8 +1044,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onSaveGroup={openSaveFileGroup}
               compactionEnabled={compaction.compactionEnabled}
               onToggleCompaction={compaction.compactionAvailable && settings.selectedCli === 'claude-code' ? compaction.toggleCompaction : undefined}
-              selectedElements={elementPicker.selectedElements}
-              onClearElements={elementPicker.clearSelectedElements}
               linkedRepos={linkedRepos}
               atMentionActive={atMention.atMentionQuery !== null}
               atMentionQuery={atMention.atMentionQuery || ''}
@@ -1091,7 +1064,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               promptBase={promptBase}
               onClearRepos={clearLinkedRepos}
               onRemoveFile={fileSelection.removeFileFromSelection}
-              onRemoveElement={elementPicker.removeElement}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
             />
@@ -1099,12 +1071,10 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
             <ContextStatus
               selectedFiles={fileSelection.selectedFiles}
               fileStates={fileSelection.fileStates}
-              selectedElements={elementPicker.selectedElements}
               currentPath={currentPath}
               linkedRepos={linkedRepos}
               onSetFileState={fileSelection.setFileState}
               onRemoveFile={fileSelection.removeFileFromSelection}
-              onRemoveElement={elementPicker.removeElement}
               onUnlinkRepo={unlinkTabRepo}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
@@ -1221,7 +1191,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
         toggleSandbox={toggleSandbox}
         toggleNetwork={toggleNetwork}
         cliAvailability={cliAvailability}
-        elementPicker={elementPicker}
         fileSelection={fileSelection}
         branchName={branchName}
         autoCommit={autoCommit}

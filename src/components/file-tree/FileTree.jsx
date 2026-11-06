@@ -39,7 +39,6 @@ export const FileTree = memo(function FileTree({
   showGitChangesOnly,
   showMarkdownOnly,
   onToggle,
-  onSendToTerminal,
   onViewDiff,
   onViewMarkdown,
   selectedFiles,
@@ -110,13 +109,10 @@ export const FileTree = memo(function FileTree({
     }
   }, [showGitChangesOnly, showMarkdownOnly, onViewDiff, onViewMarkdown, onToggleFileSelection]);
 
-  // Clicking (or Enter on) a file: select it into the prompt when the panel
-  // is open, otherwise send it to the terminal. Deleted files are inert.
+  // Clicking (or Enter on) a file toggles its selection. Deleted files are inert.
   const handleActivateFile = useCallback((filePath, isDeleted) => {
-    if (isDeleted) return;
-    if (isTextareaPanelOpen) handleToggleFileSelection(filePath);
-    else onSendToTerminal(filePath);
-  }, [isTextareaPanelOpen, handleToggleFileSelection, onSendToTerminal]);
+    if (!isDeleted) handleToggleFileSelection(filePath);
+  }, [handleToggleFileSelection]);
 
   // Flat list of every visible row: pinned section, then the tree.
   const rows = useMemo(() => {
