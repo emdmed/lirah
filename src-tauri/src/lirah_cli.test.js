@@ -74,3 +74,27 @@ it('refuses to write files while a Lirah is running', () => {
   put(`control/${process.pid}.sock`, {});
   expect(() => lirah('tasks', 'list')).toThrow(/Lirah is running/);
 });
+
+it('sets the theme and settings in settings.json, keeping other keys', () => {
+  put('settings.json', { version: 1, revision: 3, bookmarks: [{ id: 'b' }], theme: 'nord' });
+  expect(lirah('theme', 'get').trim()).toBe('nord');
+  expect(lirah('theme', 'set', 'Rose Pine').trim()).toBe('theme = rose-pine');
+  expect(lirah('settings', 'set', 'scrollback', '50000').trim()).toBe('scrollback = 50000');
+  expect(lirah('settings', 'set', 'autoLaunchCli', 'off').trim()).toBe('autoLaunchCli = false');
+  expect(file('settings.json')).toMatchObject({ revision: 6, bookmarks: [{ id: 'b' }], theme: 'rose-pine', scrollback: 50000, autoLaunchCli: false });
+  expect(lirah('settings', 'get', 'figures').trim()).toBe('full');
+  expect(() => lirah('settings', 'set', 'figures', 'tiny')).toThrow(/must be one of full, compact/);
+});
+
+it('refuses sensitive settings without the app', () => {
+  expect(() => lirah('settings', 'set', 'sandboxEnabled', 'on')).toThrow(/sensitive setting.*while Lirah is running/);
+  expect(() => lirah('settings', 'reset', 'agentControl')).toThrow(/sensitive setting/);
+});
+
+it('edits startup projects in settings.json', () => {
+  expect(lirah('startup', 'add', project, '--name', 'P', '--launch')).toMatch(/added .* as "P", launching its agent/);
+  expect(lirah('startup', 'mode', 'projects').trim()).toBe('startup mode = projects');
+  expect(file('settings.json')).toMatchObject({ startupMode: 'projects', startupProjects: [{ path: project, name: 'P', launch: true }] });
+  expect(lirah('startup', 'remove', project).trim()).toBe(`removed ${project}`);
+  expect(lirah('startup', 'clear').trim()).toBe('no startup projects to clear');
+});

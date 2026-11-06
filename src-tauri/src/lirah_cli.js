@@ -2,8 +2,9 @@
 // Lirah. Sends one request to the app's control socket ($LIRAH_CONTROL) and
 // prints the reply. Run `lirah help` for the commands.
 //
-// With the app closed (its socket gone), tasks list/add/done and plans
-// list/show/import/revise/rechunk/done read and write the ~/.lirah files
+// With the app closed (its socket gone), settings (but not the sensitive ones:
+// sandbox, network, hooks, agent control), theme, startup, tasks list/add/done
+// and plans list/show/import/revise/rechunk/done read and write the ~/.lirah files
 // directly; what needs the app (a plan's split, checking a chunk's commits)
 // is left queued in the file and done when Lirah next loads the repo's plans.
 //
@@ -622,8 +623,175 @@ function revisePrompt(plan, notes, path) {
   ].filter(Boolean).join("\n\n");
 }
 
+// Settings, as settingsSchema in src/features/agent-control/actions.js (from
+// SETTINGS_ROWS and SETTINGS_DEFAULTS); keep in step by hand.
+const CLI_IDS = ["claude-code", "opencode"];
+const SETTINGS = Object.fromEntries([
+  ["selectedCli", "agent", "Default CLI", "claude-code", { values: CLI_IDS, appliesTo: "new tabs" }],
+  ["autoLaunchCli", "agent", "Auto-launch agent", true],
+  ["agentStateHook", "agent", "Agent state hook", true, { guarded: true }],
+  ["compactionHook", "agent", "Compaction hook", true, { guarded: true }],
+  ["agentControl", "agent", "Agent control", true, { guarded: true }],
+  ["keepFilesAfterSend", "agent", "Keep context after send", false],
+  ["promptBoxOnStart", "agent", "Prompt box on new tabs", false],
+  ["autoChunkTaskPlans", "agent", "Split task plans into chunks", true],
+  ["showTitleBar", "appearance", "Window controls", true],
+  ["figures", "appearance", "Figures", "full", { values: ["full", "compact"] }],
+  ["scrollback", "terminal", "Scrollback", 10000, { values: [1000, 10000, 50000, 200000] }],
+  ["autoCommitCli", "git", "Auto commit", "claude-code", { values: CLI_IDS }],
+  ["autoChangelogEnabled", "git", "Auto changelog", false],
+  ["sandboxEnabled", "sandbox", "Sandbox", false, { guarded: true, appliesTo: "new tabs" }],
+  ["networkIsolation", "sandbox", "Network isolation", false, { guarded: true, appliesTo: "new tabs" }],
+].map(([key, section, label, def, extra]) => {
+  const type = extra?.values ? "choice" : typeof def === "boolean" ? "bool" : typeof def;
+  return [key, { key, label, section, type, default: def, ...extra }];
+}));
+
+// Themes in src/themes/theme-config.js: [id, name]; keep in step by hand.
+const THEMES = [
+  ["catppuccin-mocha", "Catppuccin Mocha"], ["ristretto", "Ristretto"], ["kanagawa", "Kanagawa"],
+  ["monokai", "Monokai"], ["emerald-mono", "Emerald Mono"], ["gruvbox", "Gruvbox"], ["retro", "Retro"],
+  ["tokyo-night", "Tokyo Night"], ["everforest", "Everforest"], ["nord", "Nord"], ["rose-pine", "Rose Pine"],
+  ["matte-black", "Matte Black"], ["hackerman", "Hackerman"], ["osaka-jade", "Osaka Jade"],
+  ["ethereal", "Ethereal"], ["flexoki", "Flexoki Light"], ["catppuccin-latte", "Catppuccin Latte"],
+  ["rivendell", "Rivendell"], ["lothlorien", "Lothlórien"],
+];
+const DEFAULT_THEME = "tokyo-night";
+
+const settingsDoc = () => read("settings.json") ?? {};
+// A stored value of the wrong type (or not allowed) reads as the default, as sanitize() does.
+function settingValue(doc, entry) {
+  const v = doc[entry.key];
+  if (typeof v !== typeof entry.default) return entry.default;
+  return entry.values && !entry.values.includes(v) ? entry.default : v;
+}
+const saveSettings = (doc, changes) => write("settings.json", { ...doc, ...changes }, revisionOf(doc));
+
+function settingEntry(key) {
+  if (typeof key !== "string" || !key) throw new Error("missing setting name (see `lirah settings list`)");
+  const entry = SETTINGS[key];
+  if (!entry) throw new Error(`unknown setting "${key}"; known: ${Object.keys(SETTINGS).join(", ")}`);
+  return entry;
+}
+
+const BOOL_WORDS = { on: true, true: true, yes: true, 1: true, off: false, false: false, no: false, 0: false };
+
+// As parseValue in actions.js.
+function settingInput(entry, raw) {
+  if (raw === undefined || raw === null || raw === "") throw new Error(`missing value for ${entry.key}`);
+  if (entry.type === "bool") {
+    if (typeof raw === "boolean") return raw;
+    const word = String(raw).trim().toLowerCase();
+    if (word in BOOL_WORDS) return BOOL_WORDS[word];
+    throw new Error(`${entry.key} takes on/off or true/false, not "${raw}"`);
+  }
+  const value = typeof entry.default === "number" ? Number(String(raw).replace(/[,_]/g, "")) : String(raw).trim();
+  if (!entry.values.includes(value)) throw new Error(`${entry.key} must be one of ${entry.values.join(", ")}, not "${raw}"`);
+  return value;
+}
+
+// Sandbox, network isolation, the hooks and agent control are confirmed by the user in the app.
+function changeSetting(entry, value, verb) {
+  if (entry.guarded) {
+    throw new Error(`${entry.key} is a sensitive setting: Lirah asks the user before changing it, so it can only be ${verb} while Lirah is running (run this from a Lirah tab, or change it in Settings)`);
+  }
+  const doc = settingsDoc();
+  if (Object.is(settingValue(doc, entry), value)) return `${entry.key} is already ${show(value)}`;
+  saveSettings(doc, { [entry.key]: value });
+  return `${entry.key} = ${show(value)}${entry.appliesTo ? " (new tabs)" : ""}`;
+}
+
+const themeOf = (doc) => (THEMES.some(([id]) => id === doc.theme) ? doc.theme : DEFAULT_THEME);
+
+const startupOf = (doc) => ({
+  mode: doc.startupMode === "projects" ? "projects" : "restore",
+  // As cleanStartupProject in settingsStore.js.
+  projects: (Array.isArray(doc.startupProjects) ? doc.startupProjects : [])
+    .filter((p) => p && typeof p === "object" && typeof p.path === "string" && p.path.trim())
+    .map((p) => ({ path: p.path, ...(typeof p.name === "string" && { name: p.name }), ...(typeof p.launch === "boolean" && { launch: p.launch }) })),
+});
+
 // [dispatcher cmd] -> (args, positional) => reply data, as the app's handler.
 const LOCAL = {
+  "settings.list": () => {
+    const doc = settingsDoc();
+    return Object.values(SETTINGS).map((e) => ({ ...e, value: settingValue(doc, e) }));
+  },
+  "settings.get": (args, [key = args.key]) => settingValue(settingsDoc(), settingEntry(key)),
+  "settings.set": (args, [key = args.key, value = args.value]) => {
+    const entry = settingEntry(key);
+    return changeSetting(entry, settingInput(entry, value), "set");
+  },
+  "settings.reset": (args, [key = args.key]) => {
+    const entry = settingEntry(key);
+    return changeSetting(entry, entry.default, "reset");
+  },
+  "theme.list": () => {
+    const current = themeOf(settingsDoc());
+    return THEMES.map(([id, name]) => ({ id, name, current: id === current }));
+  },
+  "theme.get": () => themeOf(settingsDoc()),
+  "theme.set": (args, [name = args.name]) => {
+    if (typeof name !== "string" || !name.trim()) throw new Error("missing theme name (see `lirah theme list`)");
+    const wanted = name.trim().toLowerCase();
+    const id = THEMES.find(([k, n]) => k.toLowerCase() === wanted || n.toLowerCase() === wanted)?.[0];
+    if (!id) throw new Error(`unknown theme "${name}"; known: ${THEMES.map(([k]) => k).join(", ")}`);
+    const doc = settingsDoc();
+    if (themeOf(doc) === id) return `theme is already ${id}`;
+    saveSettings(doc, { theme: id });
+    return `theme = ${id}`;
+  },
+  "startup.get": () => startupOf(settingsDoc()),
+  "startup.mode": (args, [raw = args.mode]) => {
+    const doc = settingsDoc();
+    const { mode: previous, projects } = startupOf(doc);
+    if (raw === undefined) return previous;
+    const mode = String(raw).trim().toLowerCase();
+    if (mode !== "restore" && mode !== "projects") throw new Error(`startup mode must be restore or projects, not "${raw}"`);
+    if (mode === previous) return `startup mode is already ${mode}`;
+    saveSettings(doc, { startupMode: mode });
+    const note = mode === "projects" && !projects.length
+      ? " (no startup projects yet, so the last tabs still restore; add some with `lirah startup add`)" : "";
+    return `startup mode = ${mode}${note}`;
+  },
+  // The path is checked and made absolute in route().
+  "startup.add": (args, [raw = args.path]) => {
+    const path = raw.length > 1 ? raw.replace(/\/+$/, "") : raw;
+    const doc = settingsDoc();
+    const { mode, projects } = startupOf(doc);
+    const index = projects.findIndex((p) => p.path === path);
+    const entry = { ...(index === -1 ? { path } : projects[index]) };
+    const launch = args.launch === undefined ? undefined : args.launch === true || args.launch === "true" || args.launch === "on" || args.launch === 1;
+    if (launch !== undefined) {
+      if (launch) entry.launch = true;
+      else delete entry.launch;
+    }
+    if (args.name !== undefined) {
+      const label = String(args.name).trim();
+      if (label) entry.name = label;
+      else delete entry.name;
+    }
+    saveSettings(doc, { startupProjects: index === -1 ? [...projects, entry] : projects.map((p, i) => (i === index ? entry : p)) });
+    const what = `${entry.path}${entry.name ? ` as "${entry.name}"` : ""}${entry.launch ? ", launching its agent" : ""}`;
+    const note = mode === "projects" ? "" : " (startup mode is restore; `lirah startup mode projects` to use it)";
+    return `${index === -1 ? "added" : "updated"} ${what}${note}`;
+  },
+  "startup.remove": (args, [raw = args.path]) => {
+    const path = raw.length > 1 ? raw.replace(/\/+$/, "") : raw;
+    const doc = settingsDoc();
+    const { projects } = startupOf(doc);
+    const removed = projects.find((p) => p.path === path);
+    if (!removed) throw new Error(`not a startup project: ${path} (see \`lirah startup\`)`);
+    saveSettings(doc, { startupProjects: projects.filter((p) => p !== removed) });
+    return `removed ${removed.path}`;
+  },
+  "startup.clear": () => {
+    const doc = settingsDoc();
+    const count = startupOf(doc).projects.length;
+    if (!count) return "no startup projects to clear";
+    saveSettings(doc, { startupProjects: [] });
+    return `cleared ${count} startup project${count === 1 ? "" : "s"}`;
+  },
   "tasks.list": (args) => {
     const scope = taskScope(args);
     return {
