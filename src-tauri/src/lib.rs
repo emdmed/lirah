@@ -18,6 +18,7 @@ mod plans;
 mod util;
 mod compaction;
 mod user_plugins;
+mod store;
 
 use tauri::Manager;
 
@@ -213,6 +214,10 @@ pub fn run(initial_path: Option<String>) {
             plans::remove_plan_workdir,
             plans::last_assistant_text,
             plans::gh_pr_for_branch,
+            // ~/.lirah JSON store
+            store::store_read,
+            store::store_write,
+            store::store_delete,
         ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
