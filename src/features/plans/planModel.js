@@ -74,6 +74,11 @@ export const AUTO_RESUME_REASONS = new Set([
   HALT_REASON.NEEDS_INPUT, HALT_REASON.NO_COMMIT, HALT_REASON.PERMISSION,
 ]);
 
+/** Does the run handle its agent's Stop itself? Otherwise (paused after a restart, no hooks) the chunk is checked like one sent by hand. */
+export function stopDrivesRun(ap) {
+  return ap?.status === AUTOPILOT_STATUS.RUNNING || AUTO_RESUME_REASONS.has(ap?.reason);
+}
+
 /** A run that is going or waiting on you, as opposed to finished, failed or off. */
 export function isAutopilotLive(ap) {
   return ap?.status === AUTOPILOT_STATUS.RUNNING || ap?.status === AUTOPILOT_STATUS.PAUSED;

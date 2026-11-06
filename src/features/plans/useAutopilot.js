@@ -7,7 +7,7 @@ import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../t
 import { getTabSession } from '../tabs/terminalActivity';
 import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, nextChunkId,
-  planProgress, UNTITLED_PLAN,
+  planProgress, stopDrivesRun, UNTITLED_PLAN,
 } from './planModel';
 import { buildNudgePrompt, parseDecisions, parseStatusMarker, STATUS_DONE } from './planPrompts';
 import { requestPlanFocus } from './plansPaneEvents';
@@ -62,6 +62,17 @@ function nextSessionStart(sessionId, ms) {
 
 /** Is this plan's live run driven by the agent in `sessionId`? */
 const pilotedBy = (plan, sessionId) => isAutopilotLive(plan.autopilot) && getTabSession(plan.autopilot.tabId) === sessionId;
+
+/**
+ * Throws unless an agent in `tabId` has reported through its hooks since Lirah
+ * started: after a restart the run's tab holds a bare shell, and a chunk or
+ * nudge pasted there would run as shell commands.
+ */
+export function assertAgentInTab(tabId) {
+  if (!getAgentHookState(getTabSession(tabId))) {
+    throw new Error('no agent has reported from that tab since Lirah started. Launch it there (Ctrl+K), then resume');
+  }
+}
 
 const inFlight = (chunk) => chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix;
 
@@ -218,6 +229,7 @@ export function useAutopilot({
 
   const resumeAutopilot = useCallback((repoRoot, planId, tabId) => {
     const ap = findPlan(repoRoot, planId)?.autopilot;
+    assertAgentInTab(tabId || ap?.tabId);
     setAutopilot(repoRoot, planId, {
       status: AUTOPILOT_STATUS.RUNNING, tabId: tabId || ap?.tabId, nudged: false, reason: null, message: null,
     });
@@ -305,7 +317,7 @@ export function useAutopilot({
           status: AUTOPILOT_STATUS.RUNNING, reason: null, message: null, nudged: ap.reason === HALT_REASON.PERMISSION ? ap.nudged : false,
         });
       }
-      if (turnEnded && (ap.status === AUTOPILOT_STATUS.RUNNING || AUTO_RESUME_REASONS.has(ap.reason))) {
+      if (turnEnded && stopDrivesRun(ap)) {
         onAutopilotStop(repoRoot, plan.id, sessionId, next.error);
       }
     };
@@ -320,9 +332,11 @@ export function useAutopilot({
           }
           if (clearingRef.current.has(plan.id)) continue; // Its own /clear ending and starting the session.
           const pilotChunkId = plan.autopilot.chunkId;
+          const drives = stopDrivesRun(plan.autopilot);
           steer(repoRoot, plan, sessionId, next, turnEnded);
-          // Auto-pilot checks its own chunk; checking it here too would race.
-          if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, (c) => c.awaitingFix && c.id !== pilotChunkId);
+          // Auto-pilot checks its own chunk when it drives the Stop; checking it here too would race.
+          if (turnEnded && drives) checkSessionChunks(repoRoot, plan, sessionId, (c) => c.awaitingFix && c.id !== pilotChunkId);
+          else if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, inFlight, (c) => settle(repoRoot, plan.id, c, sessionId));
         }
       }
     });
