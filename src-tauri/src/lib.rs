@@ -18,6 +18,7 @@ mod plans;
 mod util;
 mod compaction;
 mod user_plugins;
+mod persistence;
 
 use tauri::Manager;
 
@@ -160,6 +161,8 @@ pub fn run(initial_path: Option<String>) {
             fs::directory::read_directory,
             fs::directory::read_file_content,
             fs::directory::write_file_content,
+            persistence::read_persisted,
+            persistence::write_persisted,
             fs::directory::read_directory_recursive,
             fs::commands::get_home_dir,
             fs::commands::get_shell_kind,
