@@ -5,6 +5,7 @@
 // Does nothing outside a Lirah terminal.
 
 import { appendFileSync, readFileSync, writeSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const session = process.env.LIRAH_PTY_SESSION;
@@ -28,8 +29,13 @@ function pendingContext(prompt) {
   return text;
 }
 
+// Settings → Agent state hook, read per call so the switch needs no relaunch.
+function switchedOff() {
+  try { return JSON.parse(readFileSync(join(homedir(), '.lirah', 'settings.json'), 'utf8')).agentStateHook === false; } catch { return false; }
+}
+
 async function main() {
-  if (!session || !dir) return;
+  if (!session || !dir || switchedOff()) return;
   let raw = '';
   process.stdin.setEncoding('utf8');
   for await (const chunk of process.stdin) raw += chunk;

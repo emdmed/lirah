@@ -407,26 +407,25 @@ fn merge_hooks(hooks: &mut serde_json::Map<String, serde_json::Value>, add: serd
     }
 }
 
-/// Compose Lirah's one Claude Code plugin (~/.lirah/claude-plugin) from the
-/// parts switched on in settings and return its directory, or None when no
-/// part is on or installed. Rewritten per launch; a running agent keeps the
-/// hooks it read at its start.
-fn write_base_plugin(agent_state: bool, compaction: bool, agent_control: bool) -> Result<Option<String>, String> {
+/// Compose Lirah's one Claude Code plugin (~/.lirah/claude-plugin) and return
+/// its directory, or None when nothing is installed. Every hook is always in;
+/// each script reads its own switch (agentStateHook, compactionHook) from
+/// settings.json per call. The skill is no hook, so `agent_control` decides at
+/// launch whether it is in.
+fn write_base_plugin(agent_control: bool) -> Result<Option<String>, String> {
     let plugin = claude_plugin_dir().ok_or("No home directory")?;
     if !plugin.join(".claude-plugin").join("plugin.json").exists() {
         return Ok(None); // startup install failed
     }
     let mut hooks = serde_json::Map::new();
     let script = crate::util::lirah_dir().ok_or("No home directory")?.join("hooks").join("agent-state.js");
-    if agent_state && script.exists() {
+    if script.exists() {
         // The script runs in milliseconds; the timeout only bounds a wedged disk.
         let command = serde_json::json!([{ "type": "command", "command": crate::util::node_command(&script), "timeout": 5 }]);
         merge_hooks(&mut hooks, CLAUDE_EVENTS.iter().map(|e| (e.to_string(), serde_json::json!([{ "hooks": command }]))).collect());
     }
-    if compaction {
-        if let Some(add) = crate::compaction::claude_hooks() {
-            merge_hooks(&mut hooks, add);
-        }
+    if let Some(add) = crate::compaction::claude_hooks() {
+        merge_hooks(&mut hooks, add);
     }
     let skill = plugin.join("skills").join("lirah").join("SKILL.md");
     if agent_control {
@@ -449,8 +448,8 @@ fn write_base_plugin(agent_state: bool, compaction: bool, agent_control: bool) -
 /// `--plugin-dir`, so Lirah's hooks and skill load without touching the
 /// user's own settings.
 #[tauri::command]
-pub async fn install_base_plugin(agent_state: bool, compaction: bool, agent_control: bool) -> Result<Option<String>, String> {
-    crate::ipc::blocking("install_base_plugin", move || write_base_plugin(agent_state, compaction, agent_control)).await
+pub async fn install_base_plugin(agent_control: bool) -> Result<Option<String>, String> {
+    crate::ipc::blocking("install_base_plugin", move || write_base_plugin(agent_control)).await
 }
 
 #[cfg(test)]

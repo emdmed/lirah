@@ -13,6 +13,7 @@
 // down where those hooks are installed. Any failure lets the call through.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -225,7 +226,11 @@ export function decide(input, env) {
   }
 }
 
+// Settings → Compaction hook, read per call so the switch needs no relaunch.
+const switchedOff = () => { try { return JSON.parse(readFileSync(join(homedir(), '.lirah', 'settings.json'), 'utf8')).compactionHook === false; } catch { return false; } };
+
 async function main() {
+  if (switchedOff()) return;
   let raw = '';
   for await (const chunk of process.stdin) raw += chunk;
   decide(JSON.parse(raw || '{}'), process.env);
