@@ -63,6 +63,7 @@ import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
 import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
+import { useCliRunning } from "./useTabsSummary";
 import { useSeededSetting, useSetting, getSettings } from "../settings/settingsStore";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
 import { useTabShortcuts } from "./useTabShortcuts";
@@ -363,6 +364,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   const autoMerge = useAutoMerge();
 
   const sidebarSearch = useSidebarSearch();
+  const cliRunning = useCliRunning(terminalSessionId, isActive && sidebar.sidebarOpen && viewMode === 'tree');
 
   const treeView = useTreeView({
     terminalSessionId,
@@ -370,6 +372,9 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     initializeSearch: sidebarSearch.initializeSearch,
     searchResults: sidebarSearch.searchResults,
     isActive,
+    // A running agent can't cd the shell, and in the sandbox the cwd lookup
+    // would read the agent's own child processes, so follow only a bare shell.
+    followCwd: isActive && sidebar.sidebarOpen && viewMode === 'tree' && cliRunning === null,
   });
 
   // Terminate any running CLI process in the terminal before navigation

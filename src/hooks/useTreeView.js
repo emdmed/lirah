@@ -103,6 +103,8 @@ function isSelfOrDescendantOf(path, pathSet) {
   return false;
 }
 
+const CWD_POLL_MS = 1500;
+
 /** One folder level as the tree shows it: gitignored entries hidden. */
 const readLevel = (path) => invoke('read_directory', { path, gitignore: true });
 
@@ -114,7 +116,7 @@ function assembleTree(entries, byDir) {
   });
 }
 
-export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults, isActive = true }) {
+export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults, isActive = true, followCwd = false }) {
   // `treeData` is built from the recursive index and serves search, filters
   // and counts. The browsing tree (`lazyTree`) loads one folder per expand.
   const [treeData, setTreeData] = useState([]);
@@ -211,6 +213,22 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
       });
     }
   }, [terminalSessionId, setCurrentPath, commitAllFiles]);
+
+  // The root follows `cd` in the shell. Opened folders belong to the old
+  // root, so they are dropped; nothing is expanded automatically.
+  useEffect(() => {
+    if (!followCwd || !terminalSessionId) return undefined;
+    const id = setInterval(async () => {
+      const cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId }).catch(() => null);
+      if (!cwd || !projectRootRef.current || cwd === projectRootRef.current) return;
+      projectRootRef.current = cwd;
+      userExpandedRef.current = new Set();
+      setUserExpandedFolders(userExpandedRef.current);
+      setTransientExpandedFolders(prev => (prev ? new Set() : prev));
+      loadTreeData({ silent: true });
+    }, CWD_POLL_MS);
+    return () => clearInterval(id);
+  }, [followCwd, terminalSessionId, loadTreeData]);
 
   // Track project root for fs watcher (set after first loadTreeData)
   const [watchPath, setWatchPath] = useState(null);
