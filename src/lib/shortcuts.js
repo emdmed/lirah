@@ -52,7 +52,7 @@ export const SHORTCUTS = [
   { id: 'prompt-send', keys: ['Ctrl', 'Enter'], description: 'Send Prompt', category: 'Prompt', note: 'in the prompt', hint: { bar: 'ctrl', label: 'send' } },
   { id: 'prompt-restore', keys: ['Ctrl', 'Shift', 'Z'], description: 'Restore Last Prompt', category: 'Prompt', note: 'when empty' },
   { id: 'compact', keys: ['Ctrl', 'Shift', 'P'], description: 'Toggle Compaction Hook', category: 'Prompt', hint: { bar: 'ctrl+shift', label: 'compaction' }, paletteCommand: 'compact', match: (e) => mod(e) && e.shiftKey && e.key === 'P' },
-  { id: 'templates', keys: ['Alt', 'Alt'], description: 'Open Instructions (templates + patterns) / Clear Template', category: 'Prompt', note: 'double-tap', doubleTap: true },
+  { id: 'templates', keys: ['Alt', 'Alt'], description: 'Open Instructions (templates) / Clear Template', category: 'Prompt', note: 'double-tap', doubleTap: true },
   { id: 'at-mention', keys: ['@'], description: 'Quick File Search', category: 'Prompt', note: 'type @ in the prompt', highlight: true },
 
   // Agent & CLI

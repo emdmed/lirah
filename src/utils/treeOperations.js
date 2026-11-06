@@ -73,10 +73,9 @@ function fileExistsInTree(nodes, filePath) {
 function addChildToParent(nodes, parentPath, childNode) {
   return nodes.map(node => {
     if (node.path === parentPath) {
-      const newNode = { ...node };
-      if (!newNode.children) {
-        newNode.children = [];
-      }
+      // Children not loaded yet (lazy tree): they arrive on expand.
+      if (node.children == null) return node;
+      const newNode = { ...node, children: [...node.children] };
       if (!newNode.children.some(child => child.path === childNode.path)) {
         newNode.children.push(childNode);
         newNode.children.sort(compareTreeEntries);
@@ -93,7 +92,7 @@ function addChildToParent(nodes, parentPath, childNode) {
  * Incrementally update a tree with new untracked files (avoids full reload).
  * Returns a new tree array with the changes applied.
  */
-export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
+export function incrementallyUpdateTree(prevTreeData, changes, rootPath, { lazy = false } = {}) {
   const normalizedRoot = normalizePath(rootPath);
   let newData = [...prevTreeData];
 
@@ -116,7 +115,8 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
       path: filePath,
       is_dir: !!isDir,
       parent_path: parentPath,
-      children: isDir ? [] : undefined,
+      // In a lazy tree a new folder loads its contents on expand.
+      children: isDir ? (lazy ? null : []) : undefined,
     };
 
     // Root-level file
@@ -133,4 +133,31 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath) {
   });
 
   return newData;
+}
+
+/** One `read_directory` level as tree nodes; folders start unloaded (children null). */
+export function nodesFromEntries(entries) {
+  return entries
+    .map(e => ({ name: e.name, path: normalizePath(e.path), is_dir: !!e.is_dir, children: e.is_dir ? null : undefined }))
+    .sort(compareTreeEntries);
+}
+
+/** Replace the children of the folder at `path`. */
+export function setChildrenAt(nodes, path, children) {
+  return nodes.map(node => {
+    if (node.path === path) return { ...node, children };
+    if (node.children && path.startsWith(node.path + '/')) {
+      return { ...node, children: setChildrenAt(node.children, path, children) };
+    }
+    return node;
+  });
+}
+
+/** Find the node at `path`, or undefined. */
+export function findNode(nodes, path) {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    if (node.children && path.startsWith(node.path + '/')) return findNode(node.children, path);
+  }
+  return undefined;
 }

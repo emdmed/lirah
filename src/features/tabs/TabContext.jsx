@@ -3,10 +3,10 @@ import { useToast } from "../toast";
 import { useConfirm } from "../dialogs/DialogProvider";
 import { getAgentHookState, getLastTurn } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
-import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";
+import { deleteWorkspaceFolder, getSavedWorkspaces, saveWorkspaces } from "../../lib/workspaceStore";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 import { invoke } from "@tauri-apps/api/core";
-import { getSettings } from "../settings/settingsStore";
+import { getEffectiveSettings } from "../settings/settingsStore";
 import { formatDuration } from "../../lib/formatDuration";
 import { tildePath } from "../../components/ui/picker";
 
@@ -15,10 +15,6 @@ import { tildePath } from "../../components/ui/picker";
 const TabContext = createContext(null);
 const TabActionsContext = createContext(null);
 
-const STORAGE_KEY = 'nevo-terminal:tabs';
-const WORKSPACES_KEY = 'nevo-terminal:workspaces';
-export const MAX_TABS = 8;
-const LIMIT_MESSAGE = `Tab limit reached (${MAX_TABS}) — close a tab first`;
 // Agent states where closing the tab would kill work in flight.
 const BUSY_STATES = new Set(['working', 'permission']);
 
@@ -36,17 +32,30 @@ function createWorkspace(name) {
 
 // Saved workspaces, with one to start from; saved tabs from before workspaces
 // (or of a workspace that is gone) join the first one.
-function loadWorkspaces(tabs) {
-  const saved = loadJson(WORKSPACES_KEY, null);
-  const workspaces = Array.isArray(saved) && saved.length > 0 ? saved : [createWorkspace('main')];
+function loadWorkspaces(saved, tabs) {
+  const workspaces = saved.length > 0 ? saved : [createWorkspace('main')];
   const ids = new Set(workspaces.map((w) => w.id));
   const placed = tabs.map((t) => (ids.has(t.workspaceId) ? t : { ...t, workspaceId: workspaces[0].id }));
   return { workspaces, tabs: placed };
 }
 
+// The workspace's master terminal: a tab of its own, kept out of the tab list,
+// whose agent orchestrates the workspace's tabs. Null until first opened.
+export function masterTabOf(tabs, workspaceId) {
+  return tabs.find((t) => t.workspaceId === workspaceId && t.master) || null;
+}
+
+// The deepest folder holding all of these paths ("/" at worst).
+function commonFolder(paths) {
+  const parts = paths.map((p) => p.split('/').filter(Boolean));
+  const shared = [];
+  for (let i = 0; parts.every((p) => i < p.length && p[i] === parts[0][i]); i++) shared.push(parts[0][i]);
+  return `/${shared.join('/')}`;
+}
+
 // `launch` asks the tab to start its agent once its shell is up, even with
 // auto-launch off; ProjectTab clears it as soon as it boots.
-function createTab(projectPath, { launch = false, name, workspaceId } = {}) {
+function createTab(projectPath, { launch = false, name, workspaceId, master = false } = {}) {
   return {
     id: crypto.randomUUID(),
     projectPath,
@@ -54,18 +63,19 @@ function createTab(projectPath, { launch = false, name, workspaceId } = {}) {
     label: projectPath.split('/').filter(Boolean).pop() || projectPath,
     ...(name?.trim() && { customLabel: name.trim() }),
     ...(launch && { launch: true }),
+    ...(master && { master: true }),
   };
 }
 
 // The startup projects to open instead of restoring the saved tabs, or null
-// when the app should restore as usual.
+// when the app should restore as usual. The active workspace may override startupMode.
 function startupProjectList() {
-  const { startupMode, startupProjects } = getSettings();
+  const { startupMode, startupProjects } = getEffectiveSettings(getSavedWorkspaces().activeWorkspaceId);
   return startupMode === 'projects' && startupProjects.length > 0 ? startupProjects : null;
 }
 
 // Tabs for the startup projects whose folder still exists; the rest are named
-// in `missing`. Capped at MAX_TABS.
+// in `missing`.
 async function buildStartupTabs(projects, workspaceId) {
   let home = null;
   const checked = await Promise.all(projects.map(async (p) => {
@@ -80,7 +90,6 @@ async function buildStartupTabs(projects, workspaceId) {
   }));
   const tabs = checked
     .filter((p) => p.exists)
-    .slice(0, MAX_TABS)
     .map((p) => createTab(p.path, { launch: !!p.launch, name: p.name, workspaceId }));
   return { tabs, missing: checked.filter((p) => !p.exists).map((p) => p.path) };
 }
@@ -93,36 +102,31 @@ export function TabProvider({ children }) {
   const [startupProjects] = useState(startupProjectList);
   const [startupPending, setStartupPending] = useState(!!startupProjects);
   const [initial] = useState(() => {
-    const parsed = startupProjects ? [] : loadJson(STORAGE_KEY, null);
-    return loadWorkspaces(Array.isArray(parsed) ? parsed : []);
+    const saved = getSavedWorkspaces();
+    return { ...loadWorkspaces(saved.workspaces, startupProjects ? [] : saved.tabs), saved };
   });
   const [tabs, setTabs] = useState(initial.tabs);
   const [workspaces, setWorkspaces] = useState(initial.workspaces);
 
   const [activeTabId, setActiveTabId] = useState(() => {
-    const stored = loadText(STORAGE_KEY + ':active');
+    const stored = initial.saved.activeTabId;
     if (stored && tabs.find(t => t.id === stored)) return stored;
     return tabs[0]?.id || null;
   });
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => {
-    const stored = loadText(WORKSPACES_KEY + ':active');
+    const stored = initial.saved.activeWorkspaceId;
     const fromTab = tabs.find((t) => t.id === activeTabId)?.workspaceId;
     return fromTab || (workspaces.some((w) => w.id === stored) ? stored : workspaces[0].id);
   });
-  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId), [tabs, activeWorkspaceId]);
+  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId && !t.master), [tabs, activeWorkspaceId]);
 
-  // Persist tabs to localStorage synchronously on every change.
-  // A debounce here loses state: the window's close button calls
-  // appWindow.close() immediately, destroying the webview before a deferred
-  // write can flush — so tab edits made right before quitting never persist.
+  // Persist to workspaces/ (debounced; fileStore flushes on window close).
+  // The active tab is saved as its workspace's activeTabId.
   useEffect(() => {
     // Parent effects run last, so this marks the end of the switch's effects.
     perfTabSwitchStep('effects-flushed');
-    saveJson(STORAGE_KEY, tabs);
-    saveText(STORAGE_KEY + ':active', activeTabId || '');
-    saveJson(WORKSPACES_KEY, workspaces);
-    saveText(WORKSPACES_KEY + ':active', activeWorkspaceId);
-  }, [tabs, activeTabId, workspaces, activeWorkspaceId]);
+    saveWorkspaces({ tabs, workspaces, activeWorkspaceId });
+  }, [tabs, workspaces, activeWorkspaceId]);
 
   // Latest values for the actions below, so they can stay referentially stable.
   const tabsRef = useRef(tabs);
@@ -139,8 +143,8 @@ export function TabProvider({ children }) {
   // Each workspace comes back to the tab it was on.
   useEffect(() => {
     if (!activeTabId) return;
-    setWorkspaces((prev) => (prev.some((w) => w.id === activeWorkspaceId && w.lastTabId !== activeTabId)
-      ? prev.map((w) => (w.id === activeWorkspaceId ? { ...w, lastTabId: activeTabId } : w))
+    setWorkspaces((prev) => (prev.some((w) => w.id === activeWorkspaceId && w.activeTabId !== activeTabId)
+      ? prev.map((w) => (w.id === activeWorkspaceId ? { ...w, activeTabId } : w))
       : prev));
   }, [activeTabId, activeWorkspaceId]);
 
@@ -165,17 +169,13 @@ export function TabProvider({ children }) {
     return () => { cancelled = true; };
   }, [startupProjects, toast]);
 
-  const addTab = useCallback((projectPath, options) => {
-    if (tabsRef.current.length >= MAX_TABS) {
-      toast.warning(LIMIT_MESSAGE);
-      return null;
-    }
+  const addTab = useCallback((projectPath, options = {}) => {
     const tab = createTab(projectPath, { ...options, workspaceId: activeWorkspaceIdRef.current });
     tabsRef.current = [...tabsRef.current, tab];
     setTabs(prev => [...prev, tab]);
-    setActiveTabId(tab.id);
+    if (options.focus !== false) setActiveTabId(tab.id);
     return tab;
-  }, [toast]);
+  }, []);
 
   const removeTab = useCallback((tabId) => {
     setTabs(prev => {
@@ -187,8 +187,8 @@ export function TabProvider({ children }) {
       // workspace; the workspace may be left empty.
       if (tabId === activeTabIdRef.current) {
         const ws = prev[idx].workspaceId;
-        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws);
-        const after = next.slice(idx).filter((t) => t.workspaceId === ws);
+        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws && !t.master);
+        const after = next.slice(idx).filter((t) => t.workspaceId === ws && !t.master);
         setActiveTabId((after[0] || before[before.length - 1])?.id || null);
       }
       return next;
@@ -246,7 +246,7 @@ export function TabProvider({ children }) {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     if (!ws || workspaceId === activeWorkspaceIdRef.current) return;
     const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
-    const tabId = (own.find((t) => t.id === ws.lastTabId) || own[0])?.id || null;
+    const tabId = (own.find((t) => t.id === ws.activeTabId) || own.find((t) => !t.master))?.id || null;
     if (tabId) perfTabSwitchStart();
     activeWorkspaceIdRef.current = workspaceId;
     setActiveWorkspaceId(workspaceId);
@@ -277,17 +277,21 @@ export function TabProvider({ children }) {
     setWorkspaces((prev) => prev.map((w) => (w.id === workspaceId ? { ...w, name: name.trim() } : w)));
   }, []);
 
-  // Removes a workspace and closes its tabs, after asking when it has any.
+  // Removes a workspace, closes its tabs and deletes its folder, after asking.
   // The last workspace stays. Resolves true when it was removed.
   const removeWorkspace = useCallback(async (workspaceId) => {
     const list = workspacesRef.current;
     const ws = list.find((w) => w.id === workspaceId);
     if (!ws || list.length < 2) return false;
     const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
-    if (own.length > 0 && !(await confirm({
+    const closes = own.length === 0 ? '' : ` Its ${own.length === 1 ? 'tab closes' : `${own.length} tabs close`}, with their terminals and agents.`;
+    if (!(await confirm({
       title: `Remove workspace ${ws.name}?`,
-      description: `Its ${own.length === 1 ? 'tab closes' : `${own.length} tabs close`}, with their terminals and agents.`,
-      facts: own.map((t) => ({ label: 'Tab', value: t.customLabel || t.label })),
+      description: `Its folder and everything in it are deleted.${closes}`,
+      facts: [
+        { label: 'Folder', value: `~/.lirah/workspaces/${workspaceId}/` },
+        ...own.map((t) => ({ label: 'Tab', value: t.customLabel || t.label })),
+      ],
       confirmLabel: 'Remove workspace',
       destructive: true,
     }))) return false;
@@ -300,6 +304,7 @@ export function TabProvider({ children }) {
     setTabs((prev) => prev.filter((t) => !gone.has(t.id)));
     workspacesRef.current = list.filter((w) => w.id !== workspaceId);
     setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId));
+    deleteWorkspaceFolder(workspaceId).catch((error) => console.warn(`Failed to delete workspace ${workspaceId}:`, error));
     return true;
   }, [confirm, switchWorkspace]);
 
@@ -350,8 +355,44 @@ export function TabProvider({ children }) {
       : prev));
   }, []);
 
+  // A one-line purpose for the tab, read by the master agent (`lirah tabs note`).
+  const setTabNote = useCallback((tabId, note) => {
+    setTabs(prev => prev.map(t => (t.id === tabId ? { ...t, note: note?.trim() || undefined } : t)));
+  }, []);
+
+  // Boots a tab's terminal and agent without showing it (the master sends it
+  // work). Not saved, so restored tabs still boot on first view.
+  const wakeTab = useCallback((tabId) => {
+    setTabs(prev => (prev.some(t => t.id === tabId && !t.background)
+      ? prev.map(t => (t.id === tabId ? { ...t, background: true } : t))
+      : prev));
+  }, []);
+
+  // Shows the active workspace's master terminal, opening it on first use in
+  // the folder holding all its tabs' projects (home when it has none), so its
+  // agent can read every repo.
+  const openMaster = useCallback(async () => {
+    const ws = activeWorkspaceIdRef.current;
+    const existing = masterTabOf(tabsRef.current, ws);
+    if (existing) {
+      setActiveTabId(existing.id);
+      return existing;
+    }
+    const paths = tabsRef.current.filter((t) => t.workspaceId === ws).map((t) => t.projectPath);
+    const home = await invoke('get_home_dir').catch(() => '/');
+    const path = paths.length ? commonFolder(paths) : home;
+    const tab = createTab(path === '/' ? home : path, { launch: true, name: 'master', workspaceId: ws, master: true });
+    tabsRef.current = [...tabsRef.current, tab];
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+    return tab;
+  }, []);
+
   const actions = useMemo(() => ({
     addTab,
+    setTabNote,
+    wakeTab,
+    openMaster,
     removeTab,
     confirmCloseTab,
     requestCloseTab,
@@ -367,7 +408,7 @@ export function TabProvider({ children }) {
     openWorkspace,
     renameWorkspace,
     removeWorkspace,
-  }), [addTab, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
+  }), [addTab, setTabNote, wakeTab, openMaster, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
     switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace]);
 
   // `tabs` is every tab, of all workspaces; `workspaceTabs` the active one's.

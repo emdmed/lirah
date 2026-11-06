@@ -1,43 +1,18 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { loadJson, saveJson } from '../../lib/storage';
+import { createContext, useContext } from 'react';
+import { useSetting } from '../settings/settingsStore';
 
 const PromptTemplatesContext = createContext(undefined);
 
-const STORAGE_KEY = 'nevo-terminal:prompt-templates';
 const MAX_TEMPLATES = 50;
 
 const DEFAULT_TEMPLATES = [];
 
-function validateTemplates(templates) {
-  if (!Array.isArray(templates)) return [];
-
-  return templates.filter(t =>
-    t &&
-    typeof t.id === 'string' &&
-    typeof t.title === 'string' &&
-    typeof t.content === 'string' &&
-    t.title.trim() !== '' &&
-    t.content.trim() !== ''
-  );
-}
-
-function loadTemplates() {
-  return validateTemplates(loadJson(STORAGE_KEY, []));
-}
-
-function saveTemplates(templates) {
-  saveJson(STORAGE_KEY, templates);
-}
-
 export function PromptTemplatesProvider({ children }) {
-  const [userTemplates, setUserTemplates] = useState(() => loadTemplates());
+  // Stored as settings.json's promptTemplates (validated by settingsStore).
+  const [userTemplates, setUserTemplates] = useSetting('promptTemplates');
 
   // Combine default templates with user templates
   const templates = [...DEFAULT_TEMPLATES, ...userTemplates];
-
-  useEffect(() => {
-    saveTemplates(userTemplates);
-  }, [userTemplates]);
 
   const addTemplate = (title, content) => {
     if (userTemplates.length >= MAX_TEMPLATES) {

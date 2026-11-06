@@ -1,38 +1,13 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { loadJson, saveJson } from '../../lib/storage';
+import { createContext, useContext } from 'react';
+import { useSetting } from '../settings/settingsStore';
 
 const BookmarksContext = createContext(undefined);
 
-const STORAGE_KEY = 'nevo-terminal:project-bookmarks';
 const MAX_BOOKMARKS = 50;
 
-function validateBookmarks(bookmarks) {
-  if (!Array.isArray(bookmarks)) return [];
-
-  return bookmarks.filter(b =>
-    b &&
-    typeof b.id === 'string' &&
-    typeof b.name === 'string' &&
-    typeof b.path === 'string' &&
-    b.name.trim() !== '' &&
-    b.path.trim() !== ''
-  );
-}
-
-function loadBookmarks() {
-  return validateBookmarks(loadJson(STORAGE_KEY, []));
-}
-
-function saveBookmarks(bookmarks) {
-  saveJson(STORAGE_KEY, bookmarks);
-}
-
 export function BookmarksProvider({ children }) {
-  const [bookmarks, setBookmarks] = useState(() => loadBookmarks());
-
-  useEffect(() => {
-    saveBookmarks(bookmarks);
-  }, [bookmarks]);
+  // Stored as settings.json's bookmarks (validated by settingsStore).
+  const [bookmarks, setBookmarks] = useSetting('bookmarks');
 
   const addBookmark = (path, name) => {
     // Check if bookmark limit reached

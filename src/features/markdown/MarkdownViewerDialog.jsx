@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '../../components/ui/button';
@@ -14,9 +15,13 @@ import './markdown.css';
 
 const REMARK_PLUGINS = [remarkGfm];
 const EMPTY_FILES = [];
+const MARKDOWN_RE = /\.(md|markdown|mdx)$/i;
+// shortcut: big files are read whole and cut for display; stream a range if huge logs get opened.
+const MAX_SHOWN = 1_000_000;
 
 /**
- * Formatted markdown in a full-size dialog: a pane that takes over the
+ * Read-only preview of any file: markdown is formatted, anything else is shown
+ * as plain text. Formatted markdown in a full-size dialog: a pane that takes over the
  * window, with the file name as its legend and file-to-file keys in the
  * bottom frame line.
  * @param {boolean} open - Whether overlay is visible
@@ -50,26 +55,48 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
     return markdownFiles.indexOf(filePath);
   }, [markdownFiles, filePath]);
 
-  const hasMultipleFiles = markdownFiles.length > 1;
+  const isMarkdown = !!filePath && MARKDOWN_RE.test(filePath);
+  // File-to-file keys only step through the markdown list the open file is in.
+  const hasMultipleFiles = markdownFiles.length > 1 && currentFileIndex >= 0;
   const canGoPrev = currentFileIndex > 0;
   const canGoNext = currentFileIndex < markdownFiles.length - 1;
 
   useEffect(() => {
-    if (open && filePath) {
-      setLoading(true);
-      setError(null);
-      invoke('read_file_content', { path: filePath })
-        .then(setContent)
-        .catch(err => {
-          console.error('Failed to read markdown file:', err);
-          setError(err.toString());
-        })
-        .finally(() => setLoading(false));
-    } else {
+    if (!open || !filePath) {
       setContent('');
       setError(null);
+      return undefined;
     }
+    let cancelled = false;
+    const read = (initial) => {
+      if (initial) {
+        setLoading(true);
+        setError(null);
+      }
+      invoke('read_file_content', { path: filePath })
+        .then((text) => {
+          if (cancelled) return;
+          setContent(text);
+          setError(null);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(String(err));
+        })
+        .finally(() => {
+          if (!cancelled && initial) setLoading(false);
+        });
+    };
+    read(true);
+    // Re-read on the tab watcher's events: plain writes come as
+    // git-stats-changed, editors' save-by-rename as fs-changes.
+    const unlistens = ['fs-changes', 'git-stats-changed'].map((ev) => listen(ev, () => read(false)));
+    return () => {
+      cancelled = true;
+      unlistens.forEach((p) => p.then((fn) => fn()).catch(() => {}));
+    };
   }, [open, filePath]);
+
+  const shown = content.length > MAX_SHOWN ? content.slice(0, MAX_SHOWN) : content;
 
   const goToPrev = useCallback(() => {
     if (canGoPrev && onFileChange) onFileChange(markdownFiles[currentFileIndex - 1]);
@@ -122,8 +149,8 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
         bodyRef.current?.focus();
       }}
     >
-      <DialogTitle>{fileName || 'Markdown'}</DialogTitle>
-      <DialogDescription className="sr-only">Rendered markdown of {relativePath}</DialogDescription>
+      <DialogTitle>{fileName || 'Preview'}</DialogTitle>
+      <DialogDescription className="sr-only">Read-only preview of {relativePath}</DialogDescription>
 
       {/* Path and file controls */}
       <div className="flex items-center justify-between gap-2 px-3 pb-2 edge-b-engraved flex-shrink-0">
@@ -181,10 +208,15 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
             <p>Failed to load file</p>
             <p className="text-xs mt-1 text-muted-foreground">{error}</p>
           </div>
-        ) : (
+        ) : isMarkdown ? (
           <div className="markdown-body">
-            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{shown}</ReactMarkdown>
           </div>
+        ) : (
+          <pre className="font-mono text-xs whitespace-pre text-foreground select-text">{shown}</pre>
+        )}
+        {!loading && !error && shown !== content && (
+          <p className="mt-4 text-xs text-muted-foreground">Showing the first {MAX_SHOWN.toLocaleString()} characters.</p>
         )}
       </div>
     </DialogContent>

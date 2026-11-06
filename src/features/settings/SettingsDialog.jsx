@@ -18,7 +18,7 @@ import { TAB_CLIS } from '../../lib/agentClis';
 import { shortcutForCommand } from '../../lib/shortcuts';
 import { FilterContext, SECTIONS, SETTINGS_ROW as ROW } from './settingsSections';
 import { IS_WINDOWS } from '../../utils/pathUtils';
-import { Choice, ChoiceRow, DraftField, Group, Row, Section, StepRow, SubRows, ToggleRow } from './parts';
+import { Choice, ChoiceRow, DraftField, Group, Row, ScopeLine, Section, StepRow, SubRows, ToggleRow } from './parts';
 import { AppearanceSection } from './AppearanceSection';
 import { StartupRow } from './StartupRow';
 import { PluginsRow } from './PluginsRow';
@@ -32,6 +32,7 @@ import { CLI_COMMANDS } from '../cli-selection/useClaudeLauncher';
 const PlanContextsDialog = lazyNamed(() => import('../tasks/PlanContextsDialog'), 'PlanContextsDialog');
 
 const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
+const cliLabel = (v) => CLI_OPTIONS.find((o) => o.value === v)?.label ?? v;
 
 // The auto commit shortcut, as the hint bar shows it.
 const COMMIT_KEYS = shortcutForCommand('commit');
@@ -67,15 +68,15 @@ function SandboxSpecList() {
 }
 
 export function SettingsDialog({
-  open, onOpenChange, settings, sessionId, projectPath, onToggleSandbox, onToggleNetwork, onOpenBudget,
+  open, onOpenChange, settings, workspaceId, sessionId, projectPath, onToggleSandbox, onToggleNetwork, onOpenBudget,
 }) {
   const { currentTheme, themes } = useTheme();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const confirm = useConfirm();
   const scrollback = useScrollback();
-  // The store's CLI is the default for new tabs; this tab's own CLI is
-  // chosen from the status bar.
-  const [defaultCli, setDefaultCli] = useSetting('selectedCli');
+  // The store's CLI is the default for new tabs (this workspace's override
+  // wins); this tab's own CLI is chosen from the status bar.
+  const [defaultCli, setDefaultCli] = useSetting('selectedCli', workspaceId);
   const [agentStateHook, setAgentStateHook] = useSetting('agentStateHook');
   const [compactionHook, setCompactionHook] = useSetting('compactionHook');
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
@@ -227,10 +228,16 @@ export function SettingsDialog({
               <div className="flex flex-col gap-8">
                 <Section section={section('agent')} active={activeId === 'agent'}>
                   <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'auto-launch', 'startup']}>
-                    <ChoiceRow row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli} />
+                    <ChoiceRow
+                      row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli}
+                      scope={<ScopeLine workspaceId={workspaceId} settingKey="selectedCli" label={ROW['default-cli'].label} format={cliLabel} />}
+                    />
                     <ClaudeCommandRow />
-                    <ToggleRow row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli} />
-                    <StartupRow projectPath={projectPath} />
+                    <ToggleRow
+                      row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli}
+                      scope={<ScopeLine workspaceId={workspaceId} settingKey="autoLaunchCli" label={ROW['auto-launch'].label} />}
+                    />
+                    <StartupRow projectPath={projectPath} workspaceId={workspaceId} />
                   </Group>
                   <Group label="Prompt" sectionId="agent" rows={['keep-context', 'prompt-box']}>
                     <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
@@ -335,6 +342,7 @@ export function SettingsDialog({
                     onChange={toggleSandbox}
                     disabled={IS_WINDOWS}
                     hint={IS_WINDOWS ? 'Not available on Windows' : undefined}
+                    scope={!IS_WINDOWS && <ScopeLine workspaceId={workspaceId} settingKey="sandboxEnabled" label={ROW.sandbox.label} />}
                   >
                     {sandboxEnabled && sandboxFailed && (
                       <div className="mb-2 flex items-center gap-2 text-[11px] text-[var(--ins-fault)]">
@@ -358,6 +366,7 @@ export function SettingsDialog({
                     onChange={toggleNetwork}
                     disabled={IS_WINDOWS || !sandboxEnabled}
                     tone="warn"
+                    scope={!IS_WINDOWS && <ScopeLine workspaceId={workspaceId} settingKey="networkIsolation" label={ROW.network.label} />}
                     hint={IS_WINDOWS ? 'Not available on Windows'
                       : sandboxEnabled
                         ? 'Cut the sandboxed terminal off from the network. Restarts the terminal.'

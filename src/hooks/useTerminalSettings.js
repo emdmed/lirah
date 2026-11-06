@@ -8,14 +8,15 @@ import { useSetting, useSeededSetting } from "../features/settings/settingsStore
 // when the tab's terminal spawns, so each tab keeps its own live value (the
 // last one set becomes the default for new tabs). Sharing them would make
 // other tabs report a sandbox or CLI their running process doesn't have.
-export function useTerminalSettings() {
-  const [sandboxEnabled, setSandboxEnabled] = useSeededSetting('sandboxEnabled');
+// workspaceId: its overrides win for the agent CLI, sandbox, network and auto-launch.
+export function useTerminalSettings(workspaceId) {
+  const [sandboxEnabled, setSandboxEnabled] = useSeededSetting('sandboxEnabled', workspaceId);
   const [sandboxFailed, setSandboxFailed] = useState(false);
-  const [networkIsolation, setNetworkIsolation] = useSeededSetting('networkIsolation');
-  const [selectedCli, setSelectedCli] = useSeededSetting('selectedCli');
+  const [networkIsolation, setNetworkIsolation] = useSeededSetting('networkIsolation', workspaceId);
+  const [selectedCli, setSelectedCli] = useSeededSetting('selectedCli', workspaceId);
   const [showTitleBar, setShowTitleBar] = useSetting('showTitleBar');
   const [keepFilesAfterSend, setKeepFilesAfterSend] = useSetting('keepFilesAfterSend');
-  const [autoLaunchCli, setAutoLaunchCli] = useSetting('autoLaunchCli');
+  const [autoLaunchCli, setAutoLaunchCli] = useSetting('autoLaunchCli', workspaceId);
   const [autoChangelogEnabled, setAutoChangelogEnabled] = useSetting('autoChangelogEnabled');
   const [autoChangelogTarget, setAutoChangelogTarget] = useSetting('autoChangelogTarget');
   const [autoChangelogTrigger, setAutoChangelogTrigger] = useSetting('autoChangelogTrigger');

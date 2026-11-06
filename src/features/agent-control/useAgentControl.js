@@ -5,17 +5,20 @@ import { useToast } from '../toast';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getSettings, setSetting } from '../settings/settingsStore';
-import { MAX_TABS, tabDisplayName, useTabManager } from '../tabs/TabContext';
+import { masterTabOf, tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 import { useTasksActions } from '../tasks/TasksContext';
 import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
 import { usePlansActions } from '../plans/PlansContext';
 import { relToRepo, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
-import { CHUNK_STATUS, effectiveChunkState, planProgress, planStarted } from '../plans/planModel';
+import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage } from '../plans/planModel';
+import { buildPlanRevisePrompt } from '../plans/planPrompts';
 import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
 import { planGit } from '../plans/planGit';
-import { getAgentHookState } from '../tabs/agentHookState';
+import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../tabs/agentHookState';
+import { getTabPrompt } from '../tabs/tabPrompts';
+import { getTabTranscript } from '../../lib/terminalSessions';
 import { getTabSession } from '../tabs/terminalActivity';
 import { hash8 } from '../../lib/ids';
 import { JOB_CLIS } from '../../lib/agentClis';
@@ -23,6 +26,9 @@ import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
 } from './actions';
+
+// Worker tab id -> when the master last sent it a prompt; tabs.wait waits for a turn ending after it.
+const sentAt = new Map();
 
 // Answers the `lirah` CLI. The Rust control server relays each request as an
 // `agent-control` event {id, sessionId, cmd, args}; every one gets exactly one
@@ -83,14 +89,38 @@ export function useAgentControl() {
 
     const name = (tab) => tabDisplayName(tab, live.current.bookmarks);
     const target = (tabs, ref, sessionId) => resolveTab(tabs, ref, { sessionId, bookmarks: live.current.bookmarks });
+    // The caller's workspace (else the active one): its tabs, numbered as `lirah tabs`
+    // lists them (the master terminal is not one of them), and its master.
+    const scope = (sessionId) => {
+      const { tabs, activeWorkspaceId } = live.current.tabManager;
+      const ws = callerTab(tabs, sessionId)?.workspaceId || activeWorkspaceId;
+      const own = tabs.filter((t) => t.workspaceId === ws && !t.master);
+      return { tabs: own, master: masterTabOf(tabs, ws) };
+    };
+    // A worker tab of the caller's workspace, never the caller itself.
+    const worker = (ref, sessionId) => {
+      const tab = target(scope(sessionId).tabs, ref, sessionId);
+      if (tab.id === callerTab(live.current.tabManager.tabs, sessionId)?.id) throw new Error("that's this tab; pick another one");
+      return tab;
+    };
+    const lastReply = (tab) => {
+      const path = getAgentTranscript(getTabSession(tab.id)) || getTabTranscript(tab.id);
+      return path ? invoke('last_assistant_text', { transcriptPath: path }).catch(() => null) : null;
+    };
 
     const projectScope = async (sessionId) => {
       const tab = callerTab(live.current.tabManager.tabs, sessionId);
       if (!tab) throw new Error("can't tell which tab this is; pass --global for the global list");
       return (await resolveRepoRoot(tab.projectPath).catch(() => null)) || tab.projectPath;
     };
-    const taskScope = (args, sessionId) => (args.global === true ? GLOBAL : projectScope(sessionId));
-    const where = (scope) => (scope === GLOBAL ? 'the global list' : scope);
+    // Tasks are kept per workspace: the caller tab's workspace, or the global list.
+    const workspaceScope = (sessionId) => {
+      const tab = callerTab(live.current.tabManager.tabs, sessionId);
+      if (!tab?.workspaceId) throw new Error("can't tell which tab this is; pass --global for the global list");
+      return tab.workspaceId;
+    };
+    const taskScope = async (args, sessionId) => (args.global === true ? GLOBAL : workspaceScope(sessionId));
+    const where = (scope) => (scope === GLOBAL ? 'the global list' : 'this workspace');
     // [scope, task] for an id from `lirah tasks`, in the list --global picks.
     const findTask = async (args, id, sessionId) => {
       if (!id) throw new Error('missing task id (see `lirah tasks`)');
@@ -121,6 +151,7 @@ export function useAgentControl() {
       return {
         index, id: plan.id, title: plan.title || '(untitled)', done, total,
         split: plan.split, autopilot: plan.autopilot?.status || 'off', file: plan.importedFrom?.path || null,
+        stage: planStage(plan), pr: plan.pr ?? null, merged: plan.merged ?? null,
       };
     };
 
@@ -230,20 +261,89 @@ export function useAgentControl() {
 
       // Tabs. <tab> is ".", a 1-based index, an id or a name (see resolveTab).
       'tabs.list': (args, positional, { sessionId }) => {
-        const { tabs, activeTabId } = live.current.tabManager;
-        return listTabs(tabs, activeTabId, live.current.bookmarks, callerTab(tabs, sessionId)?.id);
+        const { tabs } = scope(sessionId);
+        return listTabs(tabs, live.current.tabManager.activeTabId, live.current.bookmarks, callerTab(tabs, sessionId)?.id);
       },
-      'tabs.open': async (args, [path = args.path]) => {
+      'tabs.master': (args, positional, { sessionId }) => {
+        const { master } = scope(sessionId);
+        if (!master) return 'this workspace has no master terminal open (the crown in the Workspace pane opens it)';
+        return master.id === callerTab(live.current.tabManager.tabs, sessionId)?.id
+          ? 'you are this workspace\'s master: the tabs in `lirah tabs` are your workers'
+          : 'you are a worker tab; this workspace\'s master terminal is open';
+      },
+      'tabs.note': (args, [ref = args.tab, ...words], { sessionId }) => {
+        const tab = target(scope(sessionId).tabs, ref, sessionId);
+        const note = (words.length ? words.join(' ') : String(args.note ?? '')).trim();
+        live.current.tabManager.setTabNote(tab.id, note);
+        return note ? `${name(tab)}: ${note}` : `cleared the note of ${name(tab)}`;
+      },
+      'tabs.show': async (args, [ref = args.tab], { sessionId }) => {
+        const { tabs } = scope(sessionId);
+        const tab = target(tabs, ref, sessionId);
+        const branch = await invoke('get_current_branch', { repoPath: tab.projectPath }).catch(() => null);
+        const reply = await lastReply(tab);
+        return {
+          index: tabs.indexOf(tab) + 1, name: name(tab), path: tab.projectPath, note: tab.note || null,
+          role: tab.role || null, branch,
+          agent: getAgentHookState(getTabSession(tab.id))?.state || null,
+          lastReply: reply && reply.length > 400 ? `${reply.slice(0, 400)}…` : reply,
+        };
+      },
+      // Pastes a prompt into a worker tab's agent without switching to it; a
+      // tab never shown boots in the background first.
+      'tabs.send': async (args, [ref = args.tab, ...words], { sessionId }) => {
+        const tab = worker(ref, sessionId);
+        const text = (words.length ? words.join(' ') : String(args.prompt ?? '')).trim();
+        if (!text) throw new Error('missing prompt');
+        const agentUp = () => getTabPrompt(tab.id) && getAgentHookState(getTabSession(tab.id));
+        if (!agentUp()) {
+          if (getTabSession(tab.id) && !tab.background) {
+            throw new Error(`${name(tab)} has no agent running; start one there first`);
+          }
+          live.current.tabManager.wakeTab(tab.id);
+          const until = Date.now() + 45_000;
+          while (!agentUp()) {
+            if (Date.now() > until) throw new Error(`${name(tab)}'s agent didn't start in 45 s`);
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        }
+        sentAt.set(tab.id, Date.now());
+        await getTabPrompt(tab.id).send(text);
+        return `sent to ${name(tab)}; \`lirah tabs wait ${scope(sessionId).tabs.indexOf(tab) + 1}\` for its reply`;
+      },
+      // Waits for the worker's turn (since the last send) to end, then gives its
+      // last reply. Under the app's 60 s limit; the caller loops on "working".
+      'tabs.wait': async (args, [ref = args.tab], { sessionId }) => {
+        const tab = worker(ref, sessionId);
+        const limit = Math.min(Number(args.timeout) || 50, 55) * 1000;
+        const since = sentAt.get(tab.id) || 0;
+        const settled = () => {
+          const s = getAgentHookState(getTabSession(tab.id));
+          return s && (s.state === 'done' || s.state === 'waiting') && s.at > since;
+        };
+        if (!settled()) {
+          await new Promise((resolve) => {
+            const timer = setTimeout(done, limit);
+            const unsubscribe = subscribeAgentHooks(() => { if (settled()) done(); });
+            function done() { clearTimeout(timer); unsubscribe(); resolve(); }
+          });
+        }
+        const state = getAgentHookState(getTabSession(tab.id))?.state || null;
+        if (!settled()) return { done: false, state };
+        return { done: true, state, reply: await lastReply(tab) };
+      },
+      'tabs.open': async (args, [path = args.path], { sessionId }) => {
         const dir = await resolveTabPath(path);
         const launch = args.launch === true || args.launch === 'true';
-        const tab = live.current.tabManager.addTab(dir, { launch });
-        if (!tab) throw new Error(`tab limit reached (${MAX_TABS}); close a tab first`);
+        // A tab the master opens for a worker stays in the background.
+        const fromMaster = !!callerTab(live.current.tabManager.tabs, sessionId)?.master;
+        const tab = live.current.tabManager.addTab(dir, { launch, focus: !fromMaster });
         live.current.toast.info(`Claude opened a tab in ${tab.label}${launch ? ' and is starting its agent' : ''}`);
         return `opened ${tab.label} (${tab.id})${launch ? ', launching its agent' : ''}`;
       },
       'tabs.close': async (args, [ref = args.tab], { sessionId, later }) => {
         const { tabs, confirmCloseTab, removeTab } = live.current.tabManager;
-        const tab = target(tabs, ref, sessionId);
+        const tab = target(scope(sessionId).tabs, ref, sessionId);
         if (tabs.length < 2) throw new Error("can't close the last tab");
         if (!(await confirmCloseTab(tab.id))) throw new Error('denied by user');
         // Close after replying: closing the caller's own tab ends the CLI waiting on it.
@@ -252,14 +352,14 @@ export function useAgentControl() {
       },
       'tabs.rename': (args, [ref = args.tab, ...words], { sessionId }) => {
         const { tabs, renameTab } = live.current.tabManager;
-        const tab = target(tabs, ref, sessionId);
+        const tab = target(scope(sessionId).tabs, ref, sessionId);
         const label = (words.length ? words.join(' ') : String(args.name ?? '')).trim();
         renameTab(tab.id, label);
         return label ? `renamed ${tab.label} → ${label}` : `${tab.label} is back to its automatic name`;
       },
       'tabs.focus': (args, [ref = args.tab], { sessionId }) => {
         const { tabs, switchTab } = live.current.tabManager;
-        const tab = target(tabs, ref, sessionId);
+        const tab = target(scope(sessionId).tabs, ref, sessionId);
         switchTab(tab.id);
         return `focused ${name(tab)}`;
       },
@@ -324,14 +424,31 @@ export function useAgentControl() {
         const existing = (await getPlans(repo)).find((p) => p.importedFrom?.path === path);
         if (existing?.importedFrom.hash === importedFrom.hash) return `already imported as ${existing.id}`;
         let id;
-        if (existing && !planStarted(existing)) {
-          replaceSource(repo, existing.id, { source, importedFrom });
+        if (existing) {
+          replaceSource(repo, existing.id, { source, importedFrom }); // keeps the chunks already done
           id = existing.id;
         } else {
-          id = await createPlan(repo, { source, importedFrom });
+          id = await createPlan(repo, { source, importedFrom, workspaceId: callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId });
         }
         live.current.toast.info(`Claude imported plan ${path.split('/').pop()}`);
         return `${existing && id === existing.id ? 'updated' : 'imported'} ${id}; splitting into chunks (see \`lirah plans show ${id}\`)`;
+      },
+      // The plan's file and what to change in it, for the calling agent to edit; then plans.rechunk.
+      'plans.revise': async (args, [ref = args.plan, ...words], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plan = findPlan(await live.current.plans.getPlans(repo), ref);
+        const notes = words.join(' ').trim() || String(args.notes ?? '').trim();
+        if (!notes) throw new Error('say what should change: lirah plans revise <plan> <notes>');
+        const path = await live.current.plans.ensurePlanFile(repo, plan.id);
+        return `${buildPlanRevisePrompt(plan, notes, path)}\n\nWhen the file is updated, run \`lirah plans rechunk ${plan.id}\`.`;
+      },
+      // As the pane's re-chunk: the plan's file as it is now, the chunks already done kept.
+      'plans.rechunk': async (args, [ref = args.plan], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const plan = findPlan(await live.current.plans.getPlans(repo), ref);
+        await live.current.plans.rechunk(repo, plan.id);
+        live.current.toast.info(`Claude re-chunked ${plan.title || 'a plan'}`);
+        return `re-chunking ${plan.id} (see \`lirah plans show ${plan.id}\`)`;
       },
       // As the pane's "mark done": commits since the chunk started win, else it's done with nothing to commit.
       'plans.done': async (args, [planRef = args.plan, chunkRef = args.chunk], { sessionId }) => {
@@ -403,7 +520,10 @@ export function useAgentControl() {
           confirmLabel: 'Start job',
         });
         if (!ok) throw new Error('denied by user');
-        const id = await live.current.jobs.launchJob({ cli, prompt, label, repoPath: repo, useWorktree: true });
+        const id = await live.current.jobs.launchJob({
+          cli, prompt, label, repoPath: repo, useWorktree: true,
+          workspaceId: callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId,
+        });
         live.current.toast.info(`Claude started job "${label}"`);
         return `started job ${id} (${cli}) in ${repo}; follow it with \`lirah jobs show ${id}\``;
       },
@@ -466,7 +586,7 @@ export function useAgentControl() {
         const scope = await taskScope(args, sessionId);
         const tasks = await live.current.tasks.getTasks(scope);
         return {
-          scope: scope === GLOBAL ? 'global' : scope,
+          scope: scope === GLOBAL ? 'global' : 'workspace',
           tasks: tasks.map(({ id, title, notes, status }) => ({ id, title, notes, status })),
         };
       },
@@ -475,6 +595,7 @@ export function useAgentControl() {
         if (args.notes !== undefined) fields.notes = [fields.notes, String(args.notes)].filter(Boolean).join('\n\n');
         if (!fields.title) throw new Error('missing title: lirah tasks add <title> [--notes N] [--global]');
         const scope = await taskScope(args, sessionId);
+        if (scope !== GLOBAL) fields.repos = [await projectScope(sessionId)];
         const id = await live.current.tasks.addTask(scope, fields);
         live.current.toast.info(`Claude added task "${fields.title}"`);
         return `added task ${id} to ${where(scope)}`;
@@ -520,9 +641,9 @@ export function useAgentControl() {
       // Between this tab's project list and the global list; --global moves from global.
       'tasks.move': async (args, [id = args.id], { sessionId }) => {
         const [from, task] = await findTask(args, id, sessionId);
-        const to = from === GLOBAL ? await projectScope(sessionId) : GLOBAL;
+        const to = from === GLOBAL ? workspaceScope(sessionId) : GLOBAL;
         await live.current.tasks.moveToScope(from, to, id);
-        live.current.toast.info(`Claude moved "${task.title}" to ${to === GLOBAL ? 'global tasks' : 'this project'}`);
+        live.current.toast.info(`Claude moved "${task.title}" to ${to === GLOBAL ? 'global tasks' : 'this workspace'}`);
         return `moved ${id} to ${where(to)}`;
       },
     };

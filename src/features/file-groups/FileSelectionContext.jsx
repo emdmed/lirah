@@ -3,9 +3,10 @@ import { getRelativePath, basename } from '../../utils/pathUtils';
 
 const FileSelectionContext = createContext(undefined);
 
-export function FileSelectionProvider({ children }) {
-  const [selectedFiles, setSelectedFiles] = useState(new Set());
-  const [fileStates, setFileStates] = useState(new Map());
+// initialFiles: [{ path, state }] to start with, e.g. a restored draft.
+export function FileSelectionProvider({ children, initialFiles = [] }) {
+  const [selectedFiles, setSelectedFiles] = useState(() => new Set(initialFiles.map((f) => f.path)));
+  const [fileStates, setFileStates] = useState(() => new Map(initialFiles.map((f) => [f.path, f.state])));
 
   // These will be set by App once fileSymbols hook is ready
   const [symbolCallbacks, setSymbolCallbacks] = useState(null);

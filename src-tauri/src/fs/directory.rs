@@ -95,62 +95,97 @@ fn resolve_dir(path: Option<String>) -> Result<PathBuf, String> {
     }
 }
 
-#[tauri::command]
-pub async fn read_directory(
-    path: Option<String>,
-    state: tauri::State<'_, AppState>,
-) -> Result<Arc<Vec<DirectoryEntry>>, String> {
-    let state = state.inner().clone();
-    crate::ipc::blocking("read_directory", move || {
-        let dir_path = resolve_dir(path)?;
-
-        let cached = state
-            .lock()
-            .map_err(|e| format!("Failed to lock state: {}", e))?
-            .directory_cache
-            .get(&dir_path);
-        if let Some(cached) = cached {
-            return Ok(cached);
+/// One level of `dir`. With `gitignore`, entries matched by .gitignore (also
+/// those in parent folders up to the repo root), .ignore and git excludes are
+/// left out, as are `IGNORE_DIRS`; that is the file tree's view. Without it,
+/// every entry is listed, for callers that read ignored folders on purpose.
+fn list_dir(dir: &Path, gitignore: bool) -> Result<Vec<DirectoryEntry>, String> {
+    let mut result = Vec::new();
+    let mut push = |path: PathBuf, is_dir: bool| {
+        // Skip editor temp/backup files and atomic-write temp files
+        if !is_dir && should_ignore_file(&path) {
+            return;
         }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+        if gitignore && is_dir && IGNORE_DIRS.contains(&name.as_str()) {
+            return;
+        }
+        result.push(DirectoryEntry {
+            name,
+            path: path.to_string_lossy().to_string(),
+            is_dir,
+        });
+    };
 
+    if gitignore {
+        // Fail like fs::read_dir on a missing or unreadable folder; the walker
+        // would only report that as a per-entry error.
+        fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
+        let walker = ignore::WalkBuilder::new(dir)
+            .max_depth(Some(1))
+            .hidden(false)
+            .follow_links(true)
+            .build();
+        for entry in walker {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(err) => {
+                    eprintln!("Warning: Failed to read entry: {}", err);
+                    continue;
+                }
+            };
+            if entry.depth() == 0 {
+                continue;
+            }
+            let is_dir = entry.file_type().is_some_and(|t| t.is_dir());
+            push(entry.into_path(), is_dir);
+        }
+    } else {
         let entries =
-            fs::read_dir(&dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
-
-        let mut result = Vec::new();
-
+            fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
             let metadata = entry
                 .metadata()
                 .map_err(|e| format!("Failed to read metadata: {}", e))?;
-            let path = entry.path();
+            push(entry.path(), metadata.is_dir());
+        }
+    }
 
-            // Skip editor temp/backup files and atomic-write temp files
-            if !metadata.is_dir() && should_ignore_file(&path) {
-                continue;
-            }
+    sort_entries(&mut result, |e| e.is_dir, |e| &e.name);
+    Ok(result)
+}
 
-            let name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("Unknown")
-                .to_string();
+#[tauri::command]
+pub async fn read_directory(
+    path: Option<String>,
+    gitignore: Option<bool>,
+    state: tauri::State<'_, AppState>,
+) -> Result<Arc<Vec<DirectoryEntry>>, String> {
+    let state = state.inner().clone();
+    crate::ipc::blocking("read_directory", move || {
+        let dir_path = resolve_dir(path)?;
+        let gitignore = gitignore.unwrap_or(false);
 
-            result.push(DirectoryEntry {
-                name,
-                path: path.to_string_lossy().to_string(),
-                is_dir: metadata.is_dir(),
-            });
+        let cached = state
+            .lock()
+            .map_err(|e| format!("Failed to lock state: {}", e))?
+            .directory_cache
+            .get(&dir_path, gitignore);
+        if let Some(cached) = cached {
+            return Ok(cached);
         }
 
-        sort_entries(&mut result, |e| e.is_dir, |e| &e.name);
-
-        let result = Arc::new(result);
+        let result = Arc::new(list_dir(&dir_path, gitignore)?);
         state
             .lock()
             .map_err(|e| format!("Failed to lock state: {}", e))?
             .directory_cache
-            .set(dir_path, result.clone());
+            .set(dir_path, gitignore, result.clone());
 
         Ok(result)
     })
@@ -343,6 +378,34 @@ mod tests {
         assert_eq!(cut.entries.len(), 4);
         assert!(cut.entries.iter().all(|e| e.depth <= 2));
         assert!(cut.entries[0].is_dir);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn list_dir_respects_gitignore_and_lists_one_level() {
+        let root = std::env::temp_dir().join(format!("nevo-list-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        // .gitignore only applies inside a git repo; a bare .git folder is enough.
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::create_dir_all(root.join("ignored/sub")).unwrap();
+        fs::create_dir_all(root.join("src/deep")).unwrap();
+        fs::create_dir_all(root.join("node_modules")).unwrap();
+        fs::write(root.join(".gitignore"), "ignored/\n*.log\n").unwrap();
+        fs::write(root.join("app.log"), "x").unwrap();
+        fs::write(root.join("README.md"), "x").unwrap();
+        fs::write(root.join("src/ignored.log"), "x").unwrap();
+        fs::write(root.join("src/main.rs"), "x").unwrap();
+
+        let names = |dir: &Path, gi: bool| -> Vec<String> {
+            list_dir(dir, gi).unwrap().into_iter().map(|e| e.name).collect()
+        };
+        assert_eq!(names(&root, true), ["src", "README.md", ".gitignore"]);
+        // Parent .gitignore rules apply when listing a subfolder.
+        assert_eq!(names(&root.join("src"), true), ["deep", "main.rs"]);
+        // Unfiltered mode lists everything.
+        assert!(names(&root, false).contains(&"ignored".to_string()));
+        assert!(list_dir(&root.join("missing"), true).is_err());
 
         let _ = fs::remove_dir_all(&root);
     }

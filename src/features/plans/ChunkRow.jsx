@@ -12,6 +12,7 @@ import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAut
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { useToast } from '../toast';
+import { useDialogStore } from '../dialogs/DialogProvider';
 import { basename } from '../../utils/pathUtils';
 
 const CHUNK_LAMP = {
@@ -78,6 +79,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   const { repoRoot } = pane;
   const { updateChunk, moveChunk, deleteChunk, restoreChunk } = usePlansActions();
   const toast = useToast();
+  const dialogs = useDialogStore();
   const busy = useBusy(BUSY.chunk(chunk.id));
   const isNext = chunk.id === nextChunkId(plan);
   const first = plan.chunks[0]?.id === chunk.id;
@@ -108,6 +110,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   // The one action the diagnosis recommends: commit a dirty tree, mark a clean one done.
   const recommend = stuck && dirty ? (dirty.length > 0 ? 'commit' : 'done') : null;
   const lamp = chunkLamp(chunk);
+  const latestPrompt = chunk.prompts?.at(-1);
 
   const startEdit = () => {
     setDraft({ title: chunk.title, details: chunk.details });
@@ -386,6 +389,18 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
                 )}
                 {chunk.commits?.length > 0 && (
                   <Spec label="commits"><CommitList chunk={chunk} /></Spec>
+                )}
+                {latestPrompt && (
+                  <Spec label="prompt">
+                    <button
+                      type="button"
+                      onClick={() => dialogs.open('markdown', { filePath: latestPrompt.file }, null)}
+                      className="text-left text-[11px] text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground"
+                      title={latestPrompt.file}
+                    >
+                      {latestPrompt.kind}{chunk.prompts.length > 1 && <span className="text-muted-foreground"> · latest of {chunk.prompts.length}</span>}
+                    </button>
+                  </Spec>
                 )}
               </dl>
             </>

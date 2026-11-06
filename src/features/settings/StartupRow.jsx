@@ -2,22 +2,23 @@ import { X } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useToast } from '../toast';
 import { addStartupProject, removeStartupProject, setStartupMode } from '../agent-control/actions';
-import { useSetting } from './settingsStore';
+import { getOverride, setOverride, useSetting } from './settingsStore';
 import { SETTINGS_ROW } from './settingsSections';
-import { InlineChoice, Row, SubRows } from './parts';
+import { InlineChoice, Row, ScopeLine, SubRows } from './parts';
 
 const MODE_OPTIONS = [
   { value: 'restore', label: 'Restore last tabs' },
   { value: 'projects', label: 'Open startup projects' },
 ];
+const modeLabel = (v) => MODE_OPTIONS.find((o) => o.value === v)?.label ?? v;
 
 /**
  * What opens at launch: the mode, and the startup projects. Same actions and
  * stored values as `lirah startup`, so both always agree.
  */
-export function StartupRow({ projectPath }) {
+export function StartupRow({ projectPath, workspaceId }) {
   const toast = useToast();
-  const [mode] = useSetting('startupMode');
+  const [mode] = useSetting('startupMode', workspaceId);
   const [projects] = useSetting('startupProjects');
   const current = projectPath?.replace(/\/+$/, '') || '';
   const listed = projects.some((p) => p.path === current);
@@ -25,6 +26,10 @@ export function StartupRow({ projectPath }) {
   const run = (fn) => Promise.resolve().then(fn).catch((e) => toast.error(e?.message || String(e)));
   const add = () => run(() => addStartupProject(current));
   const remove = (path) => run(() => removeStartupProject(path));
+  // With a workspace override the choice edits it; else the shared action (`lirah startup`).
+  const setMode = (m) => (workspaceId && getOverride(workspaceId, 'startupMode') !== undefined
+    ? setOverride(workspaceId, 'startupMode', m)
+    : run(() => setStartupMode(m)));
 
   const hint = mode === 'projects' && projects.length === 0
     ? 'No startup projects yet, so the last tabs still restore.'
@@ -37,7 +42,8 @@ export function StartupRow({ projectPath }) {
       sectionId="agent"
       label={SETTINGS_ROW.startup.label}
       hint={hint}
-      control={<InlineChoice label="Startup mode" value={mode} options={MODE_OPTIONS} onChange={(m) => run(() => setStartupMode(m))} />}
+      control={<InlineChoice label="Startup mode" value={mode} options={MODE_OPTIONS} onChange={setMode} />}
+      scope={<ScopeLine workspaceId={workspaceId} settingKey="startupMode" label="Startup mode" format={modeLabel} />}
     >
       {mode === 'projects' && (
         <SubRows className="flex flex-col gap-1">

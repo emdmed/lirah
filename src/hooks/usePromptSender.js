@@ -31,9 +31,6 @@ export function usePromptSender({
   setTextareaContent,
   clearFileSelection,
   clearSelectedElements,
-  selectedPatterns,
-  getPatternInstructions,
-  clearPatterns,
   clearSelectedTemplate,
   linkedRepos,
   clearLinkedRepos,
@@ -56,8 +53,6 @@ export function usePromptSender({
       getLineCount,
       getViewModeLabel,
       selectedElements,
-      selectedPatterns,
-      getPatternInstructions,
       linkedRepos,
     });
 
@@ -104,8 +99,7 @@ export function usePromptSender({
     }
 
     if (clearSelectedTemplate) clearSelectedTemplate();
-    if (clearPatterns) clearPatterns();
-  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, terminalRef, setTextareaContent, clearFileSelection, selectedPatterns, getPatternInstructions, clearPatterns, clearSelectedTemplate, linkedRepos, clearLinkedRepos, toastError]);
+  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, terminalRef, setTextareaContent, clearFileSelection, clearSelectedTemplate, linkedRepos, clearLinkedRepos, toastError]);
 
   return sendPrompt;
 }

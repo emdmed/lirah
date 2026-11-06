@@ -94,8 +94,6 @@ export function buildPrompt({
   getLineCount,
   getViewModeLabel,
   selectedElements,
-  selectedPatterns,
-  getPatternInstructions,
   linkedRepos,
 }) {
   const files = selectedFiles || new Set();
@@ -164,18 +162,6 @@ export function buildPrompt({
         id: 'template',
         label: `TEMPLATE · ${template.title}`,
         body: template.content,
-      });
-    }
-  }
-
-  if (selectedPatterns && selectedPatterns.size > 0) {
-    const instructions = getPatternInstructions();
-    if (instructions) {
-      sections.push({
-        id: 'patterns',
-        label: 'PATTERNS',
-        body: instructions,
-        count: selectedPatterns.size,
       });
     }
   }

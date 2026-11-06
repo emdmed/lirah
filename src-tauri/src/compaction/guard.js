@@ -13,6 +13,7 @@
 // down where those hooks are installed. Any failure lets the call through.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,7 +23,7 @@ const CAP_CHARS = 300;
 
 const ARTIFACT_RE = /compacted_[^\s'"]*\.md|compacted_\*/;
 // Files that aren't code: config, docs, lockfiles. Reading them needs no index.
-const SAFE_PATH_RE = /(\.orchestration\/|\.patterns\/|CLAUDE\.md$)|\.(json|ya?ml|toml|md|txt|env|lock|config|gitignore|eslintrc|prettierrc)$/;
+const SAFE_PATH_RE = /(\.orchestration\/|CLAUDE\.md$)|\.(json|ya?ml|toml|md|txt|env|lock|config|gitignore|eslintrc|prettierrc)$/;
 const SOURCE_EXT = 'tsx?|jsx?|mjs|cjs|mts|cts|cs|py|rs|go|vue|svelte|css|scss|sass|less|html|sh|java|kt|rb|php|swift|c|cc|cpp|h|hpp';
 const NAMES_SOURCE_RE = new RegExp(`\\.(${SOURCE_EXT})(['"\`:)]|\\s|$)`);
 const GENERIC_TERMS = new Set(('get set add new data info item items list value values name names type types file files path paths id ids key keys util utils '
@@ -109,7 +110,7 @@ export function notReadOnly(cmd) {
 // file, or a recursive search of the tree. A grep fed by a pipe reads stdin.
 export function bashReadsSource(cmd) {
   for (const raw of splitSegments(cmd)) {
-    if (/\.orchestration\/|\.patterns\/|compacted_/.test(raw)) continue;
+    if (/\.orchestration\/|compacted_/.test(raw)) continue;
     const piped = raw.startsWith('|');
     const { s, verb } = verbOf(raw);
     if (verb === 'git') { if (/^git(\s+-C\s+\S+)?\s+grep/.test(s)) return true; continue; }
@@ -187,7 +188,7 @@ export function decide(input, env) {
 
   if (tool === 'Glob') {
     const pattern = ti.pattern || '';
-    if (unlocked || /\.orchestration|\.patterns/.test(`${pattern} ${ti.path || ''}`) || SAFE_PATH_RE.test(pattern)) return;
+    if (unlocked || /\.orchestration/.test(`${pattern} ${ti.path || ''}`) || SAFE_PATH_RE.test(pattern)) return;
     return deny(GATE);
   }
 
@@ -225,7 +226,11 @@ export function decide(input, env) {
   }
 }
 
+// Settings → Compaction hook, read per call so the switch needs no relaunch.
+const switchedOff = () => { try { return JSON.parse(readFileSync(join(homedir(), '.lirah', 'settings.json'), 'utf8')).compactionHook === false; } catch { return false; } };
+
 async function main() {
+  if (switchedOff()) return;
   let raw = '';
   for await (const chunk of process.stdin) raw += chunk;
   decide(JSON.parse(raw || '{}'), process.env);

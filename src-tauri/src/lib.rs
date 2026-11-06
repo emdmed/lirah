@@ -19,6 +19,7 @@ mod util;
 mod compaction;
 mod user_plugins;
 mod persistence;
+mod store;
 
 use tauri::Manager;
 
@@ -177,11 +178,11 @@ pub fn run(initial_path: Option<String>) {
             fs::git::get_file_watchers_status,
             fs_watcher::start_fs_watcher,
             fs_watcher::stop_fs_watcher,
+            fs_watcher::start_lirah_watcher,
             // Code
             typecheck::check_file_types,
             typecheck::check_project_types,
             python_parser::parse_python_skeleton,
-            compaction::get_compaction_plugin_dir,
             compaction::set_compaction_hook,
             // Git
             fs::git::get_git_stats,
@@ -201,8 +202,7 @@ pub fn run(initial_path: Option<String>) {
             claude::tokens::get_project_stats,
             claude::tokens::get_all_projects_stats,
             claude::context::get_context_breakdown,
-            agent_hooks::get_agent_hook_plugin_dir,
-            agent_hooks::get_agent_control_plugin_dir,
+            agent_hooks::install_base_plugin,
             user_plugins::install_user_plugin,
             agent_hooks::set_opencode_agent_plugin,
             agent_hooks::set_prompt_context,
@@ -217,6 +217,12 @@ pub fn run(initial_path: Option<String>) {
             plans::delete_plan_file,
             plans::remove_plan_workdir,
             plans::last_assistant_text,
+            plans::gh_pr_for_branch,
+            // ~/.lirah JSON store
+            store::store_read,
+            store::store_write,
+            store::store_delete,
+            store::store_list,
         ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

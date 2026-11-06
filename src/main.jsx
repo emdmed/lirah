@@ -20,6 +20,9 @@ import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { perfMark } from "./lib/perf";
 import { flushAll } from "./lib/persistence";
+import { initSettings } from "./features/settings/settingsStore";
+import { initWorkspaces } from "./lib/workspaceStore";
+import { runMigrations } from "./lib/migrations";
 
 // Imports are hoisted, so this marks the point where every module has been
 // evaluated — the JS parse/eval cost sits before it.
@@ -29,6 +32,11 @@ perfMark("app:start");
 const showKit = import.meta.env.DEV && new URLSearchParams(window.location.search).has("kit");
 // `?figs` (dev only) shows every FIG drawing with mock data; `&theme=<key>` picks the theme.
 const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");
+
+// Settings and workspaces come from ~/.lirah; every reader expects them loaded.
+await Promise.all([initSettings(), initWorkspaces()]);
+// Old per-repo task and plan files move into workspaces once, before the stores read them.
+await runMigrations();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -40,17 +48,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <BookmarksProvider>
             <PromptTemplatesProvider>
               <FileGroupsProvider>
-                <PinnedFilesProvider>
                   <AgentJobsProvider>
                     <TabProvider>
+                     <PinnedFilesProvider>
                       <PlansProvider>
                         <TasksProvider>
                           <App />
                         </TasksProvider>
                       </PlansProvider>
+                     </PinnedFilesProvider>
                     </TabProvider>
                   </AgentJobsProvider>
-                </PinnedFilesProvider>
               </FileGroupsProvider>
             </PromptTemplatesProvider>
           </BookmarksProvider>

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Nevo Terminal Installation Script
 # Usage: curl -fsSL https://raw.githubusercontent.com/emdmed/lirah/main/scripts/install.sh | bash
+# Local build: LIRAH_SOURCE=/path/to/checkout bash scripts/install.sh  (builds that tree as it is, no clone)
 # Note: This script requires bash (not sh/dash) due to bashisms like pipefail
 
 set -euo pipefail
@@ -285,6 +286,10 @@ install_from_source() {
 
     remove_stale_builds
 
+    if [ -n "${LIRAH_SOURCE:-}" ]; then
+        info "Building from local source in $LIRAH_SOURCE..."
+        cd "$LIRAH_SOURCE" || error "Cannot enter $LIRAH_SOURCE"
+    else
     # Build on disk, not in /tmp: on tmpfs (e.g. Omarchy) a ~2GB build tree hits the RAM-backed quota.
     BUILD_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/lirah-build"
     mkdir -p "$BUILD_ROOT"
@@ -296,6 +301,7 @@ install_from_source() {
     git clone --depth 1 --branch "$VERSION" "https://github.com/$REPO.git" "$BUILD_DIR/lirah" || error "Failed to clone repository"
 
     cd "$BUILD_DIR/lirah"
+    fi
 
     info "Installing npm dependencies..."
     npm install || error "Failed to install npm dependencies"
@@ -313,6 +319,8 @@ install_from_source() {
     INSTALL_DIR="$HOME/.local/bin"
     mkdir -p "$INSTALL_DIR"
 
+    # Remove first: copying over a running binary fails with "Text file busy"; the running app keeps its copy.
+    rm -f "$INSTALL_DIR/${APP_NAME}-bin"
     cp "$BINARY" "$INSTALL_DIR/${APP_NAME}-bin"
     chmod +x "$INSTALL_DIR/${APP_NAME}-bin"
 
@@ -683,6 +691,12 @@ main() {
 
     detect_arch
     detect_distro
+
+    # A local build has no release version, so `lirah update` will still install the next release.
+    if [ -n "${LIRAH_SOURCE:-}" ]; then
+        install_from_source
+        return
+    fi
 
     get_latest_version
 

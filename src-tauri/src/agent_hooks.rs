@@ -14,7 +14,7 @@
 //! - opencode: a global plugin that forwards session events the same way.
 //!
 //! The same Claude Code hook also carries the prompt box's selected context
-//! (files, elements, repos, template, patterns) into prompts typed straight
+//! (files, elements, repos, template) into prompts typed straight
 //! into the terminal: the frontend mirrors it to
 //! `<prompt context dir>/<session id>.md` and the hook adds that file to the
 //! prompt on UserPromptSubmit.
@@ -32,6 +32,7 @@ pub const SESSION_ENV: &str = "LIRAH_PTY_SESSION";
 pub const EVENTS_ENV: &str = "LIRAH_AGENT_EVENTS";
 pub const PROMPT_CONTEXT_ENV: &str = "LIRAH_PROMPT_CONTEXT";
 pub const CONTROL_ENV: &str = "LIRAH_CONTROL";
+pub const WORKSPACE_ENV: &str = "LIRAH_WORKSPACE";
 
 /// One payload line is a few hundred bytes; anything this large is not a hook
 /// payload and is skipped rather than buffered.
@@ -43,6 +44,7 @@ const HOOKS_PACKAGE_JSON: &str = "{\"type\":\"module\"}\n";
 /// The `lirah` CLI (an ES module, so its folder gets the same package.json)
 /// and the sh wrapper that puts it on PATH as `lirah`.
 const LIRAH_CLI_JS: &str = include_str!("lirah_cli.js");
+const LIRAH_FILES_JS: &str = include_str!("lirah_files.js");
 const LIRAH_SKILL_MD: &str = include_str!("lirah_skill.md");
 const LIRAH_WRAPPER: &str = "#!/bin/sh\nexec node \"$(dirname \"$0\")/lirah.js\" \"$@\"\n";
 
@@ -139,12 +141,6 @@ fn prompt_context_dir() -> Option<PathBuf> {
 
 fn claude_plugin_dir() -> Option<PathBuf> {
     crate::util::lirah_dir().map(|d| d.join("claude-plugin"))
-}
-
-/// The Claude Code plugin that ships the `lirah` skill. Separate from the
-/// agent-state plugin so each follows its own setting.
-fn control_plugin_dir() -> Option<PathBuf> {
-    crate::util::lirah_dir().map(|d| d.join("control").join("claude-plugin"))
 }
 
 fn cli_bin_dir() -> Option<PathBuf> {
@@ -264,51 +260,26 @@ fn install() -> Result<(), String> {
 
     install_cli(&lirah.join("bin")).map_err(|e| e.to_string())?;
 
-    let to_json = |v: serde_json::Value| serde_json::to_string_pretty(&v).map_err(|e| e.to_string());
-    install_control_plugin(&to_json)?;
+    // Left by builds that shipped the skill as a plugin of its own.
+    let _ = fs::remove_dir_all(lirah.join("control").join("claude-plugin"));
 
     let plugin = claude_plugin_dir().ok_or("No home directory")?;
-    let manifest = to_json(serde_json::json!({
-        "name": "lirah-agent-state",
+    let manifest = serde_json::to_string_pretty(&serde_json::json!({
+        "name": "lirah",
         "version": "1.0.0",
         "author": { "name": "Lirah" },
-        "description": "Reports agent state (working, needs permission, done) to the Lirah terminal running it."
-    }))?;
+        "description": "Lirah's hooks and skill: agent state, project compaction and the lirah command."
+    }))
+    .map_err(|e| e.to_string())?;
     write_if_changed(&plugin.join(".claude-plugin").join("plugin.json"), &manifest)
         .map_err(|e| e.to_string())?;
-    // The script runs in milliseconds; the timeout only bounds a wedged disk.
-    let command = serde_json::json!([{ "type": "command", "command": crate::util::node_command(&script), "timeout": 5 }]);
-    let hooks: serde_json::Map<String, serde_json::Value> = CLAUDE_EVENTS
-        .iter()
-        .map(|event| (event.to_string(), serde_json::json!([{ "hooks": command }])))
-        .collect();
-    let hooks_json = to_json(serde_json::json!({ "hooks": hooks }))?;
-    write_if_changed(&plugin.join("hooks").join("hooks.json"), &hooks_json)
-        .map_err(|e| e.to_string())?;
-
     Ok(())
-}
-
-/// The plugin that teaches Claude Code the `lirah` command, as a skill.
-fn install_control_plugin(
-    to_json: &dyn Fn(serde_json::Value) -> Result<String, String>,
-) -> Result<(), String> {
-    let plugin = control_plugin_dir().ok_or("No home directory")?;
-    let manifest = to_json(serde_json::json!({
-        "name": "lirah-control",
-        "version": "1.0.0",
-        "author": { "name": "Lirah" },
-        "description": "Teaches the agent to configure Lirah (settings, theme, tabs, startup) and add tasks with the lirah command."
-    }))?;
-    write_if_changed(&plugin.join(".claude-plugin").join("plugin.json"), &manifest)
-        .map_err(|e| e.to_string())?;
-    write_if_changed(&plugin.join("skills").join("lirah").join("SKILL.md"), LIRAH_SKILL_MD)
-        .map_err(|e| e.to_string())
 }
 
 /// The `lirah` CLI: `bin/lirah` runs `bin/lirah.js` with node.
 fn install_cli(bin: &Path) -> std::io::Result<()> {
     write_if_changed(&bin.join("lirah.js"), LIRAH_CLI_JS)?;
+    write_if_changed(&bin.join("lirah_files.js"), LIRAH_FILES_JS)?;
     write_if_changed(&bin.join("package.json"), HOOKS_PACKAGE_JSON)?;
     let wrapper = bin.join("lirah");
     write_if_changed(&wrapper, LIRAH_WRAPPER)?;
@@ -425,23 +396,60 @@ pub fn start(app: AppHandle) {
         .expect("failed to start agent-hooks thread");
 }
 
-/// The plugin directory the CLI launcher passes to Claude Code with
-/// `--plugin-dir`, so its hooks report to Lirah without touching the user's
-/// own settings.
-#[tauri::command]
-pub fn get_agent_hook_plugin_dir() -> Option<String> {
-    claude_plugin_dir()
-        .filter(|p| p.join("hooks").join("hooks.json").exists())
-        .map(|p| p.to_string_lossy().into_owned())
+/// Fold `add` (event -> matcher groups) into `hooks`, keeping both sides' groups.
+fn merge_hooks(hooks: &mut serde_json::Map<String, serde_json::Value>, add: serde_json::Value) {
+    let serde_json::Value::Object(add) = add else { return };
+    for (event, groups) in add {
+        let serde_json::Value::Array(groups) = groups else { continue };
+        if let serde_json::Value::Array(list) = hooks.entry(event).or_insert_with(|| serde_json::json!([])) {
+            list.extend(groups);
+        }
+    }
 }
 
-/// The plugin directory with the `lirah` skill, passed with `--plugin-dir`
-/// when the "Agent control" setting is on.
+/// Compose Lirah's one Claude Code plugin (~/.lirah/claude-plugin) and return
+/// its directory, or None when nothing is installed. Every hook is always in;
+/// each script reads its own switch (agentStateHook, compactionHook) from
+/// settings.json per call. The skill is no hook, so `agent_control` decides at
+/// launch whether it is in.
+fn write_base_plugin(agent_control: bool) -> Result<Option<String>, String> {
+    let plugin = claude_plugin_dir().ok_or("No home directory")?;
+    if !plugin.join(".claude-plugin").join("plugin.json").exists() {
+        return Ok(None); // startup install failed
+    }
+    let mut hooks = serde_json::Map::new();
+    let script = crate::util::lirah_dir().ok_or("No home directory")?.join("hooks").join("agent-state.js");
+    if script.exists() {
+        // The script runs in milliseconds; the timeout only bounds a wedged disk.
+        let command = serde_json::json!([{ "type": "command", "command": crate::util::node_command(&script), "timeout": 5 }]);
+        merge_hooks(&mut hooks, CLAUDE_EVENTS.iter().map(|e| (e.to_string(), serde_json::json!([{ "hooks": command }]))).collect());
+    }
+    if let Some(add) = crate::compaction::claude_hooks() {
+        merge_hooks(&mut hooks, add);
+    }
+    let skill = plugin.join("skills").join("lirah").join("SKILL.md");
+    if agent_control {
+        write_if_changed(&skill, LIRAH_SKILL_MD).map_err(|e| e.to_string())?;
+    } else {
+        let _ = fs::remove_dir_all(plugin.join("skills"));
+    }
+    let hooks_json = serde_json::to_string_pretty(&serde_json::json!({ "hooks": hooks })).map_err(|e| e.to_string())?;
+    let path = plugin.join("hooks").join("hooks.json");
+    if fs::read_to_string(&path).ok().as_deref() != Some(hooks_json.as_str()) {
+        fs::create_dir_all(plugin.join("hooks")).map_err(|e| e.to_string())?;
+        // Renamed into place so an agent starting at the same moment never reads half a file.
+        let tmp = plugin.join("hooks").join(format!(".hooks.json.{}", std::process::id()));
+        fs::write(&tmp, &hooks_json).and_then(|_| fs::rename(&tmp, &path)).map_err(|e| e.to_string())?;
+    }
+    Ok((!hooks.is_empty() || agent_control).then(|| plugin.to_string_lossy().into_owned()))
+}
+
+/// The base plugin directory the CLI launcher passes to Claude Code with one
+/// `--plugin-dir`, so Lirah's hooks and skill load without touching the
+/// user's own settings.
 #[tauri::command]
-pub fn get_agent_control_plugin_dir() -> Option<String> {
-    control_plugin_dir()
-        .filter(|p| p.join("skills").join("lirah").join("SKILL.md").exists())
-        .map(|p| p.to_string_lossy().into_owned())
+pub async fn install_base_plugin(agent_control: bool) -> Result<Option<String>, String> {
+    crate::ipc::blocking("install_base_plugin", move || write_base_plugin(agent_control)).await
 }
 
 #[cfg(test)]
@@ -450,6 +458,15 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use std::process::{Command, Stdio};
+
+    #[test]
+    fn merge_hooks_keeps_every_part_of_a_shared_event() {
+        let mut hooks = serde_json::Map::new();
+        merge_hooks(&mut hooks, serde_json::json!({ "UserPromptSubmit": [{ "hooks": [1] }], "Stop": [{ "hooks": [2] }] }));
+        merge_hooks(&mut hooks, serde_json::json!({ "UserPromptSubmit": [{ "hooks": [3] }] }));
+        assert_eq!(hooks["UserPromptSubmit"].as_array().unwrap().len(), 2);
+        assert_eq!(hooks["Stop"].as_array().unwrap().len(), 1);
+    }
 
     #[test]
     fn hook_logs_payload_without_tool_response() {

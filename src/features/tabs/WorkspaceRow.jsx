@@ -17,7 +17,7 @@ export function WorkspaceRow() {
     <span className="flex min-w-0 items-center gap-x-1 overflow-hidden text-[11px] leading-none normal-case tracking-normal">
       {workspaces.map((ws) => {
         const active = ws.id === activeWorkspaceId;
-        const count = tabs.filter((t) => t.workspaceId === ws.id).length;
+        const count = tabs.filter((t) => t.workspaceId === ws.id && !t.master).length;
         if (renamingId === ws.id) {
           return (
             <span key={ws.id} className="flex w-24">

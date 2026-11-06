@@ -1,13 +1,17 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its master tab (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
 ---
 
 # Configuring Lirah with the `lirah` command
 
 You are running inside a tab of Lirah, the terminal app. The `lirah` command on
-your PATH changes the app itself. Run it with the Bash tool. It only works from
-inside a Lirah tab.
+your PATH changes the app itself. Run it with the Bash tool.
+
+From a Lirah tab it talks to the app. Without the app (Lirah closed, or a shell
+it didn't start) some commands still work: they edit Lirah's files in ~/.lirah
+directly, and an open Lirah picks the change up within a second. See "Without
+the app" below.
 
 Always run `lirah settings list` before guessing a setting's key name. It
 prints every key with its current value, default, allowed values and a short
@@ -24,12 +28,20 @@ lirah settings reset <key>     put a setting back to its default
 lirah theme [list]             list themes (* marks the current one)
 lirah theme get                print the current theme
 lirah theme set <name>         switch theme (id or display name)
-lirah tabs [list]              list tabs (* active, > this tab)
+lirah tabs [list]              list this workspace's tabs (* active, > this tab)
 lirah tabs open <path> [--launch]
                                open a tab in <path>; --launch starts its agent
 lirah tabs close <tab>         close a tab (asks if its agent is busy)
 lirah tabs rename <tab> <name> rename a tab (empty name: automatic again)
 lirah tabs focus <tab>         switch to a tab
+lirah tabs master              whether you are the workspace's master (orchestrating) terminal
+lirah tabs note <tab> <text>   set a tab's one-line purpose (empty: clear it)
+lirah tabs show <tab>          a tab's note, branch, agent state and last reply
+lirah tabs send <tab> <prompt> send a prompt to a tab's agent without switching to it
+                               ("-" reads the prompt from stdin; boots the tab if needed)
+lirah tabs wait <tab> [--timeout 50]
+                               wait for its turn to end and print its last reply
+                               (exit 2 while still working: run it again)
 lirah startup                  show what opens at launch
 lirah startup mode restore|projects
                                reopen the last tabs, or open the startup projects
@@ -48,9 +60,13 @@ lirah tasks edit <id> [--title T] [--notes N]
 lirah tasks remove <id>        delete a task (the user can undo from a toast)
 lirah tasks move <id>          move between this project's list and the global list
                                task commands take --global to act on the global list
-lirah plans [list]             list this tab's repo plans and their progress
+lirah plans [list]             list this tab's repo plans, their progress and stage
+                               (planned, building, implemented, PR #N, merged)
 lirah plans show <plan>        a plan's chunks and their state
 lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+lirah plans revise <plan> <notes>
+                               the plan's file and a prompt to change it as asked
+lirah plans rechunk <plan>     split the plan again from its file; done chunks stay
 lirah plans done <plan> <chunk> [--result T]
                                mark the chunk in progress done; --result says what
                                was done when there's nothing to commit
@@ -78,6 +94,42 @@ needs `--all` again.
 Add `--json` to any command for machine-readable output. `lirah help` prints
 the full usage.
 
+## Orchestrating from the master terminal
+
+Each workspace has a master terminal, opened from the crown in the Workspace
+pane. It is not one of the tabs in `lirah tabs`; `lirah tabs master` tells you
+whether you are it. If you are, the user drives the workspace from here and the
+tabs are your workers:
+
+- Learn the workers first. For a tab with no NOTE, read its repo's AGENTS.md,
+  CLAUDE.md and README yourself (whichever exist), then save what it is for with
+  `lirah tabs note <tab> "<one line>"`. Ask the user only if it is still unclear.
+  Never send a worker a prompt just to find out what it is.
+- Dispatch with `lirah tabs send <tab> -` and the prompt on stdin (a heredoc).
+  Write a self-contained prompt: the worker hasn't seen this conversation.
+- Collect with `lirah tabs wait <tab>`. Exit 2 means it is still working: run it
+  again. Fan out to several tabs first, then wait on each. `lirah tabs show <tab>`
+  tells you what a worker is on.
+- Stay in the master: never `lirah tabs focus` unless the user asks. A tab you
+  open with `lirah tabs open` stays in the background too. Tell the
+  user what each worker did, from its reply.
+- If a wait reports a permission prompt, tell the user which tab needs them.
+
+## Without the app
+
+- Work offline: `settings` (list, get, and set/reset except the guarded keys:
+  sandbox, network isolation, the hooks and agent control), `theme`, `startup`,
+  `tasks list|add|done` and `plans list|show|import|revise|rechunk|done`.
+- Need the app: `tabs`, `jobs`, `tasks reopen|edit|remove|move`, `plans debug`,
+  `ping`, and setting the guarded keys. Offline they fail with "LIRAH_CONTROL is
+  unset" or "can't reach Lirah"; ask the user to run them from a Lirah tab.
+- Splitting an imported or re-chunked plan, and checking a chunk marked done,
+  happen in the app: right away if it is open with that repo's plans loaded,
+  else when it next loads them.
+- The workspace is `$LIRAH_WORKSPACE` (set in Lirah tabs), else the workspace with
+  a tab open on the deepest folder containing your current directory. The repo
+  is your current directory's.
+
 ## Notes
 
 - Errors go to stderr and exit 1. Read the message and fix the call; don't retry
@@ -93,6 +145,9 @@ the full usage.
 - Paths are resolved against your current directory.
 - After writing a `*_plan.md` the user wants run in Lirah, import it with
   `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
+- When the user wants a plan changed: `lirah plans revise <plan> "<what to change>"`,
+  edit only the file it names, then `lirah plans rechunk <plan>`. Don't implement
+  anything while revising.
 - When you finish the plan chunk you were sent, commit, then run
   `lirah plans done <plan> <chunk>`. With nothing to commit, pass `--result`.
 - When a plan looks stuck or broken, debug it:
@@ -105,7 +160,7 @@ the full usage.
   4. If it still can't be fixed, add one task with a short problem explanation:
      `lirah tasks add "Plan <title>: <the problem in a few words>" --notes "..."`,
      with notes saying what's wrong, what you tried, and the plan and chunk ids.
-     Tell the user. Don't edit Lirah's plans.json by hand.
+     Tell the user. Don't edit Lirah's plan files by hand.
 - Task ids come from `lirah tasks`. Only delete a task when the user asks.
 - Run `lirah tasks` before adding, so you don't add a task that's already there.
 - A task title is one line; put details in `--notes` (markdown is fine). Quote

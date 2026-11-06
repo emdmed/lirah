@@ -36,14 +36,17 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
     } finally {
       setBusy(null);
     }
-    if (done.length === 0) return;
-    toast.success(done.length === 1 ? `Imported ${done[0].name}` : `Imported ${plural(done.length, 'plan')}`, {
+    // A re-chunked plan keeps its file: it's what the next revision edits.
+    const imported = done.filter((f) => f.state !== 'changed');
+    if (done.length > imported.length) toast.success(`Re-chunking ${plural(done.length - imported.length, 'plan')}`);
+    if (imported.length === 0) return;
+    toast.success(imported.length === 1 ? `Imported ${imported[0].name}` : `Imported ${plural(imported.length, 'plan')}`, {
       duration: 10000, // long enough to decide on the delete
       action: {
-        label: done.length === 1 ? 'delete file' : `delete ${plural(done.length, 'file')}`,
+        label: imported.length === 1 ? 'delete file' : `delete ${plural(imported.length, 'file')}`,
         onClick: async () => {
           try {
-            for (const file of done) await deleteFile(file);
+            for (const file of imported) await deleteFile(file);
           } catch (e) {
             toast.error(`Could not delete: ${e?.message || e}`);
           }
@@ -67,7 +70,7 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-foreground" title={file.title || file.name}>{title || file.name}</span>
               <span className="truncate text-[11px] text-muted-foreground" title={file.path}>
-                {file.name}{changed && ' · changed since import'}
+                {file.name}{changed && ' · updated'}
               </span>
             </div>
             {busy === file.path ? (
@@ -77,9 +80,9 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
                 icon={FileDown}
                 onClick={() => run([file], file.path)}
                 disabled={!!busy}
-                title={changed ? 'Re-import and split again' : 'Import and split into chunks'}
+                title={changed ? 'Take the edited file and re-chunk what isn\'t done yet' : 'Import and split into chunks'}
               >
-                {changed ? 're-import' : 'import'}
+                {changed ? 're-chunk' : 'import'}
               </PanelButton>
             )}
           </div>

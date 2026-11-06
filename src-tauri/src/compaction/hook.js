@@ -10,6 +10,7 @@
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -300,5 +301,8 @@ async function main() {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
+// Settings → Compaction hook, read per call so the switch needs no relaunch.
+const switchedOff = () => { try { return JSON.parse(readFileSync(join(homedir(), '.lirah', 'settings.json'), 'utf8')).compactionHook === false; } catch { return false; } };
+
 // A hook that fails must never block the prompt.
-(process.argv[2] === '--session-start' ? sessionStart() : main()).catch(() => {}).finally(() => process.exit(0));
+(switchedOff() ? Promise.resolve() : process.argv[2] === '--session-start' ? sessionStart() : main()).catch(() => {}).finally(() => process.exit(0));

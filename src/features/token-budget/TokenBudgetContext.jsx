@@ -1,23 +1,18 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTokenUsageValue } from './tokenUsageStore';
 import { getStartOfDay, getStartOfWeek, formatTokenCount, formatCost, computeCostFromUsage } from './tokenCalculations';
 import { prepareChartData, prepareModelBreakdown, calculateEfficiencyMetrics } from './dashboardData';
 import { exportToCSV, exportToJSON } from './exportData';
 import { DEFAULT_MODEL } from '../../config/pricing';
-import { loadJson, saveJson } from '../../lib/storage';
+import { getWorkspaceData, setWorkspaceData } from '../../lib/workspaceStore';
 import { WARN_AT, FAULT_AT } from '../../components/instrument/gauge';
-
-const STORAGE_KEY = 'lirah:token-budgets:v1';
 
 const TokenBudgetContext = createContext(null);
 
-function loadFromStorage() {
-  const data = loadJson(STORAGE_KEY, null);
-  return data?.version === 1 ? data : { version: 1, budgets: {}, alertStates: {} };
-}
-
-function saveToStorage(data) {
-  saveJson(STORAGE_KEY, data);
+// Budgets and alert states per project path, saved in the workspace's workspace.json.
+function loadBudgets(workspaceId) {
+  const data = getWorkspaceData(workspaceId, 'budgets');
+  return { budgets: data?.budgets ?? {}, alertStates: data?.alertStates ?? {} };
 }
 
 const NO_USAGE = { total: 0, cost: 0 };
@@ -46,18 +41,13 @@ function budgetStatus(budgets, path, total) {
 // or project stats do. Live usage comes from `tokenUsageStore` (see
 // tokenUsageStore.js), subscribed to by useTokenBudget / useBudgetExhausted,
 // so a usage poll re-renders those readers and nothing else.
-export function TokenBudgetProvider({ children, tokenUsageStore, projectStats, projectPath }) {
-  const [storageData, setStorageData] = useState(loadFromStorage);
-  const saveTimeoutRef = useRef(null);
+export function TokenBudgetProvider({ children, workspaceId, tokenUsageStore, projectStats, projectPath }) {
+  const [storageData, setStorageData] = useState(() => loadBudgets(workspaceId));
 
+  // workspaceStore writes it (debounced by fileStore).
   const debouncedSave = useCallback((data) => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => saveToStorage(data), 300);
-  }, []);
-
-  useEffect(() => {
-    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, []);
+    setWorkspaceData(workspaceId, 'budgets', data);
+  }, [workspaceId]);
 
   const getBudget = useCallback((path) => {
     return storageData.budgets[path] || null;

@@ -61,7 +61,9 @@ export function useTaskPlanLinks(tasksByScope, updateTask, importTaskPlan) {
     for (const { scope, task } of linked) {
       const plan = findPlan(task);
       if (plan === undefined) continue;
-      if (plan && (task.planId !== plan.id || task.status !== TASK_STATUS.PLANNED)) {
+      if (plan?.merged) {
+        updateTask(scope, task.id, { status: TASK_STATUS.DONE, planId: plan.id }); // shipped
+      } else if (plan && (task.planId !== plan.id || task.status !== TASK_STATUS.PLANNED)) {
         updateTask(scope, task.id, { status: TASK_STATUS.PLANNED, planId: plan.id });
       } else if (!plan && task.planId) {
         updateTask(scope, task.id, { planId: null }); // the plan was deleted

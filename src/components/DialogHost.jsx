@@ -6,7 +6,6 @@ import { TAB_DIALOGS } from "../features/dialogs/registry";
 import { useDialogStore, useOpenDialogs } from "../features/dialogs/DialogProvider";
 import { DialogScopeContext } from "../features/dialogs/dialogStore";
 
-const ElementPickerDialog = lazyNamed(() => import("../features/file-analysis/ElementPickerDialog"), "ElementPickerDialog");
 const AutoCommitDialog = lazyNamed(() => import("../features/git/AutoCommitDialog"), "AutoCommitDialog");
 const AutoMergeDialog = lazyNamed(() => import("../features/git/AutoMergeDialog"), "AutoMergeDialog");
 
@@ -18,7 +17,7 @@ function WhenOpen({ open, children }) {
 // the registry; the rest are palettes kept mounted so they can animate out,
 // and dialogs driven by their own hook's stage.
 export function DialogHost(ctx) {
-  const { dialogs, elementPicker, autoCommit, autoMerge, currentPath } = ctx;
+  const { dialogs, autoCommit, autoMerge, currentPath } = ctx;
   const { scope, active } = useContext(DialogScopeContext);
   const store = useDialogStore();
   const open = useOpenDialogs(scope);
@@ -45,15 +44,6 @@ export function DialogHost(ctx) {
         onOpenChange={dialogs.setBookmarksPaletteOpen}
         onNavigate={ctx.navigateToBookmark}
       />
-      <WhenOpen open={elementPicker.elementPickerOpen}>
-        <ElementPickerDialog
-          open={elementPicker.elementPickerOpen}
-          onOpenChange={elementPicker.setElementPickerOpen}
-          filePath={elementPicker.elementPickerFilePath}
-          currentPath={currentPath}
-          onAddElements={elementPicker.handleAddElements}
-        />
-      </WhenOpen>
       <WhenOpen open={autoCommit.stage !== 'idle'}>
         <AutoCommitDialog autoCommit={autoCommit} />
       </WhenOpen>

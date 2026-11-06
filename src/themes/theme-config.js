@@ -1,3 +1,5 @@
+import { getSettings, setSetting } from '../features/settings/settingsStore';
+
 /**
  * Comprehensive theme configuration for Nevo Terminal
  * Includes both terminal (xterm.js) themes and UI (Tailwind) themes
@@ -1360,30 +1362,12 @@ export const themes = {
 
 export const defaultTheme = 'tokyo-night';
 
-/**
- * Get theme from localStorage or return default
- */
+/** The saved theme (settings.json's theme), or the default. */
 export function loadTheme() {
-  try {
-    const savedTheme = localStorage.getItem('nevo-theme');
-    if (savedTheme && themes[savedTheme]) {
-      return savedTheme;
-    }
-  } catch (error) {
-    console.warn('Failed to load theme from localStorage:', error);
-  }
-  return defaultTheme;
+  const saved = getSettings().theme;
+  return themes[saved] ? saved : defaultTheme;
 }
 
-/**
- * Save theme to localStorage
- */
 export function saveTheme(themeName) {
-  try {
-    if (themes[themeName]) {
-      localStorage.setItem('nevo-theme', themeName);
-    }
-  } catch (error) {
-    console.warn('Failed to save theme from localStorage:', error);
-  }
+  if (themes[themeName]) setSetting('theme', themeName);
 }

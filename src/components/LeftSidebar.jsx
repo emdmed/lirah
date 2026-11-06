@@ -38,11 +38,9 @@ export const LeftSidebar = memo(function LeftSidebar({
   onAddBookmark,
   onNavigateBookmark,
   hasTerminalSession,
-  onSendToTerminal,
   onViewDiff,
   onViewMarkdown,
   onGitChanges,
-  onOpenElementPicker,
   keepFilesAfterSend,
   onToggleKeepFiles,
   isActive = true,
@@ -60,7 +58,7 @@ export const LeftSidebar = memo(function LeftSidebar({
   // Destructure only needed fields from grouped props (fix #2: explicit dependencies)
   const { sidebarWidth, sidebarRef, isResizing, handleResizeStart } = sidebar;
   const { searchQuery, handleSearchClear } = search;
-  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, treeTruncated, displayedTreeData, expandedFolders, toggleFolder, collapseAllFolders, loadTreeData } = treeView;
+  const { showGitChangesOnly, handleToggleGitFilter, showMarkdownOnly, handleToggleMarkdownFilter, treeLoading, treeTruncated, treeData, displayedTreeData, expandedFolders, toggleFolder, collapseAllFolders, loadTreeData } = treeView;
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, getLevelTokens, setFileViewMode, VIEW_MODES } = fileSymbols;
 
@@ -135,13 +133,13 @@ export const LeftSidebar = memo(function LeftSidebar({
                 ) : (
                   <FileTree
                     nodes={displayedTreeData}
+                    allNodes={treeData}
                     searchQuery={searchQuery}
                     expandedFolders={expandedFolders}
                     currentPath={currentPath}
                     showGitChangesOnly={showGitChangesOnly}
                     showMarkdownOnly={showMarkdownOnly}
                     onToggle={toggleFolder}
-                    onSendToTerminal={onSendToTerminal}
                     onViewDiff={onViewDiff}
                     onViewMarkdown={onViewMarkdown}
                     selectedFiles={selectedFiles}
@@ -156,7 +154,6 @@ export const LeftSidebar = memo(function LeftSidebar({
                     onCheckFileTypes={checkFileTypes}
                     fileWatchingEnabled={fileWatchingEnabled}
                     onGitChanges={onGitChanges}
-                    onOpenElementPicker={onOpenElementPicker}
                     onClearSearch={handleSearchClear}
                     onToggleGitFilter={handleToggleGitFilter}
                     onToggleMarkdownFilter={handleToggleMarkdownFilter}

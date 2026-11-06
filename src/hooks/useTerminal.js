@@ -8,6 +8,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getTerminalSession, rememberTerminalSession, forgetTerminalSession } from '../lib/terminalSessions';
+import { workspaceOfTab } from '../lib/workspaceStore';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
@@ -327,10 +328,9 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     // Raw PTY bytes for this session only, in order — including whatever the
     // shell prints before spawn_terminal resolves. xterm decodes the UTF-8
     // itself, so sequences split across chunks need no special care.
-    const output = new Channel();
     let pendingBytes = 0;
     let paused = false;
-    output.onmessage = (buf) => {
+    const onOutput = (buf) => {
       if (cancelled) return;
       const bytes = new Uint8Array(buf);
       markTerminalOutput(id);
@@ -349,6 +349,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         invoke('pty_pause', { sessionId: id }).catch(() => {});
       }
     };
+    let output = new Channel(onOutput);
 
     const initTerminal = async () => {
       try {
@@ -364,7 +365,10 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
           : null;
         const reattached = !!result;
         if (!result) {
-          result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, output });
+          // A failed attach drops its end of the channel, which closes it on
+          // this side too, so the new shell needs a fresh one.
+          if (storedId) output = new Channel(onOutput);
+          result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, workspaceId: reattachKey ? workspaceOfTab(reattachKey) : null, output });
         }
         id = result.session_id;
         if (cancelled) {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
-import { planStarted } from './planModel';
 import { markdownTitle } from './planPrompts';
 
 // `overhaul_plan.md`, `smooth-improvements-plan.md`, `plan.md`.
@@ -66,7 +65,7 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
   const importFile = useCallback(async (file) => {
     const importedFrom = { path: file.path, hash: file.hash };
     const existing = file.planId && plans?.find((p) => p.id === file.planId);
-    if (existing && !planStarted(existing)) {
+    if (existing) {
       replaceSource(repoRoot, existing.id, { source: file.source, importedFrom });
     } else {
       await createPlan(repoRoot, { source: file.source, importedFrom });

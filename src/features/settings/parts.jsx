@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -6,6 +6,7 @@ import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { StepSlider } from '../../components/instrument/StepSlider';
 import { DialogGroup } from '../../components/ui/dialog';
 import { FilterContext, rowMatches, SECTIONS } from './settingsSections';
+import { getOverride, setOverride, subscribeSettings, useSetting } from './settingsStore';
 
 // A section's rows. While filtering, every section with a match is shown at
 // once, each under its own legend; otherwise only the active one.
@@ -48,7 +49,7 @@ export function Group({ label, sectionId, rows, children }) {
 // One setting. Label and inline control share a line joined by a dotted
 // leader, like a spec sheet; the hint sits under the label; wide controls
 // (choices, fields, lists) take the full width below.
-export function Row({ id, sectionId, label, hint, control, children, htmlFor }) {
+export function Row({ id, sectionId, label, hint, control, scope, children, htmlFor }) {
   const { query, filtering } = useContext(FilterContext);
   if (filtering) {
     const words = SECTIONS.find((s) => s.id === sectionId)?.rows[id] ?? '';
@@ -66,6 +67,7 @@ export function Row({ id, sectionId, label, hint, control, children, htmlFor }) 
         )}
       </div>
       {hint && <div className="text-[11px] leading-snug text-muted-foreground">{hint}</div>}
+      {scope}
       {children && <div className="pt-1">{children}</div>}
     </div>
   );
@@ -116,13 +118,14 @@ export function DraftField({ id, value, onCommit, multiline, fallback = '', ...p
 }
 
 /** A SETTINGS_ROWS toggle row. `hint` overrides the config's; children sit below. */
-export function ToggleRow({ row, value, onChange, hint = row.hint, disabled, tone, children }) {
+export function ToggleRow({ row, value, onChange, hint = row.hint, disabled, tone, scope, children }) {
   return (
     <Row
       id={row.id}
       sectionId={row.section}
       label={row.label}
       hint={hint}
+      scope={scope}
       control={<ToggleSwitch checked={value} onChange={onChange} disabled={disabled} tone={tone} label={row.label} />}
     >
       {children}
@@ -143,13 +146,14 @@ export function StepRow({ row, value, steps, onChange, warnFrom, hint = row.hint
  * A SETTINGS_ROWS one-of-n row. The choice sits on the label line, like a
  * switch. `hint` overrides the config's; children sit below.
  */
-export function ChoiceRow({ row, value, options, onChange, hint = row.hint, children }) {
+export function ChoiceRow({ row, value, options, onChange, hint = row.hint, scope, children }) {
   return (
     <Row
       id={row.id}
       sectionId={row.section}
       label={row.label}
       hint={hint}
+      scope={scope}
       control={<InlineChoice label={row.choiceLabel ?? row.label} value={value} options={options} onChange={onChange} />}
     >
       {children}
@@ -165,4 +169,36 @@ export function InlineChoice(props) {
 // Sub-settings under a row, set in by a hairline.
 export function SubRows({ className, children }) {
   return <div className={'pl-3 shadow-[inset_1px_0_0_var(--ins-edge)] ' + (className ?? '')}>{children}</div>;
+}
+
+const onOff = (v) => (v === true ? 'on' : v === false ? 'off' : String(v));
+
+/**
+ * Under an overridable row: a 'this workspace' switch (writes or removes the
+ * key in workspace.json `overrides`), the value in effect and where it comes
+ * from, and a reset while an override is set. `format` labels a value.
+ */
+export function ScopeLine({ workspaceId, settingKey, label, format = onOff }) {
+  const override = useSyncExternalStore(subscribeSettings, () => (workspaceId ? getOverride(workspaceId, settingKey) : undefined));
+  const [global] = useSetting(settingKey);
+  if (!workspaceId) return null;
+  const on = override !== undefined;
+  const reset = () => setOverride(workspaceId, settingKey, undefined);
+  return (
+    <div className="flex h-6 items-center gap-2 text-[11px] text-muted-foreground">
+      <ToggleSwitch
+        checked={on}
+        onChange={(next) => (next ? setOverride(workspaceId, settingKey, global) : reset())}
+        tone="lamp"
+        label={`${label}: this workspace only`}
+      />
+      <span className="shrink-0">this workspace</span>
+      <span aria-hidden="true" className="h-px flex-1 translate-y-[3px] border-b border-dotted border-[var(--ins-edge)]" />
+      <span className="min-w-0 truncate">
+        in effect <span className="text-foreground">{format(on ? override : global)}</span>
+        {on ? <> · all workspaces {format(global)}</> : ' · all workspaces'}
+      </span>
+      {on && <PanelButton className="text-xs" onClick={reset} aria-label={`Reset ${label} to all workspaces`}>reset</PanelButton>}
+    </div>
+  );
 }

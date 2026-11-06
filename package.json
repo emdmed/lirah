@@ -1,7 +1,7 @@
 {
   "name": "Lirah",
   "private": true,
-  "version": "0.12.0",
+  "version": "0.13.0",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
@@ -14,7 +14,8 @@
     "benchmark:tokens": "node scripts/benchmark-tokens.js",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:async-commands": "node scripts/check-async-commands.mjs",
-    "check:bundle": "node scripts/check-bundle-size.mjs"
+    "check:bundle": "node scripts/check-bundle-size.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",
@@ -57,6 +58,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^5.1.0"
   }
 }

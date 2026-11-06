@@ -48,7 +48,7 @@ export function useTabCommands({
     setSettingsOpen } = dialogs;
   const { sandboxEnabled, networkIsolation, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend } = settings;
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
-  const { addTab, requestCloseTab, openWorkspace } = useTabActions();
+  const { addTab, requestCloseTab, openWorkspace, openMaster } = useTabActions();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const { success: toastSuccess, info: toastInfo } = useToast();
 
@@ -134,6 +134,7 @@ export function useTabCommands({
       { id: 'task', hint: 'add a task (type it after the command to prefill)', run: (arg) => requestQuickTask(arg) },
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },
+      { id: 'master', hint: 'show the workspace\'s master agent terminal (opens it the first time)', run: () => openMaster() },
       { id: 'workspace', aliases: ['ws'], hint: 'switch to a workspace by name, or add it', run: (name) => {
         if (!name?.trim()) throw new Error('type the workspace name after the command');
         openWorkspace(name);
@@ -187,7 +188,7 @@ export function useTabCommands({
       commands.push({ id: 'settings', aliases: ['prefs'], hint: 'all settings', run: () => setSettingsOpen(true) });
     }
     return commands;
-  }, [tabId, projectPath, addTab, requestCloseTab, openWorkspace, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
+  }, [tabId, projectPath, addTab, requestCloseTab, openWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,

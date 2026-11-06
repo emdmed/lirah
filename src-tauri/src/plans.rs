@@ -110,3 +110,27 @@ pub async fn last_assistant_text(transcript_path: String) -> Result<Option<Strin
     })
     .await
 }
+
+/// The newest GitHub PR (any state) whose head is `branch`, as gh's JSON list
+/// (`[]` when there is none). Runs gh directly with fixed arguments, no shell.
+/// Errs when gh is missing, logged out, or the repo has no GitHub remote.
+#[tauri::command]
+pub async fn gh_pr_for_branch(repo_path: String, branch: String) -> Result<String, String> {
+    crate::ipc::blocking("gh_pr_for_branch", move || {
+        let mut cmd = crate::util::hidden_command("gh");
+        if let Some(path) = crate::util::terminal_path() {
+            cmd.env("PATH", path);
+        }
+        let output = cmd
+            .current_dir(&repo_path)
+            .args(["pr", "list", "--state", "all", "--limit", "1", "--head", &branch])
+            .args(["--json", "number,url,state,createdAt,mergedAt"])
+            .output()
+            .map_err(|e| format!("Failed to run gh: {}", e))?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+        Err(format!("gh failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    })
+    .await
+}

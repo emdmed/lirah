@@ -1,9 +1,8 @@
 import { TemplateSelector } from "./TemplateSelector";
 
-// Prompt-level controls: the instructions picker (templates + patterns).
+// Prompt-level controls: the instructions picker (templates).
 export function PromptToolbar({
   selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange,
-  patternFiles, selectedPatterns, onTogglePattern, onCreatePatterns,
   showSelectedBadge = true,
 }) {
   return (
@@ -14,10 +13,6 @@ export function PromptToolbar({
         onManageTemplates={onManageTemplates}
         open={templateDropdownOpen}
         onOpenChange={onTemplateDropdownOpenChange}
-        patternFiles={patternFiles}
-        selectedPatterns={selectedPatterns}
-        onTogglePattern={onTogglePattern}
-        onCreatePatterns={onCreatePatterns}
         showSelectedBadge={showSelectedBadge}
       />
     </div>

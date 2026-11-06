@@ -13,16 +13,17 @@ export const TASK_STATUS = {
 
 const STATUSES = new Set(Object.values(TASK_STATUS));
 
-// The global list's scope key. Project lists are keyed by their folder.
+// The global list's scope key. Workspace lists are keyed by the workspace id.
 export const GLOBAL = 'global';
 
-export function newTask({ title, notes = '' }) {
+export function newTask({ title, notes = '', repos = [] }) {
   const now = Date.now();
   return {
     id: shortId('t'),
     title: String(title || '').trim(),
     notes: String(notes || '').trim(),
     status: TASK_STATUS.BACKLOG,
+    repos: cleanRepos(repos), // the repo roots (or folders) the task is about
     planPath: null, // where the agent was asked to save the plan
     planId: null, // the plan it was imported as
     planTabId: null, // the tab whose agent writes the plan
@@ -31,6 +32,8 @@ export function newTask({ title, notes = '' }) {
     updatedAt: now,
   };
 }
+
+const cleanRepos = (repos) => (Array.isArray(repos) ? [...new Set(repos.filter((r) => typeof r === 'string' && r))] : []);
 
 /** A task read from disk, with every field present and of the right type. */
 export function normalizeTask(raw) {
@@ -41,6 +44,7 @@ export function normalizeTask(raw) {
     title: typeof t.title === 'string' ? t.title : '',
     notes: typeof t.notes === 'string' ? t.notes : '',
     status: STATUSES.has(t.status) ? t.status : TASK_STATUS.BACKLOG,
+    repos: cleanRepos(t.repos),
     planPath: typeof t.planPath === 'string' ? t.planPath : null,
     planId: typeof t.planId === 'string' ? t.planId : null,
     planTabId: typeof t.planTabId === 'string' ? t.planTabId : null,

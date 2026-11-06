@@ -158,6 +158,7 @@ export const TabRow = memo(function TabRow({
   };
 
   const tooltip = [
+    tab.note,
     tab.projectPath,
     `${activity.label}${activity.since ? ` · ${activity.since}` : ''}`,
     compact && info?.branch && `branch ${info.branch}`,
@@ -269,6 +270,7 @@ export const TabRow = memo(function TabRow({
             )}
           >
             {!tab.role && <RoleTagButton tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}
+
             {!active && !linked && (
               <RowAction
                 tabIndex={-1}

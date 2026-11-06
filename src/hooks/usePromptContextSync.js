@@ -7,8 +7,8 @@ const WRITE_DELAY_MS = 250;
 const ATTACHED_MS = 2500;
 
 /**
- * Makes the prompt box's selected context (files, elements, repos, template,
- * patterns) reach prompts typed straight into the terminal.
+ * Makes the prompt box's selected context (files, elements, repos, template)
+ * reach prompts typed straight into the terminal.
  *
  * The context is mirrored to ~/.lirah/prompt-context/<session>.md; Lirah's
  * Claude Code hook adds it to the next prompt submitted there. When it does,

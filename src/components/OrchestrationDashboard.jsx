@@ -153,7 +153,7 @@ export function OrchestrationDashboard({
         className="max-h-[80vh] overflow-y-auto"
       >
         <DialogTitle>Orchestration</DialogTitle>
-        <DialogDescription className="sr-only">Protocol, scripts, workflows, hooks and patterns for this project.</DialogDescription>
+        <DialogDescription className="sr-only">Protocol, scripts, workflows and hooks for this project.</DialogDescription>
 
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2">
@@ -232,14 +232,6 @@ export function OrchestrationDashboard({
               ) : (
                 <span className="opacity-40">Checking...</span>
               )}
-            </Section>
-
-            {/* Patterns */}
-            <Section title="Patterns">
-              <StatusRow
-                label=".patterns/patterns.md"
-                status={orchStatus.patterns ? 'installed' : 'missing'}
-              />
             </Section>
           </div>
         )}

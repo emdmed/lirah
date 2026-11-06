@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo, startTransition } from "react";
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
+import { NoPluginBanner } from "../../components/NoPluginBanner";
 import { TAB_CLI_PROCESSES } from "../../lib/agentClis";
 import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
@@ -15,7 +16,8 @@ import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession, getLastOutputAt } from "./terminalActivity";
-import { getAgentHookState } from "./agentHookState";
+import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from "./agentHookState";
+import { getTabTranscript, rememberTabTranscript } from "../../lib/terminalSessions";
 import { useTabContextFill } from "./tabContextFill";
 import { useTabAutoCommit } from "./tabAutoCommit";
 import { registerTabPrompt } from "./tabPrompts";
@@ -35,11 +37,13 @@ import { useTokenUsageValue } from "../token-budget/tokenUsageStore";
 import { useTypeChecker } from "../../hooks/useTypeChecker";
 import { usePromptSender } from "../../hooks/usePromptSender";
 import { usePromptStore } from "../../hooks/usePromptStore";
+import { usePromptDraft } from "../../hooks/usePromptDraft";
+import { getDraft } from "../../lib/promptDrafts";
 import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
 import { summarizeContext } from "../../components/textarea-panel/contextSummary";
-import { escapeShellPath, getRelativePath } from "../../utils/pathUtils";
+import { escapeShellPath } from "../../utils/pathUtils";
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
@@ -55,14 +59,13 @@ import { useDialogs } from "../../hooks/useDialogs";
 import { DialogScope } from "../dialogs/DialogProvider";
 import { useTerminalSettings } from "../../hooks/useTerminalSettings";
 import { useCompactionHook } from "../compact/useCompactionHook";
-import { useElementPicker } from "../file-analysis/useElementPicker";
 import { useAtMention } from "../at-mention";
 import { useFileSelection } from "../file-groups";
 import { useSidebarSearch } from "../../hooks/useSidebarSearch";
 import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
+import { useCliRunning } from "./useTabsSummary";
 import { useSeededSetting, useSetting, getSettings } from "../settings/settingsStore";
-import { usePatterns } from "../patterns";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
 import { useTabShortcuts } from "./useTabShortcuts";
 import { useTabCommands } from "./useTabCommands";
@@ -130,7 +133,12 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, compactionHook = false, launchOnStart = false, availableUpdate }) {
+// Tells the master terminal's agent what it is for; the lirah skill has the how.
+const MASTER_PROMPT = 'You are this Lirah workspace\'s master agent. The tabs listed by `lirah tabs` are your workers: '
+  + 'the user asks you for work and you hand it to them with `lirah tabs send` and collect it with `lirah tabs wait`, '
+  + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the master terminal" section.';
+
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -181,8 +189,9 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   // PTY, a WebGL context and its pollers, so N persisted tabs used to cost N
   // of everything before the user looked at any but one. Once booted a tab
   // stays mounted, as before.
-  const [booted, setBooted] = useState(isActive);
-  if (innerActive && !booted) setBooted(true);
+  // A background tab (woken by the master agent) boots without being shown.
+  const [booted, setBooted] = useState(isActive || background);
+  if ((innerActive || background) && !booted) setBooted(true);
 
   // Latched once the tab is first ready (shell up, agent started and drawn);
   // until then the placeholder covers the pane. A shell or agent that never
@@ -190,6 +199,8 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   const [ready, setReady] = useState(false);
   const [bootStage, setBootStage] = useState('shell');
   const markReady = useCallback(() => setReady(true), []);
+  // The unsent prompt this tab was left with (lib/promptDrafts).
+  const [draft] = useState(() => getDraft(tabId));
   useEffect(() => {
     if (!booted || ready) return;
     const timer = setTimeout(markReady, BOOT_PLACEHOLDER_MAX_MS);
@@ -198,11 +209,11 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
 
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
-      <FileSelectionProvider>
-        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+      <FileSelectionProvider initialFiles={draft?.files}>
+        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, tabId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -240,7 +251,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   );
 });
 
-function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -249,7 +260,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   // A tab opened with `lirah tabs open --launch` starts its agent on its first
   // fresh shell even with auto-launch off. Read once at mount and cleared from
   // the tab right away, so a reload never launches it a second time.
-  const [launchRequested] = useState(launchOnStart);
+  // A background boot always starts the agent: the master is waiting to send it work.
+  const [launchRequested] = useState(launchOnStart || background);
   useEffect(() => {
     if (launchOnStart) clearTabLaunch(tabId);
   }, [launchOnStart, clearTabLaunch, tabId]);
@@ -265,7 +277,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   const [textareaVisible, setTextareaVisible] = useState(() => getSettings().promptBoxOnStart);
   // The prompt text lives in a store, not state: typing must re-render only
   // the textarea panel, not this whole tab.
-  const promptStore = usePromptStore();
+  const promptStore = usePromptStore(draft?.text);
   const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
   const { linkedRepos, clearLinkedRepos } = useLinkedRepos(tabId);
@@ -288,7 +300,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   }, []);
 
   // Domain hooks
-  const settings = useTerminalSettings();
+  const settings = useTerminalSettings(workspaceId);
   const toast = useToast();
   const dialogs = useDialogs(tabId);
 
@@ -309,7 +321,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   // otherwise the tab's persisted project path.
   const resolvedProjectDir = isRealPath(currentPath) ? currentPath : projectPath;
 
-  const patterns = usePatterns(currentPath);
 
   // Refs for current values in async callbacks
   const currentPathRef = useRef(currentPath);
@@ -341,6 +352,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     fileSelection.registerCurrentPath(currentPath);
   }, [currentPath]);
 
+  usePromptDraft(tabId, draft, {
+    promptStore, linkedRepos, isAnalyzable, extractFileSymbols,
+    selectedFiles: fileSelection.selectedFiles, fileStates: fileSelection.fileStates,
+  });
+
   const secondary = useSecondaryTerminal(terminalRef);
 
   const { changelogStatus, dismissChangelogStatus } = useAutoChangelog(
@@ -356,6 +372,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   const autoMerge = useAutoMerge();
 
   const sidebarSearch = useSidebarSearch();
+  const cliRunning = useCliRunning(terminalSessionId, isActive && sidebar.sidebarOpen && viewMode === 'tree');
 
   const treeView = useTreeView({
     terminalSessionId,
@@ -363,6 +380,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     initializeSearch: sidebarSearch.initializeSearch,
     searchResults: sidebarSearch.searchResults,
     isActive,
+    // A running agent can't cd the shell, and in the sandbox the cwd lookup
+    // would read the agent's own child processes, so follow only a bare shell.
+    followCwd: isActive && sidebar.sidebarOpen && viewMode === 'tree' && cliRunning === null,
   });
 
   // Terminate any running CLI process in the terminal before navigation
@@ -386,7 +406,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
 
   const compaction = useCompactionHook({ tabId, terminalSessionId, enabled: compactionHook });
 
-  const elementPicker = useElementPicker();
 
   const atMention = useAtMention({
     search: sidebarSearch.search,
@@ -398,16 +417,41 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
 
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+  // A claude started by hand: stop it and start it again with the plugin.
+  const relaunchCli = useCallback(async () => {
+    await terminateCliProcess();
+    await launchClaude();
+  }, [terminateCliProcess, launchClaude]);
+
+  // Remember the conversation this tab's agent is in, for launchFresh after a restart.
+  useEffect(() => {
+    const id = terminalSessionId;
+    if (!id) return;
+    return subscribeAgentHooks((change) => {
+      const path = change?.sessionId === id && getAgentTranscript(id);
+      if (path) rememberTabTranscript(tabId, path);
+    });
+  }, [terminalSessionId, tabId]);
 
   // Every fresh shell starts the tab's agent, so a tab opens straight into it
   // (with auto-launch off, only a tab opened with a launch request does).
   // Waits until the tab is first shown, so restoring many tabs at startup
   // doesn't start every agent at once. Typing into the shell first cancels it.
-  const launchFresh = useStableHandler(launchClaude);
+  const launchFresh = useStableHandler(async () => {
+    // Continue the tab's last conversation if its transcript is still there
+    // (claude writes none for a session that never got a prompt).
+    const transcript = settings.selectedCli === 'claude-code' ? getTabTranscript(tabId) : null;
+    const resume = transcript && await invoke('path_exists', { path: transcript }).catch(() => false);
+    const resumeId = resume ? transcript.split(/[\\/]/).pop().replace(/\.jsonl$/, '') : null;
+    return launchClaude({ resumeId, systemPrompt: master ? MASTER_PROMPT : undefined });
+  });
+
   useEffect(() => {
     const id = terminalSessionId;
-    if (!(settings.autoLaunchCli || launchRequested) || !isActive || !terminalReady || !id || freshShellRef.current !== id) return;
+    if (!(settings.autoLaunchCli || launchRequested) || !(isActive || background) || !terminalReady || !id || freshShellRef.current !== id) return;
     const cancel = (e) => {
+      // Keys typed in another tab (the master) must not cancel a background launch.
+      if (!isActive) return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key.length !== 1 && e.key !== 'Enter' && e.key !== 'Backspace') return;
       if (e.target instanceof Element && e.target.closest('[data-pane="2"]')) {
@@ -426,7 +470,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       clearTimeout(timer);
       window.removeEventListener('keydown', cancel, true);
     };
-  }, [settings.autoLaunchCli, launchRequested, isActive, terminalReady, terminalSessionId, launchFresh, onReady]);
+  }, [settings.autoLaunchCli, launchRequested, isActive, background, terminalReady, terminalSessionId, launchFresh, onReady]);
 
   // When the boot placeholder can lift. Without an agent on its way (auto-launch
   // off, or a shell reclaimed after a reload), as soon as the shell is up.
@@ -543,19 +587,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     return paths;
   }, [treeView.treeData, dialogs.markdownViewerOpen]);
 
-  // Send file path to terminal
-  const sendFileToTerminal = useCallback(async (absolutePath) => {
-    if (!terminalSessionId) return;
-    try {
-      const relativePath = getRelativePath(absolutePath, currentPath);
-      const escapedPath = escapeShellPath(relativePath);
-      await invoke('write_to_terminal', { sessionId: terminalSessionId, data: `${escapedPath} ` });
-      terminalRef.current?.focus?.();
-    } catch (error) {
-      console.error('Failed to send file to terminal:', absolutePath, error);
-    }
-  }, [terminalSessionId, currentPath]);
-
   // Handle textarea changes (detect @ mentions)
   const handleTextareaChange = useCallback((newValue) => {
     setTextareaContent(newValue);
@@ -580,13 +611,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     keepFilesAfterSend: settings.keepFilesAfterSend,
     selectedTemplateId, getTemplateById,
     formatFileAnalysis, getLineCount, getViewModeLabel,
-    selectedElements: elementPicker.selectedElements,
     setTextareaContent,
     clearFileSelection: fileSelection.clearFileSelection,
-    clearSelectedElements: elementPicker.clearSelectedElements,
-    selectedPatterns: patterns.selectedPatterns,
-    getPatternInstructions: patterns.getPatternInstructions,
-    clearPatterns: patterns.clearPatterns,
     clearSelectedTemplate,
     linkedRepos,
     clearLinkedRepos,
@@ -604,15 +630,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     formatFileAnalysis,
     getLineCount,
     getViewModeLabel,
-    selectedElements: elementPicker.selectedElements,
-    selectedPatterns: patterns.selectedPatterns,
-    getPatternInstructions: patterns.getPatternInstructions,
     linkedRepos,
   }), [
     fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
-    elementPicker.selectedElements,
-    patterns.selectedPatterns, patterns.getPatternInstructions, linkedRepos,
+    linkedRepos,
   ]);
 
   // A prompt typed in the terminal gets the selected context too (through
@@ -620,27 +642,21 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   const keepFilesAfterSend = settings.keepFilesAfterSend;
   const resetContextAfterUse = useCallback(() => {
     clearSelectedTemplate();
-    patterns.clearPatterns();
     if (!keepFilesAfterSend) {
       fileSelection.clearFileSelection();
-      elementPicker.clearSelectedElements();
       clearLinkedRepos?.();
     }
-  }, [clearSelectedTemplate, patterns.clearPatterns, keepFilesAfterSend,
-    fileSelection.clearFileSelection, elementPicker.clearSelectedElements, clearLinkedRepos]);
+  }, [clearSelectedTemplate, keepFilesAfterSend,
+    fileSelection.clearFileSelection, clearLinkedRepos]);
   // What the context amounts to, kept by the sync hook for the "attached" line.
   const templateTitle = selectedTemplateId ? getTemplateById(selectedTemplateId)?.title : undefined;
   const contextSummary = useMemo(() => {
-    let elementCount = 0;
-    elementPicker.selectedElements?.forEach((els) => { elementCount += els.length; });
     return summarizeContext({
       fileCount: fileSelection.selectedFiles?.size || 0,
-      elementCount,
       repoCount: linkedRepos?.length || 0,
       templateTitle,
-      patternCount: patterns.selectedPatterns?.size || 0,
     });
-  }, [fileSelection.selectedFiles, elementPicker.selectedElements, linkedRepos, templateTitle, patterns.selectedPatterns]);
+  }, [fileSelection.selectedFiles, linkedRepos, templateTitle]);
   const { attachedSummary } = usePromptContextSync({
     terminalSessionId,
     contextText: promptBase.text,
@@ -1010,7 +1026,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   });
 
   return (
-    <TokenBudgetProvider tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
+    <TokenBudgetProvider workspaceId={workspaceId} tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
       <Layout
         sidebar={
@@ -1037,11 +1053,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onNavigateBookmark={navigateToBookmark}
               hasTerminalSession={!!terminalSessionId}
               sandboxEnabled={settings.sandboxEnabled}
-              onSendToTerminal={sendFileToTerminal}
               onViewDiff={viewFileDiff}
               onViewMarkdown={viewMarkdownFile}
               onGitChanges={handleGitChanges}
-              onOpenElementPicker={elementPicker.handleOpenElementPicker}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
               isActive={isActive}
@@ -1069,8 +1083,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onSaveGroup={openSaveFileGroup}
               compactionEnabled={compaction.compactionEnabled}
               onToggleCompaction={compaction.compactionAvailable && settings.selectedCli === 'claude-code' ? compaction.toggleCompaction : undefined}
-              selectedElements={elementPicker.selectedElements}
-              onClearElements={elementPicker.clearSelectedElements}
               linkedRepos={linkedRepos}
               atMentionActive={atMention.atMentionQuery !== null}
               atMentionQuery={atMention.atMentionQuery || ''}
@@ -1084,14 +1096,9 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onToggleFile={fileSelection.toggleFileSelection}
               sessionId={terminalSessionId}
               onClearContext={handleClearContext}
-              patternFiles={patterns.patternFiles}
-              selectedPatterns={patterns.selectedPatterns}
-              onTogglePattern={patterns.togglePattern}
-              onCreatePatterns={patterns.createPatterns}
               promptBase={promptBase}
               onClearRepos={clearLinkedRepos}
               onRemoveFile={fileSelection.removeFileFromSelection}
-              onRemoveElement={elementPicker.removeElement}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
             />
@@ -1099,12 +1106,10 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
             <ContextStatus
               selectedFiles={fileSelection.selectedFiles}
               fileStates={fileSelection.fileStates}
-              selectedElements={elementPicker.selectedElements}
               currentPath={currentPath}
               linkedRepos={linkedRepos}
               onSetFileState={fileSelection.setFileState}
               onRemoveFile={fileSelection.removeFileFromSelection}
-              onRemoveElement={elementPicker.removeElement}
               onUnlinkRepo={unlinkTabRepo}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
@@ -1114,10 +1119,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onManageTemplates={openManageTemplates}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
-              patternFiles={patterns.patternFiles}
-              selectedPatterns={patterns.selectedPatterns}
-              onTogglePattern={patterns.togglePattern}
-              onCreatePatterns={patterns.createPatterns}
               projectPath={currentPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
               onSaveGroup={openSaveFileGroup}
@@ -1206,6 +1207,12 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
           onLaunch={launchClaude}
           onChangeCli={openCliSettings}
         />}
+        <NoPluginBanner
+          sessionId={terminalSessionId}
+          isActive={isActive}
+          selectedCli={settings.selectedCli}
+          onRelaunch={relaunchCli}
+        />
       </Layout>
 
       {/* The tabs pane draws each tab's context fill as a moon. */}
@@ -1216,12 +1223,12 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       <DialogHost
         dialogs={dialogs}
         currentPath={currentPath}
+        workspaceId={workspaceId}
         settings={settings}
         sessionId={terminalSessionId}
         toggleSandbox={toggleSandbox}
         toggleNetwork={toggleNetwork}
         cliAvailability={cliAvailability}
-        elementPicker={elementPicker}
         fileSelection={fileSelection}
         branchName={branchName}
         autoCommit={autoCommit}

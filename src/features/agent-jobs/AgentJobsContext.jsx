@@ -2,7 +2,8 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, us
 import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
 import { git, repoTop, worktreeAdd, worktreeRemove } from '../../lib/git';
-import { jobWorktreesDir, lirahDir } from '../../lib/lirahPaths';
+import { jobWorktreesDir, jobsDir, lirahDir } from '../../lib/lirahPaths';
+import { getCurrentWorkspaces, workspaceListStore } from '../../lib/workspaceStore';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../../lib/notify';
 import { useConfirm } from '../dialogs/DialogProvider';
@@ -20,6 +21,9 @@ const MAX_OUTPUT_LINES = 500;
 // writing, so a long-running job's state survives a crash.
 const PERSIST_DEBOUNCE = 400;
 const PERSIST_MAX_STALENESS = 3000;
+
+// Job records, one list per workspace, beside the jobs' logs, reports and patches.
+const jobStore = workspaceListStore('jobs/jobs.json', 'jobs');
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -61,15 +65,14 @@ function parsePorcelain(output, cwd) {
     });
 }
 
-// Write a persistent markdown run log for a finished job. Lives under
-// ~/.lirah/jobs/<repo>/ so it survives worktree removal and app restarts.
+// Write a persistent markdown run log for a finished job. Lives in the job's
+// workspace jobs folder so it survives worktree removal and app restarts.
 async function writeJobReport(job, { changedFiles, success, exitCode, endedAt }) {
   try {
     const home = await invoke('get_home_dir');
     const stamp = new Date(endedAt).toISOString().replace(/[:.]/g, '-');
     const safeLabel = (job.label || 'job').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 40);
-    const repoName = basename(job.repoPath, 'repo');
-    const path = `${lirahDir(home)}/jobs/${repoName}/${stamp}-${safeLabel}.md`;
+    const path = `${jobsDir(home, job.workspaceId)}/${stamp}-${safeLabel}.md`;
 
     const rel = (p) => (job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p);
     const filesList = changedFiles.length
@@ -253,7 +256,7 @@ function buildRevisionPrompt(job, notes) {
 // that directory. Best-effort; failures are silent by design.
 //
 // Runs once at startup against the just-hydrated job list, which is shared
-// across instances via jobs-state.json — so a second window's worktrees are
+// across instances via the workspaces' jobs.json — so a second window's worktrees are
 // claimed too, apart from one it launched in the last few hundred ms (the
 // debounce window on that file).
 async function gcOrphanWorktrees(home, liveJobs) {
@@ -320,21 +323,21 @@ export function AgentJobsProvider({ children }) {
   // running detached jobs (and its PID map) across a webview reload. Persist the
   // list to disk and rehydrate on mount so the panel survives reloads/restarts.
   const hydratedRef = useRef(false);
-  const stateFileRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const home = await invoke('get_home_dir');
-        stateFileRef.current = `${lirahDir(home)}/jobs-state.json`;
-        let saved = [];
-        try {
-          const raw = await invoke('read_file_content', { path: stateFileRef.current });
-          saved = JSON.parse(raw) || [];
-        } catch {
-          saved = []; // First run or unreadable state — start empty.
-        }
+        // Before workspaces had job files, every job was in ~/.lirah/jobs-state.json.
+        const saved = await jobStore.load(async () => {
+          try {
+            const raw = await invoke('read_file_content', { path: `${lirahDir(home)}/jobs-state.json` });
+            return JSON.parse(raw) || [];
+          } catch {
+            return []; // First run or unreadable state — start empty.
+          }
+        });
         // Jobs whose backend threads are still alive (webview reload, not a full
         // restart) — those keep streaming, so leave them 'running' and let the
         // listeners below finalize them.
@@ -404,12 +407,10 @@ export function AgentJobsProvider({ children }) {
   // is forced once the snapshot is older than PERSIST_MAX_STALENESS.
   const lastPersistRef = useRef(0);
   useEffect(() => {
-    if (!hydratedRef.current || !stateFileRef.current) return;
-    const file = stateFileRef.current;
+    if (!hydratedRef.current) return;
     const write = () => {
       lastPersistRef.current = Date.now();
-      const snapshot = jobs.map(({ output, ...rest }) => rest);
-      invoke('write_file_content', { path: file, content: JSON.stringify(snapshot) }).catch(() => {});
+      jobStore.save(jobs.map(({ output, ...rest }) => rest));
     };
     if (Date.now() - lastPersistRef.current >= PERSIST_MAX_STALENESS) {
       write();
@@ -542,11 +543,12 @@ export function AgentJobsProvider({ children }) {
     // same prompt in parallel, of which the user keeps one.
     raceId = null,
     raceSize = 0,
+    workspaceId = getCurrentWorkspaces().activeWorkspaceId,
   }) => {
     const id = makeId();
     const home = await invoke('get_home_dir').catch(() => null);
     // Full output is mirrored here so it survives the in-memory cap and reloads.
-    const logPath = home ? `${lirahDir(home)}/jobs-logs/${id}.log` : null;
+    const logPath = home ? `${jobsDir(home, workspaceId)}/${id}.log` : null;
 
     // Resolve the git repo root (works even when repoPath is a subdirectory).
     // Null means repoPath is not inside a git repo.
@@ -594,6 +596,7 @@ export function AgentJobsProvider({ children }) {
       intendedFiles: Array.isArray(intendedFiles) ? intendedFiles : [],
       raceId,
       raceSize,
+      workspaceId,
       output: [],
       changedFiles: [],
       exitCode: null,
@@ -662,7 +665,7 @@ export function AgentJobsProvider({ children }) {
     const patch = await git(job.cwd, ['diff', '--cached', '--binary']);
     if (!patch.trim()) return;
     const home = await invoke('get_home_dir');
-    const patchFile = `${lirahDir(home)}/patches/job-${job.id}.patch`;
+    const patchFile = `${jobsDir(home, job.workspaceId)}/${job.id}.patch`;
     await invoke('write_file_content', { path: patchFile, content: patch });
     const applyArgs = ['apply', '--whitespace=nowarn'];
     if (threeWay) applyArgs.push('--3way');
@@ -816,7 +819,8 @@ export function AgentJobsProvider({ children }) {
       setJobs((prev) => prev.map((j) => (conflictIds.has(j.id) ? { ...j, status: 'conflict' } : j)));
     }
 
-    const logPath = `${lirahDir(home)}/jobs-logs/${id}.log`;
+    const workspaceId = targets[0].workspaceId;
+    const logPath = `${jobsDir(home, workspaceId)}/${id}.log`;
     const prompt = buildReconcilePrompt(targets, conflicts);
     const job = {
       id,
@@ -834,6 +838,7 @@ export function AgentJobsProvider({ children }) {
       exitCode: null,
       error: null,
       logPath,
+      workspaceId,
       sourceJobIds: targets.map((t) => t.id),
       // Loud conflict record: files two+ jobs both edited, and jobs whose patch
       // wouldn't apply cleanly. Rendered on the card so nothing is smoothed over.

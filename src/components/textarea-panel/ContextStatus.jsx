@@ -16,8 +16,6 @@ import { Fig32FilesByIntent } from "./Fig32FilesByIntent";
 import { focusPane } from "../../hooks/usePaneShortcuts";
 
 const NO_REPOS = [];
-const NO_PATTERN_FILES = [];
-const NO_PATTERNS = new Set();
 const NO_FILES = new Set();
 const NO_ELEMENTS = new Map();
 const NO_PROMPT = '';
@@ -46,7 +44,7 @@ const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 pl-1.5 pr-1 border 
  *     FILES          [EDIT app.jsx ×] [READ README.md ×]
  *     CODE           [fn parse ×]
  *     REPOS          [repo api ×]
- *     INSTRUCTIONS   [template Bugfix ×] [pattern conventions ×]
+ *     INSTRUCTIONS   [template Bugfix ×]
  *   ─────────────────────────────────────────────────────────────────────────
  *     instructions ▾  saved sets ▾  ✦  keep  peek  insert
  *   ─ i insert ✦ p peek ✦ k keep ──────────────────────── ~702 tok <$0.01 ─
@@ -80,10 +78,6 @@ export const ContextStatus = memo(function ContextStatus({
   onManageTemplates,
   templateDropdownOpen,
   onTemplateDropdownOpenChange,
-  patternFiles = NO_PATTERN_FILES,
-  selectedPatterns = NO_PATTERNS,
-  onTogglePattern,
-  onCreatePatterns,
   projectPath,
   onLoadGroup,
   onSaveGroup,
@@ -119,17 +113,8 @@ export const ContextStatus = memo(function ContextStatus({
     if (selectedTemplateId && templateTitle) {
       out.push({ key: 'template', tag: 'template', name: templateTitle, onRemove: () => onSelectTemplate?.(null) });
     }
-    selectedPatterns.forEach((file) => {
-      out.push({
-        key: `pattern:${file}`,
-        tag: 'pattern',
-        name: file.replace(/\.md$/, ''),
-        title: `.patterns/${file}`,
-        onRemove: () => onTogglePattern?.(file),
-      });
-    });
     return out;
-  }, [selectedTemplateId, templateTitle, onSelectTemplate, selectedPatterns, onTogglePattern]);
+  }, [selectedTemplateId, templateTitle, onSelectTemplate]);
 
   // The lamp carries the emphasis; the words stay in ink.
   let status = null;
@@ -295,10 +280,6 @@ export const ContextStatus = memo(function ContextStatus({
           onManageTemplates={onManageTemplates}
           templateDropdownOpen={templateDropdownOpen}
           onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
-          patternFiles={patternFiles}
-          selectedPatterns={selectedPatterns}
-          onTogglePattern={onTogglePattern}
-          onCreatePatterns={onCreatePatterns}
           showSelectedBadge={false}
         />
         <ProjectToolbar

@@ -1,11 +1,14 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { createEmitter } from '../../lib/createStore';
+import { load as loadFile, onExternalChange, save as saveFile } from '../../lib/fileStore';
+import { getWorkspaceData, setWorkspaceData } from '../../lib/workspaceStore';
 
-// App preferences in one module-level store, persisted under one key.
+// App preferences in one module-level store, persisted to ~/.lirah/settings.json.
+// The old localStorage blob (SETTINGS_KEY) only seeds that file on first start
+// and is then left alone as a backup.
 //
 // Every tab reads it through useSyncExternalStore, so a change made in one tab
-// reaches every other open tab in the same render. The `storage` event carries
-// changes made by another window of the app.
+// reaches every other open tab in the same render.
 //
 // A few values are "seeded" rather than shared (see useSeededSetting): the
 // store holds the default a new tab starts with, but each tab keeps its own
@@ -13,6 +16,7 @@ import { createEmitter } from '../../lib/createStore';
 // network isolation, CLI) or layout (sidebar, file view).
 
 export const SETTINGS_KEY = 'lirah:settings:v1';
+export const SETTINGS_FILE = 'settings.json';
 
 export const SETTINGS_DEFAULTS = {
   sandboxEnabled: false,
@@ -67,6 +71,17 @@ export const SETTINGS_DEFAULTS = {
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',
+  // Starred repos: { id, name, path, createdAt, lastAccessedAt }.
+  bookmarks: [],
+  // Saved prompts: { id, title, content, createdAt, updatedAt }.
+  promptTemplates: [],
+  // Instructions put in front of a task sent to plan (see tasks/planContexts.js).
+  planContexts: {
+    contexts: [{ id: 'ctx-plan', name: 'Plan', text: 'Write a full implementation plan for this task.' }],
+    defaultId: 'ctx-plan',
+  },
+  // A key of themes/theme-config.js; ThemeContext falls back on an unknown one.
+  theme: 'tokyo-night',
 };
 
 // Pre-v1 keys, one per preference. Read once on first load to migrate; never
@@ -84,8 +99,6 @@ const LEGACY_KEYS = {
   autoCommitCli: 'nevo-terminal:auto-commit-cli',
   autoCommitCustomPrompt: 'nevo-terminal:auto-commit-custom-prompt',
 };
-// Stored as a bare string, not JSON.
-const LEGACY_SELECTED_CLI_KEY = 'nevo-terminal:selected-cli';
 
 // Kept in keys of their own until after v1 shipped, so they are read whenever
 // the blob doesn't have them yet, not only on the first load. Each parses the
@@ -102,6 +115,12 @@ const LATER_KEYS = {
   }],
   jobsSidebarWide: ['agentJobsSidebarWide', (raw) => raw === '1'],
   autopilotTipSeen: ['lirah:autopilot-tip-seen', (raw) => raw === '1'],
+  // Moved into settings.json in its file era: copied while the field is absent.
+  bookmarks: ['nevo-terminal:project-bookmarks', JSON.parse],
+  promptTemplates: ['nevo-terminal:prompt-templates', JSON.parse],
+  planContexts: ['lirah:plan-contexts:v1', JSON.parse],
+  theme: ['nevo-theme', (raw) => raw || undefined],
+  selectedCli: ['nevo-terminal:selected-cli', (raw) => raw || undefined],
 };
 
 // The later keys `raw` (a saved blob, or {}) is missing, from their old keys.
@@ -116,6 +135,30 @@ function readLater(raw) {
     } catch { /* storage unavailable: keep the default */ }
   }
   return found;
+}
+
+const nonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
+
+function cleanBookmarks(v) {
+  return Array.isArray(v)
+    ? v.filter((b) => b && typeof b.id === 'string' && nonEmpty(b.name) && nonEmpty(b.path))
+    : undefined;
+}
+
+function cleanTemplates(v) {
+  return Array.isArray(v)
+    ? v.filter((t) => t && typeof t.id === 'string' && nonEmpty(t.title) && nonEmpty(t.content))
+    : undefined;
+}
+
+// Undefined (the default seed) when no context is usable: there is always one.
+export function cleanPlanContexts(v) {
+  const contexts = Array.isArray(v?.contexts)
+    ? v.contexts.filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string' && typeof c.text === 'string')
+    : [];
+  if (contexts.length === 0) return undefined;
+  const defaultId = contexts.some((c) => c.id === v.defaultId) ? v.defaultId : contexts[0].id;
+  return { contexts, defaultId };
 }
 
 const STARTUP_MODES = ['restore', 'projects'];
@@ -153,12 +196,16 @@ const VALIDATORS = {
     : undefined),
   plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
+  bookmarks: cleanBookmarks,
+  promptTemplates: cleanTemplates,
+  planContexts: cleanPlanContexts,
 };
 
 // Keep only known keys whose type matches the default, so a corrupt or
-// hand-edited blob can't put a string where a boolean belongs.
-export function sanitize(raw) {
-  const out = { ...SETTINGS_DEFAULTS };
+// hand-edited blob can't put a string where a boolean belongs. Invalid keys
+// keep their value from `base`.
+export function sanitize(raw, base = SETTINGS_DEFAULTS) {
+  const out = { ...base };
   if (!raw || typeof raw !== 'object') return out;
   for (const key of Object.keys(SETTINGS_DEFAULTS)) {
     if (!(key in raw)) continue;
@@ -181,47 +228,85 @@ function readLegacy() {
       if (saved !== null) raw[key] = JSON.parse(saved);
     } catch { /* unreadable legacy value: keep the default */ }
   }
-  try {
-    const cli = localStorage.getItem(LEGACY_SELECTED_CLI_KEY);
-    if (cli) raw.selectedCli = cli;
-  } catch { /* storage unavailable */ }
   return raw;
 }
 
 function persist(next) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-  } catch (error) {
-    console.warn(`Failed to save ${SETTINGS_KEY} to localStorage:`, error);
-  }
+  saveFile(SETTINGS_FILE, next, { debounce: 300 })
+    .catch((error) => console.warn(`Failed to save ${SETTINGS_FILE}:`, error));
 }
 
-function load() {
+// The pre-file settings from localStorage: the v1 blob, else the older keys.
+function loadLocal() {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
     if (saved !== null) {
       const raw = JSON.parse(saved);
-      const later = readLater(raw);
-      const loaded = sanitize({ ...raw, ...later });
-      if (Object.keys(later).length) persist(loaded);
-      return loaded;
+      return sanitize({ ...raw, ...readLater(raw) });
     }
   } catch { /* corrupt blob or storage unavailable: fall through */ }
-  const migrated = sanitize({ ...readLegacy(), ...readLater({}) });
-  persist(migrated);
-  return migrated;
+  return sanitize({ ...readLegacy(), ...readLater({}) });
 }
 
-let state = load();
-// Listens for other windows' writes only while something is subscribed.
-const { subscribe: subscribeSettings, emit } = createEmitter({
-  onStart: () => window.addEventListener('storage', onStorage),
-  onStop: () => window.removeEventListener('storage', onStorage),
-});
+// Until initSettings resolves (or outside Tauri) this is the localStorage copy.
+let state = loadLocal();
+const { subscribe: subscribeSettings, emit } = createEmitter();
 export { subscribeSettings };
+
+/** Load settings.json, seeding it from localStorage when missing. Await before render. */
+export async function initSettings() {
+  try {
+    const doc = await loadFile(SETTINGS_FILE);
+    if (doc) state = sanitize({ ...doc, ...readLater(doc) });
+    else await saveFile(SETTINGS_FILE, state);
+  } catch (error) {
+    console.warn(`Failed to load ${SETTINGS_FILE}, using localStorage:`, error);
+  }
+}
+
+// An edit from outside (`lirah settings set`, `lirah theme`) replaces the state.
+onExternalChange((rel) => rel === SETTINGS_FILE, (doc) => {
+  if (!doc) return;
+  state = sanitize({ ...doc, ...readLater(doc) });
+  emit();
+});
 
 export function getSettings() {
   return state;
+}
+
+// Settings a workspace may set over settings.json, in workspace.json `overrides`.
+// Budgets are per-workspace data already (workspace.json `budgets`), not a setting.
+export const OVERRIDABLE_KEYS = ['selectedCli', 'sandboxEnabled', 'networkIsolation', 'autoLaunchCli', 'startupMode'];
+
+/** Code defaults, then settings.json, then the workspace's overrides (other keys ignored). */
+export function getEffectiveSettings(workspaceId) {
+  const overrides = workspaceId ? getWorkspaceData(workspaceId, 'overrides') : null;
+  if (!overrides || typeof overrides !== 'object') return state;
+  const picked = Object.fromEntries(OVERRIDABLE_KEYS.filter((k) => k in overrides).map((k) => [k, overrides[k]]));
+  // An override of the wrong type is dropped, leaving the settings.json value.
+  return Object.keys(picked).length ? sanitize(picked, state) : state;
+}
+
+/** The workspace's override for key, or undefined when it follows settings.json. */
+export function getOverride(workspaceId, key) {
+  return getWorkspaceData(workspaceId, 'overrides')?.[key];
+}
+
+/** Set a workspace override; undefined removes it (back to settings.json). */
+export function setOverride(workspaceId, key, value) {
+  if (!OVERRIDABLE_KEYS.includes(key)) return;
+  const { [key]: _, ...rest } = getWorkspaceData(workspaceId, 'overrides') ?? {};
+  setWorkspaceData(workspaceId, 'overrides', value === undefined ? rest : { ...rest, [key]: value });
+  emit();
+}
+
+// Writes the override when the workspace has one for key, else settings.json.
+function setEffective(workspaceId, key, value) {
+  if (workspaceId && getOverride(workspaceId, key) !== undefined) {
+    const next = typeof value === 'function' ? value(getEffectiveSettings(workspaceId)[key]) : value;
+    setOverride(workspaceId, key, next);
+  } else setSetting(key, value);
 }
 
 // `value` may be a functional updater, like a useState setter.
@@ -234,32 +319,26 @@ export function setSetting(key, value) {
   emit();
 }
 
-// Another window wrote the key (or cleared storage): reload and notify.
-function onStorage(e) {
-  if (e.key !== null && e.key !== SETTINGS_KEY) return;
-  try {
-    const saved = e.key === null ? null : e.newValue;
-    state = saved ? sanitize(JSON.parse(saved)) : { ...SETTINGS_DEFAULTS };
-  } catch { return; }
-  emit();
-}
-
 // Setters are created once per key so callers can list them as stable deps.
 const setters = {};
 export function settingSetter(key) {
   return (setters[key] ||= (value) => setSetting(key, value));
 }
 
-// One shared preference: every tab sees the same value, live.
-export function useSetting(key) {
-  const value = useSyncExternalStore(subscribeSettings, () => state[key]);
-  return [value, settingSetter(key)];
+// One shared preference: every tab sees the same value, live. With a
+// workspaceId it reads the effective value (that workspace's override wins)
+// and writes the override while one is set.
+export function useSetting(key, workspaceId) {
+  const value = useSyncExternalStore(subscribeSettings, () => (workspaceId ? getEffectiveSettings(workspaceId) : state)[key]);
+  const set = useCallback((v) => setEffective(workspaceId, key, v), [workspaceId, key]);
+  return [value, workspaceId ? set : settingSetter(key)];
 }
 
-// A per-tab value seeded from the store. The tab keeps its own live copy and
-// every change is written back as the default for the next tab to open.
-export function useSeededSetting(key) {
-  const [value, setValue] = useState(() => state[key]);
+// A per-tab value seeded from the store (the effective value, given a
+// workspaceId). The tab keeps its own live copy and every change is written
+// back as the default for the next tab to open.
+export function useSeededSetting(key, workspaceId) {
+  const [value, setValue] = useState(() => (workspaceId ? getEffectiveSettings(workspaceId) : state)[key]);
   // Resolve functional updaters against a ref, not inside a setState updater:
   // writing the store there would notify other components mid-render.
   const valueRef = useRef(value);
@@ -267,7 +346,7 @@ export function useSeededSetting(key) {
     const resolved = typeof next === 'function' ? next(valueRef.current) : next;
     valueRef.current = resolved;
     setValue(resolved);
-    setSetting(key, resolved);
-  }, [key]);
+    setEffective(workspaceId, key, resolved);
+  }, [workspaceId, key]);
   return [value, set];
 }
