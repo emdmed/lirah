@@ -1,4 +1,4 @@
-// The plan's vocabulary: the status strings stored in plans.json, the
+// The plan's vocabulary: the status strings stored in plan.json, the
 // selectors and predicates over a plan, and the patches that move a chunk from
 // one status to the next. Pure, no React. The values are persisted, so they
 // never change; add new ones instead.

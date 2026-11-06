@@ -8,7 +8,7 @@ import { getSettings } from '../settings/settingsStore';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { planContext } from './planContexts';
 import {
-  buildFormatPrompt, isOpen, newTask, parseFormatted, planFileName, reorderSubset, TASK_STATUS, taskText,
+  buildFormatPrompt, GLOBAL, isOpen, newTask, parseFormatted, planFileName, reorderSubset, TASK_STATUS, taskText,
 } from './taskModel';
 import { useTaskStore } from './useTaskStore';
 import { useTaskPlanLinks } from './useTaskPlanLinks';
@@ -116,7 +116,11 @@ export function TasksProvider({ children }) {
     const text = source ?? await invoke('read_file_content', { path: task.planPath });
     if (!text.trim()) throw new Error('The plan file is empty');
     const root = task.planPath.slice(0, lastSepIndex(task.planPath));
-    const planId = await createPlan(root, { source: text, importedFrom: { path: task.planPath, hash: hash8(text) } });
+    const planId = await createPlan(root, {
+      source: text,
+      importedFrom: { path: task.planPath, hash: hash8(text) },
+      ...(scope !== GLOBAL && { workspaceId: scope }), // a global task's plan goes to the active workspace
+    });
     updateTask(scope, id, { status: TASK_STATUS.PLANNED, planId });
     return planId;
   }, [find, createPlan, updateTask]);

@@ -336,7 +336,7 @@ export function useAgentControl() {
           replaceSource(repo, existing.id, { source, importedFrom }); // keeps the chunks already done
           id = existing.id;
         } else {
-          id = await createPlan(repo, { source, importedFrom });
+          id = await createPlan(repo, { source, importedFrom, workspaceId: callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId });
         }
         live.current.toast.info(`Claude imported plan ${path.split('/').pop()}`);
         return `${existing && id === existing.id ? 'updated' : 'imported'} ${id}; splitting into chunks (see \`lirah plans show ${id}\`)`;

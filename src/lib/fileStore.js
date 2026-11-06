@@ -76,17 +76,23 @@ export function flush() {
   return Promise.allSettled([...queues.values()]);
 }
 
-/** Delete a file, dropping any pending save for it. */
+/** Names in a folder (files and subfolders), sorted; empty if it does not exist. */
+export function list(rel) {
+  return invoke('store_list', { rel });
+}
+
+/** Delete a file or a folder, dropping pending saves for it or anything inside it. */
 export async function remove(rel) {
-  const entry = pending.get(rel);
-  if (entry) {
+  const inside = (key) => key === rel || key.startsWith(`${rel}/`);
+  for (const [key, entry] of pending) {
+    if (!inside(key)) continue;
     clearTimeout(entry.timer);
-    pending.delete(rel);
+    pending.delete(key);
     entry.waiters.forEach((w) => w.resolve(null));
   }
-  await (queues.get(rel) ?? Promise.resolve()).catch(() => {});
+  await Promise.allSettled([...queues].filter(([key]) => inside(key)).map(([, q]) => q));
   await invoke('store_delete', { rel });
-  revisions.set(rel, 0);
+  for (const key of revisions.keys()) if (inside(key)) revisions.set(key, 0);
 }
 
 globalThis.addEventListener?.('beforeunload', () => { flush(); });

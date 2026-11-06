@@ -30,7 +30,7 @@ import {
   slugify,
 } from './planPrompts';
 
-// Plans live in ~/.lirah/plans/<repo>-<hash>/plans.json, one file per repo,
+// Plans live in ~/.lirah/workspaces/<id>/plans/<plan-id>/plan.json, one file per plan,
 // never inside the repo itself. Chunks are implemented by the tab's live agent,
 // one commit each (found again by its Plan-Chunk trailer), so review is that
 // commit's diff and rollback is `git revert`.
@@ -53,7 +53,7 @@ const PlansStateContext = createContext(null);
 
 export function PlansProvider({ children }) {
   const {
-    plansByRepo, stateRef, getHome, loadRepo, mutate, updatePlan, updateChunk, findPlan, findChunk,
+    plansByRepo, stateRef, getHome, loadRepo, mutate, keepWorkspaces, updatePlan, updateChunk, findPlan, findChunk,
   } = usePlanStore({
     // Chunks that finished while the app was closed.
     onLoad: (repoRoot, plans) => {
@@ -66,9 +66,12 @@ export function PlansProvider({ children }) {
   });
   const checkingRef = useRef(new Set()); // chunk ids being checked
   const toast = useToast();
-  const { tabs, switchTab } = useTabManager();
+  const { tabs, switchTab, workspaces, activeWorkspaceId } = useTabManager();
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+  const activeWorkspaceRef = useRef(activeWorkspaceId);
+  activeWorkspaceRef.current = activeWorkspaceId;
+  useEffect(() => { keepWorkspaces(workspaces.map((w) => w.id)); }, [workspaces, keepWorkspaces]);
   const tabRootsRef = useRef(new Map()); // tab folder -> repo root; misses aren't kept
 
   // The repos of the open tabs, where an agent may commit outside the plan's repos.
@@ -189,7 +192,8 @@ export function PlansProvider({ children }) {
     return stateRef.current[repoRoot] || [];
   }, [loadRepo, stateRef]);
 
-  const createPlan = useCallback(async (repoRoot, { source, importedFrom = null }) => {
+  // Stored in `workspaceId`'s folder; the active workspace's by default.
+  const createPlan = useCallback(async (repoRoot, { source, importedFrom = null, workspaceId = activeWorkspaceRef.current }) => {
     await loadRepo(repoRoot);
     const title = markdownTitle(source);
     const slug = slugify(title);
@@ -199,6 +203,7 @@ export function PlansProvider({ children }) {
       title: title || '',
       summary: '',
       repoRoot,
+      workspaceId,
       source,
       importedFrom,
       split: SPLIT_STATUS.RUNNING,

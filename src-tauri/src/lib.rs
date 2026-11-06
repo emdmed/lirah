@@ -218,6 +218,7 @@ pub fn run(initial_path: Option<String>) {
             store::store_read,
             store::store_write,
             store::store_delete,
+            store::store_list,
         ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -112,7 +112,7 @@ the full usage.
   4. If it still can't be fixed, add one task with a short problem explanation:
      `lirah tasks add "Plan <title>: <the problem in a few words>" --notes "..."`,
      with notes saying what's wrong, what you tried, and the plan and chunk ids.
-     Tell the user. Don't edit Lirah's plans.json by hand.
+     Tell the user. Don't edit Lirah's plan files by hand.
 - Task ids come from `lirah tasks`. Only delete a task when the user asks.
 - Run `lirah tasks` before adding, so you don't add a task that's already there.
 - A task title is one line; put details in `--notes` (markdown is fine). Quote

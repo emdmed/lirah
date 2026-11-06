@@ -121,6 +121,22 @@ pub fn delete_at(base: &Path, rel: &str) -> Result<(), StoreError> {
     result.map_err(|e| io(format!("{}: {e}", path.display())))
 }
 
+/// Names of the entries in a folder, sorted, without dotfiles (temp files). Missing is empty.
+pub fn list_at(base: &Path, rel: &str) -> Result<Vec<String>, StoreError> {
+    let path = resolve(base, rel)?;
+    let entries = match fs::read_dir(&path) {
+        Ok(e) => e,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(io(format!("{}: {e}", path.display()))),
+    };
+    let mut names: Vec<String> = entries
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|n| !n.starts_with('.'))
+        .collect();
+    names.sort();
+    Ok(names)
+}
+
 fn base() -> Result<PathBuf, StoreError> {
     crate::util::lirah_dir().ok_or_else(|| io("no home directory"))
 }
@@ -147,6 +163,11 @@ pub async fn store_write(rel: String, data: Value, expected_revision: Option<u64
 #[tauri::command]
 pub async fn store_delete(rel: String) -> Result<(), StoreError> {
     run("store_delete", move |b| delete_at(&b, &rel)).await
+}
+
+#[tauri::command]
+pub async fn store_list(rel: String) -> Result<Vec<String>, StoreError> {
+    run("store_list", move |b| list_at(&b, &rel)).await
 }
 
 #[cfg(test)]
@@ -222,6 +243,18 @@ mod tests {
         assert!(!b.join("workspaces/w1").exists());
         assert!(b.join("workspaces/w2/workspace.json").exists());
         delete_at(&b, "workspaces/w1").unwrap();
+        fs::remove_dir_all(&b).unwrap();
+    }
+
+    #[test]
+    fn list_names_folder_entries() {
+        let b = temp_base();
+        assert_eq!(list_at(&b, "workspaces/w1/plans").unwrap(), Vec::<String>::new());
+        write_at(&b, "workspaces/w1/plans/p2/plan.json", json!({}), None).unwrap();
+        write_at(&b, "workspaces/w1/plans/p1/plan.json", json!({}), None).unwrap();
+        fs::write(b.join("workspaces/w1/plans/.tmp"), "").unwrap();
+        assert_eq!(list_at(&b, "workspaces/w1/plans").unwrap(), vec!["p1", "p2"]);
+        assert!(list_at(&b, "../x").is_err());
         fs::remove_dir_all(&b).unwrap();
     }
 
