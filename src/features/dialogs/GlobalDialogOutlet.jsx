@@ -1,6 +1,9 @@
 import { Suspense } from 'react';
 import { NewTabDialog } from '@/features/tabs/NewTabDialog';
+import { lazyNamed } from '@/lib/lazyNamed';
 import { useDialogStore, useOpenDialogs } from './DialogProvider';
+
+const MarkdownViewerDialog = lazyNamed(() => import('@/features/markdown/MarkdownViewerDialog'), 'MarkdownViewerDialog');
 
 // App-wide dialogs, opened with `open(id, props, null)`. `ctx` is what App
 // passes in; `entry` is what the dialog was opened with.
@@ -8,6 +11,11 @@ const GLOBAL_DIALOGS = {
   newTab: {
     Component: NewTabDialog,
     props: (ctx) => ({ currentPath: ctx.currentPath, onOpenProject: ctx.onOpenProject }),
+  },
+  // Read-only preview of one file from outside a tab (the plans pane's saved prompts).
+  markdown: {
+    Component: MarkdownViewerDialog,
+    props: (_ctx, entry) => ({ filePath: entry.filePath }),
   },
 };
 
