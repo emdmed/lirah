@@ -141,3 +141,46 @@ export function saveWorkspaces(state) {
   }
   saveIfChanged(INDEX, { workspaces: workspaces.map((w) => w.id), activeWorkspaceId });
 }
+
+/**
+ * A list kept per workspace in workspaces/<id>/<file> as { [key]: [...] }. Items
+ * carry workspaceId in memory only. Workspaces that left the state are never written.
+ */
+export function workspaceListStore(file, key) {
+  const rel = (id) => `workspaces/${id}/${file}`;
+  const written = new Map(); // workspace id -> JSON last read or written
+  return {
+    rel,
+    /** Every workspace's items. `legacy()` seeds the active workspace while no workspace has the file. */
+    async load(legacy) {
+      const { workspaces, activeWorkspaceId } = current;
+      const docs = await Promise.all(workspaces.map((w) => load(rel(w.id)).catch(() => null)));
+      const items = [];
+      docs.forEach((doc, i) => {
+        if (!doc) return;
+        const id = workspaces[i].id;
+        const list = Array.isArray(doc[key]) ? doc[key] : [];
+        written.set(id, JSON.stringify(list));
+        items.push(...list.map((item) => ({ ...item, workspaceId: id })));
+      });
+      const seedId = activeWorkspaceId ?? workspaces[0]?.id;
+      if (docs.some(Boolean) || !seedId) return items;
+      return (await legacy()).map((item) => ({ ...item, workspaceId: seedId }));
+    },
+    /** Write the files whose list changed. */
+    save(items) {
+      for (const { id } of current.workspaces) {
+        const list = items.filter((item) => item.workspaceId === id).map(({ workspaceId, ...item }) => item);
+        const json = JSON.stringify(list);
+        if (json === (written.get(id) ?? '[]')) continue;
+        written.set(id, json);
+        save(rel(id), { [key]: list }).catch((error) => console.warn(`Failed to write ${rel(id)}:`, error));
+      }
+    },
+  };
+}
+
+/** The live workspace state (what TabContext last saved). */
+export function getCurrentWorkspaces() {
+  return current;
+}

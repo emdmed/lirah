@@ -1,11 +1,14 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { loadJson, saveJson } from '../../lib/storage';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { loadJson } from '../../lib/storage';
+import { getCurrentWorkspaces, workspaceListStore } from '../../lib/workspaceStore';
 
-// User-facing name: "context sets" — saved, named context (file
-// selections) per project. Storage key and shape stay "file groups".
+// User-facing name: "context sets" — saved, named context (file selections) per
+// project, kept per workspace in workspaces/<id>/context-sets.json. In code they
+// stay "file groups".
 const FileGroupsContext = createContext(undefined);
 
-const STORAGE_KEY = 'nevo-terminal:file-groups';
+const OLD_STORAGE_KEY = 'nevo-terminal:file-groups'; // only seeds a workspace, never written
+const store = workspaceListStore('context-sets.json', 'contextSets');
 const MAX_GROUPS = 100;
 
 function validateGroups(groups) {
@@ -26,19 +29,19 @@ function validateGroups(groups) {
   );
 }
 
-function loadGroups() {
-  return validateGroups(loadJson(STORAGE_KEY, []));
-}
-
-function saveGroups(groups) {
-  saveJson(STORAGE_KEY, groups);
-}
-
 export function FileGroupsProvider({ children }) {
-  const [groups, setGroups] = useState(() => loadGroups());
+  const [groups, setGroups] = useState([]);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    saveGroups(groups);
+    store.load(() => loadJson(OLD_STORAGE_KEY, []))
+      .then((loaded) => setGroups(validateGroups(loaded)))
+      .catch((error) => console.warn('Failed to load context sets:', error))
+      .finally(() => { loadedRef.current = true; });
+  }, []);
+
+  useEffect(() => {
+    if (loadedRef.current) store.save(groups);
   }, [groups]);
 
   const getGroupsForProject = useCallback((projectPath) => {
@@ -66,6 +69,7 @@ export function FileGroupsProvider({ children }) {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: name.trim(),
       projectPath: projectPath.trim(),
+      workspaceId: getCurrentWorkspaces().activeWorkspaceId,
       files: files.map(f => ({
         relativePath: f.relativePath,
         state: f.state

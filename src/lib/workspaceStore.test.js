@@ -56,3 +56,20 @@ it('migrates from localStorage, then restores the same state from files', async 
   expect(second.getWorkspaceData('w2', 'pins')).toEqual([]); // per workspace, not re-seeded
   expect(second.getWorkspaceData('w2', 'terminalSessions')).toEqual({ b: 's1' });
 });
+
+it('workspaceListStore seeds the active workspace once and writes only live, changed lists', async () => {
+  vi.resetModules();
+  const ws = await import('./workspaceStore.js');
+  await ws.initWorkspaces(); // w1, w2 from the files above; active w2
+  const { flush } = await import('./fileStore.js');
+  const store = ws.workspaceListStore('jobs/jobs.json', 'jobs');
+  const seeded = await store.load(async () => [{ id: 'j1' }]);
+  expect(seeded).toEqual([{ id: 'j1', workspaceId: 'w2' }]);
+  store.save([...seeded, { id: 'j2', workspaceId: 'gone' }]);
+  await flush();
+  expect(disk.get('workspaces/w2/jobs/jobs.json').jobs).toEqual([{ id: 'j1' }]);
+  expect(disk.has('workspaces/w1/jobs/jobs.json')).toBe(false); // empty and never written
+  expect(disk.has('workspaces/gone/jobs/jobs.json')).toBe(false);
+  const again = await ws.workspaceListStore('jobs/jobs.json', 'jobs').load(async () => [{ id: 'old' }]);
+  expect(again).toEqual([{ id: 'j1', workspaceId: 'w2' }]); // a file exists: no re-seed
+});

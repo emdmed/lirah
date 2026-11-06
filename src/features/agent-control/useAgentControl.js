@@ -428,7 +428,10 @@ export function useAgentControl() {
           confirmLabel: 'Start job',
         });
         if (!ok) throw new Error('denied by user');
-        const id = await live.current.jobs.launchJob({ cli, prompt, label, repoPath: repo, useWorktree: true });
+        const id = await live.current.jobs.launchJob({
+          cli, prompt, label, repoPath: repo, useWorktree: true,
+          workspaceId: callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId,
+        });
         live.current.toast.info(`Claude started job "${label}"`);
         return `started job ${id} (${cli}) in ${repo}; follow it with \`lirah jobs show ${id}\``;
       },
