@@ -4,8 +4,8 @@
 //! from agentic-orchestration-worflows (agentic-compaction v0.0.11), the engine
 //! its hooks run. To update it, copy both files over.
 //!
-//! Lirah writes the engine, `hook.js` and a Claude Code plugin under
-//! ~/.lirah/compaction. The launcher loads the plugin with `--plugin-dir`, so
+//! Lirah writes the engine and `hook.js` under ~/.lirah/compaction; their
+//! hooks go into Lirah's base plugin (agent_hooks), which the launcher loads, so
 //! every Claude Code that Lirah starts runs the hook on each prompt. The hook
 //! does nothing unless its terminal (`LIRAH_PTY_SESSION`) has a marker in
 //! `on/`; the tab's switch writes or removes it, so a toggle applies on the
@@ -35,10 +35,6 @@ fn compaction_dir() -> Option<PathBuf> {
     crate::util::lirah_dir().map(|d| d.join("compaction"))
 }
 
-fn plugin_dir() -> Option<PathBuf> {
-    compaction_dir().map(|d| d.join("claude-plugin"))
-}
-
 /// Marker for a terminal whose tab has compaction on.
 fn session_marker(session_id: &str) -> Option<PathBuf> {
     // Session ids are UUIDs; anything else can't name a file here.
@@ -58,8 +54,8 @@ fn write_if_changed(path: &Path, contents: &str) -> Result<(), String> {
     fs::write(path, contents).map_err(|e| format!("Failed to write {}: {}", path.display(), e))
 }
 
-/// Write the engine, the hook script and the plugin that registers it.
-fn install() -> Result<PathBuf, String> {
+/// Write the engine and the hook scripts.
+fn install() -> Result<(), String> {
     let dir = compaction_dir().ok_or("No home directory")?;
     write_if_changed(&dir.join("compaction.js"), COMPACTION_JS)?;
     write_if_changed(&dir.join("parse-utils.js"), PARSE_UTILS_JS)?;
@@ -73,32 +69,32 @@ fn install() -> Result<PathBuf, String> {
     let _ = fs::remove_file(dir.join("hook.sh"));
     fs::create_dir_all(dir.join("on")).map_err(|e| e.to_string())?;
 
-    let to_json = |v: serde_json::Value| serde_json::to_string_pretty(&v).map_err(|e| e.to_string());
-    let plugin = plugin_dir().ok_or("No home directory")?;
-    let manifest = to_json(serde_json::json!({
-        "name": "lirah-compaction",
-        "version": "1.0.0",
-        "author": { "name": "Lirah" },
-        "description": "Keeps a grep-first index of the project fresh and has the agent use it before reading code, for Lirah tabs with compaction on."
-    }))?;
-    write_if_changed(&plugin.join(".claude-plugin").join("plugin.json"), &manifest)?;
+    // Left by builds that shipped a plugin of its own; the base plugin carries the hooks now.
+    let _ = fs::remove_dir_all(dir.join("claude-plugin"));
+    Ok(())
+}
+
+/// The compaction hook entries for the base plugin's hooks.json, or None when
+/// the scripts aren't installed.
+pub fn claude_hooks() -> Option<serde_json::Value> {
+    let dir = compaction_dir()?;
+    let (script, guard) = (dir.join("hook.js"), dir.join("guard.js"));
+    if !script.exists() || !guard.exists() {
+        return None;
+    }
     // A rebuild is capped at 6s inside the script; the rest is headroom.
-    let hooks = to_json(serde_json::json!({
-        "hooks": {
-            "SessionStart": [{
-                "hooks": [{ "type": "command", "command": format!("{} --session-start", crate::util::node_command(&script)), "timeout": 10 }]
-            }],
-            "UserPromptSubmit": [{
-                "hooks": [{ "type": "command", "command": crate::util::node_command(&script), "timeout": 15 }]
-            }],
-            "PreToolUse": [{
-                "matcher": "Read|Glob|Grep|Bash|Agent|Task",
-                "hooks": [{ "type": "command", "command": crate::util::node_command(&guard), "timeout": 10 }]
-            }]
-        }
-    }))?;
-    write_if_changed(&plugin.join("hooks").join("hooks.json"), &hooks)?;
-    Ok(plugin)
+    Some(serde_json::json!({
+        "SessionStart": [{
+            "hooks": [{ "type": "command", "command": format!("{} --session-start", crate::util::node_command(&script)), "timeout": 10 }]
+        }],
+        "UserPromptSubmit": [{
+            "hooks": [{ "type": "command", "command": crate::util::node_command(&script), "timeout": 15 }]
+        }],
+        "PreToolUse": [{
+            "matcher": "Read|Glob|Grep|Bash|Agent|Task",
+            "hooks": [{ "type": "command", "command": crate::util::node_command(&guard), "timeout": 10 }]
+        }]
+    }))
 }
 
 /// Install at startup so the plugin is ready for the first launch. A failure
@@ -114,14 +110,6 @@ pub fn forget_session(session_id: &str) {
     if let Some(marker) = session_marker(session_id) {
         let _ = fs::remove_file(marker);
     }
-}
-
-/// The plugin directory the launcher passes to Claude Code with `--plugin-dir`.
-#[tauri::command]
-pub fn get_compaction_plugin_dir() -> Option<String> {
-    plugin_dir()
-        .filter(|p| p.join("hooks").join("hooks.json").exists())
-        .map(|p| p.to_string_lossy().into_owned())
 }
 
 /// Switch the compaction hook on or off for one terminal.

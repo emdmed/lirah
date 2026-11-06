@@ -178,7 +178,6 @@ pub fn run(initial_path: Option<String>) {
             typecheck::check_file_types,
             typecheck::check_project_types,
             python_parser::parse_python_skeleton,
-            compaction::get_compaction_plugin_dir,
             compaction::set_compaction_hook,
             // Git
             fs::git::get_git_stats,
@@ -198,8 +197,7 @@ pub fn run(initial_path: Option<String>) {
             claude::tokens::get_project_stats,
             claude::tokens::get_all_projects_stats,
             claude::context::get_context_breakdown,
-            agent_hooks::get_agent_hook_plugin_dir,
-            agent_hooks::get_agent_control_plugin_dir,
+            agent_hooks::install_base_plugin,
             user_plugins::install_user_plugin,
             agent_hooks::set_opencode_agent_plugin,
             agent_hooks::set_prompt_context,

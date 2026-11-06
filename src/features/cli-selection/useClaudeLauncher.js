@@ -78,21 +78,19 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
         toastError(`Couldn't launch ${selectedCli}: "${cliConfig.check}" was not found on your PATH. Install it or pick another CLI.`);
         return;
       }
-      // Lirah's hook plugins, loaded for this session only and each optional
-      // in settings. Agent state: the agent reports working / needs
+      // Lirah's base plugin, loaded for this session only, built from the
+      // parts on in settings. Agent state: the agent reports working / needs
       // permission / done to the tab. Compaction: its hook only acts for tabs
       // with compaction switched on, so that per-tab switch needs no relaunch.
       // Agent control: the skill that teaches the agent the lirah command.
       if (selectedCli === 'claude-code') {
         const { agentStateHook, compactionHook, agentControl } = getSettings();
-        const pluginDirs = await Promise.all([
-          agentStateHook ? invoke('get_agent_hook_plugin_dir').catch(() => null) : null,
-          compactionHook ? invoke('get_compaction_plugin_dir').catch(() => null) : null,
-          agentControl ? invoke('get_agent_control_plugin_dir').catch(() => null) : null,
-        ]);
+        const base = await invoke('install_base_plugin', {
+          agentState: !!agentStateHook, compaction: !!compactionHook, agentControl: !!agentControl,
+        }).catch(() => null);
         // PowerShell also reads the curly quotes as quote characters; doubling any of them keeps the string whole.
         const quote = (v) => `'${powershell ? v.replace(/['‘’‚‛]/g, '$&$&') : v.replace(/'/g, "'\\''")}'`;
-        for (const dir of pluginDirs.filter(Boolean)) command += ` --plugin-dir ${quote(dir)}`;
+        if (base) command += ` --plugin-dir ${quote(base)}`;
         // User plugins: rebuilt each launch from their folder; a broken one is skipped, not fatal.
         for (const p of (getSettings().plugins || []).filter((x) => x.enabled)) {
           try {
