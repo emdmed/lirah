@@ -3,7 +3,7 @@ import { useToast } from "../toast";
 import { useConfirm } from "../dialogs/DialogProvider";
 import { getAgentHookState, getLastTurn } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
-import { getSavedWorkspaces, saveWorkspaces } from "../../lib/workspaceStore";
+import { deleteWorkspaceFolder, getSavedWorkspaces, saveWorkspaces } from "../../lib/workspaceStore";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 import { invoke } from "@tauri-apps/api/core";
 import { getSettings } from "../settings/settingsStore";
@@ -269,17 +269,21 @@ export function TabProvider({ children }) {
     setWorkspaces((prev) => prev.map((w) => (w.id === workspaceId ? { ...w, name: name.trim() } : w)));
   }, []);
 
-  // Removes a workspace and closes its tabs, after asking when it has any.
+  // Removes a workspace, closes its tabs and deletes its folder, after asking.
   // The last workspace stays. Resolves true when it was removed.
   const removeWorkspace = useCallback(async (workspaceId) => {
     const list = workspacesRef.current;
     const ws = list.find((w) => w.id === workspaceId);
     if (!ws || list.length < 2) return false;
     const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
-    if (own.length > 0 && !(await confirm({
+    const closes = own.length === 0 ? '' : ` Its ${own.length === 1 ? 'tab closes' : `${own.length} tabs close`}, with their terminals and agents.`;
+    if (!(await confirm({
       title: `Remove workspace ${ws.name}?`,
-      description: `Its ${own.length === 1 ? 'tab closes' : `${own.length} tabs close`}, with their terminals and agents.`,
-      facts: own.map((t) => ({ label: 'Tab', value: t.customLabel || t.label })),
+      description: `Its folder and everything in it are deleted.${closes}`,
+      facts: [
+        { label: 'Folder', value: `~/.lirah/workspaces/${workspaceId}/` },
+        ...own.map((t) => ({ label: 'Tab', value: t.customLabel || t.label })),
+      ],
       confirmLabel: 'Remove workspace',
       destructive: true,
     }))) return false;
@@ -292,6 +296,7 @@ export function TabProvider({ children }) {
     setTabs((prev) => prev.filter((t) => !gone.has(t.id)));
     workspacesRef.current = list.filter((w) => w.id !== workspaceId);
     setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId));
+    deleteWorkspaceFolder(workspaceId).catch((error) => console.warn(`Failed to delete workspace ${workspaceId}:`, error));
     return true;
   }, [confirm, switchWorkspace]);
 

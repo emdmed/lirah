@@ -215,8 +215,12 @@ mod tests {
     fn delete_removes_folders() {
         let b = temp_base();
         write_at(&b, "workspaces/w1/tasks.json", json!({}), None).unwrap();
+        write_at(&b, "workspaces/w1/plans/p1/plan.json", json!({}), None).unwrap();
+        write_at(&b, "workspaces/w2/workspace.json", json!({}), None).unwrap();
+        assert!(delete_at(&b, "workspaces/w1/../w2").is_err());
         delete_at(&b, "workspaces/w1").unwrap();
         assert!(!b.join("workspaces/w1").exists());
+        assert!(b.join("workspaces/w2/workspace.json").exists());
         delete_at(&b, "workspaces/w1").unwrap();
         fs::remove_dir_all(&b).unwrap();
     }

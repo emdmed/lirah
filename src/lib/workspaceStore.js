@@ -5,7 +5,7 @@
 // pins, budgets and terminalSessions are per-workspace data owned by other modules
 // (getWorkspaceData/setWorkspaceData); old global pins and budgets seed every
 // workspace whose file does not have them yet.
-import { load, save } from './fileStore';
+import { load, remove, save } from './fileStore';
 import { loadJson, loadText } from './storage';
 
 const INDEX = 'workspaces/index.json';
@@ -110,7 +110,15 @@ function saveIfChanged(rel, doc) {
   save(rel, doc, { debounce: 300 }).catch((error) => console.warn(`Failed to write ${rel}:`, error));
 }
 
-/** Write the index and every workspace's file. Workspaces dropped from the index keep their folder. */
+/** Delete workspaces/<id>/ and everything in it. Call after the workspace left the state. */
+export async function deleteWorkspaceFolder(id) {
+  extras.delete(id);
+  lastWritten.delete(wsFile(id));
+  await remove(wsFile(id)); // drops a pending save that would recreate the folder
+  await remove(`workspaces/${id}`);
+}
+
+/** Write the index and every workspace's file. Removing a folder is deleteWorkspaceFolder's job. */
 export function saveWorkspaces(state) {
   const { workspaces, tabs, activeWorkspaceId } = state;
   current = state;
