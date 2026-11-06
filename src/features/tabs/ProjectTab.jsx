@@ -128,7 +128,7 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, compactionHook = false, launchOnStart = false, availableUpdate }) {
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -197,10 +197,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider>
-        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, tabId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
+  ), [booted, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -238,7 +238,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   );
 });
 
-function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -978,7 +978,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   });
 
   return (
-    <TokenBudgetProvider tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
+    <TokenBudgetProvider workspaceId={workspaceId} tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
       <Layout
         sidebar={

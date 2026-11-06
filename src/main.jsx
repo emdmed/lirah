@@ -44,17 +44,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <BookmarksProvider>
             <PromptTemplatesProvider>
               <FileGroupsProvider>
-                <PinnedFilesProvider>
                   <AgentJobsProvider>
                     <TabProvider>
+                     <PinnedFilesProvider>
                       <PlansProvider>
                         <TasksProvider>
                           <App />
                         </TasksProvider>
                       </PlansProvider>
+                     </PinnedFilesProvider>
                     </TabProvider>
                   </AgentJobsProvider>
-                </PinnedFilesProvider>
               </FileGroupsProvider>
             </PromptTemplatesProvider>
           </BookmarksProvider>

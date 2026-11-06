@@ -1,42 +1,32 @@
 import { invoke } from '@tauri-apps/api/core';
 
-// Which PTY session each reattachable terminal owns, kept in sessionStorage:
-// it survives a webview reload (when the backend sessions survive too) and is
-// empty after an app restart (when they don't). An entry is removed when its
-// terminal closes normally, so after a reload the entries left are exactly the
-// sessions the new page should claim back.
-const STORAGE_KEY = 'lirah:terminal-sessions:v1';
+// Which PTY session each reattachable terminal owns, kept per workspace in
+// workspace.json as terminalSessions { tabId: sessionId }. After a reload the
+// backend sessions survive and are claimed back; after an app restart the ids
+// are stale, attach_terminal fails and a fresh session replaces the entry.
+// Entries of closed tabs are dropped when the workspace is saved.
+import { getWorkspaceData, setWorkspaceData, allWorkspaceData, workspaceOfTab } from './workspaceStore';
 
-function read() {
-  try {
-    return JSON.parse(sessionStorage.getItem(STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
+const KEY = 'terminalSessions';
+
+export function getTerminalSession(tabId) {
+  const ws = workspaceOfTab(tabId);
+  return ws ? getWorkspaceData(ws, KEY)[tabId] ?? null : null;
 }
 
-function write(map) {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    // Storage unavailable: terminals just won't survive a reload.
-  }
+export function rememberTerminalSession(tabId, sessionId) {
+  const ws = workspaceOfTab(tabId);
+  if (ws) setWorkspaceData(ws, KEY, { ...getWorkspaceData(ws, KEY), [tabId]: sessionId });
 }
 
-export function getTerminalSession(key) {
-  return read()[key] ?? null;
-}
-
-export function rememberTerminalSession(key, sessionId) {
-  write({ ...read(), [key]: sessionId });
-}
-
-export function forgetTerminalSession(key, sessionId) {
-  const map = read();
+export function forgetTerminalSession(tabId, sessionId) {
+  const ws = workspaceOfTab(tabId);
+  if (!ws) return;
+  const map = getWorkspaceData(ws, KEY);
   // Only drop our own entry: a newer terminal may already own the key.
-  if (map[key] !== sessionId) return;
-  delete map[key];
-  write(map);
+  if (map[tabId] !== sessionId) return;
+  const { [tabId]: _, ...rest } = map;
+  setWorkspaceData(ws, KEY, rest);
 }
 
 // Once per page load: close the sessions the previous page left behind that no
@@ -45,7 +35,7 @@ let reaped = false;
 export function reapOrphanedTerminals() {
   if (reaped) return;
   reaped = true;
-  invoke('reap_detached_terminals', { keep: Object.values(read()) }).catch((e) => {
+  invoke('reap_detached_terminals', { keep: allWorkspaceData(KEY).flatMap(Object.values) }).catch((e) => {
     console.debug('Terminal reap skipped:', e);
   });
 }

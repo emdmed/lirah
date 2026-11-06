@@ -185,6 +185,7 @@ function App() {
               <DevProfiler key={tab.id} id={`ProjectTab:${tab.label}`}>
                 <ProjectTab
                   tabId={tab.id}
+                  workspaceId={tab.workspaceId}
                   projectPath={tab.projectPath}
                   isActive={tab.id === activeTabId}
                   compactionHook={!!tab.compactionHook}
