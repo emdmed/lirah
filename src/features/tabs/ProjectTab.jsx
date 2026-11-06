@@ -286,7 +286,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, workspaceId, compaction
   }, []);
 
   // Domain hooks
-  const settings = useTerminalSettings();
+  const settings = useTerminalSettings(workspaceId);
   const toast = useToast();
   const dialogs = useDialogs(tabId);
 

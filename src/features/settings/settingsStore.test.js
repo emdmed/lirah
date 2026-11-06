@@ -67,4 +67,23 @@ describe('settingsStore', () => {
     expect(s.getSettings().bookmarks).toEqual([]);
     expect(s.getSettings().planContexts).toEqual(s.SETTINGS_DEFAULTS.planContexts);
   });
+
+  it('resolves defaults, then settings.json, then workspace overrides', async () => {
+    disk.set('settings.json', { sandboxEnabled: true, autoLaunchCli: false, scrollback: 900, version: 1, revision: 1 });
+    disk.set('workspaces/index.json', { workspaces: ['w1'], activeWorkspaceId: 'w1', version: 1, revision: 1 });
+    disk.set('workspaces/w1/workspace.json', {
+      id: 'w1', name: 'main', tabs: [], version: 1, revision: 1,
+      overrides: { sandboxEnabled: false, selectedCli: 'opencode', scrollback: 5, autoLaunchCli: 'yes' },
+    });
+    const s = await fresh();
+    await s.initSettings();
+    await (await import('../../lib/workspaceStore.js')).initWorkspaces();
+    const eff = s.getEffectiveSettings('w1');
+    expect(eff.sandboxEnabled).toBe(false); // override wins over settings.json
+    expect(eff.selectedCli).toBe('opencode'); // override wins over the default
+    expect(eff.scrollback).toBe(900); // not overridable: ignored
+    expect(eff.autoLaunchCli).toBe(false); // wrong type: settings.json kept
+    expect(eff.networkIsolation).toBe(false); // code default
+    expect(s.getEffectiveSettings('other')).toBe(s.getSettings());
+  });
 });

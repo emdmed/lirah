@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { createEmitter } from '../../lib/createStore';
 import { load as loadFile, save as saveFile } from '../../lib/fileStore';
+import { getWorkspaceData } from '../../lib/workspaceStore';
 
 // App preferences in one module-level store, persisted to ~/.lirah/settings.json.
 // The old localStorage blob (SETTINGS_KEY) only seeds that file on first start
@@ -201,9 +202,10 @@ const VALIDATORS = {
 };
 
 // Keep only known keys whose type matches the default, so a corrupt or
-// hand-edited blob can't put a string where a boolean belongs.
-export function sanitize(raw) {
-  const out = { ...SETTINGS_DEFAULTS };
+// hand-edited blob can't put a string where a boolean belongs. Invalid keys
+// keep their value from `base`.
+export function sanitize(raw, base = SETTINGS_DEFAULTS) {
+  const out = { ...base };
   if (!raw || typeof raw !== 'object') return out;
   for (const key of Object.keys(SETTINGS_DEFAULTS)) {
     if (!(key in raw)) continue;
@@ -266,6 +268,19 @@ export function getSettings() {
   return state;
 }
 
+// Settings a workspace may set over settings.json, in workspace.json `overrides`.
+// Budgets are per-workspace data already (workspace.json `budgets`), not a setting.
+export const OVERRIDABLE_KEYS = ['selectedCli', 'sandboxEnabled', 'networkIsolation', 'autoLaunchCli', 'startupMode'];
+
+/** Code defaults, then settings.json, then the workspace's overrides (other keys ignored). */
+export function getEffectiveSettings(workspaceId) {
+  const overrides = workspaceId ? getWorkspaceData(workspaceId, 'overrides') : null;
+  if (!overrides || typeof overrides !== 'object') return state;
+  const picked = Object.fromEntries(OVERRIDABLE_KEYS.filter((k) => k in overrides).map((k) => [k, overrides[k]]));
+  // An override of the wrong type is dropped, leaving the settings.json value.
+  return Object.keys(picked).length ? sanitize(picked, state) : state;
+}
+
 // `value` may be a functional updater, like a useState setter.
 export function setSetting(key, value) {
   const prev = state[key];
@@ -282,16 +297,18 @@ export function settingSetter(key) {
   return (setters[key] ||= (value) => setSetting(key, value));
 }
 
-// One shared preference: every tab sees the same value, live.
-export function useSetting(key) {
-  const value = useSyncExternalStore(subscribeSettings, () => state[key]);
+// One shared preference: every tab sees the same value, live. With a
+// workspaceId it reads the effective value (that workspace's override wins).
+export function useSetting(key, workspaceId) {
+  const value = useSyncExternalStore(subscribeSettings, () => (workspaceId ? getEffectiveSettings(workspaceId) : state)[key]);
   return [value, settingSetter(key)];
 }
 
-// A per-tab value seeded from the store. The tab keeps its own live copy and
-// every change is written back as the default for the next tab to open.
-export function useSeededSetting(key) {
-  const [value, setValue] = useState(() => state[key]);
+// A per-tab value seeded from the store (the effective value, given a
+// workspaceId). The tab keeps its own live copy and every change is written
+// back as the default for the next tab to open.
+export function useSeededSetting(key, workspaceId) {
+  const [value, setValue] = useState(() => (workspaceId ? getEffectiveSettings(workspaceId) : state)[key]);
   // Resolve functional updaters against a ref, not inside a setState updater:
   // writing the store there would notify other components mid-render.
   const valueRef = useRef(value);

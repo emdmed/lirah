@@ -6,7 +6,7 @@ import { getTabSession } from "./terminalActivity";
 import { deleteWorkspaceFolder, getSavedWorkspaces, saveWorkspaces } from "../../lib/workspaceStore";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 import { invoke } from "@tauri-apps/api/core";
-import { getSettings } from "../settings/settingsStore";
+import { getEffectiveSettings } from "../settings/settingsStore";
 import { formatDuration } from "../../lib/formatDuration";
 import { tildePath } from "../../components/ui/picker";
 
@@ -55,9 +55,9 @@ function createTab(projectPath, { launch = false, name, workspaceId } = {}) {
 }
 
 // The startup projects to open instead of restoring the saved tabs, or null
-// when the app should restore as usual.
+// when the app should restore as usual. The active workspace may override startupMode.
 function startupProjectList() {
-  const { startupMode, startupProjects } = getSettings();
+  const { startupMode, startupProjects } = getEffectiveSettings(getSavedWorkspaces().activeWorkspaceId);
   return startupMode === 'projects' && startupProjects.length > 0 ? startupProjects : null;
 }
 

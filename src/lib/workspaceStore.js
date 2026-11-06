@@ -1,6 +1,6 @@
 // Workspaces and their tabs, persisted under ~/.lirah/workspaces:
 //   index.json            { workspaces: [id, ...], activeWorkspaceId }
-//   <id>/workspace.json   { id, name, activeTabId, tabs: [...], pins, budgets, terminalSessions }
+//   <id>/workspace.json   { id, name, activeTabId, tabs: [...], pins, budgets, terminalSessions, overrides }
 // The old localStorage keys only seed a missing index and are left as a backup.
 // pins, budgets and terminalSessions are per-workspace data owned by other modules
 // (getWorkspaceData/setWorkspaceData); old global pins and budgets seed every
@@ -20,6 +20,7 @@ const EXTRAS = {
   pins: () => [],
   budgets: () => ({ budgets: {}, alertStates: {} }),
   terminalSessions: () => ({}), // tabId -> PTY session id, for reattach after a reload
+  overrides: () => ({}), // settings this workspace sets over settings.json (see getEffectiveSettings)
 };
 
 let saved = { workspaces: [], tabs: [], activeTabId: null, activeWorkspaceId: null };
@@ -43,8 +44,8 @@ function fromLocalStorage() {
 async function fromFiles(index) {
   const ids = Array.isArray(index.workspaces) ? index.workspaces : [];
   const docs = (await Promise.all(ids.map((id) => load(wsFile(id))))).filter(Boolean);
-  for (const d of docs) extras.set(d.id, { pins: d.pins, budgets: d.budgets, terminalSessions: d.terminalSessions });
-  const workspaces = docs.map(({ version, revision, tabs, pins, budgets, terminalSessions, ...w }) => w);
+  for (const d of docs) extras.set(d.id, { pins: d.pins, budgets: d.budgets, terminalSessions: d.terminalSessions, overrides: d.overrides });
+  const workspaces = docs.map(({ version, revision, tabs, pins, budgets, terminalSessions, overrides, ...w }) => w);
   const tabs = docs.flatMap((d) => (Array.isArray(d.tabs) ? d.tabs : []).map((t) => ({ ...t, workspaceId: d.id })));
   const active = workspaces.find((w) => w.id === index.activeWorkspaceId);
   const activeTabId = active?.activeTabId ?? tabs.find((t) => t.workspaceId === active?.id)?.id ?? null;
@@ -78,7 +79,7 @@ function seedOldGlobals() {
   }
 }
 
-/** A workspace's pins, budgets or terminalSessions (a default when unset). */
+/** A workspace's pins, budgets, terminalSessions or overrides (a default when unset). */
 export function getWorkspaceData(id, key) {
   return extras.get(id)?.[key] ?? EXTRAS[key]();
 }
@@ -133,6 +134,7 @@ export function saveWorkspaces(state) {
       pins: getWorkspaceData(w.id, 'pins'),
       budgets: getWorkspaceData(w.id, 'budgets'),
       terminalSessions,
+      overrides: getWorkspaceData(w.id, 'overrides'),
     });
   }
   saveIfChanged(INDEX, { workspaces: workspaces.map((w) => w.id), activeWorkspaceId });
