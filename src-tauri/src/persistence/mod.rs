@@ -1,6 +1,7 @@
 //! Persisted JSON files under `~/.lirah/`: one envelope, atomic writes and a
 //! revision check so a crash or a second writer never loses data.
 
+mod backup;
 mod envelope;
 mod store;
 
@@ -24,6 +25,18 @@ pub async fn write_persisted(
 ) -> Result<Persisted, String> {
     crate::ipc::blocking("write_persisted", move || {
         store::write(path.as_ref(), version, data, expected_revision)
+    })
+    .await
+}
+
+/// Back up a file before a migration rewrites it (the steps run in JS, the
+/// write goes through `write_persisted`). Returns the backup path, or `None`
+/// when there is no file yet.
+#[tauri::command]
+pub async fn backup_persisted(path: String) -> Result<Option<String>, String> {
+    crate::ipc::blocking("backup_persisted", move || {
+        let backup = backup::backup(path.as_ref())?;
+        Ok(backup.map(|path| path.to_string_lossy().into_owned()))
     })
     .await
 }

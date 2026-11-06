@@ -163,6 +163,7 @@ pub fn run(initial_path: Option<String>) {
             fs::directory::write_file_content,
             persistence::read_persisted,
             persistence::write_persisted,
+            persistence::backup_persisted,
             fs::directory::read_directory_recursive,
             fs::commands::get_home_dir,
             fs::commands::get_shell_kind,
