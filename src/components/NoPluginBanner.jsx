@@ -25,11 +25,16 @@ export const NoPluginBanner = memo(function NoPluginBanner({ sessionId, isActive
   const idleAtRef = useRef(null);
 
   useEffect(() => { idleAtRef.current = null; setShow(false); }, [sessionId]);
+  // Stamped only when the poll result changes: re-running on `live` (the tab or
+  // window shown at boot) with an old "no claude" would date it after the
+  // launcher claude's SessionStart and raise the banner wrongly.
+  useEffect(() => {
+    if (running !== undefined && running !== 'claude') idleAtRef.current = Date.now();
+  }, [running, sessionId]);
 
   useEffect(() => {
     if (!live || running === undefined) return;
     if (running !== 'claude') {
-      idleAtRef.current = Date.now();
       setShow(false);
       return;
     }

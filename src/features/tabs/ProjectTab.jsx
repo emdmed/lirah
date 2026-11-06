@@ -16,7 +16,8 @@ import { useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession, getLastOutputAt } from "./terminalActivity";
-import { getAgentHookState } from "./agentHookState";
+import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from "./agentHookState";
+import { getTabTranscript, rememberTabTranscript } from "../../lib/terminalSessions";
 import { useTabContextFill } from "./tabContextFill";
 import { useTabAutoCommit } from "./tabAutoCommit";
 import { registerTabPrompt } from "./tabPrompts";
@@ -415,11 +416,29 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     await launchClaude();
   }, [terminateCliProcess, launchClaude]);
 
+  // Remember the conversation this tab's agent is in, for launchFresh after a restart.
+  useEffect(() => {
+    const id = terminalSessionId;
+    if (!id) return;
+    return subscribeAgentHooks((change) => {
+      const path = change?.sessionId === id && getAgentTranscript(id);
+      if (path) rememberTabTranscript(tabId, path);
+    });
+  }, [terminalSessionId, tabId]);
+
   // Every fresh shell starts the tab's agent, so a tab opens straight into it
   // (with auto-launch off, only a tab opened with a launch request does).
   // Waits until the tab is first shown, so restoring many tabs at startup
   // doesn't start every agent at once. Typing into the shell first cancels it.
-  const launchFresh = useStableHandler(launchClaude);
+  const launchFresh = useStableHandler(async () => {
+    // Continue the tab's last conversation if its transcript is still there
+    // (claude writes none for a session that never got a prompt).
+    const transcript = settings.selectedCli === 'claude-code' ? getTabTranscript(tabId) : null;
+    const resume = transcript && await invoke('path_exists', { path: transcript }).catch(() => false);
+    const resumeId = resume ? transcript.split(/[\\/]/).pop().replace(/\.jsonl$/, '') : null;
+    return launchClaude({ resumeId });
+  });
+
   useEffect(() => {
     const id = terminalSessionId;
     if (!(settings.autoLaunchCli || launchRequested) || !isActive || !terminalReady || !id || freshShellRef.current !== id) return;

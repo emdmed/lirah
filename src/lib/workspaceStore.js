@@ -22,6 +22,7 @@ const EXTRAS = {
   terminalSessions: () => ({}), // tabId -> PTY session id, for reattach after a reload
   overrides: () => ({}), // settings this workspace sets over settings.json (see getEffectiveSettings)
   drafts: () => ({}), // tabId -> unsent prompt (see promptDrafts.js)
+  agentTranscripts: () => ({}), // tabId -> last claude transcript, resumed after a restart
 };
 
 let saved = { workspaces: [], tabs: [], activeTabId: null, activeWorkspaceId: null };
@@ -45,8 +46,8 @@ function fromLocalStorage() {
 async function fromFiles(index) {
   const ids = Array.isArray(index.workspaces) ? index.workspaces : [];
   const docs = (await Promise.all(ids.map((id) => load(wsFile(id))))).filter(Boolean);
-  for (const d of docs) extras.set(d.id, { pins: d.pins, budgets: d.budgets, terminalSessions: d.terminalSessions, overrides: d.overrides, drafts: d.drafts });
-  const workspaces = docs.map(({ version, revision, tabs, pins, budgets, terminalSessions, overrides, drafts, ...w }) => w);
+  for (const d of docs) extras.set(d.id, { pins: d.pins, budgets: d.budgets, terminalSessions: d.terminalSessions, overrides: d.overrides, drafts: d.drafts, agentTranscripts: d.agentTranscripts });
+  const workspaces = docs.map(({ version, revision, tabs, pins, budgets, terminalSessions, overrides, drafts, agentTranscripts, ...w }) => w);
   const tabs = docs.flatMap((d) => (Array.isArray(d.tabs) ? d.tabs : []).map((t) => ({ ...t, workspaceId: d.id })));
   const active = workspaces.find((w) => w.id === index.activeWorkspaceId);
   const activeTabId = active?.activeTabId ?? tabs.find((t) => t.workspaceId === active?.id)?.id ?? null;
@@ -139,6 +140,7 @@ export function saveWorkspaces(state) {
       terminalSessions: openTabsOnly('terminalSessions'),
       overrides: getWorkspaceData(w.id, 'overrides'),
       drafts: openTabsOnly('drafts'),
+      agentTranscripts: openTabsOnly('agentTranscripts'),
     });
   }
   saveIfChanged(INDEX, { workspaces: workspaces.map((w) => w.id), activeWorkspaceId });

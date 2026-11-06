@@ -41,7 +41,8 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
     checkAvailability();
   }, [terminalSessionId]);
 
-  const launchCli = useCallback(async () => {
+  // resumeId: a claude conversation to continue (claude-code only).
+  const launchCli = useCallback(async ({ resumeId } = {}) => {
     if (!terminalSessionId) {
       console.warn('Terminal session not ready, cannot launch CLI');
       toastError('Terminal is still starting. Try launching again in a moment.');
@@ -88,6 +89,7 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
         // PowerShell also reads the curly quotes as quote characters; doubling any of them keeps the string whole.
         const quote = (v) => `'${powershell ? v.replace(/['‘’‚‛]/g, '$&$&') : v.replace(/'/g, "'\\''")}'`;
         if (base) command += ` --plugin-dir ${quote(base)}`;
+        if (resumeId) command += ` --resume ${quote(resumeId)}`;
         // User plugins: rebuilt each launch from their folder; a broken one is skipped, not fatal.
         for (const p of (getSettings().plugins || []).filter((x) => x.enabled)) {
           try {

@@ -39,3 +39,19 @@ export function reapOrphanedTerminals() {
     console.debug('Terminal reap skipped:', e);
   });
 }
+
+// The claude conversation each tab last ran, as its transcript path, so the
+// agent a restart auto-launches resumes it instead of starting over.
+const TRANSCRIPTS = 'agentTranscripts';
+
+export function getTabTranscript(tabId) {
+  const ws = workspaceOfTab(tabId);
+  return ws ? getWorkspaceData(ws, TRANSCRIPTS)[tabId] ?? null : null;
+}
+
+export function rememberTabTranscript(tabId, path) {
+  const ws = workspaceOfTab(tabId);
+  if (!ws) return;
+  const map = getWorkspaceData(ws, TRANSCRIPTS);
+  if (map[tabId] !== path) setWorkspaceData(ws, TRANSCRIPTS, { ...map, [tabId]: path });
+}
