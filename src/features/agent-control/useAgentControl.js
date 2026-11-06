@@ -22,7 +22,6 @@ import { getTabTranscript } from '../../lib/terminalSessions';
 import { getTabSession } from '../tabs/terminalActivity';
 import { hash8 } from '../../lib/ids';
 import { JOB_CLIS } from '../../lib/agentClis';
-import * as qa from './qaDriver';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
@@ -35,6 +34,9 @@ const sentAt = new Map();
 // `agent-control` event {id, sessionId, cmd, args}; every one gets exactly one
 // agent_control_reply. Mount once, inside the app's providers (it needs the
 // tab and bookmark contexts).
+
+// Loaded on first use: only QA instances ever need it, so it stays out of the startup bundle.
+const qaDriver = () => import('./qaDriver');
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
@@ -243,14 +245,14 @@ export function useAgentControl() {
 
     const handlers = {
       // QA driver (`lirah qa ...`); the control server only lets these through when the app runs with LIRAH_QA=1.
-      'qa.snapshot': (args, [scope = args.scope]) => qa.snapshot(scope),
-      'qa.click': (args, [ref = args.ref]) => qa.click(ref),
-      'qa.type': (args, [ref = args.ref, ...words]) => qa.type(ref, args.text ?? words.join(' ')),
-      'qa.key': (args, [combo = args.key]) => qa.key(combo),
-      'qa.text': (args, [what = args.target]) => qa.text(what),
-      'qa.wait': (args, words) => qa.wait(args.text ?? words.join(' '), { timeout: Math.min(Number(args.timeout) || 10, 50), gone: !!args.gone }),
-      'qa.terminal': (args, [n = args.n ?? 1]) => qa.terminal(n, args.rows ?? 40),
-      'qa.terminal-type': (args, [n = 1, ...words]) => qa.terminalType(n, (args.text ?? words.join(' ')) + (args.enter ? '\r' : '')),
+      'qa.snapshot': async (args, [scope = args.scope]) => (await qaDriver()).snapshot(scope),
+      'qa.click': async (args, [ref = args.ref]) => (await qaDriver()).click(ref),
+      'qa.type': async (args, [ref = args.ref, ...words]) => (await qaDriver()).type(ref, args.text ?? words.join(' ')),
+      'qa.key': async (args, [combo = args.key]) => (await qaDriver()).key(combo),
+      'qa.text': async (args, [what = args.target]) => (await qaDriver()).text(what),
+      'qa.wait': async (args, words) => (await qaDriver()).wait(args.text ?? words.join(' '), { timeout: Math.min(Number(args.timeout) || 10, 50), gone: !!args.gone }),
+      'qa.terminal': async (args, [n = args.n ?? 1]) => (await qaDriver()).terminal(n, args.rows ?? 40),
+      'qa.terminal-type': async (args, [n = 1, ...words]) => (await qaDriver()).terminalType(n, (args.text ?? words.join(' ')) + (args.enter ? '\r' : '')),
       'settings.list': () => listSettings(),
       'settings.get': (args, [key = args.key]) => getSetting(key),
       'settings.set': (args, [key = args.key, value = args.value]) => apply(prepareSetting(key, value), 'set'),
