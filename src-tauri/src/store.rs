@@ -13,6 +13,8 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 
+mod backup;
+
 /// Schema version written to every file.
 const CURRENT_VERSION: u64 = 1;
 
@@ -53,6 +55,11 @@ fn revision_of(doc: &Option<Value>) -> u64 {
 
 /// Read and migrate a file. `None` if it does not exist.
 pub fn read_at(base: &Path, rel: &str) -> Result<Option<Value>, StoreError> {
+    Ok(read_doc(base, rel)?.map(|(doc, _)| doc))
+}
+
+/// The migrated file and the schema version it had on disk.
+fn read_doc(base: &Path, rel: &str) -> Result<Option<(Value, u64)>, StoreError> {
     let path = resolve(base, rel)?;
     let text = match fs::read_to_string(&path) {
         Ok(t) => t,
@@ -66,6 +73,7 @@ pub fn read_at(base: &Path, rel: &str) -> Result<Option<Value>, StoreError> {
     };
     // A file without a version (hand-written) is taken as current.
     let mut version = doc.get("version").and_then(Value::as_u64).unwrap_or(CURRENT_VERSION);
+    let disk_version = version;
     for (from, migrate) in MIGRATIONS {
         if *from == version {
             migrate(rel, &mut doc);
@@ -73,7 +81,7 @@ pub fn read_at(base: &Path, rel: &str) -> Result<Option<Value>, StoreError> {
         }
     }
     doc.insert("version".into(), version.into());
-    Ok(Some(Value::Object(doc)))
+    Ok(Some((Value::Object(doc), disk_version)))
 }
 
 /// Write `data` atomically and return what was written (with the new revision).
@@ -83,10 +91,18 @@ pub fn write_at(base: &Path, rel: &str, data: Value, expected_revision: Option<u
         return Err(io("store data must be a JSON object"));
     };
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let current = read_at(base, rel)?;
+    let (current, disk_version) = match read_doc(base, rel)? {
+        Some((doc, version)) => (Some(doc), Some(version)),
+        None => (None, None),
+    };
     let revision = revision_of(&current);
     if expected_revision.is_some_and(|r| r != revision) {
         return Err(StoreError::Conflict { current });
+    }
+    // Replacing a file of another schema (a migration, or a newer app's file): keep a copy first.
+    if let Some(version) = disk_version.filter(|v| *v != CURRENT_VERSION) {
+        let dir = base.join("backups").join(Path::new(rel).parent().unwrap_or(Path::new("")));
+        backup::backup(&path, version, &dir).map_err(io)?;
     }
     doc.insert("version".into(), CURRENT_VERSION.into());
     doc.insert("revision".into(), (revision + 1).into());
@@ -219,6 +235,63 @@ mod tests {
             assert!(matches!(delete_at(&b, rel), Err(StoreError::Io { .. })), "{rel}");
         }
         assert!(!b.exists());
+    }
+
+    #[test]
+    fn replacing_another_schema_backs_up_the_old_file() {
+        let b = temp_base();
+        fs::create_dir_all(b.join("w")).unwrap();
+        let old = r#"{"version": 0, "x": 1}"#;
+        fs::write(b.join("w/t.json"), old).unwrap();
+
+        write_at(&b, "w/t.json", json!({"x": 2}), None).unwrap();
+
+        let kept: Vec<_> = fs::read_dir(b.join("backups/w")).unwrap().map(|e| e.unwrap().path()).collect();
+        assert_eq!(kept.len(), 1);
+        assert!(kept[0].file_name().unwrap().to_str().unwrap().starts_with("t.v0."));
+        assert_eq!(fs::read_to_string(&kept[0]).unwrap(), old);
+        fs::remove_dir_all(&b).unwrap();
+    }
+
+    #[test]
+    fn two_writers_with_the_same_revision_cannot_both_win() {
+        let b = temp_base();
+        let start = std::sync::Barrier::new(2);
+        let results: Vec<_> = std::thread::scope(|scope| {
+            let writers: Vec<_> = (0..2)
+                .map(|n| {
+                    let (b, start) = (&b, &start);
+                    scope.spawn(move || {
+                        start.wait();
+                        write_at(b, "t.json", json!({ "n": n }), Some(0))
+                    })
+                })
+                .collect();
+            writers.into_iter().map(|w| w.join().unwrap()).collect()
+        });
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert!(results.iter().any(|r| matches!(r, Err(StoreError::Conflict { .. }))));
+        fs::remove_dir_all(&b).unwrap();
+    }
+
+    #[test]
+    fn corrupt_file_is_an_error_and_is_not_overwritten() {
+        let b = temp_base();
+        fs::create_dir_all(&b).unwrap();
+        fs::write(b.join("t.json"), "{ not json").unwrap();
+        assert!(matches!(read_at(&b, "t.json"), Err(StoreError::Io { .. })));
+        assert!(write_at(&b, "t.json", json!({"x": 1}), None).is_err());
+        assert_eq!(fs::read_to_string(b.join("t.json")).unwrap(), "{ not json");
+        fs::remove_dir_all(&b).unwrap();
+    }
+
+    #[test]
+    fn same_schema_write_makes_no_backup() {
+        let b = temp_base();
+        write_at(&b, "t.json", json!({"x": 1}), None).unwrap();
+        write_at(&b, "t.json", json!({"x": 2}), Some(1)).unwrap();
+        assert!(!b.join("backups").exists());
+        fs::remove_dir_all(&b).unwrap();
     }
 
     #[test]

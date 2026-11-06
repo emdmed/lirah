@@ -19,7 +19,6 @@ import { FigureSheet } from "./dev/FigureSheet";
 import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { perfMark } from "./lib/perf";
-import { flushAll } from "./lib/persistence";
 import { initSettings } from "./features/settings/settingsStore";
 import { initWorkspaces } from "./lib/workspaceStore";
 import { runMigrations } from "./lib/migrations";
@@ -90,9 +89,3 @@ Promise.all([firstFrame, document.fonts.ready, window.__splashReady ?? Promise.r
       setTimeout(() => splash.remove(), 300);
     }, wait);
   });
-
-// Closing waits for this handler: save the persisted changes still in their
-// debounce before the window goes away. A failed save must not trap the window open.
-getCurrentWindow().onCloseRequested(() =>
-  flushAll().catch((error) => console.error("Closing with unsaved changes:", error)),
-);

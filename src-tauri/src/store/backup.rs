@@ -1,27 +1,22 @@
-//! Copy of a persisted file taken before a migration rewrites it.
+//! Copy of a store file taken before a write replaces a different schema version.
 
-use super::store;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const KEEP_PER_FILE: usize = 3;
 
-/// Copy `path` to `backups/<name>.v<version>.<timestamp>.json` next to it, then
-/// drop all but the newest backups of that file. `None` if there is no file yet.
-pub fn backup(path: &Path) -> Result<Option<PathBuf>, String> {
-    let Some(file) = store::read(path)? else {
-        return Ok(None);
-    };
+/// Copy `path` (at schema `version` on disk) to `<dir>/<name>.v<version>.<timestamp>.json`,
+/// then drop all but the newest backups of that file.
+pub fn backup(path: &Path, version: u64, dir: &Path) -> Result<PathBuf, String> {
     let name = file_name(path)?;
-    let dir = path.with_file_name("backups");
-    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
+    fs::create_dir_all(dir).map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
 
-    let backup = dir.join(format!("{}.v{}.{}.json", name, file.version, timestamp()?));
+    let backup = dir.join(format!("{}.v{}.{}.json", name, version, timestamp()?));
     fs::copy(path, &backup).map_err(|e| format!("Failed to back up {}: {}", path.display(), e))?;
 
-    prune(&dir, &name)?;
-    Ok(Some(backup))
+    prune(dir, &name)?;
+    Ok(backup)
 }
 
 /// `tasks.json` -> `tasks`.
@@ -56,7 +51,7 @@ fn backup_time(path: &Path, name: &str) -> Option<u128> {
     let file = path.file_name()?.to_str()?;
     let rest = file.strip_prefix(name)?.strip_prefix(".v")?.strip_suffix(".json")?;
     let (version, time) = rest.split_once('.')?;
-    version.parse::<u32>().ok()?;
+    version.parse::<u64>().ok()?;
     time.parse().ok()
 }
 
@@ -73,7 +68,7 @@ mod tests {
     }
 
     fn backup_names(dir: &Path) -> Vec<String> {
-        let mut names: Vec<String> = fs::read_dir(dir.join("backups"))
+        let mut names: Vec<String> = fs::read_dir(dir)
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
@@ -82,19 +77,12 @@ mod tests {
     }
 
     #[test]
-    fn no_file_means_no_backup() {
-        let dir = test_dir("none");
-        assert_eq!(backup(&dir.join("tasks.json")).unwrap(), None);
-        assert!(!dir.join("backups").exists());
-    }
-
-    #[test]
     fn copies_the_file_named_with_its_version() {
         let dir = test_dir("copy");
         let path = dir.join("tasks.json");
-        fs::write(&path, r#"{"version": 2, "revision": 5, "data": []}"#).unwrap();
+        fs::write(&path, r#"{"version": 2, "revision": 5}"#).unwrap();
 
-        let made = backup(&path).unwrap().unwrap();
+        let made = backup(&path, 2, &dir.join("backups")).unwrap();
 
         assert!(made.file_name().unwrap().to_str().unwrap().starts_with("tasks.v2."));
         assert_eq!(fs::read_to_string(made).unwrap(), fs::read_to_string(&path).unwrap());
@@ -104,15 +92,16 @@ mod tests {
     fn keeps_only_the_newest_three_of_that_file() {
         let dir = test_dir("prune");
         let path = dir.join("tasks.json");
+        let backups = dir.join("backups");
         fs::write(&path, r#"{"version": 1}"#).unwrap();
-        fs::create_dir_all(dir.join("backups")).unwrap();
+        fs::create_dir_all(&backups).unwrap();
         for name in ["tasks.v1.100.json", "tasks.v1.200.json", "tasks.v1.300.json", "tasks.v1.400.json", "plans.v1.100.json"] {
-            fs::write(dir.join("backups").join(name), "{}").unwrap();
+            fs::write(backups.join(name), "{}").unwrap();
         }
 
-        backup(&path).unwrap();
+        backup(&path, 1, &backups).unwrap();
 
-        let kept = backup_names(&dir);
+        let kept = backup_names(&backups);
         assert_eq!(kept.len(), 4, "3 tasks backups + the untouched plans one: {kept:?}");
         assert!(kept.contains(&"plans.v1.100.json".to_string()));
         assert!(!kept.contains(&"tasks.v1.100.json".to_string()));
