@@ -254,6 +254,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     }
 
     terminalInstRef.current = term;
+    terminalRef.current.__xterm = term; // read by the QA driver (agent-control/qaDriver.js)
     setTerminal(term);
     setFitAddon(fit);
     setSearchAddon(search);

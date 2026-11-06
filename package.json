@@ -12,10 +12,11 @@
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "benchmark:tokens": "node scripts/benchmark-tokens.js",
-    "check:contrast": "node scripts/check-contrast.mjs",
+    "check:contrast": "jiti scripts/check-contrast.mjs",
     "check:async-commands": "node scripts/check-async-commands.mjs",
     "check:bundle": "node scripts/check-bundle-size.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "qa": "node scripts/qa.mjs"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",

@@ -181,6 +181,10 @@ fn relay(app: &AppHandle, req: Request) -> Value {
     if req.cmd == "ping" {
         return json!({ "ok": true, "data": "pong" });
     }
+    // The QA driver clicks and types in the UI: only for instances launched for QA.
+    if (req.cmd == "qa" || req.cmd.starts_with("qa.")) && std::env::var_os("LIRAH_QA").is_none() {
+        return json!({ "ok": false, "error": "qa commands need an instance started with LIRAH_QA=1 (npm run qa)" });
+    }
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
     pending().lock().unwrap_or_else(|e| e.into_inner()).insert(id, tx);

@@ -22,6 +22,7 @@ import { getTabTranscript } from '../../lib/terminalSessions';
 import { getTabSession } from '../tabs/terminalActivity';
 import { hash8 } from '../../lib/ids';
 import { JOB_CLIS } from '../../lib/agentClis';
+import * as qa from './qaDriver';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
@@ -37,7 +38,7 @@ const sentAt = new Map();
 
 const show = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list', plans: 'list', jobs: 'list' };
+const FAMILIES = { settings: 'list', theme: 'get', tabs: 'list', startup: 'get', tasks: 'list', plans: 'list', jobs: 'list', qa: 'snapshot' };
 
 const flag = (v) => (v === undefined ? undefined : v === true || v === 'true' || v === 'on' || v === 1);
 
@@ -241,6 +242,15 @@ export function useAgentControl() {
     };
 
     const handlers = {
+      // QA driver (`lirah qa ...`); the control server only lets these through when the app runs with LIRAH_QA=1.
+      'qa.snapshot': (args, [scope = args.scope]) => qa.snapshot(scope),
+      'qa.click': (args, [ref = args.ref]) => qa.click(ref),
+      'qa.type': (args, [ref = args.ref, ...words]) => qa.type(ref, args.text ?? words.join(' ')),
+      'qa.key': (args, [combo = args.key]) => qa.key(combo),
+      'qa.text': (args, [what = args.target]) => qa.text(what),
+      'qa.wait': (args, words) => qa.wait(args.text ?? words.join(' '), { timeout: Math.min(Number(args.timeout) || 10, 50), gone: !!args.gone }),
+      'qa.terminal': (args, [n = args.n ?? 1]) => qa.terminal(n, args.rows ?? 40),
+      'qa.terminal-type': (args, [n = 1, ...words]) => qa.terminalType(n, (args.text ?? words.join(' ')) + (args.enter ? '\r' : '')),
       'settings.list': () => listSettings(),
       'settings.get': (args, [key = args.key]) => getSetting(key),
       'settings.set': (args, [key = args.key, value = args.value]) => apply(prepareSetting(key, value), 'set'),

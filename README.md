@@ -152,6 +152,13 @@ npm run check:async-commands  # Fails on sync Tauri commands that do IO (they fr
 npm run check:bundle          # Startup JS size budget (run npm run build first)
 ```
 
+QA: a cheap model (Haiku) uses a throwaway copy of the app the way a user would, following one recipe per feature. See [qa/README.md](qa/README.md).
+
+```bash
+npm run qa                    # every recipe in qa/index.md
+npm run qa -- tabs            # recipes whose name contains "tabs"
+```
+
 ### Layout of the code
 - `src/features/*`: one folder per feature (tabs, agent-jobs, plans, token-budget, compact, bookmarks, settings and so on).
 - `src/hooks`, `src/components`, `src/lib`: shared hooks, UI primitives and the shortcut registry.
