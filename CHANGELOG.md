@@ -4,6 +4,16 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-06
+
+### Added
+
+- **Agentic QA for contributors** - `npm run qa` starts a throwaway copy of Lirah (its own profile and port, nothing touches your real `~/.lirah`) and has Claude Haiku use it the way a person would, following one recipe per feature in `qa/recipes/`, and reports which steps broke. Nine features have recipes so far: terminal, file tree, tabs, tasks, settings, workspaces, starred projects, the command palette and keyboard shortcuts. New recipes are written by Opus with `/qa-recipes <feature>`. See `qa/README.md`.
+
+### Changed
+
+- **Backups before a data migration** - Before Lirah rewrites a file in `~/.lirah` in a newer format, it saves a copy to `~/.lirah/backups/` (the newest three per file are kept).
+
 ## [0.13.0] - 2026-11-06
 
 ### Added
