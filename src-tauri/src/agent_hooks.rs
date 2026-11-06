@@ -14,7 +14,7 @@
 //! - opencode: a global plugin that forwards session events the same way.
 //!
 //! The same Claude Code hook also carries the prompt box's selected context
-//! (files, elements, repos, template, patterns) into prompts typed straight
+//! (files, elements, repos, template) into prompts typed straight
 //! into the terminal: the frontend mirrors it to
 //! `<prompt context dir>/<session id>.md` and the hook adds that file to the
 //! prompt on UserPromptSubmit.
