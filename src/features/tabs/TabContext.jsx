@@ -3,7 +3,7 @@ import { useToast } from "../toast";
 import { useConfirm } from "../dialogs/DialogProvider";
 import { getAgentHookState, getLastTurn } from "./agentHookState";
 import { getTabSession } from "./terminalActivity";
-import { loadJson, loadText, saveJson, saveText } from "../../lib/storage";
+import { getSavedWorkspaces, saveWorkspaces } from "../../lib/workspaceStore";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 import { invoke } from "@tauri-apps/api/core";
 import { getSettings } from "../settings/settingsStore";
@@ -15,8 +15,6 @@ import { tildePath } from "../../components/ui/picker";
 const TabContext = createContext(null);
 const TabActionsContext = createContext(null);
 
-const STORAGE_KEY = 'nevo-terminal:tabs';
-const WORKSPACES_KEY = 'nevo-terminal:workspaces';
 export const MAX_TABS = 8;
 const LIMIT_MESSAGE = `Tab limit reached (${MAX_TABS}) — close a tab first`;
 // Agent states where closing the tab would kill work in flight.
@@ -36,9 +34,8 @@ function createWorkspace(name) {
 
 // Saved workspaces, with one to start from; saved tabs from before workspaces
 // (or of a workspace that is gone) join the first one.
-function loadWorkspaces(tabs) {
-  const saved = loadJson(WORKSPACES_KEY, null);
-  const workspaces = Array.isArray(saved) && saved.length > 0 ? saved : [createWorkspace('main')];
+function loadWorkspaces(saved, tabs) {
+  const workspaces = saved.length > 0 ? saved : [createWorkspace('main')];
   const ids = new Set(workspaces.map((w) => w.id));
   const placed = tabs.map((t) => (ids.has(t.workspaceId) ? t : { ...t, workspaceId: workspaces[0].id }));
   return { workspaces, tabs: placed };
@@ -93,36 +90,31 @@ export function TabProvider({ children }) {
   const [startupProjects] = useState(startupProjectList);
   const [startupPending, setStartupPending] = useState(!!startupProjects);
   const [initial] = useState(() => {
-    const parsed = startupProjects ? [] : loadJson(STORAGE_KEY, null);
-    return loadWorkspaces(Array.isArray(parsed) ? parsed : []);
+    const saved = getSavedWorkspaces();
+    return { ...loadWorkspaces(saved.workspaces, startupProjects ? [] : saved.tabs), saved };
   });
   const [tabs, setTabs] = useState(initial.tabs);
   const [workspaces, setWorkspaces] = useState(initial.workspaces);
 
   const [activeTabId, setActiveTabId] = useState(() => {
-    const stored = loadText(STORAGE_KEY + ':active');
+    const stored = initial.saved.activeTabId;
     if (stored && tabs.find(t => t.id === stored)) return stored;
     return tabs[0]?.id || null;
   });
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => {
-    const stored = loadText(WORKSPACES_KEY + ':active');
+    const stored = initial.saved.activeWorkspaceId;
     const fromTab = tabs.find((t) => t.id === activeTabId)?.workspaceId;
     return fromTab || (workspaces.some((w) => w.id === stored) ? stored : workspaces[0].id);
   });
   const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId), [tabs, activeWorkspaceId]);
 
-  // Persist tabs to localStorage synchronously on every change.
-  // A debounce here loses state: the window's close button calls
-  // appWindow.close() immediately, destroying the webview before a deferred
-  // write can flush — so tab edits made right before quitting never persist.
+  // Persist to workspaces/ (debounced; fileStore flushes on window close).
+  // The active tab is saved as its workspace's activeTabId.
   useEffect(() => {
     // Parent effects run last, so this marks the end of the switch's effects.
     perfTabSwitchStep('effects-flushed');
-    saveJson(STORAGE_KEY, tabs);
-    saveText(STORAGE_KEY + ':active', activeTabId || '');
-    saveJson(WORKSPACES_KEY, workspaces);
-    saveText(WORKSPACES_KEY + ':active', activeWorkspaceId);
-  }, [tabs, activeTabId, workspaces, activeWorkspaceId]);
+    saveWorkspaces({ tabs, workspaces, activeWorkspaceId });
+  }, [tabs, workspaces, activeWorkspaceId]);
 
   // Latest values for the actions below, so they can stay referentially stable.
   const tabsRef = useRef(tabs);
@@ -139,8 +131,8 @@ export function TabProvider({ children }) {
   // Each workspace comes back to the tab it was on.
   useEffect(() => {
     if (!activeTabId) return;
-    setWorkspaces((prev) => (prev.some((w) => w.id === activeWorkspaceId && w.lastTabId !== activeTabId)
-      ? prev.map((w) => (w.id === activeWorkspaceId ? { ...w, lastTabId: activeTabId } : w))
+    setWorkspaces((prev) => (prev.some((w) => w.id === activeWorkspaceId && w.activeTabId !== activeTabId)
+      ? prev.map((w) => (w.id === activeWorkspaceId ? { ...w, activeTabId } : w))
       : prev));
   }, [activeTabId, activeWorkspaceId]);
 
@@ -246,7 +238,7 @@ export function TabProvider({ children }) {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     if (!ws || workspaceId === activeWorkspaceIdRef.current) return;
     const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
-    const tabId = (own.find((t) => t.id === ws.lastTabId) || own[0])?.id || null;
+    const tabId = (own.find((t) => t.id === ws.activeTabId) || own[0])?.id || null;
     if (tabId) perfTabSwitchStart();
     activeWorkspaceIdRef.current = workspaceId;
     setActiveWorkspaceId(workspaceId);

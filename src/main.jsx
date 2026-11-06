@@ -20,6 +20,7 @@ import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { perfMark } from "./lib/perf";
 import { initSettings } from "./features/settings/settingsStore";
+import { initWorkspaces } from "./lib/workspaceStore";
 
 // Imports are hoisted, so this marks the point where every module has been
 // evaluated — the JS parse/eval cost sits before it.
@@ -30,8 +31,8 @@ const showKit = import.meta.env.DEV && new URLSearchParams(window.location.searc
 // `?figs` (dev only) shows every FIG drawing with mock data; `&theme=<key>` picks the theme.
 const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");
 
-// Settings come from ~/.lirah/settings.json; every reader expects them loaded.
-await initSettings();
+// Settings and workspaces come from ~/.lirah; every reader expects them loaded.
+await Promise.all([initSettings(), initWorkspaces()]);
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
