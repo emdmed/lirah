@@ -32,9 +32,12 @@ const CACHE_TTL_SECONDS: u64 = 2;
 /// Recursive listings depend on the walk limits as well as the root.
 type RecursiveKey = (PathBuf, usize, usize);
 
+/// Flat listings differ with and without .gitignore filtering.
+type FlatKey = (PathBuf, bool);
+
 // Directory listing cache - uses RwLock for better read performance
 pub struct DirectoryCache {
-    entries: RwLock<HashMap<PathBuf, CacheEntry<Vec<DirectoryEntry>>>>,
+    entries: RwLock<HashMap<FlatKey, CacheEntry<Vec<DirectoryEntry>>>>,
     recursive_entries: RwLock<HashMap<RecursiveKey, CacheEntry<RecursiveListing>>>,
 }
 
@@ -47,14 +50,14 @@ impl DirectoryCache {
     }
 
     /// Get directory listing from cache if valid
-    pub fn get(&self, path: &Path) -> Option<Arc<Vec<DirectoryEntry>>> {
-        self.entries.read().ok()?.get(path)?.fresh()
+    pub fn get(&self, path: &Path, gitignore: bool) -> Option<Arc<Vec<DirectoryEntry>>> {
+        self.entries.read().ok()?.get(&(path.to_path_buf(), gitignore))?.fresh()
     }
 
     /// Store directory listing in cache
-    pub fn set(&self, path: PathBuf, entries: Arc<Vec<DirectoryEntry>>) {
+    pub fn set(&self, path: PathBuf, gitignore: bool, entries: Arc<Vec<DirectoryEntry>>) {
         if let Ok(mut cache) = self.entries.write() {
-            cache.insert(path, CacheEntry::new(entries));
+            cache.insert((path, gitignore), CacheEntry::new(entries));
         }
     }
 
@@ -85,7 +88,7 @@ impl DirectoryCache {
     /// Invalidate every listing at or below `path` (flat and recursive).
     pub fn invalidate(&self, path: &Path) {
         if let Ok(mut cache) = self.entries.write() {
-            cache.retain(|k, _| !k.starts_with(path));
+            cache.retain(|k, _| !k.0.starts_with(path));
         }
         if let Ok(mut cache) = self.recursive_entries.write() {
             cache.retain(|k, _| !k.0.starts_with(path));
