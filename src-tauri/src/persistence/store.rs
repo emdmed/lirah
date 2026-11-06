@@ -1,11 +1,23 @@
 use super::envelope::Persisted;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// Makes "check the revision, then write" one step across commands.
 static WRITE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Last revision of each file this process wrote or reported, so the watcher
+/// stays quiet about our own writes and about repeated events for one change.
+static KNOWN_REVISIONS: Mutex<Option<HashMap<PathBuf, u64>>> = Mutex::new(None);
+
+/// Record `revision` as the latest of `path`. True when it was not already
+/// known, i.e. the change came from someone else and is worth reporting.
+pub fn note_revision(path: &Path, revision: u64) -> bool {
+    let mut known = KNOWN_REVISIONS.lock().unwrap_or_else(|e| e.into_inner());
+    known.get_or_insert_with(HashMap::new).insert(path.to_path_buf(), revision) != Some(revision)
+}
 
 pub fn read(path: &Path) -> Result<Option<Persisted>, String> {
     let text = match fs::read_to_string(path) {
@@ -38,6 +50,7 @@ pub fn write(
 
     let saved = Persisted { version, revision: current + 1, data };
     write_atomically(path, &saved)?;
+    note_revision(path, saved.revision);
     Ok(saved)
 }
 
@@ -65,6 +78,22 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("lirah-persistence-{}-{}", std::process::id(), name));
         let _ = fs::remove_dir_all(&dir);
         dir
+    }
+
+    #[test]
+    fn own_write_is_not_reported_as_a_change() {
+        let path = test_dir("own-write").join("a.json");
+        let saved = write(&path, 1, json!(1), 0).unwrap();
+        assert!(!note_revision(&path, saved.revision));
+    }
+
+    #[test]
+    fn external_revision_is_reported_once() {
+        let path = test_dir("external").join("a.json");
+        let saved = write(&path, 1, json!(1), 0).unwrap();
+
+        assert!(note_revision(&path, saved.revision + 1));
+        assert!(!note_revision(&path, saved.revision + 1), "repeated event for the same change");
     }
 
     #[test]

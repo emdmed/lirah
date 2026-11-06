@@ -4,6 +4,7 @@
 mod backup;
 mod envelope;
 mod store;
+mod watcher;
 
 use envelope::Persisted;
 use serde_json::Value;
@@ -39,4 +40,11 @@ pub async fn backup_persisted(path: String) -> Result<Option<String>, String> {
         Ok(backup.map(|path| path.to_string_lossy().into_owned()))
     })
     .await
+}
+
+/// Start watching `~/.lirah/` and emit `lirah-file-changed` when another process
+/// changes a persisted file. Safe to call again: only the first call watches.
+#[tauri::command]
+pub async fn start_persistence_watcher(app: tauri::AppHandle) -> Result<(), String> {
+    crate::ipc::blocking("start_persistence_watcher", move || watcher::start(app)).await
 }
