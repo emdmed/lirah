@@ -30,7 +30,6 @@ import { useRepoRoot } from '../plans/planRepoRoot';
 import { CHUNK_STATUS } from '../plans/planModel';
 import { TasksPane } from '../tasks/TasksPane';
 import { useOpenTaskCount } from '../tasks/TasksContext';
-import { useProjectScope } from '../tasks/useProjectScope';
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -109,8 +108,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
-  const openTasks = useOpenTaskCount(useProjectScope(projectPath).scope);
-  const { tabs: openTabs, workspaceTabs } = useTabManager();
+  const { tabs: openTabs, workspaceTabs, activeWorkspaceId } = useTabManager();
+  const openTasks = useOpenTaskCount(activeWorkspaceId);
   const toast = useToast();
   const confirm = useConfirm();
 

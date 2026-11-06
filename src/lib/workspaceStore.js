@@ -115,7 +115,9 @@ function saveIfChanged(rel, doc) {
 export async function deleteWorkspaceFolder(id) {
   extras.delete(id);
   lastWritten.delete(wsFile(id));
-  await remove(wsFile(id)); // drops a pending save that would recreate the folder
+  // Each remove drops a pending save that would recreate the folder.
+  await remove(wsFile(id));
+  await remove(`workspaces/${id}/tasks.json`);
   await remove(`workspaces/${id}`);
 }
 

@@ -28,18 +28,18 @@ import { useProjectScope } from './useProjectScope';
 
 const PlanContextsDialog = lazyNamed(() => import('./PlanContextsDialog'), 'PlanContextsDialog');
 
-/** The backlog: this project's tasks or the global ones, a key away from a plan. */
+/** The backlog: this workspace's tasks or the global ones, a key away from a plan. */
 export function TasksPane({ projectPath }) {
   const { scope: projectScope, isRepo } = useProjectScope(projectPath);
-  const [view, setView] = useState('project'); // 'project' | 'global'
-  const scope = view === 'global' ? GLOBAL : projectScope;
-  const otherScope = view === 'global' ? projectScope : GLOBAL;
+  const { tabs, activeTabId, workspaces, activeWorkspaceId } = useTabManager();
+  const [view, setView] = useState('project'); // 'project' (this workspace) | 'global'
+  const scope = view === 'global' ? GLOBAL : activeWorkspaceId;
+  const otherScope = view === 'global' ? activeWorkspaceId : GLOBAL;
 
   const {
     tasks, addTask, updateTask, removeTask, restoreTask, reorderTasks, moveToScope, planTask, importTaskPlan, formatTask,
   } = useTasks(scope);
   const { tasks: otherTasks } = useTasks(otherScope);
-  const { tabs, activeTabId } = useTabManager();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -61,7 +61,7 @@ export function TasksPane({ projectPath }) {
   const handleFormat = useCallback(async (id) => {
     setFormatting((s) => new Set(s).add(id));
     try {
-      const cwd = scope === GLOBAL ? await invoke('get_home_dir') : scope;
+      const cwd = projectScope || await invoke('get_home_dir');
       await formatTask(scope, id, cwd);
     } catch (e) {
       toast.error(`Couldn't format the task, kept as written: ${errorMessage(e)}`);
@@ -72,7 +72,7 @@ export function TasksPane({ projectPath }) {
         return next;
       });
     }
-  }, [formatTask, scope, toast]);
+  }, [formatTask, scope, projectScope, toast]);
 
   const focusQuickAdd = useCallback(() => {
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -93,7 +93,7 @@ export function TasksPane({ projectPath }) {
 
   const submit = async () => {
     if (!text.trim() || !scope) return;
-    const id = await addTask(scope, splitTaskText(text));
+    const id = await addTask(scope, { ...splitTaskText(text), repos: scope !== GLOBAL && projectScope ? [projectScope] : [] });
     setText('');
     focusQuickAdd();
     if (id) handleFormat(id);
@@ -163,12 +163,13 @@ export function TasksPane({ projectPath }) {
     });
   }, [removeTask, restoreTask, scope, toast]);
 
-  const moveLabel = otherScope ? (view === 'global' ? 'Move to this project' : 'Move to global tasks') : null;
+  const workspaceName = workspaces.find((w) => w.id === activeWorkspaceId)?.name || 'workspace';
+  const moveLabel = otherScope ? (view === 'global' ? 'Move to this workspace' : 'Move to global tasks') : null;
   const handleMove = useCallback((task) => {
     if (!otherScope) return;
     moveToScope(scope, otherScope, task.id);
-    toast.info(view === 'global' ? `Moved to ${basename(otherScope)}` : 'Moved to global tasks');
-  }, [moveToScope, scope, otherScope, view, toast]);
+    toast.info(view === 'global' ? `Moved to ${workspaceName}` : 'Moved to global tasks');
+  }, [moveToScope, scope, otherScope, view, toast, workspaceName]);
 
   // Linked: show the plan. Not imported yet: import it here, which splits it.
   const handleOpenPlan = useCallback(async (task) => {
@@ -216,7 +217,6 @@ export function TasksPane({ projectPath }) {
     onCursorKey(e);
   };
 
-  const projectName = projectScope ? basename(projectScope, 'project') : 'project';
   const count = (list) => (list || []).filter(isOpen).length;
   const projectCount = view === 'global' ? count(otherTasks) : count(tasks);
   const globalCount = view === 'global' ? count(tasks) : count(otherTasks);
@@ -247,7 +247,7 @@ export function TasksPane({ projectPath }) {
   return (
     <div ref={containerRef} tabIndex={-1} onKeyDown={onPaneKey} onBlur={onBlur} className="flex flex-col outline-none">
       <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
-        <ScopeButton active={view === 'project'} onClick={() => setView('project')} label={projectName} count={projectCount} />
+        <ScopeButton active={view === 'project'} onClick={() => setView('project')} label={workspaceName} count={projectCount} />
         <ScopeButton active={view === 'global'} onClick={() => setView('global')} label="global" count={globalCount} />
         <button
           type="button"
@@ -280,7 +280,7 @@ export function TasksPane({ projectPath }) {
           }}
           disabled={!scope}
           rows={2}
-          placeholder={view === 'global' ? 'Add a global task…' : `Add a task to ${projectName}…`}
+          placeholder={view === 'global' ? 'Add a global task…' : `Add a task to ${workspaceName}…`}
           aria-label="New task"
           className="min-h-12 resize-none py-1.5 text-xs leading-[18px]"
         />

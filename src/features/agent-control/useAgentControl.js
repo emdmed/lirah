@@ -90,8 +90,14 @@ export function useAgentControl() {
       if (!tab) throw new Error("can't tell which tab this is; pass --global for the global list");
       return (await resolveRepoRoot(tab.projectPath).catch(() => null)) || tab.projectPath;
     };
-    const taskScope = (args, sessionId) => (args.global === true ? GLOBAL : projectScope(sessionId));
-    const where = (scope) => (scope === GLOBAL ? 'the global list' : scope);
+    // Tasks are kept per workspace: the caller tab's workspace, or the global list.
+    const workspaceScope = (sessionId) => {
+      const tab = callerTab(live.current.tabManager.tabs, sessionId);
+      if (!tab?.workspaceId) throw new Error("can't tell which tab this is; pass --global for the global list");
+      return tab.workspaceId;
+    };
+    const taskScope = async (args, sessionId) => (args.global === true ? GLOBAL : workspaceScope(sessionId));
+    const where = (scope) => (scope === GLOBAL ? 'the global list' : 'this workspace');
     // [scope, task] for an id from `lirah tasks`, in the list --global picks.
     const findTask = async (args, id, sessionId) => {
       if (!id) throw new Error('missing task id (see `lirah tasks`)');
@@ -485,7 +491,7 @@ export function useAgentControl() {
         const scope = await taskScope(args, sessionId);
         const tasks = await live.current.tasks.getTasks(scope);
         return {
-          scope: scope === GLOBAL ? 'global' : scope,
+          scope: scope === GLOBAL ? 'global' : 'workspace',
           tasks: tasks.map(({ id, title, notes, status }) => ({ id, title, notes, status })),
         };
       },
@@ -494,6 +500,7 @@ export function useAgentControl() {
         if (args.notes !== undefined) fields.notes = [fields.notes, String(args.notes)].filter(Boolean).join('\n\n');
         if (!fields.title) throw new Error('missing title: lirah tasks add <title> [--notes N] [--global]');
         const scope = await taskScope(args, sessionId);
+        if (scope !== GLOBAL) fields.repos = [await projectScope(sessionId)];
         const id = await live.current.tasks.addTask(scope, fields);
         live.current.toast.info(`Claude added task "${fields.title}"`);
         return `added task ${id} to ${where(scope)}`;
@@ -539,9 +546,9 @@ export function useAgentControl() {
       // Between this tab's project list and the global list; --global moves from global.
       'tasks.move': async (args, [id = args.id], { sessionId }) => {
         const [from, task] = await findTask(args, id, sessionId);
-        const to = from === GLOBAL ? await projectScope(sessionId) : GLOBAL;
+        const to = from === GLOBAL ? workspaceScope(sessionId) : GLOBAL;
         await live.current.tasks.moveToScope(from, to, id);
-        live.current.toast.info(`Claude moved "${task.title}" to ${to === GLOBAL ? 'global tasks' : 'this project'}`);
+        live.current.toast.info(`Claude moved "${task.title}" to ${to === GLOBAL ? 'global tasks' : 'this workspace'}`);
         return `moved ${id} to ${where(to)}`;
       },
     };

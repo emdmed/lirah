@@ -1,68 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { basename } from '../../utils/pathUtils';
-import { hash8 } from '../../lib/ids';
-import { lirahDir } from '../../lib/lirahPaths';
+import { useCallback, useRef, useState } from 'react';
+import { load, save } from '../../lib/fileStore';
 import { GLOBAL, normalizeTask } from './taskModel';
 
-// The task lists and their files, loaded on first use and written back
-// debounced, the same way the plans store works:
-//   global:   ~/.lirah/tasks/global.json
-//   project:  ~/.lirah/tasks/<folder>-<hash>/tasks.json
+// The task lists and their files (under ~/.lirah), loaded on first use and
+// written back debounced through fileStore:
+//   global:     tasks/global.json (first saved as tasks/inbox.json)
+//   workspace:  workspaces/<id>/tasks.json
 
 const PERSIST_DEBOUNCE = 400;
 
-function storePath(home, scope) {
-  const base = `${lirahDir(home)}/tasks`;
-  if (scope === GLOBAL) return `${base}/global.json`;
-  return `${base}/${basename(scope, 'project')}-${hash8(scope)}/tasks.json`;
+export const taskFile = (scope) => (scope === GLOBAL ? 'tasks/global.json' : `workspaces/${scope}/tasks.json`);
+
+async function readTasks(scope) {
+  let doc = await load(taskFile(scope));
+  if (!doc && scope === GLOBAL) doc = await load('tasks/inbox.json');
+  return Array.isArray(doc?.tasks) ? doc.tasks : [];
 }
+
+const persist = (scope, tasks) => {
+  save(taskFile(scope), { scope, tasks }, { debounce: PERSIST_DEBOUNCE })
+    .catch((e) => console.error('Failed to save tasks:', e));
+};
 
 export function useTaskStore() {
   const [tasksByScope, setTasksByScope] = useState({}); // scope -> task[]
   const stateRef = useRef(tasksByScope);
   stateRef.current = tasksByScope;
-  const homeRef = useRef(null);
   const loadingRef = useRef(new Map()); // scope -> Promise
   const loadedRef = useRef(new Set());
-  const dirtyRef = useRef(new Set());
-  const saveTimer = useRef(null);
-
-  const getHome = useCallback(async () => {
-    if (!homeRef.current) homeRef.current = await invoke('get_home_dir');
-    return homeRef.current;
-  }, []);
-
-  const flush = useCallback(async () => {
-    saveTimer.current = null;
-    const scopes = [...dirtyRef.current];
-    dirtyRef.current.clear();
-    const home = await getHome();
-    for (const scope of scopes) {
-      const tasks = stateRef.current[scope];
-      if (!tasks) continue;
-      try {
-        await invoke('write_file_content', {
-          path: storePath(home, scope),
-          content: JSON.stringify({ version: 1, scope, tasks }, null, 2),
-        });
-      } catch (e) {
-        console.error('Failed to save tasks:', e);
-      }
-    }
-  }, [getHome]);
-
-  useEffect(() => {
-    if (dirtyRef.current.size === 0 || saveTimer.current) return;
-    saveTimer.current = setTimeout(flush, PERSIST_DEBOUNCE);
-  }, [tasksByScope, flush]);
-
-  useEffect(() => () => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-      flush();
-    }
-  }, [flush]);
 
   const loadScope = useCallback((scope) => {
     if (!scope) return Promise.resolve();
@@ -72,16 +37,9 @@ export function useTaskStore() {
     const promise = (async () => {
       let tasks = [];
       try {
-        const home = await getHome();
-        const raw = await invoke('read_file_content', { path: storePath(home, scope) }).catch((e) => {
-          // The global list was first saved as inbox.json.
-          if (scope !== GLOBAL) throw e;
-          return invoke('read_file_content', { path: `${lirahDir(home)}/tasks/inbox.json` });
-        });
-        const list = JSON.parse(raw)?.tasks;
-        tasks = Array.isArray(list) ? list : [];
-      } catch {
-        // No tasks here yet.
+        tasks = await readTasks(scope);
+      } catch (e) {
+        console.warn('Failed to read tasks:', e);
       }
       tasks = tasks.map(normalizeTask);
       loadedRef.current.add(scope);
@@ -89,20 +47,21 @@ export function useTaskStore() {
       // its tasks, ahead of the ones on disk.
       const early = stateRef.current[scope];
       const merged = early ? [...early, ...tasks.filter((t) => !early.some((e) => e.id === t.id))] : tasks;
-      if (early) dirtyRef.current.add(scope);
+      if (early) persist(scope, merged);
       stateRef.current = { ...stateRef.current, [scope]: merged };
       setTasksByScope(stateRef.current);
     })().finally(() => loadingRef.current.delete(scope));
     loadingRef.current.set(scope, promise);
     return promise;
-  }, [getHome]);
+  }, []);
 
   // The ref is updated at once, so a chain of calls reads its own writes.
   const mutate = useCallback((scope, fn) => {
-    dirtyRef.current.add(scope);
-    const next = { ...stateRef.current, [scope]: fn(stateRef.current[scope] || []) };
-    stateRef.current = next;
-    setTasksByScope(next);
+    const tasks = fn(stateRef.current[scope] || []);
+    stateRef.current = { ...stateRef.current, [scope]: tasks };
+    setTasksByScope(stateRef.current);
+    // Not read yet: loadScope merges and saves, so the file isn't overwritten.
+    if (loadedRef.current.has(scope)) persist(scope, tasks);
   }, []);
 
   return { tasksByScope, stateRef, loadScope, mutate };
