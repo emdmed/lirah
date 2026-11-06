@@ -1169,6 +1169,7 @@ function ProjectTabInner({ projectPath, isActive, tabId, workspaceId, compaction
       <DialogHost
         dialogs={dialogs}
         currentPath={currentPath}
+        workspaceId={workspaceId}
         settings={settings}
         sessionId={terminalSessionId}
         toggleSandbox={toggleSandbox}

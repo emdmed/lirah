@@ -61,6 +61,7 @@ export const TAB_DIALOGS = {
     Component: SettingsDialog,
     props: (ctx) => ({
       settings: ctx.settings,
+      workspaceId: ctx.workspaceId,
       sessionId: ctx.sessionId,
       projectPath: ctx.currentPath,
       onToggleSandbox: ctx.toggleSandbox,

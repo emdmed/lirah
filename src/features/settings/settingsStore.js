@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { createEmitter } from '../../lib/createStore';
 import { load as loadFile, save as saveFile } from '../../lib/fileStore';
-import { getWorkspaceData } from '../../lib/workspaceStore';
+import { getWorkspaceData, setWorkspaceData } from '../../lib/workspaceStore';
 
 // App preferences in one module-level store, persisted to ~/.lirah/settings.json.
 // The old localStorage blob (SETTINGS_KEY) only seeds that file on first start
@@ -281,6 +281,27 @@ export function getEffectiveSettings(workspaceId) {
   return Object.keys(picked).length ? sanitize(picked, state) : state;
 }
 
+/** The workspace's override for key, or undefined when it follows settings.json. */
+export function getOverride(workspaceId, key) {
+  return getWorkspaceData(workspaceId, 'overrides')?.[key];
+}
+
+/** Set a workspace override; undefined removes it (back to settings.json). */
+export function setOverride(workspaceId, key, value) {
+  if (!OVERRIDABLE_KEYS.includes(key)) return;
+  const { [key]: _, ...rest } = getWorkspaceData(workspaceId, 'overrides') ?? {};
+  setWorkspaceData(workspaceId, 'overrides', value === undefined ? rest : { ...rest, [key]: value });
+  emit();
+}
+
+// Writes the override when the workspace has one for key, else settings.json.
+function setEffective(workspaceId, key, value) {
+  if (workspaceId && getOverride(workspaceId, key) !== undefined) {
+    const next = typeof value === 'function' ? value(getEffectiveSettings(workspaceId)[key]) : value;
+    setOverride(workspaceId, key, next);
+  } else setSetting(key, value);
+}
+
 // `value` may be a functional updater, like a useState setter.
 export function setSetting(key, value) {
   const prev = state[key];
@@ -298,10 +319,12 @@ export function settingSetter(key) {
 }
 
 // One shared preference: every tab sees the same value, live. With a
-// workspaceId it reads the effective value (that workspace's override wins).
+// workspaceId it reads the effective value (that workspace's override wins)
+// and writes the override while one is set.
 export function useSetting(key, workspaceId) {
   const value = useSyncExternalStore(subscribeSettings, () => (workspaceId ? getEffectiveSettings(workspaceId) : state)[key]);
-  return [value, settingSetter(key)];
+  const set = useCallback((v) => setEffective(workspaceId, key, v), [workspaceId, key]);
+  return [value, workspaceId ? set : settingSetter(key)];
 }
 
 // A per-tab value seeded from the store (the effective value, given a
@@ -316,7 +339,7 @@ export function useSeededSetting(key, workspaceId) {
     const resolved = typeof next === 'function' ? next(valueRef.current) : next;
     valueRef.current = resolved;
     setValue(resolved);
-    setSetting(key, resolved);
-  }, [key]);
+    setEffective(workspaceId, key, resolved);
+  }, [workspaceId, key]);
   return [value, set];
 }

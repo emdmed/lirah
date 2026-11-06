@@ -86,4 +86,24 @@ describe('settingsStore', () => {
     expect(eff.networkIsolation).toBe(false); // code default
     expect(s.getEffectiveSettings('other')).toBe(s.getSettings());
   });
+
+  it('sets, edits and resets a workspace override in workspace.json', async () => {
+    disk.set('workspaces/index.json', { workspaces: ['w1'], activeWorkspaceId: 'w1', version: 1, revision: 1 });
+    disk.set('workspaces/w1/workspace.json', { id: 'w1', name: 'main', tabs: [], version: 1, revision: 1 });
+    const s = await fresh();
+    await s.initSettings();
+    const ws = await import('../../lib/workspaceStore.js');
+    await ws.initWorkspaces();
+    ws.saveWorkspaces(ws.getSavedWorkspaces());
+    const { flush } = await import('../../lib/fileStore.js');
+    s.setOverride('w1', 'sandboxEnabled', true);
+    s.setOverride('w1', 'scrollback', 5); // not overridable: ignored
+    await flush();
+    expect(disk.get('workspaces/w1/workspace.json').overrides).toEqual({ sandboxEnabled: true });
+    expect(s.getEffectiveSettings('w1').sandboxEnabled).toBe(true);
+    s.setOverride('w1', 'sandboxEnabled', undefined);
+    await flush();
+    expect(disk.get('workspaces/w1/workspace.json').overrides).toEqual({});
+    expect(s.getEffectiveSettings('w1').sandboxEnabled).toBe(s.getSettings().sandboxEnabled);
+  });
 });
