@@ -12,10 +12,11 @@ import { AgentMark } from "./AgentMark";
  * @param {boolean} isCurrentPath - Whether this is the current working directory
  * @param {boolean} isCursor - Whether the keyboard cursor is on this row
  * @param {boolean} isDimmed - Dotfile or build output: drawn in the faint tier
+ * @param {number} [selectedInside] - Files inside selected into the prompt
  * @param {string} [agentMark] - An agent read or edited something inside (see AgentMark)
  * @param {Function} onToggle - Callback to toggle folder expansion
  */
-export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCursor, isDimmed, agentMark, onToggle }) {
+export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCursor, isDimmed, selectedInside, agentMark, onToggle }) {
   return (
     <SidebarMenuButton
       size="sm"
@@ -32,8 +33,18 @@ export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCur
         <span className={`truncate pl-1 ${isDimmed ? 'text-faint' : 'text-foreground'}`} title={name}>
           {name}<span className="text-faint">/</span>
         </span>
-        {agentMark && (
-          <span className="ml-auto pr-[18px]">
+        {(selectedInside > 0 || agentMark) && (
+          <span className="ml-auto pr-[18px] flex items-center gap-1">
+            {/* Inverse video, like the selected file rows it stands for. */}
+            {selectedInside > 0 && (
+              <span
+                className="px-1 bg-foreground text-background tabular-nums leading-none"
+                style={{ fontSize: 'var(--font-sm)' }}
+                title={`${selectedInside} selected ${selectedInside === 1 ? 'file' : 'files'} in here`}
+              >
+                {selectedInside}
+              </span>
+            )}
             <AgentMark mark={agentMark} isDir />
           </span>
         )}

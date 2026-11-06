@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { buildTreeFromFlatList, incrementallyUpdateTree } from "../utils/treeOperations";
+import { buildTreeFromFlatList, incrementallyUpdateTree, nodesFromEntries, setChildrenAt, findNode } from "../utils/treeOperations";
 import { lastSepIndex } from "../utils/pathUtils";
 import { useToast } from "../features/toast";
 import { useWatcher } from "../features/watcher/WatcherContext";
@@ -103,8 +103,25 @@ function isSelfOrDescendantOf(path, pathSet) {
   return false;
 }
 
+/** One folder level as the tree shows it: gitignored entries hidden. */
+const readLevel = (path) => invoke('read_directory', { path, gitignore: true });
+
+/** Root nodes with each loaded folder's children filled in from `byDir`. */
+function assembleTree(entries, byDir) {
+  return nodesFromEntries(entries).map(node => {
+    const children = node.is_dir ? byDir.get(node.path) : null;
+    return children ? { ...node, children: assembleTree(children, byDir) } : node;
+  });
+}
+
 export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearch, searchResults, isActive = true }) {
+  // `treeData` is built from the recursive index and serves search, filters
+  // and counts. The browsing tree (`lazyTree`) loads one folder per expand.
   const [treeData, setTreeData] = useState([]);
+  const [lazyTree, setLazyTree] = useState([]);
+  const lazyTreeRef = useRef(lazyTree);
+  lazyTreeRef.current = lazyTree;
+  const loadIdRef = useRef(0);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeTruncated, setTreeTruncated] = useState(false);
   // Folders the user opened. While search or a filter is active the tree shows
@@ -112,6 +129,8 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   // untouched when it is turned off.
   const [userExpandedFolders, setUserExpandedFolders] = useState(() => new Set());
   const [transientExpandedFolders, setTransientExpandedFolders] = useState(null);
+  const userExpandedRef = useRef(userExpandedFolders);
+  userExpandedRef.current = userExpandedFolders;
   const expandedFolders = transientExpandedFolders ?? userExpandedFolders;
   const transientActive = transientExpandedFolders !== null;
   const [showGitChangesOnly, setShowGitChangesOnly] = useState(false);
@@ -142,6 +161,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
         return;
       }
       if (opts?.silent !== true) setTreeLoading(true);
+      const loadId = ++loadIdRef.current;
       let cwd;
       if (projectRootRef.current) {
         cwd = projectRootRef.current;
@@ -149,21 +169,34 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
         cwd = await invoke('get_terminal_cwd', { sessionId: terminalSessionId });
         projectRootRef.current = cwd;
       }
-      const result = await invoke('read_directory_recursive', {
-        path: cwd, maxDepth: 10, maxFiles: 10000
-      });
-      const { entries, truncated } = parseDirectoryResult(result);
-      const treeNodes = buildTreeFromFlatList(entries, cwd);
-      setTreeData(treeNodes);
-      setTreeTruncated(truncated);
+      // The root plus every folder the user has open; a folder that is gone
+      // just stays unloaded.
+      const expanded = [...userExpandedRef.current];
+      const [rootEntries, ...levels] = await Promise.all([
+        readLevel(cwd),
+        ...expanded.map(p => readLevel(p).catch(() => null)),
+      ]);
+      if (loadId !== loadIdRef.current) return;
+      setLazyTree(assembleTree(rootEntries, new Map(expanded.map((p, i) => [p, levels[i]]))));
       setCurrentPath(cwd);
-      commitAllFiles(entries);
       setTreeLoading(false);
       setWatchPath(cwd);
+
+      // The full index (search, filters, counts) loads behind the tree.
+      invoke('read_directory_recursive', { path: cwd, maxDepth: 10, maxFiles: 10000 })
+        .then((result) => {
+          if (loadId !== loadIdRef.current) return;
+          const { entries, truncated } = parseDirectoryResult(result);
+          setTreeData(buildTreeFromFlatList(entries, cwd));
+          setTreeTruncated(truncated);
+          commitAllFiles(entries);
+        })
+        .catch(err => console.warn('[useTreeView] Failed to index project files:', err));
     } catch (err) {
       console.error('Failed to load tree data:', err);
       const errorMessage = err?.message || err?.toString() || 'Unknown error';
       setTreeData([]);
+      setLazyTree([]);
       setTreeTruncated(false);
       setCurrentPath('Error loading directory');
       setTreeLoading(false);
@@ -271,6 +304,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
           if (hasDeleted) {
             const deletedPaths = deleted.map(d => parseChange(d).path);
             setTreeData(prev => removeDeletedFromTree(prev, deletedPaths));
+            setLazyTree(prev => removeDeletedFromTree(prev, deletedPaths));
             removeFromAllFiles(deletedPaths);
           }
 
@@ -278,6 +312,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
           if (hasCreated) {
             const createdChanges = created.map(parseChange);
             setTreeData(prev => incrementallyUpdateTree(prev, { newUntracked: createdChanges }, watchPath));
+            setLazyTree(prev => incrementallyUpdateTree(prev, { newUntracked: createdChanges }, watchPath, { lazy: true }));
             addToAllFiles(createdChanges);
           }
         });
@@ -302,6 +337,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
 
   const handleIncrementalUpdate = useCallback((changes, rootPath) => {
     setTreeData(prev => incrementallyUpdateTree(prev, changes, rootPath));
+    setLazyTree(prev => incrementallyUpdateTree(prev, changes, rootPath, { lazy: true }));
 
     // Update allFiles and search with new untracked files
     if (changes.newUntracked.length > 0) {
@@ -318,6 +354,13 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
   }, [loadTreeData]);
 
   const toggleFolder = useCallback((folderPath) => {
+    // Opening a browsing-tree folder for the first time loads its level.
+    if (!transientActive && !userExpandedRef.current.has(folderPath)
+        && findNode(lazyTreeRef.current, folderPath)?.children === null) {
+      readLevel(folderPath)
+        .then(entries => setLazyTree(prev => setChildrenAt(prev, folderPath, nodesFromEntries(entries))))
+        .catch(err => console.warn('[useTreeView] Failed to read folder:', err));
+    }
     const setActive = transientActive ? setTransientExpandedFolders : setUserExpandedFolders;
     setActive(prev => {
       const next = new Set(prev);
@@ -392,15 +435,14 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
     }
   }, [searchResults, filterActive, showGitChangesOnly, treeLoaded]);
 
+  // Search and filters show the full index; plain browsing the lazy tree.
   const displayedTreeData = useMemo(() => {
-    let filtered = treeData;
     // Use debounced search results to prevent excessive filtering during typing
     if (debouncedSearchResults) {
-      const matchingPaths = debouncedSearchResults.map(r => r.path);
-      filtered = filterTreeBySearch(filtered, matchingPaths);
+      return filterTreeBySearch(treeData, debouncedSearchResults.map(r => r.path));
     }
-    return filtered;
-  }, [treeData, debouncedSearchResults, filterTreeBySearch]);
+    return filterActive ? treeData : lazyTree;
+  }, [treeData, lazyTree, filterActive, debouncedSearchResults, filterTreeBySearch]);
 
   return useMemo(() => ({
     treeData, setTreeData,

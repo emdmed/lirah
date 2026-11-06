@@ -33,6 +33,7 @@ const rowHeight = (row) =>
  */
 export const FileTree = memo(function FileTree({
   nodes,
+  allNodes,
   searchQuery,
   expandedFolders,
   currentPath,
@@ -83,7 +84,8 @@ export const FileTree = memo(function FileTree({
   }, [nodes, showGitChangesOnly, showMarkdownOnly, gitStats]);
 
   // What the md and git keys would show, printed beside them in the header.
-  const mdCount = useMemo(() => countMarkdownFiles(nodes), [nodes]);
+  // Counted on the full index: the browsing tree only holds opened folders.
+  const mdCount = useMemo(() => countMarkdownFiles(allNodes ?? nodes), [allNodes, nodes]);
   const gitCount = useMemo(() => countGitChanges(gitStats, currentPath), [gitStats, currentPath]);
   // Unfiltered row total (pinned + tree), for the legend's `N of M` while a
   // filter is on. Only walked while filtering.
@@ -113,6 +115,20 @@ export const FileTree = memo(function FileTree({
   const handleActivateFile = useCallback((filePath, isDeleted) => {
     if (!isDeleted) handleToggleFileSelection(filePath);
   }, [handleToggleFileSelection]);
+
+  // Folders holding files selected into the prompt, with how many: marked on
+  // the folder row instead of opening it.
+  const selectedInFolder = useMemo(() => {
+    const counts = new Map();
+    if (!isTextareaPanelOpen || !selectedFiles) return counts;
+    for (const file of selectedFiles) {
+      for (let i = file.lastIndexOf('/'); i > 0; i = file.lastIndexOf('/', i - 1)) {
+        const dir = file.slice(0, i);
+        counts.set(dir, (counts.get(dir) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [isTextareaPanelOpen, selectedFiles]);
 
   // Flat list of every visible row: pinned section, then the tree.
   const rows = useMemo(() => {
@@ -330,6 +346,7 @@ export const FileTree = memo(function FileTree({
               gitAdded={stats?.added || 0}
               gitDeleted={stats?.deleted || 0}
               gitStatus={stats?.status || undefined}
+              selectedInside={node.is_dir ? selectedInFolder.get(path) || 0 : 0}
               agentMark={markKey((node.is_dir ? agentActivity.folders : agentActivity.files).get(path))}
               onToggle={onToggle}
               onActivateFile={handleActivateFile}
