@@ -70,13 +70,13 @@ function watchCli(getSessionIds) {
   };
 }
 
-/** The CLI process running in `sessionId` ('claude', 'opencode'), or null. Polls only while `enabled`. */
+/** The CLI process running in `sessionId` ('claude', 'opencode'), null for none, undefined before the first poll. Polls only while `enabled`. */
 export function useCliRunning(sessionId, enabled = true) {
   useEffect(() => {
     if (!enabled || !sessionId) return undefined;
     return watchCli(() => [sessionId]);
   }, [enabled, sessionId]);
-  return useStore(cliStore)[sessionId] ?? null;
+  return useStore(cliStore)[sessionId];
 }
 
 /**

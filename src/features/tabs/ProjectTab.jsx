@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo, startTransition } from "react";
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
+import { NoPluginBanner } from "../../components/NoPluginBanner";
 import { TAB_CLI_PROCESSES } from "../../lib/agentClis";
 import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
@@ -403,6 +404,11 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
 
   // Claude launcher
   const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+  // A claude started by hand: stop it and start it again with the plugin.
+  const relaunchCli = useCallback(async () => {
+    await terminateCliProcess();
+    await launchClaude();
+  }, [terminateCliProcess, launchClaude]);
 
   // Every fresh shell starts the tab's agent, so a tab opens straight into it
   // (with auto-launch off, only a tab opened with a launch request does).
@@ -1168,6 +1174,12 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           onLaunch={launchClaude}
           onChangeCli={openCliSettings}
         />}
+        <NoPluginBanner
+          sessionId={terminalSessionId}
+          isActive={isActive}
+          selectedCli={settings.selectedCli}
+          onRelaunch={relaunchCli}
+        />
       </Layout>
 
       {/* The tabs pane draws each tab's context fill as a moon. */}
