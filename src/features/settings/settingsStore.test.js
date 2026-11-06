@@ -36,4 +36,35 @@ describe('settingsStore', () => {
     await flush();
     expect(disk.get('settings.json')).toMatchObject({ scrollback: 1200, revision: 4 });
   });
+
+  it('copies moved keys into an existing settings.json once, keeping the old keys', async () => {
+    const bm = [{ id: 'b1', name: 'repo', path: '/r' }];
+    local.set('nevo-terminal:project-bookmarks', JSON.stringify(bm));
+    local.set('nevo-terminal:prompt-templates', JSON.stringify([{ id: 't1', title: 'T', content: 'C' }]));
+    local.set('lirah:plan-contexts:v1', JSON.stringify({ contexts: [{ id: 'c', name: 'N', text: 'X' }], defaultId: 'c' }));
+    local.set('nevo-theme', 'rivendell');
+    local.set('nevo-terminal:selected-cli', 'opencode');
+    disk.set('settings.json', { scrollback: 900, selectedCli: 'claude-code', version: 1, revision: 1 });
+    const s = await fresh();
+    await s.initSettings();
+    const got = s.getSettings();
+    expect(got.bookmarks).toEqual(bm);
+    expect(got.promptTemplates[0].id).toBe('t1');
+    expect(got.planContexts.defaultId).toBe('c');
+    expect(got.theme).toBe('rivendell');
+    expect(got.selectedCli).toBe('claude-code'); // present in the file: not overwritten
+    expect(local.has('nevo-theme')).toBe(true);
+    s.setSetting('theme', 'tokyo-night');
+    const { flush } = await import('../../lib/fileStore.js');
+    await flush();
+    expect(disk.get('settings.json')).toMatchObject({ theme: 'tokyo-night', bookmarks: bm });
+  });
+
+  it('drops invalid entries of the moved fields', async () => {
+    disk.set('settings.json', { bookmarks: [{ id: 'x', name: '', path: '/r' }], planContexts: { contexts: [] }, version: 1, revision: 1 });
+    const s = await fresh();
+    await s.initSettings();
+    expect(s.getSettings().bookmarks).toEqual([]);
+    expect(s.getSettings().planContexts).toEqual(s.SETTINGS_DEFAULTS.planContexts);
+  });
 });

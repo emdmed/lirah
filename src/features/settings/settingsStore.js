@@ -70,6 +70,17 @@ export const SETTINGS_DEFAULTS = {
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',
+  // Starred repos: { id, name, path, createdAt, lastAccessedAt }.
+  bookmarks: [],
+  // Saved prompts: { id, title, content, createdAt, updatedAt }.
+  promptTemplates: [],
+  // Instructions put in front of a task sent to plan (see tasks/planContexts.js).
+  planContexts: {
+    contexts: [{ id: 'ctx-plan', name: 'Plan', text: 'Write a full implementation plan for this task.' }],
+    defaultId: 'ctx-plan',
+  },
+  // A key of themes/theme-config.js; ThemeContext falls back on an unknown one.
+  theme: 'tokyo-night',
 };
 
 // Pre-v1 keys, one per preference. Read once on first load to migrate; never
@@ -87,8 +98,6 @@ const LEGACY_KEYS = {
   autoCommitCli: 'nevo-terminal:auto-commit-cli',
   autoCommitCustomPrompt: 'nevo-terminal:auto-commit-custom-prompt',
 };
-// Stored as a bare string, not JSON.
-const LEGACY_SELECTED_CLI_KEY = 'nevo-terminal:selected-cli';
 
 // Kept in keys of their own until after v1 shipped, so they are read whenever
 // the blob doesn't have them yet, not only on the first load. Each parses the
@@ -105,6 +114,12 @@ const LATER_KEYS = {
   }],
   jobsSidebarWide: ['agentJobsSidebarWide', (raw) => raw === '1'],
   autopilotTipSeen: ['lirah:autopilot-tip-seen', (raw) => raw === '1'],
+  // Moved into settings.json in its file era: copied while the field is absent.
+  bookmarks: ['nevo-terminal:project-bookmarks', JSON.parse],
+  promptTemplates: ['nevo-terminal:prompt-templates', JSON.parse],
+  planContexts: ['lirah:plan-contexts:v1', JSON.parse],
+  theme: ['nevo-theme', (raw) => raw || undefined],
+  selectedCli: ['nevo-terminal:selected-cli', (raw) => raw || undefined],
 };
 
 // The later keys `raw` (a saved blob, or {}) is missing, from their old keys.
@@ -119,6 +134,30 @@ function readLater(raw) {
     } catch { /* storage unavailable: keep the default */ }
   }
   return found;
+}
+
+const nonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
+
+function cleanBookmarks(v) {
+  return Array.isArray(v)
+    ? v.filter((b) => b && typeof b.id === 'string' && nonEmpty(b.name) && nonEmpty(b.path))
+    : undefined;
+}
+
+function cleanTemplates(v) {
+  return Array.isArray(v)
+    ? v.filter((t) => t && typeof t.id === 'string' && nonEmpty(t.title) && nonEmpty(t.content))
+    : undefined;
+}
+
+// Undefined (the default seed) when no context is usable: there is always one.
+export function cleanPlanContexts(v) {
+  const contexts = Array.isArray(v?.contexts)
+    ? v.contexts.filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string' && typeof c.text === 'string')
+    : [];
+  if (contexts.length === 0) return undefined;
+  const defaultId = contexts.some((c) => c.id === v.defaultId) ? v.defaultId : contexts[0].id;
+  return { contexts, defaultId };
 }
 
 const STARTUP_MODES = ['restore', 'projects'];
@@ -156,6 +195,9 @@ const VALIDATORS = {
     : undefined),
   plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
+  bookmarks: cleanBookmarks,
+  promptTemplates: cleanTemplates,
+  planContexts: cleanPlanContexts,
 };
 
 // Keep only known keys whose type matches the default, so a corrupt or
@@ -184,10 +226,6 @@ function readLegacy() {
       if (saved !== null) raw[key] = JSON.parse(saved);
     } catch { /* unreadable legacy value: keep the default */ }
   }
-  try {
-    const cli = localStorage.getItem(LEGACY_SELECTED_CLI_KEY);
-    if (cli) raw.selectedCli = cli;
-  } catch { /* storage unavailable */ }
   return raw;
 }
 
