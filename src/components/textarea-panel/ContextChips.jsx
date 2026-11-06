@@ -21,7 +21,7 @@ const REMOVE = "flex items-center justify-center shrink-0 text-muted-foreground 
  * The prompt's attached context as removable chips: files (with their
  * EDIT/READ/COPY state, click to cycle) and picked code elements. `extras`
  * adds other things the prompt carries ({ key, tag, name, title, onRemove }:
- * linked repos, the instruction template, patterns), so the list can be the
+ * linked repos, the instruction template), so the list can be the
  * whole manifest.
  */
 export function ContextChips({

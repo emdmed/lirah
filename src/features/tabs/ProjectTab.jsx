@@ -61,7 +61,6 @@ import { useSidebarSearch } from "../../hooks/useSidebarSearch";
 import { useTreeView } from "../../hooks/useTreeView";
 import { useSidebar } from "../../hooks/useSidebar";
 import { useSeededSetting, useSetting, getSettings } from "../settings/settingsStore";
-import { usePatterns } from "../patterns";
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
 import { useTabShortcuts } from "./useTabShortcuts";
 import { useTabCommands } from "./useTabCommands";
@@ -308,7 +307,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   // otherwise the tab's persisted project path.
   const resolvedProjectDir = isRealPath(currentPath) ? currentPath : projectPath;
 
-  const patterns = usePatterns(currentPath);
 
   // Refs for current values in async callbacks
   const currentPathRef = useRef(currentPath);
@@ -567,9 +565,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     formatFileAnalysis, getLineCount, getViewModeLabel,
     setTextareaContent,
     clearFileSelection: fileSelection.clearFileSelection,
-    selectedPatterns: patterns.selectedPatterns,
-    getPatternInstructions: patterns.getPatternInstructions,
-    clearPatterns: patterns.clearPatterns,
     clearSelectedTemplate,
     linkedRepos,
     clearLinkedRepos,
@@ -587,13 +582,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
     formatFileAnalysis,
     getLineCount,
     getViewModeLabel,
-    selectedPatterns: patterns.selectedPatterns,
-    getPatternInstructions: patterns.getPatternInstructions,
     linkedRepos,
   }), [
     fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
-    patterns.selectedPatterns, patterns.getPatternInstructions, linkedRepos,
+    linkedRepos,
   ]);
 
   // A prompt typed in the terminal gets the selected context too (through
@@ -601,12 +594,11 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
   const keepFilesAfterSend = settings.keepFilesAfterSend;
   const resetContextAfterUse = useCallback(() => {
     clearSelectedTemplate();
-    patterns.clearPatterns();
     if (!keepFilesAfterSend) {
       fileSelection.clearFileSelection();
       clearLinkedRepos?.();
     }
-  }, [clearSelectedTemplate, patterns.clearPatterns, keepFilesAfterSend,
+  }, [clearSelectedTemplate, keepFilesAfterSend,
     fileSelection.clearFileSelection, clearLinkedRepos]);
   // What the context amounts to, kept by the sync hook for the "attached" line.
   const templateTitle = selectedTemplateId ? getTemplateById(selectedTemplateId)?.title : undefined;
@@ -615,9 +607,8 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
       fileCount: fileSelection.selectedFiles?.size || 0,
       repoCount: linkedRepos?.length || 0,
       templateTitle,
-      patternCount: patterns.selectedPatterns?.size || 0,
     });
-  }, [fileSelection.selectedFiles, linkedRepos, templateTitle, patterns.selectedPatterns]);
+  }, [fileSelection.selectedFiles, linkedRepos, templateTitle]);
   const { attachedSummary } = usePromptContextSync({
     terminalSessionId,
     contextText: promptBase.text,
@@ -1057,10 +1048,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onToggleFile={fileSelection.toggleFileSelection}
               sessionId={terminalSessionId}
               onClearContext={handleClearContext}
-              patternFiles={patterns.patternFiles}
-              selectedPatterns={patterns.selectedPatterns}
-              onTogglePattern={patterns.togglePattern}
-              onCreatePatterns={patterns.createPatterns}
               promptBase={promptBase}
               onClearRepos={clearLinkedRepos}
               onRemoveFile={fileSelection.removeFileFromSelection}
@@ -1084,10 +1071,6 @@ function ProjectTabInner({ projectPath, isActive, tabId, compactionHook, launchO
               onManageTemplates={openManageTemplates}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
-              patternFiles={patterns.patternFiles}
-              selectedPatterns={patterns.selectedPatterns}
-              onTogglePattern={patterns.togglePattern}
-              onCreatePatterns={patterns.createPatterns}
               projectPath={currentPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
               onSaveGroup={openSaveFileGroup}

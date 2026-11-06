@@ -89,7 +89,6 @@ export function useOrchestrationCheck() {
       protocol: 'missing',
       scripts: {},
       workflows: [],
-      patterns: false,
     };
 
     // Check protocol
@@ -133,15 +132,6 @@ export function useOrchestrationCheck() {
       }
     } catch { /* no workflows */ }
 
-    // Check patterns
-    try {
-      status.patterns = await invoke('path_exists', {
-        path: `${projectPath}/.patterns/patterns.md`
-      });
-    } catch {
-      status.patterns = false;
-    }
-
     return status;
   }, []);
 
@@ -157,7 +147,6 @@ export function useOrchestrationCheck() {
       { path: 'react/test.md', label: 'Test (React)' },
       { path: 'react/docs.md', label: 'Docs (React)' },
       { path: 'todo.md', label: 'Todo / Multi-step' },
-      { path: 'patterns-gen.md', label: 'Patterns Generator' },
     ];
 
     const workflowDir = projectPath ? `${projectPath}/.orchestration/workflows` : null;

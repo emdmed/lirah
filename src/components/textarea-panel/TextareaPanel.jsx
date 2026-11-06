@@ -16,8 +16,6 @@ import { useSeededSetting } from "../../features/settings/settingsStore";
 const FILE_STATES = ['modify', 'do-not-modify', 'use-as-example'];
 const NO_RESULTS = [];
 const NO_REPOS = [];
-const NO_PATTERN_FILES = [];
-const NO_PATTERNS = new Set();
 
 // Memoized: the tab re-renders for branch, cwd, changelog and secondary-focus
 // changes the panel doesn't show. ProjectTab passes it stable callbacks.
@@ -56,10 +54,6 @@ export const TextareaPanel = memo(function TextareaPanel({
   onToggleFile,
   onClearContext,
   sessionId,
-  patternFiles = NO_PATTERN_FILES,
-  selectedPatterns = NO_PATTERNS,
-  onTogglePattern,
-  onCreatePatterns,
   promptBase,
   onClearRepos,
   onRemoveFile,
@@ -231,15 +225,10 @@ export const TextareaPanel = memo(function TextareaPanel({
         onManageTemplates={onManageTemplates}
         templateDropdownOpen={templateDropdownOpen}
         onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
-        patternFiles={patternFiles}
-        selectedPatterns={selectedPatterns}
-        onTogglePattern={onTogglePattern}
-        onCreatePatterns={onCreatePatterns}
       />
     </div>
   ), [
     selectedTemplateId, onSelectTemplate, onManageTemplates, templateDropdownOpen, onTemplateDropdownOpenChange,
-    patternFiles, selectedPatterns, onTogglePattern, onCreatePatterns,
   ]);
 
   const footerInfo = (

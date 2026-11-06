@@ -11,30 +11,20 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { usePromptTemplates } from "../../features/templates";
-import { PatternsMenuItems } from "../../features/patterns/PatternsSelector";
 
-const NO_PATTERN_FILES = [];
-const NO_PATTERNS = new Set();
 const OPEN_KEYS = joinKeys(shortcutKeys("templates") ?? ["alt", "alt"]);
 
-// The "instructions" picker: one dropdown for everything that tells the agent
-// how to work. Templates (global, single-select) are text added to the
-// prompt; patterns (this repo's .patterns/*.md, multi-select) are sent as
-// "Read and follow" references. Alt+Alt opens it (controlled `open`).
+// The "instructions" picker: templates (global, single-select) are text added
+// to the prompt. Alt+Alt opens it (controlled `open`).
 export function TemplateSelector({
   selectedTemplateId,
   onSelectTemplate,
   onManageTemplates,
   open,           // Controlled open state
   onOpenChange,   // Callback to change open state
-  patternFiles = NO_PATTERN_FILES,
-  selectedPatterns = NO_PATTERNS,
-  onTogglePattern,
-  onCreatePatterns,
   // Off where the selected template is already shown (the context pane's chips).
   showSelectedBadge = true,
 }) {
@@ -61,19 +51,16 @@ export function TemplateSelector({
   }, [open, templates.length, onSelectTemplate, onOpenChange]);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
-  const patternCount = selectedPatterns.size;
-  const showPatterns = !!onTogglePattern;
 
   // An active template is a lit state: lamp-coloured outline, no fill.
   const badgeStyle = 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-foreground/10';
 
   const activeParts = [
     selectedTemplate && `template: ${selectedTemplate.title}`,
-    patternCount > 0 && `patterns: ${Array.from(selectedPatterns).map(f => f.replace(/\.md$/, '')).join(', ')}`,
   ].filter(Boolean);
   const triggerTitle = activeParts.length > 0
     ? `Instructions · ${activeParts.join(' · ')}  ·  ${OPEN_KEYS}`
-    : `Instructions: templates and patterns  ·  ${OPEN_KEYS}`;
+    : `Instructions: templates  ·  ${OPEN_KEYS}`;
 
   return (
     <div className="flex items-center gap-1">
@@ -98,7 +85,7 @@ export function TemplateSelector({
             title={triggerTitle}
             className="gap-1 px-1.5"
           >
-            <span>instructions{patternCount > 0 && <span className="tube">:{patternCount}</span>}</span>
+            <span>instructions</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
@@ -144,18 +131,6 @@ export function TemplateSelector({
           >
             Manage templates…
           </DropdownMenuItem>
-          {showPatterns && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>patterns · this repo</DropdownMenuLabel>
-              <PatternsMenuItems
-                patternFiles={patternFiles}
-                selectedPatterns={selectedPatterns}
-                onTogglePattern={onTogglePattern}
-                onCreatePatterns={onCreatePatterns}
-              />
-            </>
-          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
