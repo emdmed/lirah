@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { createEmitter } from '../../lib/createStore';
-import { load as loadFile, save as saveFile } from '../../lib/fileStore';
+import { load as loadFile, onExternalChange, save as saveFile } from '../../lib/fileStore';
 import { getWorkspaceData, setWorkspaceData } from '../../lib/workspaceStore';
 
 // App preferences in one module-level store, persisted to ~/.lirah/settings.json.
@@ -263,6 +263,13 @@ export async function initSettings() {
     console.warn(`Failed to load ${SETTINGS_FILE}, using localStorage:`, error);
   }
 }
+
+// An edit from outside (`lirah settings set`, `lirah theme`) replaces the state.
+onExternalChange((rel) => rel === SETTINGS_FILE, (doc) => {
+  if (!doc) return;
+  state = sanitize({ ...doc, ...readLater(doc) });
+  emit();
+});
 
 export function getSettings() {
   return state;

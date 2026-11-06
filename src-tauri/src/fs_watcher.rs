@@ -409,3 +409,66 @@ pub fn stop_fs_watcher(
     }
     Ok(())
 }
+
+/// Quiet period and longest batch for "lirah-files-changed".
+const LIRAH_QUIET: Duration = Duration::from_millis(200);
+const LIRAH_MAX_WAIT: Duration = Duration::from_millis(1000);
+static LIRAH_WATCHER_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Watch the store's JSON files under ~/.lirah (the root, workspaces/ and
+/// tasks/, not the worktrees) and emit "lirah-files-changed" with their paths
+/// relative to ~/.lirah. The app's own writes are reported too; the frontend
+/// skips them by revision. Starts once; later calls do nothing.
+#[tauri::command]
+pub fn start_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    if LIRAH_WATCHER_STARTED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    build_lirah_watcher(app_handle).inspect_err(|_| LIRAH_WATCHER_STARTED.store(false, Ordering::SeqCst))
+}
+
+fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
+    let base = crate::util::lirah_dir().ok_or("no home directory")?;
+    let (tx, rx) = mpsc::channel::<PathBuf>();
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        let Ok(event) = res else { return };
+        if matches!(event.kind, EventKind::Access(_)) {
+            return;
+        }
+        // Temp files (".x.json.tmp-<pid>") have another extension, so only renames onto the target count.
+        for p in event.paths {
+            if p.extension().is_some_and(|e| e == "json") {
+                let _ = tx.send(p);
+            }
+        }
+    })
+    .map_err(|e| format!("Failed to create watcher: {e}"))?;
+    let _ = std::fs::create_dir_all(&base);
+    watcher
+        .watch(&base, RecursiveMode::NonRecursive)
+        .map_err(|e| format!("Failed to watch {}: {e}", base.display()))?;
+    for dir in ["workspaces", "tasks"] {
+        let dir = base.join(dir);
+        let _ = std::fs::create_dir_all(&dir);
+        watcher
+            .watch(&dir, RecursiveMode::Recursive)
+            .map_err(|e| format!("Failed to watch {}: {e}", dir.display()))?;
+    }
+    thread::spawn(move || {
+        let _watcher = watcher; // lives as long as the app
+        while let Ok(first) = rx.recv() {
+            let mut changed = BTreeSet::from([first]);
+            drain_debounced(&rx, Instant::now(), LIRAH_QUIET, LIRAH_MAX_WAIT, |p| {
+                changed.insert(p);
+            });
+            let rels: Vec<String> = changed
+                .iter()
+                .filter_map(|p| p.strip_prefix(&base).ok())
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+            let _ = app_handle.emit("lirah-files-changed", rels);
+        }
+    });
+    Ok(())
+}

@@ -6,8 +6,12 @@ description: Use when the user asks to change Lirah settings, startup projects, 
 # Configuring Lirah with the `lirah` command
 
 You are running inside a tab of Lirah, the terminal app. The `lirah` command on
-your PATH changes the app itself. Run it with the Bash tool. It only works from
-inside a Lirah tab.
+your PATH changes the app itself. Run it with the Bash tool.
+
+From a Lirah tab it talks to the app. Without the app (Lirah closed, or a shell
+it didn't start) some commands still work: they edit Lirah's files in ~/.lirah
+directly, and an open Lirah picks the change up within a second. See "Without
+the app" below.
 
 Always run `lirah settings list` before guessing a setting's key name. It
 prints every key with its current value, default, allowed values and a short
@@ -81,6 +85,21 @@ needs `--all` again.
 `<tab>` is `.` (this tab), an index from `lirah tabs`, a tab id or a tab name.
 Add `--json` to any command for machine-readable output. `lirah help` prints
 the full usage.
+
+## Without the app
+
+- Work offline: `settings` (list, get, and set/reset except the guarded keys:
+  sandbox, network isolation, the hooks and agent control), `theme`, `startup`,
+  `tasks list|add|done` and `plans list|show|import|revise|rechunk|done`.
+- Need the app: `tabs`, `jobs`, `tasks reopen|edit|remove|move`, `plans debug`,
+  `ping`, and setting the guarded keys. Offline they fail with "LIRAH_CONTROL is
+  unset" or "can't reach Lirah"; ask the user to run them from a Lirah tab.
+- Splitting an imported or re-chunked plan, and checking a chunk marked done,
+  happen in the app: right away if it is open with that repo's plans loaded,
+  else when it next loads them.
+- The workspace is `$LIRAH_WORKSPACE` (set in Lirah tabs), else the workspace with
+  a tab open on the deepest folder containing your current directory. The repo
+  is your current directory's.
 
 ## Notes
 

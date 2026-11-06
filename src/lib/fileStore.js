@@ -1,6 +1,7 @@
 // JS side of the Rust store (src-tauri/src/store.rs): JSON files under ~/.lirah
 // with a `version` and a write `revision`. Paths are relative to ~/.lirah.
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const revisions = new Map(); // rel -> revision last read or written
@@ -95,10 +96,44 @@ export async function remove(rel) {
   for (const key of revisions.keys()) if (inside(key)) revisions.set(key, 0);
 }
 
+const watchers = new Set(); // { test(rel), onChange(doc, rel) }
+
+/**
+ * Call `onChange(doc, rel)` when a file matching `test(rel)` is changed by
+ * someone else (the CLI, an editor); `doc` is null if it was deleted. Returns
+ * an unsubscribe function.
+ */
+export function onExternalChange(test, onChange) {
+  const w = { test, onChange };
+  watchers.add(w);
+  return () => watchers.delete(w);
+}
+
+/** Re-read changed files and notify, skipping writes this window made itself (same revision). */
+export function reloadChanged(rels) {
+  for (const rel of rels) {
+    const subs = [...watchers].filter((w) => w.test(rel));
+    if (!subs.length) continue;
+    // Queued like a write, so it never reads between our write and its revision update.
+    const run = (queues.get(rel) ?? Promise.resolve()).catch(() => {}).then(async () => {
+      const doc = await invoke('store_read', { rel });
+      const revision = doc?.revision ?? 0;
+      if (revisions.get(rel) === revision) return;
+      revisions.set(rel, revision);
+      for (const w of subs) {
+        try { w.onChange(doc, rel); } catch (e) { console.error(`Reloading ${rel} failed:`, e); }
+      }
+    });
+    queues.set(rel, run.catch((e) => console.warn(`Failed to reload ${rel}:`, e)));
+  }
+}
+
 globalThis.addEventListener?.('beforeunload', () => { flush(); });
 try {
   // onCloseRequested awaits this, then destroys the window (needs core:window:allow-destroy).
   getCurrentWindow().onCloseRequested(() => flush());
+  listen('lirah-files-changed', (e) => reloadChanged(e.payload)).catch(() => {});
+  invoke('start_lirah_watcher')?.catch?.((e) => console.warn('Failed to watch ~/.lirah:', e));
 } catch {
   // Not running inside Tauri (plain vite or tests).
 }

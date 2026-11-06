@@ -173,6 +173,7 @@ pub fn run(initial_path: Option<String>) {
             fs::git::get_file_watchers_status,
             fs_watcher::start_fs_watcher,
             fs_watcher::stop_fs_watcher,
+            fs_watcher::start_lirah_watcher,
             // Code
             typecheck::check_file_types,
             typecheck::check_project_types,

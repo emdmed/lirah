@@ -6,7 +6,8 @@
 // sandbox, network, hooks, agent control), theme, startup, tasks list/add/done
 // and plans list/show/import/revise/rechunk/done read and write the ~/.lirah files
 // directly; what needs the app (a plan's split, checking a chunk's commits)
-// is left queued in the file and done when Lirah next loads the repo's plans.
+// is left queued in the file and done when Lirah loads the repo's plans (at once
+// if it is open and has them loaded: it reloads ~/.lirah files changed outside it).
 //
 // Any other `lirah <cmd> [positional...] [--key value | --key=value | --flag]`
 // is sent as is: positionals go in args._; flag values are parsed as JSON when
@@ -14,7 +15,7 @@
 // is true.
 import { connect } from "node:net";
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { lirahDir, list, read, resolveWorkspace, revisionOf, write } from "./lirah_files.js";
@@ -454,26 +455,6 @@ function route(cmd, positional, args) {
 // Keep in step with their handlers in src/features/agent-control/useAgentControl.js
 // and the plan and task helpers they use.
 
-// Is any Lirah running? Its control sockets are ~/.lirah/control/<pid>.sock.
-function appRunning() {
-  let names;
-  try {
-    names = readdirSync(join(lirahDir(), "control"));
-  } catch {
-    return false;
-  }
-  return names.some((n) => {
-    const pid = Number(/^(\d+)\.sock$/.exec(n)?.[1]);
-    if (!pid) return false;
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (e) {
-      return e.code === "EPERM";
-    }
-  });
-}
-
 const shortId = (prefix) => `${prefix}${Math.random().toString(36).slice(2, 8)}`;
 
 // FNV-1a as 8 hex chars, as hash8 in src/lib/ids.js (spots an edited plan file).
@@ -581,7 +562,7 @@ function planSummary(plan, index) {
   };
 }
 
-// As the app's replaceSource, with the split queued for the app's next start.
+// As the app's replaceSource, with the split queued for the app.
 function replaceSource(plan, source, importedFrom) {
   if (autopilotLive(plan)) throw new Error("stop auto-pilot before re-chunking");
   const busy = plan.chunks.find((c) => c.status === "in-progress" || c.awaitingFix);
@@ -593,7 +574,7 @@ function replaceSource(plan, source, importedFrom) {
   });
 }
 
-const QUEUED = "Lirah splits it into chunks when it next opens this repo's plans";
+const QUEUED = "Lirah splits it into chunks when it loads this repo's plans (at once if they're open)";
 
 function slugify(text) {
   const slug = String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -911,7 +892,7 @@ const LOCAL = {
     }
     const result = args.result === undefined ? null : String(args.result);
     savePlan({ ...plan, chunks: plan.chunks.map((c) => (c === chunk ? { ...c, doneRequested: { result } } : c)) });
-    return `chunk ${chunk.n} will be marked done when Lirah next opens this repo's plans (its commits are checked first)`;
+    return `chunk ${chunk.n} will be marked done when Lirah loads this repo's plans, at once if they're open (its commits are checked first)`;
   },
 };
 
@@ -920,8 +901,7 @@ async function run(name, args) {
   const local = LOCAL[name];
   const data = await request(name, args, { fallback: !!local });
   if (data !== UNREACHABLE) return data;
-  // The running app would overwrite the files from its own state.
-  if (appRunning()) fail("Lirah is running, but this shell can't reach it; run this from a Lirah tab");
+  // A running app that this shell can't reach picks the file edits up (it watches ~/.lirah).
   try {
     if (read("settings.json")?.agentControl === false) fail("agent control is off in Lirah's settings (Agent → Agent control)");
     return local(args, args._);

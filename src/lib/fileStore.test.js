@@ -7,7 +7,7 @@ vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({ onCloseRequested: (h) => { closeHandler = h; } }),
 }));
 
-const { load, save, flush, remove } = await import('./fileStore.js');
+const { load, save, flush, remove, onExternalChange, reloadChanged } = await import('./fileStore.js');
 
 // A fake disk: one file per rel, with the same revision rules as store.rs.
 let disk;
@@ -69,5 +69,25 @@ describe('fileStore', () => {
     await remove('r.json');
     await flush();
     expect(disk.has('r.json')).toBe(false);
+  });
+
+  it('reloads files changed by someone else and skips its own writes', async () => {
+    const seen = [];
+    const off = onExternalChange((rel) => rel === 'w.json', (doc) => seen.push(doc?.n ?? null));
+    await save('w.json', { n: 1 });
+    reloadChanged(['w.json', 'other.json']);
+    await flush();
+    expect(seen).toEqual([]); // our own write: same revision
+    disk.set('w.json', { n: 2, version: 1, revision: 7 }); // the CLI wrote it
+    reloadChanged(['w.json']);
+    await flush();
+    expect(seen).toEqual([2]);
+    await save('w.json', { n: 3 }); // and our next write expects revision 7
+    expect(disk.get('w.json').revision).toBe(8);
+    disk.delete('w.json');
+    reloadChanged(['w.json']);
+    await flush();
+    expect(seen).toEqual([2, null]);
+    off();
   });
 });

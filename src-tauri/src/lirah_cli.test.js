@@ -70,9 +70,10 @@ it('asks the app to mark an in-progress chunk done', () => {
   expect(() => lirah('plans', 'done', 'p1', '2')).toThrow(/only a chunk in progress/);
 });
 
-it('refuses to write files while a Lirah is running', () => {
+it('writes the files even while a Lirah it cannot reach is running (the app reloads them)', () => {
   put(`control/${process.pid}.sock`, {});
-  expect(() => lirah('tasks', 'list')).toThrow(/Lirah is running/);
+  expect(lirah('tasks', 'add', 'From outside')).toMatch(/added task/);
+  expect(file('workspaces/w1/tasks.json').tasks[0].title).toBe('From outside');
 });
 
 it('sets the theme and settings in settings.json, keeping other keys', () => {

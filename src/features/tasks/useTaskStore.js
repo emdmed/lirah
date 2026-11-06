@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { load, save } from '../../lib/fileStore';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { load, onExternalChange, save } from '../../lib/fileStore';
 import { GLOBAL, normalizeTask } from './taskModel';
 
 // The task lists and their files (under ~/.lirah), loaded on first use and
@@ -54,6 +54,17 @@ export function useTaskStore() {
     loadingRef.current.set(scope, promise);
     return promise;
   }, []);
+
+  // A loaded list changed on disk (`lirah tasks add`): take the file's tasks.
+  useEffect(() => onExternalChange(
+    (rel) => rel === 'tasks/global.json' || /^workspaces\/[^/]+\/tasks\.json$/.test(rel),
+    (doc, rel) => {
+      const scope = rel === 'tasks/global.json' ? GLOBAL : rel.split('/')[1];
+      if (!loadedRef.current.has(scope)) return;
+      stateRef.current = { ...stateRef.current, [scope]: (Array.isArray(doc?.tasks) ? doc.tasks : []).map(normalizeTask) };
+      setTasksByScope(stateRef.current);
+    },
+  ), []);
 
   // The ref is updated at once, so a chain of calls reads its own writes.
   const mutate = useCallback((scope, fn) => {

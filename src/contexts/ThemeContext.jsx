@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getRecordingMode } from '../lib/recordingMode';
 import { themes, defaultTheme, loadTheme, saveTheme } from '../themes/theme-config';
+import { subscribeSettings } from '../features/settings/settingsStore';
 
 const ThemeContext = createContext(undefined);
 
@@ -24,6 +25,11 @@ export function ThemeProvider({ children }) {
       setCurrentTheme(name);
     });
   }, []);
+
+  // Follow settings.json, e.g. `lirah theme <name>` from a shell.
+  useEffect(() => subscribeSettings(() => {
+    if (!forced.current) setCurrentTheme(loadTheme());
+  }), []);
 
   // Apply theme to CSS variables whenever theme changes
   useEffect(() => {

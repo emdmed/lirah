@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { list, load, remove, save } from '../../lib/fileStore';
+import { list, load, onExternalChange, remove, save } from '../../lib/fileStore';
 import { getSavedWorkspaces } from '../../lib/workspaceStore';
 import { normalizeLoadedPlan } from './planModel';
 
@@ -63,6 +63,30 @@ export function usePlanStore({ onLoad } = {}) {
     setPlansByRepo(stateRef.current);
     onLoadRef.current?.(repoRoot, plans);
   }, []);
+
+  // A plan changed on disk (`lirah plans import/revise/done`): swap it into its
+  // repo's list if that repo is loaded, and run onLoad for its queued work.
+  useEffect(() => onExternalChange(
+    (rel) => /^workspaces\/[^/]+\/plans\/[^/]+\/plan\.json$/.test(rel),
+    (doc, rel) => {
+      const [, ws, , id] = rel.split('/');
+      const { version, revision, ...raw } = doc ?? {};
+      // Not normalizeLoadedPlan: that is for startup (it fails running splits, pauses autopilot).
+      const plan = doc?.repoRoot ? { ...raw, workspaceId: ws } : null;
+      const roots = Object.keys(stateRef.current).filter((root) =>
+        root === plan?.repoRoot || stateRef.current[root].some((p) => p.id === id));
+      if (!roots.length) return;
+      stateRef.current = {
+        ...stateRef.current,
+        ...Object.fromEntries(roots.map((root) => {
+          const rest = stateRef.current[root].filter((p) => p.id !== id);
+          return [root, root === plan?.repoRoot ? [plan, ...rest].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)) : rest];
+        })),
+      };
+      setPlansByRepo(stateRef.current);
+      if (plan && stateRef.current[plan.repoRoot]) onLoadRef.current?.(plan.repoRoot, [plan]);
+    },
+  ), []);
 
   // Changed plans are saved (debounced per file); removed plans lose their folder.
   // The ref is updated at once, not on the next render, so a chain of awaits
