@@ -8,6 +8,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getTerminalSession, rememberTerminalSession, forgetTerminalSession } from '../lib/terminalSessions';
+import { workspaceOfTab } from '../lib/workspaceStore';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
@@ -364,7 +365,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
           : null;
         const reattached = !!result;
         if (!result) {
-          result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, output });
+          result = await invoke('spawn_terminal', { rows, cols, sandbox: sandboxEnabled, sandboxNoNet: networkIsolation, projectDir: projectDir || null, workspaceId: reattachKey ? workspaceOfTab(reattachKey) : null, output });
         }
         id = result.session_id;
         if (cancelled) {

@@ -32,6 +32,7 @@ pub const SESSION_ENV: &str = "LIRAH_PTY_SESSION";
 pub const EVENTS_ENV: &str = "LIRAH_AGENT_EVENTS";
 pub const PROMPT_CONTEXT_ENV: &str = "LIRAH_PROMPT_CONTEXT";
 pub const CONTROL_ENV: &str = "LIRAH_CONTROL";
+pub const WORKSPACE_ENV: &str = "LIRAH_WORKSPACE";
 
 /// One payload line is a few hundred bytes; anything this large is not a hook
 /// payload and is skipped rather than buffered.
@@ -43,6 +44,7 @@ const HOOKS_PACKAGE_JSON: &str = "{\"type\":\"module\"}\n";
 /// The `lirah` CLI (an ES module, so its folder gets the same package.json)
 /// and the sh wrapper that puts it on PATH as `lirah`.
 const LIRAH_CLI_JS: &str = include_str!("lirah_cli.js");
+const LIRAH_FILES_JS: &str = include_str!("lirah_files.js");
 const LIRAH_SKILL_MD: &str = include_str!("lirah_skill.md");
 const LIRAH_WRAPPER: &str = "#!/bin/sh\nexec node \"$(dirname \"$0\")/lirah.js\" \"$@\"\n";
 
@@ -309,6 +311,7 @@ fn install_control_plugin(
 /// The `lirah` CLI: `bin/lirah` runs `bin/lirah.js` with node.
 fn install_cli(bin: &Path) -> std::io::Result<()> {
     write_if_changed(&bin.join("lirah.js"), LIRAH_CLI_JS)?;
+    write_if_changed(&bin.join("lirah_files.js"), LIRAH_FILES_JS)?;
     write_if_changed(&bin.join("package.json"), HOOKS_PACKAGE_JSON)?;
     let wrapper = bin.join("lirah");
     write_if_changed(&wrapper, LIRAH_WRAPPER)?;

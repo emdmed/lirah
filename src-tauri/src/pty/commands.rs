@@ -171,6 +171,7 @@ pub async fn spawn_terminal(
     sandbox: bool,
     sandbox_no_net: bool,
     project_dir: Option<String>,
+    workspace_id: Option<String>,
     output: Channel,
     app: AppHandle,
     state: tauri::State<'_, AppState>,
@@ -178,7 +179,11 @@ pub async fn spawn_terminal(
     // The id exists before the shell does: the shell's env carries it, so
     // agent hooks running inside can say which terminal they belong to.
     let session_id = Uuid::new_v4().to_string();
-    let env = crate::agent_hooks::session_env(&session_id);
+    let mut env = crate::agent_hooks::session_env(&session_id);
+    // The `lirah` CLI acts on this workspace's files.
+    if let Some(id) = workspace_id.filter(|id| !id.is_empty()) {
+        env.push((crate::agent_hooks::WORKSPACE_ENV.to_string(), id));
+    }
     let sandbox = sandbox && !cfg!(windows);
     let (session, reader) = crate::ipc::blocking("spawn_terminal", move || {
         manager::spawn_pty(rows, cols, sandbox, sandbox_no_net, project_dir, env)
