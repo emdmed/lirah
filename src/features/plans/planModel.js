@@ -44,6 +44,7 @@ export const SPLIT_STATUS = Object.freeze({
   RUNNING: 'running',
   DONE: 'done',
   FAILED: 'failed',
+  QUEUED: 'queued', // written by the `lirah` CLI while the app was closed; split when the plans load
 });
 
 /** Where a plan is in its life, furthest first reached last. Derived, never stored. */
@@ -229,6 +230,7 @@ export function toInProgress({ tabId, baseShas, primaryRoot, now = Date.now() })
     awaitingFix: false,
     result: null,
     decisions: [],
+    doneRequested: null,
     startedAt: now,
     doneAt: null,
   };
@@ -248,6 +250,7 @@ export function toImplemented(chunk, { commits, commitsByRepo, result = null, de
     awaitingFix: false,
     result,
     decisions: decisions ?? chunk.decisions ?? [],
+    doneRequested: null, // { result } from `lirah plans done` while the app was closed
     doneAt: chunk.status === CHUNK_STATUS.IMPLEMENTED ? chunk.doneAt : now,
   };
 }

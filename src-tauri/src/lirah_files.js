@@ -3,7 +3,7 @@
 // `revision` keys belong to the store. Writes go to a temp file in the same
 // folder and are renamed over the target; a write naming an expected revision
 // fails with a conflict if the file moved on since it was read.
-import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
+import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
 
@@ -63,7 +63,7 @@ export function read(rel) {
   return doc;
 }
 
-const revisionOf = (doc) => (Number.isInteger(doc?.revision) && doc.revision >= 0 ? doc.revision : 0);
+export const revisionOf = (doc) => (Number.isInteger(doc?.revision) && doc.revision >= 0 ? doc.revision : 0);
 
 /**
  * Write `data` atomically and return what was written. `expectedRevision`
@@ -99,6 +99,17 @@ export function write(rel, data, expectedRevision = null) {
     throw new StoreError("io", { message: `${path}: ${e.message}` });
   }
   return doc;
+}
+
+/** Entry names of the folder at `rel`, sorted, dotfiles left out; [] when missing (as store_list). */
+export function list(rel) {
+  const path = storePath(rel);
+  try {
+    return readdirSync(path).filter((n) => !n.startsWith(".")).sort();
+  } catch (e) {
+    if (e.code === "ENOENT") return [];
+    throw new StoreError("io", { message: `${path}: ${e.message}` });
+  }
 }
 
 const inside = (dir, path) => {

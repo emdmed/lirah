@@ -55,11 +55,14 @@ export function PlansProvider({ children }) {
   const {
     plansByRepo, stateRef, getHome, loadRepo, mutate, keepWorkspaces, updatePlan, updateChunk, findPlan, findChunk,
   } = usePlanStore({
-    // Chunks that finished while the app was closed.
+    // Chunks that finished while the app was closed, and what the CLI left queued then.
     onLoad: (repoRoot, plans) => {
       for (const plan of plans) {
+        if (plan.split === SPLIT_STATUS.QUEUED) runSplit(repoRoot, plan.id);
         for (const chunk of plan.chunks) {
-          if (chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
+          if (chunk.status === CHUNK_STATUS.IN_PROGRESS && chunk.doneRequested) {
+            markChunkDone(repoRoot, plan.id, chunk.id, chunk.doneRequested.result ?? null);
+          } else if (chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
         }
       }
     },
