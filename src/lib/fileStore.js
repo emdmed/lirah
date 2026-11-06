@@ -77,6 +77,13 @@ export function flush() {
   return Promise.allSettled([...queues.values()]);
 }
 
+/** Write a plain text file (not a store doc) at `rel`; resolves with its absolute path. */
+export async function writeText(rel, text) {
+  const path = `${await invoke('get_home_dir')}/.lirah/${rel}`;
+  await invoke('write_file_content', { path, content: text });
+  return path;
+}
+
 /** Names in a folder (files and subfolders), sorted; empty if it does not exist. */
 export function list(rel) {
   return invoke('store_list', { rel });

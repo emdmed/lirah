@@ -180,6 +180,7 @@ export function newChunks(chunks) {
     awaitingFix: false,
     result: null, // what the agent said when a chunk was done with nothing to commit
     decisions: [], // its Decision: lines, passed on to later chunks' prompts
+    prompts: [], // { kind, at, file } per prompt sent for it (chunk, fix, nudge)
     startedAt: null,
     doneAt: null,
   }));

@@ -68,10 +68,10 @@ const inFlight = (chunk) => chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.a
 /**
  * The auto-pilot actions, plus the hook-event and closed-tab watchers that
  * drive the runs. Plan state comes from usePlanStore; chunk work from the
- * provider's checkChunk, implementChunk and sendToTab.
+ * provider's checkChunk, implementChunk and sendChunkPrompt.
  */
 export function useAutopilot({
-  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, clearTabContext, tabs, switchTab, toast,
+  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
 }) {
   // Plans whose agent is being cleared: the session ending and starting again
   // is expected then, not something to steer the run by.
@@ -139,9 +139,9 @@ export function useAutopilot({
 
   // Remind the agent to commit `chunk`, once per chunk.
   const nudge = useCallback((repoRoot, plan, chunk) => sendOrHalt(repoRoot, plan.id, async () => {
-    await sendToTab(plan.autopilot.tabId, buildNudgePrompt(plan, chunk));
+    await sendChunkPrompt(repoRoot, plan.id, chunk.id, plan.autopilot.tabId, 'nudge', buildNudgePrompt(plan, chunk));
     setAutopilot(repoRoot, plan.id, { nudged: true });
-  }), [sendOrHalt, sendToTab, setAutopilot]);
+  }), [sendOrHalt, sendChunkPrompt, setAutopilot]);
 
   // Clear the agent's context in `tabId` and wait until it can take a prompt.
   const clearContext = useCallback(async (planId, tabId) => {

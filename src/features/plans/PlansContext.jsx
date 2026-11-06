@@ -13,6 +13,7 @@ import { useTabManager } from '../tabs/TabContext';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
+import { sendSaved } from './sentPrompts';
 import {
   captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, rollbackChunk as revertChunk, strayCommits,
 } from './planGitOps';
@@ -365,6 +366,16 @@ export function PlansProvider({ children }) {
     await send(text);
   }, []);
 
+  // Send a chunk's prompt (kind: chunk, fix or nudge), save it to a file and list it in chunk.prompts.
+  const sendChunkPrompt = useCallback(async (repoRoot, planId, chunkId, tabId, kind, text) => {
+    const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
+    const entry = await sendSaved((t) => sendToTab(tabId, t), plan, chunk, kind, text);
+    if (!entry) return;
+    updatePlan(repoRoot, planId, (p) => ({
+      chunks: p.chunks.map((c) => (c.id === chunkId ? { ...c, prompts: [...(c.prompts ?? []), entry] } : c)),
+    }));
+  }, [findChunk, sendToTab, updatePlan]);
+
   // Clears the agent's context in the tab: /clear, or /new in opencode.
   const clearTabContext = useCallback(async (tabId) => {
     const clear = getTabPrompt(tabId)?.clearContext;
@@ -378,16 +389,16 @@ export function PlansProvider({ children }) {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (cfg.removedAt) throw new Error('The plan\'s worktrees were removed');
     const baseShas = await captureBaseShas(cfg);
-    await sendToTab(tabId, buildChunkPrompt(plan, chunk, { autopilot }));
+    await sendChunkPrompt(repoRoot, planId, chunkId, tabId, 'chunk', buildChunkPrompt(plan, chunk, { autopilot }));
     updateChunk(repoRoot, planId, chunkId, toInProgress({ tabId, baseShas, primaryRoot: repoRoot }));
-  }, [findChunk, ensureGit, sendToTab, updateChunk]);
+  }, [findChunk, ensureGit, sendChunkPrompt, updateChunk]);
 
   const sendFix = useCallback(async (repoRoot, planId, chunkId, notes, tabId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     if (!chunk || notes.length === 0) return;
-    await sendToTab(tabId, buildFixPrompt(plan, chunk, notes));
+    await sendChunkPrompt(repoRoot, planId, chunkId, tabId, 'fix', buildFixPrompt(plan, chunk, notes));
     updateChunk(repoRoot, planId, chunkId, { awaitingFix: true, tabId });
-  }, [findChunk, sendToTab, updateChunk]);
+  }, [findChunk, sendChunkPrompt, updateChunk]);
 
   // Review notes on the whole plan's diff: one fix commit, not tied to a chunk.
   // Change requests for the plan's file; you re-chunk once the agent is done.
@@ -422,7 +433,7 @@ export function PlansProvider({ children }) {
   const {
     startAutopilot, resumeAutopilot, stopAutopilot, dismissAutopilot, revealRun,
   } = useAutopilot({
-    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendToTab, clearTabContext, tabs, switchTab, toast,
+    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
   });
 
   const actions = useMemo(() => ({
