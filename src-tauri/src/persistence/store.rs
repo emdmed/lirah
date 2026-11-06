@@ -1,6 +1,6 @@
 use super::envelope::Persisted;
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Write};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -63,8 +63,16 @@ fn write_atomically(path: &Path, file: &Persisted) -> Result<(), String> {
     let text = serde_json::to_string_pretty(file).map_err(|e| e.to_string())?;
     let mut temp = path.as_os_str().to_owned();
     temp.push(".tmp");
-    fs::write(&temp, text).map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+    write_synced(Path::new(&temp), &text).map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
     fs::rename(&temp, path).map_err(|e| format!("Failed to replace {}: {}", path.display(), e))
+}
+
+/// Flush to disk before the rename: otherwise a power cut can leave the new
+/// name pointing at an empty file.
+fn write_synced(path: &Path, text: &str) -> std::io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    file.write_all(text.as_bytes())?;
+    file.sync_all()
 }
 
 #[cfg(test)]
@@ -112,6 +120,28 @@ mod tests {
         assert_eq!(saved.revision, 1);
         assert_eq!(read(&path).unwrap(), Some(saved));
         assert!(!dir.join("deep").join("a.json.tmp").exists());
+    }
+
+    #[test]
+    fn two_writers_with_the_same_revision_cannot_both_win() {
+        let path = test_dir("race").join("a.json");
+        let start = std::sync::Barrier::new(2);
+
+        let results: Vec<_> = std::thread::scope(|scope| {
+            let writers: Vec<_> = (0..2)
+                .map(|n| {
+                    let (path, start) = (&path, &start);
+                    scope.spawn(move || {
+                        start.wait();
+                        write(path, 1, json!(n), 0)
+                    })
+                })
+                .collect();
+            writers.into_iter().map(|writer| writer.join().unwrap()).collect()
+        });
+
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert!(results.iter().any(|r| r.as_ref().is_err_and(|e| e.starts_with("conflict:"))));
     }
 
     #[test]

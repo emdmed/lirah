@@ -54,6 +54,7 @@ Every file is an envelope:
 ## What happens when…
 
 - **Two writers conflict.** Each write states the revision it started from. The second writer finds the file already moved on and is refused. The layer re-reads and re-applies the change, so both changes survive. After 3 failed attempts the error is reported and the change stays in memory, to be tried again at the next change or on close.
+- **A second process writes at the same time.** The write lock covers this app only. Another process (the CLI, B-078) is not protected yet and could slip in between the check and the write.
 - **The app crashes mid-write.** A write goes to a temporary file first and is then renamed over the real one. The file is either the old version or the new one, never half of each.
 - **The window closes with a pending change.** Closing waits for the layer to save everything that is still in its 400 ms pause.
 - **An upgrade fails.** The file is backed up first and written only once, after every step has run. A failing step stops before the write, so the file stays as it was, with the backup next to it.

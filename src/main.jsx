@@ -84,5 +84,7 @@ Promise.all([firstFrame, document.fonts.ready, window.__splashReady ?? Promise.r
   });
 
 // Closing waits for this handler: save the persisted changes still in their
-// debounce before the window goes away.
-getCurrentWindow().onCloseRequested(() => flushAll());
+// debounce before the window goes away. A failed save must not trap the window open.
+getCurrentWindow().onCloseRequested(() =>
+  flushAll().catch((error) => console.error("Closing with unsaved changes:", error)),
+);

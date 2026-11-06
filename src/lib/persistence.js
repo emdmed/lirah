@@ -34,7 +34,8 @@ export async function read(file) {
 /**
  * Change a file: `fn(data)` returns the new data (`data` is null for a file
  * that does not exist yet). `fn` must be pure, a conflict runs it again on the
- * newer data. The save is debounced; returns the new data at once.
+ * newer data. The save is debounced; returns the new data at once. If `fn`
+ * throws, the error reaches the caller and the file is left as it was.
  * `version` is only used when the file is created.
  */
 export async function update(file, fn, version = NEW_FILE_VERSION) {
@@ -47,15 +48,27 @@ export async function update(file, fn, version = NEW_FILE_VERSION) {
   }
   // No await from here: the entry cannot be dropped by a finishing save.
   const entry = dirty.get(file);
+  let data;
+  try {
+    data = fn(dataOf(entry)); // only a working fn may join `pending`
+  } catch (error) {
+    if (entry.pending.length === 0) dirty.delete(file); // opened just for this call
+    throw error;
+  }
   entry.pending.push(fn);
-  clearTimeout(entry.timer);
-  entry.timer = setTimeout(() => save(file), DEBOUNCE_MS);
-  return dataOf(entry);
+  scheduleSave(file, entry);
+  return data;
 }
 
-/** Save every file with waiting changes now. Call it before the window closes. */
-export function flushAll() {
-  return Promise.all([...dirty.keys()].map(save));
+/**
+ * Save every file with waiting changes now. Call it before the window closes.
+ * Rejects if any file could not be saved (its changes stay in memory).
+ */
+export async function flushAll() {
+  const files = [...dirty.keys()];
+  const results = await Promise.allSettled(files.map(save));
+  const failed = files.filter((_, i) => results[i].status === 'rejected');
+  if (failed.length > 0) throw new Error(`Could not save: ${failed.join(', ')}`);
 }
 
 /**
@@ -89,17 +102,22 @@ export async function migrate(file, steps) {
   await invoke('write_persisted', { path: file, version: latest, data, expectedRevision: disk.revision });
 }
 
-// Saves of one file run one after the other.
+function scheduleSave(file, entry) {
+  clearTimeout(entry.timer);
+  // saveEntry already logged the failure; the changes wait for the next try.
+  entry.timer = setTimeout(() => save(file).catch(() => {}), DEBOUNCE_MS);
+}
+
+// Saves of one file run one after the other, even if an earlier one failed.
 function save(file) {
   const entry = dirty.get(file);
   if (!entry) return Promise.resolve();
   clearTimeout(entry.timer);
-  entry.saving = (entry.saving ?? Promise.resolve()).then(() => saveEntry(file, entry));
+  entry.saving = (entry.saving ?? Promise.resolve()).catch(() => {}).then(() => saveEntry(file, entry));
   return entry.saving;
 }
 
 async function saveEntry(file, entry) {
-  if (entry.pending.length === 0) return;
   try {
     for (let attempt = 1; ; attempt++) {
       try {
@@ -112,10 +130,12 @@ async function saveEntry(file, entry) {
   } catch (error) {
     // The changes stay in `pending`: the next update or flushAll tries again.
     console.error(`Failed to save ${file}:`, error);
+    throw error;
   }
 }
 
 async function write(file, entry) {
+  if (entry.pending.length === 0) return dirty.delete(file); // nothing left to save
   const count = entry.pending.length; // updates that arrive during the write wait for the next save
   const data = dataOf(entry);
   const saved = await invoke('write_persisted', {
@@ -128,15 +148,27 @@ async function write(file, entry) {
   entry.base = data;
   entry.pending.splice(0, count);
   if (entry.pending.length === 0) dirty.delete(file);
-  else entry.timer = setTimeout(() => save(file), DEBOUNCE_MS);
+  else scheduleSave(file, entry);
 }
 
-// Someone else wrote first: start again from what is on disk now.
+// Someone else wrote first: start again from what is on disk now. A change
+// that no longer applies to the newer data is dropped, so it cannot block the rest.
 async function rebase(file, entry) {
   const disk = await readDisk(file);
   entry.version = disk?.version ?? entry.version;
   entry.revision = disk?.revision ?? 0;
   entry.base = disk?.data ?? null;
+
+  let data = entry.base;
+  entry.pending = entry.pending.filter((fn) => {
+    try {
+      data = fn(data);
+      return true;
+    } catch (error) {
+      console.error(`Dropped a change to ${file} that no longer applies:`, error);
+      return false;
+    }
+  });
 }
 
 let watching = null;
