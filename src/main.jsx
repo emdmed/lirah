@@ -19,6 +19,7 @@ import { FigureSheet } from "./dev/FigureSheet";
 import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { perfMark } from "./lib/perf";
+import { flushAll } from "./lib/persistence";
 
 // Imports are hoisted, so this marks the point where every module has been
 // evaluated — the JS parse/eval cost sits before it.
@@ -81,3 +82,7 @@ Promise.all([firstFrame, document.fonts.ready, window.__splashReady ?? Promise.r
       setTimeout(() => splash.remove(), 300);
     }, wait);
   });
+
+// Closing waits for this handler: save the persisted changes still in their
+// debounce before the window goes away.
+getCurrentWindow().onCloseRequested(() => flushAll());
