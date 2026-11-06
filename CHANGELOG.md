@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-06
+
+### Fixed
+
+- **0.14.0 never shipped** - Its build stopped at the startup size check, so there are no 0.14.0 installers. This release has everything listed under 0.14.0. The QA driver now loads only in QA instances, which keeps it out of the app's startup.
+
 ## [0.14.0] - 2026-11-06
 
 ### Added
