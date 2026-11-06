@@ -19,6 +19,7 @@ import { FigureSheet } from "./dev/FigureSheet";
 import "./index.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { perfMark } from "./lib/perf";
+import { initSettings } from "./features/settings/settingsStore";
 
 // Imports are hoisted, so this marks the point where every module has been
 // evaluated — the JS parse/eval cost sits before it.
@@ -28,6 +29,9 @@ perfMark("app:start");
 const showKit = import.meta.env.DEV && new URLSearchParams(window.location.search).has("kit");
 // `?figs` (dev only) shows every FIG drawing with mock data; `&theme=<key>` picks the theme.
 const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");
+
+// Settings come from ~/.lirah/settings.json; every reader expects them loaded.
+await initSettings();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

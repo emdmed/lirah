@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { createEmitter } from '../../lib/createStore';
+import { load as loadFile, save as saveFile } from '../../lib/fileStore';
 
-// App preferences in one module-level store, persisted under one key.
+// App preferences in one module-level store, persisted to ~/.lirah/settings.json.
+// The old localStorage blob (SETTINGS_KEY) only seeds that file on first start
+// and is then left alone as a backup.
 //
 // Every tab reads it through useSyncExternalStore, so a change made in one tab
-// reaches every other open tab in the same render. The `storage` event carries
-// changes made by another window of the app.
+// reaches every other open tab in the same render.
 //
 // A few values are "seeded" rather than shared (see useSeededSetting): the
 // store holds the default a new tab starts with, but each tab keeps its own
@@ -13,6 +15,7 @@ import { createEmitter } from '../../lib/createStore';
 // network isolation, CLI) or layout (sidebar, file view).
 
 export const SETTINGS_KEY = 'lirah:settings:v1';
+export const SETTINGS_FILE = 'settings.json';
 
 export const SETTINGS_DEFAULTS = {
   sandboxEnabled: false,
@@ -189,36 +192,37 @@ function readLegacy() {
 }
 
 function persist(next) {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-  } catch (error) {
-    console.warn(`Failed to save ${SETTINGS_KEY} to localStorage:`, error);
-  }
+  saveFile(SETTINGS_FILE, next, { debounce: 300 })
+    .catch((error) => console.warn(`Failed to save ${SETTINGS_FILE}:`, error));
 }
 
-function load() {
+// The pre-file settings from localStorage: the v1 blob, else the older keys.
+function loadLocal() {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
     if (saved !== null) {
       const raw = JSON.parse(saved);
-      const later = readLater(raw);
-      const loaded = sanitize({ ...raw, ...later });
-      if (Object.keys(later).length) persist(loaded);
-      return loaded;
+      return sanitize({ ...raw, ...readLater(raw) });
     }
   } catch { /* corrupt blob or storage unavailable: fall through */ }
-  const migrated = sanitize({ ...readLegacy(), ...readLater({}) });
-  persist(migrated);
-  return migrated;
+  return sanitize({ ...readLegacy(), ...readLater({}) });
 }
 
-let state = load();
-// Listens for other windows' writes only while something is subscribed.
-const { subscribe: subscribeSettings, emit } = createEmitter({
-  onStart: () => window.addEventListener('storage', onStorage),
-  onStop: () => window.removeEventListener('storage', onStorage),
-});
+// Until initSettings resolves (or outside Tauri) this is the localStorage copy.
+let state = loadLocal();
+const { subscribe: subscribeSettings, emit } = createEmitter();
 export { subscribeSettings };
+
+/** Load settings.json, seeding it from localStorage when missing. Await before render. */
+export async function initSettings() {
+  try {
+    const doc = await loadFile(SETTINGS_FILE);
+    if (doc) state = sanitize({ ...doc, ...readLater(doc) });
+    else await saveFile(SETTINGS_FILE, state);
+  } catch (error) {
+    console.warn(`Failed to load ${SETTINGS_FILE}, using localStorage:`, error);
+  }
+}
 
 export function getSettings() {
   return state;
@@ -231,16 +235,6 @@ export function setSetting(key, value) {
   if (Object.is(prev, next)) return;
   state = { ...state, [key]: next };
   persist(state);
-  emit();
-}
-
-// Another window wrote the key (or cleared storage): reload and notify.
-function onStorage(e) {
-  if (e.key !== null && e.key !== SETTINGS_KEY) return;
-  try {
-    const saved = e.key === null ? null : e.newValue;
-    state = saved ? sanitize(JSON.parse(saved)) : { ...SETTINGS_DEFAULTS };
-  } catch { return; }
   emit();
 }
 
