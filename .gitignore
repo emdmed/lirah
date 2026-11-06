@@ -23,7 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 win-macOs-support.md
-/docs
 .claude
 .orchestration
 /demos
