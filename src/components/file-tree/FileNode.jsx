@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Pin, PinOff } from "lucide-react";
+import { Eye, Pin, PinOff } from "lucide-react";
 import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { TreeGuide } from "./TreeGuide";
 import { AgentMark } from "./AgentMark";
@@ -24,6 +24,7 @@ export function FileNode({
   agentMark,
   onActivateFile,
   onTogglePin,
+  onViewFile,
 }) {
   // Git stats arrive as primitives (so the row memo holds across git polls)
   const stats = useMemo(
@@ -79,6 +80,19 @@ export function FileNode({
           </span>
         )}
       </div>
+
+      {/* Read-only preview */}
+      {!isDeleted && onViewFile && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onViewFile(path); }}
+          title="View: open a read-only preview (v)"
+          aria-label="View file"
+          className="shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 hover:bg-foreground hover:text-background text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <Eye className="w-2.5 h-2.5" />
+        </button>
+      )}
 
       {/* Pin toggle */}
       {!isDeleted && onTogglePin && (

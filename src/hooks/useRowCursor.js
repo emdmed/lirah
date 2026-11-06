@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 /**
- * Vim-style cursor over the rows of a list (j/k, g/G, Enter, p, /; with
+ * Vim-style cursor over the rows of a list (j/k, g/G, Enter, p, v, /; with
  * `onParent`, Backspace / h / - go up a directory, as in ranger and netrw;
  * with `onCollapseAll`, X folds every folder).
  *
@@ -89,6 +89,10 @@ export function useRowCursor({ onSearch, onParent, onCollapseAll } = {}) {
         break;
       case 'p':
         if (list && current >= 0 && current < list.count) list.pin?.(current);
+        break;
+      case 'v':
+        if (!list?.view || current < 0 || current >= list.count) return;
+        list.view(current);
         break;
       case '/':
         if (!onSearch) return;

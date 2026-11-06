@@ -227,6 +227,12 @@ export const FileTree = memo(function FileTree({
         if (node.is_deleted || gitStats?.get(node.path)?.status === 'deleted') return;
         onTogglePin(node.path);
       },
+      view: (i) => {
+        const node = nodeAt(i);
+        if (!node || node.is_dir || !onViewMarkdown) return;
+        if (node.is_deleted || gitStats?.get(node.path)?.status === 'deleted') return;
+        onViewMarkdown(node.path);
+      },
       // Right: open a folder, or step into an open one. Returns the new cursor.
       expand: (i) => {
         const row = allRows[navRowIndices[i]];
@@ -257,7 +263,7 @@ export const FileTree = memo(function FileTree({
         if (rowIndex != null) virtualizer.scrollToIndex(rowIndex, { align: 'auto' });
       },
     });
-  }, [registerList, allRows, navRowIndices, expandedFolders, onToggle, handleActivateFile, onTogglePin, gitStats, virtualizer]);
+  }, [registerList, allRows, navRowIndices, expandedFolders, onToggle, handleActivateFile, onTogglePin, onViewMarkdown, gitStats, virtualizer]);
   useEffect(() => (registerList ? () => registerList(null) : undefined), [registerList]);
 
   if (!showList) {
@@ -351,6 +357,7 @@ export const FileTree = memo(function FileTree({
               onToggle={onToggle}
               onActivateFile={handleActivateFile}
               onTogglePin={onTogglePin}
+              onViewFile={onViewMarkdown}
             />
           </SidebarMenuItem>
         );

@@ -27,6 +27,7 @@ export const TreeNode = memo(function TreeNode({
   onToggle,
   onActivateFile,
   onTogglePin,
+  onViewFile,
 }) {
   const isDimmed = isDimmedEntry(name);
 
@@ -62,6 +63,7 @@ export const TreeNode = memo(function TreeNode({
           agentMark={agentMark}
           onActivateFile={onActivateFile}
           onTogglePin={onTogglePin}
+          onViewFile={onViewFile}
         />
       )}
     </div>
