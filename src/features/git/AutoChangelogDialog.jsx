@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, Di
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
+import { Choice } from '../settings/parts';
 
 export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targetFile, cli, onSave }) {
   const [draftEnabled, setDraftEnabled] = useState(enabled);
@@ -48,52 +49,30 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
           />
         </div>
 
-        <div className="flex flex-col gap-2" role="radiogroup" aria-label="When">
+        <div className="flex flex-col gap-2">
           <DialogGroup label="When" />
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="trigger"
-                  checked={draftTrigger === 'commit'}
-                  onChange={() => setDraftTrigger('commit')}
-                  className="accent-[var(--ins-lamp)]"
-                />
-                After every commit
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="trigger"
-                  checked={draftTrigger === 'merge'}
-                  onChange={() => setDraftTrigger('merge')}
-                  className="accent-[var(--ins-lamp)]"
-                />
-                After a merge to main/master
-              </label>
+          <Choice
+            label="When"
+            value={draftTrigger}
+            onChange={setDraftTrigger}
+            options={[
+              { value: 'commit', label: 'after every commit' },
+              { value: 'merge', label: 'after a merge to main/master' },
+            ]}
+          />
         </div>
 
-        <div className="flex flex-col gap-2" role="radiogroup" aria-label="Agent">
+        <div className="flex flex-col gap-2">
           <DialogGroup label="Agent" />
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="cli-backend"
-                  checked={draftCli === 'claude-code'}
-                  onChange={() => setDraftCli('claude-code')}
-                  className="accent-[var(--ins-lamp)]"
-                />
-                Claude Code
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="cli-backend"
-                  checked={draftCli === 'opencode'}
-                  onChange={() => setDraftCli('opencode')}
-                  className="accent-[var(--ins-lamp)]"
-                />
-                OpenCode
-              </label>
+          <Choice
+            label="Agent"
+            value={draftCli}
+            onChange={setDraftCli}
+            options={[
+              { value: 'claude-code', label: 'Claude Code' },
+              { value: 'opencode', label: 'OpenCode' },
+            ]}
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">

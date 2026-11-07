@@ -6,6 +6,7 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { cn } from '../../lib/utils';
 import { Fig11Merge, planCommands } from './Fig11Merge';
+import { StepOrbit } from './StepOrbit';
 
 // `git diff --name-status` letters, coloured like the auto-commit list.
 const STATUS_COLOR = {
@@ -23,34 +24,13 @@ const STEPS = [
 const stepIndex = (stage) => STEPS.findIndex((s) => s.stages.includes(stage));
 
 
-function StepLine({ stage, failedAt }) {
+function stepStates(stage, failedAt) {
   const current = stage === 'error' ? failedAt : stepIndex(stage);
-  return (
-    <ol className="flex items-center gap-2 text-[11px]">
-      {STEPS.map((step, i) => {
-        let lamp = 'off';
-        let blink = false;
-        if (i < current || stage === 'done') lamp = 'ok';
-        else if (i === current) {
-          if (stage === 'error') lamp = 'fault';
-          else if (stage === 'ready') lamp = 'on';
-          else { lamp = 'on'; blink = true; }
-        }
-        const active = i === current && stage !== 'done';
-        return (
-          <li key={step.id} className="flex items-center gap-2">
-            {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
-            <span className="flex items-center gap-1.5">
-              <Lamp state={lamp} blink={blink} />
-              <span className={active ? 'text-foreground' : 'text-muted-foreground'}>
-                {step.label.toLowerCase()}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  return STEPS.map((_, i) => {
+    if (i < current || stage === 'done') return 'done';
+    if (i > current) return 'queued';
+    return stage === 'error' ? 'fault' : stage === 'ready' ? 'next' : 'live';
+  });
 }
 
 // Errors are a summary, a blank line, then git's own output.
@@ -127,7 +107,7 @@ export function AutoMergeDialog({ autoMerge }) {
         </DialogDescription>
 
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <StepLine stage={stage} failedAt={lastStepRef.current} />
+          <StepOrbit steps={STEPS} states={stepStates(stage, lastStepRef.current)} />
           {feature && (
             <span className="truncate text-xs">
               <span className="text-foreground">{feature}</span>

@@ -304,9 +304,9 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
               )}
 
               <div className="flex-1 grid grid-cols-3 gap-3 min-h-0">
-                <div className="col-span-2 bg-background rounded-none border edge-engraved p-3 flex flex-col min-h-0">
+                <div className="col-span-2 flex flex-col min-h-0">
                   <div className="flex items-center justify-between mb-2 shrink-0">
-                    <div className="text-xs">Token Usage Over Time</div>
+                    <span className="ins-legend">Token usage over time</span>
                     <Button
                       variant={showCacheTokens ? 'default' : 'outline'}
                       size="sm"
@@ -329,7 +329,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
               {/* Figures: FIG.29 draws spend by model once; the "By Model"
                   list and "Cost Breakdown" strip are its fallback. */}
-              <div className="bg-background rounded-none border edge-engraved p-3 shrink-0">
+              <div className="shrink-0">
                 <Fig29Spend
                   models={modelBreakdown.map((mb) => ({ name: formatModelName(mb.model), cost: mb.cost, tokens: mb.tokens }))}
                   scope={projectPath ? projectPath.split('/').filter(Boolean).pop() : undefined}
@@ -371,7 +371,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                           {modelBreakdown.map((mb, idx) => (
                             <div key={idx} className="flex items-center gap-2">
                               <div
-                                className="w-3 h-3 rounded-xs"
+                                className="w-3 h-3"
                                 style={{ backgroundColor: idx === 0 ? chartColors.input : idx === 1 ? chartColors.output : chartColors.cacheRead }}
                               />
                               <span className="text-muted-foreground">{formatModelName(mb.model)}:</span>
