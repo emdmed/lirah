@@ -5,7 +5,7 @@ import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
 import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { DiffBar } from '../../components/instrument/DiffBar';
-import { YOUR_TURN } from './tabActivity';
+import { activityLamp, YOUR_TURN } from './tabActivity';
 import { RowAction } from './RowAction';
 import { rowKeys } from './rowKeys';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -14,21 +14,6 @@ import { RenameField } from './RenameField';
 import { RoleChip, RoleTagButton } from './RoleMenu';
 import { TurnTrail } from './TurnTrail';
 import { isSettledPlan, SettledPlans, TabPlanTier } from '../plans/TabPlanTier';
-
-// Activity → the row's lamp: live work blinks gold, your move is gold, a
-// failed run is a fault, a finished turn you've seen is ok, resting is off.
-const LAMP = {
-  working: { state: 'on', blink: true },
-  running: { state: 'on', blink: true },
-  remote: { state: 'on', blink: true },
-  permission: { state: 'warn' },
-  failed: { state: 'fault' },
-};
-
-function activityLamp(kind, queued) {
-  if (kind === 'done') return queued ? { state: 'warn' } : { state: 'ok', settled: true };
-  return LAMP[kind] ?? { state: 'off' };
-}
 
 // Line counts past four digits read as a size, not a number: +146812 → +147k.
 function compactCount(n) {

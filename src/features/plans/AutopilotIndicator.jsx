@@ -29,7 +29,7 @@ export function AutopilotIndicator() {
         >
           <Lamp state={lamp.state} blink={lamp.blink} />
           <span className="text-muted-foreground">
-            [auto-pilot {label}{runs.length > 1 ? ` +${runs.length - 1}` : ''}]
+            auto-pilot {label}{runs.length > 1 ? ` +${runs.length - 1}` : ''}
           </span>
         </Button>
       </TooltipTrigger>

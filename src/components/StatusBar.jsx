@@ -263,7 +263,7 @@ function AttentionIndicator() {
           className="gap-1.5 px-1 h-5 before:content-none after:content-none"
         >
           <Lamp state={blocked ? 'fault' : 'warn'} blink={blocked > 0} />
-          <span className="text-muted-foreground">[{queue.length} waiting]</span>
+          <span className="text-muted-foreground">{queue.length} waiting</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent>
@@ -335,7 +335,7 @@ export const StatusBar = memo(({
   return (
     <>
     <div
-      className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
+      className="ins-rail grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
       {...drag}
     >
       {/* LEFT: maker's mark, project name and branch, then waiting / update. On macOS the window controls come first, at the left. */}
@@ -370,7 +370,7 @@ export const StatusBar = memo(({
                       className="gap-1.5 px-1 h-5 before:content-none after:content-none"
                     >
                       <Lamp state="ok" />
-                      <span className="text-muted-foreground">[update {availableUpdate.version}]</span>
+                      <span className="text-muted-foreground">update {availableUpdate.version}</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Update available — click to view release</TooltipContent>

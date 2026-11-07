@@ -1,7 +1,5 @@
-import { ShieldAlert, Sparks, Terminal } from 'iconoir-react';
 import { formatAgo } from '../../lib/formatDuration';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
-import { FaultLamp, LensLamp, StarDim, StarLamp, StarOutline } from './ActivityGlyphs';
 import { EDIT_TOOLS, getAgentHookState, getAgentTouches } from './agentHookState';
 
 // What each tab is doing, for the tabs summary pane: from its agent's hooks
@@ -24,24 +22,21 @@ export const LIVE = new Set([...OWN_BUSY, ...YOUR_TURN, 'remote']);
 // A finished turn this old drops out of the row; the tooltip still has it.
 export const STALE_TURN_MS = 60 * 60 * 1000;
 
-// What each activity looks like: an icon (Iconoir, or one of the star family)
-// that names the state, and its colour. Working is a lit star, waiting an unlit
-// star, done an outlined star, idle a dark lens, so a moon in the row only ever
-// means context fill.
-// `pulse` marks work in progress. How long it has held is in the row tooltip.
-export const ACTIVITY = {
-  working: { icon: StarLamp, color: 'text-[var(--ins-lamp)]', pulse: true },
-  permission: { icon: ShieldAlert, color: 'text-[var(--ins-warn)]', pulse: true },
-  done: { icon: StarOutline, color: 'text-[var(--ins-ok)]' },
-  // Muted: an agent idling at its prompt is not an alarm; amber is kept for
-  // states that need the user (permission, the attention queue number).
-  waiting: { icon: StarDim, color: 'text-muted-foreground' },
-  running: { icon: Terminal, color: 'text-[var(--ins-lamp)]', pulse: true },
-  remote: { icon: Sparks, color: 'text-[var(--ins-lamp)]', pulse: true },
-  idle: { icon: LensLamp, color: 'text-muted-foreground' },
-  // A resting tab whose auto-pilot run failed: its plan needs you.
-  failed: { icon: FaultLamp, color: 'text-[var(--ins-fault)]' },
+// The reticle lamp each activity shows in its tab row (and the shortcuts
+// legend). Live work blinks gold; a finished turn is gold while queued for
+// you, then settles to ok.
+const LAMP = {
+  working: { state: 'on', blink: true },
+  running: { state: 'on', blink: true },
+  remote: { state: 'on', blink: true },
+  permission: { state: 'warn' },
+  failed: { state: 'fault' },
 };
+
+export function activityLamp(kind, queued) {
+  if (kind === 'done') return queued ? { state: 'warn' } : { state: 'ok', settled: true };
+  return LAMP[kind] ?? { state: 'off' };
+}
 
 // What the agent's own hooks said, when it has them (see agentHookState.js).
 function hookActivity(cliName, hook, now) {

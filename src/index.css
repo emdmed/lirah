@@ -424,6 +424,13 @@ body {
   font-weight: 300;
 }
 
+/* Rail words stay lowercase mono: its ghost keys don't take the italic verb face. */
+.ins-rail .ins-key-verb {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-weight: 400;
+}
+
 /* Numeric readouts: fixed-width columns in the lamp colour. */
 .tube {
   font-variant-numeric: tabular-nums;

@@ -24,6 +24,9 @@ import { TabRow } from '../features/tabs/TabRow';
 import { TabProvider } from '../features/tabs/TabContext';
 import { ContextChips } from '../components/textarea-panel/ContextChips';
 import { SelectedFileItem } from '../components/textarea-panel/SelectedFileItem';
+import { TreeGuide } from '../components/file-tree/TreeGuide';
+import { AgentMark } from '../components/file-tree/AgentMark';
+import { EmptyPlate } from '../components/EmptyState';
 
 // Kit-only tab rows: live, waiting on you, resting (folded) and a plain shell.
 const NOOP = () => {};
@@ -36,7 +39,11 @@ const KIT_TABS = [
   { name: 'infra', kind: 'idle', label: 'idle', info: { branch: 'ops', files: 1, added: 2, deleted: 0 } },
 ];
 
-// Component sheet for the Instrument TUI primitives (board 01b). Mounted
+// Kit-only file tree rows (depth, name, agent mark) and plan chunks (body, title).
+const KIT_TREE = [[0, 'src/', null], [1, 'limiter.ts', 'edit-live'], [1, 'schema.ts', 'edit'], [1, 'login.ts', 'read-live'], [1, 'routes.ts', 'read'], [0, 'README.md', null]];
+const KIT_CHUNKS = [['done', 'Bundle fonts'], ['done', 'Reticle Lamp'], ['live', 'Orbit Scanner'], ['queued', 'Pane legends'], ['queued', 'Status rail', true]];
+
+// Component sheet for the orrery-plate primitives. Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
 // Three attached files, one per intent, with made-up level sizes.
 const KIT_FILES = ['/p/src/db/schema.ts', '/p/src/auth/login.ts', '/p/src/limiter.ts'];
@@ -72,7 +79,7 @@ export function InstrumentKit() {
   return (
     <div className="h-full overflow-y-auto bg-[var(--ins-gutter)] p-4 text-xs font-mono text-foreground">
       <div className="mb-4 flex items-center gap-3">
-        <span className="ins-legend">Instrument kit</span>
+        <span className="ins-legend">Orrery kit</span>
         <select
           value={currentTheme}
           onChange={(e) => changeTheme(e.target.value)}
@@ -279,6 +286,42 @@ export function InstrumentKit() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="tui-pane max-w-[260px]" data-legend>
+          <PaneLegend index={13} title="Files" note="guides · agent marks" />
+          <div className="flex flex-col py-1 text-[var(--font-lg)]">
+            {KIT_TREE.map(([depth, name, mark]) => (
+              <div key={name} className="flex h-6 items-center gap-0.5 pr-2">
+                <TreeGuide depth={depth} />
+                <span className="w-3 shrink-0" />
+                <span className="truncate pl-1">{name}</span>
+                {mark && <span className="ml-auto pl-1.5 flex items-center"><AgentMark mark={mark} /></span>}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="tui-pane max-w-[260px]" data-legend>
+          <PaneLegend index={14} title="Plans" note="chunk spine" />
+          <div className="flex flex-col py-1">
+            {KIT_CHUNKS.map(([body, title, skipped], i) => (
+              <div key={title} data-body={body} className="ins-spine relative">
+                <div className="grid grid-cols-[14px_16px_minmax(0,1fr)] items-start gap-x-1.5 px-3 py-[3px] text-[11px]">
+                  <span className="flex h-[18px] w-3.5 items-center justify-center">
+                    <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} role="img" aria-label={body} />
+                  </span>
+                  <span className="text-right leading-[18px] text-muted-foreground tabular-nums">{i + 1}</span>
+                  <span className={`leading-[18px] ${body === 'live' ? 'ins-name text-[12px]' : body === 'done' ? 'text-muted-foreground' : skipped ? 'text-muted-foreground line-through' : ''}`}>{title}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="tui-pane px-3" data-legend>
+          <PaneLegend index={15} title="Empty" note="orbit plate" />
+          <EmptyPlate className="py-4" title="No tasks yet" description="Add one with the + key." action={{ label: 'add task', onClick: NOOP }} />
         </section>
 
         <section className="tui-pane px-3" data-legend>

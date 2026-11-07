@@ -2,17 +2,21 @@
 // While a recipe wrapped with atlas() draws, K.leader and K.box draw:
 //   leader  a thin ink line that ends in a dot at the label;
 //   box     a free label: an italic name (--font-name) over a mono note,
-//           no frame. It sits where the box would, set against the leader's
+//           no frame.
+//   node    the plan spine's bodies: done a filled body in muted ink, live
+//           the gold sun with a dotted corona, to do a dashed ring, fault a
+//           body in fault ink (merge and started keep the vendored marks);
+//   count   the n/N reading as a free mono label, no box. It sits where the box would, set against the leader's
 //           dot (right-aligned when the leader lands on its right edge,
 //           centred under a leader that lands on its top edge).
-// Anything drawn outside a wrapped recipe (<cal-meter>, FIG.06's
-// measuredToned) keeps the vendored look. The FIG caption under the drawing
+// <cal-progress> (FIG.16) draws in this hand too. Anything else drawn outside
+// a wrapped recipe (<cal-meter>, FIG.06's measuredToned) keeps the vendored look. The FIG caption under the drawing
 // is CalRecipe's. Imported first by recipes/index.js.
 const C = window.Calibrated;
 const { K } = C;
 const R = C.recipes;
 
-const vendored = { leader: K.leader, box: K.box };
+const vendored = { leader: K.leader, box: K.box, node: K.node, count: K.count };
 let depth = 0;
 let lastEnd = null; // where the last atlas leader ended, for the label after it
 
@@ -38,8 +42,20 @@ function box(x, y, w, l1, l2, c2 = 'fg') {
   return name + (l2 ? K.t(tx, y + 27, l2, c2, a) : '');
 }
 
+const BODY = {
+  done: (x, y) => `<circle cx="${n2(x)}" cy="${n2(y)}" r="3" style="fill:var(--muted);stroke:none"/>`,
+  live: (x, y) => `<circle cx="${n2(x)}" cy="${n2(y)}" r="7" style="fill:none;stroke:var(--live)" stroke-width="0.8" stroke-dasharray="1 2"/>`
+    + `<circle cx="${n2(x)}" cy="${n2(y)}" r="4" style="fill:var(--live);stroke:none"/>`,
+  todo: (x, y) => `<circle cx="${n2(x)}" cy="${n2(y)}" r="3" style="fill:var(--panel);stroke:var(--muted)" stroke-dasharray="1.5 1.5"/>`,
+  fault: (x, y) => `<circle cx="${n2(x)}" cy="${n2(y)}" r="3" style="fill:var(--fault);stroke:none"/>`,
+};
+const node = (x, y, st = 'todo', size) => (BODY[st] ? BODY[st](x, y) : vendored.node(x, y, st, size));
+const count = (x, y, n, c = 'fg', pad = 0) => K.t(x + 4, y + 4, pad ? String(n).padStart(pad, '0') : String(n), c);
+
 K.leader = (...a) => (depth ? leader(...a) : vendored.leader(...a));
 K.box = (...a) => (depth ? box(...a) : vendored.box(...a));
+K.node = (...a) => (depth ? node(...a) : vendored.node(...a));
+K.count = (...a) => (depth ? count(...a) : vendored.count(...a));
 
 // The recipe drawn in the atlas hand, with its motion hooks carried over.
 export function atlas(fn) {
@@ -54,3 +70,11 @@ export function atlas(fn) {
 // themselves. measured stays as it is for FIG.06 (measuredAtlas is the
 // atlas copy, registered by measuredToned.js).
 ['merge', 'loop', 'section', 'matrix'].forEach((name) => { R[name] = atlas(R[name]); });
+
+// FIG.16's element draws in the atlas hand as well.
+const Progress = customElements.get('cal-progress');
+const drawProgress = Progress.prototype.draw;
+Progress.prototype.draw = function draw(...a) {
+  depth++;
+  try { return drawProgress.apply(this, a); } finally { depth--; lastEnd = null; }
+};
