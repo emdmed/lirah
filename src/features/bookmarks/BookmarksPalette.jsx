@@ -105,7 +105,7 @@ export function BookmarksPalette({ open, onOpenChange, onNavigate }) {
         side="bottom"
         className="h-[50vh] gap-3 border-t-[var(--ins-edge-focus)] bg-[var(--ins-raised)] px-5 pt-5 pb-3 font-mono shadow-none [&>[data-slot=sheet-close]]:hidden"
       >
-        <SheetTitle className="ins-legend absolute -top-[6px] left-[10px] flex items-center gap-[7px] bg-[var(--ins-raised)] px-[5px] font-normal leading-[12px] text-foreground">
+        <SheetTitle className="ins-name absolute -top-[7px] left-[10px] flex items-center gap-[7px] bg-[var(--ins-raised)] px-[5px] text-[13px] leading-[14px] text-foreground">
           <Keycap size="sm" lit>^P</Keycap>
           Starred projects
           <Lamp state="on" />

@@ -5,7 +5,7 @@ import { Lamp } from './Lamp';
 // type, the name in italic, `status` (a mark: mascot, lamp) then `note` in
 // mono; `trailing` (a key hint, usually) sits on the right end. The number
 // lights from CSS when the pane holds focus; `lit` lights it (and the lamp)
-// explicitly.
+// explicitly. A `status` mark stands in for the lamp.
 export function PaneLegend({ index, title, status, note, lit = false, lamp, trailing }) {
   const lampState = lamp ?? (lit ? 'on' : 'off');
   return (
@@ -14,7 +14,7 @@ export function PaneLegend({ index, title, status, note, lit = false, lamp, trai
         {index != null && <span className="ins-legend ins-pane-key" data-lit={lit || undefined}>{index}</span>}
         <span className="ins-name ins-pane-name">{title}</span>
         {status != null && <span className="ins-pane-legend-status">{status}</span>}
-        {(lamp != null || lit) && <Lamp state={lampState} />}
+        {(lamp != null || lit) && status == null && <Lamp state={lampState} />}
         {note != null && <span className="ins-pane-legend-note">{note}</span>}
       </span>
       {trailing && <span>{trailing}</span>}

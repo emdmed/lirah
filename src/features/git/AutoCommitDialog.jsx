@@ -193,6 +193,7 @@ export function AutoCommitDialog({ autoCommit }) {
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) dismiss(); }}>
       <DialogContent
         size="lg"
+        fig="33"
         className="max-h-[85vh] flex flex-col gap-4 overflow-hidden"
         keys={['^', '⇧', '␣']}
         lamp={lamp}

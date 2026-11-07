@@ -268,7 +268,7 @@ export function PlanDetail({ plan }) {
             title={`Go to chunk ${stuck.n}`}
             className="ins-well mt-3 flex min-w-0 cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-[11px] outline-none hover:text-foreground focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
           >
-            <Lamp state="warn" label="needs you" />
+            <Lamp state="wait" label="needs you" />
             <span className="engraved-label shrink-0">needs you</span>
             <span className="min-w-0 truncate tabular-nums text-foreground" role="status">
               chunk {stuck.n} · no commit
@@ -455,7 +455,7 @@ function LifecycleLine({ plan }) {
     <p aria-label="Plan lifecycle" className="mt-2 flex flex-wrap items-baseline gap-x-1 text-[11px] tabular-nums text-muted-foreground">
       {stops.map((s, i) => (
         <span key={s.stage} className="whitespace-nowrap">
-          {i > 0 && <span className="opacity-70">─{formatAgo(s.at - stops[i - 1].at)}→ </span>}
+          {i > 0 && <span>─{formatAgo(s.at - stops[i - 1].at)}→ </span>}
           {s.stage === PLAN_STAGE.PR_OPEN && plan.pr?.url ? (
             <button type="button" onClick={openPr} className="cursor-pointer text-foreground underline-offset-2 hover:underline" title={plan.pr.url}>
               PR #{plan.pr.number}
@@ -467,7 +467,7 @@ function LifecycleLine({ plan }) {
         </span>
       ))}
       {plan.revisions?.length > 0 && (
-        <span className="whitespace-nowrap opacity-70" title={plan.revisions.map((r) => shortDate(r.at)).join(', ')}>
+        <span className="whitespace-nowrap" title={plan.revisions.map((r) => shortDate(r.at)).join(', ')}>
           · revised {plan.revisions.length}×
         </span>
       )}

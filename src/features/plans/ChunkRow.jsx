@@ -13,9 +13,11 @@ import { usePlansActions } from './PlansContext';
 import { useToast } from '../toast';
 import { useDialogStore } from '../dialogs/DialogProvider';
 import { basename } from '../../utils/pathUtils';
+import { LirahMark } from '../../components/LirahMark';
 
 // The chunk's body on the spine: done filled, live (sent, fixing, waiting on
-// its commit) the gold sun, the rest queued as dashed rings.
+// its commit) the gold sun, the next one a solid ring, the rest queued as
+// faint dashed rings.
 const CHUNK_BODY = {
   [CHUNK_STATE.IMPLEMENTED]: 'done',
   [CHUNK_STATE.IN_PROGRESS]: 'live',
@@ -23,6 +25,24 @@ const CHUNK_BODY = {
   [CHUNK_STATE.NO_COMMIT]: 'live',
 };
 const chunkBody = (chunk) => CHUNK_BODY[effectiveChunkState(chunk)] || 'queued';
+
+// The body itself. Live is the site's sun: a dotted corona, a ring round the
+// mark, four rays.
+export function ChunkBody({ body, skipped, label }) {
+  if (body === 'live') {
+    return (
+      <span className="ins-chunk-sun" role="img" aria-label={label}>
+        <svg width="22" height="22" viewBox="-30 -30 60 60" aria-hidden="true">
+          <circle r="22" fill="none" strokeWidth="1.2" strokeDasharray="1 3" />
+          <circle r="15" fill="var(--pane-bg, var(--ins-panel))" strokeWidth="1.4" />
+          <path d="M-30 0H-17M17 0H30M0 -30V-17M0 17V30" strokeWidth="1.4" />
+        </svg>
+        <LirahMark size={11} className="ins-sun" />
+      </span>
+    );
+  }
+  return <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} role="img" aria-label={label} />;
+}
 
 const STATUS_LABEL = {
   [CHUNK_STATE.PENDING]: 'pending',
@@ -109,7 +129,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
     : pilotChunk && chunk.status === CHUNK_STATUS.IN_PROGRESS ? null : statusNote(chunk);
   // The one action the diagnosis recommends: commit a dirty tree, mark a clean one done.
   const recommend = stuck && dirty ? (dirty.length > 0 ? 'commit' : 'done') : null;
-  const body = chunkBody(chunk);
+  const body = chunkBody(chunk) === 'queued' && isNext ? 'next' : chunkBody(chunk);
   const latestPrompt = chunk.prompts?.at(-1);
 
   const startEdit = () => {
@@ -265,7 +285,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         title={isNext ? 'Next chunk' : undefined}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
-          <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} role="img" aria-label={status} />
+          <ChunkBody body={body} skipped={skipped} label={status} />
         </span>
         <span
           className={cn(
@@ -280,7 +300,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
             'min-w-0 leading-[18px]',
             open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
             skipped ? 'text-muted-foreground line-through' : implemented && !open ? 'text-muted-foreground' : 'text-foreground',
-            body === 'live' && 'ins-name text-[12px]',
+            body === 'live' && 'ins-name text-[16px]',
           )}
         >
           {chunk.title}
@@ -301,7 +321,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
           ) :isNext && chunk.status === CHUNK_STATUS.PENDING ? (
             <span className="text-foreground">next</span>
           ) : chunk.status !== CHUNK_STATUS.PENDING ? (
-            <span className="tabular-nums">{status}</span>
+            <span className={cn('tabular-nums', body === 'live' && 'text-[var(--ins-lamp)]')}>{status}</span>
           ) : !open && chunk.files?.length > 0 && (
             <span className="tabular-nums">{chunk.files.length} {chunk.files.length === 1 ? 'file' : 'files'}</span>
           )}

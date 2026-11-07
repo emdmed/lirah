@@ -59,8 +59,8 @@ function ChangelogStatus({ status }) {
 // Hover shows FIG.10 while the sandbox is on and running; the one-word state
 // is its fallback.
 function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolation }) {
-  const tooltip = IS_WINDOWS ? 'Sandbox: not available on Windows'
-    : enabled && failed ? 'Sandbox: FAILED' : enabled ? 'Sandbox: ON' : 'Sandbox: OFF';
+  const tooltip = IS_WINDOWS ? 'not available on Windows'
+    : enabled && failed ? 'failed' : enabled ? 'on' : 'off';
   const compact = useFigureCompact();
   const drawn = enabled && !failed && !IS_WINDOWS;
   return (
@@ -72,7 +72,7 @@ function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolatio
             <circle r="6.2" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1.6" />
           </svg>
           <span>sandbox</span>
-          <ToggleSwitch checked={enabled} onChange={onToggle} disabled={IS_WINDOWS} label="Sandbox" tone="ok" />
+          <ToggleSwitch checked={enabled} onChange={onToggle} disabled={IS_WINDOWS} label="Sandbox" tone="ink" />
           {enabled && failed && <Lamp state="fault" label="Sandbox failed" />}
         </span>
       </TooltipTrigger>
@@ -83,10 +83,10 @@ function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolatio
             networkIsolation={networkIsolation}
             paper="var(--ins-raised)"
             className="px-4 pt-2 pb-3"
-            fallback={<div className="px-2 py-1">{tooltip}</div>}
+            fallback={<div className="px-2 py-1">Sandbox · {tooltip}</div>}
           />
         </TooltipContent>
-      ) : <TooltipContent>{tooltip}</TooltipContent>}
+      ) : <TooltipContent title="Sandbox" hint="click to change">{tooltip}</TooltipContent>}
     </Tooltip>
   );
 }
@@ -99,19 +99,19 @@ function CompactionSwitch({ enabled, onToggle }) {
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 px-1">
           <span>index</span>
-          <ToggleSwitch checked={enabled} onChange={onToggle} label="Compaction hook" tone="ok" />
+          <ToggleSwitch checked={enabled} onChange={onToggle} label="Compaction hook" tone="ink" />
         </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {enabled ? 'Compaction: ON' : 'Compaction: OFF'} · this tab's agent gets a fresh project index to grep on each prompt (Ctrl+Shift+P)
+      <TooltipContent title="Index" hint="Ctrl+Shift+P">
+        {enabled ? 'on' : 'off'} · this tab's agent gets a fresh project index to grep on each prompt
       </TooltipContent>
     </Tooltip>
   );
 }
 
 function NetworkSwitch({ isolated, enabled, onToggle }) {
-  const tooltip = IS_WINDOWS ? 'Network isolation: not available on Windows'
-    : isolated && enabled ? 'Network: ISOLATED' : 'Network: ALLOWED';
+  const tooltip = IS_WINDOWS ? 'isolation not available on Windows'
+    : isolated && enabled ? 'isolated' : 'allowed';
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -120,7 +120,7 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
           <ToggleSwitch checked={isolated} onChange={onToggle} disabled={IS_WINDOWS || !enabled} label="Network isolation" tone="warn" />
         </span>
       </TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
+      <TooltipContent title="Network" hint="click to change">{tooltip}</TooltipContent>
     </Tooltip>
   );
 }
@@ -262,12 +262,12 @@ function AttentionIndicator() {
           onClick={requestAttentionJump}
           className="gap-1.5 px-1 h-5 before:content-none after:content-none"
         >
-          <Lamp state={blocked ? 'fault' : 'warn'} blink={blocked > 0} />
+          <Lamp state={blocked ? 'fault' : 'wait'} blink={blocked > 0} />
           <span className="text-muted-foreground">{queue.length} waiting</span>
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
-        {blocked ? `${blocked} blocked on permission · ` : ''}Jump to the next one <KeyChord keys={shortcutKeys('attention-jump')} size="sm" className="ml-1" />
+      <TooltipContent title="Waiting on you" hint={<KeyChord keys={shortcutKeys('attention-jump')} size="sm" />}>
+        {blocked ? `${blocked} blocked on permission · ` : ''}jump to the next one
       </TooltipContent>
     </Tooltip>
   );
@@ -344,13 +344,16 @@ export const StatusBar = memo(({
         <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />
         {currentPath && (
           <span className="flex items-baseline gap-2 min-w-0" title={currentPath}>
-            <span className="ins-name text-[15px] leading-none shrink-0">{basename(currentPath)}</span>
+            <span className="ins-name text-[16px] leading-none shrink-0">{basename(currentPath)}</span>
             {branchName && <span className="text-muted-foreground truncate">{branchName}</span>}
           </span>
         )}
 
-        <AttentionIndicator />
-        <AutopilotIndicator />
+        {/* Who needs you, pushed up against the gauge so it reads in the middle of the rail. */}
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <AttentionIndicator />
+          <AutopilotIndicator />
+        </div>
 
         {/* Context actions: update (shown when relevant) */}
         {availableUpdate && (
@@ -373,7 +376,7 @@ export const StatusBar = memo(({
                       <span className="text-muted-foreground">update {availableUpdate.version}</span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Update available — click to view release</TooltipContent>
+                  <TooltipContent title="Update available" hint="click to view release">{availableUpdate.version}</TooltipContent>
                 </Tooltip>
               )}
             </div>
@@ -392,7 +395,7 @@ export const StatusBar = memo(({
       />
 
       {/* RIGHT: Runtime status + Settings */}
-      <div className="flex items-center justify-end gap-1.5 min-w-0" {...drag}>
+      <div className="flex items-center justify-end gap-3 min-w-0" {...drag}>
         {/* Transient status (changelog) — only visible when active */}
         {changelogStatus && (
           <ChangelogStatus status={changelogStatus} />
@@ -407,13 +410,13 @@ export const StatusBar = memo(({
                 commit · {AUTO_COMMIT_CHIP[autoCommitStage].label}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{autoCommitStage === 'ready' ? 'Review and commit' : 'Show auto commit'}</TooltipContent>
+            <TooltipContent title="Auto commit" hint="click to open">{autoCommitStage === 'ready' ? 'ready to review and commit' : AUTO_COMMIT_CHIP[autoCommitStage].label}</TooltipContent>
           </Tooltip>
         )}
 
         {/* Runtime zone: CLI, sandbox, network. Jobs live
             in their own rail, so they are not repeated here. */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-3">
           {selectedCli && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -422,7 +425,7 @@ export const StatusBar = memo(({
                   {cliName}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
+              <TooltipContent title="Agent" hint="Ctrl+K">{cliName} · click to change the CLI</TooltipContent>
             </Tooltip>
           )}
           {onToggleCompaction && (
@@ -440,8 +443,7 @@ export const StatusBar = memo(({
           )}
         </div>
 
-        {/* Settings — visually separated as the final anchor */}
-        <span className="ins-sep-star mx-1" aria-hidden="true" />
+        {/* Settings, the final anchor */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -451,7 +453,7 @@ export const StatusBar = memo(({
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>Settings and quick actions</TooltipContent>
+            <TooltipContent title="Settings" hint="click for actions">preferences and quick actions</TooltipContent>
           </Tooltip>
           {/* Preferences live in the Settings dialog; this menu keeps actions. */}
           <DropdownMenuContent align="end" className="w-56 text-xs">

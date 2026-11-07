@@ -11,25 +11,19 @@ import {
 import { useTabManager } from './TabContext';
 import { useAttentionQueue } from './useAgentAttention';
 import { RenameField } from './RenameField';
-import { StarOutline } from './ActivityGlyphs';
+import { Lamp } from '../../components/instrument/Lamp';
+import { PanelButton } from '../../components/instrument/PanelButton';
+import { Plus } from 'iconoir-react';
 
-// The outlined star on a background workspace whose agent waits on you.
+// The lamp on a background workspace whose agent waits on you.
 function Waiting({ blocked }) {
-  return (
-    <span
-      role="img"
-      className={blocked ? 'text-[var(--ins-warn)]' : 'text-[var(--ins-ok)]'}
-      aria-label={blocked ? 'agent needs permission' : 'agent waiting on you'}
-    >
-      <StarOutline />
-    </span>
-  );
+  return <Lamp state={blocked ? 'fault' : 'wait'} label={blocked ? 'agent needs permission' : 'agent waiting on you'} />;
 }
 
 // The workspaces, in the Workspace pane's legend: click to switch (Alt+W cycles),
-// double-click or F2 to rename, × to remove, + to add one. An outlined star marks a
-// workspace in the background whose agent is waiting on you: warn when one
-// needs permission, ok otherwise. When they don't all fit, the others fold into
+// double-click or F2 to rename, × to remove, + to add one. A lamp marks a
+// workspace in the background whose agent is waiting on you: fault when one
+// needs permission, the gold waiting lamp otherwise. When they don't all fit, the others fold into
 // a +N chip: one click switches to the only other one, or opens a menu of them.
 export function WorkspaceRow() {
   const { tabs, workspaces, activeWorkspaceId, switchWorkspace, addWorkspace, renameWorkspace, removeWorkspace } = useTabManager();
@@ -87,7 +81,7 @@ export function WorkspaceRow() {
           isActive ? 'text-foreground border-[var(--ins-legend)]' : 'text-muted-foreground border-transparent hover:text-foreground',
         )}
       >
-        <span className="truncate">{ws.name}</span>
+        <span className="ins-name truncate text-[13px]">{ws.name}</span>
         <span className="tabular-nums text-muted-foreground">{count}</span>
         {star(ws)}
       </button>
@@ -122,7 +116,7 @@ export function WorkspaceRow() {
   const chipBody = (
     <>
       +{others.length}
-      {othersWaiting && <span aria-hidden="true" className={othersBlocked ? 'text-[var(--ins-warn)]' : 'text-[var(--ins-ok)]'}><StarOutline /></span>}
+      {othersWaiting && <Lamp state={othersBlocked ? 'fault' : 'wait'} className="ml-1" />}
     </>
   );
 
@@ -206,14 +200,12 @@ export function WorkspaceRow() {
           </>
         )
       )}
-      <button
+      <PanelButton
+        icon={Plus}
         onClick={() => addWorkspace()}
         title="New workspace"
         aria-label="New workspace"
-        className="px-1 text-muted-foreground hover:text-foreground cursor-pointer"
-      >
-        +
-      </button>
+      />
     </span>
   );
 }

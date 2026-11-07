@@ -2,22 +2,16 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { INK, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { Plus } from 'iconoir-react';
 import { Keycap } from '@/components/instrument/Keycap';
+import { EmptyPlate } from '@/components/EmptyState';
 import { cn } from '../../lib/utils';
-import { AUTOPILOT_STATUS, CHUNK_STATUS } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON } from './planModel';
 
 // Small presentational pieces of the plans pane.
 
+// An empty pane's plate: the shared empty orbit, the line in italic and the
+// hint as its note.
 export function EmptyLine({ children, hint }) {
-  return (
-    <div className="flex flex-col gap-1 px-3 py-2 text-[11px]">
-      <div className="text-foreground">
-        <span className="text-muted-foreground">-- </span>
-        {children}
-        <span className="text-muted-foreground"> --</span>
-      </div>
-      {hint && <div className="leading-relaxed text-muted-foreground"># {hint}</div>}
-    </div>
-  );
+  return <EmptyPlate title={children} description={hint} />;
 }
 
 // The `+ new X … [key]` row that ends each Workspace pane section. The pane's N
@@ -216,8 +210,14 @@ export function ProgressReadout({ plan, done, total, paper }) {
 // The lamp for each auto-pilot status, in the pane and the status bar.
 export const AUTOPILOT_LAMP = {
   [AUTOPILOT_STATUS.RUNNING]: { state: 'on', blink: true },
-  [AUTOPILOT_STATUS.PAUSED]: { state: 'warn' },
+  [AUTOPILOT_STATUS.PAUSED]: { state: 'wait' },
   [AUTOPILOT_STATUS.FAILED]: { state: 'fault' },
   [AUTOPILOT_STATUS.DONE]: { state: 'ok' },
   [AUTOPILOT_STATUS.OFF]: { state: 'off' },
 };
+
+/** A run's lamp. Blocked is a fault everywhere; only a pause that waits on you is gold. */
+export function autopilotLamp(ap) {
+  if (ap?.status === AUTOPILOT_STATUS.PAUSED && ap.reason === HALT_REASON.BLOCKED) return { state: 'fault' };
+  return AUTOPILOT_LAMP[ap?.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
+}

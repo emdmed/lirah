@@ -11,7 +11,7 @@ import { useCalSvg } from './useCalSvg';
 // sit in one list they share a time scale (SpanScale) and the list prints
 // its ruler once at the top (SpanRuler, the spanRuler recipe on the same
 // track), so the lines compare at a glance. `tone` done | live | fault |
-// muted inks the line; a running item ends in the lamp star and a dashed
+// muted inks the line; a running item ends in the gold sun and a dashed
 // lamp tail, redrawn at most once a second. Full draws end ticks; compact
 // keeps the line and the value. Every Span has the same width, so values
 // line up in a column under the ruler. Lines grow in when they first show.

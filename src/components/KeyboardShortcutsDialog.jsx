@@ -67,6 +67,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange, section }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size='lg'
+        fig="15"
         className='max-h-[80vh] flex flex-col overflow-hidden'
         keys={['^', 'H']}
         status={`${COUNT} shortcuts`}

@@ -15,6 +15,11 @@ const { assertAgentInTab } = await import('./useAutopilot');
 const running = { id: 'p1', split: 'done', chunks: [], autopilot: { status: AUTOPILOT_STATUS.RUNNING, tabId: 't1', chunkId: 'c1' } };
 
 describe('auto-pilot across a restart', () => {
+  it('a run whose chunks were all done reads as finished, not waiting on you', () => {
+    const finished = { ...running, chunks: [{ id: 'c1', status: 'implemented' }, { id: 'c2', status: 'skipped' }] };
+    expect(normalizeLoadedPlan(finished).autopilot).toMatchObject({ status: AUTOPILOT_STATUS.DONE, chunkId: null, message: null });
+  });
+
   it('a run read from plan.json is paused, and its agent\'s Stop is then checked like a hand-sent chunk', () => {
     const { autopilot } = normalizeLoadedPlan(running);
     expect(autopilot).toMatchObject({ status: AUTOPILOT_STATUS.PAUSED, reason: HALT_REASON.APP_RESTARTED, tabId: 't1' });

@@ -121,7 +121,7 @@ function TabBootPlaceholder({ projectPath, stage }) {
       className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
       style={{ backgroundColor: 'var(--ins-gutter)' }}
     >
-      <span className="ins-legend text-foreground">{name}</span>
+      <span className="ins-name text-[16px] text-foreground">{name}</span>
       <span className="h-px w-56 bg-[var(--ins-edge)]" aria-hidden="true" />
       <span className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
         <Lamp state="on" blink />

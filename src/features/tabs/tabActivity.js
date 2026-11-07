@@ -29,12 +29,12 @@ const LAMP = {
   working: { state: 'on', blink: true },
   running: { state: 'on', blink: true },
   remote: { state: 'on', blink: true },
-  permission: { state: 'warn' },
+  permission: { state: 'wait' },
   failed: { state: 'fault' },
 };
 
 export function activityLamp(kind, queued) {
-  if (kind === 'done') return queued ? { state: 'warn' } : { state: 'ok', settled: true };
+  if (kind === 'done') return queued ? { state: 'wait' } : { state: 'ok', settled: true };
   return LAMP[kind] ?? { state: 'off' };
 }
 

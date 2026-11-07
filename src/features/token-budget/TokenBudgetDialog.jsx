@@ -91,6 +91,7 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="sm"
+        fig="14"
         keys={['^', '⇧', 'B']}
         escLabel="cancel"
         status={<span className="tabular-nums">{currentUsage.total.toLocaleString()} tokens · {cost}</span>}

@@ -13,7 +13,7 @@ const agentState = (tab) => getAgentHookState(getTabSession(tab.id))?.state;
 // Only live states light the lamp; resting ones are a word (DESIGN rule 4).
 const MASTER_STATE = {
   working: { lamp: 'on', blink: true, word: 'working' },
-  permission: { lamp: 'warn', word: 'needs you' },
+  permission: { lamp: 'wait', word: 'needs you' },
 };
 
 // A worker body per agent state, in row order: filled ink while it

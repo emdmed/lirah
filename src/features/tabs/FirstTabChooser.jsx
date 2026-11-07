@@ -8,13 +8,14 @@ import { LirahMark } from '../../components/LirahMark';
 import { SKY } from '../../components/Layout';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 
-// The orrery: starred projects as bodies on flat orbits around the mark.
+// The orrery: starred projects as bodies on orbits tilted -11deg around the mark, like the site's.
 const W = 760;
-const H = 250;
+const H = 290;
 const CX = W / 2;
 const CY = H / 2;
-const ORBITS = [130, 205, 280];
-const RY = 0.36;
+const ORBITS = [110, 165, 220, 280];
+const RY = 0.47;
+const TILT = (-11 * Math.PI) / 180;
 const MAX_BODIES = 8;
 const f = (n) => n.toFixed(1);
 
@@ -50,7 +51,9 @@ const LAND_SVG = (
 function place(i) {
   const rx = ORBITS[i % ORBITS.length];
   const t = ((i * 137.5 + 205) * Math.PI) / 180;
-  return { rx, x: CX + rx * Math.cos(t), y: CY + rx * RY * Math.sin(t) };
+  const ex = rx * Math.cos(t);
+  const ey = rx * RY * Math.sin(t);
+  return { rx, x: CX + ex * Math.cos(TILT) - ey * Math.sin(TILT), y: CY + ex * Math.sin(TILT) + ey * Math.cos(TILT) };
 }
 
 const parentDir = (path) => tildePath(path.replace(/\/[^/]+\/?$/, '') || '/');
@@ -204,7 +207,7 @@ export function FirstTabChooser({ onOpenProject }) {
                   viewBox={`0 0 ${W} ${H}`}
                   style={{ '--sun-x': `${CX}px`, '--sun-y': `${CY}px` }}
                 >
-                  <g fill="none" stroke="var(--color-foreground)" strokeWidth="1" vectorEffect="non-scaling-stroke">
+                  <g fill="none" stroke="var(--color-foreground)" strokeWidth="1" vectorEffect="non-scaling-stroke" transform={`rotate(-11 ${CX} ${CY})`}>
                     {ORBITS.map((rx, i) => (
                       <ellipse
                         key={rx}
@@ -212,11 +215,23 @@ export function FirstTabChooser({ onOpenProject }) {
                         cy={CY}
                         rx={rx}
                         ry={rx * RY}
-                        opacity={i === ORBITS.length - 1 ? 0.18 : 0.12}
-                        strokeDasharray={i === ORBITS.length - 1 ? '4 4' : undefined}
+                        opacity={i === ORBITS.length - 1 ? 0.4 : 0.3}
+                        strokeDasharray={i === ORBITS.length - 1 ? '5 4' : undefined}
                       />
                     ))}
-                    <circle cx={CX} cy={CY} r="40" strokeDasharray="1 3" opacity=".3" />
+                  </g>
+                  {/* Spokes from the sun to each body. */}
+                  <g stroke="var(--color-foreground)" strokeWidth="0.5" opacity=".25" vectorEffect="non-scaling-stroke">
+                    {starred.map((item, i) => {
+                      const { x, y } = place(i);
+                      return <line key={item.id} x1={CX} y1={CY} x2={f(x)} y2={f(y)} />;
+                    })}
+                  </g>
+                  {/* The sun: the mark in gold, ringed, with four rays (the site's sunMark). */}
+                  <g fill="none" stroke="var(--ins-lamp)" vectorEffect="non-scaling-stroke">
+                    <circle cx={CX} cy={CY} r="44" strokeWidth="0.6" strokeDasharray="1 3" />
+                    <circle cx={CX} cy={CY} r="30" strokeWidth="0.8" fill="var(--ins-gutter)" />
+                    <path d={`M${CX - 52} ${CY}H${CX - 34}M${CX + 34} ${CY}H${CX + 52}M${CX} ${CY - 52}V${CY - 34}M${CX} ${CY + 34}V${CY + 52}`} strokeWidth="0.8" />
                   </g>
                   {starred.map((item, i) => {
                     const { x, y } = place(i);
@@ -267,7 +282,7 @@ export function FirstTabChooser({ onOpenProject }) {
                     );
                   })}
                 </svg>
-                <LirahMark size={56} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+                <LirahMark size={40} className="ins-sun absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
             </div>
           ) : (

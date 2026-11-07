@@ -216,7 +216,7 @@ export const TabRow = memo(function TabRow({
           aria-hidden="true"
           title={queued ? `Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A` : undefined}
           className={cn(
-            'inline-flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[10px] tabular-nums',
+            'inline-flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[11px] tabular-nums',
             queued ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]' : 'border-[var(--ins-edge-strong)] text-muted-foreground',
           )}
         >
@@ -239,7 +239,7 @@ export const TabRow = memo(function TabRow({
             <MiddleTruncate
               text={name}
               className={cn(
-                'ins-name text-[13px] leading-5',
+                'ins-name text-[15px] font-semibold! leading-5',
                 active ? 'text-foreground' : compact ? 'text-muted-foreground' : 'text-foreground/80',
               )}
             />

@@ -2,8 +2,8 @@ import { cn } from '@/lib/utils';
 
 // An indicator lamp, drawn as a reticle (see .ins-lamp). `off` is an empty
 // ring; lit adds a crosshair and dot: `on` in ink, `on` + `blink` (live) and
-// `warn` (waiting) in the lamp gold with a dotted halo, `ok`/`fault` in their
-// status colours. `settled` drops the halo: a finished state, not a live one.
+// `wait` (waiting on you) in the lamp gold with a dotted halo, `ok`/`warn`/
+// `fault` in their status colours. `settled` drops the halo: a finished state, not a live one.
 export function Lamp({ state = 'off', blink = false, settled = false, label, className }) {
   return (
     <span

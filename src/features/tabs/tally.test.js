@@ -6,7 +6,7 @@ const bucket = (kind) => tally([kind]).map((t) => t.label);
 
 describe('tally', () => {
   it('puts each kind in exactly one bucket', () => {
-    expect(bucket('failed')).toEqual(['run failed']);
+    expect(bucket('failed')).toEqual(['run stopped']);
     expect(bucket('permission')).toEqual(['needs you']);
     expect(bucket('done')).toEqual(['your turn']);
     for (const k of ['working', 'running', 'remote']) expect(bucket(k)).toEqual(['working']);

@@ -6,6 +6,7 @@ import { formatCost, formatTokenCount } from '../tokenCalculations';
 import { filterSessions } from '../../../utils/projectScanner';
 import { NavArrowDown, NavArrowRight } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
+import { EmptyPlate } from '@/components/EmptyState';
 
 const PAGE_SIZE = 20;
 
@@ -134,9 +135,7 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
           ))}
 
           {paged.length === 0 && (
-            <div className="text-xs text-muted-foreground text-center py-8">
-              No sessions match your filters
-            </div>
+            <EmptyPlate title="No sessions match your filters" />
           )}
         </div>
 

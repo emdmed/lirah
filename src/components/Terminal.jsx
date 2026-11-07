@@ -82,6 +82,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
         status={cli === 'claude-code'
           ? <ClaudeMark idle={!cliRunning} />
           : <span className={cliRunning ? 'text-foreground' : undefined}>{tabCliLabel(cli)}</span>}
+        note={[cli === 'claude-code' ? 'claude' : null, projectDir?.split(/[\\/]/).filter(Boolean).pop()].filter(Boolean).join(' · ') || undefined}
         lit={isFocused}
       />
       {/* The screen carries the inset; the ref div stays unpadded so FitAddon

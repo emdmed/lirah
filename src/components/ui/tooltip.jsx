@@ -31,6 +31,7 @@ function TooltipContent({
   sideOffset = 0,
   title,
   fig,
+  hint,
   children,
   ...props
 }) {
@@ -46,7 +47,12 @@ function TooltipContent({
         {...props}>
         {title && <span className="ins-tip-title ins-name">{title}</span>}
         {children}
-        {fig && <span className="ins-tip-fig ins-legend">FIG.{fig}</span>}
+        {(fig || hint) && (
+          <span className="ins-tip-fig">
+            <span>{fig ? `FIG. ${fig}` : ''}</span>
+            {hint && <span>{hint}</span>}
+          </span>
+        )}
         <TooltipPrimitive.Arrow
           className="hidden" />
       </TooltipPrimitive.Content>

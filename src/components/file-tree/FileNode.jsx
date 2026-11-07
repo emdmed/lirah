@@ -40,7 +40,7 @@ export function FileNode({
   const gitClass = gitColorClass(stats);
   const [base, ext] = splitExtension(name);
   const baseClass = gitClass || (isDimmed ? 'text-faint' : 'text-foreground');
-  const extClass = gitClass ? `${gitClass} opacity-60` : 'text-faint';
+  const extClass = gitClass ? `${gitClass} opacity-80` : 'text-muted-foreground';
 
   // Deleted files ignore clicks (handled by onActivateFile)
   const handleFileClick = () => onActivateFile(path, isDeleted);

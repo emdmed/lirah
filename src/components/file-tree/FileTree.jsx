@@ -328,7 +328,7 @@ export const FileTree = memo(function FileTree({
           return (
             <SidebarMenuItem
               key={row.key}
-              className={`${itemClass} flex items-center px-1 select-none text-muted-foreground opacity-70`}
+              className={`${itemClass} flex items-center px-1 select-none text-muted-foreground`}
               style={style}
               title="The project has more entries than the tree loads; search and listings are partial"
             >

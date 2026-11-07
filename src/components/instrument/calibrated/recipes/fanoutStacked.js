@@ -14,6 +14,8 @@
 // `top` (default 0) moves everything down, to leave room for a title above.
 // Geometry is exported on the function (fanoutStacked.layout) so callers
 // can place hit areas over the boxes.
+import { atlas } from './atlas';
+
 const C = window.Calibrated;
 const { K } = C;
 const R = C.recipes;
@@ -94,4 +96,4 @@ function fanoutStacked(o) {
 fanoutStacked.extent = fanoutStacked.duration = () => MOTION.flash;
 fanoutStacked.layout = layout;
 
-R.fanoutStacked = fanoutStacked;
+R.fanoutStacked = atlas(fanoutStacked);

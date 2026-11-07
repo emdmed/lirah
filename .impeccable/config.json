@@ -11,6 +11,12 @@
         ],
         "createdAt": "2026-10-16T06:41:52.006Z",
         "reason": "Claude triage: L977-978 are transparent border-left/right widths forming the CSS-triangle meter needle (.ins-meter-needle), not a coloured side accent"
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist mono",
+        "createdAt": "2026-11-07T15:00:35.308Z",
+        "reason": "Orrery redesign plan, chunk 1, specifies Geist Mono to match the website's orrery plate type"
       }
     ]
   }

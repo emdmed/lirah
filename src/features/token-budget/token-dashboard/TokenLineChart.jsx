@@ -68,13 +68,13 @@ export function TokenLineChart({ data, timeRange, colors, showCache = false }) {
         <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.3} />
         <XAxis 
           dataKey="displayDate" 
-          tick={{ fill: chartColors.text, fontSize: 10 }}
+          tick={{ fill: chartColors.text, fontSize: 11 }}
           tickLine={false}
           axisLine={{ stroke: chartColors.grid, opacity: 0.3 }}
           interval="preserveStartEnd"
         />
         <YAxis 
-          tick={{ fill: chartColors.text, fontSize: 10 }}
+          tick={{ fill: chartColors.text, fontSize: 11 }}
           tickLine={false}
           axisLine={false}
           tickFormatter={(value) => value >= 1000 ? `${(value/1000).toFixed(0)}k` : value}
@@ -82,7 +82,7 @@ export function TokenLineChart({ data, timeRange, colors, showCache = false }) {
         />
         <Tooltip content={<CustomTooltip colors={chartColors} />} />
         <Legend 
-          wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }}
+          wrapperStyle={{ fontSize: '11px', paddingTop: '5px' }}
           iconType="circle"
           iconSize={8}
         />

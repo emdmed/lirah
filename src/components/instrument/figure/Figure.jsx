@@ -36,6 +36,7 @@ export function Figure({
   label,
   minWidth,
   paper = 'var(--ins-panel)',
+  note,
   className,
   children,
 }) {
@@ -82,10 +83,10 @@ export function Figure({
             '--fig-paper': paper,
           }}
         >
-          {n != null && !compact && <FigLabel n={n} title={heading} x={vb.x} y={vb.y + 11} />}
           {children}
         </svg>
       )}
+      {!tooNarrow && n != null && !compact && <FigLabel title={heading} note={note} />}
     </div>
   );
 }

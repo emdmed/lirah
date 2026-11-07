@@ -27,6 +27,7 @@ import { SelectedFileItem } from '../components/textarea-panel/SelectedFileItem'
 import { TreeGuide } from '../components/file-tree/TreeGuide';
 import { AgentMark } from '../components/file-tree/AgentMark';
 import { EmptyPlate } from '../components/EmptyState';
+import { ChunkBody } from '../features/plans/ChunkRow';
 
 // Kit-only tab rows: live, waiting on you, resting (folded) and a plain shell.
 const NOOP = () => {};
@@ -41,7 +42,7 @@ const KIT_TABS = [
 
 // Kit-only file tree rows (depth, name, agent mark) and plan chunks (body, title).
 const KIT_TREE = [[0, 'src/', null], [1, 'limiter.ts', 'edit-live'], [1, 'schema.ts', 'edit'], [1, 'login.ts', 'read-live'], [1, 'routes.ts', 'read'], [0, 'README.md', null]];
-const KIT_CHUNKS = [['done', 'Bundle fonts'], ['done', 'Reticle Lamp'], ['live', 'Orbit Scanner'], ['queued', 'Pane legends'], ['queued', 'Status rail', true]];
+const KIT_CHUNKS = [['done', 'Bundle fonts'], ['done', 'Reticle Lamp'], ['live', 'Orbit Scanner'], ['next', 'Pane legends'], ['queued', 'Status rail', true]];
 
 // Component sheet for the orrery-plate primitives. Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -105,7 +106,7 @@ export function InstrumentKit() {
         <section className="tui-pane px-3" data-legend tabIndex={0}>
           <PaneLegend index={2} title="Lamps" note="focus me" />
           <div className="flex flex-wrap items-center gap-3 py-2">
-            {['off', 'on', 'ok', 'warn', 'fault'].map((s) => (
+            {['off', 'on', 'ok', 'wait', 'warn', 'fault'].map((s) => (
               <span key={s} className="flex items-center gap-1.5"><Lamp state={s} />{s}</span>
             ))}
             <span className="flex items-center gap-1.5"><Lamp state="on" blink />blink</span>
@@ -309,10 +310,10 @@ export function InstrumentKit() {
               <div key={title} data-body={body} className="ins-spine relative">
                 <div className="grid grid-cols-[14px_16px_minmax(0,1fr)] items-start gap-x-1.5 px-3 py-[3px] text-[11px]">
                   <span className="flex h-[18px] w-3.5 items-center justify-center">
-                    <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} role="img" aria-label={body} />
+                    <ChunkBody body={body} skipped={skipped} label={body} />
                   </span>
                   <span className="text-right leading-[18px] text-muted-foreground tabular-nums">{i + 1}</span>
-                  <span className={`leading-[18px] ${body === 'live' ? 'ins-name text-[12px]' : body === 'done' ? 'text-muted-foreground' : skipped ? 'text-muted-foreground line-through' : ''}`}>{title}</span>
+                  <span className={`leading-[18px] ${body === 'live' ? 'ins-name text-[16px]' : body === 'done' ? 'text-muted-foreground' : skipped ? 'text-muted-foreground line-through' : ''}`}>{title}</span>
                 </div>
               </div>
             ))}

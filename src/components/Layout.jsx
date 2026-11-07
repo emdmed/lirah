@@ -43,9 +43,10 @@ export const SKY = (
     viewBox={`0 0 ${SKY_W} ${SKY_H}`}
     preserveAspectRatio="xMidYMin slice"
   >
-    <path d={SWELLS} fill="none" stroke="var(--color-foreground)" strokeWidth="1" opacity=".09" vectorEffect="non-scaling-stroke" />
+    {/* The mock's .3 hairline at .09: about half a pixel's ink at window scale. */}
+    <path d={SWELLS} fill="none" stroke="var(--color-foreground)" strokeWidth="1" opacity=".045" vectorEffect="non-scaling-stroke" />
     {DUST.map((d, i) => (
-      <path key={i} d={d} fill="var(--color-foreground)" opacity={[0.06, 0.1, 0.15][i]} />
+      <path key={i} d={d} fill="var(--color-foreground)" opacity={[0.25, 0.45, 0.7][i]} />
     ))}
   </svg>
 );

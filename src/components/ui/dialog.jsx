@@ -127,7 +127,7 @@ function DialogContent({
             <span className="tui-frame-status">{status}</span>
           )}
           {fig != null && (
-            <span className="tui-dialog-fig ins-legend">FIG.{fig}</span>
+            <span className="tui-dialog-fig">FIG. {fig}</span>
           )}
           <span className="tui-pane-info tui-frame-hints">
             <FrameHints hints={hintList}>

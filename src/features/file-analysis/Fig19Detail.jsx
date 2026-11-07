@@ -3,20 +3,20 @@ import { DASH, Figure, INK, Node, Ruler, STROKE, T, textWidth, useFigureCompact 
 import { middleTruncate } from '../plans/Fig21PlanGit';
 
 // FIG.19: what each detail level of a file costs, as measure lines on one
-// token scale: full text first, then each level the language produces, each
-// with its size and, in italic, how much it saves on the full text. The
-// chosen level is in lamp; the default for the file's size says so when it
-// isn't the chosen one. Sizes are measured on the exact text the prompt sends
+// token scale under the file's italic name: full text first, then each level
+// the language produces, one row each (name, line, size). The chosen level is
+// in lamp and its saving on the full text sits in italic on the caption; the
+// default for the file's size is named in the figure's label (hover). Sizes are measured on the exact text the prompt sends
 // (useFileSymbols' levelTokens). Compact stacks the bars tight over the
 // ruler's ticks, the chosen one in lamp; sizes go to the tooltip.
 
 const MIN_W = 180;
 const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 360;
-const ROW_H = 30;
-const FIRST_ROW = 20;
+const ROW_H = 20;
+const FIRST_ROW = 24;
 const IN = 6; // content inset
-const ITALIC_CH = 5.5; // Spectral italic at 12px, per character
+const ITALIC_CH = 5.5; // Spectral italic at 12px, per character (x1.35 at 16px)
 
 const LEVELS = [
   { key: 'symbols', label: 'symbols' },
@@ -60,19 +60,17 @@ export function detailRows(levels, { chosen, defaultLevel } = {}) {
   }));
 }
 
-/** Title text, shortened to the width it has. */
-function titleText(name, lineCount, whole, width) {
-  const room = Math.floor(width / textWidth('x', 0.5));
-  const NAME = name.toUpperCase();
-  const size = `${fmtTokens(whole).toUpperCase()} TOK`;
-  const tails = [` · ${lineCount} LINES · ${size}`, ` · ${lineCount} L · ${size}`, ` · ${lineCount} L`, ''];
-  for (const tail of tails) {
-    if (room - tail.length >= Math.min(NAME.length, 10)) return `${middleTruncate(NAME, room - tail.length)}${tail}`;
-  }
-  return middleTruncate(NAME, Math.max(4, room));
+/** The mono note after the italic name, shortened to the room it has. */
+function noteText(lineCount, whole, room) {
+  const tails = [`${lineCount} lines · ${fmtTokens(whole)} tok`, `${lineCount} L · ${fmtTokens(whole)}`, `${lineCount} L`, ''];
+  return tails.find((s) => textWidth(s) <= room) ?? '';
 }
 
-/** The drawing at a given width, pure so it can be rendered headless. */
+const LABEL_W = 80; // the level names' column
+const VALUE_W = 40; // the ≈ size column
+
+/** The drawing at a given width, pure so it can be rendered headless. One
+ *  row per level: name, measure line, size, as the site's Fig. 1A. */
 export function fig19Layout({ name, lineCount, levels, chosen, defaultLevel, width }) {
   const lines = [
     // Python sends the whole file by default (no digest in the prompt).
@@ -87,56 +85,41 @@ export function fig19Layout({ name, lineCount, levels, chosen, defaultLevel, wid
     ...detailRows(levels, { chosen, defaultLevel }),
   ];
   const max = Math.max(...lines.map((r) => r.tokens));
-  const x0 = IN;
-  const x1 = width - IN;
+  const x0 = IN + LABEL_W;
+  const x1 = width - IN - VALUE_W;
   const xAt = (v) => x0 + (v / max) * (x1 - x0);
-  const height = FIRST_ROW + lines.length * ROW_H + 2;
+  const shown = middleTruncate(name, Math.max(6, Math.floor((width - 2 * IN) / ITALIC_CH / 1.4)));
+  const nameW = shown.length * ITALIC_CH * 1.35;
+  const note = noteText(lineCount, levels.whole, width - 2 * IN - nameW - 10);
+  const height = FIRST_ROW + lines.length * ROW_H;
 
   const drawing = (
     <g>
+      <text x={IN} y={14} style={{ fontFamily: 'var(--font-name)', fontStyle: 'italic', fontWeight: 300, fontSize: 16, fill: INK.fg }}>{shown}</text>
+      {note && <T x={IN + nameW + 10} y={14}>{note}</T>}
       {lines.map((r, i) => {
-        const top = FIRST_ROW + i * ROW_H;
-        const y = top + 20; // the measure line
+        const y = FIRST_ROW + i * ROW_H + ROW_H / 2;
         const end = Math.max(x0 + 2, xAt(r.tokens));
-        const ink = r.chosen ? INK.lamp : INK.muted;
-        const label = r.isDefault && textWidth(`${r.label} · default`) + textWidth('≈ 99k') + 12 <= x1 - x0
-          ? `${r.label} · default`
-          : r.label;
-        const saving = fmtSaving(r.ratio);
-        const savingFits = saving && end + 8 + saving.length * ITALIC_CH <= x1;
+        const ink = r.chosen ? INK.lamp : INK.fg;
         return (
           <g key={r.key}>
-            <T x={x0} y={top + 10} color={r.chosen ? INK.lamp : r.isDefault ? INK.fg : INK.muted}>{label}</T>
-            <T x={x1} y={top + 10} anchor="end" color={r.chosen ? INK.lamp : INK.muted}>{`≈ ${fmtTokens(r.tokens)}`}</T>
+            <T x={IN} y={y + 4} color={r.chosen ? INK.lamp : INK.fg}>{r.label}</T>
             <path
-              d={`M${x0} ${y - 3.5}V${y + 3.5}M${end} ${y - 3.5}V${y + 3.5}M${x0} ${y}H${end}`}
-              style={{ fill: 'none', stroke: ink, strokeWidth: r.chosen ? STROKE.emphasis : STROKE.hair }}
+              d={`M${x0} ${y - 4.5}V${y + 4.5}M${end} ${y - 4.5}V${y + 4.5}M${x0} ${y}H${end}`}
+              style={{ fill: 'none', stroke: ink, strokeWidth: STROKE.hair }}
             />
-            {savingFits && (
-              <text
-                x={end + 8}
-                y={y + 4}
-                style={{
-                  fontFamily: 'var(--font-name)',
-                  fontStyle: 'italic',
-                  fontWeight: 300,
-                  fontSize: 12,
-                  fill: r.chosen ? INK.lamp : INK.muted,
-                }}
-              >
-                {saving}
-              </text>
-            )}
+            <T x={width - IN} y={y + 4} anchor="end" color={r.chosen ? INK.lamp : INK.fg}>{fmtTokens(r.tokens)}</T>
           </g>
         );
       })}
     </g>
   );
+  const pick = lines.find((r) => r.chosen);
 
   return {
     height,
     drawing,
-    title: titleText(name, lineCount, levels.whole, width),
+    saving: pick && pick.ratio < 1 ? fmtSaving(pick.ratio) : null,
     label: `${name}: ${lineCount} lines. ${lines
       .map((r) => `${r.label} about ${r.tokens} tokens${r.ratio < 1 ? `, ${fmtSaving(r.ratio) ?? 'the same'}` : ''}${r.chosen ? ' (chosen)' : ''}${r.isDefault ? ' (default)' : ''}`)
       .join('; ')}.`,
@@ -200,11 +183,11 @@ export function Fig19Detail({ name, lineCount, levels, chosen, defaultLevel, pap
   const small = measurable && compact ? fig19Compact({ levels, chosen, defaultLevel, width }) : null;
 
   return (
-    <div ref={rootRef} className="min-w-0 w-full">
+    <div ref={rootRef} className={fig && !small ? 'ins-fig-plate min-w-0 w-full' : 'min-w-0 w-full'}>
       {fig && (
         <Figure
           fig="detail"
-          title={fig.title}
+          note={small ? undefined : fig.saving}
           viewBox={`0 0 ${width} ${fig.height}`}
           compactViewBox={small ? `0 0 ${width} ${small.height}` : undefined}
           minWidth={MIN_W}

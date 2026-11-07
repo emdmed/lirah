@@ -15,7 +15,7 @@ export function AgentMark({ mark, isDir }) {
   const read = mark.startsWith('read');
   const title = isDir ? TITLES[mark].replace(/this/, 'something in here') : TITLES[mark];
   return (
-    <span className={`shrink-0 inline-flex items-center px-1 ${read && live ? 'ins-pulse' : ''}`} title={title}>
+    <span className={`shrink-0 inline-flex items-center px-1 ${read ? 'ins-agent-read' : ''} ${read && live ? 'ins-pulse' : ''}`} title={title}>
       <Lamp state={read ? 'off' : 'on'} blink={live && !read} label={title} />
     </span>
   );

@@ -29,6 +29,10 @@ const buttonVariants = cva(
         "icon-lg": "size-10",
       },
     },
+    // Spectral sets small beside the mono: italic verbs take 13px, like the panel verbs.
+    compoundVariants: [
+      { variant: ["outline", "secondary", "ghost"], class: "text-[13px]" },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

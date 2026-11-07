@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { basename, getRelativePath } from "../../utils/pathUtils";
-import { MODE_TOKENS, FILE_STATE_LABELS, FILE_STATE_ORDER } from "./FileStateSelector";
+import { FILE_STATE_LABELS, FILE_STATE_ORDER } from "./FileStateSelector";
 import { Lamp } from "../instrument/Lamp";
 import { fmtTokens } from "@/features/file-analysis/Fig19Detail";
 
@@ -89,7 +89,7 @@ export function ContextChips({
         const level = fileLevel(fileSymbols, abs);
         return (
           <li key={abs} className={cn(CHIP, sz.chip)} style={on ? INK_FRAME : undefined} title={rel}>
-            <Lamp state={on ? "on" : "off"} className="ml-1 shrink-0" />
+            <Lamp state="on" className={cn("ml-1 shrink-0", !on && "ins-lamp-muted")} />
             <span className="px-1 truncate text-foreground">{name}</span>
             <button
               type="button"
@@ -97,11 +97,11 @@ export function ContextChips({
               disabled={!onSetFileState}
               aria-label={`${name}: ${FILE_STATE_LABELS[state]}. Change to ${FILE_STATE_LABELS[next]}`}
               title={onSetFileState ? `${FILE_STATE_LABELS[state]} · click to cycle ${FILE_STATE_ORDER.map((s) => FILE_STATE_LABELS[s]).join(' → ')}` : undefined}
-              className={cn(sz.tag, "shrink-0 lowercase focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", on ? DEFAULT_TAG : MODE_TOKENS[state])}
+              className={cn(sz.tag, "shrink-0 lowercase focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", on ? DEFAULT_TAG : "text-muted-foreground")}
             >
               {FILE_STATE_LABELS[state]}
             </button>
-            {level && <span className="pr-1 shrink-0 whitespace-nowrap text-muted-foreground">{level}</span>}
+            {level && <span className="pr-1 shrink-0 whitespace-nowrap text-[var(--ins-faint)]">{level}</span>}
             {onRemoveFile && (
               <button type="button" onClick={() => onRemoveFile(abs)} aria-label={`Remove ${name} from context`} className={cn(REMOVE, sz.remove)}>
                 ×

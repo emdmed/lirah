@@ -5,6 +5,7 @@ import { computeCost } from '../dashboardData';
 // What a short Opus session would have cost on the current Sonnet.
 const SONNET_MODEL = 'claude-sonnet-5';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { EmptyPlate } from '@/components/EmptyState';
 
 function getPieColors(colors) {
   return [
@@ -128,7 +129,7 @@ export function ModelInsights({ sessions, projects, colors }) {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-40 flex items-center justify-center text-xs text-muted-foreground">No data</div>
+            <EmptyPlate className="h-40 content-center" title="No data" />
           )}
           <div className="space-y-1 mt-2">
             {modelData.map((m, i) => (

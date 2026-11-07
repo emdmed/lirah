@@ -5,8 +5,8 @@ import { Lamp } from '../../components/instrument/Lamp';
 
 // Message line, as in vim: the newest notification occupies one line directly
 // above the status bar, prefixed by a status mark. Older ones wait behind it.
-// Errors and warnings mark with a lit star in the theme's fault/warn colour;
-// a success settles as an ok star; info is a faint dot.
+// Errors and warnings mark with a lit reticle in the theme's fault/warn
+// colour; a success settles as an ok reticle; info is a faint dot.
 const LAMPS = {
   error: 'fault',
   warning: 'warn',
