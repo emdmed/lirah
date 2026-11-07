@@ -372,7 +372,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   const autoMerge = useAutoMerge();
 
   const sidebarSearch = useSidebarSearch();
-  const cliRunning = useCliRunning(terminalSessionId, isActive && sidebar.sidebarOpen && viewMode === 'tree');
+  // Polled while active: the terminal legend shows the Claude mark while claude runs.
+  const cliRunning = useCliRunning(terminalSessionId, isActive);
 
   const treeView = useTreeView({
     terminalSessionId,
@@ -1198,6 +1199,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           projectDir={resolvedProjectDir}
           onSandboxFailed={handleSandboxFailed}
           reattachKey={tabId}
+          claudeRunning={settings.selectedCli === 'claude-code' && cliRunning === 'claude'}
         />
         {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}

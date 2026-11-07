@@ -2,8 +2,9 @@ import { useRef, useEffect, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { PaneLegend } from './instrument/PaneLegend';
+import { ClaudeMark } from './ClaudeMark';
 
-export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null }, ref) => {
+export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, claudeRunning = false }, ref) => {
   const terminalRef = useRef(null);
   const { handleResize, sessionId, reattached, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive, reattachKey);
@@ -74,7 +75,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
         position: 'relative',
       }}
     >
-      <PaneLegend index={2} title="Terminal" lit={isFocused} />
+      <PaneLegend index={2} title="Terminal" status={claudeRunning ? <ClaudeMark /> : null} lit={isFocused} />
       {/* The screen carries the inset; the ref div stays unpadded so FitAddon
           measures exactly the cell area. */}
       <div className="ins-glass relative" style={{ width: '100%', height: '100%', padding: '10px 14px', overflow: 'hidden' }}>
