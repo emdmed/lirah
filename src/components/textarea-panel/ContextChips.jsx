@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { basename, getRelativePath } from "../../utils/pathUtils";
 import { MODE_TOKENS, FILE_STATE_LABELS, FILE_STATE_ORDER } from "./FileStateSelector";
+import { Lamp } from "../instrument/Lamp";
+import { fmtTokens } from "@/features/file-analysis/Fig19Detail";
 
 const NO_EXTRAS = [];
 const CHIP = "inline-flex items-center shrink-0 max-w-full edge-engraved font-mono leading-none";
@@ -15,11 +17,25 @@ const SIZES = {
 // files that differ from it.
 const DEFAULT_STATE = 'modify';
 const DEFAULT_TAG = 'text-foreground';
+// EDIT chips carry the ink frame: the chip-sized form of the files pane's
+// inverse video (DESIGN rule 9). An inline shadow, since .edge-engraved draws
+// its hairline the same way and would win over a utility.
+const INK_FRAME = { boxShadow: "inset 0 0 0 1px var(--color-foreground)" };
+// Under 300 lines the whole file is sent (see buildPrompt).
+const LEVEL_SHORT = { symbols: "sym", signatures: "sig", skeleton: "skel" };
+function fileLevel(fileSymbols, abs) {
+  const tokens = fileSymbols?.getLevelTokens(abs);
+  if (!tokens) return null;
+  const mode = fileSymbols.getLineCount(abs) >= 300 ? fileSymbols.getFileViewMode(abs) : "whole";
+  return tokens[mode] == null ? null : `${LEVEL_SHORT[mode] || "full"} ${fmtTokens(tokens[mode])}`;
+}
 const REMOVE = "flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**
  * The prompt's attached context as removable chips: files (with their
- * EDIT/READ/COPY state, click to cycle) and picked code elements. `extras`
+ * EDIT/READ/COPY state, click to cycle; led by a reticle, then the detail
+ * level and tokens when `fileSymbols` (useFileSymbols) knows them) and
+ * picked code elements. `extras`
  * adds other things the prompt carries ({ key, tag, name, title, onRemove }:
  * linked repos, the instruction template), so the list can be the
  * whole manifest.
@@ -34,6 +50,7 @@ export function ContextChips({
   onRemoveElement,
   extras = NO_EXTRAS,
   size = "sm",
+  fileSymbols,
 }) {
   const sz = SIZES[size];
   // Grouped by intent (EDIT, then READ, then COPY), selection order within.
@@ -68,19 +85,23 @@ export function ContextChips({
     <ul className={cn("flex flex-wrap gap-1 overflow-y-auto", sz.list)} aria-label="Context attached to the prompt">
       {files.map(({ abs, name, rel, state }) => {
         const next = FILE_STATE_ORDER[(FILE_STATE_ORDER.indexOf(state) + 1) % FILE_STATE_ORDER.length];
+        const on = state === DEFAULT_STATE;
+        const level = fileLevel(fileSymbols, abs);
         return (
-          <li key={abs} className={cn(CHIP, sz.chip)} title={rel}>
+          <li key={abs} className={cn(CHIP, sz.chip)} style={on ? INK_FRAME : undefined} title={rel}>
+            <Lamp state={on ? "on" : "off"} className="ml-1 shrink-0" />
+            <span className="px-1 truncate text-foreground">{name}</span>
             <button
               type="button"
               onClick={() => onSetFileState?.(abs, next)}
               disabled={!onSetFileState}
               aria-label={`${name}: ${FILE_STATE_LABELS[state]}. Change to ${FILE_STATE_LABELS[next]}`}
               title={onSetFileState ? `${FILE_STATE_LABELS[state]} · click to cycle ${FILE_STATE_ORDER.map((s) => FILE_STATE_LABELS[s]).join(' → ')}` : undefined}
-              className={cn(sz.tag, "tracking-[0.08em] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", state === DEFAULT_STATE ? DEFAULT_TAG : MODE_TOKENS[state])}
+              className={cn(sz.tag, "shrink-0 lowercase focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", on ? DEFAULT_TAG : MODE_TOKENS[state])}
             >
               {FILE_STATE_LABELS[state]}
             </button>
-            <span className="px-1 truncate text-foreground">{name}</span>
+            {level && <span className="pr-1 shrink-0 whitespace-nowrap text-muted-foreground">{level}</span>}
             {onRemoveFile && (
               <button type="button" onClick={() => onRemoveFile(abs)} aria-label={`Remove ${name} from context`} className={cn(REMOVE, sz.remove)}>
                 ×

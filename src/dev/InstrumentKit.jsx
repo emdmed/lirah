@@ -22,6 +22,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '../components/ui/dialog';
 import { TabRow } from '../features/tabs/TabRow';
 import { TabProvider } from '../features/tabs/TabContext';
+import { ContextChips } from '../components/textarea-panel/ContextChips';
+import { SelectedFileItem } from '../components/textarea-panel/SelectedFileItem';
 
 // Kit-only tab rows: live, waiting on you, resting (folded) and a plain shell.
 const NOOP = () => {};
@@ -36,6 +38,17 @@ const KIT_TABS = [
 
 // Component sheet for the Instrument TUI primitives (board 01b). Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
+// Three attached files, one per intent, with made-up level sizes.
+const KIT_FILES = ['/p/src/db/schema.ts', '/p/src/auth/login.ts', '/p/src/limiter.ts'];
+const KIT_STATES = new Map([[KIT_FILES[1], 'do-not-modify'], [KIT_FILES[2], 'use-as-example']]);
+const KIT_SIZES = { [KIT_FILES[0]]: [420, { whole: 12600, signatures: 2100, skeleton: 900 }], [KIT_FILES[1]]: [80, { whole: 400 }], [KIT_FILES[2]]: [120, { whole: 1100 }] };
+const KIT_SYMBOLS = {
+  getLevelTokens: (f) => KIT_SIZES[f]?.[1] ?? null,
+  getLineCount: (f) => KIT_SIZES[f]?.[0] ?? 0,
+  getFileViewMode: () => 'signatures',
+};
+const KIT_REPOS = [{ key: 'r', tag: 'repo', name: 'acme-web', onRemove: () => {} }];
+
 export function InstrumentKit() {
   const { currentTheme, themes, changeTheme } = useTheme();
   const [sandbox, setSandbox] = useState(true);
@@ -243,6 +256,29 @@ export function InstrumentKit() {
             ))}
           </div>
           </TabProvider>
+        </section>
+
+        <section className="tui-pane px-3 max-w-[420px]" data-legend>
+          <PaneLegend index={12} title="Context" note="chips" />
+          <div className="flex flex-col gap-2 py-2">
+            <ContextChips size="md" selectedFiles={KIT_FILES} fileStates={KIT_STATES} currentPath="/p" fileSymbols={KIT_SYMBOLS} onSetFileState={() => {}} onRemoveFile={() => {}} />
+            <ContextChips selectedFiles={[]} currentPath="/p" extras={KIT_REPOS} />
+            <div role="list" className="w-[260px]">
+              {KIT_FILES.map((f) => (
+                <SelectedFileItem
+                  key={f}
+                  file={{ absolute: f, name: f.split('/').pop() }}
+                  currentState={KIT_STATES.get(f) || 'modify'}
+                  onSetFileState={() => {}}
+                  onRemoveFile={() => {}}
+                  lineCount={KIT_SIZES[f][0]}
+                  viewModeLabel="Signatures"
+                  viewMode="signatures"
+                  levelTokens={KIT_SIZES[f][1]}
+                />
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="tui-pane px-3" data-legend>

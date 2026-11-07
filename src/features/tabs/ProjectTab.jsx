@@ -1094,6 +1094,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               onAtMentionClose={atMention.handleAtMentionClose}
               fileStates={fileSelection.fileStates}
               onSetFileState={fileSelection.setFileState}
+              fileSymbols={fileSymbolsHook}
               onToggleFile={fileSelection.toggleFileSelection}
               sessionId={terminalSessionId}
               onClearContext={handleClearContext}
@@ -1106,6 +1107,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           ) : (
             <ContextStatus
               selectedFiles={fileSelection.selectedFiles}
+              fileSymbols={fileSymbolsHook}
               fileStates={fileSelection.fileStates}
               currentPath={currentPath}
               linkedRepos={linkedRepos}

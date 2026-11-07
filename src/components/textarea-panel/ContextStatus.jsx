@@ -65,6 +65,7 @@ export const ContextStatus = memo(function ContextStatus({
   fileStates,
   selectedElements,
   currentPath,
+  fileSymbols,
   linkedRepos = NO_REPOS,
   onSetFileState,
   onRemoveFile,
@@ -163,6 +164,7 @@ export const ContextStatus = memo(function ContextStatus({
     onRemoveFile,
     onRemoveElement,
     size: "md",
+    fileSymbols,
   };
 
   const rows = [];
