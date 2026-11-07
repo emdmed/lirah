@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Xmark } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useToast } from '../toast';
 import { addStartupProject, removeStartupProject, setStartupMode } from '../agent-control/actions';
@@ -57,7 +57,7 @@ export function StartupRow({ projectPath, workspaceId }) {
                   </span>
                   {p.launch && <span className="shrink-0 text-[11px] text-muted-foreground">launch</span>}
                   <PanelButton
-                    icon={X}
+                    icon={Xmark}
                     aria-label={`Remove ${p.name || p.path} from startup projects`}
                     title="Remove"
                     onClick={() => remove(p.path)}
