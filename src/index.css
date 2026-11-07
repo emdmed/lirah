@@ -615,9 +615,17 @@ body {
   align-self: stretch;
   flex-shrink: 0;
   width: calc(var(--tree-lead) + var(--depth, 0) * var(--tree-step));
-  background: repeating-linear-gradient(to right, transparent 0 5.5px, var(--ins-edge) 5.5px 6.5px, transparent 6.5px var(--tree-step))
-    var(--tree-lead) 0 / calc(100% - var(--tree-lead)) 100% no-repeat;
   user-select: none;
+}
+
+/* Dotted meridians: the hairline columns, masked into 1px dots every 3px.
+   On ::before so the mask leaves the cursor (::after) whole. */
+.tui-tree-guide::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 var(--tree-lead);
+  background: repeating-linear-gradient(to right, transparent 0 5.5px, var(--ins-faint) 5.5px 6.5px, transparent 6.5px var(--tree-step));
+  mask: repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 3px);
 }
 
 /* Folder disclosure: a muted text glyph in the chevron column (12px), from
