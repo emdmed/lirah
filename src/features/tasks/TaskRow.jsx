@@ -1,9 +1,7 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
 import { Check, DataTransferBoth, NavArrowDown, Trash, Undo } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Textarea } from '../../components/ui/textarea';
 import {
@@ -21,7 +19,12 @@ import { usePlanContexts } from './planContexts';
 import { splitTaskText, TASK_STATUS, taskText } from './taskModel';
 import '../markdown/markdown.css';
 
-const REMARK_PLUGINS = [remarkGfm];
+// Lazy: markdown parsing is ~100 KB and must stay out of startup JS.
+const Markdown = lazy(() =>
+  Promise.all([import('react-markdown'), import('remark-gfm')]).then(([md, gfm]) => ({
+    default: ({ children }) => <md.default remarkPlugins={[gfm.default]}>{children}</md.default>,
+  })),
+);
 
 const LAMP = {
   [TASK_STATUS.BACKLOG]: { state: 'off', label: 'backlog' },
@@ -200,7 +203,9 @@ export const TaskRow = memo(function TaskRow({
 function TaskNotes({ notes, className }) {
   return (
     <div className={cn('markdown-body markdown-compact pl-5 text-muted-foreground', className)}>
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{notes}</ReactMarkdown>
+      <Suspense fallback={<p className="whitespace-pre-wrap">{notes}</p>}>
+        <Markdown>{notes}</Markdown>
+      </Suspense>
     </div>
   );
 }
