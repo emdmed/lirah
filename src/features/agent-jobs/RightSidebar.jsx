@@ -18,6 +18,7 @@ import { Keycap } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { Span, SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { jobsPaneRequest } from './jobsPane';
+import { useAttentionQueue } from '../tabs/useAgentAttention';
 import { useAgentJobs } from './AgentJobsContext';
 import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
@@ -122,6 +123,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const openPlans = useOpenPlanCount(projectPath);
   const { workspaceTabs, activeWorkspaceId } = useTabManager();
   const openTasks = useOpenTaskCount(activeWorkspaceId);
+  const waitingTabs = useAttentionQueue(workspaceTabs).length;
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -621,7 +623,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
       <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
-        <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={workspaceTabs.length} />
+        <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={waitingTabs} countTone="text-[var(--ins-warn)]" />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
@@ -830,7 +832,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   );
 }
 
-function TabButton({ active, onClick, label, count, lamp = false }) {
+function TabButton({ active, onClick, label, count, lamp = false, countTone = 'text-foreground' }) {
   return (
     <button
       onClick={onClick}
@@ -842,7 +844,7 @@ function TabButton({ active, onClick, label, count, lamp = false }) {
     >
       {lamp && <Lamp state="on" />}
       {label}
-      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
+      {count > 0 && <span className={cn('tabular-nums', countTone)}>{count}</span>}
     </button>
   );
 }
