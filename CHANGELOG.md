@@ -4,6 +4,24 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-07
+
+### Added
+
+- **Claude mark in the terminal legend** - While `claude` runs in a terminal, its legend shows the Claude mark.
+- **Workspace pane keys** - `[` and `]` cycle the pane's sections, `?` opens help at the current section with a legend of its glyphs, each row shows its keys, and `:tabs` joins `:jobs` (which now works).
+
+### Changed
+
+- **Master terminal is now the workspace terminal** - Renamed, with a larger worker fan and a working/total box. The workspace pane is clearer: the TABS count shows who is waiting, each tab is counted once, state words and colours match across sections, row actions show on hover or focus, and workspaces collapse to a chip only when they don't fit.
+- **New icons** - Every icon in the app now comes from Iconoir instead of Lucide.
+- **Folders open as tabs** - The file tree marks folders that are open as tabs.
+
+### Fixed
+
+- **Failed auto-pilot runs** - A failed run lights a fault lamp on its tab row and names the chunk it stopped on and why (git error, tab closed, blocked). A blocked agent pauses the run instead of failing it.
+- **Jobs** - The jobs list shows a single count, the repo on each card, and toasts name the right branch.
+
 ## [0.14.1] - 2026-11-06
 
 ### Fixed
