@@ -3,7 +3,6 @@ export { GitDiffDialog } from './GitDiffDialog.jsx';
 export { DiffContent } from './DiffContent.jsx';
 export { AutoChangelogDialog } from './AutoChangelogDialog.jsx';
 export { AutoCommitDialog } from './AutoCommitDialog.jsx';
-export { AutoCommitConfigDialog } from './AutoCommitConfigDialog.jsx';
 export { AutoMergeDialog } from './AutoMergeDialog.jsx';
 export { GitStatsBadge } from './GitStatsBadge.jsx';
 

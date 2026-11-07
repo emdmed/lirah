@@ -116,7 +116,8 @@ export function useAutoCommit(cli = 'claude-code', customPrompt = '') {
         if (cancelledRef.current) return;
       }
       if (deleted.length > 0) {
-        await git(currentPath, ['rm', '--cached', '--', ...deleted]);
+        // --ignore-unmatch: a deletion already staged is no longer in the index.
+        await git(currentPath, ['rm', '--cached', '--ignore-unmatch', '--', ...deleted]);
         if (cancelledRef.current) return;
       }
 

@@ -5,7 +5,7 @@ import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
 import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { DiffBar } from '../../components/instrument/DiffBar';
-import { activityLamp, YOUR_TURN } from './tabActivity';
+import { activityLamp } from './tabActivity';
 import { RowAction } from './RowAction';
 import { rowKeys } from './rowKeys';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -65,11 +65,14 @@ function Readout({ info, contextFill, autoCommit, lamp, label }) {
   // Fixed slots, so the moons line up down the pane whatever the counts are.
   return (
     <span className="flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground">
-      <span className="min-w-[9ch] text-right">{diff}</span>
+      <span className="inline-flex min-w-[9ch] items-center justify-end">{diff}</span>
       <span className="inline-flex w-3 justify-center">
         {contextFill != null && <ContextMoon ratio={contextFill} />}
       </span>
-      <Lamp {...lamp} label={label} />
+      {/* 15px slot: the lamp's reticle reaches 4px past its 7px box. */}
+      <span className="inline-flex w-[15px] justify-center">
+        <Lamp {...lamp} label={label} />
+      </span>
     </span>
   );
 }
@@ -99,7 +102,7 @@ export const ROW_KEYS = [
  * (a running "since" or duration included) changes.
  */
 export const TabRow = memo(function TabRow({
-  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, agent, workLabel, active, linked, closable, queuePos,
+  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, workLabel, active, linked, closable, queuePos,
   turn, summaryText, summaryRunning, summaryStale, trailOpen, renaming, roleMenuOpen, plans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
@@ -112,12 +115,7 @@ export const TabRow = memo(function TabRow({
   const settledPlans = livePlans.length ? [] : plans?.filter(isSettledPlan) ?? [];
   // An old finished turn leaves the row (it stays in the tooltip).
   const showTrail = summary && (!summaryStale || active || trailOpen);
-  const yourTurn = YOUR_TURN.has(activity.kind);
   const queued = queuePos >= 0;
-  // The ledger's second line: what the agent is doing, without its name twice.
-  const doing = agent && activity.kind !== 'remote' && activity.label.startsWith(`${agent} `)
-    ? activity.label.slice(agent.length + 1)
-    : activity.label;
   const onRoleMenu = (open) => actions.setRoleMenu(open ? tab.id : null);
   const edited = turn?.edited?.size ? [...turn.edited] : null;
 
@@ -315,18 +313,14 @@ export const TabRow = memo(function TabRow({
 
       {!compact && (
         <>
-          {/* Tier 2: agent · activity; when it's your move, its question in
-              italic and how long it has waited. */}
-          <div className="flex min-w-0 items-baseline gap-1 pl-6 text-[11px] text-muted-foreground">
-            {yourTurn ? (
-              <>
-                <span className="ins-name min-w-0 truncate text-xs text-foreground">{activityQuestion ?? doing}</span>
-                {activity.since && <span className="shrink-0 tabular-nums text-[var(--ins-lamp)]">· {activity.since}</span>}
-              </>
-            ) : (
-              <span className="min-w-0 truncate font-mono">{agent && activity.kind !== 'remote' ? `${agent} · ${doing}` : doing}</span>
-            )}
-          </div>
+          {/* Tier 2: only a permission prompt's question and how long it has
+              waited; the lamp already says working, done or idle. */}
+          {activity.kind === 'permission' && (
+            <div className="flex min-w-0 items-baseline gap-1 pl-6 text-[11px] text-muted-foreground">
+              <span className="ins-name min-w-0 truncate text-xs text-foreground">{activityQuestion ?? activity.label}</span>
+              {activity.since && <span className="shrink-0 tabular-nums text-[var(--ins-lamp)]">· {activity.since}</span>}
+            </div>
+          )}
 
           {/* Tier 3: the branch, in full; long names wrap rather than clip. */}
           <div
@@ -367,8 +361,8 @@ export const TabRow = memo(function TabRow({
           ))}
           <SettledPlans plans={settledPlans} onOpen={(planId) => actions.openPlan(tab.id, planId)} />
 
-          {/* Tier 6: another tab's agent working in this repo, unless tier 2 says it. */}
-          {workLabel && activity.kind !== 'remote' && (
+          {/* Tier 6: another tab's agent working in this repo. */}
+          {workLabel && (
             <div className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-[var(--ins-lamp)]">
               <Sparks className="h-3 w-3 shrink-0" />
               <span className="min-w-0 truncate">{workLabel}</span>

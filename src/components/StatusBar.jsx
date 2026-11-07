@@ -21,12 +21,8 @@ import { WindowControls } from './WindowControls';
 import { IS_MAC, IS_WINDOWS, basename } from '../utils/pathUtils';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
-import { useTabManager } from '../features/tabs/TabContext';
 import { useConfirm } from '../features/dialogs/DialogProvider';
-import { shortcutForCommand, shortcutKeys } from '../lib/shortcuts';
-import { KeyChord } from './instrument/Keycap';
-import { requestAttentionJump, useAttentionQueue } from '../features/tabs/useAgentAttention';
-import { AutopilotIndicator } from '../features/plans/AutopilotIndicator';
+import { shortcutForCommand } from '../lib/shortcuts';
 import { ContextPeek } from '../features/token-budget/ContextPeek';
 import { Fig06Context } from './Fig06Context';
 import { Fig10Sandbox } from '../features/settings/Fig10Sandbox';
@@ -247,32 +243,6 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
   );
 }
 
-// Agents in other tabs waiting on you. Click (or Alt+A) jumps to the next one.
-function AttentionIndicator() {
-  const { tabs } = useTabManager();
-  const queue = useAttentionQueue(tabs);
-  if (queue.length === 0) return null;
-  const blocked = queue.filter((q) => q.state === 'permission').length;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={requestAttentionJump}
-          className="gap-1.5 px-1 h-5 before:content-none after:content-none"
-        >
-          <Lamp state={blocked ? 'fault' : 'wait'} blink={blocked > 0} />
-          <span className="text-muted-foreground">{queue.length} waiting</span>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent title="Waiting on you" hint={<KeyChord keys={shortcutKeys('attention-jump')} size="sm" />}>
-        {blocked ? `${blocked} blocked on permission · ` : ''}jump to the next one
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 // Memoized: StatusBar's props are all primitives/callbacks, so with stable
 // callbacks (see ProjectTab call site) it skips re-render on every keystroke
 // in the prompt textarea and on the 5s token/branch polls.
@@ -349,11 +319,7 @@ export const StatusBar = memo(({
           </span>
         )}
 
-        {/* Who needs you, pushed up against the gauge so it reads in the middle of the rail. */}
-        <div className="ml-auto flex shrink-0 items-center gap-3">
-          <AttentionIndicator />
-          <AutopilotIndicator />
-        </div>
+        <div className="ml-auto" />
 
         {/* Context actions: update (shown when relevant) */}
         {availableUpdate && (

@@ -1476,8 +1476,8 @@ body {
     animation: ins-scan 1.6s steps(8) infinite;
   }
 
-  /* The Lirah mark (LirahMark.jsx). Lit, it is the title bar's session lamp:
-     it warms and cools like a filament. */
+  /* The Lirah mark (LirahMark.jsx). Lit, its body is the title bar's session
+     lamp: only the body turns gold, warming and cooling like a filament. */
   .ins-mark {
     fill: var(--ins-legend);
     stroke: var(--ins-legend);
@@ -1490,9 +1490,12 @@ body {
     stroke: var(--ins-lamp);
   }
 
-  .ins-mark[data-lit] {
+  .ins-mark-body {
+    transition: fill var(--ins-cool) var(--ins-ease-out), filter var(--ins-cool) var(--ins-ease-out);
+  }
+
+  .ins-mark[data-lit] .ins-mark-body {
     fill: var(--ins-lamp);
-    stroke: var(--ins-lamp);
     filter: drop-shadow(0 0 calc(var(--ins-glow) / 2) color-mix(in srgb, var(--ins-lamp) 60%, transparent));
     transition-duration: var(--ins-warm);
   }

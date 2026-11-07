@@ -5,6 +5,7 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { Fig33Log } from './Fig33Log';
+import { StepOrbit } from './StepOrbit';
 import { cn } from '../../lib/utils';
 
 // `git status -s` style: one letter per file, coloured by kind.
@@ -28,49 +29,16 @@ const STEPS = [
 const stepIndex = (stage) => STEPS.findIndex((s) => s.stages.includes(stage));
 
 
-// One line: `● stage ✦ ● message ✦ ● commit`. A step's lamp is lit while it
-// runs, ok once done, warn where it failed but can go on, fault where it stopped.
-const STEP_LAMP = { done: 'ok', active: 'on', warn: 'warn', fault: 'fault', pending: 'off' };
-
+// A clean tree is not a failure: nothing lights. Back in review after a
+// failure, the step that failed shows its lamp.
 function stepStates(stage, failedAt, clean) {
-  // A clean tree is not a failure: nothing lights.
-  if (stage === 'error') return clean ? ['pending', 'pending', 'pending'] : ['fault', 'pending', 'pending'];
+  if (stage === 'error') return clean ? ['queued', 'queued', 'queued'] : ['fault', 'queued', 'queued'];
   if (stage === 'done') return ['done', 'done', 'done'];
   const current = stepIndex(stage);
-  const states = STEPS.map((_, i) => (i < current ? 'done' : i === current ? 'active' : 'pending'));
-  // Back in review after a failure: mark the step that failed.
+  const states = STEPS.map((_, i) => (i < current ? 'done' : i === current ? (stage === 'ready' ? 'next' : 'live') : 'queued'));
   if (stage === 'ready' && failedAt === 'commit') states[2] = 'fault';
   if (stage === 'ready' && failedAt === 'message') states[1] = 'warn';
   return states;
-}
-
-function StepLine({ stage, failedAt, clean }) {
-  const states = stepStates(stage, failedAt, clean);
-  return (
-    <ol className="flex flex-wrap items-center gap-2 text-[11px]">
-      {STEPS.map((step, i) => {
-        const state = states[i];
-        const busy = state === 'active' && stage !== 'ready';
-        return (
-          <li key={step.id} className="flex items-center gap-2" aria-current={state === 'active' ? 'step' : undefined}>
-            {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
-            <span className="flex items-center gap-1.5">
-              <Lamp state={STEP_LAMP[state]} blink={busy} />
-              <span
-                className={cn(
-                  state === 'pending' ? 'text-muted-foreground' : 'text-foreground',
-                  state === 'fault' && 'text-[var(--ins-fault)]',
-                  state === 'warn' && 'text-[var(--ins-warn)]',
-                )}
-              >
-                {step.label.toLowerCase()}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
 
 // Git's conventional subject-line limit.
@@ -218,7 +186,7 @@ export function AutoCommitDialog({ autoCommit }) {
 
         {/* Where we are, then what is about to be committed. */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <StepLine stage={stage} failedAt={failedAt} clean={nothingToCommit} />
+          <StepOrbit steps={STEPS} states={stepStates(stage, failedAt, nothingToCommit)} />
           {files.length > 0 ? (
             <span className="flex items-baseline gap-3 text-xs tabular-nums">
               <span className="text-foreground">{plural(files.length, 'file')}</span>

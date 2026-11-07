@@ -175,15 +175,14 @@ export function RaceCompareDialog({ jobs, onClose }) {
               onClick={() => setFilePath(f.path)}
               title={`${f.path}${inA && inB ? ' — both' : inA ? ` — only ${shortLabel(a)}` : ` — only ${shortLabel(b)}`}`}
               className={cn(
-                'flex shrink-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
-                f.path === filePath
-                  ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]'
-                  : 'edge-engraved text-muted-foreground hover:bg-muted/40'
+                'ins-key ins-key-panel flex shrink-0 items-center gap-1 px-1.5 text-[11px]',
+                f.path !== filePath && 'text-muted-foreground'
               )}
+              aria-pressed={f.path === filePath}
             >
               {basename(f.path)}
               {!(inA && inB) && (
-                <span className="text-[11px] uppercase text-muted-foreground">
+                <span className="text-[11px] text-muted-foreground">
                   {inA ? 'A' : 'B'}
                 </span>
               )}
