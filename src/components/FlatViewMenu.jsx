@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from './ui/sidebar';
-import { Folder, File, FileX } from 'lucide-react';
+import { Folder, Page, PageMinus } from 'iconoir-react';
 import { isDimmedEntry } from './file-tree/utils/lsColors';
 
 export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex = null, registerList }) {
@@ -66,9 +66,9 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
                 <span className="w-3 shrink-0 text-center text-git-deleted text-[11px] font-mono">{isDeleted && 'D'}</span>
                 <div className="flex items-center justify-start min-w-0 gap-1.5 flex-1">
                   {isDeleted ? (
-                    <FileX className="w-3 h-3 flex-shrink-0 text-git-deleted" />
+                    <PageMinus className="w-3 h-3 flex-shrink-0 text-git-deleted" />
                   ) : (
-                    <File className="w-3 h-3 flex-shrink-0" />
+                    <Page className="w-3 h-3 flex-shrink-0" />
                   )}
                   <span className={`truncate ${isDeleted ? 'line-through text-git-deleted' : ''}`}>{item.name}</span>
                 </div>

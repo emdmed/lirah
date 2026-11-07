@@ -1,8 +1,8 @@
 import { useMemo, memo } from 'react';
 import {
-  Keyboard, Bot, Terminal, BarChart3, Settings, GitCommitHorizontal,
-  GitMerge, ScanSearch, Shrink, Eraser
-} from 'lucide-react';
+  KeyCommand, Sparks, Terminal, StatsReport, Settings, GitCommit,
+  GitMerge, DocMagnifyingGlass, Compress, Erase
+} from 'iconoir-react';
 import { Scanner } from './instrument/Scanner';
 import { Button } from './ui/button';
 import {
@@ -33,7 +33,7 @@ import { Fig10Sandbox } from '../features/settings/Fig10Sandbox';
 import { useFigureCompact } from './instrument/figure';
 
 const CLI_DISPLAY = {
-  'claude-code': { name: 'claude', icon: Bot },
+  'claude-code': { name: 'claude', icon: Sparks },
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
@@ -210,19 +210,19 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
       <DropdownMenuContent side="bottom" align="center" className="w-64 text-xs">
         {crowded && onCompactContext && (
           <DropdownMenuItem onClick={onCompactContext} className="cursor-pointer py-1">
-            <Shrink className="mr-2 w-3 h-3" />
+            <Compress className="mr-2 w-3 h-3" />
             Compact (summarise and continue)
           </DropdownMenuItem>
         )}
         {onOpenContextDetails && (
           <DropdownMenuItem onClick={onOpenContextDetails} className="cursor-pointer py-1">
-            <ScanSearch className="mr-2 w-3 h-3" />
+            <DocMagnifyingGlass className="mr-2 w-3 h-3" />
             Details…
           </DropdownMenuItem>
         )}
         {onOpenDashboard && (
           <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
-            <BarChart3 className="mr-2 w-3 h-3" />
+            <StatsReport className="mr-2 w-3 h-3" />
             Token Metrics
             <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
           </DropdownMenuItem>
@@ -232,7 +232,7 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem destructive onClick={onClearContext} className="cursor-pointer py-1">
-              <Eraser className="mr-2 w-3 h-3" />
+              <Erase className="mr-2 w-3 h-3" />
               Clear context
               <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
             </DropdownMenuItem>
@@ -454,12 +454,12 @@ export const StatusBar = memo(({
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
-                <BarChart3 className="mr-2 w-3 h-3" />
+                <StatsReport className="mr-2 w-3 h-3" />
                 Token Metrics
                 <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoCommit} className="cursor-pointer py-1">
-                <GitCommitHorizontal className="mr-2 w-3 h-3" />
+                <GitCommit className="mr-2 w-3 h-3" />
                 Auto Commit…
                 <DropdownMenuShortcut keys={shortcutForCommand('commit')} />
               </DropdownMenuItem>
@@ -469,7 +469,7 @@ export const StatusBar = memo(({
                 <DropdownMenuShortcut keys={shortcutForCommand('merge')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
-                <Keyboard className="mr-2 w-3 h-3" />
+                <KeyCommand className="mr-2 w-3 h-3" />
                 Keyboard Shortcuts
                 <DropdownMenuShortcut keys={shortcutForCommand('help')} />
               </DropdownMenuItem>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Input } from './ui/input';
 import { PanelButton } from './instrument/PanelButton';
-import { ChevronsDownUp, CornerLeftUp, RefreshCw } from 'lucide-react';
+import { CompressLines, LongArrowUpLeft, Refresh } from 'iconoir-react';
 import { BookmarksDropdown } from '../features/bookmarks';
 import { Keycap } from './instrument/Keycap';
 import { Scanner } from './instrument/Scanner';
@@ -76,7 +76,7 @@ export function SidebarHeader({
       {onNavigateParent && (
         <div className="mr-auto flex items-center gap-2 min-w-0 pr-2">
           <PanelButton
-            icon={CornerLeftUp}
+            icon={LongArrowUpLeft}
             onClick={onNavigateParent}
             title="Parent directory (Backspace)"
             aria-label="Go to parent directory"
@@ -109,14 +109,14 @@ export function SidebarHeader({
           {/* Printed keys have no box, so a wider step sets the icon group
               apart from the md/git filters. */}
           <PanelButton
-            icon={ChevronsDownUp}
+            icon={CompressLines}
             className="ml-1.5"
             onClick={onCollapseAll}
             title="Collapse all folders (X)"
             aria-label="Collapse all folders"
           />
           <PanelButton
-            icon={treeLoading ? SyncBusy : RefreshCw}
+            icon={treeLoading ? SyncBusy : Refresh}
             onClick={onSyncTree}
             disabled={treeLoading}
             title="Sync file tree"

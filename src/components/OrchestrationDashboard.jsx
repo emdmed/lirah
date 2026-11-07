@@ -11,16 +11,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Scanner } from '@/components/instrument/Scanner';
 import {
-  CheckCircle2, AlertTriangle, XCircle, Download,
-} from 'lucide-react';
+  CheckCircle, WarningTriangle, XmarkCircle, Download,
+} from 'iconoir-react';
 import { useToast } from '@/features/toast';
 
 const STATUS_ICON = {
-  installed: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
-  current: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
-  outdated: <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-warning)' }} />,
-  missing: <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-critical)' }} />,
-  updated: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-status-info)' }} />,
+  installed: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
+  current: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
+  outdated: <WarningTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-warning)' }} />,
+  missing: <XmarkCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-critical)' }} />,
+  updated: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-info)' }} />,
 };
 
 const STATUS_BADGE = {
@@ -212,7 +212,7 @@ export function OrchestrationDashboard({
                 <>
                   {!hooksStatus.installed && (
                     <div className="flex items-center gap-1.5 text-[11px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
-                      <AlertTriangle className="w-3 h-3" />
+                      <WarningTriangle className="w-3 h-3" />
                       Hooks not installed. Install globally via the orchestration setup guide.
                     </div>
                   )}
