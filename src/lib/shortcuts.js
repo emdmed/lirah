@@ -5,6 +5,7 @@
 //
 //   keys            full key names, as the help dialog prints them
 //   note            the condition or extra keys, shown beside the keys
+//   either          the keys are alternatives (`[` / `]`), not a chord
 //   hint            { bar: 'ctrl' | 'ctrl+shift' | 'always', label }: shown
 //                   in the hint bar while that modifier is held
 //   paletteCommand  the `:` command that does the same, which then shows
@@ -26,7 +27,7 @@ const mod = (e) => e.ctrlKey || e.metaKey; // Ctrl, or Cmd
 const alt = (e) => e.altKey && !e.ctrlKey && !e.metaKey; // Alt alone, Shift allowed
 const key = (k) => (e) => e.key === k;
 
-export const SHORTCUT_CATEGORIES = ['Tabs', 'Panes & Views', 'Prompt', 'Agent & CLI', 'Files & Search', 'Git', 'Token Usage'];
+export const SHORTCUT_CATEGORIES = ['Tabs', 'Panes & Views', 'Prompt', 'Agent & CLI', 'Files & Search', 'Git', 'Token Usage', 'Workspace pane'];
 
 export const SHORTCUTS = [
   // Tabs
@@ -74,6 +75,22 @@ export const SHORTCUTS = [
   // Token usage
   { id: 'tokens', keys: ['Ctrl', 'Shift', 'D'], description: 'Open Token Dashboard', category: 'Token Usage', hint: { bar: 'ctrl+shift', label: 'tokens' }, paletteCommand: 'tokens', match: (e) => mod(e) && e.shiftKey && e.key === 'D' },
   { id: 'budget', keys: ['Ctrl', 'Shift', 'B'], description: 'Open Budget Settings', category: 'Token Usage', paletteCommand: 'budget', match: (e) => mod(e) && e.shiftKey && e.key === 'B' },
+
+  // Workspace pane: handled in RightSidebar (`[ ]` `?` N), TabsSummaryPane (j k)
+  // and TabRow (row keys, see features/tabs/rowKeys.js), with the pane focused.
+  { id: 'ws-section', keys: ['[', ']'], either: true, description: 'Previous / Next Section', category: 'Workspace pane' },
+  { id: 'ws-move', keys: ['j', 'k'], either: true, description: 'Move Between Rows', category: 'Workspace pane', note: 'or arrows, Home, End' },
+  { id: 'ws-switch', keys: ['Enter'], description: 'Switch to Tab', category: 'Workspace pane', note: 'tabs row' },
+  { id: 'ws-attach', keys: ['a'], description: 'Attach Edited Files to Prompt', category: 'Workspace pane', note: 'tabs row with edits' },
+  { id: 'ws-edits', keys: ['e'], description: 'Show Edit Trail', category: 'Workspace pane', note: 'tabs row with edits' },
+  { id: 'ws-plan', keys: ['o'], description: 'Open Plan', category: 'Workspace pane', note: 'tabs row with a plan' },
+  { id: 'ws-link', keys: ['l'], description: 'Link Repo Into the Prompt', category: 'Workspace pane', note: 'tabs row, not the active one' },
+  { id: 'ws-rename', keys: ['r'], description: 'Rename Tab', category: 'Workspace pane', note: 'or F2' },
+  { id: 'ws-close', keys: ['x'], description: 'Close Tab', category: 'Workspace pane', note: 'tabs row' },
+  { id: 'ws-role', keys: ['t'], description: 'Set Role', category: 'Workspace pane', note: 'tabs row' },
+  { id: 'ws-folder', keys: ['f'], description: 'Open Folder', category: 'Workspace pane', note: 'tabs row' },
+  { id: 'ws-new', keys: ['N'], description: 'New Job / Task', category: 'Workspace pane', note: 'jobs or tasks section' },
+  { id: 'ws-help', keys: ['?'], description: 'Open This Section', category: 'Workspace pane' },
 ];
 
 const COMPACT = { Ctrl: '^', Shift: '⇧', Alt: 'alt', Enter: '↵', Space: 'space', Tab: 'tab', Backspace: '⌫' };

@@ -10,7 +10,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
-import { useConfirm } from '../dialogs/DialogProvider';
+import { useConfirm, useDialog } from '../dialogs/DialogProvider';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
@@ -121,7 +121,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
-  const { workspaceTabs, activeWorkspaceId } = useTabManager();
+  const { workspaceTabs, activeWorkspaceId, activeTabId } = useTabManager();
+  const dialog = useDialog();
   const openTasks = useOpenTaskCount(activeWorkspaceId);
   const waitingTabs = useAttentionQueue(workspaceTabs).length;
   const toast = useToast();
@@ -573,6 +574,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           const step = e.key === ']' ? 1 : -1;
           e.preventDefault();
           setTab(sections[(sections.indexOf(tab) + step + sections.length) % sections.length]);
+          return;
+        }
+        // ? opens the shortcuts at this pane's section. The pane sits outside the tabs, so open it in the active tab's scope.
+        if (e.key === '?' && !(e.ctrlKey || e.metaKey || e.altKey)) {
+          e.preventDefault();
+          dialog.open('help', { section: 'Workspace pane' }, activeTabId);
           return;
         }
         // N opens a new job while focus is in the pane (not in a text field).

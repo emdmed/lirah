@@ -56,7 +56,10 @@ export const TAB_DIALOGS = {
       cliAvailability: ctx.cliAvailability,
     }),
   },
-  help: { Component: KeyboardShortcutsDialog },
+  help: {
+    Component: KeyboardShortcutsDialog,
+    props: (_ctx, entry) => ({ section: entry.section }),
+  },
   settings: {
     Component: SettingsDialog,
     props: (ctx) => ({
