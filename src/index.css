@@ -1759,7 +1759,8 @@ body {
     gap: 2px;
   }
 
-  .ins-seg > .ins-key[aria-checked="true"] {
+  .ins-seg > .ins-key[aria-checked="true"],
+  .ins-seg-key[aria-selected="true"] {
     color: var(--color-foreground);
     background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
     box-shadow: inset 0 -1px 0 var(--ins-legend);

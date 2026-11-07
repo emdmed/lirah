@@ -855,8 +855,8 @@ function TabButton({ active, onClick, label, count, lamp = false, countTone = 't
       aria-selected={active}
       aria-controls="workspace-section"
       className={cn(
-        'ins-legend flex items-center gap-1.5 px-1.5 pt-0.5 pb-1.5 cursor-pointer border-b-2',
-        active ? 'text-[var(--ins-lamp)] border-[var(--ins-lamp)]' : 'text-muted-foreground border-transparent hover:text-foreground'
+        'ins-legend ins-seg-key flex items-center gap-1.5 px-1.5 pt-0.5 pb-2 cursor-pointer',
+        !active && 'text-muted-foreground hover:text-foreground'
       )}
     >
       {lamp && <Lamp state="on" />}

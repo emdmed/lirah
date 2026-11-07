@@ -1,9 +1,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '../../lib/utils';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { errorMessage } from '../../lib/errorMessage';
 import { Scanner } from '../../components/instrument/Scanner';
+import { SegmentBank } from '../../components/instrument/SegmentBank';
 import { useSetting } from '../settings/settingsStore';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { getAgentHookState } from '../tabs/agentHookState';
@@ -214,6 +214,7 @@ export function TasksPane({ projectPath }) {
       focusQuickAdd();
       return;
     }
+    if (e.target.closest('[role="radiogroup"]')) return; // the scope bank owns its arrow keys
     onCursorKey(e);
   };
 
@@ -247,8 +248,16 @@ export function TasksPane({ projectPath }) {
   return (
     <div ref={containerRef} tabIndex={-1} onKeyDown={onPaneKey} onBlur={onBlur} className="flex flex-col outline-none">
       <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
-        <ScopeButton active={view === 'project'} onClick={() => setView('project')} label={workspaceName} count={projectCount} />
-        <ScopeButton active={view === 'global'} onClick={() => setView('global')} label="global" count={globalCount} />
+        <SegmentBank
+          label="Task scope"
+          value={view}
+          onChange={setView}
+          className="min-w-0"
+          options={[
+            { value: 'project', label: <ScopeLabel label={workspaceName} count={projectCount} /> },
+            { value: 'global', label: <ScopeLabel label="global" count={globalCount} /> },
+          ]}
+        />
         <button
           type="button"
           onClick={() => setContextsOpen(true)}
@@ -330,19 +339,11 @@ export function TasksPane({ projectPath }) {
   );
 }
 
-function ScopeButton({ active, onClick, label, count }) {
+function ScopeLabel({ label, count }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'flex max-w-[45%] items-center gap-1.5 px-1.5 py-0.5 font-mono text-[11px] leading-4 cursor-pointer',
-        active ? 'text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)]' : 'text-muted-foreground hover:text-foreground',
-      )}
-    >
+    <span className="flex max-w-40 items-center gap-1.5 px-1.5 text-[11px]">
       <span className="truncate">{label}</span>
       {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
-    </button>
+    </span>
   );
 }
