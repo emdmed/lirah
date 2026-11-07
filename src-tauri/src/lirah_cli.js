@@ -667,7 +667,7 @@ const THEMES = [
   ["tokyo-night", "Tokyo Night"], ["everforest", "Everforest"], ["nord", "Nord"], ["rose-pine", "Rose Pine"],
   ["matte-black", "Matte Black"], ["hackerman", "Hackerman"], ["osaka-jade", "Osaka Jade"],
   ["ethereal", "Ethereal"], ["flexoki", "Flexoki Light"], ["catppuccin-latte", "Catppuccin Latte"],
-  ["rivendell", "Rivendell"], ["lothlorien", "Lothlórien"],
+  ["rivendell", "Rivendell"], ["lothlorien", "Lothlórien"], ["orrery", "Orrery"],
 ];
 const DEFAULT_THEME = "tokyo-night";
 

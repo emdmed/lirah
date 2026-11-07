@@ -1358,6 +1358,82 @@ export const themes = {
       treeGuide: '46 56% 85% / 0.1',    // Silver-gold with opacity for tree guide lines
     },
   },
+  orrery: {
+    name: 'Orrery',
+    type: 'dark',
+    // Terminal colors - Orrery (the site's Serrit plate): slate ground, parchment ink, gold leaf
+    terminal: {
+      foreground: '#e8e2d0',      // Parchment
+      background: '#141b1e',      // Slate ground
+      cursor: '#dcb662',          // Gold leaf
+      cursorAccent: '#141b1e',    // Slate
+      selectionBackground: '#2b343a', // Lifted slate
+      selectionForeground: '#e8e2d0', // Parchment
+
+      // Normal colors
+      black: '#1e272b',           // Plate shadow
+      red: '#e3836f',             // Rose clay
+      green: '#a6c78e',           // Sage
+      yellow: '#dcb662',          // Gold leaf
+      blue: '#73a3cc',            // Night river
+      magenta: '#c897b8',         // Heather
+      cyan: '#93c3b8',            // Celadon
+      white: '#c9c3b2',           // Vellum
+
+      // Bright colors
+      brightBlack: '#6e7a7c',     // Graphite (readable for comments)
+      brightRed: '#f0998a',       // Bright rose
+      brightGreen: '#bcd9a4',     // Bright sage
+      brightYellow: '#ecc97c',    // Bright gold
+      brightBlue: '#94bedb',      // Bright river
+      brightMagenta: '#dab1cc',   // Bright heather
+      brightCyan: '#b4ddd6',      // Bright celadon
+      brightWhite: '#f4efe2',     // Fresh parchment
+    },
+    // UI colors: one slate hue (198) for every surface, parchment (45) for ink.
+    ui: {
+      background: 'hsl(198 20% 10%)',
+      foreground: 'hsl(45 37% 86%)',
+      card: 'hsl(198 18% 12%)',
+      cardForeground: 'hsl(45 37% 86%)',
+      popover: 'hsl(198 18% 12%)',
+      popoverForeground: 'hsl(45 37% 86%)',
+      primary: 'hsl(45 37% 86%)',
+      primaryForeground: 'hsl(198 20% 10%)',
+      secondary: 'hsl(198 16% 16%)',
+      secondaryForeground: 'hsl(45 37% 86%)',
+      muted: 'hsl(198 16% 16%)',
+      mutedForeground: 'hsl(40 10% 62%)',
+      // Faded parchment: gold is kept for lit state only.
+      accent: 'hsl(42 22% 72%)',
+      accentForeground: 'hsl(198 20% 10%)',
+      destructive: 'hsl(8 70% 62%)',
+      destructiveForeground: 'hsl(198 20% 10%)',
+      border: 'hsl(198 13% 23%)',
+      input: 'hsl(198 16% 16%)',
+      inputBackground: 'hsl(198 22% 6%)',
+      ring: 'hsl(41 64% 62%)',
+      sidebar: 'hsl(198 20% 10%)',
+      sidebarForeground: 'hsl(45 37% 86%)',
+      sidebarPrimary: 'hsl(45 37% 86%)',
+      sidebarPrimaryForeground: 'hsl(198 20% 10%)',
+      sidebarAccent: 'hsl(198 16% 14%)',
+      sidebarAccentForeground: 'hsl(45 37% 86%)',
+      sidebarBorder: 'hsl(198 13% 23%)',
+      sidebarRing: 'hsl(41 64% 62%)',
+      // Instrument lamps: gold leaf lit, sage ok, copper warn, rose fault.
+      // Lightness steps down ok > lamp > warn > fault so each reads apart.
+      lamp: '#dcb662',
+      ok: '#b8d6a0',
+      warn: '#e5925f',
+      fault: '#e06e5c',
+      // Semantic colors
+      folder: '42 22% 66%',              // Aged parchment for folder icons
+      gitAdded: '95 34% 67%',            // Sage for +lines
+      gitDeleted: '10 67% 66%',          // Rose clay for -lines
+      treeGuide: '45 37% 86% / 0.1',    // Parchment hairlines for the tree
+    },
+  },
 };
 
 export const defaultTheme = 'tokyo-night';

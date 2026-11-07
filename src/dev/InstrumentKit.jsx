@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Keycap, KeyChord } from '../components/instrument/Keycap';
 import { Lamp, JOB_LAMP } from '../components/instrument/Lamp';
@@ -31,6 +31,13 @@ export function InstrumentKit() {
   const [range, setRange] = useState('weekly');
   const [detail, setDetail] = useState('signatures');
   const [scroll, setScroll] = useState(10000);
+
+  // `?kit&theme=orrery` picks the theme for headless screenshots.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('theme');
+    if (t && themes[t]) changeTheme(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--ins-gutter)] p-4 text-xs font-mono text-foreground">
