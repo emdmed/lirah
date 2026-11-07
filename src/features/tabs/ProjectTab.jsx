@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, mem
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
 import { NoPluginBanner } from "../../components/NoPluginBanner";
-import { TAB_CLI_PROCESSES } from "../../lib/agentClis";
+import { TAB_CLI_PROCESSES, tabCliProcess } from "../../lib/agentClis";
 import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
@@ -1199,7 +1199,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           projectDir={resolvedProjectDir}
           onSandboxFailed={handleSandboxFailed}
           reattachKey={tabId}
-          claudeRunning={settings.selectedCli === 'claude-code' && cliRunning === 'claude'}
+          cli={settings.selectedCli}
+          cliRunning={cliRunning === tabCliProcess(settings.selectedCli)}
           master={master}
         />
         {!settings.autoLaunchCli && <LaunchAgentPrompt

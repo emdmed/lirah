@@ -248,7 +248,7 @@ export const ContextStatus = memo(function ContextStatus({
       <PaneLegend
         index={3}
         title="Context"
-        status={status}
+        note={status}
         lamp={lamp}
         trailing={onOpenBox && <InputModeSwitch mode="terminal" onChange={onOpenBox} />}
       />

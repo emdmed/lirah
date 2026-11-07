@@ -66,7 +66,7 @@ export function InstrumentKit() {
         </section>
 
         <section className="tui-pane px-3" data-legend tabIndex={0}>
-          <PaneLegend index={2} title="Lamps" status="focus me" />
+          <PaneLegend index={2} title="Lamps" note="focus me" />
           <div className="flex flex-wrap items-center gap-3 py-2">
             {['off', 'on', 'ok', 'warn', 'fault'].map((s) => (
               <span key={s} className="flex items-center gap-1.5"><Lamp state={s} />{s}</span>

@@ -548,17 +548,23 @@ body {
   }
 
   /* The legend follows the frame: warms with focus, cools after it. */
-  .tui-pane > .ins-pane-legend :is(.ins-legend, .ins-cap) {
+  .tui-pane > .ins-pane-legend :is(.ins-legend, .ins-name, .ins-cap) {
     transition: color var(--ins-cool) var(--ins-ease), border-color var(--ins-cool) var(--ins-ease);
   }
 
-  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-legend, .ins-cap) {
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-legend, .ins-name, .ins-cap) {
     transition-duration: var(--ins-warm);
   }
 
-  .tui-pane:focus-within > .ins-pane-legend .ins-legend,
-  .tui-pane.terminal-live > .ins-pane-legend .ins-legend {
+  .tui-pane:focus-within > .ins-pane-legend :is(.ins-legend, .ins-name),
+  .tui-pane.terminal-live > .ins-pane-legend :is(.ins-legend, .ins-name) {
     color: var(--color-foreground);
+  }
+
+  /* The key number lights gold with focus, like the keycap it replaced. */
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-key,
+  .ins-pane-legend .ins-pane-key[data-lit] {
+    color: var(--ins-lamp);
   }
 
   /* A terminal pane: the screen fills the frame, so the hairline is the
@@ -1877,9 +1883,27 @@ body {
   .ins-pane-legend > :first-child { flex-shrink: 0; }
   .ins-pane-legend > :last-child { min-width: 0; }
 
+  /* Name: italic Spectral, sized to sit in the 14px legend row. */
+  .ins-pane-name {
+    font-size: 13px;
+    line-height: 1;
+    color: var(--ins-legend);
+    white-space: nowrap;
+  }
+
   .ins-pane-legend-status {
+    display: inline-flex;
+    align-items: center;
     font-size: var(--font-xs);
     line-height: 1;
+    color: var(--color-muted-foreground);
+  }
+
+  .ins-pane-legend-note {
+    font-family: var(--font-mono);
+    font-size: var(--font-xs);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
     color: var(--color-muted-foreground);
   }
 }

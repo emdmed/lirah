@@ -3,8 +3,9 @@ import { useTerminal } from '../hooks/useTerminal';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { PaneLegend } from './instrument/PaneLegend';
 import { ClaudeMark } from './ClaudeMark';
+import { tabCliLabel } from '../lib/agentClis';
 
-export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, claudeRunning = false, master = false }, ref) => {
+export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, cli = 'claude-code', cliRunning = false, master = false }, ref) => {
   const terminalRef = useRef(null);
   const { handleResize, sessionId, reattached, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive, reattachKey);
@@ -78,7 +79,9 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       <PaneLegend
         index={2}
         title={master ? 'Workspace terminal' : 'Terminal'}
-        status={claudeRunning ? <ClaudeMark /> : null}
+        status={cli === 'claude-code'
+          ? <ClaudeMark idle={!cliRunning} />
+          : <span className={cliRunning ? 'text-foreground' : undefined}>{tabCliLabel(cli)}</span>}
         lit={isFocused}
       />
       {/* The screen carries the inset; the ref div stays unpadded so FitAddon
