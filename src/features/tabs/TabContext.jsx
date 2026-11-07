@@ -255,7 +255,7 @@ export function TabProvider({ children }) {
 
   // A new, empty workspace, switched to.
   const addWorkspace = useCallback((name) => {
-    const ws = createWorkspace(name?.trim() || `ws ${workspacesRef.current.length + 1}`);
+    const ws = createWorkspace(name?.trim() || `ws${workspacesRef.current.length + 1}`);
     workspacesRef.current = [...workspacesRef.current, ws];
     setWorkspaces((prev) => [...prev, ws]);
     activeWorkspaceIdRef.current = ws.id;

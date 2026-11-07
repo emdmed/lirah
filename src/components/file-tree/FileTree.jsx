@@ -8,6 +8,7 @@ import { filterTreeByGitChanges, filterTreeByMarkdown, countMarkdownFiles, count
 import { flattenVisibleTree } from "./utils/flattenTree";
 import { basename } from "../../utils/pathUtils";
 import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
+import { useTabManager } from "../../features/tabs/TabContext";
 
 // Row pitch: rows fill it edge to edge so indent guides run unbroken.
 const ROW_HEIGHT = 24;
@@ -65,6 +66,9 @@ export const FileTree = memo(function FileTree({
   // Files agents are reading or editing, marked on their rows and folders.
   // A background tab stops listening and catches up on activation.
   const agentActivity = useAgentFileActivity(isActive);
+  // Folders open as tabs get a quiet mark (never expanded for it).
+  const { tabs } = useTabManager();
+  const tabRoots = useMemo(() => new Set(tabs.map((t) => t.projectPath?.replace(/\/+$/, ""))), [tabs]);
 
   // Apply filters to get displayed nodes
   const displayedNodes = useMemo(() => {
@@ -312,7 +316,7 @@ export const FileTree = memo(function FileTree({
               <div className="flex flex-1 items-center gap-1.5">
                 <div className="flex-none w-2 border-t border-[var(--ins-edge-strong)]" aria-hidden />
                 <span className="engraved-label">hidden</span>
-                <span className="text-[var(--ins-faint)]" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }}>
+                <span className="text-muted-foreground" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }}>
                   · {row.count} {row.count === 1 ? 'folder' : 'folders'}
                 </span>
                 <div className="flex-1 border-t border-[var(--ins-edge-strong)]" aria-hidden />
@@ -353,6 +357,7 @@ export const FileTree = memo(function FileTree({
               gitDeleted={stats?.deleted || 0}
               gitStatus={stats?.status || undefined}
               selectedInside={node.is_dir ? selectedInFolder.get(path) || 0 : 0}
+              isOpenTab={!!node.is_dir && tabRoots.has(path.replace(/\/+$/, ""))}
               agentMark={markKey((node.is_dir ? agentActivity.folders : agentActivity.files).get(path))}
               onToggle={onToggle}
               onActivateFile={handleActivateFile}

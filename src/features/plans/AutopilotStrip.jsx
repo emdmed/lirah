@@ -6,7 +6,7 @@ import { AUTOPILOT_LAMP, Prose } from './parts';
 import { useTick } from '../../hooks/useTick';
 import { Fig09Loop } from './Fig09Loop';
 import { Fig20Timeline } from './Fig20Timeline';
-import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition } from './planModel';
+import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, haltWord, pilotPosition } from './planModel';
 
 /** Where the auto-pilot run stands, and what you can do about it. */
 export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop, onDismiss, onGoToTab, onReviewAll }) {
@@ -34,8 +34,8 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
   ].filter(Boolean).join(' · ');
   const headline = {
     [AUTOPILOT_STATUS.RUNNING]: at ? [at, elapsed, ap.nudged && 'nudged to commit'].filter(Boolean).join(' · ') : 'starting',
-    [AUTOPILOT_STATUS.PAUSED]: ['needs you', at].filter(Boolean).join(' · '),
-    [AUTOPILOT_STATUS.FAILED]: ['error', at].filter(Boolean).join(' · '),
+    [AUTOPILOT_STATUS.PAUSED]: [haltWord(ap), at].filter(Boolean).join(' · '),
+    [AUTOPILOT_STATUS.FAILED]: [haltWord(ap), at].filter(Boolean).join(' · '),
     // The timeline below carries the run's time (its tooltip, in compact figures).
     [AUTOPILOT_STATUS.DONE]: 'plan complete',
     [AUTOPILOT_STATUS.OFF]: 'off',

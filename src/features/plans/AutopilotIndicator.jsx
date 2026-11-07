@@ -2,7 +2,7 @@ import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { Lamp } from '../../components/instrument/Lamp';
 import { useAutopilotRuns, usePlansActions } from './PlansContext';
-import { AUTOPILOT_STATUS, planProgress, UNTITLED_PLAN } from './planModel';
+import { AUTOPILOT_STATUS, haltWord, planProgress, UNTITLED_PLAN } from './planModel';
 import { AUTOPILOT_LAMP } from './parts';
 
 /**
@@ -16,7 +16,7 @@ export function AutopilotIndicator() {
   const { repoRoot, plan } = runs[0];
   const ap = plan.autopilot;
   const { done, total } = planProgress(plan);
-  const label = ap.status === AUTOPILOT_STATUS.RUNNING ? `${done}/${total}` : ap.status === AUTOPILOT_STATUS.PAUSED ? 'needs you' : 'error';
+  const label = ap.status === AUTOPILOT_STATUS.RUNNING ? `${done}/${total}` : haltWord(ap);
   const lamp = AUTOPILOT_LAMP[ap.status];
   return (
     <Tooltip>

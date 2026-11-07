@@ -88,7 +88,7 @@ export function WorkspaceRow() {
         )}
       >
         <span className="truncate">{ws.name}</span>
-        <span className="tabular-nums">{count}</span>
+        <span className="tabular-nums text-muted-foreground">{count}</span>
         {star(ws)}
       </button>
     );

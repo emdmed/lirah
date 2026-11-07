@@ -273,7 +273,8 @@ export function useAutopilot({
       return advance(repoRoot, planId);
     }
     if (marker?.kind === HALT_REASON.BLOCKED) {
-      return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.BLOCKED, marker.message || `Chunk ${current.n}: the agent is blocked.`);
+      // The agent says it can't go on: that needs you, the run itself didn't break.
+      return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.BLOCKED, marker.message || `Chunk ${current.n}: the agent is blocked.`);
     }
     if (marker?.kind === HALT_REASON.NEEDS_INPUT) {
       return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.NEEDS_INPUT, marker.message || `Chunk ${current.n}: the agent has a question.`);

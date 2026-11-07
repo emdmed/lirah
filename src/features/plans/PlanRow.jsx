@@ -2,7 +2,7 @@ import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { ProgressReadout } from './parts';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, PLAN_STAGE, pilotPosition, planProgress, planStage, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, haltWord, PLAN_STAGE, pilotPosition, planProgress, planStage, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
 /** The plan's lamp and auto-pilot tag, as its row and its tab show them. */
 // A run's tag takes its lamp's tone.
@@ -12,7 +12,7 @@ export function planStatus(plan) {
   const { done, total } = planProgress(plan);
   const running = plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
   const ap = plan.autopilot;
-  const tag = AUTOPILOT_TAG[ap?.status];
+  const tag = ap?.status === AUTOPILOT_STATUS.RUNNING ? 'auto-pilot' : AUTOPILOT_LIVE.has(ap?.status) ? haltWord(ap) : undefined;
   const lampState = plan.split === SPLIT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.FAILED ? 'fault'
     : ap?.status === AUTOPILOT_STATUS.PAUSED ? 'warn'
       : running ? 'on' : total > 0 && done === total ? 'ok' : 'off';
@@ -65,11 +65,7 @@ export function PlanRow({ plan, onOpen }) {
   );
 }
 
-const AUTOPILOT_TAG = {
-  [AUTOPILOT_STATUS.RUNNING]: 'auto-pilot',
-  [AUTOPILOT_STATUS.PAUSED]: 'needs you',
-  [AUTOPILOT_STATUS.FAILED]: 'error',
-};
+const AUTOPILOT_LIVE = new Set([AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED]);
 
 /** The plan's stage in a few words: "building", "PR #12", "merged". */
 export function stageLabel(plan) {

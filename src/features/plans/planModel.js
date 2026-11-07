@@ -70,6 +70,19 @@ export const EXCERPT_MAX = 160;
 
 // Paused for these, auto-pilot picks up again on its own once the agent works
 // on: you answered its question or approved the prompt in the terminal.
+/** A stopped run in a word or two: what broke, or that it needs you. */
+const HALT_WORD = {
+  [HALT_REASON.SEND_FAILED]: 'send failed',
+  [HALT_REASON.GIT_ERROR]: 'git error',
+  [HALT_REASON.AGENT_ERROR]: 'agent error',
+  [HALT_REASON.TAB_CLOSED]: 'tab closed',
+  [HALT_REASON.BLOCKED]: 'blocked',
+};
+export function haltWord(ap) {
+  if (ap?.status === AUTOPILOT_STATUS.PAUSED) return ap.reason === HALT_REASON.BLOCKED ? 'blocked' : 'needs you';
+  return HALT_WORD[ap?.reason] ?? 'error';
+}
+
 export const AUTO_RESUME_REASONS = new Set([
   HALT_REASON.NEEDS_INPUT, HALT_REASON.NO_COMMIT, HALT_REASON.PERMISSION,
 ]);

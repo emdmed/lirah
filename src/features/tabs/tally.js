@@ -1,7 +1,7 @@
 // The pane's closing line: every tab in exactly one bucket, first match wins.
 // A resting tab whose auto-pilot run failed counts as failed.
 const BUCKETS = [
-  { label: 'failed', className: 'text-[var(--ins-fault)]', has: (k) => k === 'failed' },
+  { label: 'run failed', className: 'text-[var(--ins-fault)]', has: (k) => k === 'failed' },
   { label: 'needs you', className: 'text-[var(--ins-warn)]', has: (k) => k === 'permission' },
   { label: 'your turn', className: 'text-[var(--ins-ok)]', has: (k) => k === 'done' },
   { label: 'working', className: 'text-[var(--ins-lamp)]', has: (k) => k === 'working' || k === 'running' || k === 'remote' },

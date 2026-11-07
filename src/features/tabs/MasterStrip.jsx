@@ -16,51 +16,83 @@ const MASTER_STATE = {
   permission: { lamp: 'warn', word: 'needs you' },
 };
 
-// A worker node per agent state: filled ink while it works, warn while a
-// permission prompt holds it, an ok outline when it's your turn, else empty.
+// A worker node per agent state, in row order: filled ink while it
+// works, a dashed warn frame while a permission prompt holds it, an ok outline
+// when it's your turn, else an empty outline.
 const NODE_INK = {
   working: { fill: 'var(--color-foreground)', stroke: 'var(--color-foreground)', word: 'working' },
-  permission: { fill: 'var(--ins-warn)', stroke: 'var(--ins-warn)', word: 'needs you' },
-  waiting: { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-edge-strong)', word: 'idle' },
-  done: { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-ok)', word: 'your turn' },
+  permission: { fill: 'none', stroke: 'var(--ins-warn)', word: 'needs you', frame: true },
+  waiting: { fill: 'none', stroke: 'var(--ins-edge-strong)', word: 'idle' },
+  done: { fill: 'none', stroke: 'var(--ins-ok)', word: 'your turn' },
 };
-const NODE_IDLE = { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-edge-strong)', word: 'no agent' };
+const NODE_IDLE = { fill: 'none', stroke: 'var(--ins-edge-strong)', word: 'no agent' };
 
-const NODE = 5;
-const PITCH = 8;
-const LEAD = 7; // from the hollow origin dot to the first drop
-const MAX_NODES = 12;
+const NODE = 13;
+const PITCH = 16;
+const LEAD = 10; // from the hollow origin dot to the first node
+const BUS_Y = 5;
+const NODE_Y = 11;
+const MAX_NODES = 8;
+const ink = (t) => ({ transition: `${t} var(--ins-cool) var(--ins-ease)` });
 
 // The master's workers as a fan-out in the figures' language: a leader from a
-// hollow origin dot along a bus, one drop and node per tab. Hovering a node
-// names the tab. Replaces "N workers".
+// hollow origin dot along a bus, one drop and node per tab row.
+// Hovering a node names the tab. Replaces "N workers".
 function WorkerFan({ workers }) {
   const shown = workers.slice(0, MAX_NODES);
   const width = LEAD + Math.max(shown.length, 1) * PITCH;
-  const busEnd = LEAD + (shown.length - 0.5) * PITCH;
+  const busEnd = LEAD + (shown.length - 1) * PITCH + NODE / 2;
   const hair = { stroke: 'var(--ins-faint)', strokeWidth: 1 };
   return (
-    <svg width={width} height={13} viewBox={`0 0 ${width} 13`} className="shrink-0 overflow-visible" aria-hidden="true">
-      <circle cx={2} cy={2} r={1.5} style={{ fill: 'var(--fig-paper, var(--ins-raised))', ...hair }} />
-      {shown.length > 0 && <line x1={3.5} y1={2} x2={busEnd} y2={2} style={hair} />}
+    <svg width={width} height={26} viewBox={`0 0 ${width} 26`} className="-mt-1 shrink-0 overflow-visible" aria-hidden="true">
+      <circle cx={2} cy={BUS_Y} r={1.75} style={{ fill: 'var(--ins-raised)', ...hair }} />
+      {shown.length > 0 && <line x1={3.75} y1={BUS_Y} x2={busEnd} y2={BUS_Y} style={hair} />}
       {shown.map(({ name, state }, i) => {
-        const cx = LEAD + i * PITCH + PITCH / 2;
-        const ink = NODE_INK[state] ?? NODE_IDLE;
+        const x = LEAD + i * PITCH;
+        const cx = x + NODE / 2;
+        const k = NODE_INK[state] ?? NODE_IDLE;
         return (
           <g key={i}>
-            <title>{`${name}: ${ink.word}`}</title>
-            <line x1={cx} y1={2} x2={cx} y2={7} style={hair} />
+            <title>{`${name}: ${k.word}`}</title>
+            <line x1={cx} y1={BUS_Y} x2={cx} y2={NODE_Y} style={hair} />
             <rect
-              x={cx - NODE / 2 + 0.5}
-              y={7.5}
+              x={x + 0.5}
+              y={NODE_Y + 0.5}
               width={NODE - 1}
               height={NODE - 1}
-              style={{ fill: ink.fill, stroke: ink.stroke, strokeWidth: 1, transition: 'fill var(--ins-cool) var(--ins-ease), stroke var(--ins-cool) var(--ins-ease)' }}
+              style={{ fill: k.fill, stroke: k.stroke, strokeWidth: 1, ...ink('fill, stroke') }}
             />
+            {k.frame && (
+              <rect
+                x={x - 1.5}
+                y={NODE_Y - 1.5}
+                width={NODE + 3}
+                height={NODE + 3}
+                style={{ fill: 'none', stroke: 'var(--ins-warn)', strokeWidth: 0.75, strokeDasharray: '1.5 1.5' }}
+              />
+            )}
           </g>
         );
       })}
     </svg>
+  );
+}
+
+// working / tabs as a boxed value on a short leader; the box inks up while
+// any tab works. Hidden when the pane is too narrow to hold it.
+function BusyBox({ busy, total }) {
+  return (
+    <span className="hidden shrink-0 items-center @[300px]:flex">
+      <span className="h-px w-2.5 bg-[var(--ins-faint)]" />
+      <span
+        className={cn(
+          'border px-[3px] leading-[13px] tabular-nums transition-colors duration-[var(--ins-cool)]',
+          busy ? 'border-foreground text-foreground' : 'border-[var(--ins-edge-strong)] text-muted-foreground',
+        )}
+      >
+        {busy}/{total}
+      </span>
+    </span>
   );
 }
 
@@ -90,7 +122,7 @@ export function MasterStrip() {
   return (
     <div
       className={cn(
-        'flex h-9 shrink-0 items-center gap-2 pl-3 pr-2 edge-b-engraved text-[11px]',
+        '@container flex h-9 shrink-0 items-center gap-2 pl-3 pr-2 edge-b-engraved text-[11px]',
         'transition-[background-color] duration-[var(--ins-dur-base)] ease-[var(--ins-ease)]',
         showing ? 'bg-[color-mix(in_srgb,var(--color-foreground)_8%,var(--ins-raised))]' : 'bg-[var(--ins-raised)]',
       )}
@@ -107,17 +139,22 @@ export function MasterStrip() {
           )}
         />
       </span>
-      <span className="engraved-label shrink-0 text-foreground">workspace terminal</span>
-      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-muted-foreground">
+      {/* The pane's legend already says workspace. */}
+      <span className="engraved-label shrink-0 text-foreground">
+        <span className="hidden @[300px]:inline">terminal</span>
+        <span className="@[300px]:hidden">term</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
         <WorkerFan workers={workers} />
         {n > MAX_NODES && <span className="tabular-nums">+{n - MAX_NODES}</span>}
-        {busy > 0 && <span className="truncate tabular-nums">{busy} working</span>}
-        <span className="sr-only">drives {drives}{master && !live ? ', idle' : ''}</span>
+        <span className="sr-only">workspace terminal, drives {drives}{master && !live ? ', idle' : ''}</span>
       </span>
-      {/* pl-2 keeps 16px between the fan and the status when the pane is narrow. */}
+      <BusyBox busy={busy} total={n} />
+      {/* The lamp and lit crown carry live state; its word is for readers only,
+          so the fan and box keep the room. */}
       <span role="status" className="ml-auto flex min-w-0 shrink items-center gap-1.5 pl-2 text-muted-foreground">
         {live && <Lamp state={live.lamp} blink={live.blink} />}
-        {word && <span className="truncate">{word}</span>}
+        {word && <span className={cn('truncate', live && 'sr-only')}>{word}</span>}
       </span>
       <PanelButton
         onClick={toggle}
