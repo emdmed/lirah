@@ -21,8 +21,8 @@ const MASTER_STATE = {
 const NODE_INK = {
   working: { fill: 'var(--color-foreground)', stroke: 'var(--color-foreground)', word: 'working' },
   permission: { fill: 'var(--ins-warn)', stroke: 'var(--ins-warn)', word: 'needs you' },
-  waiting: { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-ok)', word: 'your turn' },
-  done: { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-ok)', word: 'done' },
+  waiting: { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-edge-strong)', word: 'idle' },
+  done: { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-ok)', word: 'your turn' },
 };
 const NODE_IDLE = { fill: 'var(--fig-paper, var(--ins-raised))', stroke: 'var(--ins-edge-strong)', word: 'no agent' };
 

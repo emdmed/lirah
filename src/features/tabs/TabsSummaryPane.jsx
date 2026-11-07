@@ -11,8 +11,9 @@ import { getTabAutoCommit } from './tabAutoCommit';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
 import { AUTOPILOT_STATUS } from '../plans/planModel';
-import { LIVE, OWN_BUSY, YOUR_TURN, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
+import { LIVE, OWN_BUSY, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
 import { getTabPrompt } from './tabPrompts';
+import { tally } from './tally';
 import { linkRepo, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
 import { useDragReorder } from './useDragReorder';
 import { ROW_KEYS, TabRow } from './TabRow';
@@ -35,21 +36,6 @@ function onListKey(e) {
   e.preventDefault();
   rows[j]?.focus();
   rows[j]?.scrollIntoView({ block: 'nearest' });
-}
-
-// The pane's closing line: how many tabs failed, are live and need you.
-// A resting tab whose auto-pilot run failed counts as failed.
-function tally(kinds) {
-  const failed = kinds.filter((k) => k === 'failed').length;
-  const live = kinds.filter((k) => OWN_BUSY.has(k) || k === 'remote').length;
-  const yours = kinds.filter((k) => YOUR_TURN.has(k)).length;
-  const resting = kinds.length - failed - live - yours;
-  return [
-    failed > 0 && { n: failed, label: 'failed', className: 'text-[var(--ins-fault)]' },
-    live > 0 && { n: live, label: 'live', className: 'text-[var(--ins-lamp)]' },
-    yours > 0 && { n: yours, label: 'your turn', className: 'text-[var(--ins-ok)]' },
-    resting > 0 && { n: resting, label: 'resting', className: 'text-muted-foreground' },
-  ].filter(Boolean);
 }
 
 export function TabsSummaryPane() {

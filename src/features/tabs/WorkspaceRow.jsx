@@ -3,15 +3,19 @@ import { cn } from '@/lib/utils';
 import { useTabManager } from './TabContext';
 import { useAttentionQueue } from './useAgentAttention';
 import { RenameField } from './RenameField';
+import { StarOutline } from './ActivityGlyphs';
 
 // The workspaces, in the Workspace pane's legend: click to switch (Alt+W cycles),
-// double-click to rename, × to remove, + to add one. A green dot marks a
-// workspace in the background whose agent is waiting on you.
+// double-click to rename, × to remove, + to add one. An outlined star marks a
+// workspace in the background whose agent is waiting on you: warn when one
+// needs permission, ok otherwise.
 export function WorkspaceRow() {
   const { tabs, workspaces, activeWorkspaceId, switchWorkspace, addWorkspace, renameWorkspace, removeWorkspace } = useTabManager();
   const queue = useAttentionQueue(tabs);
   const [renamingId, setRenamingId] = useState(null);
-  const waiting = new Set(queue.map((q) => tabs.find((t) => t.id === q.tabId)?.workspaceId));
+  const wsOf = (q) => tabs.find((t) => t.id === q.tabId)?.workspaceId;
+  const waiting = new Set(queue.map(wsOf));
+  const blocked = new Set(queue.filter((q) => q.state === 'permission').map(wsOf));
 
   return (
     <span className="flex min-w-0 items-center gap-x-1 overflow-hidden text-[11px] leading-none normal-case tracking-normal">
@@ -45,7 +49,12 @@ export function WorkspaceRow() {
               {ws.name}
               <span className="tabular-nums">{count}</span>
               {!active && waiting.has(ws.id) && (
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--ins-ok)]" aria-label="agent waiting on you" />
+                <span
+                  className={blocked.has(ws.id) ? 'text-[var(--ins-warn)]' : 'text-[var(--ins-ok)]'}
+                  aria-label={blocked.has(ws.id) ? 'agent needs permission' : 'agent waiting on you'}
+                >
+                  <StarOutline />
+                </span>
               )}
             </button>
             {workspaces.length > 1 && (

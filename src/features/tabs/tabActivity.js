@@ -31,7 +31,7 @@ export const STALE_TURN_MS = 60 * 60 * 1000;
 // `pulse` marks work in progress. How long it has held is in the row tooltip.
 export const ACTIVITY = {
   working: { icon: StarLamp, color: 'text-[var(--ins-lamp)]', pulse: true },
-  permission: { icon: ShieldAlert, color: 'text-[var(--ins-fault)]', pulse: true },
+  permission: { icon: ShieldAlert, color: 'text-[var(--ins-warn)]', pulse: true },
   done: { icon: StarOutline, color: 'text-[var(--ins-ok)]' },
   // Muted: an agent idling at its prompt is not an alarm; amber is kept for
   // states that need the user (permission, the attention queue number).
