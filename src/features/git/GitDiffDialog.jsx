@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { ChevronLeft, ChevronRight, Pin, PinOff, MessageSquarePlus, Send, Trash2 } from 'lucide-react';
+import { NavArrowLeft, NavArrowRight, Pin, PinSlash, ChatPlusIn, Send, Trash } from 'iconoir-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
@@ -227,7 +227,7 @@ export function GitDiffDialog({
                   onClick={goToPrevFile}
                   aria-label="Previous file"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <NavArrowLeft className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Previous file (Ctrl+[)</TooltipContent>
@@ -242,7 +242,7 @@ export function GitDiffDialog({
                   onClick={goToNextFile}
                   aria-label="Next file"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <NavArrowRight className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Next file (Ctrl+])</TooltipContent>
@@ -262,7 +262,7 @@ export function GitDiffDialog({
                 aria-label={pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
                 className={pinned ? 'text-[var(--ins-lamp)]' : ''}
               >
-                {pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                {pinned ? <PinSlash className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>
@@ -319,7 +319,7 @@ export function GitDiffDialog({
                     onClick={() => onRemoveAnnotation?.(n.id)}
                     title="Remove note"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash className="w-3 h-3" />
                   </Button>
                 </div>
               ))}
@@ -356,7 +356,7 @@ export function GitDiffDialog({
               onClick={addNote}
               title="Pin this note to the selected lines"
             >
-              <MessageSquarePlus className="w-3 h-3 mr-1" />
+              <ChatPlusIn className="w-3 h-3 mr-1" />
               Add
             </Button>
             <Button

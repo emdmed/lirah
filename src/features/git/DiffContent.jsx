@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, memo, useCallback } from 'react';
 import { diffLines, diffWords } from 'diff';
-import { ChevronDown, Copy, Check } from 'lucide-react';
+import { NavArrowDown, Copy, Check } from 'iconoir-react';
 import { Button } from '../../components/ui/button';
 import { useFigureCompact } from '../../components/instrument/figure';
 import { Fig25DiffMap, MAP_COMPACT_W, MAP_W } from './Fig25DiffMap';
@@ -680,7 +680,7 @@ const CollapsedRegionPlaceholder = memo(function CollapsedRegionPlaceholder({ hi
       className="flex items-center justify-center h-6 bg-muted/30 border-y edge-engraved cursor-pointer hover:bg-muted/50 transition-colors"
       onClick={onExpand}
     >
-      <ChevronDown className="w-3 h-3 mr-1 text-muted-foreground" />
+      <NavArrowDown className="w-3 h-3 mr-1 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">
         {hiddenCount} unchanged {hiddenCount === 1 ? 'line' : 'lines'}
       </span>
