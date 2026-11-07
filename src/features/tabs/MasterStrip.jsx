@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Crown } from 'lucide-react';
+import { Crown } from 'iconoir-react';
 import { cn } from '@/lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';

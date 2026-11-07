@@ -1,5 +1,5 @@
 import { formatDuration } from '../../lib/formatDuration';
-import { Eye, Play, Square, SquareTerminal } from 'lucide-react';
+import { Eye, Play, Square, Terminal } from 'iconoir-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { AUTOPILOT_LAMP, Prose } from './parts';
@@ -102,7 +102,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         {tabOpen && (
-          <PanelButton icon={SquareTerminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
+          <PanelButton icon={Terminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
         )}
         {(ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED) && (
           <PanelButton icon={Play} onClick={onResume} title={tabOpen ? 'Carry on in the same tab' : 'Carry on in this tab'}>

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { INK, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
-import { Plus } from 'lucide-react';
+import { Plus } from 'iconoir-react';
 import { Keycap } from '@/components/instrument/Keycap';
 import { cn } from '../../lib/utils';
 import { AUTOPILOT_STATUS, CHUNK_STATUS } from './planModel';

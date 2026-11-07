@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Play, RefreshCw } from 'lucide-react';
+import { NavArrowLeft, Play, Refresh } from 'iconoir-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -184,7 +184,7 @@ export function PlanDetail({ plan }) {
     <div className="flex flex-col">
       <div className="flex flex-col px-3 pt-2 pb-3.5">
         <div className="flex items-center gap-1.5">
-          <PanelButton icon={ChevronLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
+          <PanelButton icon={NavArrowLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
           <span className="ml-auto flex items-center gap-1">
             {/* Pressed, not latched: a view toggle has no lamp to light. */}
             <PanelButton
@@ -361,7 +361,7 @@ export function PlanDetail({ plan }) {
         <div className="flex flex-col items-start gap-1.5 px-3 py-2.5 text-[11px]">
           <span className="flex items-center gap-2 text-foreground"><Lamp state="fault" /> split failed</span>
           <span className="break-words text-[11px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
-          <PanelButton icon={RefreshCw} onClick={resplit}>re-split</PanelButton>
+          <PanelButton icon={Refresh} onClick={resplit}>re-split</PanelButton>
         </div>
       )}
 

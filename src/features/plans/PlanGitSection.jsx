@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { cn } from '../../lib/utils';
-import { FolderX, SquareTerminal, X } from 'lucide-react';
+import { FolderMinus, Terminal, Xmark } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
@@ -124,7 +124,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
                   }))} />
                 )}
                 {i > 0 && (
-                  <PanelButton icon={X} onClick={() => onRemoveRepo(repo.root)} title="Remove from the plan" aria-label={`Remove ${basename(repo.root)}`} />
+                  <PanelButton icon={Xmark} onClick={() => onRemoveRepo(repo.root)} title="Remove from the plan" aria-label={`Remove ${basename(repo.root)}`} />
                 )}
               </>
             )}
@@ -200,8 +200,8 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
 
       {locked && cfg.worktrees && !removed && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <PanelButton icon={SquareTerminal} onClick={onOpenTab} title={`Open a tab in ${cfg.workDir}`}>open tab</PanelButton>
-          <PanelButton icon={FolderX} onClick={onRemoveWorktrees} disabled={busy} title="Remove the worktrees (the branches stay)">
+          <PanelButton icon={Terminal} onClick={onOpenTab} title={`Open a tab in ${cfg.workDir}`}>open tab</PanelButton>
+          <PanelButton icon={FolderMinus} onClick={onRemoveWorktrees} disabled={busy} title="Remove the worktrees (the branches stay)">
             remove worktrees
           </PanelButton>
         </div>
