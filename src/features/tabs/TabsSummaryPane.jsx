@@ -17,6 +17,7 @@ import { tally } from './tally';
 import { linkRepo, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
 import { useDragReorder } from './useDragReorder';
 import { ROW_KEYS, TabRow } from './TabRow';
+import { rowKeys } from './rowKeys';
 import { useTabPlans } from '../plans/useTabPlans';
 import { PlanRow } from '../plans/PlanRow';
 import { isSettledPlan } from '../plans/TabPlanTier';
@@ -51,6 +52,7 @@ export function TabsSummaryPane() {
   const [openTrail, setOpenTrail] = useState(null); // tab id whose last turn is expanded
   const [renamingId, setRenamingId] = useState(null);
   const [roleMenuId, setRoleMenuId] = useState(null); // tab id whose role menu is open
+  const [focusedId, setFocusedId] = useState(null); // tab id whose row has focus
   // useDragReorder hands back a new object each render; rows are memoized, so
   // keep it the same until one of its parts changes.
   const { dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt } = useDragReorder(reorderTab);
@@ -132,9 +134,15 @@ export function TabsSummaryPane() {
   }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail]);
 
   const kinds = [];
+  let focusKeys = null;
 
   return (
-    <div className="group/list flex flex-1 flex-col" onKeyDown={onListKey}>
+    <div
+      className="group/list flex flex-1 flex-col"
+      onKeyDown={onListKey}
+      onFocus={(e) => setFocusedId(e.target.matches?.(ROW) ? e.target.dataset.tabRow : null)}
+      onBlur={() => setFocusedId(null)}
+    >
       {workspaceTabs.length === 0 && (
         <span className="px-3 pt-2 text-[11px] text-muted-foreground">No tabs in this workspace yet.</span>
       )}
@@ -162,6 +170,9 @@ export function TabsSummaryPane() {
         const compact = !active && !LIVE.has(activity.kind) && queuePos < 0 && !trailOpen
           && renamingId !== tab.id && roleMenuId !== tab.id
           && !tabPlans?.some((p) => !isSettledPlan(p));
+        if (tab.id === focusedId) {
+          focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary });
+        }
         return (
           <TabRow
             key={tab.id}
@@ -215,9 +226,9 @@ export function TabsSummaryPane() {
           ))}
         </>
       )}
-      {/* Closing line, pinned to the pane's foot: the tally, then the row keys while the list has focus. */}
+      {/* Closing line, pinned to the pane's foot: the tally, then the focused row's keys. */}
       <div className="sticky bottom-0 mt-auto flex flex-wrap items-center gap-x-1 gap-y-1 bg-[var(--ins-panel)] px-3 pt-2 pb-1 text-[11px] tabular-nums edge-t-engraved">
-        <span className="flex items-center gap-1 group-focus-within/list:hidden">
+        <span className="flex items-center gap-1">
           {tally(kinds).map((t, i) => (
             <span key={t.label} className="flex items-center gap-1">
               {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
@@ -226,9 +237,18 @@ export function TabsSummaryPane() {
             </span>
           ))}
         </span>
-        <span className="hidden flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground group-focus-within/list:flex">
-          <FrameHints hints={ROW_KEYS} />
-        </span>
+        {focusKeys && (
+          <span className="flex basis-full flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground">
+            <FrameHints
+              hints={[
+                { keys: ['↵'], label: 'switch' },
+                ...focusKeys.slice(0, 2),
+                { keys: ['[', ']'], label: 'section' },
+                { keys: ['?'], label: 'keys' },
+              ]}
+            />
+          </span>
+        )}
       </div>
     </div>
   );

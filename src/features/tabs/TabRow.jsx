@@ -7,6 +7,7 @@ import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { ACTIVITY, YOUR_TURN } from './tabActivity';
 import { RowAction } from './RowAction';
+import { rowKeys } from './rowKeys';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Lamp } from '../../components/instrument/Lamp';
 import { RenameField } from './RenameField';
@@ -133,29 +134,19 @@ export const TabRow = memo(function TabRow({
       e.preventDefault();
       fn();
     };
-    switch (e.key) {
-      case 'Enter':
-      case ' ':
-        return run(() => actions.switchTab(tab.id));
-      case 'F2':
-      case 'r':
-        return run(() => actions.startRename(tab.id));
-      case 'x':
-        return closable && run(() => actions.closeTab(tab.id));
-      case 'l':
-        return !active && run(() => actions.toggleLink(tab, name, linked));
-      case 't':
-        return run(() => onRoleMenu(true));
-      case 'f':
-        return run(() => actions.openFolder(tab.projectPath));
-      case 'a':
-        return edited && run(() => actions.attachEdits(edited));
-      case 'o':
-        return plans?.length && run(() => actions.openPlan(tab.id, (livePlans[0] ?? plans[0]).id));
-      case 'e':
-        return summary && edited && run(() => actions.toggleTrail(tab.id));
-      default:
-    }
+    if (e.key === 'Enter' || e.key === ' ') return run(() => actions.switchTab(tab.id));
+    const hit = rowKeys({ active, closable, edited, plans, summary }).find((k) => k.on.includes(e.key));
+    if (!hit) return;
+    run({
+      attach: () => actions.attachEdits(edited),
+      edits: () => actions.toggleTrail(tab.id),
+      plan: () => actions.openPlan(tab.id, (livePlans[0] ?? plans[0]).id),
+      link: () => actions.toggleLink(tab, name, linked),
+      rename: () => actions.startRename(tab.id),
+      close: () => actions.closeTab(tab.id),
+      role: () => onRoleMenu(true),
+      folder: () => actions.openFolder(tab.projectPath),
+    }[hit.label]);
   };
 
   const tooltip = [
@@ -187,7 +178,7 @@ export const TabRow = memo(function TabRow({
       aria-selected={active}
       aria-label={ariaLabel}
       aria-describedby="tab-row-keys"
-      data-tab-row=""
+      data-tab-row={tab.id}
       // One tab stop for the list: the active row. j/k move from there.
       tabIndex={active ? 0 : -1}
       draggable={closable && !renaming}
