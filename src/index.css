@@ -1,14 +1,5 @@
 @import "tailwindcss" source(".");
 
-/* Local Typestar OCR font declaration */
-@font-face {
-  font-family: 'Typestar OCR';
-  src: url('/fonts/Typestar-OCR.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* Splash/wordmark face (OFL, bundled: no render-blocking network request,
    and the app runs offline). Latin subset. */
 @font-face {
@@ -19,13 +10,43 @@
   font-display: swap;
 }
 
-/* Panel legend face (MIT, bundled: the app runs offline). A pixel face drawn
-   on an 11px grid, so legends stay at 11px and its single weight. */
+/* Terminal, chrome and legend face (OFL, bundled: the app runs offline).
+   Latin subset; xterm draws box-drawing glyphs itself. */
 @font-face {
-  font-family: 'Departure Mono';
-  src: url('/fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Name face, for proper names set in italic (.ins-name). OFL, latin subset. */
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-LightItalic.woff2') format('woff2');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -33,7 +54,7 @@
 
 @theme {
   /* Font family */
-  --font-mono: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  --font-mono: "Geist Mono", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
   
   /* Two sizes, like a terminal: 11px for chrome (labels, titles, status
      line), 12px for content (files, prompt, lists). xl/2xl stay for the rare
@@ -138,7 +159,8 @@
      in the same order, as --ins-star-square, so the scanner can step between them. */
   --ins-star:        polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
   --ins-star-square: polygon(50% 0, 100% 0, 100% 50%, 100% 100%, 50% 100%, 0 100%, 0 50%, 0 0);
-  --font-legend: "Departure Mono", var(--font-mono);
+  --font-legend: "Geist Mono", var(--font-mono);
+  --font-name: "Spectral", Georgia, serif;
   --legend-weight: 400;
   --legend-tracking: 0.04em;
   /* Slow, even easing for colour changes on hover and focus. */
@@ -209,7 +231,7 @@ body,
 body {
   /* The window edge is gutter, so it meets the pane gutters seamlessly. */
   background: var(--ins-gutter);
-  font-family: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  font-family: var(--font-mono);
 }
 
 :root {
@@ -395,6 +417,13 @@ body {
   letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
   color: var(--ins-legend);
+}
+
+/* Proper names (projects, plans, agents): light Spectral italic. */
+.ins-name {
+  font-family: var(--font-name);
+  font-style: italic;
+  font-weight: 300;
 }
 
 /* Numeric readouts: fixed-width columns in the lamp colour. */
