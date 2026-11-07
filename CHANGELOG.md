@@ -4,6 +4,22 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-07
+
+### Added
+
+- **Step orbit in git dialogs** - Auto commit, auto merge, auto changelog and race compare show their steps as bodies on one orbit line, so you can see which step is running, waiting on you or failed.
+
+### Changed
+
+- **New Lirah mark** - The logo and app icon are redrawn as a bare lyre with one body in its ring, and the install script now installs the app icon.
+- **Simpler tab row** - The tab row's second tier is simplified.
+- **Quieter status rail** - The "waiting" and "auto-pilot blocked" notices next to the context meter are gone. Tab rows, the tabs pane and the sidebar still show who needs you.
+
+### Fixed
+
+- **Auto commit failed with a staged deletion** - Auto commit stopped with "Couldn't stage the changes" when a deleted file was already staged. It now commits normally.
+
 ## [0.16.0] - 2026-11-07
 
 ### Added
