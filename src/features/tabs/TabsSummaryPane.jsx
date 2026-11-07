@@ -187,6 +187,8 @@ export function TabsSummaryPane({ onNewTab }) {
             activityKind={activity.kind}
             activityLabel={activity.label}
             activitySince={activity.since}
+            activityQuestion={activity.question}
+            agent={cli[tab.id]}
             workLabel={workLabel}
             active={active}
             linked={!active && linkedRepos.some((r) => r.path === tab.projectPath)}

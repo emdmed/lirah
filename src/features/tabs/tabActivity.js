@@ -53,10 +53,11 @@ function hookActivity(cliName, hook, now) {
       return {
         kind: 'permission',
         label: hook.message ? `${cliName} needs permission: ${hook.message}` : `${cliName} needs permission`,
+        question: hook.message || 'needs permission',
         since,
       };
     case 'done':
-      return { kind: 'done', label: `${cliName} done, your turn`, since };
+      return { kind: 'done', label: `${cliName} done, your turn`, question: 'done, your turn', since };
     default:
       return { kind: 'waiting', label: `${cliName} waiting`, since };
   }

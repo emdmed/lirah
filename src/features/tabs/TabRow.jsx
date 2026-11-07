@@ -5,7 +5,7 @@ import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
 import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { DiffBar } from '../../components/instrument/DiffBar';
-import { ACTIVITY, YOUR_TURN } from './tabActivity';
+import { YOUR_TURN } from './tabActivity';
 import { RowAction } from './RowAction';
 import { rowKeys } from './rowKeys';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -15,17 +15,19 @@ import { RoleChip, RoleTagButton } from './RoleMenu';
 import { TurnTrail } from './TurnTrail';
 import { isSettledPlan, SettledPlans, TabPlanTier } from '../plans/TabPlanTier';
 
-function ActivityIcon({ kind, label }) {
-  const { icon: Icon, color, pulse } = ACTIVITY[kind];
-  return (
-    <span
-      role="img"
-      aria-label={label}
-      className={cn('inline-flex h-4 w-4 shrink-0 items-center justify-center', color, pulse && 'ins-pulse')}
-    >
-      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
-    </span>
-  );
+// Activity → the row's lamp: live work blinks gold, your move is gold, a
+// failed run is a fault, a finished turn you've seen is ok, resting is off.
+const LAMP = {
+  working: { state: 'on', blink: true },
+  running: { state: 'on', blink: true },
+  remote: { state: 'on', blink: true },
+  permission: { state: 'warn' },
+  failed: { state: 'fault' },
+};
+
+function activityLamp(kind, queued) {
+  if (kind === 'done') return queued ? { state: 'warn' } : { state: 'ok', settled: true };
+  return LAMP[kind] ?? { state: 'off' };
 }
 
 // Line counts past four digits read as a size, not a number: +146812 → +147k.
@@ -59,8 +61,8 @@ function AutoCommitMark({ stage }) {
   );
 }
 
-/** The row's right-hand readout: uncommitted lines, then the context moon. */
-function Readout({ info, contextFill, autoCommit }) {
+/** The row's right-hand readout: uncommitted lines, the context moon, the lamp. */
+function Readout({ info, contextFill, autoCommit, lamp, label }) {
   let diff = null;
   if (autoCommit && autoCommit !== 'done') {
     diff = <AutoCommitMark stage={autoCommit} />;
@@ -82,6 +84,7 @@ function Readout({ info, contextFill, autoCommit }) {
       <span className="inline-flex w-3 justify-center">
         {contextFill != null && <ContextMoon ratio={contextFill} />}
       </span>
+      <Lamp {...lamp} label={label} />
     </span>
   );
 }
@@ -111,7 +114,7 @@ export const ROW_KEYS = [
  * (a running "since" or duration included) changes.
  */
 export const TabRow = memo(function TabRow({
-  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, workLabel, active, linked, closable, queuePos,
+  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, agent, workLabel, active, linked, closable, queuePos,
   turn, summaryText, summaryRunning, summaryStale, trailOpen, renaming, roleMenuOpen, plans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
@@ -125,6 +128,11 @@ export const TabRow = memo(function TabRow({
   // An old finished turn leaves the row (it stays in the tooltip).
   const showTrail = summary && (!summaryStale || active || trailOpen);
   const yourTurn = YOUR_TURN.has(activity.kind);
+  const queued = queuePos >= 0;
+  // The ledger's second line: what the agent is doing, without its name twice.
+  const doing = agent && activity.kind !== 'remote' && activity.label.startsWith(`${agent} `)
+    ? activity.label.slice(agent.length + 1)
+    : activity.label;
   const onRoleMenu = (open) => actions.setRoleMenu(open ? tab.id : null);
   const edited = turn?.edited?.size ? [...turn.edited] : null;
 
@@ -198,9 +206,11 @@ export const TabRow = memo(function TabRow({
       aria-keyshortcuts="Enter r x l t a f o e"
       data-marker="top"
       className={cn(
-        'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
+        'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
         compact ? 'py-1.5' : 'py-2.5',
         active ? 'ins-row-selected before:!top-3' : 'hover:bg-foreground/5',
+        // Waiting on you: the row is framed in the lamp gold.
+        queued ? 'outline-solid outline-1 -outline-offset-1 outline-[var(--ins-lamp)]' : 'outline-none',
         drag.dragIndex === index && 'opacity-50',
       )}
     >
@@ -216,15 +226,17 @@ export const TabRow = memo(function TabRow({
       )}
       {/* Tier 1: what it is and what it is doing. */}
       <div className="flex h-5 min-w-0 items-center gap-2">
-        <ActivityIcon kind={activity.kind} label={activity.label} />
-        {queuePos >= 0 && (
-          <span
-            title={`Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A`}
-            className="shrink-0 font-mono tabular-nums text-[var(--ins-warn)]"
-          >
-            {queuePos + 1}
-          </span>
-        )}
+        {/* Boxed tab number, 16px wide so the tiers below line up at pl-6. */}
+        <span
+          aria-hidden="true"
+          title={queued ? `Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A` : undefined}
+          className={cn(
+            'inline-flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[10px] tabular-nums',
+            queued ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]' : 'border-[var(--ins-edge-strong)] text-muted-foreground',
+          )}
+        >
+          {index + 1}
+        </span>
         {renaming ? (
           <RenameField
             initial={name}
@@ -242,15 +254,11 @@ export const TabRow = memo(function TabRow({
             <MiddleTruncate
               text={name}
               className={cn(
-                'text-xs',
+                'ins-name text-[13px] leading-5',
                 active ? 'text-foreground' : compact ? 'text-muted-foreground' : 'text-foreground/80',
               )}
             />
           </span>
-        )}
-        {/* How long it has been your move. */}
-        {yourTurn && activity.since && (
-          <span className={cn('shrink-0 tabular-nums', ACTIVITY[activity.kind].color)}>{activity.since}</span>
         )}
         {tab.role && <RoleChip tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}
         {linked && (
@@ -310,13 +318,32 @@ export const TabRow = memo(function TabRow({
               </RowAction>
             )}
           </span>
-          <Readout info={info} contextFill={contextFill} autoCommit={autoCommit} />
+          <Readout
+            info={info}
+            contextFill={contextFill}
+            autoCommit={autoCommit}
+            lamp={activityLamp(activity.kind, queued)}
+            label={activity.label}
+          />
         </span>
       </div>
 
       {!compact && (
         <>
-          {/* Tier 2: the branch, in full; long names wrap rather than clip. */}
+          {/* Tier 2: agent · activity; when it's your move, its question in
+              italic and how long it has waited. */}
+          <div className="flex min-w-0 items-baseline gap-1 pl-6 text-[11px] text-muted-foreground">
+            {yourTurn ? (
+              <>
+                <span className="ins-name min-w-0 truncate text-xs text-foreground">{activityQuestion ?? doing}</span>
+                {activity.since && <span className="shrink-0 tabular-nums text-[var(--ins-lamp)]">· {activity.since}</span>}
+              </>
+            ) : (
+              <span className="min-w-0 truncate font-mono">{agent && activity.kind !== 'remote' ? `${agent} · ${doing}` : doing}</span>
+            )}
+          </div>
+
+          {/* Tier 3: the branch, in full; long names wrap rather than clip. */}
           <div
             className={cn(
               'flex min-w-0 pl-6 text-[11px] text-muted-foreground',
@@ -337,7 +364,7 @@ export const TabRow = memo(function TabRow({
             )}
           </div>
 
-          {/* Tier 3: what its agent did in the latest turn; click for the files. */}
+          {/* Tier 4: what its agent did in the latest turn; click for the files. */}
           {showTrail && (
             <TurnTrail
               turn={turn}
@@ -349,14 +376,14 @@ export const TabRow = memo(function TabRow({
             />
           )}
 
-          {/* Tier 4: the plans its agent is working through; click for the plan. */}
+          {/* Tier 5: the plans its agent is working through; click for the plan. */}
           {livePlans.map((plan) => (
             <TabPlanTier key={plan.id} plan={plan} onOpen={() => actions.openPlan(tab.id, plan.id)} />
           ))}
           <SettledPlans plans={settledPlans} onOpen={(planId) => actions.openPlan(tab.id, planId)} />
 
-          {/* Tier 5: another tab's agent working in this repo. */}
-          {workLabel && (
+          {/* Tier 6: another tab's agent working in this repo, unless tier 2 says it. */}
+          {workLabel && activity.kind !== 'remote' && (
             <div className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-[var(--ins-lamp)]">
               <Sparks className="h-3 w-3 shrink-0" />
               <span className="min-w-0 truncate">{workLabel}</span>

@@ -20,6 +20,19 @@ import { SegmentBank } from '../components/instrument/SegmentBank';
 import { SplitKey } from '../components/instrument/SplitKey';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '../components/ui/dialog';
+import { TabRow } from '../features/tabs/TabRow';
+import { TabProvider } from '../features/tabs/TabContext';
+
+// Kit-only tab rows: live, waiting on you, resting (folded) and a plain shell.
+const NOOP = () => {};
+const KIT_DRAG = { dragIndex: -1, dropLineAt: () => null, onDragStart: NOOP, onDragOver: NOOP, onDrop: NOOP, endDrag: NOOP };
+const KIT_ACTIONS = new Proxy({}, { get: () => NOOP });
+const KIT_TABS = [
+  { name: 'acme-api', agent: 'claude', kind: 'working', label: 'claude editing limiter.ts', fill: 0.41, info: { branch: 'feat/rate-limit', files: 3, added: 84, deleted: 12 }, active: true },
+  { name: 'acme-web', agent: 'opencode', kind: 'permission', label: 'opencode needs permission', question: 'run the migration now?', since: '2m', fill: 0.66, info: { branch: 'main', files: 0 }, queuePos: 0 },
+  { name: 'acme-db', agent: 'claude', kind: 'waiting', label: 'claude waiting', fill: 0.12, info: { branch: 'main', files: 0 }, compact: true },
+  { name: 'infra', kind: 'idle', label: 'idle', info: { branch: 'ops', files: 1, added: 2, deleted: 0 } },
+];
 
 // Component sheet for the Instrument TUI primitives (board 01b). Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -201,6 +214,35 @@ export function InstrumentKit() {
               </DialogContent>
             </Dialog>
           </div>
+        </section>
+
+        <section className="tui-pane max-w-[320px]" data-legend>
+          <PaneLegend index={11} title="Tabs" note="ledger" />
+          <TabProvider>
+          <div role="listbox" aria-label="Tabs" className="flex flex-col py-1">
+            {KIT_TABS.map((t, i) => (
+              <TabRow
+                key={t.name}
+                tab={{ id: t.name, projectPath: `/home/you/${t.name}` }}
+                index={i}
+                name={t.name}
+                info={t.info}
+                contextFill={t.fill ?? null}
+                activityKind={t.kind}
+                activityLabel={t.label}
+                activitySince={t.since}
+                activityQuestion={t.question}
+                agent={t.agent}
+                active={!!t.active}
+                closable
+                queuePos={t.queuePos ?? -1}
+                compact={!!t.compact}
+                drag={KIT_DRAG}
+                actions={KIT_ACTIONS}
+              />
+            ))}
+          </div>
+          </TabProvider>
         </section>
 
         <section className="tui-pane px-3" data-legend>
