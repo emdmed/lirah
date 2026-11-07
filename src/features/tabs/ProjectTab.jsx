@@ -1138,6 +1138,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
             viewMode={viewMode}
             currentPath={currentPath}
             sessionId={terminalSessionId}
+            branchName={branchName}
             onToggleHelp={toggleHelp}
             selectedCli={settings.selectedCli}
             onOpenCliSettings={openCliSettings}

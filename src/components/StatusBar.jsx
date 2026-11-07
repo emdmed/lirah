@@ -18,7 +18,7 @@ import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
 import { WindowControls } from './WindowControls';
-import { IS_MAC, IS_WINDOWS } from '../utils/pathUtils';
+import { IS_MAC, IS_WINDOWS, basename } from '../utils/pathUtils';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
 import { useTabManager } from '../features/tabs/TabContext';
@@ -67,7 +67,11 @@ function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolatio
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 px-1">
-          <span className="ins-legend">Sandbox</span>
+          {/* The site's sandbox orbit: a dashed ring, faint while off. */}
+          <svg width="14" height="14" viewBox="-8 -8 16 16" aria-hidden="true" className={cn('shrink-0', !enabled && 'text-faint')}>
+            <circle r="6.2" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1.6" />
+          </svg>
+          <span>sandbox</span>
           <ToggleSwitch checked={enabled} onChange={onToggle} disabled={IS_WINDOWS} label="Sandbox" tone="ok" />
           {enabled && failed && <Lamp state="fault" label="Sandbox failed" />}
         </span>
@@ -94,7 +98,7 @@ function CompactionSwitch({ enabled, onToggle }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 px-1">
-          <span className="ins-legend">Index</span>
+          <span>index</span>
           <ToggleSwitch checked={enabled} onChange={onToggle} label="Compaction hook" tone="ok" />
         </span>
       </TooltipTrigger>
@@ -112,7 +116,7 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="flex items-center gap-1.5 px-1">
-          <span className="ins-legend">Net</span>
+          <span>net</span>
           <ToggleSwitch checked={isolated} onChange={onToggle} disabled={IS_WINDOWS || !enabled} label="Network isolation" tone="warn" />
         </span>
       </TooltipTrigger>
@@ -287,7 +291,7 @@ export const StatusBar = memo(({
   onOpenDashboard, onOpenContextDetails, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
   autoCommitStage = 'idle', onShowAutoCommit,
   onClearContext, onCompactContext,
-  availableUpdate, compactionEnabled = false, onToggleCompaction,
+  availableUpdate, compactionEnabled = false, onToggleCompaction, branchName,
 }) => {
   const confirm = useConfirm();
 
@@ -334,11 +338,16 @@ export const StatusBar = memo(({
       className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
       {...drag}
     >
-      {/* LEFT: maker's legend + update. Project and branch live in
-          the sidebar's TABS pane. On macOS the window controls come first, at the left. */}
+      {/* LEFT: maker's mark, project name and branch, then waiting / update. On macOS the window controls come first, at the left. */}
       <div className="flex items-center gap-3 overflow-hidden min-w-0" {...drag}>
         {IS_MAC && showTitleBar && <WindowControls />}
         <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />
+        {currentPath && (
+          <span className="flex items-baseline gap-2 min-w-0" title={currentPath}>
+            <span className="ins-name text-[15px] leading-none shrink-0">{basename(currentPath)}</span>
+            {branchName && <span className="text-muted-foreground truncate">{branchName}</span>}
+          </span>
+        )}
 
         <AttentionIndicator />
         <AutopilotIndicator />
@@ -409,7 +418,7 @@ export const StatusBar = memo(({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1.5 px-1 h-5 lowercase before:content-none after:content-none">
-                  <Lamp state={sessionId ? 'ok' : 'off'} />
+                  <Lamp state={sessionId ? 'on' : 'off'} />
                   {cliName}
                 </Button>
               </TooltipTrigger>
@@ -438,7 +447,7 @@ export const StatusBar = memo(({
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="xs" className="px-1.5" aria-label="Settings and actions">
-                  <span className="ins-legend">Settings</span>
+                  <span className="text-muted-foreground">settings</span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
