@@ -339,8 +339,13 @@ Exec=$INSTALL_DIR/$APP_NAME
 Icon=$APP_NAME
 Terminal=false
 Categories=Development;Utility;
-StartupWMClass=$APP_NAME
+StartupWMClass=${APP_NAME}-bin
 EOF
+
+    # The .deb/.rpm ship the icon themselves; this path has to install it
+    ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+    mkdir -p "$ICON_DIR"
+    cp src-tauri/icons/128x128@2x.png "$ICON_DIR/$APP_NAME.png" || warn "Could not install the app icon"
 
     info "Binary installed to: $INSTALL_DIR/$APP_NAME"
     info "Desktop entry created at: $DESKTOP_DIR/${APP_NAME}.desktop"
@@ -406,6 +411,11 @@ StartupWMClass=$APP_NAME
 EOF
 
     write_user_launcher "$APPIMAGE_PATH"
+
+    ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+    mkdir -p "$ICON_DIR"
+    fetch "https://raw.githubusercontent.com/$REPO/$VERSION/src-tauri/icons/128x128@2x.png" > "$ICON_DIR/$APP_NAME.png" \
+        || warn "Could not install the app icon"
 
     info "AppImage installed to: $APPIMAGE_PATH"
     info "Symlinked as: $INSTALL_DIR/$APP_NAME"
