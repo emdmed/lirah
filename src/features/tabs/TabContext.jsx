@@ -272,8 +272,10 @@ export function TabProvider({ children }) {
     else addWorkspace(name);
   }, [switchWorkspace, addWorkspace]);
 
+  // A null id renames the active workspace.
   const renameWorkspace = useCallback((workspaceId, name) => {
     if (!name?.trim()) return;
+    workspaceId ??= activeWorkspaceIdRef.current;
     setWorkspaces((prev) => prev.map((w) => (w.id === workspaceId ? { ...w, name: name.trim() } : w)));
   }, []);
 

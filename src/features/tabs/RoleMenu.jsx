@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,16 +16,25 @@ import { RowAction } from './RowAction';
 // `onOpenChange` let the pane open it from the keyboard (t on a row).
 function RoleMenu({ tab, open, onOpenChange, children }) {
   const { setTabRole } = useTabManager();
+  const wrapRef = useRef(null);
   const setRole = (role) => {
     setTabRole(tab.id, role);
     setLinkedRepoRole(tab.projectPath, role || undefined);
   };
   return (
     // Portalled menu clicks still bubble through React to the row.
-    <span className="contents" onClick={(e) => e.stopPropagation()}>
+    <span ref={wrapRef} className="contents" onClick={(e) => e.stopPropagation()}>
       <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="text-xs">
+        <DropdownMenuContent
+          align="start"
+          className="text-xs"
+          // The trigger is aria-hidden (RowAction), so focus goes back to the row.
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            wrapRef.current?.closest('[data-tab-row]')?.focus();
+          }}
+        >
           <DropdownMenuRadioGroup value={tab.role ?? ''} onValueChange={setRole}>
             {REPO_ROLES.map((r) => (
               <DropdownMenuRadioItem key={r.value} value={r.value}>

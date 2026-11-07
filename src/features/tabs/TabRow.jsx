@@ -319,9 +319,8 @@ export const TabRow = memo(function TabRow({
           {/* Tier 2: the branch, in full; long names wrap rather than clip. */}
           <div
             className={cn(
-              'flex min-w-0 pl-6 text-[11px]',
-              active ? 'text-muted-foreground' : 'text-muted-foreground/75',
-            )}
+              'flex min-w-0 pl-6 text-[11px] text-muted-foreground',
+              )}
           >
             {info?.branch ? (
               <RowAction

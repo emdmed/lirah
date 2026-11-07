@@ -6,7 +6,7 @@ import { RenameField } from './RenameField';
 import { StarOutline } from './ActivityGlyphs';
 
 // The workspaces, in the Workspace pane's legend: click to switch (Alt+W cycles),
-// double-click to rename, × to remove, + to add one. An outlined star marks a
+// double-click or F2 to rename, × to remove, + to add one. An outlined star marks a
 // workspace in the background whose agent is waiting on you: warn when one
 // needs permission, ok otherwise.
 export function WorkspaceRow() {
@@ -39,8 +39,9 @@ export function WorkspaceRow() {
             <button
               onClick={() => switchWorkspace(ws.id)}
               onDoubleClick={() => setRenamingId(ws.id)}
+              onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); setRenamingId(ws.id); } }}
               aria-pressed={active}
-              title={`${ws.name}: ${count} tab${count === 1 ? '' : 's'} (double-click to rename)`}
+              title={`${ws.name}: ${count} tab${count === 1 ? '' : 's'} (double-click or F2 to rename)`}
               className={cn(
                 'flex items-center gap-1 px-1 cursor-pointer border-b',
                 active ? 'text-foreground border-[var(--ins-legend)]' : 'text-muted-foreground border-transparent hover:text-foreground',
@@ -50,6 +51,7 @@ export function WorkspaceRow() {
               <span className="tabular-nums">{count}</span>
               {!active && waiting.has(ws.id) && (
                 <span
+                  role="img"
                   className={blocked.has(ws.id) ? 'text-[var(--ins-warn)]' : 'text-[var(--ins-ok)]'}
                   aria-label={blocked.has(ws.id) ? 'agent needs permission' : 'agent waiting on you'}
                 >

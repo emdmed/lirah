@@ -223,6 +223,17 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     document.body.style.userSelect = 'none';
   };
 
+  // ←/→ on the focused handle: 16px a step, 64px with Shift. Left widens.
+  const resizeByKey = (e) => {
+    const dir = { ArrowLeft: 1, ArrowRight: -1 }[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    const next = Math.min(maxWidth(), Math.max(MIN_WIDTH, paneWidth + dir * (e.shiftKey ? 64 : 16)));
+    setWidth(next);
+    setSetting('jobsSidebarWidth', next);
+    if (wide) toggleWide();
+  };
+
   const runningJobs = jobs.filter((j) => j.status === 'running').length;
   const reviewJobs = jobs.filter((j) => !j.archived && needsReview(j)).length;
 
@@ -625,11 +636,19 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           </>
         }
       />
-      {/* Drag-to-resize handle sitting over the left edge. */}
+      {/* Resize handle over the left edge: drag, or focus it and use ←/→. */}
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize Workspace pane"
+        aria-valuenow={paneWidth}
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={maxWidth()}
+        tabIndex={0}
         onMouseDown={startResize}
-        className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] active:bg-[var(--ins-lamp)] transition-colors"
-        title="Drag to resize"
+        onKeyDown={resizeByKey}
+        className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] active:bg-[var(--ins-lamp)] focus-visible:bg-[var(--ins-lamp)] focus-visible:outline-none transition-colors"
+        title="Drag to resize (or ←/→)"
       />
 
       <MasterStrip />

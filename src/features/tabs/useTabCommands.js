@@ -48,7 +48,7 @@ export function useTabCommands({
     setSettingsOpen } = dialogs;
   const { sandboxEnabled, networkIsolation, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend } = settings;
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
-  const { addTab, requestCloseTab, openWorkspace, openMaster } = useTabActions();
+  const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster } = useTabActions();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const { success: toastSuccess, info: toastInfo } = useToast();
 
@@ -136,8 +136,13 @@ export function useTabCommands({
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },
       { id: 'master', hint: 'show the workspace\'s master agent terminal (opens it the first time)', run: () => openMaster() },
-      { id: 'workspace', aliases: ['ws'], hint: 'switch to a workspace by name, or add it', run: (name) => {
+      { id: 'workspace', aliases: ['ws'], hint: 'switch to a workspace by name, or add it; rename <name> renames this one', run: (name) => {
         if (!name?.trim()) throw new Error('type the workspace name after the command');
+        const [first, ...rest] = name.trim().split(/\s+/);
+        if (first === 'rename') {
+          if (!rest.length) throw new Error('type the new name after rename');
+          return renameWorkspace(null, rest.join(' '));
+        }
         openWorkspace(name);
       } },
 
@@ -189,7 +194,7 @@ export function useTabCommands({
       commands.push({ id: 'settings', aliases: ['prefs'], hint: 'all settings', run: () => setSettingsOpen(true) });
     }
     return commands;
-  }, [tabId, projectPath, addTab, requestCloseTab, openWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
+  }, [tabId, projectPath, addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
