@@ -4,6 +4,20 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-07
+
+### Added
+
+- **Orrery theme** - A new night-sky theme. Busy states show an orbit scanner, lamps become reticle marks, there's a startup orrery and splash, and empty panes show an empty-orbit plate.
+
+### Changed
+
+- **Orrery redesign** - New type: Typestar OCR for content and the terminal, Geist Mono for legends, and Spectral italic for names and button labels. The status rail, pane legends, buttons, tooltips and dialogs (with crop ticks) are restyled. Plans get a chunk spine and the tabs pane reads as a ledger. The file tree gets guides and agent marks, and the context chips and Fig. 19 get measure lines.
+
+### Fixed
+
+- **Button labels were hard to read** - Panel buttons such as source, revise and delete now use a regular italic instead of a light one, so the text no longer breaks up on dark panels.
+
 ## [0.15.1] - 2026-11-07
 
 ### Fixed
