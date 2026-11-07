@@ -88,7 +88,9 @@ export function InstrumentKit() {
             <Meter value={196000} max={200000} label="Context fault" />
             <div className="flex items-center gap-3">
               {[0.05, ctx / 200000, 0.5, 0.75, 0.86, 0.97].map((r, i) => <ContextMoon key={i} ratio={r} />)}
+              <Scanner size="sm" label="Working" />
               <Scanner size="md" label="Working" />
+              <Scanner size="lg" label="Working" />
             </div>
             <input type="range" min={0} max={200000} value={ctx} onChange={(e) => setCtx(+e.target.value)} />
           </div>

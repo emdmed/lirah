@@ -154,11 +154,9 @@
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
   --ins-glow:        6px;
-  /* Eärendil's star, the mark's four-point star: the meter needle,
-     the scanner's lit cell and the status-bar separator. Same eight points,
-     in the same order, as --ins-star-square, so the scanner can step between them. */
+  /* Eärendil's star, the mark's four-point star: the meter needle and the
+     status-bar separator. */
   --ins-star:        polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
-  --ins-star-square: polygon(50% 0, 100% 0, 100% 50%, 100% 100%, 50% 100%, 0 100%, 0 50%, 0 0);
   --font-legend: "Geist Mono", var(--font-mono);
   --font-name: "Spectral", Georgia, serif;
   --legend-weight: 400;
@@ -1190,29 +1188,48 @@ body {
     animation: ins-blink 1s steps(1) infinite;
   }
 
-  /* Busy scanner (Scanner.jsx): square lamp segments, one lit cell chasing
-     across with a dimmer trail. Stepped, like a TUI redraw. */
+  /* Busy scanner (Scanner.jsx): a gold body stepping round a tilted orbit.
+     --scan-a steps through eight angles; cos/sin place the body on the ellipse. */
   .ins-scan {
-    --scan-cell: 3px;
-    --scan-gap: 1px;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--scan-gap);
+    --scan-rx: 6px;
+    --scan-ry: 2.5px;
+    --scan-body: 3px;
+    --scan-tilt: -20deg;
+    position: relative;
+    display: inline-block;
+    width: calc(var(--scan-rx) * 2 + var(--scan-body));
+    height: calc(var(--scan-rx) + var(--scan-body));
     flex-shrink: 0;
     vertical-align: middle;
   }
 
-  .ins-scan[data-size="md"] { --scan-cell: 4px; --scan-gap: 2px; }
-  .ins-scan[data-size="lg"] { --scan-cell: 6px; --scan-gap: 3px; }
+  .ins-scan[data-size="md"] { --scan-rx: 9px; --scan-ry: 3.5px; --scan-body: 4px; }
+  .ins-scan[data-size="lg"] { --scan-rx: 14px; --scan-ry: 5.5px; --scan-body: 6px; }
 
-  /* Resting cells are squares; the lit cell steps up into a star. */
+  .ins-scan::before,
   .ins-scan > i {
-    display: block;
-    width: var(--scan-cell);
-    height: var(--scan-cell);
-    background: var(--ins-lamp-off);
-    clip-path: var(--ins-star-square);
-    animation: ins-scan 0.6s steps(1) infinite;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+  }
+
+  .ins-scan::before {
+    content: "";
+    width: calc(var(--scan-rx) * 2);
+    height: calc(var(--scan-ry) * 2);
+    border: 1px solid var(--ins-faint);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) rotate(var(--scan-tilt));
+  }
+
+  .ins-scan > i {
+    width: var(--scan-body);
+    height: var(--scan-body);
+    margin: calc(var(--scan-body) / -2);
+    background: var(--ins-lamp);
+    transform: rotate(var(--scan-tilt))
+      translate(calc(cos(var(--scan-a)) * var(--scan-rx)), calc(sin(var(--scan-a)) * var(--scan-ry)));
+    animation: ins-scan 1.2s steps(8) infinite;
   }
 
   /* The Lirah mark (LirahMark.jsx). Lit, it is the title bar's session lamp:
@@ -1888,6 +1905,12 @@ body {
 }
 
 /* Registered so the lamp's colour can transition and step in a keyframe. */
+@property --scan-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @property --lamp-ink {
   syntax: '<color>';
   inherits: true;
@@ -1908,32 +1931,15 @@ body {
 }
 
 @keyframes ins-scan {
-  0% {
-    background: var(--ins-lamp);
-    clip-path: var(--ins-star);
-    transform: scale(1.7);
-  }
-  25% {
-    background: color-mix(in srgb, var(--ins-lamp) 45%, var(--ins-lamp-off));
-    clip-path: var(--ins-star-square);
-    transform: none;
-  }
-  50%, 100% {
-    background: var(--ins-lamp-off);
-    clip-path: var(--ins-star-square);
-    transform: none;
-  }
+  to { --scan-a: 360deg; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ins-lamp[data-blink] { animation: none; }
   .ins-pulse { animation: none; }
   .fig-live { transition: none; }
-  /* Still reads as "busy": every segment held half-lit. */
-  .ins-scan > i {
-    animation: none;
-    background: color-mix(in srgb, var(--ins-lamp) 55%, var(--ins-lamp-off));
-  }
+  /* Body held still at the first step. */
+  .ins-scan > i { animation: none; }
   .ins-meter-needle,
   .ins-meter-callout,
   .ins-meter-fill,
