@@ -1,4 +1,4 @@
-import { Paperclip } from 'lucide-react';
+import { Attachment } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { relativeTo } from './tabActivity';
@@ -34,7 +34,7 @@ export function TurnTrail({ turn, summary, root, open, onToggle, onAttach }) {
               title="Add these files to the current tab's prompt"
               className="flex items-center gap-1 self-start pt-0.5 hover:text-[var(--ins-lamp)]"
             >
-              <Paperclip className="h-3 w-3" />
+              <Attachment className="h-3 w-3" />
               attach {plural(turn.edited.size, 'file')} to prompt
             </RowAction>
           ) : (

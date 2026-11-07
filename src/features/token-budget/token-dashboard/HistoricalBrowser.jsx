@@ -4,7 +4,7 @@ import { CalendarHeatmap } from './CalendarHeatmap';
 import { FilterPanel } from './FilterPanel';
 import { formatCost, formatTokenCount } from '../tokenCalculations';
 import { filterSessions } from '../../../utils/projectScanner';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { NavArrowDown, NavArrowRight } from 'iconoir-react';
 import { Button } from '@/components/ui/button';
 
 const PAGE_SIZE = 20;
@@ -111,7 +111,7 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
                 className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/20 text-xs font-mono text-left"
                 onClick={() => setExpandedSession(expandedSession === s.sessionId ? null : s.sessionId)}
               >
-                {expandedSession === s.sessionId ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {expandedSession === s.sessionId ? <NavArrowDown width={12} height={12} /> : <NavArrowRight width={12} height={12} />}
                 <span className="w-36 shrink-0">{formatTime(s.timestamp)}</span>
                 <span className="w-16 text-right shrink-0">{formatTokenCount(s.tokens)}</span>
                 <span className="w-14 text-right shrink-0">{formatCost(s.cost)}</span>

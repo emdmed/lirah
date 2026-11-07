@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash } from 'iconoir-react';
 import {
   Dialog,
   DialogContent,
@@ -91,7 +91,7 @@ function ContextEditor({ context, isDefault, canRemove, autoFocus }) {
           default
         </PanelButton>
         <PanelButton
-          icon={Trash2}
+          icon={Trash}
           onClick={() => removePlanContext(context.id)}
           disabled={!canRemove}
           title={canRemove ? 'Remove this context' : 'Keep at least one context'}

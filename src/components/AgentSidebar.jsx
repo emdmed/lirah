@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePageVisible } from '../hooks/usePageVisible';
 import { EmptyLine } from '../features/plans/parts';
-import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-react';
+import { Sparks, SidebarCollapse, SidebarExpand, Xmark, ChatBubble } from 'iconoir-react';
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
 import { Lamp } from './instrument/Lamp';
@@ -44,7 +44,7 @@ export function AgentCard({ agent, onDismiss, now, defaultExpanded = false }) {
             }}
             title="Dismiss"
           >
-            <X size={10} className="text-muted-foreground" />
+            <Xmark width={10} height={10} className="text-muted-foreground" />
           </button>
         )}
       </div>
@@ -58,7 +58,7 @@ export function AgentCard({ agent, onDismiss, now, defaultExpanded = false }) {
         )}
         {agent.message_count > 0 && (
           <span className="flex items-center gap-0.5" title={`${agent.message_count} messages`}>
-            <MessageSquare size={8} />
+            <ChatBubble width={8} height={8} />
             <span className="tabular-nums">{agent.message_count}</span>
           </span>
         )}
@@ -245,7 +245,7 @@ export function AgentSidebar() {
           className="p-1 rounded hover:bg-sidebar-accent cursor-pointer"
           title="Expand agent sidebar"
         >
-          <PanelRightOpen size={14} className="text-muted-foreground" />
+          <SidebarExpand width={14} height={14} className="-scale-x-100 text-muted-foreground" />
         </button>
         {totalActiveCount > 0 && (
           <span
@@ -271,7 +271,7 @@ export function AgentSidebar() {
       {/* Header */}
       <div className="flex items-center justify-between px-2 py-1.5 shrink-0 border-b border-b-sidebar-border">
         <div className="flex items-center gap-1.5">
-          <Bot size={12} className="text-muted-foreground" />
+          <Sparks width={12} height={12} className="text-muted-foreground" />
           <span className="text-xs">Agents</span>
           {totalActiveCount > 0 && (
             <span
@@ -290,7 +290,7 @@ export function AgentSidebar() {
           className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer"
           title="Collapse sidebar"
         >
-          <PanelRightClose size={14} className="text-muted-foreground" />
+          <SidebarCollapse width={14} height={14} className="-scale-x-100 text-muted-foreground" />
         </button>
       </div>
 
@@ -298,7 +298,7 @@ export function AgentSidebar() {
       <div className="flex-1 overflow-y-auto min-h-0 py-1">
         {visibleSubagents.length === 0 ? (
           <div className="px-3 py-6 text-center">
-            <Bot size={16} className="mx-auto mb-2 text-faint" />
+            <Sparks width={16} height={16} className="mx-auto mb-2 text-faint" />
             <div className="text-[11px] text-muted-foreground">
               No agents running
             </div>

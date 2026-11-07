@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
+import { Check } from 'iconoir-react';
 
 export function AutoCommitConfigDialog({ open, onOpenChange, cli, customPrompt, onSave }) {
   const [draftCli, setDraftCli] = useState(cli);
@@ -40,9 +41,7 @@ export function AutoCommitConfigDialog({ open, onOpenChange, cli, customPrompt, 
         <div className="space-y-4 py-2">
           {showSuccess && (
             <div className="flex items-center gap-2 text-[var(--ins-ok)] bg-[var(--ins-raised)] shadow-[inset_0_0_0_1px_var(--ins-edge-strong)] rounded-none px-3 py-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="w-5 h-5" strokeWidth={2} />
               <span className="text-sm">Settings saved successfully!</span>
             </div>
           )}

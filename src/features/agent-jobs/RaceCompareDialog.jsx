@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { NavArrowLeft, NavArrowRight } from 'iconoir-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogEmpty } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -148,7 +148,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
         {files.length > 1 && (
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon-sm" disabled={fileIndex <= 0} onClick={goPrev} aria-label="Previous file">
-              <ChevronLeft className="w-4 h-4" />
+              <NavArrowLeft className="w-4 h-4" />
             </Button>
             <Button
               variant="ghost"
@@ -157,7 +157,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
               onClick={goNext}
               aria-label="Next file"
             >
-              <ChevronRight className="w-4 h-4" />
+              <NavArrowRight className="w-4 h-4" />
             </Button>
           </div>
         )}

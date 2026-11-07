@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { open as openFolderPicker } from '@tauri-apps/plugin-dialog';
-import { X } from 'lucide-react';
+import { Xmark } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useToast } from '../toast';
@@ -63,7 +63,7 @@ export function PluginsRow() {
                     <span className="text-muted-foreground">{p.folder}</span>
                   </button>
                   {!p.prompt.trim() && <span className="shrink-0 text-[11px] text-muted-foreground">no prompt</span>}
-                  <PanelButton icon={X} aria-label={`Remove plugin ${p.name}`} title="Remove" onClick={() => remove(p.id)} />
+                  <PanelButton icon={Xmark} aria-label={`Remove plugin ${p.name}`} title="Remove" onClick={() => remove(p.id)} />
                 </div>
                 {openId === p.id && (
                   <div className="flex flex-col gap-1 pb-1">

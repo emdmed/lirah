@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Eye, Pin, PinOff } from "lucide-react";
+import { Eye, Pin, PinSlash } from "iconoir-react";
 import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { TreeGuide } from "./TreeGuide";
 import { AgentMark } from "./AgentMark";
@@ -111,7 +111,7 @@ export function FileNode({
           {isPinned ? (
             <>
               <Pin className="w-2.5 h-2.5 opacity-60 group-hover/pin:hidden" />
-              <PinOff className="w-2.5 h-2.5 hidden group-hover/pin:block" />
+              <PinSlash className="w-2.5 h-2.5 hidden group-hover/pin:block" />
             </>
           ) : (
             <Pin className="w-2.5 h-2.5" />

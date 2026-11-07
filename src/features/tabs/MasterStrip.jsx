@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Crown } from 'lucide-react';
+import { Crown } from 'iconoir-react';
 import { cn } from '@/lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -27,11 +27,11 @@ const NODE_INK = {
 };
 const NODE_IDLE = { fill: 'none', stroke: 'var(--ins-edge-strong)', word: 'no agent' };
 
-const NODE = 13;
-const PITCH = 16;
-const LEAD = 10; // from the hollow origin dot to the first node
-const BUS_Y = 5;
-const NODE_Y = 11;
+const NODE = 9;
+const PITCH = 12;
+const LEAD = 8; // from the hollow origin dot to the first node
+const BUS_Y = 3;
+const NODE_Y = 7;
 const MAX_NODES = 8;
 const ink = (t) => ({ transition: `${t} var(--ins-cool) var(--ins-ease)` });
 
@@ -44,7 +44,7 @@ function WorkerFan({ workers }) {
   const busEnd = LEAD + (shown.length - 1) * PITCH + NODE / 2;
   const hair = { stroke: 'var(--ins-faint)', strokeWidth: 1 };
   return (
-    <svg width={width} height={26} viewBox={`0 0 ${width} 26`} className="-mt-1 shrink-0 overflow-visible" aria-hidden="true">
+    <svg width={width} height={18} viewBox={`0 0 ${width} 18`} className="shrink-0 overflow-visible" aria-hidden="true">
       <circle cx={2} cy={BUS_Y} r={1.75} style={{ fill: 'var(--ins-raised)', ...hair }} />
       {shown.length > 0 && <line x1={3.75} y1={BUS_Y} x2={busEnd} y2={BUS_Y} style={hair} />}
       {shown.map(({ name, state }, i) => {

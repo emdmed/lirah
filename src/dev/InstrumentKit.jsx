@@ -8,8 +8,7 @@ import { Scanner } from '../components/instrument/Scanner';
 import { ToggleSwitch } from '../components/instrument/ToggleSwitch';
 import { PanelButton } from '../components/instrument/PanelButton';
 import { Button } from '../components/ui/button';
-import { Send } from 'lucide-react';
-import { FileText, RefreshCw } from 'lucide-react';
+import { Send, JournalPage, Refresh } from 'iconoir-react';
 import { PaneLegend } from '../components/instrument/PaneLegend';
 import { DiffBar } from '../components/instrument/DiffBar';
 import { LirahMark, LirahLockup } from '../components/LirahMark';
@@ -99,8 +98,8 @@ export function InstrumentKit() {
               <span className="ins-legend">Net</span>
               <ToggleSwitch checked={net} onChange={setNet} label="Network" tone="warn" disabled={!sandbox} />
             </span>
-            <PanelButton icon={FileText} latched={latch} onClick={() => setLatch((v) => !v)}>md</PanelButton>
-            <PanelButton icon={RefreshCw} aria-label="Sync" />
+            <PanelButton icon={JournalPage} latched={latch} onClick={() => setLatch((v) => !v)}>md</PanelButton>
+            <PanelButton icon={Refresh} aria-label="Sync" />
             <PanelButton disabled>off</PanelButton>
           </div>
           <div className="flex flex-wrap items-center gap-2 pb-2">

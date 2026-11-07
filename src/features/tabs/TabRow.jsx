@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Bot, FolderOpen, GitBranch, Link2 } from 'lucide-react';
+import { Folder, GitBranch, Link, Sparks } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
@@ -262,7 +262,7 @@ export const TabRow = memo(function TabRow({
             onClick={() => actions.toggleLink(tab, name, linked)}
             className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[var(--ins-lamp)] hover:text-[var(--ins-fault)]"
           >
-            <Link2 className="h-3 w-3" />
+            <Link className="h-3 w-3" />
           </RowAction>
         )}
 
@@ -286,7 +286,7 @@ export const TabRow = memo(function TabRow({
                 onClick={() => actions.toggleLink(tab, name, linked)}
                 className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
               >
-                <Link2 className="h-3 w-3" />
+                <Link className="h-3 w-3" />
               </RowAction>
             )}
             <RowAction
@@ -296,7 +296,7 @@ export const TabRow = memo(function TabRow({
               onClick={() => actions.openFolder(tab.projectPath)}
               className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
             >
-              <FolderOpen className="h-3 w-3" />
+              <Folder className="h-3 w-3" />
             </RowAction>
             {closable && (
               <RowAction
@@ -358,7 +358,7 @@ export const TabRow = memo(function TabRow({
           {/* Tier 5: another tab's agent working in this repo. */}
           {workLabel && (
             <div className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-[var(--ins-lamp)]">
-              <Bot className="h-3 w-3 shrink-0" />
+              <Sparks className="h-3 w-3 shrink-0" />
               <span className="min-w-0 truncate">{workLabel}</span>
             </div>
           )}

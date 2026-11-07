@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Xmark } from 'iconoir-react';
 import { FIGURES, figNumber, useFigureCompact } from '@/components/instrument/figure';
 import { CalRecipe, Calibrated } from '@/components/instrument/calibrated';
 import { agentName, formatElapsed, truncate } from './agentLabels';
@@ -186,7 +186,7 @@ export function Fig13Agents({ agents, now, onDismiss, onOpenList, renderCard, cl
                 aria-label={`Dismiss ${name}`}
                 title="Dismiss"
               >
-                <X size={10} className="text-muted-foreground" />
+                <Xmark width={10} height={10} className="text-muted-foreground" />
               </button>
             </div>
           );

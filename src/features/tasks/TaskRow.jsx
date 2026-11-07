@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, Check, ChevronDown, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, DataTransferBoth, NavArrowDown, Trash, Undo } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import ReactMarkdown from 'react-markdown';
@@ -114,7 +114,7 @@ export const TaskRow = memo(function TaskRow({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button type="button" className={ICON_BTN} title="Plan with another context" aria-label="Plan with another context">
-                    <ChevronDown className="h-3 w-3" />
+                    <NavArrowDown className="h-3 w-3" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[240px]">
@@ -157,15 +157,15 @@ export const TaskRow = memo(function TaskRow({
             title={done ? 'Back to the backlog' : 'Mark done'}
             aria-label={done ? 'Back to the backlog' : 'Mark done'}
           >
-            {done ? <RotateCcw className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+            {done ? <Undo className="h-3 w-3" /> : <Check className="h-3 w-3" />}
           </button>
           {moveLabel && (
             <button type="button" onClick={() => onMove(task)} className={ICON_BTN} title={moveLabel} aria-label={moveLabel}>
-              <ArrowRightLeft className="h-3 w-3" />
+              <DataTransferBoth className="h-3 w-3" />
             </button>
           )}
           <button type="button" onClick={() => onRemove(task)} className={ICON_BTN} title="Delete task" aria-label="Delete task">
-            <Trash2 className="h-3 w-3" />
+            <Trash className="h-3 w-3" />
           </button>
         </span>
       </div>

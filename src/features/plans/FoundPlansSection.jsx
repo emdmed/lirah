@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileDown } from 'lucide-react';
+import { PageDown } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Scanner } from '../../components/instrument/Scanner';
 import { plural } from '../../lib/plural';
@@ -77,7 +77,7 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
               <Scanner />
             ) : (
               <PanelButton
-                icon={FileDown}
+                icon={PageDown}
                 onClick={() => run([file], file.path)}
                 disabled={!!busy}
                 title={changed ? 'Take the edited file and re-chunk what isn\'t done yet' : 'Import and split into chunks'}
