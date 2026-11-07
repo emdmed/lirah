@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
-  <!-- Lirah app icon master: the Ithil lyre (crescent bowl, tall horns, yoke, Eärendil's star)
-       in one flat ivory on a graphite tile. Mirrors src/components/LirahMark.jsx with fixed colours.
+  <!-- Lirah app icon master: the bare lyre (Ithil's crescent, tall horns) with one body in its ring,
+       ivory on a graphite tile, the body in gold. Mirrors src/components/LirahMark.jsx with fixed colours.
        Regenerate the raster set:
        rsvg-convert -w 1024 -h 1024 src-tauri/icons/icon.svg -o /tmp/lirah.png && npx tauri icon /tmp/lirah.png -o /tmp/lirah-icons
        then copy only the files already in src-tauri/icons/. public/lirah.svg (favicon) is a copy of this file. -->
   <rect x="4" y="4" width="92" height="92" rx="21" fill="#3A3A3A"/>
-  <g transform="translate(50 50) scale(.68) translate(-50 -49.5)" fill="#F4F1EA" stroke="#F4F1EA">
-    <path stroke="none" d="M22 8C24 34 12 48 14 64C16 84 32 94 50 94C68 94 84 84 86 64C88 48 76 34 78 8C77 34 70 48 70 60C70 74 62 80 50 80C38 80 30 74 30 60C30 48 23 34 22 8Z"/>
-    <path stroke="none" d="M50 5Q51.28 15.08 58 17Q51.28 18.92 50 29Q48.72 18.92 42 17Q48.72 15.08 50 5Z"/>
-    <path fill="none" stroke-width="3" stroke-linecap="round" d="M23.5 32Q50 41 76.5 32"/>
-    <path fill="none" stroke-width="2.6" stroke-linecap="round" d="M40 35.6L40 78M50 37L50 80M60 35.6L60 78"/>
+  <g transform="translate(50 50) scale(.78) translate(-50 -50)">
+    <path fill="#F4F1EA" transform="translate(50 52) scale(.86) translate(-50 -49.5)" d="M22 8C24 34 12 48 14 64C16 84 32 94 50 94C68 94 84 84 86 64C88 48 76 34 78 8C77 34 70 48 70 60C70 74 62 80 50 80C38 80 30 74 30 60C30 48 23 34 22 8Z"/>
+    <circle cx="50" cy="27" r="9.5" fill="none" stroke="#F4F1EA" stroke-width="2"/>
+    <circle cx="50" cy="27" r="4.4" fill="#DCB662"/>
   </g>
 </svg>
