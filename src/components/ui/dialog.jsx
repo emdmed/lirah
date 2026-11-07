@@ -68,10 +68,14 @@ const SIZES = {
 
 // A dialog is a pane floating over the app, drawn like the focused pane:
 //
-//   ┌─ ^T NEW TAB ✦ ─────────────── status ┐
-//   │ body                                 │
-//   └──────── ↑ ↓ move ✦ ↵ open ✦ esc close┘
+//  ⌐                                        ¬
+//   ┌─ ^T New tab ● ──────────────── status ┐
+//   │ body                                  │
+//   └─ FIG.03 ───── ↑ ↓ move ✦ ↵ open ✦ esc ┘
+//  L                                        ⌐
 //
+// The title is set in the name face (italic), the status as a mono note, and
+// faint crop ticks sit just outside the frame's four corners (CSS ::before).
 // keys    shortcut that opens it, as a lit keycap in the legend (['^','T'])
 // lamp    'on' (default) | 'blink' while work runs | 'ok' | 'warn' | 'fault' | null
 // status  short text or a Scanner in the top-right corner of the frame
@@ -79,6 +83,7 @@ const SIZES = {
 //         a clickable esc cap is always appended (escLabel, default "close")
 // size    sm 440 | md 540 | lg 720 | xl 960 | full (window minus the gutter)
 // tone    'fault' for destructive confirms: fault hairline and fault star
+// fig     optional caption, printed FIG.<fig> at the left of the bottom rule
 function DialogContent({
   className,
   children,
@@ -91,6 +96,7 @@ function DialogContent({
   status,
   hints,
   escLabel = "close",
+  fig,
   ...props
 }) {
   const shell = React.useMemo(
@@ -117,6 +123,9 @@ function DialogContent({
           </ShellContext.Provider>
           {status != null && (
             <span className="tui-frame-status">{status}</span>
+          )}
+          {fig != null && (
+            <span className="tui-dialog-fig ins-legend">FIG.{fig}</span>
           )}
           <span className="tui-pane-info tui-frame-hints">
             <FrameHints hints={hintList}>
@@ -147,8 +156,8 @@ function DialogHeader({
   );
 }
 
-// Actions sit right-aligned, primary last. Text-only buttons print as
-// `[label]` (see .tui-dialog in index.css). Pickers have none: Enter acts.
+// Actions sit right-aligned, primary last: italic verbs, then the solid ink
+// key. Pickers have none: Enter acts.
 function DialogFooter({
   className,
   ...props
@@ -176,7 +185,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("ins-legend text-foreground", className)}
+      className={cn("ins-name text-foreground", className)}
       {...props}>
       {shell?.keys?.length > 0 && (
         <Keycap size="sm" lit>{joinKeys(shell.keys)}</Keycap>

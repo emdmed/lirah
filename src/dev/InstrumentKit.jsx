@@ -19,6 +19,7 @@ import { StepSlider } from '../components/instrument/StepSlider';
 import { SegmentBank } from '../components/instrument/SegmentBank';
 import { SplitKey } from '../components/instrument/SplitKey';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '../components/ui/dialog';
 
 // Component sheet for the Instrument TUI primitives (board 01b). Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -32,6 +33,8 @@ export function InstrumentKit() {
   const [range, setRange] = useState('weekly');
   const [detail, setDetail] = useState('signatures');
   const [scroll, setScroll] = useState(10000);
+  // `?kit&dialog` opens the sample dialog for screenshots.
+  const [dialog, setDialog] = useState(() => new URLSearchParams(window.location.search).has('dialog'));
 
   // `?kit&theme=orrery` picks the theme for headless screenshots.
   useEffect(() => {
@@ -180,6 +183,23 @@ export function InstrumentKit() {
             </Tooltip>
             <span title={'Orrery redesign\nOpen the plan'} className="underline decoration-dotted">native title</span>
             <span title="Settings and quick actions" className="underline decoration-dotted">native, one line</span>
+          </div>
+        </section>
+
+        <section className="tui-pane px-3" data-legend>
+          <PaneLegend index={10} title="Dialog" />
+          <div className="py-2">
+            <Button variant="ghost" size="xs" onClick={() => setDialog(true)}>open dialog</Button>
+            <Dialog open={dialog} onOpenChange={setDialog}>
+              <DialogContent size="sm" keys={['^', 'T']} status="3 of 12" fig="03" hints={[{ keys: ['↑', '↓'], label: 'move' }, { keys: ['↵'], label: 'open' }]}>
+                <DialogTitle>New tab</DialogTitle>
+                <DialogDescription>Pick a project to open in a new tab.</DialogDescription>
+                <DialogFooter>
+                  <Button variant="ghost" size="sm" onClick={() => setDialog(false)}>cancel</Button>
+                  <Button size="sm" onClick={() => setDialog(false)}>open</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </section>
 

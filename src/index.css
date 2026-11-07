@@ -736,12 +736,16 @@ body {
 }
 
 /*
-  Dialogs are panes floating over the app, drawn like the focused pane:
-    ┌─ ^T NEW TAB ✦ ─────────────── status ┐
-    └──────── ↑ ↓ move ✦ ↵ open ✦ esc close┘
-  The title (with the shortcut keycap and lamp DialogTitle adds) sits in the
-  top line, a status in the top-right corner, and every key hint in the
-  bottom line, ending in a clickable esc cap. Unlayered so a dialog's own
+  Dialogs are panes floating over the app, drawn like the focused pane, with
+  the atlas plate's crop ticks just outside the corners:
+   ⌐                                       ¬
+    ┌─ ^T New tab ● ─────────────── status ┐
+    └─ FIG.03 ──── ↑ ↓ move ✦ ↵ open ✦ esc ┘
+   L                                       ⌐
+  The italic title (with the shortcut keycap and lamp DialogTitle adds) sits
+  in the top line, a mono status in the top-right corner, an optional FIG
+  caption and every key hint in the bottom line, ending in a clickable esc
+  cap. Unlayered so a dialog's own
   padding or title classes can't push the content onto the frame.
 */
 .tui-dialog {
@@ -780,9 +784,34 @@ body {
   100% { border-color: var(--dialog-edge); }
 }
 
-/* The title is a real element (DialogTitle), not the data-title attribute. */
+/* The title is a real element (DialogTitle), so ::before draws the crop
+   ticks instead: two short faint lines per corner, a gap off the frame (the
+   frame is ::after, inset 6px top and bottom). */
 .tui-dialog::before {
-  content: none;
+  --crop-gap: 3px;
+  --crop-len: 7px;
+  --crop-o: calc(var(--crop-gap) + var(--crop-len));
+  --crop-ink: linear-gradient(var(--ins-faint), var(--ins-faint));
+  content: "";
+  inset: calc(6px - var(--crop-o)) calc(0px - var(--crop-o));
+  padding: 0;
+  background:
+    var(--crop-ink) left 0 top var(--crop-o) / var(--crop-len) 1px,
+    var(--crop-ink) left var(--crop-o) top 0 / 1px var(--crop-len),
+    var(--crop-ink) right 0 top var(--crop-o) / var(--crop-len) 1px,
+    var(--crop-ink) right var(--crop-o) top 0 / 1px var(--crop-len),
+    var(--crop-ink) left 0 bottom var(--crop-o) / var(--crop-len) 1px,
+    var(--crop-ink) left var(--crop-o) bottom 0 / 1px var(--crop-len),
+    var(--crop-ink) right 0 bottom var(--crop-o) / var(--crop-len) 1px,
+    var(--crop-ink) right var(--crop-o) bottom 0 / 1px var(--crop-len);
+  background-repeat: no-repeat;
+}
+
+/* Dialogs that clip their body still show the ticks.
+   shortcut: WebKit may ignore overflow-clip-margin, then these clip the side ticks. */
+.tui-dialog.overflow-hidden {
+  overflow: clip;
+  overflow-clip-margin: 12px;
 }
 
 /* Only simple titles move into the frame; a structured header (icon box,
@@ -800,12 +829,8 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-legend);
-  font-weight: var(--legend-weight);
-  font-size: var(--font-xs);
+  font-size: 13px;
   line-height: 12px;
-  letter-spacing: var(--legend-tracking);
-  text-transform: uppercase;
   color: var(--color-foreground);
   background: var(--pane-bg);
   z-index: 6;
@@ -813,8 +838,21 @@ body {
 
 /* The keycap and lamp in a title keep their own type. */
 .tui-dialog [data-slot="dialog-title"] .ins-cap {
-  text-transform: none;
-  letter-spacing: 0;
+  font-style: normal;
+  font-weight: 400;
+}
+
+/* Bottom-left of the frame: the plate's FIG caption. */
+.tui-dialog-fig {
+  position: absolute;
+  left: 10px;
+  bottom: 0;
+  padding: 0 5px;
+  font-size: var(--font-xs);
+  line-height: 12px;
+  color: var(--ins-faint);
+  background: var(--pane-bg);
+  z-index: 6;
 }
 
 .tui-dialog [data-slot="dialog-title"]:not(:has(div, p)) svg {
@@ -834,9 +872,11 @@ body {
   max-width: 40%;
   padding: 0 5px;
   overflow: hidden;
+  font-family: var(--font-mono);
   font-size: var(--font-xs);
   line-height: 12px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
   background: var(--pane-bg);
   z-index: 6;
@@ -921,19 +961,8 @@ body {
   clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
 }
 
-/* Actions print as `[label]`; a destructive one draws a fault hairline, as
-   the primary draws a lamp one. */
-.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg))::before {
-  content: "[";
-  opacity: 0.55;
-}
-.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg))::after {
-  content: "]";
-  opacity: 0.55;
-}
-.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg)) {
-  column-gap: 0;
-}
+/* Actions are italic verbs and the solid ink primary (no brackets); a
+   destructive one draws a fault hairline. */
 .tui-dialog [data-slot="dialog-footer"] .ins-key-danger {
   border-color: color-mix(in srgb, var(--ins-fault) 70%, var(--ins-edge-strong));
 }
