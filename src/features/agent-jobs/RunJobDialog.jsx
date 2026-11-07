@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, git } from '../../lib/git';
 import { useFigureCompact } from '@/components/instrument/figure';
 import { Fig26Isolation } from './Fig26Isolation';
-import { ChevronDown, Check, GitBranch, FolderGit2, Pin, ListTree, FolderInput } from 'lucide-react';
+import { NavArrowDown, Check, GitBranch, Git, Pin, TaskList, Import } from 'iconoir-react';
 import {
   Dialog,
   DialogContent,
@@ -35,9 +35,9 @@ import { useAgentJobs } from './AgentJobsContext';
 const MAX_COPIES = 3;
 
 const SOURCE_META = {
-  selected: { label: 'tree', hint: 'select in the tree', icon: ListTree },
+  selected: { label: 'tree', hint: 'select in the tree', icon: TaskList },
   pinned: { label: 'pinned', hint: 'pin a file', icon: Pin },
-  group: { label: 'group', hint: 'add a group', icon: FolderInput },
+  group: { label: 'group', hint: 'add a group', icon: Import },
 };
 
 // Turn a template + chosen files + free-text into a single headless prompt.
@@ -352,9 +352,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
               groups.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <PanelButton icon={FolderInput}>
+                    <PanelButton icon={Import}>
                       Add group
-                      <ChevronDown aria-hidden="true" className="opacity-60" />
+                      <NavArrowDown aria-hidden="true" className="opacity-60" />
                     </PanelButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
@@ -488,7 +488,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                 {useWorktree ? (
                   <GitBranch className="h-3 w-3 text-[var(--ins-lamp)]" aria-hidden="true" />
                 ) : (
-                  <FolderGit2 className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                  <Git className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
                 )}
                 {useWorktree ? 'Isolated worktree' : 'In place'}
               </div>
@@ -575,7 +575,7 @@ function Picker({ value, items, selectedId, onSelect, disabled = false }) {
       <DropdownMenuTrigger asChild disabled={disabled}>
         <Button variant="outline" size="sm" className="h-7 w-full min-w-0 justify-between px-2 text-xs">
           <span className="truncate">{value}</span>
-          <ChevronDown className="h-3 w-3 opacity-60" />
+          <NavArrowDown className="h-3 w-3 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">

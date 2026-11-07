@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Maximize2, Minimize2 } from 'lucide-react';
+import { Square, GitCompare, Check, Trash, JournalPage, GitMerge, Undo, NavArrowRight, NavArrowDown, WarningTriangle, Copy, Archive, Upload, Trophy, Expand, Collapse } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -637,7 +637,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               aria-label={wide ? 'Restore pane width' : 'Widen pane'}
               aria-pressed={wide}
             >
-              {wide ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+              {wide ? <Collapse className="h-3 w-3" /> : <Expand className="h-3 w-3" />}
             </button>
             <button
               onClick={() => setCollapsedOverride(true)}
@@ -738,7 +738,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   onClick={() => setShowArchived((v) => !v)}
                   className="flex w-full items-center gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
                 >
-                  {showArchived ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  {showArchived ? <NavArrowDown className="h-3 w-3" /> : <NavArrowRight className="h-3 w-3" />}
                   <Archive className="h-3 w-3" />
                   Archived
                   <span className="tabular-nums">{archivedJobs.length}</span>
@@ -989,7 +989,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             style={{ color: 'var(--color-status-warning)' }}
             title="No output or CPU work. The agent may be waiting on an approval it can't get in a headless run. It is stopped after 15 min idle."
           >
-            <AlertTriangle className="h-2.5 w-2.5" />
+            <WarningTriangle className="h-2.5 w-2.5" />
             idle {Math.floor(job.idleSecs / 60)}m
           </span>
         )}
@@ -1005,7 +1005,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             style={{ color: 'var(--color-destructive)' }}
             title={tc.failed.map((f) => `${basename(f.path)}: ${f.errorCount}`).join('\n')}
           >
-            <AlertTriangle className="h-2.5 w-2.5" />
+            <WarningTriangle className="h-2.5 w-2.5" />
             {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}
           </span>
         )}
@@ -1031,7 +1031,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
       {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
         <div className="mb-2 mx-2.5 border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
           <div className="flex items-center gap-1 text-[var(--color-status-warning)]">
-            <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+            <WarningTriangle className="h-2.5 w-2.5 shrink-0" />
             {job.overlaps?.length > 0
               ? `${job.overlaps.length} file${job.overlaps.length === 1 ? '' : 's'} edited by multiple jobs`
               : 'Merge conflicts on apply'}
@@ -1101,7 +1101,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             )}
             {canApprove && (
               <PrimaryAction
-                icon={tcErrors ? AlertTriangle : isRace ? Trophy : Check}
+                icon={tcErrors ? WarningTriangle : isRace ? Trophy : Check}
                 label={
                   tcChecking
                     ? 'Checking…'
@@ -1136,8 +1136,8 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             )}
 
             <div className="ml-auto flex items-center gap-0.5">
-              {isDone && <IconAction icon={RotateCcw} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
-              {job.reportPath && <IconAction icon={FileText} title="View run report" onClick={() => actions.report(job.id)} />}
+              {isDone && <IconAction icon={Undo} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
+              {job.reportPath && <IconAction icon={JournalPage} title="View run report" onClick={() => actions.report(job.id)} />}
               {isDone && (job.logPath || job.output.length > 0) && (
                 <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={() => actions.copyOutput(job.id)} />
               )}
@@ -1145,11 +1145,11 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
                 <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={() => actions.archive(job.id)} />
               )}
               {archived && (
-                <IconAction icon={ArchiveRestore} title="Restore to the jobs list" onClick={() => actions.unarchive(job.id)} />
+                <IconAction icon={Upload} title="Restore to the jobs list" onClick={() => actions.unarchive(job.id)} />
               )}
               {!isRunning && (
                 <IconAction
-                  icon={Trash2}
+                  icon={Trash}
                   title={job.worktreePath ? 'Discard changes' : 'Dismiss'}
                   onClick={() => actions.discard(job.id)}
                   danger
