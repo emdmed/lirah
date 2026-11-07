@@ -36,7 +36,7 @@ const DUST = (() => {
 })();
 
 // Built once: a constant element, so Layout's re-renders never touch it.
-const SKY = (
+export const SKY = (
   <svg
     aria-hidden="true"
     className="absolute inset-x-0 bottom-0 -top-8 w-full h-[calc(100%+2rem)] pointer-events-none"

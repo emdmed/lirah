@@ -472,6 +472,23 @@ body {
     color: var(--color-foreground);
   }
 
+  /* Startup orrery (FirstTabChooser): bodies travel out from the mark, and fade when typing filters them out. */
+  .ins-orrery-body {
+    transition: opacity 0.2s;
+    animation: ins-orrery-arrive 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation-delay: calc(var(--i) * 60ms);
+  }
+
+  .ins-orrery-body[data-faded] {
+    opacity: 0.15;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ins-orrery-body {
+      animation-name: ins-orrery-fade;
+    }
+  }
+
   .tui-dialog-empty {
     padding: 4px 0;
   }
@@ -2246,4 +2263,17 @@ body {
   .ins-line-enter { animation-name: ins-fade-in; }
   /* The edge holds full width until the message goes. */
   .ins-drain { animation: none; }
+}
+
+@keyframes ins-orrery-arrive {
+  from {
+    transform: translate(var(--sun-x), var(--sun-y)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes ins-orrery-fade {
+  from {
+    opacity: 0;
+  }
 }
