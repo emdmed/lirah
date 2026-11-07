@@ -2,21 +2,21 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { DASH, Figure, INK, Node, Ruler, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 import { middleTruncate } from '../plans/Fig21PlanGit';
 
-// FIG.19: what each detail level of a file costs. A faint line is the whole
-// file; under it each level the language can produce is a bar on the same
-// token ruler, ending in a node, with its size and its ratio to the whole.
-// The chosen level is framed in lamp; the default for the file's size says so
-// when it isn't the chosen one. Sizes are measured on the exact text the
-// prompt sends (useFileSymbols' levelTokens). Compact stacks the bars tight
-// over the ruler's ticks, the chosen one in lamp; sizes go to the tooltip.
+// FIG.19: what each detail level of a file costs, as measure lines on one
+// token scale: full text first, then each level the language produces, each
+// with its size and, in italic, how much it saves on the full text. The
+// chosen level is in lamp; the default for the file's size says so when it
+// isn't the chosen one. Sizes are measured on the exact text the prompt sends
+// (useFileSymbols' levelTokens). Compact stacks the bars tight over the
+// ruler's ticks, the chosen one in lamp; sizes go to the tooltip.
 
 const MIN_W = 180;
 const C_MIN_W = 120; // compact has no text to keep at 1:1
 const MAX_W = 360;
 const ROW_H = 30;
-const ROW_GAP = 6;
-const FIRST_ROW = 22;
-const IN = 6; // content inset inside a row's frame
+const FIRST_ROW = 20;
+const IN = 6; // content inset
+const ITALIC_CH = 5.5; // Spectral italic at 12px, per character
 
 const LEVELS = [
   { key: 'symbols', label: 'symbols' },
@@ -31,11 +31,10 @@ export function fmtTokens(n) {
   return `${Math.round(n / 1000)}k`;
 }
 
-// Ratio to the whole file, to two significant figures: × 0.12, × 0.035.
-export function fmtRatio(r) {
-  if (!(r > 0)) return '× 0';
-  if (r >= 1) return `× ${r.toFixed(r >= 10 ? 0 : 1)}`;
-  return `× ${Number(r.toPrecision(2))}`;
+/** "82% fewer tokens" against the full text, or null when it saves nothing. */
+export function fmtSaving(ratio) {
+  const pct = Math.round((1 - ratio) * 100);
+  return pct > 0 ? `${pct}% fewer tokens` : null;
 }
 
 // A ruler step of 1/2/5 × 10^k giving labels at least `minPx` apart.
@@ -75,100 +74,62 @@ function titleText(name, lineCount, whole, width) {
 
 /** The drawing at a given width, pure so it can be rendered headless. */
 export function fig19Layout({ name, lineCount, levels, chosen, defaultLevel, width }) {
-  const rows = detailRows(levels, { chosen, defaultLevel });
-  const max = Math.max(levels.whole, ...rows.map((r) => r.tokens));
+  const lines = [
+    // Python sends the whole file by default (no digest in the prompt).
+    {
+      key: 'whole',
+      label: 'full text',
+      tokens: levels.whole,
+      ratio: 1,
+      chosen: chosen === 'whole',
+      isDefault: defaultLevel === 'whole' && chosen !== 'whole',
+    },
+    ...detailRows(levels, { chosen, defaultLevel }),
+  ];
+  const max = Math.max(...lines.map((r) => r.tokens));
   const x0 = IN;
   const x1 = width - IN;
   const xAt = (v) => x0 + (v / max) * (x1 - x0);
-  const rowTop = (i) => FIRST_ROW + i * (ROW_H + ROW_GAP);
-  const rulerY = rowTop(rows.length + 1) - ROW_GAP + 2;
-  const height = rulerY + 22;
-  const step = niceStep(max, x1 - x0, 44);
+  const height = FIRST_ROW + lines.length * ROW_H + 2;
 
   const drawing = (
     <g>
-      {/* Whole-file reference */}
-      <g>
-        {/* Python sends the whole file by default (no digest in the prompt). */}
-        <T x={x0} y={FIRST_ROW + 12} color={INK.faint}>
-          {defaultLevel === 'whole' && chosen !== 'whole' ? 'whole file · default' : 'whole file'}
-        </T>
-        <T x={x1} y={FIRST_ROW + 12} anchor="end" color={INK.faint}>{`≈ ${fmtTokens(levels.whole)}`}</T>
-        <line
-          x1={x0}
-          x2={xAt(levels.whole)}
-          y1={FIRST_ROW + 22}
-          y2={FIRST_ROW + 22}
-          style={{ stroke: INK.faint, strokeWidth: STROKE.hair }}
-        />
-        <line
-          x1={xAt(levels.whole)}
-          x2={xAt(levels.whole)}
-          y1={FIRST_ROW + 18}
-          y2={FIRST_ROW + 26}
-          style={{ stroke: INK.faint, strokeWidth: STROKE.hair }}
-        />
-        {/* Where the whole file ends, carried down to the ruler. */}
-        <line
-          x1={xAt(levels.whole)}
-          x2={xAt(levels.whole)}
-          y1={FIRST_ROW + 26}
-          y2={rulerY}
-          style={{ stroke: INK.edge, strokeWidth: STROKE.hair, strokeDasharray: DASH.fine }}
-        />
-      </g>
-
-      {rows.map((r, i) => {
-        const top = rowTop(i + 1);
-        const barY = top + 23;
-        const end = Math.max(x0 + 1, xAt(r.tokens));
-        const wide = `≈ ${fmtTokens(r.tokens)}  ${fmtRatio(r.ratio)}`;
-        const values = textWidth(r.label) + textWidth(wide) + 12 <= x1 - x0
-          ? wide
-          : `≈${fmtTokens(r.tokens)} ${fmtRatio(r.ratio).replace(' ', '')}`;
-        const note = 'default for this size';
-        const noteFits = end + 10 + textWidth(note) <= x1;
+      {lines.map((r, i) => {
+        const top = FIRST_ROW + i * ROW_H;
+        const y = top + 20; // the measure line
+        const end = Math.max(x0 + 2, xAt(r.tokens));
+        const ink = r.chosen ? INK.lamp : INK.muted;
+        const label = r.isDefault && textWidth(`${r.label} · default`) + textWidth('≈ 99k') + 12 <= x1 - x0
+          ? `${r.label} · default`
+          : r.label;
+        const saving = fmtSaving(r.ratio);
+        const savingFits = saving && end + 8 + saving.length * ITALIC_CH <= x1;
         return (
           <g key={r.key}>
-            {r.chosen && (() => {
-              // Lamp frame with a gap in its top edge for the word "chosen".
-              const l = 0.5;
-              const rt = width - 0.5;
-              const b = top + ROW_H - 2;
-              const gx1 = width - IN - textWidth('chosen') - 4;
-              const gx2 = width - IN + 4;
-              return (
-                <g>
-                  <path
-                    d={`M${gx1} ${top}H${l}V${b}H${rt}V${top}H${gx2}`}
-                    style={{ fill: 'none', stroke: INK.lamp, strokeWidth: STROKE.ink }}
-                  />
-                  <T x={width - IN} y={top + 4} anchor="end" color={INK.lamp}>chosen</T>
-                </g>
-              );
-            })()}
-            <T x={x0} y={top + 14} color={r.chosen ? INK.fg : INK.muted}>{r.label}</T>
-            <T x={x1} y={top + 14} anchor="end" color={r.chosen ? INK.fg : INK.muted}>
-              {values}
-            </T>
-            <line
-              x1={x0}
-              x2={end}
-              y1={barY}
-              y2={barY}
-              style={{ stroke: r.chosen ? INK.lamp : INK.fg, strokeWidth: r.chosen ? STROKE.emphasis : STROKE.ink }}
+            <T x={x0} y={top + 10} color={r.chosen ? INK.lamp : r.isDefault ? INK.fg : INK.muted}>{label}</T>
+            <T x={x1} y={top + 10} anchor="end" color={r.chosen ? INK.lamp : INK.muted}>{`≈ ${fmtTokens(r.tokens)}`}</T>
+            <path
+              d={`M${x0} ${y - 3.5}V${y + 3.5}M${end} ${y - 3.5}V${y + 3.5}M${x0} ${y}H${end}`}
+              style={{ fill: 'none', stroke: ink, strokeWidth: r.chosen ? STROKE.emphasis : STROKE.hair }}
             />
-            <Node x={end} y={barY} state="done" size={5} />
-            {r.isDefault && (
-              <T x={noteFits ? end + 8 : x1} y={barY + 4} anchor={noteFits ? 'start' : 'end'} color={INK.faint}>
-                {noteFits ? note : 'default'}
-              </T>
+            {savingFits && (
+              <text
+                x={end + 8}
+                y={y + 4}
+                style={{
+                  fontFamily: 'var(--font-name)',
+                  fontStyle: 'italic',
+                  fontWeight: 300,
+                  fontSize: 12,
+                  fill: r.chosen ? INK.lamp : INK.muted,
+                }}
+              >
+                {saving}
+              </text>
             )}
           </g>
         );
       })}
-
-      <Ruler x0={x0} x1={x1} y={rulerY} max={max} step={step} fmt={(v) => (v === 0 ? '0' : fmtTokens(v))} />
     </g>
   );
 
@@ -176,9 +137,9 @@ export function fig19Layout({ name, lineCount, levels, chosen, defaultLevel, wid
     height,
     drawing,
     title: titleText(name, lineCount, levels.whole, width),
-    label: `${name}: ${lineCount} lines, about ${levels.whole} tokens whole. ${rows
-      .map((r) => `${r.label} about ${r.tokens} tokens${r.chosen ? ' (chosen)' : ''}${r.isDefault ? ' (default)' : ''}`)
-      .join(', ')}.`,
+    label: `${name}: ${lineCount} lines. ${lines
+      .map((r) => `${r.label} about ${r.tokens} tokens${r.ratio < 1 ? `, ${fmtSaving(r.ratio) ?? 'the same'}` : ''}${r.chosen ? ' (chosen)' : ''}${r.isDefault ? ' (default)' : ''}`)
+      .join('; ')}.`,
   };
 }
 
