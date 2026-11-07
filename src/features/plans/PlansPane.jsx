@@ -272,6 +272,7 @@ export function PlansPane({ projectPath }) {
               <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground edge-b-engraved">
                 <span className="engraved-label">plans</span>
                 <span className="font-mono tabular-nums">{plans.length}</span>
+                <span className="truncate">· {basename(repoRoot)}</span>
               </div>
               {[...plans].sort((a, b) => runRank(a) - runRank(b)).map((plan) => (
                 <PlanRow key={plan.id} plan={plan} onOpen={() => setOpenPlanId(plan.id)} />

@@ -131,7 +131,7 @@ export function useTabCommands({
         if (arg && arg !== 'next' && arg !== 'implement') throw new Error(`no plan action "${arg}"`);
         requestPlanChunkCommand(arg || 'next');
       } },
-      { id: 'tasks', hint: 'tasks: the project backlog and the global tasks', run: () => requestTasksPane('toggle') },
+      { id: 'tasks', hint: 'tasks: this workspace\'s tasks and the global tasks', run: () => requestTasksPane('toggle') },
       { id: 'task', hint: 'add a task (type it after the command to prefill)', run: (arg) => requestQuickTask(arg) },
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },

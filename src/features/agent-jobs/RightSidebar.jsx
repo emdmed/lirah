@@ -726,7 +726,10 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             ) : (
               <SpanScale items={spanJobs}>
               <div className="flex flex-col">
-                <SpanRuler className="flex justify-end px-2.5 pt-1" />
+                <div className="flex items-center justify-between px-2.5 pt-1 text-[11px] text-muted-foreground">
+                  <span>· all repos</span>
+                  <SpanRuler />
+                </div>
                 {groupJobs(visibleJobs).map((entry) =>
                   entry.type === 'race' ? (
                     <RaceGroup

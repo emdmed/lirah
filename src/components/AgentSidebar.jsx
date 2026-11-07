@@ -181,6 +181,7 @@ export function SubagentList() {
 
   return (
     <>
+      <div className="px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground">· all tabs</div>
       {[...groups.entries()].map(([tabId, group]) => (
         <TabGroup
           key={tabId}
