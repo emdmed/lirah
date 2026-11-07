@@ -13,15 +13,15 @@ const agentState = (tab) => getAgentHookState(getTabSession(tab.id))?.state;
 // Only live states light the lamp; resting ones are a word (DESIGN rule 4).
 const MASTER_STATE = {
   working: { lamp: 'on', blink: true, word: 'working' },
-  permission: { lamp: 'warn', word: 'needs you' },
+  permission: { lamp: 'wait', word: 'needs you' },
 };
 
-// A worker node per agent state, in row order: filled ink while it
-// works, a dashed warn frame while a permission prompt holds it, an ok outline
-// when it's your turn, else an empty outline.
+// A worker body per agent state, in row order: filled ink while it
+// works, gold with a dotted halo while a permission prompt holds it, an ok ring
+// when it's your turn, else an empty ring.
 const NODE_INK = {
   working: { fill: 'var(--color-foreground)', stroke: 'var(--color-foreground)', word: 'working' },
-  permission: { fill: 'none', stroke: 'var(--ins-warn)', word: 'needs you', frame: true },
+  permission: { fill: 'var(--ins-lamp)', stroke: 'var(--ins-lamp)', word: 'needs you', halo: true },
   waiting: { fill: 'none', stroke: 'var(--ins-edge-strong)', word: 'idle' },
   done: { fill: 'none', stroke: 'var(--ins-ok)', word: 'your turn' },
 };
@@ -55,20 +55,18 @@ function WorkerFan({ workers }) {
           <g key={i}>
             <title>{`${name}: ${k.word}`}</title>
             <line x1={cx} y1={BUS_Y} x2={cx} y2={NODE_Y} style={hair} />
-            <rect
-              x={x + 0.5}
-              y={NODE_Y + 0.5}
-              width={NODE - 1}
-              height={NODE - 1}
-              style={{ fill: k.fill, stroke: k.stroke, strokeWidth: 1, ...ink('fill, stroke') }}
+            <circle
+              cx={cx}
+              cy={NODE_Y + NODE / 2}
+              r={NODE / 2 - 1}
+              style={{ fill: k.fill === 'none' ? 'var(--ins-raised)' : k.fill, stroke: k.stroke, strokeWidth: 1, ...ink('fill, stroke') }}
             />
-            {k.frame && (
-              <rect
-                x={x - 1.5}
-                y={NODE_Y - 1.5}
-                width={NODE + 3}
-                height={NODE + 3}
-                style={{ fill: 'none', stroke: 'var(--ins-warn)', strokeWidth: 0.75, strokeDasharray: '1.5 1.5' }}
+            {k.halo && (
+              <circle
+                cx={cx}
+                cy={NODE_Y + NODE / 2}
+                r={NODE / 2 + 1.5}
+                style={{ fill: 'none', stroke: 'var(--ins-lamp)', strokeWidth: 0.75, strokeDasharray: '1 2' }}
               />
             )}
           </g>
@@ -78,16 +76,17 @@ function WorkerFan({ workers }) {
   );
 }
 
-// working / tabs as a boxed value on a short leader; the box inks up while
-// any tab works. Hidden when the pane is too narrow to hold it.
+// working / tabs as a free label on a short leader ending in a dot; it inks
+// up while any tab works. Hidden when the pane is too narrow to hold it.
 function BusyBox({ busy, total }) {
   return (
     <span className="hidden shrink-0 items-center @[300px]:flex">
       <span className="h-px w-2.5 bg-[var(--ins-faint)]" />
+      <span className="mr-1 size-[3px] rounded-full bg-[var(--ins-faint)]" />
       <span
         className={cn(
-          'border px-[3px] leading-[13px] tabular-nums transition-colors duration-[var(--ins-cool)]',
-          busy ? 'border-foreground text-foreground' : 'border-[var(--ins-edge-strong)] text-muted-foreground',
+          'leading-[13px] tabular-nums transition-colors duration-[var(--ins-cool)]',
+          busy ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
         {busy}/{total}

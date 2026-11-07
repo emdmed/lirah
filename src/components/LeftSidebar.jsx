@@ -82,7 +82,7 @@ export const LeftSidebar = memo(function LeftSidebar({
         <PaneLegend
           index={1}
           title="Files"
-          status={
+          note={
             cursorIndex != null && rowCount > 0 ? <Position index={cursorIndex} count={rowCount} width={48} />
             : filtering && filterCounts?.total != null ? <span className="tabular-nums">{rowCount} <span className="text-faint">of {filterCounts.total}</span></span>
             : rowCount

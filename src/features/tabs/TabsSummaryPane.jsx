@@ -10,7 +10,8 @@ import { getTabContextFill } from './tabContextFill';
 import { getTabAutoCommit } from './tabAutoCommit';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
-import { AUTOPILOT_STATUS } from '../plans/planModel';
+import { AUTOPILOT_STATUS, haltWord } from '../plans/planModel';
+import { autopilotLamp } from '../plans/parts';
 import { LIVE, OWN_BUSY, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
 import { getTabPrompt } from './tabPrompts';
 import { tally } from './tally';
@@ -24,6 +25,7 @@ import { isSettledPlan } from '../plans/TabPlanTier';
 import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
+import { EmptyPlate } from '@/components/EmptyState';
 
 const ROW = '[data-tab-row]';
 
@@ -145,7 +147,7 @@ export function TabsSummaryPane({ onNewTab }) {
       onBlur={() => setFocusedId(null)}
     >
       {workspaceTabs.length === 0 && (
-        <span className="px-3 pt-2 text-[11px] text-muted-foreground">No tabs in this workspace yet.</span>
+        <EmptyPlate title="No tabs in this workspace yet" />
       )}
       <span id="tab-row-keys" className="sr-only">
         {ROW_KEYS.map((k) => `${k.keys.join(' ')} ${k.label}`).join(', ')}
@@ -160,9 +162,13 @@ export function TabsSummaryPane({ onNewTab }) {
         const turn = cli[tab.id] ? getLastTurn(getTabSession(tab.id)) : null;
         const summary = turnSummary(turn, now);
         const tabPlans = plans.byTab[tab.id];
-        const runFailed = tabPlans?.some((p) => p.autopilot?.status === AUTOPILOT_STATUS.FAILED);
+        // A stopped run speaks for a resting tab, in the plan card's own word and lamp.
+        const stopped = tabPlans?.map((p) => p.autopilot)
+          .filter((ap) => ap?.status === AUTOPILOT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.PAUSED)
+          .sort((a, b) => (autopilotLamp(b).state === 'fault') - (autopilotLamp(a).state === 'fault'))[0];
         const activity = workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel }
-          : runFailed && !LIVE.has(own.kind) ? { kind: 'failed', label: 'auto-pilot failed', since: own.since }
+          : stopped && !LIVE.has(own.kind)
+            ? { kind: autopilotLamp(stopped).state === 'fault' ? 'failed' : 'permission', label: `auto-pilot ${haltWord(stopped)}`, since: own.since }
             : own;
         kinds.push(activity.kind);
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
@@ -187,6 +193,8 @@ export function TabsSummaryPane({ onNewTab }) {
             activityKind={activity.kind}
             activityLabel={activity.label}
             activitySince={activity.since}
+            activityQuestion={activity.question}
+            agent={cli[tab.id]}
             workLabel={workLabel}
             active={active}
             linked={!active && linkedRepos.some((r) => r.path === tab.projectPath)}

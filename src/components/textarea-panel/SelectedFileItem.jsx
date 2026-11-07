@@ -2,7 +2,8 @@ import React, { useRef, useState } from "react";
 import { FileIntentTag } from "./FileStateSelector";
 import { Detent } from "../instrument/Detent";
 import { cn } from "@/lib/utils";
-import { Fig19Detail } from "@/features/file-analysis/Fig19Detail";
+import { Fig19Detail, fmtTokens } from "@/features/file-analysis/Fig19Detail";
+import { Lamp } from "../instrument/Lamp";
 import { defaultViewMode } from "@/features/file-analysis/useFileSymbols";
 
 /**
@@ -32,6 +33,9 @@ export function SelectedFileItem({
   const canAdjust = hasDetailLevel && !!onSetViewMode && !!detailOptions?.length;
   const [adjusting, setAdjusting] = useState(false);
   const detailButtonRef = useRef(null);
+  // Level and tokens, as the context chips print them: `sig 2.1k`, `full 0.4k`.
+  const sentTokens = levelTokens?.[hasDetailLevel ? viewMode : 'whole'];
+  const sent = sentTokens == null ? null : fmtTokens(sentTokens);
 
   const closeDetent = (refocus) => {
     setAdjusting(false);
@@ -56,10 +60,7 @@ export function SelectedFileItem({
       )}
     >
     <div className="flex min-w-0 items-center gap-1">
-      <FileIntentTag
-        value={currentState}
-        onValueChange={(newState) => onSetFileState(file.absolute, newState)}
-      />
+      <Lamp state={currentState === 'modify' ? 'on' : 'off'} className="mx-1 shrink-0" />
       <button
         onClick={() => onRemoveFile(file.absolute)}
         className="min-w-0 truncate text-left text-xs font-mono hover:line-through hover:text-destructive transition-colors cursor-pointer bg-transparent border-0 p-0"
@@ -67,6 +68,11 @@ export function SelectedFileItem({
       >
         {file.name}
       </button>
+      <FileIntentTag
+        value={currentState}
+        onValueChange={(newState) => onSetFileState(file.absolute, newState)}
+        className="lowercase tracking-normal"
+      />
       {hasDetailLevel ? (
         <button
           ref={detailButtonRef}
@@ -81,8 +87,8 @@ export function SelectedFileItem({
           aria-label={`Detail level: ${viewModeLabel}. Change.`}
           className="flex-shrink-0 flex items-center gap-1 px-1 h-3.5 border edge-engraved text-[11px] font-mono leading-none text-muted-foreground hover:text-foreground hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-colors disabled:pointer-events-none"
         >
-          <span className="engraved-label">{viewModeLabel}</span>
-          <span className="tube-idle">{lineCount}L</span>
+          <span>{{ Symbols: 'sym', Signatures: 'sig', Skeleton: 'skel' }[viewModeLabel] ?? viewModeLabel.toLowerCase()}</span>
+          <span className="tube-idle">{sent ?? `${lineCount}L`}</span>
           {showKeyboardHints && isSelected && (
             <span className="text-faint">V</span>
           )}
@@ -92,7 +98,7 @@ export function SelectedFileItem({
           title={`${lineCount} lines — sent in full`}
           className="flex-shrink-0 px-1 text-[11px] font-mono leading-none tube-idle"
         >
-          {lineCount}L
+          {sent ? `full ${sent}` : `${lineCount}L`}
         </span>
       ) : null}
     </div>

@@ -1,14 +1,5 @@
 @import "tailwindcss" source(".");
 
-/* Local Typestar OCR font declaration */
-@font-face {
-  font-family: 'Typestar OCR';
-  src: url('/fonts/Typestar-OCR.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* Splash/wordmark face (OFL, bundled: no render-blocking network request,
    and the app runs offline). Latin subset. */
 @font-face {
@@ -19,13 +10,59 @@
   font-display: swap;
 }
 
-/* Panel legend face (MIT, bundled: the app runs offline). A pixel face drawn
-   on an 11px grid, so legends stay at 11px and its single weight. */
+/* Terminal, chrome and legend face (OFL, bundled: the app runs offline).
+   Latin subset; xterm draws box-drawing glyphs itself. */
 @font-face {
-  font-family: 'Departure Mono';
-  src: url('/fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Base face for content and the terminal (bundled: the app runs offline). */
+@font-face {
+  font-family: 'Typestar OCR';
+  src: url('/fonts/Typestar-OCR.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Name face, for proper names set in italic (.ins-name). OFL, latin subset. */
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-LightItalic.woff2') format('woff2');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Spectral';
+  src: url('/fonts/Spectral-SemiBoldItalic.woff2') format('woff2');
+  font-weight: 600;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -33,7 +70,7 @@
 
 @theme {
   /* Font family */
-  --font-mono: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  --font-mono: "Typestar OCR", "Geist Mono", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
   
   /* Two sizes, like a terminal: 11px for chrome (labels, titles, status
      line), 12px for content (files, prompt, lists). xl/2xl stay for the rare
@@ -133,12 +170,11 @@
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
   --ins-glow:        6px;
-  /* Eärendil's star, the mark's four-point star: lit lamps, the meter needle,
-     the scanner's lit cell and the status-bar separator. Same eight points,
-     in the same order, as --ins-star-square, so the scanner can step between them. */
+  /* Eärendil's star, the mark's four-point star: the meter needle and the
+     status-bar separator. */
   --ins-star:        polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
-  --ins-star-square: polygon(50% 0, 100% 0, 100% 50%, 100% 100%, 50% 100%, 0 100%, 0 50%, 0 0);
-  --font-legend: "Departure Mono", var(--font-mono);
+  --font-legend: "Geist Mono", var(--font-mono);
+  --font-name: "Spectral", Georgia, serif;
   --legend-weight: 400;
   --legend-tracking: 0.04em;
   /* Slow, even easing for colour changes on hover and focus. */
@@ -209,7 +245,7 @@ body,
 body {
   /* The window edge is gutter, so it meets the pane gutters seamlessly. */
   background: var(--ins-gutter);
-  font-family: "Typestar OCR", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  font-family: var(--font-mono);
 }
 
 :root {
@@ -380,10 +416,11 @@ body {
   box-shadow: inset 0 -1px 0 0 var(--tui-line);
 }
 
-/* A status line: tab bar, status bar. */
+/* A status line: tab bar, status bar. No fill: it sits on the gutter's night
+   sky, as the site's rail does. */
 .chassis-rail,
 .chassis-rail.chassis-rail {
-  background-color: var(--tui-bar);
+  background-color: transparent;
 }
 
 /* Panel legends: printed caps, for inline use (.ins-legend's twin). */
@@ -395,6 +432,25 @@ body {
   letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
   color: var(--ins-legend);
+}
+
+/* Proper names (projects, plans, agents): Spectral italic. Tab titles go to 600. */
+.ins-name {
+  font-family: var(--font-name);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Tooltip heads stay light so they don't read as names. Button verbs keep 400: light italic vanished at 13px. */
+.ins-tip-title.ins-name {
+  font-weight: 300;
+}
+
+/* Rail words stay lowercase mono: its ghost keys don't take the italic verb face. */
+.ins-rail .ins-key-verb {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-weight: 400;
 }
 
 /* Numeric readouts: fixed-width columns in the lamp colour. */
@@ -424,6 +480,60 @@ body {
   `before:content-none` can opt a button out (status line segments do).
 */
 @layer components {
+  /* Empty-orbit plate (EmptyPlate in EmptyState.jsx). */
+  .ins-empty {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 22px 12px;
+    text-align: center;
+    font-size: var(--font-xs);
+    color: var(--color-muted-foreground);
+  }
+
+  .ins-empty-orbit {
+    flex-shrink: 0;
+    color: var(--ins-faint);
+  }
+
+  .ins-empty-line {
+    font-size: 16px;
+    line-height: 1.2;
+    color: var(--color-foreground);
+  }
+
+  .ins-empty-line::first-letter { text-transform: uppercase; }
+
+  .ins-empty-note { max-width: 30ch; }
+
+  .ins-empty-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-foreground);
+  }
+
+  /* Startup orrery (FirstTabChooser): bodies travel out from the mark, and fade when typing filters them out. */
+  .ins-orrery-body {
+    transition: opacity 0.2s;
+    animation: ins-orrery-arrive 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation-delay: calc(var(--i) * 60ms);
+  }
+
+  .ins-orrery-body[data-faded] {
+    opacity: 0.15;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ins-orrery-body {
+      animation-name: ins-orrery-fade;
+    }
+  }
+
+  .tui-dialog-empty {
+    padding: 4px 0;
+  }
+
   .tui-btn:not(:has(svg))::before {
     content: "[";
     opacity: 0.55;
@@ -521,17 +631,23 @@ body {
   }
 
   /* The legend follows the frame: warms with focus, cools after it. */
-  .tui-pane > .ins-pane-legend :is(.ins-legend, .ins-cap) {
+  .tui-pane > .ins-pane-legend :is(.ins-legend, .ins-name, .ins-cap) {
     transition: color var(--ins-cool) var(--ins-ease), border-color var(--ins-cool) var(--ins-ease);
   }
 
-  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-legend, .ins-cap) {
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-legend, .ins-name, .ins-cap) {
     transition-duration: var(--ins-warm);
   }
 
-  .tui-pane:focus-within > .ins-pane-legend .ins-legend,
-  .tui-pane.terminal-live > .ins-pane-legend .ins-legend {
+  .tui-pane:focus-within > .ins-pane-legend :is(.ins-legend, .ins-name),
+  .tui-pane.terminal-live > .ins-pane-legend :is(.ins-legend, .ins-name) {
     color: var(--color-foreground);
+  }
+
+  /* The key number lights gold with focus, like the keycap it replaced. */
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-key,
+  .ins-pane-legend .ins-pane-key[data-lit] {
+    color: var(--ins-lamp);
   }
 
   /* A terminal pane: the screen fills the frame, so the hairline is the
@@ -551,7 +667,7 @@ body {
     color: var(--ins-lamp);
   }
 
-  /* The focused pane's legend lamp lights as a star (see .ins-lamp). */
+  /* The focused pane's legend lamp lights gold (see .ins-lamp). */
   .tui-pane:focus-within > .ins-pane-legend .ins-lamp,
   .tui-pane.terminal-live > .ins-pane-legend .ins-lamp {
     --lamp-c: var(--ins-lamp);
@@ -582,10 +698,24 @@ body {
   align-self: stretch;
   flex-shrink: 0;
   width: calc(var(--tree-lead) + var(--depth, 0) * var(--tree-step));
-  background: repeating-linear-gradient(to right, transparent 0 5.5px, var(--ins-edge) 5.5px 6.5px, transparent 6.5px var(--tree-step))
-    var(--tree-lead) 0 / calc(100% - var(--tree-lead)) 100% no-repeat;
   user-select: none;
 }
+
+/* Dotted meridians: the hairline columns, masked into 1px dots every 2px.
+   On ::before so the mask leaves the cursor (::after) whole. */
+.tui-tree-guide::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 var(--tree-lead);
+  background: repeating-linear-gradient(to right, transparent 0 5.5px, var(--ins-faint) 5.5px 6.5px, transparent 6.5px var(--tree-step));
+  mask: repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 2px);
+}
+
+/* A file an agent read: its empty ring in muted ink, a step above faint. */
+.ins-agent-read .ins-lamp[data-state="off"] { --lamp-c: var(--color-muted-foreground); }
+
+/* A settled reticle in muted ink (READ and COPY context chips). */
+.ins-lamp.ins-lamp-muted[data-state="on"] { --lamp-c: var(--color-muted-foreground); }
 
 /* Folder disclosure: a muted text glyph in the chevron column (12px), from
    the glyph face, since the OCR face lacks the triangles. */
@@ -703,18 +833,22 @@ body {
 }
 
 /*
-  Dialogs are panes floating over the app, drawn like the focused pane:
-    ┌─ ^T NEW TAB ✦ ─────────────── status ┐
-    └──────── ↑ ↓ move ✦ ↵ open ✦ esc close┘
-  The title (with the shortcut keycap and lamp DialogTitle adds) sits in the
-  top line, a status in the top-right corner, and every key hint in the
-  bottom line, ending in a clickable esc cap. Unlayered so a dialog's own
+  Dialogs are panes floating over the app, drawn like the focused pane, with
+  the atlas plate's crop ticks just outside the corners:
+   ⌐                                       ¬
+    ┌─ ^T New tab ● ─────────────── status ┐
+    └─ FIG.03 ──── ↑ ↓ move ✦ ↵ open ✦ esc ┘
+   L                                       ⌐
+  The italic title (with the shortcut keycap and lamp DialogTitle adds) sits
+  in the top line, a mono status in the top-right corner, an optional FIG
+  caption and every key hint in the bottom line, ending in a clickable esc
+  cap. Unlayered so a dialog's own
   padding or title classes can't push the content onto the frame.
 */
 .tui-dialog {
   /* A dialog floats over the app, so its legends mask with its own face. */
   --pane-bg: var(--ins-raised);
-  --dialog-edge: var(--ins-edge-focus);
+  --dialog-edge: var(--ins-edge-strong);
   background: var(--ins-raised);
   padding-top: 22px !important;
   padding-bottom: 20px !important;
@@ -730,26 +864,81 @@ body {
   --dialog-edge: color-mix(in srgb, var(--ins-fault) 55%, var(--ins-edge-strong));
 }
 
-/* The frame strikes lamp-bright as the dialog arrives, then cools to its
-   edge: the filament the panes use. */
-[data-slot="dialog-content"].tui-dialog[data-state="open"]:not([data-instant])::after {
-  animation: ins-dialog-strike calc(var(--ins-warm) + var(--ins-cool)) var(--ins-ease) both;
+/* Arrival hairline: one ink line scales in across the top edge and fades as a
+   dialog opens, a float pane appears or a pane takes focus (Alt+1–4). Dialogs
+   draw it on a span (their ::before/::after are ticks and frame); panes on
+   their legend's ::after, under the legend's masked words. */
+.ins-arrive,
+.tui-pane > .ins-pane-legend::after {
+  position: absolute;
+  height: 1px;
+  background: var(--color-foreground);
+  transform-origin: left;
+  opacity: 0;
+  pointer-events: none;
 }
-@keyframes ins-dialog-strike {
-  0%, 28% { border-color: var(--ins-lamp); }
-  100% { border-color: var(--dialog-edge); }
+.ins-arrive {
+  top: 6px;
+  left: 0;
+  right: 0;
+  z-index: 5;
 }
-.tui-dialog[data-tone="fault"][data-state="open"]:not([data-instant])::after {
-  animation-name: ins-dialog-strike-fault;
+.tui-pane > .ins-pane-legend::after {
+  content: "";
+  top: 6px;
+  left: -8px;
+  right: -8px;
+  z-index: -1;
 }
-@keyframes ins-dialog-strike-fault {
-  0%, 28% { border-color: var(--ins-fault); }
-  100% { border-color: var(--dialog-edge); }
+[data-slot="dialog-content"][data-state="open"]:not([data-instant]) > .ins-arrive,
+.tui-float > .ins-pane-legend::after,
+.tui-pane:focus-within > .ins-pane-legend::after {
+  animation: ins-arrive 1.6s var(--ins-ease-out);
+}
+@keyframes ins-arrive {
+  0% { transform: scaleX(0); opacity: 1; }
+  55% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+@keyframes ins-arrive-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing travels: the line is drawn whole and only fades. */
+  .ins-arrive,
+  .tui-pane > .ins-pane-legend::after { animation-name: ins-arrive-fade !important; }
 }
 
-/* The title is a real element (DialogTitle), not the data-title attribute. */
+/* The title is a real element (DialogTitle), so ::before draws the crop
+   ticks instead: an 8px corner per corner, 5px off the frame on the
+   diagonal, its arms pointing away from the dialog (the frame is ::after,
+   inset 6px top and bottom). */
 .tui-dialog::before {
-  content: none;
+  --crop-len: 8px;
+  --crop-o: 13px;               /* tick box offset: 5px gap + 8px arm */
+  --crop-p: calc(var(--crop-len) - 1px);
+  --crop-ink: linear-gradient(var(--ins-faint), var(--ins-faint));
+  content: "";
+  inset: calc(6px - var(--crop-o)) calc(0px - var(--crop-o));
+  padding: 0;
+  background:
+    var(--crop-ink) left 0 top var(--crop-p) / var(--crop-len) 1px,
+    var(--crop-ink) left var(--crop-p) top 0 / 1px var(--crop-len),
+    var(--crop-ink) right 0 top var(--crop-p) / var(--crop-len) 1px,
+    var(--crop-ink) right var(--crop-p) top 0 / 1px var(--crop-len),
+    var(--crop-ink) left 0 bottom var(--crop-p) / var(--crop-len) 1px,
+    var(--crop-ink) left var(--crop-p) bottom 0 / 1px var(--crop-len),
+    var(--crop-ink) right 0 bottom var(--crop-p) / var(--crop-len) 1px,
+    var(--crop-ink) right var(--crop-p) bottom 0 / 1px var(--crop-len);
+  background-repeat: no-repeat;
+}
+
+/* Dialogs that clip their body still show the ticks.
+   shortcut: WebKit may ignore overflow-clip-margin, then these clip the side ticks. */
+.tui-dialog.overflow-hidden {
+  overflow: clip;
+  overflow-clip-margin: 14px;
 }
 
 /* Only simple titles move into the frame; a structured header (icon box,
@@ -767,12 +956,8 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-legend);
-  font-weight: var(--legend-weight);
-  font-size: var(--font-xs);
+  font-size: 13px;
   line-height: 12px;
-  letter-spacing: var(--legend-tracking);
-  text-transform: uppercase;
   color: var(--color-foreground);
   background: var(--pane-bg);
   z-index: 6;
@@ -780,8 +965,22 @@ body {
 
 /* The keycap and lamp in a title keep their own type. */
 .tui-dialog [data-slot="dialog-title"] .ins-cap {
-  text-transform: none;
-  letter-spacing: 0;
+  font-style: normal;
+  font-weight: 400;
+}
+
+/* Bottom-left of the frame: the plate's FIG caption. */
+.tui-dialog-fig {
+  position: absolute;
+  left: 10px;
+  bottom: 0;
+  padding: 0 5px;
+  font-size: var(--font-xs);
+  line-height: 12px;
+  letter-spacing: .06em;
+  color: var(--color-muted-foreground);
+  background: var(--pane-bg);
+  z-index: 6;
 }
 
 .tui-dialog [data-slot="dialog-title"]:not(:has(div, p)) svg {
@@ -801,9 +1000,11 @@ body {
   max-width: 40%;
   padding: 0 5px;
   overflow: hidden;
+  font-family: var(--font-mono);
   font-size: var(--font-xs);
   line-height: 12px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
   background: var(--pane-bg);
   z-index: 6;
@@ -871,36 +1072,8 @@ body {
 }
 
 /* An empty list: a faint star and one line. */
-.tui-dialog-empty {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: var(--font-xs);
-  color: var(--color-muted-foreground);
-}
-
-.tui-dialog-empty-star {
-  width: 9px;
-  height: 13px;
-  flex-shrink: 0;
-  background: var(--ins-faint);
-  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
-}
-
-/* Actions print as `[label]`; a destructive one draws a fault hairline, as
-   the primary draws a lamp one. */
-.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg))::before {
-  content: "[";
-  opacity: 0.55;
-}
-.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg))::after {
-  content: "]";
-  opacity: 0.55;
-}
-.tui-dialog [data-slot="dialog-footer"] [data-slot="button"]:not(:has(svg)) {
-  column-gap: 0;
-}
+/* Actions are italic verbs and the solid ink primary (no brackets); a
+   destructive one draws a fault hairline. */
 .tui-dialog [data-slot="dialog-footer"] .ins-key-danger {
   border-color: color-mix(in srgb, var(--ins-fault) 70%, var(--ins-edge-strong));
 }
@@ -1023,17 +1196,30 @@ body {
     color: var(--color-foreground);
   }
 
-  /* Primary: the legend and edge are printed in the lamp colour. */
+  /* Primary: a solid ink key, legend knocked out in the panel colour. */
   .ins-key-primary {
-    border-color: color-mix(in srgb, var(--ins-lamp) 70%, var(--ins-edge-strong));
-    color: var(--ins-lamp);
+    border-color: var(--color-foreground);
+    background: var(--color-foreground);
+    color: var(--ins-panel, var(--color-background));
   }
 
   .ins-key-primary:hover {
-    border-color: var(--ins-lamp);
-    background: color-mix(in srgb, var(--ins-lamp) 8%, transparent);
-    color: var(--ins-lamp);
+    border-color: color-mix(in srgb, var(--color-foreground) 85%, var(--ins-panel, var(--color-background)));
+    background: color-mix(in srgb, var(--color-foreground) 85%, var(--ins-panel, var(--color-background)));
+    color: var(--ins-panel, var(--color-background));
   }
+
+  /* Secondary actions print as italic verbs (pair with .ins-name): no tint,
+     a dotted underline on hover. Icons carry no underline. */
+  .ins-key-verb:hover {
+    background: transparent;
+    text-decoration: underline dotted var(--ins-faint);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  /* Spectral sets small next to the mono; the panel verbs take a step up. */
+  .ins-key-panel.ins-key-verb { font-size: 13px; }
 
   .ins-key-danger {
     color: var(--ins-fault);
@@ -1078,57 +1264,151 @@ body {
     padding: 0;
   }
 
-  /* Lamp. Off is a dark round lens; lit, it is a four-point star (Eärendil's
-     light) in its own colour, so on and off differ in shape as well as hue.
-     The star is the clipped ::before; the glow is a drop-shadow on the lamp
-     itself, which the clip can't cut. The star overhangs the 7px box by 2px,
-     so lighting a lamp never shifts its row. */
+  /* Lamp: a reticle in a 7px box. Off is an empty ring; lit adds a
+     crosshair and a centre dot. Steady on is ink; live (on + blink) and
+     waiting (wait) are gold (--ins-lamp) with a dotted halo; ok, warn and
+     fault keep their status colours. Crosshair and halo overhang the box, so a
+     lamp changing state never shifts its row. Colour lives in the
+     registered --lamp-ink, so it warms fast and cools slow (the filament). */
   .ins-lamp {
-    --lamp-c: var(--ins-lamp);
-    --lamp-glow: 70%;
+    --lamp-c: var(--ins-faint);
+    --lamp-ink: var(--lamp-c);
     position: relative;
     display: inline-block;
     width: 7px;
     height: 7px;
     flex-shrink: 0;
     border-radius: 9999px;
-    background: var(--ins-lamp-off);
-    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
-    /* Cooling: the glow lingers a moment after the lamp goes out. */
-    transition: background-color var(--ins-cool) var(--ins-ease-out), box-shadow var(--ins-cool) var(--ins-ease-out), filter var(--ins-cool) var(--ins-ease-out);
+    box-shadow: inset 0 0 0 1px var(--lamp-ink);
+    transition: --lamp-ink var(--ins-cool) var(--ins-ease-out);
   }
 
-  .ins-lamp::before {
+  .ins-lamp::before,
+  .ins-lamp::after {
     content: '';
     position: absolute;
-    inset: -2px;
-    clip-path: var(--ins-star);
-    transition: background-color var(--ins-cool) var(--ins-ease-out);
+    pointer-events: none;
   }
 
-  .ins-lamp[data-state="on"]    { --lamp-c: var(--ins-lamp); }
+  /* Crosshair arms outside the ring, reaching past the halo, and a 3px dot.
+     15px box, so the 1px lines land on the middle pixel. */
+  .ins-lamp::before {
+    inset: -4px;
+    background:
+      radial-gradient(circle, var(--lamp-ink) 1.5px, transparent 1.6px),
+      linear-gradient(to right, var(--lamp-ink) 5px, transparent 5px 10px, var(--lamp-ink) 10px) center / 100% 1px no-repeat,
+      linear-gradient(to bottom, var(--lamp-ink) 5px, transparent 5px 10px, var(--lamp-ink) 10px) center / 1px 100% no-repeat;
+    opacity: 0;
+    transform: scale(1.5);
+    transition: opacity var(--ins-cool) var(--ins-ease-out), transform var(--ins-cool) var(--ins-ease-out);
+  }
+
+  /* Dotted halo: live and waiting only. */
+  .ins-lamp::after {
+    inset: -3px;
+    border: 1px dotted var(--lamp-ink);
+    border-radius: 9999px;
+    opacity: 0;
+    transition: opacity var(--ins-cool) var(--ins-ease-out);
+  }
+
+  .ins-lamp[data-state="on"]    { --lamp-c: var(--color-foreground); }
   .ins-lamp[data-state="ok"]    { --lamp-c: var(--ins-ok); }
   .ins-lamp[data-state="warn"]  { --lamp-c: var(--ins-warn); }
+  .ins-lamp:is([data-state="wait"], [data-state="on"][data-blink]) { --lamp-c: var(--ins-lamp); }
   .ins-lamp[data-state="fault"] { --lamp-c: var(--ins-fault); }
 
-  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]),
-  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp {
-    background: transparent;
-    box-shadow: none;
-    filter: drop-shadow(0 0 calc(var(--ins-glow) / 2) color-mix(in srgb, var(--lamp-c) var(--lamp-glow), transparent));
-    transition-duration: var(--ins-warm);
-  }
-
-  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"])::before,
+  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="wait"], [data-state="fault"]),
+  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="wait"], [data-state="fault"])::before,
+  .ins-lamp:is([data-state="wait"], [data-state="on"][data-blink]):not([data-settled])::after,
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp,
   .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp::before {
-    background: var(--lamp-c);
+    opacity: 1;
     transition-duration: var(--ins-warm);
   }
 
-  /* Settled: the star keeps its colour, without the glow (glow means live). */
-  .ins-lamp[data-settled] { filter: none; }
+  /* Lighting, the crosshair closes in on the ring: a sight locking on. */
+  .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="wait"], [data-state="fault"])::before,
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp::before {
+    transform: none;
+    transition-duration: var(--ins-warm), 240ms;
+  }
 
-  :root[data-theme="light"] :is(.ins-lamp, .fig-glow) { --lamp-glow: 50%; }
+  /* A figure's caption (figure/kit.jsx FigLabel): under the drawing on a
+     hairline, tracked uppercase mono. */
+  .ins-fig-caption {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px solid var(--ins-edge);
+    font: 11px/1.2 var(--font-legend);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .ins-fig-caption-note {
+    font-size: 13px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ins-lamp);
+  }
+
+  /* A figure set on its own raised plate (FIG.19 under a file row). */
+  .ins-fig-plate {
+    padding: 12px 14px;
+    border: 1px solid var(--ins-edge-strong);
+    background: var(--ins-raised);
+    --fig-paper: var(--ins-raised);
+  }
+
+  /* Plan chunk spine (ChunkRow): a body per chunk on one faint vertical line
+     through the 14px node column. Done bodies are filled ink, the live chunk
+     is the gold sun (.ins-chunk-sun), the next a solid ink ring, queued ones
+     faint dashed rings. */
+  .ins-body {
+    position: relative;
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    border: 1px dashed var(--color-foreground);
+    background: var(--pane-bg, var(--ins-panel));
+    opacity: 0.6;
+  }
+  .ins-body[data-body="done"] { border: 0; background: var(--color-foreground); opacity: 1; }
+  .ins-body[data-body="next"] { border-style: solid; opacity: 1; }
+  .ins-body[data-skipped] { opacity: 0.5; }
+
+  .ins-chunk-sun {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    stroke: var(--ins-lamp);
+  }
+  .ins-chunk-sun > .ins-sun { position: absolute; }
+
+  .ins-spine::before,
+  .ins-spine::after {
+    content: '';
+    position: absolute;
+    left: calc(0.75rem + 6.5px); /* centre of the node column */
+    border-left: 1px solid var(--ins-faint);
+    pointer-events: none;
+  }
+  .ins-spine::before { top: 0; height: 4px; }
+  .ins-spine::after { top: 20px; bottom: 0; }
+  .ins-spine:not(.ins-spine ~ .ins-spine)::before,
+  .ins-spine:not(:has(~ .ins-spine))::after { display: none; }
+
+  :root[data-theme="light"] .fig-glow { --lamp-glow: 50%; }
 
   /* Figure glow (kit Glow): the one lit thing in a FIG drawing, in the
      lamp's colour and strength. .fig-live is the moving star: it glides to
@@ -1147,36 +1427,53 @@ body {
   .ins-lamp[data-blink] {
     /* A variable, since the minifier drops color-mix() inside keyframes. */
     --lamp-dim: color-mix(in srgb, var(--lamp-c) 25%, var(--ins-lamp-off));
-    animation: ins-blink-glow 1s steps(1) infinite;
+    animation: ins-blink 1s steps(1) infinite;
   }
 
-  .ins-lamp[data-blink]::before {
-    animation: ins-blink-face 1s steps(1) infinite;
-  }
-
-  /* Busy scanner (Scanner.jsx): square lamp segments, one lit cell chasing
-     across with a dimmer trail. Stepped, like a TUI redraw. */
+  /* Busy scanner (Scanner.jsx): a gold body stepping round a tilted orbit.
+     --scan-a steps through eight angles; cos/sin place the body on the ellipse. */
   .ins-scan {
-    --scan-cell: 3px;
-    --scan-gap: 1px;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--scan-gap);
+    --scan-rx: 6px;
+    --scan-ry: 2.5px;
+    --scan-body: 3px;
+    --scan-tilt: -11deg;
+    position: relative;
+    display: inline-block;
+    width: calc(var(--scan-rx) * 2 + var(--scan-body));
+    height: calc(var(--scan-rx) + var(--scan-body));
     flex-shrink: 0;
     vertical-align: middle;
   }
 
-  .ins-scan[data-size="md"] { --scan-cell: 4px; --scan-gap: 2px; }
-  .ins-scan[data-size="lg"] { --scan-cell: 6px; --scan-gap: 3px; }
+  .ins-scan[data-size="md"] { --scan-rx: 9px; --scan-ry: 3.5px; --scan-body: 4px; }
+  .ins-scan[data-size="lg"] { --scan-rx: 14px; --scan-ry: 5.5px; --scan-body: 6px; }
 
-  /* Resting cells are squares; the lit cell steps up into a star. */
+  .ins-scan::before,
   .ins-scan > i {
-    display: block;
-    width: var(--scan-cell);
-    height: var(--scan-cell);
-    background: var(--ins-lamp-off);
-    clip-path: var(--ins-star-square);
-    animation: ins-scan 0.6s steps(1) infinite;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+  }
+
+  .ins-scan::before {
+    content: "";
+    width: calc(var(--scan-rx) * 2);
+    height: calc(var(--scan-ry) * 2);
+    border: 1px solid var(--ins-faint);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) rotate(var(--scan-tilt));
+    /* The ink sun at the centre. */
+    background: radial-gradient(circle, var(--color-foreground) 1.5px, transparent 2px);
+  }
+
+  .ins-scan > i {
+    width: var(--scan-body);
+    height: var(--scan-body);
+    margin: calc(var(--scan-body) / -2);
+    background: var(--ins-lamp);
+    transform: rotate(var(--scan-tilt))
+      translate(calc(cos(var(--scan-a)) * var(--scan-rx)), calc(sin(var(--scan-a)) * var(--scan-ry)));
+    animation: ins-scan 1.6s steps(8) infinite;
   }
 
   /* The Lirah mark (LirahMark.jsx). Lit, it is the title bar's session lamp:
@@ -1185,6 +1482,12 @@ body {
     fill: var(--ins-legend);
     stroke: var(--ins-legend);
     transition: fill var(--ins-cool) var(--ins-ease-out), stroke var(--ins-cool) var(--ins-ease-out), filter var(--ins-cool) var(--ins-ease-out);
+  }
+
+  /* The orrery's sun (startup orrery): the mark in gold, no glow. */
+  .ins-mark.ins-sun {
+    fill: var(--ins-lamp);
+    stroke: var(--ins-lamp);
   }
 
   .ins-mark[data-lit] {
@@ -1257,6 +1560,28 @@ body {
     box-shadow:
       inset 0 0 0 1px var(--ins-edge-strong),
       0 4px 12px rgb(0 0 0 / 0.12);
+  }
+
+  /* Tooltip plate: italic title over the mono body, then a hairline with the
+     FIG number at the left and the hint (key, click) at the right. */
+  .ins-tip:has(.ins-tip-title) { padding: 10px 12px; }
+  .ins-tip-title {
+    display: block;
+    font-size: 16px;
+    line-height: 1.2;
+    color: var(--color-foreground);
+    margin-bottom: 4px;
+  }
+
+  .ins-tip-fig {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid var(--ins-edge);
+    color: var(--color-muted-foreground);
+    font-size: 11px;
   }
 
   /* Raised face for cards and overlays. */
@@ -1824,9 +2149,29 @@ body {
   .ins-pane-legend > :first-child { flex-shrink: 0; }
   .ins-pane-legend > :last-child { min-width: 0; }
 
+  /* Name: italic Spectral, sized to sit in the 14px legend row. */
+  .ins-pane-legend .ins-pane-key { color: var(--ins-faint); }
+
+  .ins-pane-name {
+    font-size: 14px;
+    line-height: 1;
+    color: var(--ins-legend);
+    white-space: nowrap;
+  }
+
   .ins-pane-legend-status {
+    display: inline-flex;
+    align-items: center;
     font-size: var(--font-xs);
     line-height: 1;
+    color: var(--color-muted-foreground);
+  }
+
+  .ins-pane-legend-note {
+    font-family: var(--font-mono);
+    font-size: var(--font-xs);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
     color: var(--color-muted-foreground);
   }
 }
@@ -1844,19 +2189,28 @@ body {
   text-decoration-line: none;
 }
 
-/* Registered so the glow can step in a keyframe (see .ins-lamp[data-blink]). */
+/* Registered so the figure glow can vary per theme (see .fig-glow). */
 @property --lamp-glow {
   syntax: '<percentage>';
   inherits: true;
   initial-value: 70%;
 }
 
-@keyframes ins-blink-glow {
-  50% { --lamp-glow: 0%; }
+/* Registered so the lamp's colour can transition and step in a keyframe. */
+@property --scan-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
 
-@keyframes ins-blink-face {
-  50% { background-color: var(--lamp-dim); }
+@property --lamp-ink {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@keyframes ins-blink {
+  50% { --lamp-ink: var(--lamp-dim); }
 }
 
 /* Soft breathing for busy placeholders and working-state icons. */
@@ -1869,33 +2223,16 @@ body {
 }
 
 @keyframes ins-scan {
-  0% {
-    background: var(--ins-lamp);
-    clip-path: var(--ins-star);
-    transform: scale(1.7);
-  }
-  25% {
-    background: color-mix(in srgb, var(--ins-lamp) 45%, var(--ins-lamp-off));
-    clip-path: var(--ins-star-square);
-    transform: none;
-  }
-  50%, 100% {
-    background: var(--ins-lamp-off);
-    clip-path: var(--ins-star-square);
-    transform: none;
-  }
+  to { --scan-a: 360deg; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ins-lamp[data-blink],
-  .ins-lamp[data-blink]::before { animation: none; }
+  .ins-lamp[data-blink] { animation: none; }
+  .ins-lamp::before { transform: none !important; }
   .ins-pulse { animation: none; }
   .fig-live { transition: none; }
-  /* Still reads as "busy": every segment held half-lit. */
-  .ins-scan > i {
-    animation: none;
-    background: color-mix(in srgb, var(--ins-lamp) 55%, var(--ins-lamp-off));
-  }
+  /* Body held still at the first step. */
+  .ins-scan > i { animation: none; }
   .ins-meter-needle,
   .ins-meter-callout,
   .ins-meter-fill,
@@ -2039,4 +2376,17 @@ body {
   .ins-line-enter { animation-name: ins-fade-in; }
   /* The edge holds full width until the message goes. */
   .ins-drain { animation: none; }
+}
+
+@keyframes ins-orrery-arrive {
+  from {
+    transform: translate(var(--sun-x), var(--sun-y)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes ins-orrery-fade {
+  from {
+    opacity: 0;
+  }
 }

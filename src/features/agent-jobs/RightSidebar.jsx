@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Square, GitCompare, Check, Trash, JournalPage, GitMerge, Undo, NavArrowRight, NavArrowDown, WarningTriangle, Copy, Archive, Upload, Trophy, Expand, Collapse } from 'iconoir-react';
+import { Square, GitCompare, Check, Trash, JournalPage, GitMerge, Undo, NavArrowRight, NavArrowDown, WarningTriangle, Copy, Archive, Upload, Trophy, Expand, Collapse, FastArrowRight } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -630,23 +630,19 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <>
             <WorkspaceRow />
             <span className="ins-sep-star" aria-hidden="true" />
-            <button
+            <PanelButton
+              icon={wide ? Collapse : Expand}
               onClick={toggleWide}
-              className="text-muted-foreground hover:text-foreground cursor-pointer"
               title={wide ? 'Restore pane width' : 'Widen pane to half the window'}
               aria-label={wide ? 'Restore pane width' : 'Widen pane'}
               aria-pressed={wide}
-            >
-              {wide ? <Collapse className="h-3 w-3" /> : <Expand className="h-3 w-3" />}
-            </button>
-            <button
+            />
+            <PanelButton
+              icon={FastArrowRight}
               onClick={() => setCollapsedOverride(true)}
-              className="text-[11px] leading-none text-muted-foreground hover:text-foreground cursor-pointer"
               title="Collapse pane"
               aria-label="Collapse pane"
-            >
-              »
-            </button>
+            />
           </>
         }
       />

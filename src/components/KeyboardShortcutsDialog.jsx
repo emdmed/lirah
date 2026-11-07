@@ -3,11 +3,11 @@ import { Keycap } from './instrument/Keycap'
 import { shortcutsByCategory } from '../lib/shortcuts'
 import { Fig15Keys } from './Fig15Keys'
 import { useEffect, useRef } from 'react'
-import { cn } from '@/lib/utils'
-import { ACTIVITY } from '@/features/tabs/tabActivity'
+import { activityLamp } from '@/features/tabs/tabActivity'
+import { Lamp } from './instrument/Lamp'
 import { ContextMoon } from './instrument/ContextMoon'
 
-// What each glyph in the workspace pane's tab rows means, drawn with the row's own icons.
+// What each lamp in the workspace pane's tab rows means, drawn with the row's own lamp map.
 const GLYPHS = [
   ['working', 'working'],
   ['running', 'running a command'],
@@ -29,11 +29,7 @@ function GlyphLegend() {
   return (
     <ul aria-label='Tab row glyphs' className='grid grid-cols-2 gap-x-4 pt-2'>
       {GLYPHS.map(([kind, label]) => {
-        const { icon: Icon, color, pulse } = ACTIVITY[kind]
-        return row(
-          <span aria-hidden='true' className={cn('inline-flex', color, pulse && 'ins-pulse')}><Icon className='h-3.5 w-3.5' strokeWidth={2} /></span>,
-          label,
-        )
+        return row(<Lamp {...activityLamp(kind, false)} />, label)
       })}
       {row(<ContextMoon ratio={0.6} />, 'context window fill')}
       {row(<span aria-hidden='true' className='font-mono tabular-nums text-[var(--ins-warn)]'>1</span>, 'place in the Alt+A queue')}
@@ -71,6 +67,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange, section }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size='lg'
+        fig="15"
         className='max-h-[80vh] flex flex-col overflow-hidden'
         keys={['^', 'H']}
         status={`${COUNT} shortcuts`}

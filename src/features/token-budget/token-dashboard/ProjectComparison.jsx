@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Sort, ArrowUp, ArrowDown, Search } from 'iconoir-react';
 import { formatCost, formatTokenCount } from '../tokenCalculations';
+import { EmptyPlate } from '@/components/EmptyState';
 
 const SORT_OPTIONS = [
   { key: 'totalCost', label: 'Cost' },
@@ -112,9 +113,7 @@ export function ProjectComparison({ projects, totals, colors }) {
         ))}
 
         {sorted.length === 0 && (
-          <div className="text-xs text-muted-foreground text-center py-8">
-            {search ? 'No projects match your search' : 'No projects found in ~/.claude/projects'}
-          </div>
+          <EmptyPlate title={search ? 'No projects match your search' : 'No projects found'} description={search ? undefined : '~/.claude/projects is empty'} />
         )}
 
         {/* Totals row */}

@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, mem
 import { Terminal } from "../../components/Terminal";
 import { LaunchAgentPrompt } from "../../components/LaunchAgentPrompt";
 import { NoPluginBanner } from "../../components/NoPluginBanner";
-import { TAB_CLI_PROCESSES } from "../../lib/agentClis";
+import { TAB_CLI_PROCESSES, tabCliProcess } from "../../lib/agentClis";
 import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
@@ -121,7 +121,7 @@ function TabBootPlaceholder({ projectPath, stage }) {
       className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3"
       style={{ backgroundColor: 'var(--ins-gutter)' }}
     >
-      <span className="ins-legend text-foreground">{name}</span>
+      <span className="ins-name text-[16px] text-foreground">{name}</span>
       <span className="h-px w-56 bg-[var(--ins-edge)]" aria-hidden="true" />
       <span className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
         <Lamp state="on" blink />
@@ -1094,6 +1094,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               onAtMentionClose={atMention.handleAtMentionClose}
               fileStates={fileSelection.fileStates}
               onSetFileState={fileSelection.setFileState}
+              fileSymbols={fileSymbolsHook}
               onToggleFile={fileSelection.toggleFileSelection}
               sessionId={terminalSessionId}
               onClearContext={handleClearContext}
@@ -1106,6 +1107,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           ) : (
             <ContextStatus
               selectedFiles={fileSelection.selectedFiles}
+              fileSymbols={fileSymbolsHook}
               fileStates={fileSelection.fileStates}
               currentPath={currentPath}
               linkedRepos={linkedRepos}
@@ -1138,6 +1140,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
             viewMode={viewMode}
             currentPath={currentPath}
             sessionId={terminalSessionId}
+            branchName={branchName}
             onToggleHelp={toggleHelp}
             selectedCli={settings.selectedCli}
             onOpenCliSettings={openCliSettings}
@@ -1199,7 +1202,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           projectDir={resolvedProjectDir}
           onSandboxFailed={handleSandboxFailed}
           reattachKey={tabId}
-          claudeRunning={settings.selectedCli === 'claude-code' && cliRunning === 'claude'}
+          cli={settings.selectedCli}
+          cliRunning={cliRunning === tabCliProcess(settings.selectedCli)}
           master={master}
         />
         {!settings.autoLaunchCli && <LaunchAgentPrompt

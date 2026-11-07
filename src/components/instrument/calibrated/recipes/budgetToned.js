@@ -1,5 +1,7 @@
 // budgetToned: the kit's budget recipe plus Lirah's gauge tones.
 // Registered on Calibrated.recipes by recipes/index.js.
+import { atlas } from './atlas';
+
 const C = window.Calibrated;
 const { K } = C;
 const R = C.recipes;
@@ -65,4 +67,4 @@ function budgetToned(o) {
 }
 budgetToned.extent = R.budget.extent;
 
-R.budgetToned = budgetToned;
+R.budgetToned = atlas(budgetToned);

@@ -1,9 +1,10 @@
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { Lamp } from '../../components/instrument/Lamp';
+import { tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useAutopilotRuns, usePlansActions } from './PlansContext';
 import { AUTOPILOT_STATUS, haltWord, planProgress, UNTITLED_PLAN } from './planModel';
-import { AUTOPILOT_LAMP } from './parts';
+import { autopilotLamp } from './parts';
 
 /**
  * Status-bar readout of auto-pilot runs, whichever tab is showing: the most
@@ -12,12 +13,15 @@ import { AUTOPILOT_LAMP } from './parts';
 export function AutopilotIndicator() {
   const runs = useAutopilotRuns();
   const { revealRun } = usePlansActions();
+  const { tabs } = useTabManager();
   if (runs.length === 0) return null;
   const { repoRoot, plan } = runs[0];
   const ap = plan.autopilot;
   const { done, total } = planProgress(plan);
   const label = ap.status === AUTOPILOT_STATUS.RUNNING ? `${done}/${total}` : haltWord(ap);
-  const lamp = AUTOPILOT_LAMP[ap.status];
+  const lamp = autopilotLamp(ap);
+  // Name the run's tab, so the rail says where to look.
+  const tab = tabs.find((t) => t.id === ap.tabId);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -29,7 +33,9 @@ export function AutopilotIndicator() {
         >
           <Lamp state={lamp.state} blink={lamp.blink} />
           <span className="text-muted-foreground">
-            [auto-pilot {label}{runs.length > 1 ? ` +${runs.length - 1}` : ''}]
+            auto-pilot {label}
+            {tab && <span className="text-foreground"> · {tabDisplayName(tab)}</span>}
+            {runs.length > 1 ? ` +${runs.length - 1}` : ''}
           </span>
         </Button>
       </TooltipTrigger>

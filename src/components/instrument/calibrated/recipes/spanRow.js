@@ -1,12 +1,14 @@
 // spanRow: one duration as a dimension line on a shared time scale, in the
 // calibrated marks, at Lirah's list-row size (14px tall, values in a column).
 // `tone` done | live | fault | muted inks the line; a live span ends in the
-// lamp star with a dashed lamp tail. Full adds end ticks; compact keeps the
-// line, the star and the value.
+// gold sun (atlas) with a dashed lamp tail. Full adds end ticks; compact keeps
+// the line, the sun and the value.
 //
 // Data: { ms, max (ms), tone, text, compact, track, gap, valueW }.
 // Motion (see Calibrated.play): t is ms; on entry the line grows from 0 to
 // its length. A live span's once-a-second redraw is a plain mount.
+import { atlas } from './atlas';
+
 const C = window.Calibrated;
 const { K } = C;
 const R = C.recipes;
@@ -33,7 +35,7 @@ function spanRow(o) {
 }
 spanRow.extent = spanRow.duration = () => DUR;
 
-R.spanRow = spanRow;
+R.spanRow = atlas(spanRow);
 
 // spanRuler: the list's time scale over the same track, printed once above
 // the rows. Data: { maxSecs, step (s), track, w, fmt }. Ticks every step,

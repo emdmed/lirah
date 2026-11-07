@@ -10,6 +10,8 @@
 //   stopped  true for a cancelled or interrupted run: muted ink, open node.
 // Motion as the kit's lanes: a time cursor sweeps the ruler, each lane grows
 // from its start and latches when the cursor passes its end.
+import { atlas } from './atlas';
+
 const C = window.Calibrated;
 const { K, fmt } = C;
 const R = C.recipes;
@@ -39,7 +41,7 @@ function lanesToned(o) {
     if (xe - xs > 1) k += K.dim(xs, xe, y - 14, lab, live ? 'fg' : fault ? 'ft' : 'mu');
     if (l.box && land) {
       k += K.box(w - boxW - 10, y - 16, boxW, l.box[0], l.box[1], live ? 'lv' : fault ? 'ft' : 'fg', live ? 'lv' : 'ed');
-      if (!live) k += K.line(xe + 6, y, w - boxW - 10, y, 'e1', { dash: '1 3' });
+      if (!live) k += K.leader([[xe + 6, y], [w - boxW - 10, y]], false);
     }
     g += land ? `<g data-land="${i}">${k}</g>` : k;
   });
@@ -51,4 +53,4 @@ function lanesToned(o) {
 }
 lanesToned.extent = R.lanes.extent;
 
-R.lanesToned = lanesToned;
+R.lanesToned = atlas(lanesToned);

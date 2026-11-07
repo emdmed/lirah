@@ -58,6 +58,7 @@ export const TextareaPanel = memo(function TextareaPanel({
   onClearRepos,
   onRemoveFile,
   onRemoveElement,
+  fileSymbols,
   keepFilesAfterSend = false,
   onToggleKeepFiles,
 }) {
@@ -204,9 +205,10 @@ export const TextareaPanel = memo(function TextareaPanel({
         onSetFileState={onSetFileState}
         onRemoveFile={onRemoveFile}
         onRemoveElement={onRemoveElement}
+        fileSymbols={fileSymbols}
       />
     ) : null
-  ), [chipsOpen, fileArray.length, elementCount, selectedFiles, fileStates, selectedElements, currentPath, onSetFileState, onRemoveFile, onRemoveElement]);
+  ), [chipsOpen, fileArray.length, elementCount, selectedFiles, fileStates, selectedElements, currentPath, onSetFileState, onRemoveFile, onRemoveElement, fileSymbols]);
 
   const projectZone = useMemo(() => (
     <ProjectToolbar

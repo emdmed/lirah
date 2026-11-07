@@ -127,6 +127,7 @@ export async function deleteWorkspaceFolder(id) {
 export function saveWorkspaces(state) {
   const { workspaces, tabs, activeWorkspaceId } = state;
   current = state;
+  try { localStorage.setItem('lirah-splash-tabs', String(tabs.length)); } catch { /* storage unavailable */ } // index.html: 'restoring N tabs'
   for (const w of workspaces) {
     const own = tabs.filter((t) => t.workspaceId === w.id).map(({ workspaceId, background, ...t }) => t);
     const ids = new Set(own.map((t) => t.id));

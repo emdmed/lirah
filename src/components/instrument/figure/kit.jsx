@@ -28,8 +28,8 @@ export const STROKE = { hair: 1, ink: 1.3, emphasis: 1.6, heavy: 2 };
 // Dash patterns, finest first: projection, pending, planned, out of reach.
 export const DASH = { fine: '2 3', medium: '4 3', long: '5 4', sparse: '2 4' };
 
-// Departure Mono at 11px advances 7px per character (its 7px pixel cell;
-// 6.6 left one-line boxes a character short). Layout uses this
+// Geist Mono at 11px advances 6.6px per character, ~7px with the legend
+// tracking (6.6 left one-line boxes a character short). Layout uses this
 // estimate rather than measuring, so figures lay out in one pass.
 export const CH = 7;
 export const textWidth = (s, tracking = 0) => String(s).length * (CH + tracking);
@@ -62,43 +62,45 @@ export function T({ x, y, children, color = INK.muted, anchor = 'start', trackin
   );
 }
 
-// The figure's title in the top-left corner. The FIG number stays in
-// registry.js for citing and opening, but is not printed.
-export function FigLabel({ title, x = 0, y = 11 }) {
+// The figure's caption, under the drawing on a hairline (Figure renders it
+// as HTML after the SVG). The FIG number stays in registry.js for citing and
+// opening, but is not printed.
+// `note` sits at the right of the rule in italic gold (FIG.19's saving).
+export function FigLabel({ title, note }) {
   if (!title) return null;
-  return <T x={x} y={y} tracking={0.5}>{title}</T>;
+  return (
+    <div className="ins-fig-caption">
+      <span>{title}</span>
+      {note && <span className="ins-fig-caption-note ins-name">{note}</span>}
+    </div>
+  );
 }
 
-// A boxed value: name on the first line, value on the second. One line is
-// 19px tall, two lines 32px.
-export function Box({ x, y, width, label, value, valueColor = INK.fg, stroke = INK.edgeStrong }) {
+// A free label (the atlas hand): the name in italic over a mono note, no
+// frame. Keeps the old boxed value's footprint: one line 19px, two 32px.
+export function Box({ x, y, label, value, valueColor = INK.muted }) {
   const two = value != null && value !== '';
   return (
     <g>
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={two ? 32 : 19}
-        style={{ fill: INK.paper, stroke, strokeWidth: STROKE.hair }}
-      />
-      <T x={x + 7} y={y + 13}>{label}</T>
-      {two && <T x={x + 7} y={y + 26} color={valueColor}>{value}</T>}
+      <text x={x + 7} y={y + 14} style={{ fill: INK.fg, fontFamily: 'var(--font-name)', fontStyle: 'italic', fontWeight: 300, fontSize: 15 }}>
+        {label}
+      </text>
+      {two && <T x={x + 7} y={y + 28} color={valueColor}>{value}</T>}
     </g>
   );
 }
 
-// A leader: an elbowed hairline from the measured thing to its label. The
-// hollow dot sits on the first point, the thing being pointed at.
-export function Leader({ points, dot = true, color = INK.faint }) {
+// A leader (the atlas hand): a thin ink line from the measured thing to its
+// label, ending in a dot at the label. `dot` also marks the first point.
+export function Leader({ points, dot = false, color = INK.fg }) {
   const d = `M${points.map((p) => p.join(' ')).join(' L')}`;
-  const [cx, cy] = points[0];
+  const [sx, sy] = points[0];
+  const [ex, ey] = points[points.length - 1];
   return (
     <g>
-      <path d={d} style={{ fill: 'none', stroke: color, strokeWidth: STROKE.hair }} />
-      {dot && (
-        <circle cx={cx} cy={cy} r={2} style={{ fill: INK.paper, stroke: INK.fg, strokeWidth: STROKE.hair }} />
-      )}
+      <path d={d} style={{ fill: 'none', stroke: color, strokeWidth: 0.6, strokeOpacity: 0.6 }} />
+      {dot && <circle cx={sx} cy={sy} r={1.6} style={{ fill: color }} />}
+      <circle cx={ex} cy={ey} r={1.6} style={{ fill: color }} />
     </g>
   );
 }
@@ -133,19 +135,17 @@ export function Glow({ live = false, style, children }) {
 }
 
 // A state node. done: filled square; todo: outlined square; merge: diamond;
-// live: the lamp star, the only mark that glows.
+// live: the gold sun with a dotted corona, the only mark that glows.
 export function Node({ x, y, state = 'todo', size = 8 }) {
   const h = size / 2;
   if (state === 'live') {
     // Drawn at the origin and moved by a CSS transform, so a redraw that
     // moves it (a clock tick, the next step) glides over --ins-dur-base;
     // reduced motion snaps it (index.css .fig-live).
-    const r = size;
-    const s = size / 4;
-    const d = `M0 ${-r}L${s} ${-s}L${r} 0L${s} ${s}L0 ${r}L${-s} ${s}L${-r} 0L${-s} ${-s}Z`;
     return (
       <Glow live style={{ transform: `translate(${x}px, ${y}px)` }}>
-        <path d={d} style={{ fill: INK.lamp }} />
+        <circle r={size * 0.85} style={{ fill: 'none', stroke: INK.lamp, strokeWidth: 0.8 }} strokeDasharray="1 2" />
+        <circle r={size / 2} style={{ fill: INK.lamp }} />
       </Glow>
     );
   }

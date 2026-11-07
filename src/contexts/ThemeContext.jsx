@@ -71,12 +71,16 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--color-warn', ui.warn ?? terminal.brightYellow);
     root.style.setProperty('--color-fault', ui.fault ?? terminal.brightRed);
 
-    // Save theme preference, and its gutter colour for the boot splash
+    // Save theme preference, and its gutter, ink and lamp colours for the boot splash
     // (index.html reads it before any module loads).
     if (forced.current !== currentTheme) {
       forced.current = null; // a manual switch during the run is a real choice
       saveTheme(currentTheme);
-      try { localStorage.setItem('lirah-splash-bg', ui.background); } catch { /* storage unavailable */ }
+      try {
+        localStorage.setItem('lirah-splash-bg', ui.background);
+        localStorage.setItem('lirah-splash-ink', ui.foreground);
+        localStorage.setItem('lirah-splash-lamp', ui.lamp ?? terminal.brightYellow);
+      } catch { /* storage unavailable */ }
     }
 
     return () => {

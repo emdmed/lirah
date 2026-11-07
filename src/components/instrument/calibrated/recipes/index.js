@@ -4,6 +4,7 @@
 // skills; anything Lirah needs beyond them lives here, one file per recipe.
 // Each file reads window.Calibrated and adds itself to Calibrated.recipes.
 // Imported by kit.js after the vendored scripts.
+import './atlas';
 import './budgetToned';
 import './lanesToned';
 import './fanoutStacked';

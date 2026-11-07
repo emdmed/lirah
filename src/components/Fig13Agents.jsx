@@ -24,7 +24,7 @@ const MAX = 6;
 const MIN_W = 280;
 const FIT = { min: MIN_W, max: 520 };
 const STACK_W = 420; // narrower than this, the stacked layout
-const TITLE_TOP = 16; // room under CalRecipe's title (drawn at y 11) in the stacked layout
+const TITLE_TOP = 0; // CalRecipe's caption sits under the drawing, so the stacked layout starts at the top
 // The kit fanout's fixed geometry (calibrated-recipes.js, fanout).
 const FAN = { kidX: 212, top: 44, gap: 52 };
 

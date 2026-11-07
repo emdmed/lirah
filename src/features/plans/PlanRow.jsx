@@ -2,7 +2,7 @@ import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { ProgressReadout } from './parts';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, haltWord, PLAN_STAGE, pilotPosition, planProgress, planStage, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON, haltWord, PLAN_STAGE, pilotPosition, planProgress, planStage, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
 /** The plan's lamp and auto-pilot tag, as its row and its tab show them. */
 // A run's tag takes its lamp's tone.
@@ -14,7 +14,7 @@ export function planStatus(plan) {
   const ap = plan.autopilot;
   const tag = ap?.status === AUTOPILOT_STATUS.RUNNING ? 'auto-pilot' : AUTOPILOT_LIVE.has(ap?.status) ? haltWord(ap) : undefined;
   const lampState = plan.split === SPLIT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.FAILED ? 'fault'
-    : ap?.status === AUTOPILOT_STATUS.PAUSED ? 'warn'
+    : ap?.status === AUTOPILOT_STATUS.PAUSED ? (ap.reason === HALT_REASON.BLOCKED ? 'fault' : 'wait')
       : running ? 'on' : total > 0 && done === total ? 'ok' : 'off';
   return { done, total, running, tag, lampState };
 }

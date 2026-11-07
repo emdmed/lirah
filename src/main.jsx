@@ -28,7 +28,7 @@ import { runMigrations } from "./lib/migrations";
 // evaluated — the JS parse/eval cost sits before it.
 perfMark("app:start");
 
-// `?kit` (dev only) shows the Instrument TUI component sheet instead of the app.
+// `?kit` (dev only) shows the orrery-plate component sheet instead of the app.
 const showKit = import.meta.env.DEV && new URLSearchParams(window.location.search).has("kit");
 // `?figs` (dev only) shows every FIG drawing with mock data; `&theme=<key>` picks the theme.
 const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");

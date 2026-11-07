@@ -209,14 +209,18 @@ export const renumber = (chunks) => chunks.map((c, i) => (c.n === i + 1 ? c : { 
 /** A plan as read from disk: a split can't survive a restart, and auto-pilot's tab is gone. */
 export function normalizeLoadedPlan(p) {
   let next = p.split === SPLIT_STATUS.RUNNING ? { ...p, split: SPLIT_STATUS.FAILED, splitError: 'Interrupted — the app was closed.' } : p;
-  if (isAutopilotLive(p.autopilot)) {
+  const { done, total } = planProgress(p);
+  if (isAutopilotLive(p.autopilot) && total > 0 && done === total) {
+    // Closed after the last chunk landed: resuming would only mark it done.
+    next = { ...next, autopilot: { ...p.autopilot, status: AUTOPILOT_STATUS.DONE, chunkId: null, reason: null, message: null, endedAt: p.autopilot.endedAt ?? Date.now() } };
+  } else if (isAutopilotLive(p.autopilot)) {
     next = {
       ...next,
       autopilot: {
         ...p.autopilot,
         status: AUTOPILOT_STATUS.PAUSED,
         reason: HALT_REASON.APP_RESTARTED,
-        message: 'The app was closed during the run. Resume it from a tab with an agent.',
+        message: 'The app was closed during the run. Open the plan and resume it.',
       },
     };
   }

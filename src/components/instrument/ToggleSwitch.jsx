@@ -5,6 +5,7 @@ const TONES = {
   warn: 'var(--ins-warn)',
   fault: 'var(--ins-fault)',
   lamp: 'var(--ins-lamp)',
+  ink: 'var(--color-foreground)',
 };
 
 // A two-position switch. Real button with role="switch"; Space/Enter toggle.

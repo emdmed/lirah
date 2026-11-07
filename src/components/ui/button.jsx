@@ -9,13 +9,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Every variant but `link` is a printed key (.ins-key, see index.css):
-        // no box, brightens on hover, tinted while pressed/open.
+        // Every variant but `link` is a key (.ins-key, see index.css): primary
+        // is solid ink; ghost/outline/secondary print as italic verbs.
         default: "ins-key ins-key-primary ins-round",
         destructive: "ins-key ins-key-danger ins-round",
-        outline: "ins-key ins-round",
-        secondary: "ins-key ins-round text-muted-foreground",
-        ghost: "ins-key ins-round",
+        outline: "ins-key ins-key-verb ins-name ins-round",
+        secondary: "ins-key ins-key-verb ins-name ins-round text-muted-foreground",
+        ghost: "ins-key ins-key-verb ins-name ins-round",
         link: "ins-link text-primary",
       },
       size: {
@@ -29,6 +29,10 @@ const buttonVariants = cva(
         "icon-lg": "size-10",
       },
     },
+    // Spectral sets small beside the mono: italic verbs take 13px, like the panel verbs.
+    compoundVariants: [
+      { variant: ["outline", "secondary", "ghost"], class: "text-[13px]" },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

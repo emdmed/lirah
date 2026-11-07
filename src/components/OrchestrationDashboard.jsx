@@ -14,6 +14,7 @@ import {
   CheckCircle, WarningTriangle, XmarkCircle, Download,
 } from 'iconoir-react';
 import { useToast } from '@/features/toast';
+import { EmptyPlate } from '@/components/EmptyState';
 
 const STATUS_ICON = {
   installed: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
@@ -177,7 +178,7 @@ export function OrchestrationDashboard({
                 <StatusRow key={name} label={name} status={status} />
               ))}
               {Object.keys(orchStatus.scripts).length === 0 && (
-                <span className="opacity-40">No scripts found</span>
+                <EmptyPlate title="No scripts found" />
               )}
             </Section>
 
@@ -196,7 +197,7 @@ export function OrchestrationDashboard({
                     />
                   ))
                 ) : (
-                  <span className="opacity-40">No workflows available</span>
+                  <EmptyPlate title="No workflows available" />
                 )
               ) : (
                 <div className="flex items-center gap-2">

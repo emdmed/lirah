@@ -90,6 +90,9 @@ export function TitleTooltips() {
   }, [tip]);
 
   if (!tip) return null;
+  // A multi-line title reads as a name over its note: the first line is the italic title.
+  const [head, ...rest] = tip.text.split('\n');
+  const body = rest.join('\n');
 
   return createPortal(
     <div
@@ -100,7 +103,7 @@ export function TitleTooltips() {
       className="ins-pop ins-tip fixed z-[1000] pointer-events-none max-w-80 px-2 py-1 text-xs font-mono whitespace-pre-line text-balance"
       style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
     >
-      {tip.text}
+      {head && body ? <><span className="ins-tip-title ins-name">{head}</span>{body}</> : tip.text}
     </div>,
     document.body,
   );

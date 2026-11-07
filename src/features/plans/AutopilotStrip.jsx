@@ -2,7 +2,7 @@ import { formatDuration } from '../../lib/formatDuration';
 import { Eye, Play, Square, Terminal } from 'iconoir-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
-import { AUTOPILOT_LAMP, Prose } from './parts';
+import { autopilotLamp, Prose } from './parts';
 import { useTick } from '../../hooks/useTick';
 import { Fig09Loop } from './Fig09Loop';
 import { Fig20Timeline } from './Fig20Timeline';
@@ -40,7 +40,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
     [AUTOPILOT_STATUS.DONE]: 'plan complete',
     [AUTOPILOT_STATUS.OFF]: 'off',
   }[ap.status] || ap.status;
-  const lamp = AUTOPILOT_LAMP[ap.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
+  const lamp = autopilotLamp(ap);
   const live = running || ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
   // A settled run is a line, not a box: only a live one should pull the eye.
   if (!live) {
@@ -77,6 +77,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
     <span className="ml-auto shrink-0 font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-muted-foreground">{runLine}</span>
   );
   const stopped = ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED;
+  const loop = <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} fallback={null} />;
   return (
     <div className="ins-well flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px]">
       <div className="flex min-w-0 items-center gap-2">
@@ -85,14 +86,14 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
         {runLineEl}
       </div>
-      {/* The loop drawing; too narrow, the headline is enough. */}
-      <Fig09Loop plan={plan} pos={pos} elapsed={elapsed} fallback={null} />
+      {/* The loop drawing; too narrow, the headline is enough. Stopped, it follows the fix. */}
+      {!stopped && loop}
       {/* Why it stopped is what you came back for: full ink, more room. */}
       {ap.message && (
         <Prose
           text={ap.message}
           clamp={stopped ? 4 : 3}
-          className={stopped ? 'text-[11px] leading-relaxed text-foreground' : 'text-[11px] leading-relaxed text-muted-foreground'}
+          className={stopped ? 'text-[12px] leading-relaxed text-foreground' : 'text-[11px] leading-relaxed text-muted-foreground'}
         />
       )}
       {ap.status === AUTOPILOT_STATUS.PAUSED && AUTO_RESUME_REASONS.has(ap.reason) && (
@@ -112,6 +113,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
         <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
         {options && <span className="ml-auto">{options}</span>}
       </div>
+      {stopped && loop}
     </div>
   );
 }

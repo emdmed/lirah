@@ -101,6 +101,7 @@ export function AutoMergeDialog({ autoMerge }) {
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) cancel(); }}>
       <DialogContent
         size="lg"
+        fig="11"
         className="max-h-[85vh] flex flex-col gap-4 overflow-hidden"
         keys={['alt', 'M']}
         lamp={lamp}
