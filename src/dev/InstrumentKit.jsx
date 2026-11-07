@@ -120,6 +120,19 @@ export function InstrumentKit() {
             <Button variant="ghost" size="xs" aria-pressed="true">pressed</Button>
             <Button variant="link" size="xs">link</Button>
           </div>
+          <div className="flex flex-wrap items-center gap-2 pb-2">
+            {['xs', 'sm', 'default', 'lg'].map((size) => (
+              <Button key={size} size={size}>{size}</Button>
+            ))}
+            {['xs', 'sm', 'default', 'lg'].map((size) => (
+              <Button key={size} variant="ghost" size={size}>{size}</Button>
+            ))}
+            {['icon-xs', 'icon-sm', 'icon', 'icon-lg'].map((size) => (
+              <Button key={size} variant="ghost" size={size} aria-label={size}><Refresh /></Button>
+            ))}
+            <Button disabled>disabled</Button>
+            <Button variant="ghost" disabled>disabled</Button>
+          </div>
         </section>
 
         <section className="tui-pane px-3" data-legend>

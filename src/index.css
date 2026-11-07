@@ -1056,16 +1056,26 @@ body {
     color: var(--color-foreground);
   }
 
-  /* Primary: the legend and edge are printed in the lamp colour. */
+  /* Primary: a solid ink key, legend knocked out in the panel colour. */
   .ins-key-primary {
-    border-color: color-mix(in srgb, var(--ins-lamp) 70%, var(--ins-edge-strong));
-    color: var(--ins-lamp);
+    border-color: var(--color-foreground);
+    background: var(--color-foreground);
+    color: var(--ins-panel, var(--color-background));
   }
 
   .ins-key-primary:hover {
-    border-color: var(--ins-lamp);
-    background: color-mix(in srgb, var(--ins-lamp) 8%, transparent);
-    color: var(--ins-lamp);
+    border-color: color-mix(in srgb, var(--color-foreground) 85%, var(--ins-panel, var(--color-background)));
+    background: color-mix(in srgb, var(--color-foreground) 85%, var(--ins-panel, var(--color-background)));
+    color: var(--ins-panel, var(--color-background));
+  }
+
+  /* Secondary actions print as italic verbs (pair with .ins-name): no tint,
+     a dotted underline on hover. Icons carry no underline. */
+  .ins-key-verb:hover {
+    background: transparent;
+    text-decoration: underline dotted;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   .ins-key-danger {
