@@ -18,6 +18,7 @@ import { Detent } from '../components/instrument/Detent';
 import { StepSlider } from '../components/instrument/StepSlider';
 import { SegmentBank } from '../components/instrument/SegmentBank';
 import { SplitKey } from '../components/instrument/SplitKey';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip';
 
 // Component sheet for the Instrument TUI primitives (board 01b). Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -163,6 +164,22 @@ export function InstrumentKit() {
             <SegmentBank label="Range" value={range} onChange={setRange} options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]} />
             <Detent label="Detail level" value={detail} onChange={setDetail} options={[{ value: 'symbols', label: 'symbols' }, { value: 'signatures', label: 'signatures' }, { value: 'skeleton', label: 'skeleton' }]} className="max-w-[240px]" />
             <StepSlider label="Scrollback" value={scroll} onChange={setScroll} warnFrom={2} steps={[{ value: 1000, label: '1,000 lines', short: '1k' }, { value: 10000, label: '10,000 lines', short: '10k' }, { value: 50000, label: '50,000 lines', short: '50k' }, { value: 200000, label: '200,000 lines', short: '200k' }]} />
+          </div>
+        </section>
+
+        <section className="tui-pane px-3" data-legend>
+          <PaneLegend index={9} title="Tooltips" note="hover" />
+          <div className="flex flex-wrap items-center gap-3 py-2">
+            <Tooltip defaultOpen>
+              <TooltipTrigger asChild><Button variant="ghost" size="xs">plate</Button></TooltipTrigger>
+              <TooltipContent side="bottom" title="Detail level" fig="12">Signatures only · 3.1k tokens</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild><Button variant="ghost" size="xs">plain</Button></TooltipTrigger>
+              <TooltipContent>Change CLI tool (Ctrl+K)</TooltipContent>
+            </Tooltip>
+            <span title={'Orrery redesign\nOpen the plan'} className="underline decoration-dotted">native title</span>
+            <span title="Settings and quick actions" className="underline decoration-dotted">native, one line</span>
           </div>
         </section>
 

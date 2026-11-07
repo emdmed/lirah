@@ -29,6 +29,8 @@ function TooltipTrigger({
 function TooltipContent({
   className,
   sideOffset = 0,
+  title,
+  fig,
   children,
   ...props
 }) {
@@ -42,7 +44,9 @@ function TooltipContent({
           className
         )}
         {...props}>
+        {title && <span className="ins-tip-title ins-name">{title}</span>}
         {children}
+        {fig && <span className="ins-tip-fig ins-legend">FIG.{fig}</span>}
         <TooltipPrimitive.Arrow
           className="hidden" />
       </TooltipPrimitive.Content>
