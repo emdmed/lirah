@@ -767,21 +767,50 @@ body {
   --dialog-edge: color-mix(in srgb, var(--ins-fault) 55%, var(--ins-edge-strong));
 }
 
-/* The frame strikes lamp-bright as the dialog arrives, then cools to its
-   edge: the filament the panes use. */
-[data-slot="dialog-content"].tui-dialog[data-state="open"]:not([data-instant])::after {
-  animation: ins-dialog-strike calc(var(--ins-warm) + var(--ins-cool)) var(--ins-ease) both;
+/* Arrival hairline: one ink line scales in across the top edge and fades as a
+   dialog opens, a float pane appears or a pane takes focus (Alt+1–4). Dialogs
+   draw it on a span (their ::before/::after are ticks and frame); panes on
+   their legend's ::after, under the legend's masked words. */
+.ins-arrive,
+.tui-pane > .ins-pane-legend::after {
+  position: absolute;
+  height: 1px;
+  background: var(--color-foreground);
+  transform-origin: left;
+  opacity: 0;
+  pointer-events: none;
 }
-@keyframes ins-dialog-strike {
-  0%, 28% { border-color: var(--ins-lamp); }
-  100% { border-color: var(--dialog-edge); }
+.ins-arrive {
+  top: 6px;
+  left: 0;
+  right: 0;
+  z-index: 5;
 }
-.tui-dialog[data-tone="fault"][data-state="open"]:not([data-instant])::after {
-  animation-name: ins-dialog-strike-fault;
+.tui-pane > .ins-pane-legend::after {
+  content: "";
+  top: 6px;
+  left: -8px;
+  right: -8px;
+  z-index: -1;
 }
-@keyframes ins-dialog-strike-fault {
-  0%, 28% { border-color: var(--ins-fault); }
-  100% { border-color: var(--dialog-edge); }
+[data-slot="dialog-content"][data-state="open"]:not([data-instant]) > .ins-arrive,
+.tui-float > .ins-pane-legend::after,
+.tui-pane:focus-within > .ins-pane-legend::after {
+  animation: ins-arrive 1.6s var(--ins-ease-out);
+}
+@keyframes ins-arrive {
+  0% { transform: scaleX(0); opacity: 1; }
+  30% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+@keyframes ins-arrive-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing travels: the line is drawn whole and only fades. */
+  .ins-arrive,
+  .tui-pane > .ins-pane-legend::after { animation-name: ins-arrive-fade !important; }
 }
 
 /* The title is a real element (DialogTitle), so ::before draws the crop

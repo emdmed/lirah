@@ -121,6 +121,7 @@ function DialogContent({
           <ShellContext.Provider value={shell}>
             {children}
           </ShellContext.Provider>
+          <span className="ins-arrive" aria-hidden="true" />
           {status != null && (
             <span className="tui-frame-status">{status}</span>
           )}
