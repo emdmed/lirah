@@ -8,14 +8,14 @@ import { Calibrated } from './kit';
 // (Calibrated.update), so a ticking clock doesn't sweep the figure in again
 // and a replay in flight lands on the newest data, unless:
 //   - `transition(prev, next)` returns data to play (e.g. a loop step), or
-//   - `replayKey` changed (e.g. a chunk landed): the entry motion replays. `title` is printed
-// top-left in the app's figure label style (no FIG number). The drawing
+//   - `replayKey` changed (e.g. a chunk landed): the entry motion replays. `title` is the
+// figure's caption, printed under the drawing on a hairline (the atlas hand). The drawing
 // scales with its pane, never above 1:1; narrower than `minWidth` (default:
 // 90% of the recipe's width) it shows `fallback` instead. With `fit` ({ min,
 // max }) the recipe is drawn at the pane's width (data.w) within those
 // bounds, and `min` is the floor. Recipes have no compact form, so compact
 // figures show `fallback` too.
-const TITLE_H = 18; // a recipe given no n/title leaves this much room on top
+const CAPTION_H = 24; // hairline 6 under the drawing, caption text 13 under that
 
 export function CalRecipe({ recipe, data: given, transition, replayKey, title, minWidth, fit, fallback = null, paper = 'var(--ins-panel)', className }) {
   const compact = useFigureCompact();
@@ -34,13 +34,15 @@ export function CalRecipe({ recipe, data: given, transition, replayKey, title, m
     return () => ro.disconnect();
   }, []);
 
-  // The recipe with the app's title printed into its free top margin.
+  // The recipe with the app's title as a caption under it.
   const draw = useMemo(() => {
     const base = Calibrated.recipes[recipe];
-    const head = title ? Calibrated.K.t(0, 11, String(title).toUpperCase(), 'mu', 'start', 0.5) : '';
+    const { K } = Calibrated;
     const fn = (d) => {
       const r = base(d);
-      return head ? { ...r, h: Math.max(r.h, TITLE_H), markup: head + r.markup } : r;
+      if (!title) return r;
+      const cap = K.line(0, r.h + 6, r.w, r.h + 6, 'e1') + K.t(0, r.h + 19, String(title).toUpperCase(), 'mu', 'start', 0.5);
+      return { ...r, h: r.h + CAPTION_H, markup: r.markup + cap };
     };
     fn.extent = base.extent;
     fn.duration = base.duration;

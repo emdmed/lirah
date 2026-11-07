@@ -14,6 +14,8 @@
 //   count    a boxed reading at the right end of the line ("15/15").
 // Motion as the kit's timeline: the line runs out through the steps, then
 // the dimension, callout, tail and count appear.
+import { atlas } from './atlas';
+
 const C = window.Calibrated;
 const { K, fmt, textWidth: tw } = C;
 const R = C.recipes;
@@ -102,4 +104,4 @@ function timelineToned(o) {
 }
 timelineToned.extent = timelineToned.duration = () => FLASH;
 
-R.timelineToned = timelineToned;
+R.timelineToned = atlas(timelineToned);

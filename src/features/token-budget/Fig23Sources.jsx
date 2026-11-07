@@ -2,7 +2,7 @@ import { CalRecipe, Calibrated } from '@/components/instrument/calibrated';
 import { formatTokenCount } from './tokenCalculations';
 import { groupLabel, sharePct } from './contextGroups';
 
-// FIG.23: what the used context is made of, as Lirah's measuredToned recipe
+// FIG.23: what the used context is made of, as Lirah's measuredToned recipe in the atlas hand (measuredAtlas)
 // (components/instrument/calibrated/recipes/measuredToned.js). The window's
 // ruler with the used span, a DETAIL inset magnifying it, and each source as
 // a part of the inset bar (largest first, darkest ink first), boxed on
@@ -103,7 +103,7 @@ export function Fig23Sources({ breakdown, windowMax, fallback, className }) {
 
   return (
     <div className={className} title={label}>
-      <CalRecipe recipe="measuredToned" data={data} minWidth={MIN_W} paper="var(--ins-raised)" fallback={fallback} />
+      <CalRecipe recipe="measuredAtlas" data={data} minWidth={MIN_W} paper="var(--ins-raised)" fallback={fallback} />
     </div>
   );
 }

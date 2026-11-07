@@ -1,5 +1,7 @@
 // measuredToned: the kit's measured recipe plus Lirah's gauge tones.
 // Registered on Calibrated.recipes by recipes/index.js.
+import { atlas } from './atlas';
+
 const C = window.Calibrated;
 const { K, textWidth: tw } = C;
 const R = C.recipes;
@@ -91,3 +93,5 @@ measuredToned.extent = measuredToned.duration = (o) => {
 };
 
 R.measuredToned = measuredToned;
+// The atlas copy for every measured figure but FIG.06, which keeps the vendored look.
+R.measuredAtlas = atlas(measuredToned);
