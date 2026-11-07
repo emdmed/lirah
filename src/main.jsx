@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { IconoirProvider } from "iconoir-react";
 import App from "./App";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { WatcherProvider } from "./features/watcher";
@@ -39,6 +40,7 @@ await runMigrations();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
+    <IconoirProvider iconProps={{ width: 24, height: 24, "aria-hidden": true }}>
     <ToastProvider>
       <ThemeProvider>
         <DialogProvider>
@@ -67,6 +69,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <TitleTooltips />
       </ThemeProvider>
     </ToastProvider>
+    </IconoirProvider>
   </React.StrictMode>,
 );
 
