@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- The terminal and chrome face; preloaded so xterm measures it, not a fallback. -->
     <link rel="preload" href="/fonts/GeistMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/GrenzeGotisch-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
     <title>Lirah</title>
     <!--
       Boot splash. The window starts hidden (tauri.conf.json "visible": false)
@@ -14,29 +15,48 @@
       once the app has rendered.
     -->
     <style>
+      /* index.css is not loaded yet, so the splash declares its own faces. */
+      @font-face { font-family: 'Grenze Gotisch'; src: url('/fonts/GrenzeGotisch-SemiBold.woff2') format('woff2'); font-weight: 600; font-display: block; }
+      @font-face { font-family: 'Geist Mono'; src: url('/fonts/GeistMono-Regular.woff2') format('woff2'); font-weight: 400; font-display: block; }
       html, body { margin: 0; background: var(--splash-bg, #1e1e26); }
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
         display: grid; place-items: center;
         background: var(--splash-bg, #1e1e26);
+        color: var(--splash-ink, #d8d4c8);
         transition: opacity 220ms ease-out;
       }
       /* The mark stays invisible until the window has its final (tiled) size,
          so it never shows centred in the pre-tiling 1024x768 viewport. */
-      #splash .mark { opacity: 0; transition: opacity 260ms ease-out; }
+      #splash .mark { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0; transition: opacity 160ms ease-out; }
       #splash.is-ready .mark { opacity: 1; }
-      #splash img { display: block; width: 64px; height: 64px; animation: splash-breathe 1.6s ease-in-out infinite alternate; }
+      #splash .plate { position: relative; width: 280px; height: 120px; }
+      #splash .orbits { position: absolute; inset: 0; overflow: visible; }
+      #splash .sun { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); fill: var(--splash-lamp, #dcb662); stroke: var(--splash-lamp, #dcb662); }
+      #splash ellipse { fill: none; stroke: currentColor; stroke-width: 1; opacity: .14; stroke-dasharray: 1; stroke-dashoffset: 1; }
+      #splash ellipse:last-child { opacity: .2; }
+      /* Four orbits draw in, inner first, inside ~500ms of the mark showing. */
+      #splash.is-ready ellipse { animation: splash-orbit 380ms cubic-bezier(.2, .7, .2, 1) forwards; }
+      #splash.is-ready ellipse:nth-child(2) { animation-delay: 40ms; }
+      #splash.is-ready ellipse:nth-child(3) { animation-delay: 80ms; }
+      #splash.is-ready ellipse:nth-child(4) { animation-delay: 120ms; }
+      #splash .word { font: 600 32px/1 'Grenze Gotisch', serif; }
+      #splash .note { font: 11px/1 'Geist Mono', monospace; letter-spacing: .04em; opacity: .55; min-height: 11px; }
       #splash.is-done { opacity: 0; pointer-events: none; }
-      @keyframes splash-breathe { from { opacity: .6; } to { opacity: .95; } }
+      @keyframes splash-orbit { to { stroke-dashoffset: 0; } }
       @media (prefers-reduced-motion: reduce) {
         #splash, #splash .mark { transition: none; }
-        #splash img { animation: none; }
+        #splash ellipse, #splash.is-ready ellipse { animation: none; stroke-dashoffset: 0; }
       }
     </style>
     <script>
       try {
-        var bg = localStorage.getItem('lirah-splash-bg');
-        if (bg) document.documentElement.style.setProperty('--splash-bg', bg);
+        // Written by ThemeContext (colours) and workspaceStore (tab count).
+        ['bg', 'ink', 'lamp'].forEach(function (k) {
+          var v = localStorage.getItem('lirah-splash-' + k);
+          if (v) document.documentElement.style.setProperty('--splash-' + k, v);
+        });
+        window.__splashTabs = Number(localStorage.getItem('lirah-splash-tabs')) || 0;
       } catch (e) {}
     </script>
   </head>
@@ -54,7 +74,17 @@
       works in the one large glass. The lit pane is the one holding focus.
       DOCUMENTED IN: DESIGN.md (tokens, primitives, icon policy).
     -->
-    <div id="splash" aria-hidden="true"><div class="mark"><img src="/lirah.svg" alt=""></div></div>
+    <div id="splash" aria-hidden="true">
+      <div class="mark">
+        <div class="plate">
+          <svg class="orbits" viewBox="0 0 280 120"><ellipse pathLength="1" cx="140" cy="60" rx="46" ry="16.5"/><ellipse pathLength="1" cx="140" cy="60" rx="74" ry="26.5"/><ellipse pathLength="1" cx="140" cy="60" rx="104" ry="37.5"/><ellipse pathLength="1" cx="140" cy="60" rx="136" ry="49"/></svg>
+          <!-- The Lirah mark (LirahMark.jsx paths) as the gold sun. -->
+          <svg class="sun" viewBox="2 1.5 96 96"><path d="M22 8C24 34 12 48 14 64C16 84 32 94 50 94C68 94 84 84 86 64C88 48 76 34 78 8C77 34 70 48 70 60C70 74 62 80 50 80C38 80 30 74 30 60C30 48 23 34 22 8Z" stroke="none"/><path d="M50 5Q51.28 15.08 58 17Q51.28 18.92 50 29Q48.72 18.92 42 17Q48.72 15.08 50 5Z" stroke="none"/><path d="M23.5 32Q50 41 76.5 32" fill="none" stroke-width="3" stroke-linecap="round"/><path d="M40 35.6L40 78M50 37L50 80M60 35.6L60 78" fill="none" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="word">Lirah</div>
+        <div class="note" id="splash-note"></div>
+      </div>
+    </div>
     <script>
       // Show the window once the splash background has painted. The window
       // manager may resize it right after mapping (tiling), so reveal the mark
@@ -62,6 +92,8 @@
       // main.jsx waits on window.__splashReady before retiring the splash.
       window.__splashReady = new Promise(function (resolve) {
         var splash = document.getElementById('splash');
+        var n = window.__splashTabs;
+        if (n) document.getElementById('splash-note').textContent = 'restoring ' + n + (n === 1 ? ' tab' : ' tabs');
         var settle, cap;
         function reveal() {
           clearTimeout(settle); clearTimeout(cap);
