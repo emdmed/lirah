@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ArrowUpDown, ArrowUp, ArrowDown, Search } from 'lucide-react';
+import { Sort, ArrowUp, ArrowDown, Search } from 'iconoir-react';
 import { formatCost, formatTokenCount } from '../tokenCalculations';
 
 const SORT_OPTIONS = [
@@ -44,8 +44,8 @@ export function ProjectComparison({ projects, totals, colors }) {
   }, [projects, sortKey, sortDir, search]);
 
   const SortIcon = ({ col }) => {
-    if (sortKey !== col) return <ArrowUpDown size={10} className="opacity-30" />;
-    return sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />;
+    if (sortKey !== col) return <Sort width={10} height={10} className="opacity-30" />;
+    return sortDir === 'asc' ? <ArrowUp width={10} height={10} /> : <ArrowDown width={10} height={10} />;
   };
 
   const columns = [
@@ -63,7 +63,7 @@ export function ProjectComparison({ projects, totals, colors }) {
       {/* Search */}
       <div className="flex items-center gap-2 mb-2 shrink-0">
         <div className="relative flex-1">
-          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search width={12} height={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={search}

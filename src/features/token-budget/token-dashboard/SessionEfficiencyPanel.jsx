@@ -1,11 +1,11 @@
 import { formatTokenCount, formatCost } from '../tokenCalculations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Gauge, Target, ArrowRightLeft, DollarSign } from 'lucide-react';
+import { DashboardSpeed, Gps, DataTransferBoth, Dollar } from 'iconoir-react';
 
 function StatRow({ icon: Icon, label, value, color }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
-      <Icon size={12} style={{ color }} />
+      <Icon width={12} height={12} style={{ color }} />
       <div className="flex-1 flex justify-between items-center text-xs font-mono">
         <span className="text-muted-foreground">{label}</span>
         <span>{value}</span>
@@ -50,10 +50,10 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
       </CardHeader>
       <CardContent className="pt-0 px-3 pb-3 flex-1 flex flex-col">
         <div className="space-y-0.5">
-          <StatRow icon={Gauge} label="Tok/Msg" value={formatTokenCount(averageTokensPerMessage)} color={c.input} />
-          <StatRow icon={Target} label="Cache Hit" value={`${cacheHitRatePercent}%`} color={c.output} />
-          <StatRow icon={ArrowRightLeft} label="Out/In Ratio" value={outputRatioDisplay} color={c.cacheRead} />
-          <StatRow icon={DollarSign} label="$/Msg" value={formatCost(costPerMessage)} color={c.input} />
+          <StatRow icon={DashboardSpeed} label="Tok/Msg" value={formatTokenCount(averageTokensPerMessage)} color={c.input} />
+          <StatRow icon={Gps} label="Cache Hit" value={`${cacheHitRatePercent}%`} color={c.output} />
+          <StatRow icon={DataTransferBoth} label="Out/In Ratio" value={outputRatioDisplay} color={c.cacheRead} />
+          <StatRow icon={Dollar} label="$/Msg" value={formatCost(costPerMessage)} color={c.input} />
         </div>
 
         <div className="mt-auto pt-2 border-t edge-engraved">

@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, FileSpreadsheet, FileJson, FileText, BarChart3 } from 'lucide-react';
+import { Download, Table, CodeBrackets, JournalPage, StatsReport } from 'iconoir-react';
 import { Scanner } from '@/components/instrument/Scanner';
 import { SegmentBank } from '@/components/instrument/SegmentBank';
 import { EmptyState } from '@/components/EmptyState';
@@ -231,22 +231,22 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1 text-xs font-mono">
-                    <Download size={12} />
+                    <Download width={12} height={12} />
                     Export
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleExportCSV} className="gap-2 text-xs font-mono">
-                    <FileSpreadsheet size={12} />
+                    <Table width={12} height={12} />
                     Export as CSV
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleExportJSON} className="gap-2 text-xs font-mono">
-                    <FileJson size={12} />
+                    <CodeBrackets width={12} height={12} />
                     Export as JSON
                   </DropdownMenuItem>
                   {allProjectsData && (
                     <DropdownMenuItem onClick={() => setExportDialogOpen(true)} className="gap-2 text-xs font-mono">
-                      <FileText size={12} />
+                      <JournalPage width={12} height={12} />
                       Advanced Export...
                     </DropdownMenuItem>
                   )}
@@ -357,7 +357,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                           ))}
                           {modelBreakdown.length === 0 && (
                             <EmptyState
-                              icon={BarChart3}
+                              icon={StatsReport}
                               title="No model data yet"
                               description="Start using Claude Code to see token usage analytics by model"
                               className="py-4"
