@@ -281,7 +281,7 @@ export const TabRow = memo(function TabRow({
           <span
             className={cn(
               'shrink-0 items-center gap-1.5',
-              roleMenuOpen || active ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
+              roleMenuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
             )}
           >
             {!tab.role && <RoleTagButton tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}
