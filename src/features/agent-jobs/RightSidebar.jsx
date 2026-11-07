@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Plus, Maximize2, Minimize2 } from 'lucide-react';
+import { Square, GitCompare, Check, Trash2, FileText, GitMerge, RotateCcw, ChevronRight, ChevronDown, AlertTriangle, Copy, Archive, ArchiveRestore, Trophy, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -27,6 +27,7 @@ import { MasterStrip } from '../tabs/MasterStrip';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 import { WorkspaceRow } from '../tabs/WorkspaceRow';
 import { PlansPane } from '../plans/PlansPane';
+import { EmptyLine, NewRow } from '../plans/parts';
 import { usePlans } from '../plans/PlansContext';
 import { useRepoRoot } from '../plans/planRepoRoot';
 import { CHUNK_STATUS } from '../plans/planModel';
@@ -593,10 +594,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           dialog.open('help', { section: 'Workspace pane' }, activeTabId);
           return;
         }
-        // N opens a new job while focus is in the pane (not in a text field).
-        if (tab !== 'jobs' || e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+        // N presses the jobs/plans section's new row while focus is in the pane (tasks handles its own).
+        if ((tab !== 'jobs' && tab !== 'plans') || e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const row = paneRef.current?.querySelector('#workspace-section [data-new-row]');
+        if (!row) return;
         e.preventDefault();
-        setDialogOpen(true);
+        row.click();
       }}
       tabIndex={-1}
       data-pane="4"
@@ -660,15 +663,6 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
-        {tab === 'tabs' && onNewTab && (
-          <PanelButton
-            icon={Plus}
-            onClick={onNewTab}
-            title={newTabTitle}
-            aria-label="New tab"
-            className="ml-auto self-center"
-          />
-        )}
       </div>
 
       {tab === 'jobs' && selected.size > 0 && (
@@ -699,7 +693,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
         {tab === 'tabs' ? (
-          <TabsSummaryPane />
+          <TabsSummaryPane onNewTab={onNewTab} />
         ) : tab === 'agents' ? (
           <SubagentList />
         ) : tab === 'plans' ? (
@@ -709,16 +703,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         ) : (
           <>
             {visibleJobs.length === 0 ? (
-              <div className="flex flex-col gap-1 px-3 py-2 text-[11px]">
-                <div className="text-foreground">
-                  <span className="text-muted-foreground">-- </span>
-                  {archivedJobs.length > 0 ? 'no active jobs' : 'no background jobs'}
-                  <span className="text-muted-foreground"> --</span>
-                </div>
-                <div className="text-[11px] leading-relaxed text-muted-foreground">
-                  # dispatch a headless agent run with [+ new job]
-                </div>
-              </div>
+              <EmptyLine hint="N dispatches a headless agent run">
+                {archivedJobs.length > 0 ? 'no active jobs' : 'no jobs'}
+              </EmptyLine>
             ) : (
               <SpanScale items={spanJobs}>
               <div className="flex flex-col">
@@ -742,14 +729,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               </SpanScale>
             )}
 
-            <button
-              onClick={() => setDialogOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-2 text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
-            >
-              <Plus className="h-3 w-3" />
-              new job
-              <Keycap size="sm" className="ml-auto">N</Keycap>
-            </button>
+            <NewRow label="job" keys="N" onClick={() => setDialogOpen(true)} />
 
             {/* Archived jobs: stored but out of immediate sight, browsable on demand. */}
             {archivedJobs.length > 0 && (

@@ -1,5 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { INK, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
+import { Plus } from 'lucide-react';
+import { Keycap } from '@/components/instrument/Keycap';
 import { cn } from '../../lib/utils';
 import { AUTOPILOT_STATUS, CHUNK_STATUS } from './planModel';
 
@@ -15,6 +17,22 @@ export function EmptyLine({ children, hint }) {
       </div>
       {hint && <div className="leading-relaxed text-muted-foreground"># {hint}</div>}
     </div>
+  );
+}
+
+// The `+ new X … [key]` row that ends each Workspace pane section. The pane's N
+// clicks it ([data-new-row]), so N does nothing where the row isn't shown.
+export function NewRow({ label, keys, onClick }) {
+  return (
+    <button
+      data-new-row
+      onClick={onClick}
+      className="flex items-center gap-1.5 px-2.5 py-2 text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
+    >
+      <Plus className="h-3 w-3" />
+      new {label}
+      <Keycap size="sm" className="ml-auto">{keys}</Keycap>
+    </button>
   );
 }
 

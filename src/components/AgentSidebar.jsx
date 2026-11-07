@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePageVisible } from '../hooks/usePageVisible';
+import { EmptyLine } from '../features/plans/parts';
 import { Bot, PanelRightClose, PanelRightOpen, X, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
@@ -169,13 +170,7 @@ export function SubagentList() {
 
   if (visibleSubagents.length === 0) {
     return (
-      <div className="px-3 py-6 text-center">
-        <Bot size={16} className="mx-auto mb-2 text-faint" />
-        <div className="text-[11px] text-muted-foreground">No agents running</div>
-        <div className="mt-1 text-[11px] text-muted-foreground">
-          Agents appear here when spawned during tool use
-        </div>
-      </div>
+      <EmptyLine hint="a tab's agent spawns them during tool use; [ ] switches section">no agents</EmptyLine>
     );
   }
 

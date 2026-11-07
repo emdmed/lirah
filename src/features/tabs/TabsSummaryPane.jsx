@@ -21,6 +21,7 @@ import { rowKeys } from './rowKeys';
 import { useTabPlans } from '../plans/useTabPlans';
 import { PlanRow } from '../plans/PlanRow';
 import { isSettledPlan } from '../plans/TabPlanTier';
+import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
 
@@ -39,7 +40,7 @@ function onListKey(e) {
   rows[j]?.scrollIntoView({ block: 'nearest' });
 }
 
-export function TabsSummaryPane() {
+export function TabsSummaryPane({ onNewTab }) {
   const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
@@ -206,6 +207,7 @@ export function TabsSummaryPane() {
         );
       })}
       </div>
+      {onNewTab && <NewRow label="tab" keys="Ctrl+T" onClick={onNewTab} />}
 
       {/* The active repo's plans with work left that no tab is working on. */}
       {plans.loose.length > 0 && (

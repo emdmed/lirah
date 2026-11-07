@@ -1,9 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { errorMessage } from '../../lib/errorMessage';
-import { Plus } from 'lucide-react';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Scanner } from '../../components/instrument/Scanner';
-import { PanelButton } from '../../components/instrument/PanelButton';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
@@ -11,7 +9,7 @@ import { usePlans } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
 import { usePlanLifecycleSync } from './planLifecycle';
 import { FoundPlansSection } from './FoundPlansSection';
-import { EmptyLine } from './parts';
+import { EmptyLine, NewRow } from './parts';
 import { runRank, UNTITLED_PLAN } from './planModel';
 import { planGit } from './planGit';
 import { uncommittedFiles } from './planGitOps';
@@ -264,7 +262,7 @@ export function PlansPane({ projectPath }) {
         <>
           <FoundPlansSection files={files} importFile={importFile} deleteFile={deleteFile} />
           {plans.length === 0 ? (
-            <EmptyLine hint="paste a plan and an agent splits it into chunks you implement one commit at a time">
+            <EmptyLine hint="N pastes a plan; an agent splits it into chunks you implement one commit at a time">
               no plans
             </EmptyLine>
           ) : (
@@ -279,9 +277,7 @@ export function PlansPane({ projectPath }) {
               ))}
             </div>
           )}
-          <PanelButton icon={Plus} onClick={() => setNewOpen(true)} className="mx-3 my-2 self-start">
-            new plan
-          </PanelButton>
+          <NewRow label="plan" keys="N" onClick={() => setNewOpen(true)} />
         </>
       )}
 

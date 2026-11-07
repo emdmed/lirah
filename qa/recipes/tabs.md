@@ -6,7 +6,7 @@ A user opens a second tab, renames it, switches between tabs, and closes one.
 Run `lirah tabs open ~/project`, then `sleep 2`.
 
 ## Steps
-1. Click `New tab` and pick the starred `project` entry (never the system folder picker).
+1. Click `new tab` (the last row of the tabs list) and pick the starred `project` entry (never the system folder picker).
    **Expect:** the `TABS` button shows 2, and two tab buttons are listed.
 2. Click the newest tab button, then press `F2`, type `qa-renamed` into the field that appears, and press `Enter`.
    **Expect:** a tab button containing `qa-renamed`. `lirah tabs list` shows it too.

@@ -89,7 +89,7 @@ export const SHORTCUTS = [
   { id: 'ws-close', keys: ['x'], description: 'Close Tab', category: 'Workspace pane', note: 'tabs row' },
   { id: 'ws-role', keys: ['t'], description: 'Set Role', category: 'Workspace pane', note: 'tabs row' },
   { id: 'ws-folder', keys: ['f'], description: 'Open Folder', category: 'Workspace pane', note: 'tabs row' },
-  { id: 'ws-new', keys: ['N'], description: 'New Job / Task', category: 'Workspace pane', note: 'jobs or tasks section' },
+  { id: 'ws-new', keys: ['N'], description: 'New Job / Plan / Task', category: 'Workspace pane', note: 'jobs, plans or tasks section' },
   { id: 'ws-help', keys: ['?'], description: 'Open This Section', category: 'Workspace pane' },
 ];
 
