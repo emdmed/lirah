@@ -3,6 +3,7 @@ import { NavArrowDown, Xmark } from "iconoir-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Keycap } from "../instrument/Keycap";
+import { EmptyPlate } from "../EmptyState";
 import { Lamp } from "../instrument/Lamp";
 import { joinKeys } from "../instrument/FrameHints";
 import { shortcutKeys } from "../../lib/shortcuts";
@@ -92,9 +93,8 @@ export function TemplateSelector({
         <DropdownMenuContent align="end" side="top" className="w-60 text-xs">
           <DropdownMenuLabel>templates · all projects</DropdownMenuLabel>
           {templates.length === 0 ? (
-            <DropdownMenuItem disabled className="tui-dialog-empty text-[11px] pl-3 data-[disabled]:opacity-100">
-              <span className="tui-dialog-empty-star" aria-hidden="true" />
-              No templates yet
+            <DropdownMenuItem disabled className="pl-3 data-[disabled]:opacity-100">
+              <EmptyPlate className="p-0" title="No templates yet" />
             </DropdownMenuItem>
           ) : (
             <>

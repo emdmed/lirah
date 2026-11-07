@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Keycap } from "@/components/instrument/Keycap"
 import { FrameHints, joinKeys } from "@/components/instrument/FrameHints"
 import { Lamp } from "@/components/instrument/Lamp"
+import { EmptyPlate } from "@/components/EmptyState"
 import { DialogScopeContext } from "@/features/dialogs/dialogStore"
 
 // What DialogContent tells DialogTitle to draw beside the title in the frame
@@ -223,10 +224,7 @@ function DialogGroup({ label, className, children }) {
 // An empty list: a faint star and one line saying how to fill it.
 function DialogEmpty({ className, children }) {
   return (
-    <p className={cn("tui-dialog-empty", className)}>
-      <span className="tui-dialog-empty-star" aria-hidden="true" />
-      <span>{children}</span>
-    </p>
+    <EmptyPlate className={cn("tui-dialog-empty", className)} title={children} />
   );
 }
 

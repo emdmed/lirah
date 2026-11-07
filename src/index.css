@@ -451,6 +451,31 @@ body {
   `before:content-none` can opt a button out (status line segments do).
 */
 @layer components {
+  /* Empty-orbit plate (EmptyPlate in EmptyState.jsx). */
+  .ins-empty {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 8px;
+    font-size: var(--font-xs);
+    color: var(--color-muted-foreground);
+  }
+
+  .ins-empty-orbit {
+    flex-shrink: 0;
+    color: var(--ins-faint);
+  }
+
+  .ins-empty-line {
+    font-size: 13px;
+    line-height: 16px;
+    color: var(--color-foreground);
+  }
+
+  .tui-dialog-empty {
+    padding: 4px 0;
+  }
+
   .tui-btn:not(:has(svg))::before {
     content: "[";
     opacity: 0.55;
@@ -981,23 +1006,6 @@ body {
 }
 
 /* An empty list: a faint star and one line. */
-.tui-dialog-empty {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: var(--font-xs);
-  color: var(--color-muted-foreground);
-}
-
-.tui-dialog-empty-star {
-  width: 9px;
-  height: 13px;
-  flex-shrink: 0;
-  background: var(--ins-faint);
-  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
-}
-
 /* Actions are italic verbs and the solid ink primary (no brackets); a
    destructive one draws a fault hairline. */
 .tui-dialog [data-slot="dialog-footer"] .ins-key-danger {
