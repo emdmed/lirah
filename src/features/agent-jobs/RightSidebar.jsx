@@ -566,9 +566,17 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       ref={paneRef}
       style={{ width: paneWidth }}
       onKeyDown={(e) => {
+        if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
+        // [ ] cycle sections. Alt is allowed and AltGraph excused: ISO layouts type [ ] with AltGr.
+        if ((e.key === '[' || e.key === ']') && (e.getModifierState('AltGraph') || !(e.ctrlKey || e.metaKey))) {
+          const sections = ['tabs', 'jobs', 'plans', 'tasks', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
+          const step = e.key === ']' ? 1 : -1;
+          e.preventDefault();
+          setTab(sections[(sections.indexOf(tab) + step + sections.length) % sections.length]);
+          return;
+        }
         // N opens a new job while focus is in the pane (not in a text field).
         if (tab !== 'jobs' || e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
-        if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
         e.preventDefault();
         setDialogOpen(true);
       }}
@@ -622,7 +630,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
-      <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
+      <div role="tablist" aria-label="Workspace sections" className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={waitingTabs} countTone="text-[var(--ins-warn)]" />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
@@ -667,7 +675,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
+      <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
         {tab === 'tabs' ? (
           <TabsSummaryPane />
         ) : tab === 'agents' ? (
@@ -836,7 +844,9 @@ function TabButton({ active, onClick, label, count, lamp = false, countTone = 't
   return (
     <button
       onClick={onClick}
-      aria-pressed={active}
+      role="tab"
+      aria-selected={active}
+      aria-controls="workspace-section"
       className={cn(
         'ins-legend flex items-center gap-1.5 px-1.5 pt-0.5 pb-1.5 cursor-pointer border-b-2',
         active ? 'text-[var(--ins-lamp)] border-[var(--ins-lamp)]' : 'text-muted-foreground border-transparent hover:text-foreground'
