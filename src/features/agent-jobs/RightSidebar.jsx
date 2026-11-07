@@ -75,6 +75,17 @@ function isReconcilable(job) {
   );
 }
 
+// Finished with changes left to look at: the card offers "Review N".
+function needsReview(job) {
+  return (
+    (job.status === 'done' || job.status === 'failed' || job.status === 'conflict' || job.status === 'interrupted') &&
+    job.changedFiles.length > 0
+  );
+}
+
+// The repo a job works on (its cwd is a throwaway worktree when isolated).
+const jobRepo = (job) => job.repoPath || job.cwd;
+
 // Fold race candidates into a single entry so they render as one comparison
 // group, in the position of the race's first (newest) candidate.
 function groupJobs(list) {
@@ -210,6 +221,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   };
 
   const runningJobs = jobs.filter((j) => j.status === 'running').length;
+  const reviewJobs = jobs.filter((j) => !j.archived && needsReview(j)).length;
 
   // Keep the selection in sync with the jobs that are still reconcilable
   // (finished/discarded jobs drop out on their own).
@@ -259,7 +271,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   };
 
   const handleApprove = async (id, force = false) => {
-    const count = jobs.find((j) => j.id === id)?.changedFiles.length ?? 0;
+    const job = jobs.find((j) => j.id === id);
+    const count = job?.changedFiles.length ?? 0;
     const result = await approveJob(id, { force });
     if (result?.blocked) {
       const n = result.typecheck?.errorCount ?? 0;
@@ -271,8 +284,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       const suffix = result.forced ? ' (typecheck skipped)' : '';
       // Looked up on demand: the toast is the only consumer, so a poll for
       // it would cost 2 Hz of git calls for one string.
-      const branchName = projectPath
-        ? await invoke('get_current_branch', { repoPath: projectPath }).catch(() => null)
+      // The job's own repo, not the active tab's: it may be another project.
+      const branchName = job && jobRepo(job)
+        ? await invoke('get_current_branch', { repoPath: jobRepo(job) }).catch(() => null)
         : null;
       toast.success(
         `Applied ${files} into your ${branchName ? `${branchName} ` : ''}working tree — uncommitted${suffix}`
@@ -608,7 +622,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           sit on one line across the window. */}
       <div className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={workspaceTabs.length} />
-        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} />
+        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
         {(totalActiveCount > 0 || tab === 'agents') && (
@@ -816,7 +830,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   );
 }
 
-function TabButton({ active, onClick, label, count }) {
+function TabButton({ active, onClick, label, count, lamp = false }) {
   return (
     <button
       onClick={onClick}
@@ -826,6 +840,7 @@ function TabButton({ active, onClick, label, count }) {
         active ? 'text-[var(--ins-lamp)] border-[var(--ins-lamp)]' : 'text-muted-foreground border-transparent hover:text-foreground'
       )}
     >
+      {lamp && <Lamp state="on" />}
       {label}
       {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
     </button>
@@ -936,7 +951,10 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
       </div>
 
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 pr-2.5 pb-2 text-[11px]">
-        <span className="text-muted-foreground">{job.cli}</span>
+        <span className="min-w-0 truncate text-muted-foreground">
+          {jobRepo(job) && <span className="text-foreground">{basename(jobRepo(job))} · </span>}
+          {job.cli}
+        </span>
         {job.kind === 'reconcile' && (
           <span className="inline-flex items-center gap-0.5 text-[var(--ins-lamp)]">
             <GitMerge className="h-2.5 w-2.5" />
@@ -978,6 +996,16 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             <Check className="h-2.5 w-2.5" />
             types ok
           </span>
+        )}
+        {!expanded && isDone && changedCount > 0 && (
+          // Same handler as the expanded "Review N" button: review comes before apply.
+          <button
+            onClick={() => actions.review(job.id)}
+            title="Review the isolated diff before applying"
+            className="ml-auto shrink-0 whitespace-nowrap text-[var(--ins-lamp)] cursor-pointer hover:underline"
+          >
+            [review {changedCount}]
+          </button>
         )}
       </div>
 
