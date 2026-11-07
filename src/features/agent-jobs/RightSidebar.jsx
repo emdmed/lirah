@@ -607,10 +607,6 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       <PaneLegend
         index={4}
         title="Workspace"
-        status={
-          runningJobs > 0 ? `${runningJobs} running`
-            : totalActiveCount > 0 ? `${totalActiveCount} active` : undefined
-        }
         lamp={runningJobs + totalActiveCount > 0 ? 'on' : undefined}
         trailing={
           <>

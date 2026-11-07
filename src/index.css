@@ -1820,6 +1820,10 @@ body {
     pointer-events: auto;
   }
 
+  /* The title holds; a crowded right end shrinks (its min-w-0 children truncate). */
+  .ins-pane-legend > :first-child { flex-shrink: 0; }
+  .ins-pane-legend > :last-child { min-width: 0; }
+
   .ins-pane-legend-status {
     font-size: var(--font-xs);
     line-height: 1;
