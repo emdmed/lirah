@@ -575,6 +575,21 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   }
 
   return (
+    <>
+      {/* Resize gutter, styled like the files pane's: drag, or focus it and use ←/→. */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize Workspace pane"
+        aria-valuenow={paneWidth}
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={maxWidth()}
+        tabIndex={0}
+        onMouseDown={startResize}
+        onKeyDown={resizeByKey}
+        className="relative w-3 shrink-0 cursor-col-resize outline-none before:absolute before:inset-y-1.5 before:left-1/2 before:w-px before:-ml-px before:transition-colors hover:before:bg-[var(--ins-edge-strong)] active:before:bg-[var(--ins-lamp)] focus-visible:before:bg-[var(--ins-lamp)]"
+        title="Drag to resize (or ←/→)"
+      />
     <div
       ref={paneRef}
       style={{ width: paneWidth }}
@@ -605,7 +620,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       data-pane="4"
       data-title={`[4] ${tab}`}
       data-legend
-      className="tui-pane flex flex-col shrink-0 overflow-hidden pt-[16px] my-1.5 mx-3 text-sidebar-foreground outline-none"
+      className="tui-pane flex flex-col shrink-0 overflow-hidden pt-[16px] my-1.5 mr-3 text-sidebar-foreground outline-none"
     >
       <PaneLegend
         index={4}
@@ -635,21 +650,6 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           </>
         }
       />
-      {/* Resize handle over the left edge: drag, or focus it and use ←/→. */}
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize Workspace pane"
-        aria-valuenow={paneWidth}
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={maxWidth()}
-        tabIndex={0}
-        onMouseDown={startResize}
-        onKeyDown={resizeByKey}
-        className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize hover:bg-[var(--ins-edge-strong)] active:bg-[var(--ins-lamp)] focus-visible:bg-[var(--ins-lamp)] focus-visible:outline-none transition-colors"
-        title="Drag to resize (or ←/→)"
-      />
-
       <MasterStrip />
 
       {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
@@ -789,6 +789,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       )}
       </Suspense>
     </div>
+    </>
   );
 }
 

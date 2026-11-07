@@ -1951,13 +1951,13 @@ body {
 }
 [data-slot="dialog-overlay"][data-state="closed"],
 [data-slot="sheet-overlay"][data-state="closed"] {
-  animation: ins-fade-out var(--ins-dur-quick) var(--ins-ease-exit);
+  animation: ins-fade-out var(--ins-dur-quick) var(--ins-ease-exit) forwards;
 }
 [data-slot="dialog-content"][data-state="open"]:not([data-instant]) {
   animation: ins-rise-in var(--ins-dur-enter) var(--ins-ease-out);
 }
 [data-slot="dialog-content"][data-state="closed"]:not([data-instant]) {
-  animation: ins-rise-out var(--ins-dur-quick) var(--ins-ease-exit);
+  animation: ins-rise-out var(--ins-dur-quick) var(--ins-ease-exit) forwards;
 }
 
 /* Menus and tooltips pop from their trigger. A tooltip that opens instantly
@@ -1972,7 +1972,7 @@ body {
   animation: ins-pop-in var(--ins-dur-base) var(--ins-ease-out);
 }
 .ins-pop[data-state="closed"] {
-  animation: ins-fade-out var(--ins-dur-quick) var(--ins-ease-exit);
+  animation: ins-fade-out var(--ins-dur-quick) var(--ins-ease-exit) forwards;
 }
 
 [data-slot="sheet-content"][data-side="right"]  { --sheet-x: 24px; }
@@ -1983,7 +1983,7 @@ body {
   animation: ins-sheet-in var(--ins-dur-enter) var(--ins-ease-out);
 }
 [data-slot="sheet-content"][data-state="closed"] {
-  animation: ins-sheet-out var(--ins-dur-base) var(--ins-ease-exit);
+  animation: ins-sheet-out var(--ins-dur-base) var(--ins-ease-exit) forwards;
 }
 
 /* Bottom lines (message line, command line) rise out of the window edge;

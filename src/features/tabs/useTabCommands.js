@@ -135,7 +135,7 @@ export function useTabCommands({
       { id: 'task', hint: 'add a task (type it after the command to prefill)', run: (arg) => requestQuickTask(arg) },
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },
-      { id: 'master', hint: 'show the workspace\'s master agent terminal (opens it the first time)', run: () => openMaster() },
+      { id: 'master', hint: 'show the workspace terminal, whose agent drives the tabs (opens it the first time)', run: () => openMaster() },
       { id: 'workspace', aliases: ['ws'], hint: 'switch to a workspace by name, or add it; rename <name> renames this one', run: (name) => {
         if (!name?.trim()) throw new Error('type the workspace name after the command');
         const [first, ...rest] = name.trim().split(/\s+/);

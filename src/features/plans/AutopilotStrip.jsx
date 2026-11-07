@@ -49,7 +49,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Lamp state={lamp.state} blink={lamp.blink} label={headline} />
           <span className="engraved-label shrink-0">auto-pilot</span>
-          <span className="min-w-0 truncate tabular-nums text-muted-foreground" role="status">{headline}</span>
+          <span className={`min-w-0 truncate tabular-nums ${ap.status === AUTOPILOT_STATUS.DONE ? 'text-[var(--ins-ok)]' : 'text-muted-foreground'}`} role="status">{headline}</span>
           <span className="ml-auto flex items-center gap-1.5">
             {ap.status === AUTOPILOT_STATUS.DONE && (
               <PanelButton icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">

@@ -133,10 +133,10 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-// Tells the master terminal's agent what it is for; the lirah skill has the how.
-const MASTER_PROMPT = 'You are this Lirah workspace\'s master agent. The tabs listed by `lirah tabs` are your workers: '
+// Tells the workspace terminal's agent what it is for; the lirah skill has the how.
+const MASTER_PROMPT = 'You are the agent in this Lirah workspace\'s workspace terminal. The tabs listed by `lirah tabs` are your workers: '
   + 'the user asks you for work and you hand it to them with `lirah tabs send` and collect it with `lirah tabs wait`, '
-  + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the master terminal" section.';
+  + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the workspace terminal" section.';
 
 export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
@@ -1200,6 +1200,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           onSandboxFailed={handleSandboxFailed}
           reattachKey={tabId}
           claudeRunning={settings.selectedCli === 'claude-code' && cliRunning === 'claude'}
+          master={master}
         />
         {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}

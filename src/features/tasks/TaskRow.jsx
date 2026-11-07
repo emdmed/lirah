@@ -80,7 +80,7 @@ export const TaskRow = memo(function TaskRow({
         />
       )}
       <div className="flex min-w-0 items-start gap-2">
-        <span className="flex h-4 shrink-0 items-center">
+        <span className="flex h-[18px] shrink-0 items-center">
           <Lamp state={lamp.state} blink={lamp.blink} settled={lamp.settled} label={lamp.label} />
         </span>
         <button
@@ -88,15 +88,19 @@ export const TaskRow = memo(function TaskRow({
           onClick={onToggleOpen}
           aria-expanded={open}
           className={cn(
-            'min-w-0 flex-1 text-left text-xs leading-4 cursor-pointer outline-none',
+            'min-w-0 flex-1 text-left text-[13px] leading-[18px] cursor-pointer outline-none',
             done ? 'text-muted-foreground line-through' : 'text-foreground',
             !open && 'line-clamp-2',
           )}
         >
           {task.title}
         </button>
-        {formatting && <span className="flex h-4 shrink-0 items-center"><Scanner size="sm" label="Formatting as a user story" /></span>}
-        <span className={cn('flex shrink-0 items-center gap-0.5', !open && 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100')}>
+        {formatting && <span className="flex h-[18px] shrink-0 items-center"><Scanner size="sm" label="Formatting as a user story" /></span>}
+        {/* Closed rows float the actions over the title's end so hidden buttons don't steal its width. */}
+        <span className={cn(
+          'flex shrink-0 items-center gap-0.5',
+          !open && 'absolute right-3 top-2 h-[18px] bg-[color-mix(in_srgb,var(--foreground)_5%,var(--ins-panel))] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+        )}>
           {!done && (
             <span className="flex items-center">
               <button
@@ -167,7 +171,7 @@ export const TaskRow = memo(function TaskRow({
       </div>
 
       {(task.status === TASK_STATUS.PLANNING || task.status === TASK_STATUS.PLANNED) && task.planPath && (
-        <div className="flex min-w-0 items-center gap-2 pl-5 text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-2 pl-5 font-[family-name:var(--font-legend)] text-[11px] leading-4 text-muted-foreground">
           <span className="truncate" title={task.planPath}>
             {task.status === TASK_STATUS.PLANNING ? 'waiting for ' : ''}{basename(task.planPath)}
             {task.status === TASK_STATUS.PLANNING && task.autoChunk ? ', then chunks' : ''}
@@ -187,7 +191,7 @@ export const TaskRow = memo(function TaskRow({
       {open ? (
         <TaskEditor task={task} onEdit={onEdit} />
       ) : (
-        task.notes && <TaskNotes notes={task.notes} className="max-h-10 overflow-hidden" />
+        task.notes && <TaskNotes notes={task.notes} className="line-clamp-2 [&>:first-child]:mt-0" />
       )}
     </div>
   );

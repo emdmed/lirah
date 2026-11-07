@@ -383,7 +383,7 @@ export function TabProvider({ children }) {
     const paths = tabsRef.current.filter((t) => t.workspaceId === ws).map((t) => t.projectPath);
     const home = await invoke('get_home_dir').catch(() => '/');
     const path = paths.length ? commonFolder(paths) : home;
-    const tab = createTab(path === '/' ? home : path, { launch: true, name: 'master', workspaceId: ws, master: true });
+    const tab = createTab(path === '/' ? home : path, { launch: true, name: 'workspace', workspaceId: ws, master: true });
     tabsRef.current = [...tabsRef.current, tab];
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);

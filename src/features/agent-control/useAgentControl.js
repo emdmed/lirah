@@ -278,10 +278,10 @@ export function useAgentControl() {
       },
       'tabs.master': (args, positional, { sessionId }) => {
         const { master } = scope(sessionId);
-        if (!master) return 'this workspace has no master terminal open (the crown in the Workspace pane opens it)';
+        if (!master) return 'no workspace terminal is open yet (the crown in the Workspace pane opens it)';
         return master.id === callerTab(live.current.tabManager.tabs, sessionId)?.id
-          ? 'you are this workspace\'s master: the tabs in `lirah tabs` are your workers'
-          : 'you are a worker tab; this workspace\'s master terminal is open';
+          ? 'you are the workspace terminal: the tabs in `lirah tabs` are your workers'
+          : 'you are a worker tab; the workspace terminal is open';
       },
       'tabs.note': (args, [ref = args.tab, ...words], { sessionId }) => {
         const tab = target(scope(sessionId).tabs, ref, sessionId);

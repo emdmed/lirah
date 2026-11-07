@@ -117,15 +117,18 @@ export async function key(combo) {
   const k = parts.pop();
   const mods = new Set(parts.map((p) => p.toLowerCase()));
   const init = {
-    key: k.length === 1 ? k.toLowerCase() : k, code: k.length === 1 ? `Key${k.toUpperCase()}` : k,
+    key: k.length === 1 ? k.toLowerCase() : k, code: /^\d$/.test(k) ? `Digit${k}` : k.length === 1 ? `Key${k.toUpperCase()}` : k,
     ctrlKey: mods.has('ctrl'), shiftKey: mods.has('shift'), altKey: mods.has('alt'), metaKey: mods.has('meta') || mods.has('cmd'),
     bubbles: true, cancelable: true, composed: true,
   };
   const el = document.activeElement || document.body;
   el.dispatchEvent(new KeyboardEvent('keydown', init));
-  el.dispatchEvent(new KeyboardEvent('keyup', init));
+  // keyup goes where focus is now, as with a real key press.
+  (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keyup', init));
   await settle();
-  return `pressed ${combo} on ${el === document.body ? 'the page' : describe(el, null)}`;
+  const name = (e) => (e === document.body ? 'the page' : describe(e, null));
+  const now = document.activeElement || document.body;
+  return `pressed ${combo} on ${name(el)}${now !== el ? `; focus is now on ${name(now)}` : ''}`;
 }
 
 /** Visible text of an element ref, a CSS selector, or the whole page. */

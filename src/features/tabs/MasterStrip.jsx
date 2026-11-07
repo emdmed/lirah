@@ -64,7 +64,7 @@ function WorkerFan({ workers }) {
   );
 }
 
-// The workspace's master terminal, one tier above its tabs: a band on the
+// The workspace terminal, one tier above its tabs: a band on the
 // raised face between the Workspace legend and the tabs/jobs switch, 36px so
 // its rule meets the files pane's header rule. Left, what it is and what it
 // drives; right, how it is and the key that shows it (opened on first use).
@@ -96,7 +96,7 @@ export function MasterStrip() {
       )}
     >
       {/* The tab rows' 16px icon column, so the crown sits over their lamps and
-          MASTER starts on their names' line (12 + 16 + 8 = 36px). */}
+          the label starts on their names' line (12 + 16 + 8 = 36px). */}
       <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">
         <Crown
           strokeWidth={1.75}
@@ -107,7 +107,7 @@ export function MasterStrip() {
           )}
         />
       </span>
-      <span className="engraved-label shrink-0 text-foreground">master</span>
+      <span className="engraved-label shrink-0 text-foreground">workspace terminal</span>
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-muted-foreground">
         <WorkerFan workers={workers} />
         {n > MAX_NODES && <span className="tabular-nums">+{n - MAX_NODES}</span>}
@@ -122,7 +122,7 @@ export function MasterStrip() {
       <PanelButton
         onClick={toggle}
         aria-pressed={showing}
-        title={showing ? 'Back to the tabs' : `Show the master terminal (:master). It drives ${drives}.`}
+        title={showing ? 'Back to the tabs' : `Show the workspace terminal (:master). It drives ${drives}.`}
         className="shrink-0"
       >
         {showing ? 'back' : master ? 'open' : 'start'}

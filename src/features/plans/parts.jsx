@@ -131,7 +131,8 @@ export function ProgressReadout({ plan, done, total, paper }) {
   const label = `${done} of ${total} chunks implemented${
     fault ? ` · chunk ${fault.n} needs you` : live ? ` · chunk ${live.n} running` : ''}`;
 
-  const tally = `${done}/${total}`;
+  const complete = total > 0 && done === total;
+  const tally = complete ? `${done}/${total} complete` : `${done}/${total}`;
   const boxW = compact ? 0 : textWidth(tally) + 12;
   const boxPart = compact ? 0 : BOX_GAP + boxW;
   const room = avail == null ? Infinity : avail - 2 * PAD - boxPart;
@@ -151,6 +152,7 @@ export function ProgressReadout({ plan, done, total, paper }) {
       {tooNarrow ? (
         <span className="font-mono text-[11px] tabular-nums text-muted-foreground" role="img" aria-label={label}>
           <span className={done > 0 ? 'text-foreground' : undefined}>{done}</span>/{total}{' '}chunks
+          {complete && <span className="text-[var(--ins-ok)]"> · complete</span>}
         </span>
       ) : (
         <svg
@@ -159,7 +161,8 @@ export function ProgressReadout({ plan, done, total, paper }) {
           width={width}
           height={H}
           viewBox={`0 0 ${width} ${H}`}
-          style={{ display: 'block', overflow: 'visible', '--fig-paper': paper }}
+          // A finished plan inks in the ok colour: done nodes and the line draw with --color-foreground.
+          style={{ display: 'block', overflow: 'visible', '--fig-paper': paper, ...(complete && { '--color-foreground': 'var(--ins-ok)' }) }}
         >
           {count > 1 && (
             <line x1={PAD} x2={lineEnd} y1={y} y2={y} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
@@ -196,10 +199,11 @@ export function ProgressReadout({ plan, done, total, paper }) {
                 y={0.5}
                 width={boxW - 1}
                 height={H - 1}
-                style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }}
+                style={{ fill: INK.paper, stroke: complete ? INK.ok : INK.edgeStrong, strokeWidth: STROKE.hair }}
               />
               <T x={width - boxW / 2} y={y + 4} anchor="middle">
                 <tspan style={{ fill: done > 0 ? INK.fg : INK.muted }}>{done}</tspan>/{total}
+                {complete && <tspan style={{ fill: INK.ok }}> complete</tspan>}
               </T>
             </g>
           )}

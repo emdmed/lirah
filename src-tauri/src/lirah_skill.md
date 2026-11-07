@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its master tab (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -34,7 +34,7 @@ lirah tabs open <path> [--launch]
 lirah tabs close <tab>         close a tab (asks if its agent is busy)
 lirah tabs rename <tab> <name> rename a tab (empty name: automatic again)
 lirah tabs focus <tab>         switch to a tab
-lirah tabs master              whether you are the workspace's master (orchestrating) terminal
+lirah tabs master              whether you are the workspace terminal (the orchestrating one)
 lirah tabs note <tab> <text>   set a tab's one-line purpose (empty: clear it)
 lirah tabs show <tab>          a tab's note, branch, agent state and last reply
 lirah tabs send <tab> <prompt> send a prompt to a tab's agent without switching to it
@@ -94,9 +94,9 @@ needs `--all` again.
 Add `--json` to any command for machine-readable output. `lirah help` prints
 the full usage.
 
-## Orchestrating from the master terminal
+## Orchestrating from the workspace terminal
 
-Each workspace has a master terminal, opened from the crown in the Workspace
+Each workspace has a workspace terminal, opened from the crown in the Workspace
 pane. It is not one of the tabs in `lirah tabs`; `lirah tabs master` tells you
 whether you are it. If you are, the user drives the workspace from here and the
 tabs are your workers:
@@ -110,7 +110,7 @@ tabs are your workers:
 - Collect with `lirah tabs wait <tab>`. Exit 2 means it is still working: run it
   again. Fan out to several tabs first, then wait on each. `lirah tabs show <tab>`
   tells you what a worker is on.
-- Stay in the master: never `lirah tabs focus` unless the user asks. A tab you
+- Stay in the workspace terminal: never `lirah tabs focus` unless the user asks. A tab you
   open with `lirah tabs open` stays in the background too. Tell the
   user what each worker did, from its reply.
 - If a wait reports a permission prompt, tell the user which tab needs them.
