@@ -13,7 +13,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { usePromptTemplates } from './PromptTemplatesContext';
-import { Pencil, Trash2 } from 'lucide-react';
+import { EditPencil, Trash } from 'iconoir-react';
 
 export function ManageTemplatesDialog({ open, onOpenChange }) {
   const { templates, addTemplate, removeTemplate, updateTemplate } = usePromptTemplates();
@@ -131,7 +131,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                           onClick={() => handleStartEdit(template)}
                           aria-label="Edit template"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <EditPencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -140,7 +140,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                           aria-label="Delete template"
                           className="text-destructive hover:text-destructive"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash className="h-4 w-4" />
                         </Button>
                       </div>
                     )}

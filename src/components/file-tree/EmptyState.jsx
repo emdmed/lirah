@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderOpen, GitBranch, FileText } from "lucide-react";
+import { Folder, GitBranch, JournalPage } from "iconoir-react";
 import { EmptyState as EmptyStateBase } from "../EmptyState";
 
 /**
@@ -15,7 +15,7 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly, 
   if (searchQuery) {
     return (
       <EmptyStateBase
-        icon={FolderOpen}
+        icon={Folder}
         title={`No files match "${searchQuery}"`}
         description="Try a different search term or show all files"
         action={onClearSearch ? { onClick: onClearSearch, label: 'Clear search' } : undefined}
@@ -37,7 +37,7 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly, 
   if (showMarkdownOnly) {
     return (
       <EmptyStateBase
-        icon={FileText}
+        icon={JournalPage}
         title="No markdown files"
         description="This directory has no .md files"
         action={onToggleMarkdownFilter ? { onClick: onToggleMarkdownFilter, label: 'Show all files' } : undefined}
@@ -47,7 +47,7 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly, 
 
   return (
     <EmptyStateBase
-      icon={FolderOpen}
+      icon={Folder}
       title="Empty directory"
       description="No files or folders here"
     />

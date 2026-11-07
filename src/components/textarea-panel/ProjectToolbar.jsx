@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { NavArrowDown } from "iconoir-react";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ export function ProjectToolbar({ projectPath, onLoadGroup, onSaveGroup, fileCoun
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="xs" className="gap-1 px-1.5" aria-label="Project actions and context sets">
             {label}
-            <ChevronDown className="h-3 w-3" />
+            <NavArrowDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-56 text-xs">

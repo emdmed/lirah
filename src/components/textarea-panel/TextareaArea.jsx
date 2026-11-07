@@ -2,7 +2,7 @@ import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import { KeyChord } from "../instrument/Keycap";
-import { Send, RotateCcw } from "lucide-react";
+import { Send, Undo } from "iconoir-react";
 import { AtMentionModal } from "../../features/at-mention";
 import { useAutoGrow } from "../../hooks/useAutoGrow";
 import { useBlockCaret } from "../../hooks/useBlockCaret";
@@ -89,7 +89,7 @@ export function TextareaArea({
                 aria-label="Clear CLI context"
                 className="px-1.5 before:content-none after:content-none text-muted-foreground"
               >
-                <RotateCcw className="h-3 w-3" />
+                <Undo className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>

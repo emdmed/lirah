@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { plural } from '../../lib/plural';
-import { Pencil, Plus, RefreshCw, Replace, Save, Trash2 } from 'lucide-react';
+import { EditPencil, Plus, Refresh, Repeat, FloppyDisk, Trash } from 'iconoir-react';
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -64,7 +64,7 @@ function HoldDeleteItem({ onConfirm, onFallback }) {
       className={`${ITEM} ins-hold`}
       {...props}
     >
-      <Trash2 className="h-3 w-3 mr-1.5" />
+      <Trash className="h-3 w-3 mr-1.5" />
       <span aria-live="polite">{state === 'holding' ? 'Keep holding…' : 'Hold to delete'}</span>
     </DropdownMenuItem>
   );
@@ -150,7 +150,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => onLoadGroup(group, 'replace')} className={ITEM}>
-                    <Replace className="h-3 w-3 mr-1.5" />
+                    <Repeat className="h-3 w-3 mr-1.5" />
                     Replace context
                     <span className="ml-auto text-muted-foreground">{plural(group.files.length, 'file')}</span>
                   </DropdownMenuItem>
@@ -165,14 +165,14 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
                     className={ITEM}
                     title={`Overwrite this set with the ${plural(currentCount, 'file')} in the current context`}
                   >
-                    <RefreshCw className="h-3 w-3 mr-1.5" />
+                    <Refresh className="h-3 w-3 mr-1.5" />
                     <span className="truncate">Update «{group.name}» with current context</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={(e) => { e.preventDefault(); setRenamingId(group.id); }}
                     className={ITEM}
                   >
-                    <Pencil className="h-3 w-3 mr-1.5" />
+                    <EditPencil className="h-3 w-3 mr-1.5" />
                     Rename…
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -192,7 +192,7 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
         disabled={!hasSelectedFiles}
         className={ITEM}
       >
-        <Save className="h-3 w-3 mr-1.5" />
+        <FloppyDisk className="h-3 w-3 mr-1.5" />
         Save context as set…
       </DropdownMenuItem>
     </>

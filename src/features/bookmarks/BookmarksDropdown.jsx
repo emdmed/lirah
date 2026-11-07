@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { Star, X } from 'lucide-react';
+import { Star, Xmark } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useBookmarks } from './BookmarksContext';
 
@@ -70,7 +70,7 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
                     title="Unstar project"
                     aria-label="Unstar project"
                   >
-                    <X className="w-2.5 h-2.5" />
+                    <Xmark className="w-2.5 h-2.5" />
                   </button>
                 )}
               </DropdownMenuItem>

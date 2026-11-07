@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { NavArrowDown } from 'iconoir-react';
 import { cn } from '@/lib/utils';
 
 // A primary action and its chooser under one lamp hairline: act now, or pick
@@ -19,7 +19,7 @@ export function SplitKey({ children, onClick, onChoose, chooseLabel, className, 
         className="ins-key ins-key-panel"
         data-icon-only
       >
-        <ChevronDown aria-hidden="true" />
+        <NavArrowDown aria-hidden="true" />
       </button>
     </span>
   );
