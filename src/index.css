@@ -154,7 +154,7 @@
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
   --ins-glow:        6px;
-  /* Eärendil's star, the mark's four-point star: lit lamps, the meter needle,
+  /* Eärendil's star, the mark's four-point star: the meter needle,
      the scanner's lit cell and the status-bar separator. Same eight points,
      in the same order, as --ins-star-square, so the scanner can step between them. */
   --ins-star:        polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
@@ -580,7 +580,7 @@ body {
     color: var(--ins-lamp);
   }
 
-  /* The focused pane's legend lamp lights as a star (see .ins-lamp). */
+  /* The focused pane's legend lamp lights gold (see .ins-lamp). */
   .tui-pane:focus-within > .ins-pane-legend .ins-lamp,
   .tui-pane.terminal-live > .ins-pane-legend .ins-lamp {
     --lamp-c: var(--ins-lamp);
@@ -1107,57 +1107,68 @@ body {
     padding: 0;
   }
 
-  /* Lamp. Off is a dark round lens; lit, it is a four-point star (Eärendil's
-     light) in its own colour, so on and off differ in shape as well as hue.
-     The star is the clipped ::before; the glow is a drop-shadow on the lamp
-     itself, which the clip can't cut. The star overhangs the 7px box by 2px,
-     so lighting a lamp never shifts its row. */
+  /* Lamp: a reticle in a 7px box. Off is an empty ring; lit adds a
+     crosshair and a centre dot. Steady on is ink; live (on + blink) and
+     waiting (warn) are gold (--ins-lamp) with a dotted halo; ok and fault
+     keep their status colours. Crosshair and halo overhang the box, so a
+     lamp changing state never shifts its row. Colour lives in the
+     registered --lamp-ink, so it warms fast and cools slow (the filament). */
   .ins-lamp {
-    --lamp-c: var(--ins-lamp);
-    --lamp-glow: 70%;
+    --lamp-c: var(--ins-faint);
+    --lamp-ink: var(--lamp-c);
     position: relative;
     display: inline-block;
     width: 7px;
     height: 7px;
     flex-shrink: 0;
     border-radius: 9999px;
-    background: var(--ins-lamp-off);
-    box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.45);
-    /* Cooling: the glow lingers a moment after the lamp goes out. */
-    transition: background-color var(--ins-cool) var(--ins-ease-out), box-shadow var(--ins-cool) var(--ins-ease-out), filter var(--ins-cool) var(--ins-ease-out);
+    box-shadow: inset 0 0 0 1px var(--lamp-ink);
+    transition: --lamp-ink var(--ins-cool) var(--ins-ease-out);
   }
 
-  .ins-lamp::before {
+  .ins-lamp::before,
+  .ins-lamp::after {
     content: '';
     position: absolute;
-    inset: -2px;
-    clip-path: var(--ins-star);
-    transition: background-color var(--ins-cool) var(--ins-ease-out);
+    pointer-events: none;
   }
 
-  .ins-lamp[data-state="on"]    { --lamp-c: var(--ins-lamp); }
+  /* Crosshair ticks outside the ring's centre, and a 3px dot. 11px box, so
+     the 1px lines land on the middle pixel. */
+  .ins-lamp::before {
+    inset: -2px;
+    background:
+      radial-gradient(circle, var(--lamp-ink) 1.5px, transparent 1.6px),
+      linear-gradient(to right, var(--lamp-ink) 3px, transparent 3px 8px, var(--lamp-ink) 8px) center / 100% 1px no-repeat,
+      linear-gradient(to bottom, var(--lamp-ink) 3px, transparent 3px 8px, var(--lamp-ink) 8px) center / 1px 100% no-repeat;
+    opacity: 0;
+    transition: opacity var(--ins-cool) var(--ins-ease-out);
+  }
+
+  /* Dotted halo: live and waiting only. */
+  .ins-lamp::after {
+    inset: -3px;
+    border: 1px dotted var(--lamp-ink);
+    border-radius: 9999px;
+    opacity: 0;
+    transition: opacity var(--ins-cool) var(--ins-ease-out);
+  }
+
+  .ins-lamp[data-state="on"]    { --lamp-c: var(--color-foreground); }
   .ins-lamp[data-state="ok"]    { --lamp-c: var(--ins-ok); }
-  .ins-lamp[data-state="warn"]  { --lamp-c: var(--ins-warn); }
+  .ins-lamp:is([data-state="warn"], [data-state="on"][data-blink]) { --lamp-c: var(--ins-lamp); }
   .ins-lamp[data-state="fault"] { --lamp-c: var(--ins-fault); }
 
   .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"]),
-  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp {
-    background: transparent;
-    box-shadow: none;
-    filter: drop-shadow(0 0 calc(var(--ins-glow) / 2) color-mix(in srgb, var(--lamp-c) var(--lamp-glow), transparent));
-    transition-duration: var(--ins-warm);
-  }
-
   .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="fault"])::before,
+  .ins-lamp:is([data-state="warn"], [data-state="on"][data-blink]):not([data-settled])::after,
+  .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp,
   .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp::before {
-    background: var(--lamp-c);
+    opacity: 1;
     transition-duration: var(--ins-warm);
   }
 
-  /* Settled: the star keeps its colour, without the glow (glow means live). */
-  .ins-lamp[data-settled] { filter: none; }
-
-  :root[data-theme="light"] :is(.ins-lamp, .fig-glow) { --lamp-glow: 50%; }
+  :root[data-theme="light"] .fig-glow { --lamp-glow: 50%; }
 
   /* Figure glow (kit Glow): the one lit thing in a FIG drawing, in the
      lamp's colour and strength. .fig-live is the moving star: it glides to
@@ -1176,11 +1187,7 @@ body {
   .ins-lamp[data-blink] {
     /* A variable, since the minifier drops color-mix() inside keyframes. */
     --lamp-dim: color-mix(in srgb, var(--lamp-c) 25%, var(--ins-lamp-off));
-    animation: ins-blink-glow 1s steps(1) infinite;
-  }
-
-  .ins-lamp[data-blink]::before {
-    animation: ins-blink-face 1s steps(1) infinite;
+    animation: ins-blink 1s steps(1) infinite;
   }
 
   /* Busy scanner (Scanner.jsx): square lamp segments, one lit cell chasing
@@ -1873,19 +1880,22 @@ body {
   text-decoration-line: none;
 }
 
-/* Registered so the glow can step in a keyframe (see .ins-lamp[data-blink]). */
+/* Registered so the figure glow can vary per theme (see .fig-glow). */
 @property --lamp-glow {
   syntax: '<percentage>';
   inherits: true;
   initial-value: 70%;
 }
 
-@keyframes ins-blink-glow {
-  50% { --lamp-glow: 0%; }
+/* Registered so the lamp's colour can transition and step in a keyframe. */
+@property --lamp-ink {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
 }
 
-@keyframes ins-blink-face {
-  50% { background-color: var(--lamp-dim); }
+@keyframes ins-blink {
+  50% { --lamp-ink: var(--lamp-dim); }
 }
 
 /* Soft breathing for busy placeholders and working-state icons. */
@@ -1916,8 +1926,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ins-lamp[data-blink],
-  .ins-lamp[data-blink]::before { animation: none; }
+  .ins-lamp[data-blink] { animation: none; }
   .ins-pulse { animation: none; }
   .fig-live { transition: none; }
   /* Still reads as "busy": every segment held half-lit. */
