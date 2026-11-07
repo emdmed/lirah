@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-07
+
+### Fixed
+
+- **0.15.0 never shipped** - Its build stopped at the startup size check, so there are no 0.15.0 installers. This release has everything listed under 0.15.0. Task notes now load their markdown renderer when first shown, which takes about 150 KB off the app's startup.
+
 ## [0.15.0] - 2026-11-07
 
 ### Added
