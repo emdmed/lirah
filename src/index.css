@@ -1248,6 +1248,45 @@ body {
     transition-duration: var(--ins-warm);
   }
 
+  /* Plan chunk spine (ChunkRow): a body per chunk on one vertical line through
+     the 14px node column. Done bodies are filled, the live chunk is the gold
+     sun with a dotted corona, queued ones are dashed rings. The line above a
+     body is solid once the work reached it, the line below once it's done. */
+  .ins-body {
+    position: relative;
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    border: 1px dashed var(--ins-faint);
+  }
+  .ins-body[data-body="done"] { border: 0; background: var(--color-muted-foreground); }
+  .ins-body[data-body="live"] { width: 9px; height: 9px; border: 0; background: var(--ins-lamp); }
+  .ins-body[data-body="live"]::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border: 1px dotted var(--ins-lamp);
+    border-radius: 9999px;
+  }
+  .ins-body[data-skipped] { opacity: 0.5; }
+
+  .ins-spine::before,
+  .ins-spine::after {
+    content: '';
+    position: absolute;
+    left: calc(0.75rem + 6.5px); /* centre of the node column */
+    border-left: 1px dashed var(--ins-faint);
+    pointer-events: none;
+  }
+  .ins-spine::before { top: 0; height: 4px; }
+  .ins-spine::after { top: 20px; bottom: 0; }
+  .ins-spine:is([data-body="done"], [data-body="live"])::before,
+  .ins-spine[data-body="done"]::after { border-left-style: solid; }
+  .ins-spine:not(.ins-spine ~ .ins-spine)::before,
+  .ins-spine:not(:has(~ .ins-spine))::after { display: none; }
+
   :root[data-theme="light"] .fig-glow { --lamp-glow: 50%; }
 
   /* Figure glow (kit Glow): the one lit thing in a FIG drawing, in the

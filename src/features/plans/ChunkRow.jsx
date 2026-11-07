@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { formatDuration } from '../../lib/formatDuration';
 import { Check, NavArrowDown, NavArrowRight, NavArrowUp, Play, Trash } from 'iconoir-react';
 import { cn } from '../../lib/utils';
-import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Span } from '../../components/instrument/Span';
@@ -15,14 +14,15 @@ import { useToast } from '../toast';
 import { useDialogStore } from '../dialogs/DialogProvider';
 import { basename } from '../../utils/pathUtils';
 
-const CHUNK_LAMP = {
-  [CHUNK_STATE.NO_COMMIT]: { state: 'warn' },
-  [CHUNK_STATE.IN_PROGRESS]: { state: 'on', blink: true },
-  [CHUNK_STATE.FIXING]: { state: 'on', blink: true },
-  [CHUNK_STATE.IMPLEMENTED]: { state: 'ok', settled: true },
-  [CHUNK_STATE.ROLLED_BACK]: { state: 'warn' },
+// The chunk's body on the spine: done filled, live (sent, fixing, waiting on
+// its commit) the gold sun, the rest queued as dashed rings.
+const CHUNK_BODY = {
+  [CHUNK_STATE.IMPLEMENTED]: 'done',
+  [CHUNK_STATE.IN_PROGRESS]: 'live',
+  [CHUNK_STATE.FIXING]: 'live',
+  [CHUNK_STATE.NO_COMMIT]: 'live',
 };
-const chunkLamp = (chunk) => CHUNK_LAMP[effectiveChunkState(chunk)] || { state: 'off' };
+const chunkBody = (chunk) => CHUNK_BODY[effectiveChunkState(chunk)] || 'queued';
 
 const STATUS_LABEL = {
   [CHUNK_STATE.PENDING]: 'pending',
@@ -109,7 +109,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
     : pilotChunk && chunk.status === CHUNK_STATUS.IN_PROGRESS ? null : statusNote(chunk);
   // The one action the diagnosis recommends: commit a dirty tree, mark a clean one done.
   const recommend = stuck && dirty ? (dirty.length > 0 ? 'commit' : 'done') : null;
-  const lamp = chunkLamp(chunk);
+  const body = chunkBody(chunk);
   const latestPrompt = chunk.prompts?.at(-1);
 
   const startEdit = () => {
@@ -253,7 +253,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   );
 
   return (
-    <div id={`chunk-${chunk.id}`} className="group/chunk relative flex flex-col">
+    <div id={`chunk-${chunk.id}`} data-body={body} className="ins-spine group/chunk relative flex flex-col">
       <button
         type="button"
         data-plan-row
@@ -265,7 +265,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         title={isNext ? 'Next chunk' : undefined}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
-          <Lamp state={lamp.state} blink={lamp.blink} settled={lamp.settled} label={status} />
+          <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} role="img" aria-label={status} />
         </span>
         <span
           className={cn(
@@ -280,6 +280,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
             'min-w-0 leading-[18px]',
             open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
             skipped ? 'text-muted-foreground line-through' : implemented && !open ? 'text-muted-foreground' : 'text-foreground',
+            body === 'live' && 'ins-name text-[12px]',
           )}
         >
           {chunk.title}
@@ -513,7 +514,7 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
   // FIG.20 above already carries the time, so it isn't printed twice.
   const took = ms > 0 ? formatDuration(ms) : null;
   return (
-    <div className="relative">
+    <div data-body="done" className="ins-spine relative">
       <button
         type="button"
         data-plan-row
@@ -523,7 +524,7 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
         title={`${unfolded ? 'Fold' : 'Show'} chunks ${first}–${last}${took ? `; worked ${took}` : ''}`}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
-          <Lamp state="ok" settled label="implemented" />
+          <span className="ins-body ins-round" data-body="done" role="img" aria-label="implemented" />
         </span>
         <span />
         <span className="min-w-0 leading-[18px] text-muted-foreground">
