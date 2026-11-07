@@ -4,14 +4,17 @@ import { Scanner } from '../../components/instrument/Scanner';
 import { RowAction } from '../tabs/RowAction';
 import { Fig16Chunks } from './Fig16Chunks';
 import { ProgressReadout } from './parts';
-import { planStatus } from './PlanRow';
+import { planStatus, TAG_TONE } from './PlanRow';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
 // What the plan is on right now: why its run stopped, or the chunk in flight.
 function nowLine(plan) {
   const ap = plan.autopilot;
   if (plan.split === SPLIT_STATUS.RUNNING) return 'splitting into chunks…';
-  if (ap?.message && (ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED)) return ap.message;
+  if (ap?.message && (ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED)) {
+    const n = pilotPosition(plan)?.chunk.n;
+    return n ? `chunk ${n} · ${ap.message}` : ap.message;
+  }
   const chunk = pilotPosition(plan)?.chunk
     ?? plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
   if (!chunk) return null;
@@ -73,7 +76,7 @@ export function TabPlanTier({ plan, onOpen }) {
           <span
             className={cn(
               'ml-auto shrink-0 tabular-nums',
-              ap.status === AUTOPILOT_STATUS.RUNNING ? 'text-[var(--ins-lamp)]' : 'text-[var(--ins-warn)]',
+              TAG_TONE[lampState] ?? 'text-[var(--ins-lamp)]',
             )}
           >
             {tag}
@@ -87,7 +90,7 @@ export function TabPlanTier({ plan, onOpen }) {
           fallback={<ProgressReadout plan={plan} done={done} total={total} paper="var(--ins-well)" />}
         />
       )}
-      {now && <span className="min-w-0 truncate text-muted-foreground">{now}</span>}
+      {now && <span className="line-clamp-2 min-w-0 break-words text-muted-foreground">{now}</span>}
     </RowAction>
   );
 }

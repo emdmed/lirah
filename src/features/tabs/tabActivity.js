@@ -1,7 +1,7 @@
 import { Bot, ShieldAlert, SquareTerminal } from 'lucide-react';
 import { formatAgo } from '../../lib/formatDuration';
 import { getLastOutputAt, getTabSession } from './terminalActivity';
-import { LensLamp, StarDim, StarLamp, StarOutline } from './ActivityGlyphs';
+import { FaultLamp, LensLamp, StarDim, StarLamp, StarOutline } from './ActivityGlyphs';
 import { EDIT_TOOLS, getAgentHookState, getAgentTouches } from './agentHookState';
 
 // What each tab is doing, for the tabs summary pane: from its agent's hooks
@@ -39,6 +39,8 @@ export const ACTIVITY = {
   running: { icon: SquareTerminal, color: 'text-[var(--ins-lamp)]', pulse: true },
   remote: { icon: Bot, color: 'text-[var(--ins-lamp)]', pulse: true },
   idle: { icon: LensLamp, color: 'text-muted-foreground' },
+  // A resting tab whose auto-pilot run failed: its plan needs you.
+  failed: { icon: FaultLamp, color: 'text-[var(--ins-fault)]' },
 };
 
 // What the agent's own hooks said, when it has them (see agentHookState.js).

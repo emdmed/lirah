@@ -10,6 +10,7 @@ import { getTabContextFill } from './tabContextFill';
 import { getTabAutoCommit } from './tabAutoCommit';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
+import { AUTOPILOT_STATUS } from '../plans/planModel';
 import { LIVE, OWN_BUSY, YOUR_TURN, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
 import { getTabPrompt } from './tabPrompts';
 import { linkRepo, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
@@ -36,12 +37,15 @@ function onListKey(e) {
   rows[j]?.scrollIntoView({ block: 'nearest' });
 }
 
-// The pane's closing line: how many tabs are live and how many need you.
+// The pane's closing line: how many tabs failed, are live and need you.
+// A resting tab whose auto-pilot run failed counts as failed.
 function tally(kinds) {
+  const failed = kinds.filter((k) => k === 'failed').length;
   const live = kinds.filter((k) => OWN_BUSY.has(k) || k === 'remote').length;
   const yours = kinds.filter((k) => YOUR_TURN.has(k)).length;
-  const resting = kinds.length - live - yours;
+  const resting = kinds.length - failed - live - yours;
   return [
+    failed > 0 && { n: failed, label: 'failed', className: 'text-[var(--ins-fault)]' },
     live > 0 && { n: live, label: 'live', className: 'text-[var(--ins-lamp)]' },
     yours > 0 && { n: yours, label: 'your turn', className: 'text-[var(--ins-ok)]' },
     resting > 0 && { n: resting, label: 'resting', className: 'text-muted-foreground' },
@@ -144,10 +148,14 @@ export function TabsSummaryPane() {
   const kinds = [];
 
   return (
-    <div className="group/list flex flex-col" onKeyDown={onListKey}>
+    <div className="group/list flex flex-1 flex-col" onKeyDown={onListKey}>
       {workspaceTabs.length === 0 && (
         <span className="px-3 pt-2 text-[11px] text-muted-foreground">No tabs in this workspace yet.</span>
       )}
+      <span id="tab-row-keys" className="sr-only">
+        {ROW_KEYS.map((k) => `${k.keys.join(' ')} ${k.label}`).join(', ')}
+      </span>
+      <div role="listbox" aria-label="Tabs" className="flex flex-col">
       {workspaceTabs.map((tab, index) => {
         const work = remote[tab.id];
         const workFrom = work && tabs.find((t) => t.id === work.fromTabId);
@@ -156,9 +164,12 @@ export function TabsSummaryPane() {
         const active = tab.id === activeTabId;
         const turn = cli[tab.id] ? getLastTurn(getTabSession(tab.id)) : null;
         const summary = turnSummary(turn, now);
-        const activity = workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel } : own;
-        kinds.push(activity.kind);
         const tabPlans = plans.byTab[tab.id];
+        const runFailed = tabPlans?.some((p) => p.autopilot?.status === AUTOPILOT_STATUS.FAILED);
+        const activity = workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel }
+          : runFailed && !LIVE.has(own.kind) ? { kind: 'failed', label: 'auto-pilot failed', since: own.since }
+            : own;
+        kinds.push(activity.kind);
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
         const trailOpen = !!summary && openTrail === tab.id;
         // Nothing live and not the tab you're on: one line is enough.
@@ -197,21 +208,6 @@ export function TabsSummaryPane() {
           />
         );
       })}
-
-      {/* Closing line: the tally, then the row keys while the list has focus. */}
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1 px-3 pt-2 pb-1 text-[11px] tabular-nums">
-        <span className="flex items-center gap-1 group-focus-within/list:hidden">
-          {tally(kinds).map((t, i) => (
-            <span key={t.label} className="flex items-center gap-1">
-              {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
-              <span className={t.className}>{t.n}</span>
-              <span className="text-muted-foreground">{t.label}</span>
-            </span>
-          ))}
-        </span>
-        <span className="hidden flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground group-focus-within/list:flex">
-          <FrameHints hints={ROW_KEYS} />
-        </span>
       </div>
 
       {/* The active repo's plans with work left that no tab is working on. */}
@@ -233,6 +229,21 @@ export function TabsSummaryPane() {
           ))}
         </>
       )}
+      {/* Closing line, pinned to the pane's foot: the tally, then the row keys while the list has focus. */}
+      <div className="sticky bottom-0 mt-auto flex flex-wrap items-center gap-x-1 gap-y-1 bg-[var(--ins-panel)] px-3 pt-2 pb-1 text-[11px] tabular-nums edge-t-engraved">
+        <span className="flex items-center gap-1 group-focus-within/list:hidden">
+          {tally(kinds).map((t, i) => (
+            <span key={t.label} className="flex items-center gap-1">
+              {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
+              <span className={t.className}>{t.n}</span>
+              <span className="text-muted-foreground">{t.label}</span>
+            </span>
+          ))}
+        </span>
+        <span className="hidden flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground group-focus-within/list:flex">
+          <FrameHints hints={ROW_KEYS} />
+        </span>
+      </div>
     </div>
   );
 }

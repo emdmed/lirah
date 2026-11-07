@@ -1,14 +1,15 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { FIGURES, figNumber, useFigureCompact } from '@/components/instrument/figure';
+import { useFigureCompact } from '@/components/instrument/figure';
 import '@/components/instrument/calibrated';
 import { formatDuration } from '../../lib/formatDuration';
-import { CHUNK_STATUS } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS } from './planModel';
 
 // FIG.16: a plan's chunks as a calibrated <cal-progress>. Done chunks are
 // filled, the one in flight is the lamp star, the rest are outlined; skipped
-// chunks leave the count. A dimension over the done run gives their summed
-// working time; once two are done, the live star's caption estimates what's
-// left at the mean pace. Compact is the node line alone.
+// chunks leave the count, and the chunk a failed auto-pilot run stopped on is
+// a fault node. A dimension over the done run gives their summed working time
+// (the n/N box already gives the count); once two are done, the live star's
+// caption estimates what's left at the mean pace. Compact is the node line alone.
 
 const MIN_W = 180;
 const C_MIN_W = 120;
@@ -23,7 +24,9 @@ const isLive = (c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix;
  */
 export function chunkRuler(plan) {
   const counted = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
-  const states = counted.map((c) => (isLive(c) ? 'live' : c.status === CHUNK_STATUS.IMPLEMENTED ? 'done' : 'todo'));
+  const failedId = plan.autopilot?.status === AUTOPILOT_STATUS.FAILED ? plan.autopilot.chunkId : null;
+  const states = counted.map((c) => (c.status === CHUNK_STATUS.IMPLEMENTED ? 'done'
+    : c.id === failedId ? 'fault' : isLive(c) ? 'live' : 'todo'));
   const doneChunks = counted.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
   const timed = doneChunks
     .filter((c) => c.startedAt && c.doneAt && c.doneAt >= c.startedAt)
@@ -45,7 +48,8 @@ export function chunkRuler(plan) {
 // animate from done/total/live. Any other shape is passed as a states list.
 function isPrefix(states) {
   const order = { done: 0, live: 1, todo: 2 };
-  return states.every((s, i) => i === 0 || order[states[i - 1]] <= order[s])
+  return !states.includes('fault')
+    && states.every((s, i) => i === 0 || order[states[i - 1]] <= order[s])
     && states.filter((s) => s === 'live').length <= 1;
 }
 
@@ -92,15 +96,14 @@ export function Fig16Chunks({ plan, label, fallback }) {
       data-density={compact ? 'compact' : 'full'}
       style={{ '--fig-paper': 'var(--ins-well)' }}
     >
-      {tooNarrow ? fallback : (<>
-        {!compact && <span className="engraved-label mb-1.5 block text-muted-foreground">{FIGURES[figNumber('chunks')].title}</span>}
+      {tooNarrow ? fallback : (
         <cal-progress
           {...attrs}
           step={step}
-          done-label={r.spent != null ? `${r.done} done · ${formatDuration(r.spent)}` : undefined}
+          done-label={r.spent != null ? formatDuration(r.spent) : undefined}
           live-label={r.estimate != null && r.live >= 0 ? `≈ ${formatDuration(r.estimate)} left` : undefined}
         />
-      </>)}
+      )}
     </div>
   );
 }

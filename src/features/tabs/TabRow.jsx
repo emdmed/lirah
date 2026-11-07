@@ -93,6 +93,7 @@ export const ROW_KEYS = [
   { keys: ['a'], label: 'attach' },
   { keys: ['f'], label: 'folder' },
   { keys: ['o'], label: 'plan' },
+  { keys: ['e'], label: 'edits' },
   { keys: ['t'], label: 'role' },
   { keys: ['r'], label: 'rename' },
   { keys: ['x'], label: 'close' },
@@ -167,10 +168,25 @@ export const TabRow = memo(function TabRow({
     `Double-click or F2 to rename${closable ? ' · drag to reorder' : ''}`,
   ].filter(Boolean).join('\n');
 
+  // What a screen reader hears for the row: its children are presentational.
+  const ariaLabel = [
+    name,
+    activity.label,
+    queuePos >= 0 && `waiting on you, ${queuePos === 0 ? 'next' : `number ${queuePos + 1}`}`,
+    info?.branch && `branch ${info.branch}`,
+    info?.branch && (info.files === 0 ? 'clean' : `${plural(info.files, 'file')} changed`),
+    ...livePlans.map((p) => `plan ${p.title || 'untitled'}${p.autopilot?.status ? `, auto-pilot ${p.autopilot.status}` : ''}`),
+    linked && 'linked to the prompt',
+    workLabel,
+  ].filter(Boolean).join(', ');
+
   return (
     // A div, not a <button>: it holds the rename input and other controls.
     <div
-      role="button"
+      role="option"
+      aria-selected={active}
+      aria-label={ariaLabel}
+      aria-describedby="tab-row-keys"
       data-tab-row=""
       // One tab stop for the list: the active row. j/k move from there.
       tabIndex={active ? 0 : -1}
@@ -188,8 +204,7 @@ export const TabRow = memo(function TabRow({
         }
       }}
       title={tooltip}
-      aria-current={active ? 'page' : undefined}
-      aria-keyshortcuts="Enter r x l t a f o"
+      aria-keyshortcuts="Enter r x l t a f o e"
       data-marker="top"
       className={cn(
         'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
@@ -266,7 +281,7 @@ export const TabRow = memo(function TabRow({
           <span
             className={cn(
               'shrink-0 items-center gap-1.5',
-              roleMenuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
+              roleMenuOpen || active ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
             )}
           >
             {!tab.role && <RoleTagButton tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}

@@ -14,7 +14,7 @@ import { useConfirm } from '../dialogs/DialogProvider';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
-import { Keycap, KeyChord } from '../../components/instrument/Keycap';
+import { Keycap } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { Span, SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { jobsPaneRequest } from './jobsPane';
@@ -573,7 +573,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         trailing={
           <>
             <WorkspaceRow />
-            <KeyChord keys={['alt', '4']} size="sm" />
+            <span className="ins-sep-star" aria-hidden="true" />
             <button
               onClick={toggleWide}
               className="text-muted-foreground hover:text-foreground cursor-pointer"

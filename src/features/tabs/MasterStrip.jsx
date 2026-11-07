@@ -79,7 +79,8 @@ export function MasterStrip() {
   const busy = workers.filter((w) => w.state === 'working').length;
   const n = workers.length;
   const drives = `${n} ${n === 1 ? 'tab' : 'tabs'}${busy ? `, ${busy} working` : ''}`;
-  const word = live?.word ?? (master ? 'idle' : 'not started');
+  // Resting prints nothing: the open key already says it's there.
+  const word = live?.word ?? (master ? null : 'not started');
 
   const toggle = () => {
     if (showing && workspaceTabs[0]) switchTab(workspaceTabs[0].id);
@@ -110,12 +111,13 @@ export function MasterStrip() {
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-muted-foreground">
         <WorkerFan workers={workers} />
         {n > MAX_NODES && <span className="tabular-nums">+{n - MAX_NODES}</span>}
-        <span className="sr-only">drives {drives}</span>
+        {busy > 0 && <span className="truncate tabular-nums">{busy} working</span>}
+        <span className="sr-only">drives {drives}{master && !live ? ', idle' : ''}</span>
       </span>
       {/* pl-2 keeps 16px between the fan and the status when the pane is narrow. */}
       <span role="status" className="ml-auto flex min-w-0 shrink items-center gap-1.5 pl-2 text-muted-foreground">
         {live && <Lamp state={live.lamp} blink={live.blink} />}
-        <span className="truncate">{word}</span>
+        {word && <span className="truncate">{word}</span>}
       </span>
       <PanelButton
         onClick={toggle}

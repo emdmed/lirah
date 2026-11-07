@@ -10,6 +10,8 @@ export const StarLamp = () => <Lamp state="on" />;
 
 export const LensLamp = () => <Lamp state="off" />;
 
+export const FaultLamp = () => <Lamp state="fault" />;
+
 // The same star, filled and unlit: an agent resting at its prompt. It is a
 // star (an agent is there) but carries no glow, unlike the working star.
 export function StarDim() {

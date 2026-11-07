@@ -5,6 +5,9 @@ import { ProgressReadout } from './parts';
 import { AUTOPILOT_STATUS, CHUNK_STATUS, PLAN_STAGE, pilotPosition, planProgress, planStage, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
 /** The plan's lamp and auto-pilot tag, as its row and its tab show them. */
+// A run's tag takes its lamp's tone.
+export const TAG_TONE = { fault: 'text-[var(--ins-fault)]', warn: 'text-[var(--ins-warn)]' };
+
 export function planStatus(plan) {
   const { done, total } = planProgress(plan);
   const running = plan.chunks.some((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
@@ -42,7 +45,7 @@ export function PlanRow({ plan, onOpen }) {
           <span
             className={cn(
               'ml-auto shrink-0 text-[11px] leading-4 tabular-nums',
-              ap.status === AUTOPILOT_STATUS.RUNNING ? 'text-[var(--ins-lamp)]' : 'text-[var(--ins-warn)]',
+              TAG_TONE[lampState] ?? 'text-[var(--ins-lamp)]',
             )}
           >
             {tag}{pos && <span className="text-muted-foreground"> · chunk {pos.index}</span>}

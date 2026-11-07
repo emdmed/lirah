@@ -39,11 +39,11 @@ export function WorkspaceRow() {
               title={`${ws.name}: ${count} tab${count === 1 ? '' : 's'} (double-click to rename)`}
               className={cn(
                 'flex items-center gap-1 px-1 cursor-pointer border-b',
-                active ? 'text-[var(--ins-lamp)] border-[var(--ins-lamp)]' : 'text-muted-foreground border-transparent hover:text-foreground',
+                active ? 'text-foreground border-[var(--ins-legend)]' : 'text-muted-foreground border-transparent hover:text-foreground',
               )}
             >
               {ws.name}
-              <span className="tabular-nums text-foreground">{count}</span>
+              <span className="tabular-nums">{count}</span>
               {!active && waiting.has(ws.id) && (
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--ins-ok)]" aria-label="agent waiting on you" />
               )}
