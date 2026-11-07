@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { requestJobsPane } from '../agent-jobs/jobsPane';
+import { requestJobsPane, requestTabsPane } from '../agent-jobs/jobsPane';
 import { requestAutopilotToggle, requestPlanChunkCommand, requestPlansPane } from '../plans/plansPaneEvents';
 import { requestQuickTask, requestTasksPane } from '../tasks/tasksPaneEvents';
 import { useWatcher } from '../watcher';
@@ -124,7 +124,8 @@ export function useTabCommands({
       } },
       { id: 'files', hint: 'toggle the files pane', run: () => setSidebarOpen(prev => !prev) },
       { id: 'prompt', hint: 'toggle the prompt pane', run: () => setTextareaVisible(prev => !prev) },
-      { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle') },
+      { id: 'jobs', hint: 'toggle the jobs pane', run: () => requestJobsPane('toggle', 'jobs') },
+      { id: 'tabs', hint: 'the workspace\'s tabs', run: () => requestTabsPane('toggle') },
       { id: 'plans', hint: 'plans: split, implement, review, roll back', run: () => requestPlansPane('toggle') },
       { id: 'plan', hint: 'plans: open (next) or send (implement) the open plan\'s next chunk', options: ['next', 'implement'], run: (arg) => {
         if (arg && arg !== 'next' && arg !== 'implement') throw new Error(`no plan action "${arg}"`);
