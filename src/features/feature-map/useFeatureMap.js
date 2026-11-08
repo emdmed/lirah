@@ -8,6 +8,7 @@ const building = new Set();
 const buildErrors = new Map();
 const listeners = new Set();
 let version = 0;
+const MIN_BUILDING_MS = 700;
 const notify = () => { version += 1; listeners.forEach((f) => f()); };
 const subscribe = (f) => { listeners.add(f); return () => listeners.delete(f); };
 
@@ -18,7 +19,10 @@ export function buildFeatureMap(projectDir, rebuild = false) {
   buildErrors.delete(projectDir);
   notify();
   const updatePrompt = rebuild ? null : buildFeatureMapUpdatePrompt();
-  return invoke('build_feature_map', { projectDir, prompt: buildFeatureMapPrompt(), updatePrompt })
+  // An update with no new files skips the model and ends in milliseconds; hold the building line long enough to see.
+  const minHold = new Promise((r) => setTimeout(r, MIN_BUILDING_MS));
+  return Promise.all([invoke('build_feature_map', { projectDir, prompt: buildFeatureMapPrompt(), updatePrompt }), minHold])
+    .then(([summary]) => summary)
     .catch((e) => { buildErrors.set(projectDir, String(e)); throw e; })
     .finally(() => { building.delete(projectDir); notify(); });
 }

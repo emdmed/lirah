@@ -4,6 +4,7 @@ import '@/components/instrument/calibrated';
 import { useCalSvg } from '@/components/instrument/useCalSvg';
 import { useFigureCompact } from '@/components/instrument/figure';
 import { Scanner } from '../../components/instrument/Scanner';
+import { Lamp } from '../../components/instrument/Lamp';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { formatAgo, formatTimer } from '../../lib/formatDuration';
@@ -35,9 +36,18 @@ export function FeaturesPane({ projectPath, fm }) {
   // The map can change outside the app (an agent, a CLI build), so re-read it when the tab opens.
   useEffect(reload, [reload]);
 
+  // The last build's summary, shown on the status line for a few seconds after it lands.
+  const [done, setDone] = useState(null);
+  useEffect(() => {
+    if (!done) return undefined;
+    const t = setTimeout(() => setDone(null), 4000);
+    return () => clearTimeout(t);
+  }, [done]);
+
   const build = (rebuild) => {
     try {
-      fm.build(rebuild).catch(() => {}); // the failed status line shows the error
+      setDone(null);
+      fm.build(rebuild).then((summary) => setDone(summary), () => {}); // the failed status line shows the error
     } catch (e) {
       toast.error(errorMessage(e));
     }
@@ -73,7 +83,7 @@ export function FeaturesPane({ projectPath, fm }) {
         if (f) { e.preventDefault(); togglePin(f); }
       }}
     >
-      <StatusLine fm={fm} onBuild={build} onExplore={explore} />
+      <StatusLine fm={fm} done={done} onBuild={build} onExplore={explore} />
       {features.map((f) => (
         <FeatureRow
           key={f.id}
@@ -91,7 +101,7 @@ export function FeaturesPane({ projectPath, fm }) {
   );
 }
 
-function StatusLine({ fm, onBuild, onExplore }) {
+function StatusLine({ fm, done, onBuild, onExplore }) {
   const { status, map } = fm;
   if (status === 'none') {
     return (
@@ -105,7 +115,13 @@ function StatusLine({ fm, onBuild, onExplore }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5 text-[11px] text-muted-foreground">
       {status === 'building' && <Building />}
-      {status === 'fresh' && <span>built {map.gitSha || '?'} · {map.generatedAt ? `${formatAgo(Date.now() - map.generatedAt)} ago` : 'unknown age'}</span>}
+      {status === 'fresh' && done && (
+        <span role="status" className="flex items-center gap-2 text-foreground">
+          <Lamp state="ok" settled />
+          {done.replace(/^Updated the feature map: /, 'updated · ').replace(/^Mapped/, 'mapped')}
+        </span>
+      )}
+      {status === 'fresh' && !done && <span>built {map.gitSha || '?'} · {map.generatedAt ? `${formatAgo(Date.now() - map.generatedAt)} ago` : 'unknown age'}</span>}
       {status === 'stale' && (
         <>
           <Fig35Freshness
