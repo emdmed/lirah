@@ -4,6 +4,24 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-08
+
+### Added
+
+- **Status from any CLI** - Programs that report their state with OSC 7501 (the Program Status Protocol) now drive a tab's agent state, the same way Claude Code's hooks do. Lirah answers the protocol's "do you support this?" question, so Claude Code reports its own state too.
+- **Wait on several workers** - `lirah tabs wait --any` returns the next worker reply as it lands, `--all` waits for every worker you sent work to.
+- **Read, press keys, interrupt** - `lirah tabs read` prints a tab's screen, `lirah tabs keys` presses keys in it (enter, esc, arrows, ctrl+c) and `lirah tabs interrupt` stops its agent's turn. Keys and interrupt refuse a tab waiting on a permission prompt.
+- **Wait for output** - `lirah tabs wait <tab> --output <text>` waits until a tab prints that text, such as a dev server's "ready" line.
+
+### Changed
+
+- **Safer sends** - `lirah tabs send` refuses a tab that is waiting on a permission prompt (unless `--force`), and says when a prompt shows no sign of arriving.
+- **Full-screen settings** - The settings dialog fills the window; its rows keep a readable width.
+
+### Fixed
+
+- **Interrupted turns end** - Pressing Esc or Ctrl+C on a Claude Code tab (or `lirah tabs interrupt`) no longer leaves it marked as working. Claude sends no hook for an interrupt; Lirah now hears it from Claude's own status report, with the transcript as a backup.
+
 ## [0.17.0] - 2026-11-07
 
 ### Added
