@@ -13,6 +13,7 @@ import { KeyChord } from "../instrument/Keycap";
 import { Lamp } from "../instrument/Lamp";
 import { FrameHints } from "../instrument/FrameHints";
 import { Fig32FilesByIntent } from "./Fig32FilesByIntent";
+import { Fig36FeatureFiles } from "../../features/feature-map/Fig36FeatureFiles";
 import { focusPane, findVisiblePane } from "../../hooks/usePaneShortcuts";
 import { PickerRow } from "../ui/picker";
 import { matches } from "../../lib/shortcuts";
@@ -271,6 +272,7 @@ export const ContextStatus = memo(function ContextStatus({
           {featureChips.length > 0 && (
             <ContextChips {...chipProps} selectedFiles={NO_FILES} selectedElements={NO_ELEMENTS} extras={featureChips} />
           )}
+          {featureChips.length > 0 && <Fig36FeatureFiles features={pinnedFeatures} className="basis-full" />}
           {matched.length > 0 && (
             <ul className="flex flex-wrap gap-1" aria-label="Features your prompt names, added on submit">
               {matched.map((m) => (
