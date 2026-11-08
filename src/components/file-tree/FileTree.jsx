@@ -38,6 +38,7 @@ export const FileTree = memo(function FileTree({
   searchQuery,
   expandedFolders,
   currentPath,
+  featureMarks,
   showGitChangesOnly,
   showMarkdownOnly,
   onToggle,
@@ -358,6 +359,7 @@ export const FileTree = memo(function FileTree({
               gitStatus={stats?.status || undefined}
               selectedInside={node.is_dir ? selectedInFolder.get(path) || 0 : 0}
               isOpenTab={!!node.is_dir && tabRoots.has(path.replace(/\/+$/, ""))}
+              featureMark={node.is_dir ? featureMarks?.folders.get(path) || 0 : featureMarks?.files.has(path) ? 1 : 0}
               agentMark={markKey((node.is_dir ? agentActivity.folders : agentActivity.files).get(path))}
               onToggle={onToggle}
               onActivateFile={handleActivateFile}

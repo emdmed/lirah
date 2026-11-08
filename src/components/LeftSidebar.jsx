@@ -30,6 +30,7 @@ export const LeftSidebar = memo(function LeftSidebar({
   fileSymbols,
   viewMode,
   currentPath,
+  featureMarks,
   folders,
   fileWatchingEnabled,
   isTextareaPanelOpen,
@@ -137,6 +138,7 @@ export const LeftSidebar = memo(function LeftSidebar({
                     searchQuery={searchQuery}
                     expandedFolders={expandedFolders}
                     currentPath={currentPath}
+                    featureMarks={featureMarks}
                     showGitChangesOnly={showGitChangesOnly}
                     showMarkdownOnly={showMarkdownOnly}
                     onToggle={toggleFolder}

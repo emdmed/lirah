@@ -5,14 +5,15 @@ import { createEmitter } from '../../lib/createStore';
 // Each tab's feature context: `selected` (feature id shown in the explorer and
 // tree) and `pinned` ([{ id, name, files }], sent as FEATURE lines). Module
 // state, like linked repos, so the FEATURES tab and context pane can share it.
+// `marked` is the file list the tree marks (the selected feature's), or null.
 
-const EMPTY = { selected: null, pinned: [] };
-const byTab = new Map(); // tabId -> { selected, pinned }
+const EMPTY = { selected: null, pinned: [], marked: null };
+const byTab = new Map(); // tabId -> { selected, pinned, marked }
 const { subscribe, emit } = createEmitter();
 
 function update(tabId, patch) {
   const next = { ...getTabFeatures(tabId), ...patch };
-  if (next.selected || next.pinned.length) byTab.set(tabId, next);
+  if (next.selected || next.pinned.length || next.marked) byTab.set(tabId, next);
   else byTab.delete(tabId);
   emit();
 }
@@ -21,8 +22,31 @@ export function getTabFeatures(tabId) {
   return byTab.get(tabId) || EMPTY;
 }
 
+// A new selection drops the tree marks; the open FEATURES pane re-marks it.
 export function selectFeature(tabId, id) {
-  update(tabId, { selected: id ?? null });
+  const selected = id ?? null;
+  if (selected !== getTabFeatures(tabId).selected) update(tabId, { selected, marked: null });
+}
+
+/** Marks these project-relative files in the tab's tree (null clears). */
+export function markFeatureInTree(tabId, files) {
+  update(tabId, { marked: files || null });
+}
+
+/** Tree marks for project-relative files: absolute folder path -> feature files under it, and the file set. */
+export function treeMarks(projectPath, files) {
+  const root = projectPath.replace(/\/+$/, '');
+  const folders = new Map();
+  const fileSet = new Set();
+  for (const rel of files) {
+    const parts = rel.split('/').filter(Boolean);
+    fileSet.add(`${root}/${parts.join('/')}`);
+    for (let i = 1; i < parts.length; i++) {
+      const dir = `${root}/${parts.slice(0, i).join('/')}`;
+      folders.set(dir, (folders.get(dir) || 0) + 1);
+    }
+  }
+  return { folders, files: fileSet };
 }
 
 /**
@@ -48,7 +72,10 @@ export function clearTabFeatures(tabId) {
 
 export function useTabFeatures(tabId) {
   const getSnapshot = useCallback(() => getTabFeatures(tabId), [tabId]);
-  const { selected, pinned } = useSyncExternalStore(subscribe, getSnapshot);
+  const { selected, pinned, marked } = useSyncExternalStore(subscribe, getSnapshot);
   const clear = useCallback(() => clearTabFeatures(tabId), [tabId]);
-  return useMemo(() => ({ selectedFeature: selected, pinnedFeatures: pinned, clearFeatures: clear }), [selected, pinned, clear]);
+  return useMemo(
+    () => ({ selectedFeature: selected, pinnedFeatures: pinned, markedFiles: marked, clearFeatures: clear }),
+    [selected, pinned, marked, clear],
+  );
 }

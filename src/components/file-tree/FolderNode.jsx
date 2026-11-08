@@ -15,9 +15,10 @@ import { AgentMark } from "./AgentMark";
  * @param {number} [selectedInside] - Files inside selected into the prompt
  * @param {boolean} [isOpenTab] - Open as a tab: a muted "tab" legend, no lamp (nothing is live)
  * @param {string} [agentMark] - An agent read or edited something inside (see AgentMark)
+ * @param {number} [featureMark] - Files of the marked feature inside (◆ n)
  * @param {Function} onToggle - Callback to toggle folder expansion
  */
-export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCursor, isDimmed, selectedInside, isOpenTab, agentMark, onToggle }) {
+export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCursor, isDimmed, selectedInside, isOpenTab, agentMark, featureMark, onToggle }) {
   return (
     <SidebarMenuButton
       size="sm"
@@ -34,7 +35,7 @@ export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCur
         <span className={`truncate pl-1 ${isDimmed ? 'text-faint' : 'text-foreground'}`} title={name}>
           {name}<span className="text-faint">/</span>
         </span>
-        {(selectedInside > 0 || agentMark || isOpenTab) && (
+        {(selectedInside > 0 || agentMark || isOpenTab || featureMark > 0) && (
           <span className="ml-auto pr-[18px] flex items-center gap-1">
             {/* Inverse video, like the selected file rows it stands for. */}
             {selectedInside > 0 && (
@@ -49,6 +50,11 @@ export function FolderNode({ path, name, depth, isExpanded, isCurrentPath, isCur
             {isOpenTab && (
               <span className="text-muted-foreground" style={{ fontFamily: 'var(--font-legend)', fontSize: 11, lineHeight: 1 }} title="Open as a tab">
                 tab
+              </span>
+            )}
+            {featureMark > 0 && (
+              <span className="text-foreground tabular-nums leading-none" style={{ fontSize: 'var(--font-sm)' }} title={`${featureMark} ${featureMark === 1 ? 'file' : 'files'} of the selected feature in here`}>
+                ◆ {featureMark}
               </span>
             )}
             <AgentMark mark={agentMark} isDir />

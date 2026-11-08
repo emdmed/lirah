@@ -14,7 +14,7 @@ import { useToast } from '../toast';
 import { useDialog } from '../dialogs/DialogProvider';
 import { EmptyPlate } from '../../components/EmptyState';
 import { Fig35Freshness } from './Fig35Freshness';
-import { pinFeature, selectFeature, useTabFeatures } from './useTabFeatures';
+import { markFeatureInTree, pinFeature, selectFeature, useTabFeatures } from './useTabFeatures';
 
 const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer';
 
@@ -48,6 +48,14 @@ export function FeaturesPane({ projectPath, fm }) {
     [fm.map],
   );
   const largest = features[0]?.files?.length || 1;
+
+  // While this tab is open the tree marks the selected feature; leaving it clears them.
+  const markFiles = features.find((f) => f.id === selectedFeature)?.files;
+  useEffect(() => {
+    if (!Array.isArray(markFiles)) return undefined;
+    markFeatureInTree(activeTabId, markFiles);
+    return () => markFeatureInTree(activeTabId, null);
+  }, [activeTabId, markFiles]);
 
   return (
     <div

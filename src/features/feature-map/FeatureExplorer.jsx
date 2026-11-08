@@ -6,7 +6,7 @@ import { errorMessage } from '../../lib/errorMessage';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { useFeatureMap } from './useFeatureMap';
-import { pinFeature, selectFeature, unpinFeature, useTabFeatures } from './useTabFeatures';
+import { markFeatureInTree, pinFeature, selectFeature, unpinFeature, useTabFeatures } from './useTabFeatures';
 import { Fig34Features } from './Fig34Features';
 import { copyFeatureFiles, FeatureRow } from './FeaturesPane';
 
@@ -104,6 +104,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
             onCopy={() => copyFeatureFiles(feature, toast)}
             onSelect={select}
             onReveal={reveal}
+            onMark={() => { markFeatureInTree(activeTabId, Array.isArray(feature.files) ? feature.files : []); onOpenChange(false); }}
           />
         </div>
       </DialogContent>
@@ -111,7 +112,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
   );
 }
 
-function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal }) {
+function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal, onMark }) {
   if (!feature) return <div />;
   const files = Array.isArray(feature.files) ? feature.files : [];
   const entries = new Set(feature.entryPoints || []);
@@ -138,7 +139,7 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal 
       </div>
       <div className="flex flex-wrap gap-2">
         <button onClick={onPin} aria-pressed={pinned} className={cn(BTN, pinned && 'text-[var(--ins-lamp)]')}>{pinned ? 'in context' : 'add to context'}</button>
-        <button disabled title="comes with the file tree marks" className={BTN}>mark in tree</button>
+        <button onClick={onMark} title="Mark its files and folders in the file tree (nothing opens)" className={BTN}>mark in tree</button>
         <button onClick={onCopy} className={BTN}>copy files</button>
       </div>
       <dl className="grid grid-cols-[80px_minmax(0,1fr)] gap-x-2 gap-y-1">

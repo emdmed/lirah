@@ -22,7 +22,7 @@ import { useTabContextFill } from "./tabContextFill";
 import { useTabAutoCommit } from "./tabAutoCommit";
 import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos, unlinkRepo } from "./useLinkedRepos";
-import { useTabFeatures } from "../feature-map/useTabFeatures";
+import { treeMarks, useTabFeatures } from "../feature-map/useTabFeatures";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
 import { useAutoMerge } from "../git/useAutoMerge";
@@ -282,7 +282,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
   const { linkedRepos, clearLinkedRepos } = useLinkedRepos(tabId);
-  const { pinnedFeatures, clearFeatures } = useTabFeatures(tabId);
+  const { pinnedFeatures, markedFiles, clearFeatures } = useTabFeatures(tabId);
+  const featureMarks = useMemo(() => (markedFiles ? treeMarks(projectPath, markedFiles) : null), [projectPath, markedFiles]);
   // Last-used file view (flat/tree) is the default for new tabs.
   const [viewMode, setViewMode] = useSeededSetting('viewMode');
 
@@ -1056,6 +1057,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               fileSymbols={fileSymbolsHook}
               viewMode={viewMode}
               currentPath={currentPath}
+              featureMarks={featureMarks}
               folders={folders}
               fileWatchingEnabled={fileWatchingEnabled && isActive && !secondary.secondaryFullscreen}
               // The prompt box or the context status always holds the
