@@ -24,7 +24,7 @@ export function EmptyPlate({ title, description, keys, keyLabel, action, classNa
         </p>
       )}
       {action && (
-        <Button variant="outline" size="xs" onClick={action.onClick}>
+        <Button variant="outline" size="sm" onClick={action.onClick}>
           {action.label}
         </Button>
       )}

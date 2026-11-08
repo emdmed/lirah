@@ -1,9 +1,10 @@
 import { useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
 
-// A one-of-n choice for filters and ranges: printed keys side by side, no box.
-// The chosen key takes the latch tint and an ink underline (not lamp gold:
-// a filter is a setting, not live state). Settings rows use `Choice`.
+// A one-of-n choice for filters and ranges: ghost keys in one framed bank.
+// The chosen key takes the ink tint (not lamp gold: a filter is a setting,
+// not live state). Settings rows use `Choice`.
 //
 // options: [{ value, label }]
 export function SegmentBank({ value, options, onChange, label, className }) {
@@ -36,7 +37,7 @@ export function SegmentBank({ value, options, onChange, label, className }) {
           aria-checked={i === index}
           tabIndex={i === index ? 0 : -1}
           onClick={() => onChange?.(o.value)}
-          className="ins-key ins-key-panel ins-round"
+          className={buttonVariants({ variant: 'ghost', size: 'panel' })}
         >
           {o.label}
         </button>

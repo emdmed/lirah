@@ -2157,6 +2157,7 @@ body {
 
   .ins-seg > .ins-key {
     border: 0;
+    border-radius: 0;
   }
 
   .ins-seg > .ins-key + .ins-key {
@@ -2174,6 +2175,10 @@ body {
   .ins-split {
     display: inline-flex;
     align-items: stretch;
+  }
+
+  .ins-split > .ins-key {
+    border-radius: 0;
   }
 
   .ins-split > .ins-key + .ins-key {
