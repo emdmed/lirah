@@ -37,11 +37,22 @@ lirah tabs focus <tab>         switch to a tab
 lirah tabs master              whether you are the workspace terminal (the orchestrating one)
 lirah tabs note <tab> <text>   set a tab's one-line purpose (empty: clear it)
 lirah tabs show <tab>          a tab's note, branch, agent state and last reply
-lirah tabs send <tab> <prompt> send a prompt to a tab's agent without switching to it
-                               ("-" reads the prompt from stdin; boots the tab if needed)
+lirah tabs send <tab> <prompt> [--force]
+                               send a prompt to a tab's agent without switching to it
+                               ("-" reads the prompt from stdin; boots the tab if needed;
+                               refuses while it waits on a permission prompt unless --force)
 lirah tabs wait <tab> [--timeout 50]
                                wait for its turn to end and print its last reply
                                (exit 2 while still working: run it again)
+lirah tabs wait <tab> --output <text>
+                               wait until the tab prints <text> (after the wait starts)
+lirah tabs wait --any|--all    wait for the next worker you sent work to (--any) or for
+                               all of them (--all); returns early if one needs permission
+lirah tabs read <tab> [--lines N]
+                               print a tab's screen as text (--lines: N lines of history too)
+lirah tabs keys <tab> <key...> press keys in a tab: enter, esc, tab, up, down, left, right,
+                               space, backspace, ctrl+c, or one character (y, 1)
+lirah tabs interrupt <tab>     stop its agent's current turn (esc); the tab stays open
 lirah startup                  show what opens at launch
 lirah startup mode restore|projects
                                reopen the last tabs, or open the startup projects
@@ -108,12 +119,23 @@ tabs are your workers:
 - Dispatch with `lirah tabs send <tab> -` and the prompt on stdin (a heredoc).
   Write a self-contained prompt: the worker hasn't seen this conversation.
 - Collect with `lirah tabs wait <tab>`. Exit 2 means it is still working: run it
-  again. Fan out to several tabs first, then wait on each. `lirah tabs show <tab>`
-  tells you what a worker is on.
+  again. Fan out to several tabs first, then `lirah tabs wait --any` to take each
+  reply as it lands (or `--all` for all at once). `lirah tabs show <tab>` tells
+  you what a worker is on.
+- If a send says the worker "shows no sign of starting", run `lirah tabs show`
+  before sending again: the prompt may still have arrived.
+- `lirah tabs wait <tab> --output "<text>"` waits for a tab to print something,
+  such as a dev server's "ready" line.
 - Stay in the workspace terminal: never `lirah tabs focus` unless the user asks. A tab you
   open with `lirah tabs open` stays in the background too. Tell the
   user what each worker did, from its reply.
 - If a wait reports a permission prompt, tell the user which tab needs them.
+  `send`, `keys` and `interrupt` refuse such a tab; never use `--force` to answer
+  a permission prompt.
+- When a worker seems stuck (no state, or a send shows no sign of starting),
+  `lirah tabs read <tab>` shows its screen. A startup dialog (trust this folder,
+  pick a theme) can be passed with `lirah tabs keys <tab> enter`; tell the user
+  what you chose. `lirah tabs interrupt <tab>` stops a turn going the wrong way.
 
 ## Without the app
 

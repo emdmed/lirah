@@ -1,9 +1,10 @@
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createEmitter } from '../../lib/createStore';
 import { bashFileTargets } from './bashFileTargets';
 
 // What each terminal's agent last said about itself through its hooks (see
-// src-tauri/src/agent_hooks.rs). Plain module state like terminalActivity.js:
+// src-tauri/src/agent_hooks.rs) or an OSC 7501 report (programStatus.js). Plain module state like terminalActivity.js:
 // events land here and the tabs summary pane reads it on its own tick.
 // Subscribers (useAgentAttention, the attention queue) hear every change.
 //
@@ -184,6 +185,42 @@ function nextState(payload) {
   }
 }
 
+// next: { state, message?, error?, notice? }, or null when the agent is gone.
+function setState(sessionId, next, source, extra = {}) {
+  const prev = states.get(sessionId) || null;
+  if (next === null) states.delete(sessionId);
+  else states.set(sessionId, { ...next, source, at: Date.now(), seq: ++seq });
+  if (next && isFocused(sessionId)) acked.set(sessionId, seq);
+  emit({ sessionId, prev, next: states.get(sessionId) || null, turnMs: null, contextUsed: false, ...extra });
+}
+
+// A state the program reported itself (OSC 7501, see programStatus.js). A
+// repeat of the current state (a progress tick) changes nothing.
+export function reportAgentState(sessionId, next, source = 'osc') {
+  if (!sessionId || next === undefined) return;
+  const prev = states.get(sessionId);
+  if (next && prev && prev.state === next.state && prev.message === next.message && !!prev.error === !!next.error) return;
+  if (next === null && !prev) return;
+  setState(sessionId, next, source);
+}
+
+// Claude Code sends no Stop hook when the user interrupts (Esc), so a tab would
+// stay "working". Its transcript does record the interrupt; if that is newer
+// than the last working event, the turn is over. True when it settled one.
+// The 1 s slack covers a hook event landing just after a quick Esc.
+export async function settleIfInterrupted(sessionId) {
+  const s = states.get(sessionId);
+  const path = transcripts.get(sessionId);
+  if (s?.state !== 'working' || !path) return false;
+  const at = await invoke('last_interrupt_at', { transcriptPath: path }).catch(() => null);
+  if (!at || !(Date.parse(at) > s.at - 1000) || states.get(sessionId) !== s) return false;
+  settleFiles(sessionId);
+  const turn = turns.get(sessionId)?.at(-1);
+  if (turn && !turn.endedAt) turn.endedAt = Date.now();
+  setState(sessionId, { state: 'waiting', message: 'interrupted' }, 'transcript');
+  return true;
+}
+
 let started = false;
 export function startAgentHookListener() {
   if (started) return;
@@ -221,13 +258,9 @@ export function startAgentHookListener() {
       if (hookEvent === 'PostToolUse') emit({ sessionId });
       return;
     }
-    const prev = states.get(sessionId) || null;
-    if (next === null) states.delete(sessionId);
-    else states.set(sessionId, { ...next, source: payload.source || 'claude', at: now, seq: ++seq });
-    if (next && isFocused(sessionId)) acked.set(sessionId, seq);
     // contextUsed: the hook added the prompt box's selected context to a
     // prompt typed in the terminal.
-    emit({ sessionId, prev, next: states.get(sessionId) || null, turnMs, contextUsed: payload.lirah_context === true });
+    setState(sessionId, next, payload.source || 'claude', { turnMs, contextUsed: payload.lirah_context === true });
   }).catch((e) => {
     started = false;
     console.debug('Agent hook listener unavailable:', e);

@@ -212,6 +212,7 @@ pub fn run(initial_path: Option<String>) {
             plans::delete_plan_file,
             plans::remove_plan_workdir,
             plans::last_assistant_text,
+            plans::last_interrupt_at,
             plans::gh_pr_for_branch,
             // ~/.lirah JSON store
             store::store_read,

@@ -40,11 +40,22 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah tabs master              whether you are the workspace's master (orchestrating) terminal
   lirah tabs note <tab> <text>   set a tab's one-line purpose (empty: clear it)
   lirah tabs show <tab>          a tab's note, branch, agent state and last reply
-  lirah tabs send <tab> <prompt> send a prompt to a tab's agent without switching to it
-                                 ("-" reads the prompt from stdin; boots the tab if needed)
+  lirah tabs send <tab> <prompt> [--force]
+                                 send a prompt to a tab's agent without switching to it
+                                 ("-" reads the prompt from stdin; boots the tab if needed;
+                                 refuses while it waits on a permission prompt unless --force)
   lirah tabs wait <tab> [--timeout 50]
                                  wait for its turn to end and print its last reply
                                  (exit 2 while still working: run it again)
+  lirah tabs wait <tab> --output <text>
+                                 wait until the tab prints <text> (after the wait starts)
+  lirah tabs wait --any|--all    wait for the next worker you sent work to (--any) or for
+                                 all of them (--all); returns early if one needs permission
+  lirah tabs read <tab> [--lines N]
+                                 print a tab's screen as text (--lines: N lines of history too)
+  lirah tabs keys <tab> <key...> press keys in a tab: enter, esc, tab, up, down, left, right,
+                                 space, backspace, ctrl+c, or one character (y, 1)
+  lirah tabs interrupt <tab>     stop its agent's current turn (esc); the tab stays open
   lirah startup                  show what opens at launch
   lirah startup mode restore|projects
                                  reopen the last tabs, or open the startup projects
@@ -113,6 +124,9 @@ function parseValue(text) {
   }
 }
 
+// Flags that never take a value, so the word after one stays a positional.
+const SWITCHES = new Set(["launch", "fix", "all", "any", "force", "global", "json", "help"]);
+
 function parseArgs(argv) {
   const args = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -128,7 +142,7 @@ function parseArgs(argv) {
     const eq = arg.indexOf("=");
     if (eq !== -1) {
       args[arg.slice(2, eq)] = parseValue(arg.slice(eq + 1));
-    } else if (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
+    } else if (!SWITCHES.has(arg.slice(2)) && i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
       args[arg.slice(2)] = parseValue(argv[++i]);
     } else {
       args[arg.slice(2)] = true;
@@ -229,11 +243,22 @@ function printTab(t) {
   return t.lastReply ? `${head}\nlast reply:\n${t.lastReply}` : head;
 }
 
-// Exit 2 while the tab is still working, so a caller loops on it.
+const stillText = (state) => (state === "permission" ? "waiting on a permission prompt" : state || "starting");
+
+// Exit 2 while still waiting, so a caller loops on it.
 function printWait(w) {
+  if (w.tabs) {
+    const text = w.tabs
+      .map((t) => `── ${t.index} ${t.name}: ${t.done ? t.state : `still ${stillText(t.state)}`}${t.done ? `\n${t.reply || "(no reply text)"}` : ""}`)
+      .join("\n\n");
+    if (w.done) return text;
+    process.exitCode = 2;
+    return `${text}\n\nrun it again`;
+  }
   if (w.done) return w.reply || `(${w.state}, no reply text)`;
   process.exitCode = 2;
-  return `still ${w.state === "permission" ? "waiting on a permission prompt" : w.state || "starting"}; run it again`;
+  if (w.output) return `"${w.output}" not printed yet; run it again`;
+  return `still ${stillText(w.state)}; run it again`;
 }
 
 function printTasks(data) {
@@ -341,13 +366,6 @@ function absolutePath(raw, usage) {
 
 // A bare --flag right before a positional swallows it as its value: put the
 // positional back and make the flag true.
-function unswallow(args, key, rest) {
-  if (args[key] !== undefined && typeof args[key] !== "boolean") {
-    rest.unshift(String(args[key]));
-    args[key] = true;
-  }
-}
-
 // The absolute directory for `tabs open` / `startup add`, which must exist.
 function tabPath(raw, usage = "lirah tabs open <path> [--launch]") {
   const path = absolutePath(raw, usage);
@@ -385,7 +403,6 @@ function route(cmd, positional, args) {
     switch (sub ?? "list") {
       case "list": return ["tabs.list", rest, printTabs];
       case "open": {
-        unswallow(args, "launch", rest);
         const [path, ...extra] = rest;
         return ["tabs.open", [tabPath(path ?? args.path), ...extra], show];
       }
@@ -401,7 +418,10 @@ function route(cmd, positional, args) {
         return ["tabs.send", [tab, prompt], show];
       }
       case "wait": return ["tabs.wait", rest, printWait];
-      default: fail(`unknown tabs command "${sub}" (list, open, close, rename, focus, master, note, show, send, wait)`);
+      case "read": return ["tabs.read", rest, show];
+      case "keys": return ["tabs.keys", rest, show];
+      case "interrupt": return ["tabs.interrupt", rest, show];
+      default: fail(`unknown tabs command "${sub}" (list, open, close, rename, focus, master, note, show, send, wait, read, keys, interrupt)`);
     }
   }
   if (cmd === "startup") {
@@ -412,7 +432,6 @@ function route(cmd, positional, args) {
       case "mode": return ["startup.mode", rest, show];
       case "add": {
         const usage = "lirah startup add <path> [--launch] [--name N]";
-        unswallow(args, "launch", rest);
         const [path, ...extra] = rest;
         return ["startup.add", [tabPath(path ?? args.path, usage), ...extra], show];
       }
@@ -437,32 +456,28 @@ function route(cmd, positional, args) {
       case "revise": return ["plans.revise", rest, show];
       case "rechunk": return ["plans.rechunk", rest, show];
       case "debug": {
-        unswallow(args, "fix", rest);
         return ["plans.debug", rest, printDebug];
       }
       default: fail(`unknown plans command "${sub}" (list, show, import, revise, rechunk, done, debug)`);
     }
   }
   if (cmd === "jobs" || cmd === "job") {
-    unswallow(args, "all", rest);
     switch (sub ?? "list") {
       case "list": return ["jobs.list", [], printJobs];
       case "run":
       case "start": return ["jobs.run", rest, show];
       case "show": return ["jobs.show", rest, printJob];
       case "cancel": return ["jobs.cancel", rest, show];
-      case "apply": unswallow(args, "force", rest); return ["jobs.apply", rest, show];
+      case "apply": return ["jobs.apply", rest, show];
       default: fail(`unknown jobs command "${sub}" (list, run, show, cancel, apply)`);
     }
   }
   if (cmd === "tasks" || cmd === "task") {
     switch (sub ?? "list") {
       case "list": {
-        unswallow(args, "global", rest);
         return ["tasks.list", [], printTasks];
       }
       case "add": {
-        unswallow(args, "global", rest);
         return ["tasks.add", rest, show];
       }
       case "done":
@@ -470,11 +485,9 @@ function route(cmd, positional, args) {
       case "edit":
       case "remove":
       case "move": {
-        unswallow(args, "global", rest);
         return [`tasks.${sub}`, rest, show];
       }
       case "rm": {
-        unswallow(args, "global", rest);
         return ["tasks.remove", rest, show];
       }
       default: fail(`unknown tasks command "${sub}" (list, add, done, reopen, edit, remove, move)`);

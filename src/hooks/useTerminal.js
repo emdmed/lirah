@@ -12,7 +12,10 @@ import { workspaceOfTab } from '../lib/workspaceStore';
 import { useToast } from '../features/toast';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
-import { markTerminalInput, markTerminalOutput } from '../features/tabs/terminalActivity';
+import { markTerminalInput, markTerminalOutput, setSessionTerminal } from '../features/tabs/terminalActivity';
+import { reportAgentState, settleIfInterrupted } from '../features/tabs/agentHookState';
+import { parseProgramStatus, PROGRAM_STATUS_REPLY } from '../features/tabs/programStatus';
+import { feedOutput } from '../features/tabs/outputTail';
 import { isFocusMode } from '../lib/focusMode';
 import { IS_WINDOWS } from '../utils/pathUtils';
 import '@xterm/xterm/css/xterm.css';
@@ -335,6 +338,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       if (cancelled) return;
       const bytes = new Uint8Array(buf);
       markTerminalOutput(id);
+      feedOutput(id, bytes);
       pendingBytes += bytes.length;
       terminal.write(bytes, () => {
         perfFirstOutput();
@@ -351,6 +355,14 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       }
     };
     let output = new Channel(onOutput);
+    // Programs that report their own state (OSC 7501) drive the tab's agent state.
+    // A program asking whether we speak it gets a yes, through xterm's own reply
+    // path so it reaches the program in order with xterm's other answers.
+    const statusOsc = terminal.parser.registerOscHandler(7501, (data) => {
+      if (data.startsWith('?')) terminal.input(PROGRAM_STATUS_REPLY, false);
+      else reportAgentState(id, parseProgramStatus(data));
+      return true;
+    });
 
     const initTerminal = async () => {
       try {
@@ -381,6 +393,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         }
         if (reattachKey) rememberTerminalSession(reattachKey, id);
         sessionIdRef.current = id;
+        setSessionTerminal(id, terminal);
         setReattached(reattached);
         setSessionId(id);
 
@@ -399,6 +412,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
           invoke('write_to_terminal', { sessionId: id, data }).catch((error) => {
             console.error('Failed to write to terminal:', error);
           });
+          // Esc or Ctrl+C may have interrupted Claude, which sends no hook for it.
+          if (data === '\x1b' || data === '\x03') setTimeout(() => settleIfInterrupted(id), 1500);
         });
         if (cancelled) dataDisposable.dispose();
         else onDataDisposableRef.current = dataDisposable;
@@ -450,11 +465,13 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     return () => {
       cancelled = true;
       output.onmessage = () => {};
+      statusOsc.dispose();
       onDataDisposableRef.current?.dispose();
       onDataDisposableRef.current = null;
       const id = sessionIdRef.current;
       if (id) {
         sessionIdRef.current = null;
+        setSessionTerminal(id, null);
         if (reattachKey) forgetTerminalSession(reattachKey, id);
         invoke('close_terminal', { sessionId: id }).catch((error) => {
           console.error('Failed to close terminal:', error);

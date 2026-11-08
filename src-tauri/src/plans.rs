@@ -111,6 +111,15 @@ pub async fn last_assistant_text(transcript_path: String) -> Result<Option<Strin
     .await
 }
 
+/// See `transcript::last_interrupt_at`.
+#[tauri::command]
+pub async fn last_interrupt_at(transcript_path: String) -> Result<Option<String>, String> {
+    crate::ipc::blocking("last_interrupt_at", move || {
+        crate::claude::transcript::last_interrupt_at(Path::new(&transcript_path))
+    })
+    .await
+}
+
 /// The newest GitHub PR (any state) whose head is `branch`, as gh's JSON list
 /// (`[]` when there is none). Runs gh directly with fixed arguments, no shell.
 /// Errs when gh is missing, logged out, or the repo has no GitHub remote.

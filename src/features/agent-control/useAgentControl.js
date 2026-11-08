@@ -16,10 +16,12 @@ import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage } from '../p
 import { buildPlanRevisePrompt } from '../plans/planPrompts';
 import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
 import { planGit } from '../plans/planGit';
-import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../tabs/agentHookState';
+import { getAgentHookState, getAgentTranscript, settleIfInterrupted, subscribeAgentHooks } from '../tabs/agentHookState';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { getTabTranscript } from '../../lib/terminalSessions';
-import { getTabSession } from '../tabs/terminalActivity';
+import { getSessionTerminal, getTabSession } from '../tabs/terminalActivity';
+import { keyBytes } from './keyNames';
+import { outputSince, subscribeOutput, watchOutput } from '../tabs/outputTail';
 import { hash8 } from '../../lib/ids';
 import { JOB_CLIS } from '../../lib/agentClis';
 import {
@@ -29,6 +31,22 @@ import {
 
 // Worker tab id -> when the master last sent it a prompt; tabs.wait waits for a turn ending after it.
 const sentAt = new Map();
+// Worker tab id -> its last reply before the master's last send, to tell a fresh reply from it.
+const replyBefore = new Map();
+// Workers whose reply to the last send a wait already returned; `wait --any|--all` skips them.
+const collected = new Set();
+// Tab id -> the `wait --output` that last timed out, so its rerun misses nothing printed in between.
+const outputWaits = new Map(); // { text, session, from, endedAt }
+
+// Resolves true once check() holds (re-checked on every event from subscribe), false after ms.
+function until(check, ms, subscribe = subscribeAgentHooks) {
+  if (check()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => finish(false), ms);
+    const unsubscribe = subscribe(() => { if (check()) finish(true); });
+    function finish(ok) { clearTimeout(timer); unsubscribe(); resolve(ok); }
+  });
+}
 
 // Answers the `lirah` CLI. The Rust control server relays each request as an
 // `agent-control` event {id, sessionId, cmd, args}; every one gets exactly one
@@ -106,9 +124,73 @@ export function useAgentControl() {
       if (tab.id === callerTab(live.current.tabManager.tabs, sessionId)?.id) throw new Error("that's this tab; pick another one");
       return tab;
     };
+    const stateOf = (tab) => getAgentHookState(getTabSession(tab.id))?.state || null;
+    // Its turn since the last send has ended.
+    const settled = (tab) => {
+      const s = getAgentHookState(getTabSession(tab.id));
+      return !!s && (s.state === 'done' || s.state === 'waiting') && s.at > (sentAt.get(tab.id) || 0);
+    };
+    // The reply to the last send. A program's own "done" (OSC 7501) can land
+    // before its transcript has the reply, so a reply equal to the one from
+    // before the send (or none yet, when there is a transcript) is re-read for up to 3 s.
+    const freshReply = async (tab) => {
+      const before = replyBefore.get(tab.id) ?? null;
+      const hasTranscript = !!(getAgentTranscript(getTabSession(tab.id)) || getTabTranscript(tab.id));
+      let reply = await lastReply(tab);
+      for (let i = 0; i < 10 && reply === before && hasTranscript; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        reply = await lastReply(tab);
+      }
+      return reply;
+    };
+    // A permission prompt is the user's call, not the master's.
+    const refuseBlocked = (tab, args) => {
+      if (stateOf(tab) === 'permission' && !flag(args.force)) {
+        throw new Error(`${name(tab)} is waiting on a permission prompt; tell the user (--force types into it anyway)`);
+      }
+    };
     const lastReply = (tab) => {
       const path = getAgentTranscript(getTabSession(tab.id)) || getTabTranscript(tab.id);
       return path ? invoke('last_assistant_text', { transcriptPath: path }).catch(() => null) : null;
+    };
+
+    // `any` returns at the first finished worker, `all` once all have; both return
+    // early when one is waiting on a permission prompt, so the user hears of it.
+    const waitMany = async (mode, limit, sessionId) => {
+      const pending = scope(sessionId).tabs.filter((t) => sentAt.has(t.id) && !collected.has(t.id));
+      if (!pending.length) throw new Error('no worker has an unanswered prompt; send one with `lirah tabs send` first');
+      await Promise.all(pending.map((t) => settleIfInterrupted(getTabSession(t.id))));
+      const ready = () => pending.some((t) => stateOf(t) === 'permission')
+        || (mode === 'all' ? pending.every(settled) : pending.some(settled));
+      const done = await until(ready, limit);
+      const { tabs } = scope(sessionId);
+      const report = await Promise.all(pending.map(async (t) => {
+        const finished = settled(t);
+        if (finished) collected.add(t.id);
+        return { index: tabs.indexOf(t) + 1, name: name(t), done: finished, state: stateOf(t), reply: finished ? await freshReply(t) : null };
+      }));
+      return { done, tabs: report };
+    };
+
+    const waitOutput = async (tab, text, limit) => {
+      if (!text) throw new Error('--output needs the text to wait for');
+      const session = getTabSession(tab.id);
+      if (!session) throw new Error(`${name(tab)} has no terminal running`);
+      const prev = outputWaits.get(tab.id);
+      const resume = prev && prev.text === text && prev.session === session && Date.now() - prev.endedAt < 30_000;
+      // Watched past the limit so a rerun within 30 s can resume.
+      const start = watchOutput(session, limit + 60_000);
+      const from = resume ? prev.from : start;
+      const found = await until(() => outputSince(session, from).includes(text), limit, subscribeOutput);
+      if (!found) {
+        outputWaits.set(tab.id, { text, session, from, endedAt: Date.now() });
+        return { done: false, output: text, state: stateOf(tab) };
+      }
+      outputWaits.delete(tab.id);
+      const seen = outputSince(session, from);
+      const at = seen.indexOf(text);
+      const end = seen.indexOf('\n', at);
+      return { done: true, state: 'printed', reply: seen.slice(seen.lastIndexOf('\n', at) + 1, end === -1 ? undefined : end).trim() };
     };
 
     const projectScope = async (sessionId) => {
@@ -319,30 +401,76 @@ export function useAgentControl() {
             await new Promise((resolve) => setTimeout(resolve, 250));
           }
         }
-        sentAt.set(tab.id, Date.now());
+        refuseBlocked(tab, args);
+        replyBefore.set(tab.id, await lastReply(tab));
+        const at = Date.now();
+        sentAt.set(tab.id, at);
+        collected.delete(tab.id);
         await getTabPrompt(tab.id).send(text);
-        return `sent to ${name(tab)}; \`lirah tabs wait ${scope(sessionId).tabs.indexOf(tab) + 1}\` for its reply`;
+        const n = scope(sessionId).tabs.indexOf(tab) + 1;
+        // Any state change after the send means it arrived.
+        const arrived = await until(() => (getAgentHookState(getTabSession(tab.id))?.at || 0) > at, 8000);
+        return arrived
+          ? `sent to ${name(tab)}; \`lirah tabs wait ${n}\` for its reply`
+          : `sent to ${name(tab)}, but it shows no sign of starting yet; check \`lirah tabs show ${n}\` before sending again`;
       },
       // Waits for the worker's turn (since the last send) to end, then gives its
       // last reply. Under the app's 60 s limit; the caller loops on "working".
-      'tabs.wait': async (args, [ref = args.tab], { sessionId }) => {
+      // The screen as text; --lines N adds that many lines of history above it.
+      'tabs.read': (args, [ref = args.tab], { sessionId }) => {
         const tab = worker(ref, sessionId);
-        const limit = Math.min(Number(args.timeout) || 50, 55) * 1000;
-        const since = sentAt.get(tab.id) || 0;
-        const settled = () => {
-          const s = getAgentHookState(getTabSession(tab.id));
-          return s && (s.state === 'done' || s.state === 'waiting') && s.at > since;
-        };
-        if (!settled()) {
-          await new Promise((resolve) => {
-            const timer = setTimeout(done, limit);
-            const unsubscribe = subscribeAgentHooks(() => { if (settled()) done(); });
-            function done() { clearTimeout(timer); unsubscribe(); resolve(); }
-          });
+        const term = getSessionTerminal(getTabSession(tab.id));
+        if (!term) throw new Error(`${name(tab)} has no terminal running`);
+        const buf = term.buffer.active;
+        const history = Math.max(0, Math.floor(Number(args.lines) || 0));
+        const lines = [];
+        for (let i = Math.max(0, buf.baseY - history); i < buf.baseY + term.rows; i++) {
+          lines.push(buf.getLine(i)?.translateToString(true) ?? '');
         }
-        const state = getAgentHookState(getTabSession(tab.id))?.state || null;
-        if (!settled()) return { done: false, state };
-        return { done: true, state, reply: await lastReply(tab) };
+        while (lines.length && !lines.at(-1).trim()) lines.pop();
+        return lines.join('\n') || `(${name(tab)}'s screen is empty)`;
+      },
+      // Named keys (enter, esc, down, ctrl+c, y), one at a time, for dialogs the agent can't get past.
+      'tabs.keys': async (args, [ref = args.tab, ...names], { sessionId }) => {
+        const tab = worker(ref, sessionId);
+        if (!names.length) throw new Error('missing keys, e.g. `lirah tabs keys 2 down enter`');
+        refuseBlocked(tab, args);
+        const session = getTabSession(tab.id);
+        if (!session) throw new Error(`${name(tab)} has no terminal running`);
+        const appCursor = !!getSessionTerminal(session)?.modes.applicationCursorKeysMode;
+        const data = names.map((k) => keyBytes(k, { appCursor })); // all checked before any is sent
+        for (const [i, bytes] of data.entries()) {
+          // A gap, or a TUI reads esc followed by a key as one alt+key.
+          if (i) await new Promise((resolve) => setTimeout(resolve, 60));
+          await invoke('write_to_terminal', { sessionId: session, data: bytes });
+        }
+        return `pressed ${names.join(' ')} in ${name(tab)}`;
+      },
+      // Stops the agent's current turn (esc, as in Claude Code and opencode); the tab stays open.
+      'tabs.interrupt': async (args, [ref = args.tab], { sessionId }) => {
+        const tab = worker(ref, sessionId);
+        refuseBlocked(tab, args);
+        if (stateOf(tab) !== 'working' && !flag(args.force)) return `${name(tab)} isn't working; nothing to stop`;
+        const session = getTabSession(tab.id);
+        await invoke('write_to_terminal', { sessionId: session, data: '\x1b' });
+        // The interrupt reaches the transcript a moment later.
+        for (let i = 0; i < 8; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          if (stateOf(tab) !== 'working' || (await settleIfInterrupted(session))) return `stopped ${name(tab)}'s turn`;
+        }
+        return `sent esc to ${name(tab)}, but it still looks busy; \`lirah tabs read\` it to check`;
+      },
+      // --output waits for text instead; --any|--all wait on every worker with an unanswered send.
+      'tabs.wait': async (args, [ref = args.tab], { sessionId }) => {
+        const limit = Math.min(Number(args.timeout) || 50, 55) * 1000;
+        if (flag(args.any) || flag(args.all)) return waitMany(flag(args.all) ? 'all' : 'any', limit, sessionId);
+        const tab = worker(ref, sessionId);
+        if (args.output !== undefined) return waitOutput(tab, String(args.output), limit);
+        await settleIfInterrupted(getTabSession(tab.id));
+        const ok = await until(() => settled(tab), limit);
+        if (!ok) return { done: false, state: stateOf(tab) };
+        collected.add(tab.id);
+        return { done: true, state: stateOf(tab), reply: await freshReply(tab) };
       },
       'tabs.open': async (args, [path = args.path], { sessionId }) => {
         const dir = await resolveTabPath(path);

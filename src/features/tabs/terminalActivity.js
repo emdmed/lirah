@@ -32,6 +32,18 @@ export function registerTabSession(tabId, sessionId) {
   };
 }
 
+// sessionId -> its xterm instance, so `lirah tabs read` can read the screen.
+const terminals = new Map();
+
+export function setSessionTerminal(sessionId, term) {
+  if (term) terminals.set(sessionId, term);
+  else terminals.delete(sessionId);
+}
+
+export function getSessionTerminal(sessionId) {
+  return terminals.get(sessionId) || null;
+}
+
 export function getTabSession(tabId) {
   return tabSessions.get(tabId) || null;
 }
