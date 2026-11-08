@@ -144,7 +144,8 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-[780px] h-[min(600px,85vh)] flex flex-col gap-0 overflow-hidden"
+        size="full"
+        className="flex flex-col gap-0 overflow-hidden"
         status={filtering
           ? `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'}`
           : section(activeId)?.title.toLowerCase()}
@@ -225,7 +226,8 @@ export function SettingsDialog({
                   No settings match “{query.trim()}”. <span className="text-foreground">esc</span> clears the filter.
                 </p>
               )}
-              <div className="flex flex-col gap-8">
+              {/* Full screen, but rows keep a readable width. */}
+              <div className="flex max-w-[720px] flex-col gap-8">
                 <Section section={section('agent')} active={activeId === 'agent'}>
                   <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'auto-launch', 'startup']}>
                     <ChoiceRow
