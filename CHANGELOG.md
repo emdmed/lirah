@@ -4,6 +4,20 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-08
+
+### Added
+
+- **Feature map** - `:features build` asks Claude to map the project's features to their files. Later builds only send changed files. When a prompt names a feature, its files are added to the prompt automatically.
+- **FEATURES tab** - The right sidebar lists the mapped features with file counts, how fresh the map is (commits behind, new and missing files) and the build status.
+- **Feature explorer** - `:features` opens a full-screen drawing of how features use each other. From there you can open a feature's files, or mark them in the file tree without expanding any folders.
+- **Pin features to a prompt** - Add features to the context pane (Alt+5 or the + toggle on a row). Their files go into the next prompt, up to 3 features and 40 files.
+
+### Changed
+
+- **Tab rows** - Tab rows have a fixed height, with one status line and a plan card.
+- **Blocked plan runs** - A blocked run now shows as "waiting" in the warning colour instead of as a fault. Paused and failed plans show a hint to open the plan to resume.
+
 ## [0.18.0] - 2026-11-08
 
 ### Added
