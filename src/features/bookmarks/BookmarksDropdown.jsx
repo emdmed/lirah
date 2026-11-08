@@ -10,6 +10,8 @@ import {
 import { Star, Xmark } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useBookmarks } from './BookmarksContext';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function BookmarksDropdown({ onNavigate, onAdd }) {
   const { bookmarks, removeBookmark } = useBookmarks();
@@ -66,7 +68,9 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
                 {hoveredId === bookmark.id && (
                   <button
                     onClick={(e) => handleDelete(e, bookmark.id)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 flex items-center justify-center rounded-xs opacity-60 hover:opacity-100 hover:bg-destructive/20"
+                    type="button"
+                    data-icon-only
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), 'absolute right-1 top-1/2 -translate-y-1/2')}
                     title="Unstar project"
                     aria-label="Unstar project"
                   >

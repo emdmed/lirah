@@ -3,6 +3,8 @@ import { Xmark } from 'iconoir-react';
 import { FIGURES, figNumber, useFigureCompact } from '@/components/instrument/figure';
 import { CalRecipe, Calibrated } from '@/components/instrument/calibrated';
 import { agentName, formatElapsed, truncate } from './agentLabels';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // FIG 13: one tab's subagents as the calibrated fanout recipe. The main
 // session is the parent (its node lit while any child runs); one branch per
@@ -181,12 +183,13 @@ export function Fig13Agents({ agents, now, onDismiss, onOpenList, renderCard, cl
               />
               <button
                 type="button"
-                className="absolute right-0.5 top-0.5 p-0.5 rounded cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ins-lamp)]"
+                data-icon-only
+                className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), 'absolute right-0.5 top-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
                 onClick={() => dismiss(id)}
                 aria-label={`Dismiss ${name}`}
                 title="Dismiss"
               >
-                <Xmark width={10} height={10} className="text-muted-foreground" />
+                <Xmark />
               </button>
             </div>
           );

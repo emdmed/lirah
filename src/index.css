@@ -2236,6 +2236,17 @@ body {
   text-decoration-line: none;
 }
 
+button.ins-link {
+  cursor: pointer;
+  text-align: left;
+}
+
+.ins-link:focus-visible {
+  outline: 1px solid var(--ins-legend);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
 /* Registered so the figure glow can vary per theme (see .fig-glow). */
 @property --lamp-glow {
   syntax: '<percentage>';

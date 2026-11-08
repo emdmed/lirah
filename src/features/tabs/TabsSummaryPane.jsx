@@ -222,8 +222,9 @@ export function TabsSummaryPane({ onNewTab }) {
             <span className="engraved-label">plans</span>
             <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{plans.loose.length}</span>
             <button
+              type="button"
               onClick={() => requestPlansPane('open')}
-              className="ml-auto text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+              className="tui-btn ml-auto"
               title="Show every plan of this repo"
             >
               all plans

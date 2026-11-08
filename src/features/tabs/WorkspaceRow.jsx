@@ -14,6 +14,7 @@ import { RenameField } from './RenameField';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Plus } from 'iconoir-react';
+import { buttonVariants } from '@/components/ui/button';
 
 // The lamp on a background workspace whose agent waits on you.
 function Waiting({ blocked }) {
@@ -185,7 +186,9 @@ export function WorkspaceRow() {
                 onClick={() => removeWorkspace(ws.id)}
                 title={`Remove workspace ${ws.name}`}
                 aria-label={`Remove workspace ${ws.name}`}
-                className="px-0.5 text-muted-foreground opacity-0 group-hover/ws:opacity-100 focus-visible:opacity-100 hover:text-foreground cursor-pointer"
+                type="button"
+                data-icon-only
+                className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), 'opacity-0 group-hover/ws:opacity-100 focus-visible:opacity-100')}
               >
                 ×
               </button>

@@ -127,7 +127,7 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
     folders.set(dir, [...(folders.get(dir) || []), p]);
   }
   const links = (ids) => (ids.length ? ids.map((id) => (
-    <button key={id} onClick={() => onSelect(id)} className="text-left underline decoration-dotted underline-offset-2 cursor-pointer hover:text-foreground">
+    <button key={id} type="button" onClick={() => onSelect(id)} className="ins-link hover:text-foreground">
       {byId.get(id).name || id}
     </button>
   )) : <span className="text-muted-foreground">none</span>);

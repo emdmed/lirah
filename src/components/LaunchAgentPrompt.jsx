@@ -5,6 +5,7 @@ import { usePageVisible } from '../hooks/usePageVisible';
 import { tabCliLabel } from '../lib/agentClis';
 import { subscribeAgentHooks, getAgentHookState } from '../features/tabs/agentHookState';
 import { useCliRunning } from '../features/tabs/useTabsSummary';
+import { buttonVariants } from '@/components/ui/button';
 
 // Tabs whose launch bar was dismissed. Module state so a terminal restart or a
 // remount doesn't bring it back; it resets with the app.
@@ -88,7 +89,8 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
       <button
         type="button"
         onClick={handleDismiss}
-        className="text-muted-foreground hover:text-foreground px-0.5"
+        className={buttonVariants({ variant: 'ghost', size: 'icon-panel' })}
+        data-icon-only
         aria-label="Dismiss launch bar for this tab"
         title="Hide for this tab"
       >

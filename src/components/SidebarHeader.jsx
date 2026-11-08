@@ -5,6 +5,8 @@ import { CompressLines, LongArrowUpLeft, Refresh } from 'iconoir-react';
 import { BookmarksDropdown } from '../features/bookmarks';
 import { Keycap } from './instrument/Keycap';
 import { Scanner } from './instrument/Scanner';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // A faint count after a filter key's label; nothing until the tree reports.
 const KeyCount = ({ value }) =>
@@ -58,7 +60,9 @@ export function SidebarHeader({
       {searchQuery && (
         <button
           onClick={onSearchClear}
-          className="absolute right-1 top-1/2 -translate-y-1/2 px-1 text-muted-foreground hover:text-foreground focus-ring"
+          type="button"
+          data-icon-only
+          className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), 'absolute right-1 top-1/2 -translate-y-1/2')}
           title="Clear search"
           aria-label="Clear search"
         >

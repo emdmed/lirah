@@ -13,10 +13,9 @@ import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { useDialog } from '../dialogs/DialogProvider';
 import { EmptyPlate } from '../../components/EmptyState';
+import { Button } from '../../components/ui/button';
 import { Fig35Freshness } from './Fig35Freshness';
 import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } from './useTabFeatures';
-
-const ICON = 'inline-flex h-4 w-4 items-center justify-center leading-none cursor-pointer text-muted-foreground hover:text-[var(--ins-lamp)] focus-visible:opacity-100';
 
 export function copyFeatureFiles(f, toast) {
   navigator.clipboard.writeText((f.files || []).join('\n'))
@@ -171,22 +170,24 @@ export function FeatureRow({ feature, largest, selected, pinned, ruler = true, o
           {ruler ? <CountRuler count={count} max={largest} /> : <span className="shrink-0 tabular-nums text-muted-foreground">{count}</span>}
         </button>
         <span className="flex shrink-0 items-center gap-1">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-panel"
             onClick={onPin}
             aria-pressed={!!pinned}
             aria-label={pinned ? `Remove ${name} from context` : `Add ${name} to context`}
             title={pinned ? 'Remove from context (p)' : 'Add to context: its files go with every prompt (p)'}
-            className={cn(ICON, pinned ? 'hover:text-[var(--ins-fault)]' : hide)}
+            className={cn('focus-visible:opacity-100', !pinned && hide)}
           >
             {pinned ? '×' : '+'}
-          </button>
-          <button onClick={onCopy} aria-label={`Copy ${name}'s file list`} title="Copy file list" className={cn(ICON, hide)}>
-            <Copy className="h-3 w-3" />
-          </button>
+          </Button>
+          <Button variant="ghost" size="icon-panel" onClick={onCopy} aria-label={`Copy ${name}'s file list`} title="Copy file list" className={cn('focus-visible:opacity-100', hide)}>
+            <Copy />
+          </Button>
           {onExplore && (
-            <button onClick={onExplore} aria-label={`Explore ${name}`} title="Explore in the map (f)" className={cn(ICON, hide)}>
+            <Button variant="ghost" size="icon-panel" onClick={onExplore} aria-label={`Explore ${name}`} title="Explore in the map (f)" className={cn('focus-visible:opacity-100', hide)}>
               ⤢
-            </button>
+            </Button>
           )}
         </span>
       </div>

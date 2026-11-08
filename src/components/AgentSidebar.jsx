@@ -5,6 +5,7 @@ import { Sparks, SidebarCollapse, SidebarExpand, Xmark, ChatBubble } from 'icono
 import { cn } from '@/lib/utils';
 import { useSubagentContext } from '../contexts/SubagentContext';
 import { Lamp } from './instrument/Lamp';
+import { Button } from './ui/button';
 import { formatElapsed, extractTaskLabel, truncate } from './agentLabels';
 import { Fig13Agents } from './Fig13Agents';
 
@@ -36,16 +37,19 @@ export function AgentCard({ agent, onDismiss, now, defaultExpanded = false }) {
           {summary || agent.slug || agent.agent_id.slice(0, 8)}
         </span>
         {hovered && (
-          <button
-            className="ml-auto shrink-0 p-0.5 rounded hover:bg-sidebar-accent cursor-pointer"
+          <Button
+            variant="ghost"
+            size="icon-panel"
+            className="ml-auto"
             onClick={(e) => {
               e.stopPropagation();
               onDismiss(agent.agent_id);
             }}
             title="Dismiss"
+            aria-label="Dismiss"
           >
-            <Xmark width={10} height={10} className="text-muted-foreground" />
-          </button>
+            <Xmark />
+          </Button>
         )}
       </div>
 
@@ -96,8 +100,9 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
         <span className="truncate">{tabLabel}</span>
         {listed && (
           <button
+            type="button"
             onClick={() => setListed(false)}
-            className="ml-auto mr-2 shrink-0 font-normal normal-case tracking-normal hover:text-sidebar-foreground cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ins-lamp)]"
+            className="tui-btn ml-auto mr-2 normal-case tracking-normal"
             title="Back to FIG.13"
           >
             fan
@@ -240,13 +245,9 @@ export function AgentSidebar() {
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-1.5 py-2 shrink-0 w-8 border-l border-l-sidebar-border bg-sidebar">
-        <button
-          onClick={() => setCollapsed(false)}
-          className="p-1 rounded hover:bg-sidebar-accent cursor-pointer"
-          title="Expand agent sidebar"
-        >
-          <SidebarExpand width={14} height={14} className="-scale-x-100 text-muted-foreground" />
-        </button>
+        <Button variant="ghost" size="icon-panel" onClick={() => setCollapsed(false)} title="Expand agent sidebar" aria-label="Expand agent sidebar">
+          <SidebarExpand className="-scale-x-100" />
+        </Button>
         {totalActiveCount > 0 && (
           <span
             className="text-[11px] tabular-nums"
@@ -285,13 +286,9 @@ export function AgentSidebar() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => setCollapsed(true)}
-          className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer"
-          title="Collapse sidebar"
-        >
-          <SidebarCollapse width={14} height={14} className="-scale-x-100 text-muted-foreground" />
-        </button>
+        <Button variant="ghost" size="icon-panel" onClick={() => setCollapsed(true)} title="Collapse sidebar" aria-label="Collapse sidebar">
+          <SidebarCollapse className="-scale-x-100" />
+        </Button>
       </div>
 
       {/* Scrollable agent list */}

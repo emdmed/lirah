@@ -416,7 +416,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
                     <button
                       type="button"
                       onClick={() => dialogs.open('markdown', { filePath: latestPrompt.file }, null)}
-                      className="text-left text-[11px] text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground"
+                      className="ins-link text-[11px] text-foreground"
                       title={latestPrompt.file}
                     >
                       {latestPrompt.kind}{chunk.prompts.length > 1 && <span className="text-muted-foreground"> · latest of {chunk.prompts.length}</span>}

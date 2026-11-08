@@ -35,6 +35,10 @@ import { TasksPane } from '../tasks/TasksPane';
 import { useOpenTaskCount } from '../tasks/TasksContext';
 import { FeaturesPane } from '../feature-map/FeaturesPane';
 import { useFeatureMap } from '../feature-map/useFeatureMap';
+import { buttonVariants } from '../../components/ui/button';
+
+// Collapsed-rail keys stack a count over a word, so they take the ghost role with no fixed size.
+const RAIL_KEY = cn(buttonVariants({ variant: 'ghost', size: null }), 'flex-col gap-0.5 w-6 px-0.5 py-1');
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -499,7 +503,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       <div data-pane="4" className="flex flex-col items-center gap-2 py-2 my-3 mx-3 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
         <button
           onClick={() => setCollapsedOverride(false)}
-          className="flex flex-col items-center gap-2 px-0.5 py-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+          type="button"
+          className={cn(RAIL_KEY, 'gap-2')}
           title="Expand pane (Alt+4)"
           aria-label="Expand pane"
         >
@@ -529,7 +534,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               setCollapsedOverride(false);
               setTab('tabs');
             }}
-            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            type="button"
+            className={RAIL_KEY}
             title="Show tabs"
             aria-label={`Show tabs (${workspaceTabs.length} in this workspace)`}
           >
@@ -541,7 +547,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               setCollapsedOverride(false);
               setTab('tasks');
             }}
-            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            type="button"
+            className={RAIL_KEY}
             title="Show tasks (Alt+Q adds one)"
             aria-label={`Show tasks (${openTasks} open)`}
           >
@@ -551,7 +558,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           {onNewTab && (
             <button
               onClick={onNewTab}
-              className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:hover:text-muted-foreground"
+              type="button"
+              className={RAIL_KEY}
               title={newTabTitle}
               aria-label="New tab"
             >
@@ -565,7 +573,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               setTab('jobs');
               setDialogOpen(true);
             }}
-            className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            type="button"
+            className={RAIL_KEY}
             title="New background job"
             aria-label="New background job"
           >
@@ -1031,9 +1040,10 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
           <button
             onClick={() => actions.review(job.id)}
             title="Review the isolated diff before applying"
-            className="ml-auto shrink-0 whitespace-nowrap text-[var(--ins-lamp)] cursor-pointer hover:underline"
+            className="tui-btn ml-auto shrink-0"
+            data-lit
           >
-            [review {changedCount}]
+            review {changedCount}
           </button>
         )}
       </div>

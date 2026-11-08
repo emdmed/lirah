@@ -23,6 +23,7 @@ import { useFeatureMap } from "../../features/feature-map/useFeatureMap";
 import { matchFeatures } from "../../features/feature-map/matchFeatures";
 import { pinFeature, unpinFeature, useTabFeatures } from "../../features/feature-map/useTabFeatures";
 import { getTypedLine, subscribeTypedLine } from "../../features/tabs/typedLine";
+import { buttonVariants } from '@/components/ui/button';
 
 const NO_REPOS = [];
 const NO_FILES = new Set();
@@ -283,7 +284,7 @@ export const ContextStatus = memo(function ContextStatus({
                     type="button"
                     onClick={() => pin(m.id)}
                     aria-label={`Pin ${m.name} to the context`}
-                    className="h-5 px-1.5 shrink-0 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className={buttonVariants({ variant: 'ghost', size: 'panel' })}
                   >
                     pin
                   </button>

@@ -385,7 +385,7 @@ export function PlanDetail({ plan }) {
                   aria-controls="plan-files-by-chunk"
                   onClick={() => setShowFiles((v) => !v)}
                   title={showFiles ? 'Hide files by chunk' : 'Show which chunks touched which files'}
-                  className="cursor-pointer tabular-nums underline decoration-dotted underline-offset-2 hover:text-foreground aria-expanded:text-foreground"
+                  className="ins-link tabular-nums hover:text-foreground aria-expanded:text-foreground"
                 >
                   {fileCount > 0 ? `${fileCount} files` : 'files'}
                 </button>
@@ -457,7 +457,7 @@ function LifecycleLine({ plan }) {
         <span key={s.stage} className="whitespace-nowrap">
           {i > 0 && <span>─{formatAgo(s.at - stops[i - 1].at)}→ </span>}
           {s.stage === PLAN_STAGE.PR_OPEN && plan.pr?.url ? (
-            <button type="button" onClick={openPr} className="cursor-pointer text-foreground underline-offset-2 hover:underline" title={plan.pr.url}>
+            <button type="button" onClick={openPr} className="ins-link text-foreground" title={plan.pr.url}>
               PR #{plan.pr.number}
             </button>
           ) : (

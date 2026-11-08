@@ -4,6 +4,11 @@ import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { TreeGuide } from "./TreeGuide";
 import { AgentMark } from "./AgentMark";
 import { gitColorClass, splitExtension } from "./utils/lsColors";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+
+// Tree rows are short: their ghost keys stay 14px, not the 20px panel size.
+const TREE_KEY = "h-3.5 w-3.5 p-0 mr-0.5";
 
 /**
  * Renders a file node in the tree with action buttons
@@ -90,7 +95,7 @@ export function FileNode({
           onClick={(e) => { e.stopPropagation(); onViewFile(path); }}
           title="View: open a read-only preview (v)"
           aria-label="View file"
-          className="shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 hover:bg-foreground hover:text-background text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), TREE_KEY, 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
         >
           <Eye className="w-2.5 h-2.5" />
         </button>
@@ -105,9 +110,7 @@ export function FileNode({
           title={isPinned ? 'Unpin: stop keeping this file at the top of the file list' : 'Pin: keep this file at the top of the file list (adds nothing to the prompt)'}
           aria-label={isPinned ? 'Unpin file' : 'Pin file to the top of the file list'}
           aria-pressed={!!isPinned}
-          className={`group/pin shrink-0 flex items-center justify-center h-3.5 w-3.5 mr-0.5 hover:bg-foreground hover:text-background text-muted-foreground ${
-            isPinned ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
-          }`}
+          className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), TREE_KEY, 'group/pin', !isPinned && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
         >
           {/* A pinned row carries a quiet pin; hovering the button offers the unpin. */}
           {isPinned ? (
