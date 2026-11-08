@@ -23,6 +23,7 @@ export const FIGURES = Object.freeze({
   29: { key: 'spend-by-model', title: 'SPEND BY MODEL' },
   32: { key: 'files-by-intent', title: 'FILES BY INTENT' },
   33: { key: 'log', title: 'LOG' },
+  35: { key: 'freshness', title: 'FRESHNESS' },
 });
 
 // The FIG number for a figure key, e.g. figNumber('sandbox') === 10.

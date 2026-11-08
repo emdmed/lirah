@@ -12,6 +12,7 @@ import { useTick } from '../../hooks/useTick';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { EmptyPlate } from '../../components/EmptyState';
+import { Fig35Freshness } from './Fig35Freshness';
 import { pinFeature, selectFeature, useTabFeatures } from './useTabFeatures';
 
 const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer';
@@ -75,9 +76,13 @@ function StatusLine({ fm, onBuild }) {
       {status === 'fresh' && <span>built {map.gitSha || '?'} · {map.generatedAt ? `${formatAgo(Date.now() - map.generatedAt)} ago` : 'unknown age'}</span>}
       {status === 'stale' && (
         <>
-          <span className="text-[var(--ins-warn)]">
-            {fm.commitsBehind || 0} commits behind · {fm.newFiles || 0} new files
-          </span>
+          <Fig35Freshness
+            gitSha={map.gitSha}
+            head={fm.head}
+            commitsBehind={fm.commitsBehind}
+            newFiles={fm.newFiles}
+            fallback={<span className="text-[var(--ins-warn)]">{fm.commitsBehind || 0} commits behind · {fm.newFiles || 0} new files</span>}
+          />
           <button onClick={() => onBuild(false)} className={BTN}>update</button>
           <button onClick={() => onBuild(true)} className={BTN}>rebuild</button>
         </>

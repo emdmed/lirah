@@ -2,6 +2,7 @@ import { Fragment, useEffect } from 'react';
 import { compactCount, DiffBar } from '../components/instrument/DiffBar';
 import { Fig25DiffMap } from '../features/git/Fig25DiffMap';
 import { Fig33Log } from '../features/git/Fig33Log';
+import { Fig35Freshness } from '../features/feature-map/Fig35Freshness';
 import { Position } from '../components/instrument/Position';
 import { useTheme } from '../contexts/ThemeContext';
 import { Figure } from '../components/instrument/figure';
@@ -523,5 +524,7 @@ const FIGS_A = [
   { n: 32, w: 420, el: () => <Fig32FilesByIntent {...FILES_12} fallback={fb('12 files: 8 EDIT · 3 READ · 1 COPY')} /> },
   { n: '32l', w: 420, el: () => <Fig32FilesByIntent {...FILES_30} fallback={fb('30 files: 19 EDIT · 9 READ · 2 COPY')} /> },
   { n: '32a', w: 420, el: () => <Fig32FilesByIntent {...FILES_ALL} fallback={fb('7 files, all EDIT')} /> },
+  { n: 35, w: 300, el: () => <Fig35Freshness gitSha="786880c1" head="a7e17b1f" commitsBehind={12} newFiles={3} fallback={fb('12 commits behind · 3 new files')} /> },
+  { n: '35n', w: 300, el: () => <Fig35Freshness gitSha="786880c1" head="786880c1" commitsBehind={0} newFiles={1} fallback={fb('0 commits behind · 1 new file')} /> },
   { n: 'P1s', w: 420, el: () => <div className="px-1"><Meter value={46_000} max={1_000_000} size="lg" printed={false} label="Context" /></div> },
 ];
