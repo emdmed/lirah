@@ -14,6 +14,11 @@ import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON, haltWord } from './planMod
 const MIN_W = 180;
 const C_MIN_W = 120;
 const STEP = 18; // the element's own node pitch, kept while it fits
+// The drawing's tallest shape (dimension above, caption below), kept at all
+// times so the tab row never changes height as the labels come and go.
+const FULL_H = 68;
+const DIM_H = 30; // the room <cal-progress> adds above the nodes for done-label
+const COMPACT_H = 22;
 
 const isLive = (c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix;
 
@@ -61,7 +66,7 @@ function isPrefix(states) {
  * The tab plan tier's chunk progress, sized to its container. Narrower than
  * MIN_W it shows `fallback`. `label` leads the tooltip; the times follow it.
  */
-export function Fig16Chunks({ plan, label, fallback }) {
+export function Fig16Chunks({ plan, label, fallback, blank = false }) {
   const compact = useFigureCompact();
   const rootRef = useRef(null);
   const [rootW, setRootW] = useState(null);
@@ -98,9 +103,12 @@ export function Fig16Chunks({ plan, label, fallback }) {
       className="cal min-w-0"
       title={sentence}
       data-density={compact ? 'compact' : 'full'}
-      style={{ '--fig-paper': 'var(--ins-well)' }}
+      style={{
+        '--fig-paper': 'var(--ins-well)',
+        ...(tooNarrow ? null : { height: compact ? COMPACT_H : FULL_H, paddingTop: compact || r.spent != null ? 0 : DIM_H }),
+      }}
     >
-      {tooNarrow ? fallback : (
+      {blank ? null : tooNarrow ? fallback : (
         <cal-progress
           {...attrs}
           step={step}

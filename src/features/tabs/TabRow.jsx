@@ -13,7 +13,7 @@ import { Lamp } from '../../components/instrument/Lamp';
 import { RenameField } from './RenameField';
 import { RoleChip, RoleTagButton } from './RoleMenu';
 import { TurnTrail } from './TurnTrail';
-import { isSettledPlan, SettledPlans, TabPlanTier } from '../plans/TabPlanTier';
+import { isSettledPlan, TabPlanTier } from '../plans/TabPlanTier';
 
 // Line counts past four digits read as a size, not a number: +146812 → +147k.
 function compactCount(n) {
@@ -95,7 +95,7 @@ export const ROW_KEYS = [
  * One tab in the tabs summary pane: what it is doing, its branch, its agent's
  * latest turn, the plans it is working through and another agent working in its
  * repo. `contextFill` (0..1, or null) is its agent's context window, drawn as a
- * moon. `compact` folds a tab with nothing live to its first line. `drag` is
+ * moon. `compact` folds a tab that is neither current nor selected to its first line. `drag` is
  * useDragReorder's result; `actions` the pane's handlers.
  * Memoized: the pane re-renders on its 1s clock, so activity and the turn
  * summary come in as primitives and a row only redraws when what it shows
@@ -103,7 +103,7 @@ export const ROW_KEYS = [
  */
 export const TabRow = memo(function TabRow({
   tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, workLabel, active, linked, closable, queuePos,
-  turn, summaryText, summaryRunning, summaryStale, trailOpen, renaming, roleMenuOpen, plans, compact, drag, actions,
+  turn, summaryText, summaryRunning, trailOpen, renaming, roleMenuOpen, plans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
   const summary = summaryText ? { text: summaryText, running: summaryRunning } : null;
@@ -111,10 +111,14 @@ export const TabRow = memo(function TabRow({
   const linkLabel = linked ? `Unlink ${name} from the current prompt` : `Link ${name} into the current prompt`;
   const dropLine = drag.dropLineAt(index);
   const livePlans = plans?.filter((p) => !isSettledPlan(p)) ?? [];
-  // Finished plans only show while nothing is live, folded into one line.
+  // With nothing live, the latest finished plan holds the card's place.
   const settledPlans = livePlans.length ? [] : plans?.filter(isSettledPlan) ?? [];
-  // An old finished turn leaves the row (it stays in the tooltip).
-  const showTrail = summary && (!summaryStale || active || trailOpen);
+  const cardPlans = livePlans.length ? livePlans : settledPlans.slice(-1);
+  const settledNote = settledPlans.length > 1 ? `${settledPlans.length} plans complete`
+    : settledPlans.length ? 'plan complete' : undefined;
+  const permission = activity.kind === 'permission';
+  // The status line shows one thing: a permission question, the latest turn, or another agent here.
+  const showTrail = summary && !permission;
   const queued = queuePos >= 0;
   const onRoleMenu = (open) => actions.setRoleMenu(open ? tab.id : null);
   const edited = turn?.edited?.size ? [...turn.edited] : null;
@@ -313,21 +317,8 @@ export const TabRow = memo(function TabRow({
 
       {!compact && (
         <>
-          {/* Tier 2: only a permission prompt's question and how long it has
-              waited; the lamp already says working, done or idle. */}
-          {activity.kind === 'permission' && (
-            <div className="flex min-w-0 items-baseline gap-1 pl-6 text-[11px] text-muted-foreground">
-              <span className="ins-name min-w-0 truncate text-xs text-foreground">{activityQuestion ?? activity.label}</span>
-              {activity.since && <span className="shrink-0 tabular-nums text-[var(--ins-lamp)]">· {activity.since}</span>}
-            </div>
-          )}
-
-          {/* Tier 3: the branch, in full; long names wrap rather than clip. */}
-          <div
-            className={cn(
-              'flex min-w-0 pl-6 text-[11px] text-muted-foreground',
-              )}
-          >
+          {/* Tier 2: the branch, in full; long names wrap rather than clip. */}
+          <div className="flex min-w-0 pl-6 text-[11px] text-muted-foreground">
             {info?.branch ? (
               <RowAction
                 tabIndex={-1}
@@ -343,8 +334,14 @@ export const TabRow = memo(function TabRow({
             )}
           </div>
 
-          {/* Tier 4: what its agent did in the latest turn; click for the files. */}
-          {showTrail && (
+          {/* Tier 3: one status line, always there so the row keeps its height.
+              Click the turn for the files it edited. */}
+          {permission ? (
+            <div className="flex h-4 min-w-0 items-baseline gap-1 pl-6 text-[11px] leading-4 text-muted-foreground">
+              <span className="ins-name min-w-0 truncate text-xs text-foreground">{activityQuestion ?? activity.label}</span>
+              {activity.since && <span className="shrink-0 tabular-nums text-[var(--ins-lamp)]">· {activity.since}</span>}
+            </div>
+          ) : showTrail ? (
             <TurnTrail
               turn={turn}
               summary={summary}
@@ -353,21 +350,19 @@ export const TabRow = memo(function TabRow({
               onToggle={() => actions.toggleTrail(tab.id)}
               onAttach={actions.attachEdits}
             />
-          )}
-
-          {/* Tier 5: the plans its agent is working through; click for the plan. */}
-          {livePlans.map((plan) => (
-            <TabPlanTier key={plan.id} plan={plan} onOpen={() => actions.openPlan(tab.id, plan.id)} />
-          ))}
-          <SettledPlans plans={settledPlans} onOpen={(planId) => actions.openPlan(tab.id, planId)} />
-
-          {/* Tier 6: another tab's agent working in this repo. */}
-          {workLabel && (
-            <div className="flex min-w-0 items-center gap-1 pl-6 text-[11px] text-[var(--ins-lamp)]">
+          ) : workLabel ? (
+            <div className="flex h-4 min-w-0 items-center gap-1 pl-6 text-[11px] leading-4 text-[var(--ins-lamp)]">
               <Sparks className="h-3 w-3 shrink-0" />
               <span className="min-w-0 truncate">{workLabel}</span>
             </div>
+          ) : (
+            <div className="h-4 pl-6 text-[11px] leading-4 text-muted-foreground">no turn yet</div>
           )}
+
+          {/* Tier 4: the plan its agent is working through, or the last one it finished. */}
+          {cardPlans.map((plan) => (
+            <TabPlanTier key={plan.id} plan={plan} note={livePlans.length ? undefined : settledNote} onOpen={() => actions.openPlan(tab.id, plan.id)} />
+          ))}
         </>
       )}
     </div>
