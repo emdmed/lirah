@@ -22,6 +22,7 @@ import { useTabContextFill } from "./tabContextFill";
 import { useTabAutoCommit } from "./tabAutoCommit";
 import { registerTabPrompt } from "./tabPrompts";
 import { useLinkedRepos, unlinkRepo } from "./useLinkedRepos";
+import { useTabFeatures } from "../feature-map/useTabFeatures";
 import { useAutoChangelog } from "../git/useAutoChangelog";
 import { useAutoCommit } from "../git/useAutoCommit";
 import { useAutoMerge } from "../git/useAutoMerge";
@@ -281,6 +282,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   const setTextareaContent = promptStore.set;
   const textareaRef = useRef(null);
   const { linkedRepos, clearLinkedRepos } = useLinkedRepos(tabId);
+  const { pinnedFeatures, clearFeatures } = useTabFeatures(tabId);
   // Last-used file view (flat/tree) is the default for new tabs.
   const [viewMode, setViewMode] = useSeededSetting('viewMode');
 
@@ -617,6 +619,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     clearSelectedTemplate,
     linkedRepos,
     clearLinkedRepos,
+    pinnedFeatures,
+    clearFeatures,
   });
 
   // The prompt as the sender builds it, minus the typed text: the cost
@@ -632,10 +636,11 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     getLineCount,
     getViewModeLabel,
     linkedRepos,
+    pinnedFeatures,
   }), [
     fileSelection.selectedFiles, currentPath, fileSelection.fileStates,
     selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel,
-    linkedRepos,
+    linkedRepos, pinnedFeatures,
   ]);
 
   // A prompt typed in the terminal gets the selected context too (through
@@ -646,9 +651,10 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     if (!keepFilesAfterSend) {
       fileSelection.clearFileSelection();
       clearLinkedRepos?.();
+      clearFeatures();
     }
   }, [clearSelectedTemplate, keepFilesAfterSend,
-    fileSelection.clearFileSelection, clearLinkedRepos]);
+    fileSelection.clearFileSelection, clearLinkedRepos, clearFeatures]);
   // What the context amounts to, kept by the sync hook for the "attached" line.
   const templateTitle = selectedTemplateId ? getTemplateById(selectedTemplateId)?.title : undefined;
   const contextSummary = useMemo(() => {
@@ -762,6 +768,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
 
   // A closed tab's links go with it.
   useEffect(() => () => clearLinkedRepos(), [clearLinkedRepos]);
+  useEffect(() => () => clearFeatures(), [clearFeatures]);
 
   // Get current git branch
   const branchName = useBranchName(secondary.secondaryFullscreen ? null : resolvedProjectDir, isActive);

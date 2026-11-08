@@ -34,6 +34,8 @@ export function usePromptSender({
   clearSelectedTemplate,
   linkedRepos,
   clearLinkedRepos,
+  pinnedFeatures,
+  clearFeatures,
 }) {
   const { error: toastError } = useToast();
   const sendingRef = useRef(false);
@@ -54,6 +56,7 @@ export function usePromptSender({
       getViewModeLabel,
       selectedElements,
       linkedRepos,
+      pinnedFeatures,
     });
 
     if (!fullCommand) return;
@@ -96,10 +99,11 @@ export function usePromptSender({
       clearFileSelection();
       clearSelectedElements();
       if (clearLinkedRepos) clearLinkedRepos();
+      if (clearFeatures) clearFeatures();
     }
 
     if (clearSelectedTemplate) clearSelectedTemplate();
-  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, terminalRef, setTextareaContent, clearFileSelection, clearSelectedTemplate, linkedRepos, clearLinkedRepos, toastError]);
+  }, [terminalSessionId, getTextareaContent, selectedFiles, currentPath, fileStates, keepFilesAfterSend, selectedTemplateId, getTemplateById, formatFileAnalysis, getLineCount, getViewModeLabel, selectedElements, clearSelectedElements, terminalRef, setTextareaContent, clearFileSelection, clearSelectedTemplate, linkedRepos, clearLinkedRepos, pinnedFeatures, clearFeatures, toastError]);
 
   return sendPrompt;
 }
