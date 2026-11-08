@@ -3,36 +3,37 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority";
 
 import { cn } from "@/lib/utils"
+import { Scanner } from "@/components/instrument/Scanner"
 
+// The one button recipe. Material (frame, fill, hover, focus, on-state) lives
+// in the .ins-key-* classes in index.css; this only picks the role and size.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1 aria-invalid:text-destructive",
+  "inline-flex items-center justify-center whitespace-nowrap shrink-0 ins-key ins-round disabled:pointer-events-none disabled:not-aria-busy:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 aria-invalid:text-destructive",
   {
     variants: {
       variant: {
-        // Every variant but `link` is a key (.ins-key, see index.css): primary
-        // is solid ink; ghost/outline/secondary print as italic verbs.
-        default: "ins-key ins-key-primary ins-round",
-        destructive: "ins-key ins-key-danger ins-round",
-        outline: "ins-key ins-key-verb ins-name ins-round",
-        secondary: "ins-key ins-key-verb ins-name ins-round text-muted-foreground",
-        ghost: "ins-key ins-key-verb ins-name ins-round",
+        default: "ins-key-primary",
+        outline: "ins-key-outline",
+        ghost: "ins-key-ghost",
+        // shortcut: alias of ghost for the one remaining site; remove in chunk 5.
+        secondary: "ins-key-ghost",
+        destructive: "ins-key-danger",
+        "destructive-fill": "ins-key-danger-fill",
         link: "ins-link text-primary",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        panel: "ins-key-panel",
+        "icon-panel": "ins-key-panel",
         xs: "h-6 px-2 py-0.5 text-xs gap-1 has-[>svg]:px-1.5",
-        sm: "h-8 gap-1.5 p-1 has-[>svg]:px-2.5",
-        lg: "h-10 px-6 has-[>svg]:px-4",
+        sm: "h-8 px-2.5 text-xs gap-1.5 has-[>svg]:px-2",
+        default: "h-9 px-4 py-2 text-[13px] gap-2 has-[>svg]:px-3",
+        lg: "h-10 px-6 text-[13px] gap-2 has-[>svg]:px-4",
         icon: "size-9",
         "icon-xs": "size-6 p-0.5",
         "icon-sm": "size-8 p-1",
         "icon-lg": "size-10",
       },
     },
-    // Spectral sets small beside the mono: italic verbs take 13px, like the panel verbs.
-    compoundVariants: [
-      { variant: ["outline", "secondary", "ghost"], class: "text-[13px]" },
-    ],
     defaultVariants: {
       variant: "default",
       size: "default",
@@ -45,6 +46,9 @@ function Button({
   variant,
   size,
   asChild = false,
+  busy = false,
+  disabled,
+  children,
   ...props
 }) {
   const Comp = asChild ? Slot : "button"
@@ -52,8 +56,14 @@ function Button({
   return (
     <Comp
       data-slot="button"
+      data-icon-only={size === "icon-panel" ? "" : undefined}
       className={cn(buttonVariants({ variant, size, className }))}
-      {...props} />
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      {...props}>
+      {busy && <Scanner size="sm" />}
+      {children}
+    </Comp>
   );
 }
 
