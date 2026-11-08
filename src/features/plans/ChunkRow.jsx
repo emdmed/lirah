@@ -198,7 +198,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
           icon={Play}
           onClick={() => pane.implement(plan, chunk)}
           disabled={busy}
-          className={isNext && primary ? 'ins-key-primary' : undefined}
+          variant={isNext && primary ? 'default' : undefined}
           title="Send this chunk to the tab's agent"
         >
           implement
@@ -209,7 +209,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         <PanelButton
           onClick={() => pane.commit(plan, chunk)}
           disabled={busy}
-          className={recommend === 'commit' ? 'ins-key-primary' : undefined}
+          variant={recommend === 'commit' ? 'default' : undefined}
           title="Commit all changes as this chunk (C)"
         >
           commit
@@ -219,7 +219,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         <PanelButton
           onClick={() => pane.markDone(plan, chunk)}
           disabled={busy}
-          className={recommend === 'done' ? 'ins-key-primary' : undefined}
+          variant={recommend === 'done' ? 'default' : undefined}
           title="Done with nothing to commit: a check, a test run (d)"
         >
           mark done

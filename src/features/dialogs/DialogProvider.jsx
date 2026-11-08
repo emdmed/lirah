@@ -70,9 +70,8 @@ function ConfirmDialog({ request, settle }) {
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => settle(false)}>Cancel</Button>
             <Button
-              variant={fault ? 'destructive' : 'default'}
+              variant={fault ? 'destructive-fill' : 'default'}
               size="sm"
-              className={fault ? 'ins-key-fill' : undefined}
               autoFocus
               onClick={() => settle(true)}
             >

@@ -324,7 +324,7 @@ export function PlanDetail({ plan }) {
                 icon={Play}
                 onClick={() => pane.autopilot(plan)}
                 // The plan's one primary key: framed and lamp-lit.
-                className={stuck ? undefined : 'ins-key-primary'}
+                variant={stuck ? undefined : 'default'}
                 title={handSent
                   ? `Adopt chunk ${handSent.n} (asking the agent to commit it if needed), then implement the rest one after another, unattended`
                   : 'Implement the remaining chunks one after another, unattended'}

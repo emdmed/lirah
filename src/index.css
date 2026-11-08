@@ -1110,17 +1110,6 @@ body {
 .tui-dialog [data-slot="dialog-footer"] .ins-key-danger {
   border-color: color-mix(in srgb, var(--ins-fault) 70%, var(--ins-edge-strong));
 }
-/* The confirm dialog's destructive action is its one filled key. */
-.tui-dialog [data-slot="dialog-footer"] .ins-key-danger.ins-key-fill {
-  border-color: var(--ins-fault);
-  background: var(--ins-fault);
-  color: var(--ins-panel, var(--color-background));
-}
-.tui-dialog [data-slot="dialog-footer"] .ins-key-danger.ins-key-fill:hover {
-  border-color: color-mix(in srgb, var(--ins-fault) 85%, var(--color-foreground));
-  background: color-mix(in srgb, var(--ins-fault) 85%, var(--color-foreground));
-  color: var(--ins-panel, var(--color-background));
-}
 
 /*
   Instrument primitives (see src/components/instrument/). Each sets its own
