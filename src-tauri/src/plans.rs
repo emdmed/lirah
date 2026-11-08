@@ -26,7 +26,7 @@ pub async fn format_task(project_dir: String, prompt: String) -> Result<String, 
 }
 
 /// Run a headless claude command with `prompt` on stdin; stdout on success.
-fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result<String, String> {
+pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result<String, String> {
     let mut child = crate::util::login_shell_command(cmd)
         .current_dir(project_dir)
         .env("TERM", "xterm-256color")

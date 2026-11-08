@@ -81,9 +81,38 @@ function sessionState(payload) {
   return state;
 }
 
-function resetGuard(state, prompt, project) {
+function resetGuard(state, prompt, project, featureFiles = []) {
   for (const name of ['unlocked', 'attached_files']) { try { unlinkSync(join(state, name)); } catch {} }
-  writeFileSync(join(state, 'prompt_files'), promptFiles(prompt, project).map((f) => f + '\n').join(''));
+  const files = new Set([...promptFiles(prompt, project), ...featureFiles]);
+  writeFileSync(join(state, 'prompt_files'), [...files].map((f) => f + '\n').join(''));
+}
+
+// Features the prompt names, from .orchestration/tools/features.json (built by
+// the `:features build` palette command): a feature counts when its name, id or
+// an alias appears as whole words. Only files that still exist; absolute paths.
+const FEATURES_MAX = 3;
+const FEATURE_FILES_MAX = 40;
+function promptFeatures(prompt, project) {
+  let features;
+  try { features = JSON.parse(readFileSync(join(toolsDir(project), 'features.json'), 'utf8')).features; } catch { return []; }
+  if (!Array.isArray(features)) return [];
+  const words = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const text = ` ${words(prompt)} `;
+  const hits = [];
+  let budget = FEATURE_FILES_MAX;
+  for (const f of features) {
+    if (hits.length >= FEATURES_MAX || budget <= 0) break;
+    const names = [f?.name, f?.id, ...(Array.isArray(f?.aliases) ? f.aliases : [])].map(words).filter((n) => n.length >= 3);
+    if (!names.some((n) => text.includes(` ${n} `))) continue;
+    const files = (Array.isArray(f.files) ? f.files : [])
+      .filter((p) => typeof p === 'string' && !isAbsolute(p) && !p.split(/[\\/]/).includes('..'))
+      .map((p) => resolve(project, p))
+      .filter((p) => { try { return statSync(p).isFile(); } catch { return false; } })
+      .slice(0, budget);
+    budget -= files.length;
+    hits.push({ name: String(f.name || f.id), files });
+  }
+  return hits;
 }
 
 // A short go-ahead after a task ("yes", "go ahead", "continue") is not a new
@@ -249,6 +278,7 @@ async function main() {
   const active = activeProject();
   if (!active) return;
   const { session, project } = active;
+  const features = promptFeatures(payload.prompt, project);
 
   let guardState = null;
   try {
@@ -257,7 +287,7 @@ async function main() {
       // Same task: keep the gate, the named files and an attached-files stand-down.
       if (existsSync(join(guardState, 'attached_files'))) return;
     } else {
-      resetGuard(guardState, payload.prompt, project);
+      resetGuard(guardState, payload.prompt, project, features.flatMap((f) => f.files));
     }
     writeFileSync(join(guardState, 'prompted'), '');
   } catch {}
@@ -296,6 +326,10 @@ async function main() {
     );
   } else {
     lines.push('COMPACTION: building in the background (large project), no artifact yet. Grep .orchestration/tools/compacted_*.md once it exists.');
+  }
+  if (features.length) {
+    lines.push('FEATURES the prompt names (from .orchestration/tools/features.json). Start from these files; they are open already:');
+    for (const f of features) lines.push(`FEATURE ${f.name}: ${f.files.map((p) => relative(project, p).split('\\').join('/')).join(', ')}`);
   }
   lines.push('</compaction-hook>');
   process.stdout.write(lines.join('\n') + '\n');

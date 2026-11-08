@@ -231,6 +231,44 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn hook_hands_over_the_files_of_a_named_feature() {
+        if Command::new("node").arg("--version").output().is_err() {
+            return; // no Node on this machine
+        }
+        let root = std::env::temp_dir().join(format!("lirah-features-{}", std::process::id()));
+        let dir = root.join("engine");
+        let project = root.join("proj");
+        fs::create_dir_all(dir.join("on")).unwrap();
+        fs::create_dir_all(project.join("src/plans")).unwrap();
+        fs::create_dir_all(project.join(".orchestration/tools")).unwrap();
+        for (name, body) in [("compaction.js", COMPACTION_JS), ("parse-utils.js", PARSE_UTILS_JS), ("package.json", PACKAGE_JSON), ("hook.js", HOOK_JS)] {
+            fs::write(dir.join(name), body).unwrap();
+        }
+        fs::write(dir.join("on").join("on-session"), "").unwrap();
+        fs::write(project.join("src/plans/split.js"), "export function split() {}\n").unwrap();
+        let map = serde_json::json!({ "features": [{
+            "id": "plans", "name": "Plans", "aliases": ["plan splitter"],
+            "files": ["src/plans/split.js", "src/plans/gone.js", "../outside.js"],
+        }] });
+        fs::write(project.join(".orchestration/tools/features.json"), map.to_string()).unwrap();
+
+        let state = dir.join("sessions").join("s1");
+        let prompt = |text: &str| run_hook_with(&dir, &project, "on-session", &[], serde_json::json!({ "session_id": "s1", "prompt": text }));
+
+        let out = prompt("the plan splitter drops the last chunk");
+        assert!(out.contains("FEATURE Plans: src/plans/split.js\n"), "{}", out);
+        let named = fs::read_to_string(state.join("prompt_files")).unwrap();
+        assert!(named.contains("src/plans/split.js"), "{}", named);
+        assert!(!named.contains("outside"), "{}", named);
+
+        let out = prompt("tidy the settings dialog");
+        assert!(!out.contains("FEATURE"), "{}", out);
+        assert!(!fs::read_to_string(state.join("prompt_files")).unwrap().contains("split.js"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// Run guard.js on one tool call; returns its decision ("" = let it through).
     fn run_guard(dir: &Path, project: &Path, tool: &str, input: serde_json::Value) -> String {
         use std::io::Write;

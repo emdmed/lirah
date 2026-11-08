@@ -9,6 +9,7 @@ import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
 import { useToast } from '../toast/ToastContext';
 import { IS_WINDOWS } from '../../utils/pathUtils';
+import { buildFeatureMapPrompt, buildFeatureMapUpdatePrompt } from '../compact/featureMapPrompt';
 import {
   addStartupProject, getStartup, removeStartupProject, setStartupMode,
 } from '../agent-control/actions';
@@ -50,7 +51,7 @@ export function useTabCommands({
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
   const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster } = useTabActions();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
-  const { success: toastSuccess, info: toastInfo } = useToast();
+  const { success: toastSuccess, info: toastInfo, error: toastError } = useToast();
 
   return useMemo(() => {
     // `:startup add|remove [path]`: the path defaults to this tab's project;
@@ -97,6 +98,17 @@ export function useTabCommands({
       { id: 'compact', hint: 'compaction hook for this tab\'s agent', options: ['on', 'off'], run: (arg) => {
         if (!compactionAvailable) throw new Error('the compaction hook is off in settings');
         if (onOff(arg, compactionEnabled) !== compactionEnabled) onToggleCompaction();
+      } },
+      // Runs for minutes, so it reports by toast instead of holding the palette.
+      // `build` updates the map from git's changes (a full build the first time); `rebuild` redoes it all.
+      { id: 'features', hint: 'map this project\'s features to their files (agents get them when a prompt names one)', options: ['build', 'rebuild'], run: (arg) => {
+        if (arg && arg !== 'build' && arg !== 'rebuild') throw new Error(`no features action "${arg}"`);
+        if (!projectPath) throw new Error('no project in this tab');
+        toastInfo('Mapping features to files…');
+        const updatePrompt = arg === 'rebuild' ? null : buildFeatureMapUpdatePrompt();
+        invoke('build_feature_map', { projectDir: projectPath, prompt: buildFeatureMapPrompt(), updatePrompt })
+          .then((summary) => toastSuccess(`${summary} → .orchestration/tools/features.json`))
+          .catch((e) => toastError(`Feature map failed: ${e}`));
       } },
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));
@@ -201,5 +213,5 @@ export function useTabCommands({
     toggleSandbox, toggleNetwork, onToggleGitFilter, onToggleMarkdownFilter, setSidebarOpen, setTextareaVisible,
     setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen, setAutoChangelogDialogOpen,
     setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setShowHelp, setSettingsOpen,
-    toastSuccess, toastInfo]);
+    toastSuccess, toastInfo, toastError]);
 }

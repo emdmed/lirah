@@ -14,6 +14,7 @@ mod ipc;
 mod watch_registry;
 mod agent_hooks;
 mod agent_control;
+mod feature_map;
 mod plans;
 mod util;
 mod compaction;
@@ -208,6 +209,7 @@ pub fn run(initial_path: Option<String>) {
             agent_runner::commands::list_running_agent_jobs,
             // Plans
             plans::split_plan,
+            feature_map::build_feature_map,
             plans::format_task,
             plans::delete_plan_file,
             plans::remove_plan_workdir,
