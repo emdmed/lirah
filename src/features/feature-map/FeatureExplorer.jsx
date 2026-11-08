@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogGroup, DialogTitle } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
-import { cn } from '../../lib/utils';
 import { errorMessage } from '../../lib/errorMessage';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
@@ -10,7 +9,6 @@ import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } fr
 import { Fig34Features } from './Fig34Features';
 import { copyFeatureFiles, FeatureRow } from './FeaturesPane';
 
-const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-default';
 const HOOK_CAP = 40; // files the prompt hook sends per prompt
 
 /** Full-screen, read-only view of the feature map: list, FIG.34 drawing and the selected feature's sheet. */
@@ -141,9 +139,9 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
         <h3 className="ins-name text-lg leading-tight text-foreground">{feature.name || feature.id}</h3>
         {feature.description && <p className="text-muted-foreground">{feature.description}</p>}
         <div className="mt-1 flex flex-wrap gap-2">
-          <button onClick={onPin} aria-pressed={pinned} title={pinned ? 'Remove from context (↵)' : 'Add to context: its files go with every prompt (↵)'} className={cn(BTN, pinned && 'text-foreground')}>{pinned ? 'in context ×' : 'add to context'}</button>
-          <button onClick={onMark} title="Mark its files and folders in the file tree (nothing opens)" className={BTN}>mark in tree</button>
-          <button onClick={onCopy} className={BTN}>copy files</button>
+          <button onClick={onPin} aria-pressed={pinned} title={pinned ? 'Remove from context (↵)' : 'Add to context: its files go with every prompt (↵)'} className="tui-btn">{pinned ? 'in context ×' : 'add to context'}</button>
+          <button onClick={onMark} title="Mark its files and folders in the file tree (nothing opens)" className="tui-btn">mark in tree</button>
+          <button onClick={onCopy} className="tui-btn">copy files</button>
         </div>
       </header>
 

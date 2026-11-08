@@ -17,7 +17,6 @@ import { Fig35Freshness } from './Fig35Freshness';
 import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } from './useTabFeatures';
 
 const ICON = 'inline-flex h-4 w-4 items-center justify-center leading-none cursor-pointer text-muted-foreground hover:text-[var(--ins-lamp)] focus-visible:opacity-100';
-const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer';
 
 export function copyFeatureFiles(f, toast) {
   navigator.clipboard.writeText((f.files || []).join('\n'))
@@ -132,18 +131,18 @@ function StatusLine({ fm, done, onBuild, onExplore }) {
             missingFiles={fm.missingFiles}
             fallback={<span className="text-[var(--ins-warn)]">{fm.commitsBehind || 0} commits behind · {fm.newFiles || 0} new files{fm.missingFiles > 0 ? ` · ${fm.missingFiles} missing` : ''}</span>}
           />
-          <button onClick={() => onBuild(false)} className={BTN}>update</button>
-          <button onClick={() => onBuild(true)} className={BTN}>rebuild</button>
+          <button onClick={() => onBuild(false)} className="tui-btn">update</button>
+          <button onClick={() => onBuild(true)} className="tui-btn">rebuild</button>
         </>
       )}
       {status === 'failed' && (
         <>
           <span className="text-[var(--ins-fault)] wrap-anywhere">{fm.error}</span>
           {map && <span>the old map is still in use</span>}
-          <button onClick={() => onBuild(!map)} className={BTN}>retry</button>
+          <button onClick={() => onBuild(!map)} className="tui-btn">retry</button>
         </>
       )}
-      {map && <button onClick={onExplore} className={cn(BTN, 'ml-auto')} title="explore the map (f)">explore ⤢</button>}
+      {map && <button onClick={onExplore} className="tui-btn ml-auto" title="explore the map (f)">explore ⤢</button>}
     </div>
   );
 }

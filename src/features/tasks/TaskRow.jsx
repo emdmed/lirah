@@ -109,7 +109,7 @@ export const TaskRow = memo(function TaskRow({
               <button
                 type="button"
                 onClick={() => onPlan(task, defaultId)}
-                className="tui-btn px-1 text-[11px] text-muted-foreground hover:text-[var(--ins-lamp)] cursor-pointer"
+                className="tui-btn px-1"
                 title={`Send to the active tab's agent to plan, with the default plan context${chunkMode === 'chunks' ? ', then split it into chunks' : ''}`}
               >
                 plan
@@ -183,7 +183,7 @@ export const TaskRow = memo(function TaskRow({
             <button
               type="button"
               onClick={() => onOpenPlan(task)}
-              className="tui-btn ml-auto shrink-0 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+              className="tui-btn ml-auto shrink-0"
             >
               {task.planId ? 'open plan' : 'import & chunk'}
             </button>
@@ -229,7 +229,7 @@ function TaskEditor({ task, onEdit }) {
         <button
           type="button"
           onClick={() => setText(original)}
-          className="tui-btn ml-5 self-start text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="tui-btn ml-5 self-start"
         >
           edit
         </button>

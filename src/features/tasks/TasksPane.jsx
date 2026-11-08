@@ -261,7 +261,7 @@ export function TasksPane({ projectPath }) {
         <button
           type="button"
           onClick={() => setContextsOpen(true)}
-          className="tui-btn ml-auto text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="tui-btn ml-auto"
           title="Edit the plan contexts sent with a task"
         >
           contexts

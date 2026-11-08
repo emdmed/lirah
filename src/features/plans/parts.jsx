@@ -52,7 +52,7 @@ export function Prose({ text, clamp, className }) {
       {long && (
         <button
           onClick={() => setFull((v) => !v)}
-          className="tui-btn self-start text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+          className="tui-btn self-start"
           aria-expanded={full}
         >
           {full ? 'less' : 'more'}

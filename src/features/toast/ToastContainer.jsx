@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { useToast, useToasts } from './ToastContext';
-import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 
 // Message line, as in vim: the newest notification occupies one line directly
@@ -58,27 +57,25 @@ export function ToastContainer() {
       {queued > 0 && <span className="shrink-0 text-muted-foreground tabular-nums">+{queued}</span>}
       <span className="ml-auto flex items-center gap-1 shrink-0">
         {toast.action && (
-          <Button
-            variant="ghost"
-            size="xs"
+          <button
+            type="button"
             onClick={() => {
               toast.action.onClick();
               dismiss(toast.id);
             }}
-            className="tui-btn h-5 px-1 gap-0"
+            className="tui-btn"
           >
             {toast.action.label}
-          </Button>
+          </button>
         )}
-        <Button
-          variant="ghost"
-          size="xs"
+        <button
+          type="button"
           onClick={() => dismiss(toast.id)}
-          className="tui-btn h-5 px-1 gap-0 text-muted-foreground"
+          className="tui-btn"
           aria-label="Dismiss notification"
         >
           dismiss
-        </Button>
+        </button>
       </span>
     </div>
   );
