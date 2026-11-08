@@ -1171,13 +1171,12 @@ body {
     border-bottom-width: 1px;
   }
 
-  /* Push button material, shared by ui/button, ui/toggle and PanelButton.
-     Printed, not raised: a key is its legend on the panel, with no box. It
-     brightens on hover; a latched key (on, pressed, menu open) sits on a
-     faint tint. Only the primary key draws a frame (one hairline in the
-     lamp colour). The border stays, transparent, so sizes don't shift.
-     Size comes from the user of the class; .ins-key-panel is the 20px
-     chassis size. Pair with .ins-round. */
+  /* Push button material behind buttonVariants (ui/button.jsx), which
+     ui/toggle and PanelButton build from. The base key is the ghost: a
+     legend on the panel that brightens on hover; a latched key (on,
+     pressed, menu open) sits on a faint tint. The role classes below add
+     frames and fills. The border stays, transparent, so sizes don't shift.
+     .ins-key-panel is the 20px chassis size. Pair with .ins-round. */
   .ins-key {
     box-sizing: border-box;
     border: 1px solid transparent;
