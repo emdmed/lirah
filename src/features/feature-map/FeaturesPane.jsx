@@ -11,17 +11,26 @@ import { errorMessage } from '../../lib/errorMessage';
 import { useTick } from '../../hooks/useTick';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
+import { useDialog } from '../dialogs/DialogProvider';
 import { EmptyPlate } from '../../components/EmptyState';
 import { Fig35Freshness } from './Fig35Freshness';
 import { pinFeature, selectFeature, useTabFeatures } from './useTabFeatures';
 
 const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer';
 
+export function copyFeatureFiles(f, toast) {
+  navigator.clipboard.writeText((f.files || []).join('\n'))
+    .then(() => toast.success(`Copied ${f.files?.length || 0} paths`), (e) => toast.error(errorMessage(e)));
+}
+
 /** The FEATURES section: the map's state on top, then its features by file count. `fm` is useFeatureMap(projectPath). */
 export function FeaturesPane({ projectPath, fm }) {
   const { activeTabId } = useTabManager();
   const { selectedFeature } = useTabFeatures(activeTabId);
   const toast = useToast();
+  const dialog = useDialog();
+  // This pane sits outside the tab's dialog scope, so open into the tab by id.
+  const explore = () => dialog.open('featureExplorer', {}, activeTabId);
   const { reload } = fm;
   // The map can change outside the app (an agent, a CLI build), so re-read it when the tab opens.
   useEffect(reload, [reload]);
@@ -41,8 +50,17 @@ export function FeaturesPane({ projectPath, fm }) {
   const largest = features[0]?.files?.length || 1;
 
   return (
-    <div className="flex flex-col">
-      <StatusLine fm={fm} onBuild={build} />
+    <div
+      className="flex flex-col outline-none"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && fm.map && !/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) {
+          e.preventDefault();
+          explore();
+        }
+      }}
+    >
+      <StatusLine fm={fm} onBuild={build} onExplore={explore} />
       {features.map((f) => (
         <FeatureRow
           key={f.id}
@@ -51,15 +69,15 @@ export function FeaturesPane({ projectPath, fm }) {
           selected={selectedFeature === f.id}
           onSelect={() => selectFeature(activeTabId, selectedFeature === f.id ? null : f.id)}
           onPin={() => pinFeature(activeTabId, projectPath, f).catch((e) => toast.error(errorMessage(e)))}
-          onCopy={() => navigator.clipboard.writeText((f.files || []).join('\n'))
-            .then(() => toast.success(`Copied ${f.files?.length || 0} paths`), (e) => toast.error(errorMessage(e)))}
+          onCopy={() => copyFeatureFiles(f, toast)}
+          onExplore={() => { selectFeature(activeTabId, f.id); explore(); }}
         />
       ))}
     </div>
   );
 }
 
-function StatusLine({ fm, onBuild }) {
+function StatusLine({ fm, onBuild, onExplore }) {
   const { status, map } = fm;
   if (status === 'none') {
     return (
@@ -94,6 +112,7 @@ function StatusLine({ fm, onBuild }) {
           <button onClick={() => onBuild(!map)} className={BTN}>retry</button>
         </>
       )}
+      {map && <button onClick={onExplore} className={cn(BTN, 'ml-auto')} title="explore the map (f)">explore ⤢</button>}
     </div>
   );
 }
@@ -106,7 +125,7 @@ function Building() {
   return <><Scanner label="building the feature map" /><span>building · {formatTimer(now - start)}</span></>;
 }
 
-function FeatureRow({ feature, largest, selected, onSelect, onPin, onCopy }) {
+export function FeatureRow({ feature, largest, selected, onSelect, onPin, onCopy, onExplore }) {
   const count = feature.files?.length || 0;
   const name = String(feature.name || feature.id);
   return (
@@ -124,6 +143,7 @@ function FeatureRow({ feature, largest, selected, onSelect, onPin, onCopy }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={onPin} className="cursor-pointer text-xs">add to context</DropdownMenuItem>
           <DropdownMenuItem onSelect={onCopy} className="cursor-pointer text-xs">copy file list</DropdownMenuItem>
+          {onExplore && <DropdownMenuItem onSelect={onExplore} className="cursor-pointer text-xs">explore</DropdownMenuItem>}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

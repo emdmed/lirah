@@ -20,6 +20,7 @@ const FLAGS = {
   autoChangelogDialogOpen: "autoChangelog",
   orchestrationDashboardOpen: "orchestration",
   markdownViewerOpen: "markdown",
+  featureExplorerOpen: "featureExplorer",
 };
 
 const setterName = (flag) => `set${flag[0].toUpperCase()}${flag.slice(1)}`;

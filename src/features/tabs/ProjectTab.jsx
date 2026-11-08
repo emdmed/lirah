@@ -945,6 +945,13 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     sidebarSearch.handleSearchChange(query);
     atMention.setAtMentionQuery(null);
   }, [sidebarSearch.handleSearchChange, atMention.setAtMentionQuery]);
+  // Shows a file in the tree through its search, which opens only the folders
+  // on the way and leaves the user's own expanded folders alone.
+  const revealInTree = useCallback((relPath) => {
+    sidebar.setSidebarOpen(true);
+    setViewMode('tree');
+    handleSidebarSearchChange(relPath);
+  }, [sidebar.setSidebarOpen, setViewMode, handleSidebarSearchChange]);
   const { setShowHelp, setCliSelectionModalOpen, setDashboardOpen, setContextDetailsOpen, setSettingsOpen,
     setAddBookmarkDialogOpen, setManageTemplatesDialogOpen,
     setSaveFileGroupDialogOpen } = dialogs;
@@ -1237,6 +1244,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
       <DialogHost
         dialogs={dialogs}
         currentPath={currentPath}
+        projectPath={projectPath}
+        revealInTree={revealInTree}
         workspaceId={workspaceId}
         settings={settings}
         sessionId={terminalSessionId}
