@@ -2,6 +2,7 @@ import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
 import { Check, DataTransferBoth, NavArrowDown, Trash, Undo } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
+import { PanelButton } from '../../components/instrument/PanelButton';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Textarea } from '../../components/ui/textarea';
 import {
@@ -32,8 +33,6 @@ const LAMP = {
   [TASK_STATUS.PLANNED]: { state: 'ok', label: 'planned' },
   [TASK_STATUS.DONE]: { state: 'ok', settled: true, label: 'done' },
 };
-
-const ICON_BTN = 'flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-default';
 
 /**
  * One task. Click (or Enter on the cursor) opens it: the story in full, a
@@ -116,9 +115,7 @@ export const TaskRow = memo(function TaskRow({
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" className={ICON_BTN} title="Plan with another context" aria-label="Plan with another context">
-                    <NavArrowDown className="h-3 w-3" />
-                  </button>
+                  <PanelButton icon={NavArrowDown} title="Plan with another context" aria-label="Plan with another context" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[240px]">
                   <DropdownMenuLabel className="text-xs">Then</DropdownMenuLabel>
@@ -153,23 +150,16 @@ export const TaskRow = memo(function TaskRow({
               </DropdownMenu>
             </span>
           )}
-          <button
-            type="button"
+          <PanelButton
+            icon={done ? Undo : Check}
             onClick={() => onDone(task)}
-            className={ICON_BTN}
             title={done ? 'Back to the backlog' : 'Mark done'}
             aria-label={done ? 'Back to the backlog' : 'Mark done'}
-          >
-            {done ? <Undo className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-          </button>
+          />
           {moveLabel && (
-            <button type="button" onClick={() => onMove(task)} className={ICON_BTN} title={moveLabel} aria-label={moveLabel}>
-              <DataTransferBoth className="h-3 w-3" />
-            </button>
+            <PanelButton icon={DataTransferBoth} onClick={() => onMove(task)} title={moveLabel} aria-label={moveLabel} />
           )}
-          <button type="button" onClick={() => onRemove(task)} className={ICON_BTN} title="Delete task" aria-label="Delete task">
-            <Trash className="h-3 w-3" />
-          </button>
+          <PanelButton icon={Trash} onClick={() => onRemove(task)} title="Delete task" aria-label="Delete task" />
         </span>
       </div>
 
