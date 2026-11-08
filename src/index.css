@@ -451,6 +451,8 @@ body {
   font-family: var(--font-mono);
   font-style: normal;
   font-weight: 400;
+  /* The verbs' 13px is for Spectral; in mono it would outsize the rail's other words. */
+  font-size: inherit;
 }
 
 /* Numeric readouts: fixed-width columns in the lamp colour. */

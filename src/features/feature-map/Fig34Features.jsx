@@ -5,11 +5,13 @@ import { featureLayout } from './featureLayout';
 // FIG.34: the feature map in layers. Leaves (features nothing else is built on)
 // sit left; an arrow runs from a feature to each feature it uses. Each node is
 // its name over a file-count ruler. Hover lights a node's edges and dims the
-// rest; the selected node is drawn in lamp; pinned nodes carry a lamp square.
+// rest; the selected node is framed in lamp; pinned nodes (in the prompt) are
+// inverse video, like selected file rows. Features with no uses either way sit
+// in a grid under the graph.
 
-const COL = 190;
+const COL = 200;
 const ROW = 40;
-const BOX = 140; // node width; COL - BOX is the gutter the edges cross
+const BOX = 160; // node width; COL - BOX is the gutter the edges cross
 const PAD = 14;
 const NAME_Y = 12;
 const RULE_Y = 22;
@@ -30,7 +32,8 @@ export function Fig34Features({ map, selected = null, pinned = [], onSelect, fal
 
   const W = Math.max(BOX, layout.width - (COL - BOX)) + PAD * 2 + 30; // room for a same-column loop
   const H = Math.max(ROW, layout.height) + PAD;
-  const label = `Feature map: ${layout.nodes.length} features in ${layout.layers} layers, ${layout.edges.length} uses`;
+  const looseCount = layout.nodes.filter((n) => n.loose).length;
+  const label = `Feature map: ${layout.nodes.length} features in ${layout.layers} layers, ${layout.edges.length} uses, ${looseCount} standalone`;
 
   return (
     <Figure fig={34} viewBox={`0 0 ${W} ${H}`} minWidth={Math.min(W, 320)} fallback={fallback} label={label} paper="var(--ins-panel)">
@@ -68,9 +71,17 @@ export function Fig34Features({ map, selected = null, pinned = [], onSelect, fal
           />
         );
       })}
+      {layout.looseY != null && (
+        <g aria-hidden="true">
+          <T x={PAD - 4} y={PAD + layout.looseY - 14} color={INK.faint}>{`STANDALONE · ${looseCount}`}</T>
+          <line x1={PAD - 4 + textWidth(`STANDALONE · ${looseCount}`) + 8} x2={W - PAD} y1={PAD + layout.looseY - 18} y2={PAD + layout.looseY - 18} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
+        </g>
+      )}
       {layout.nodes.map((n) => {
         const { x, y } = at.get(n.id);
         const on = n.id === selected;
+        const inv = pinnedIds.has(n.id);
+        const ink = inv ? INK.paper : on ? INK.lamp : INK.muted;
         const count = files.get(n.id);
         const len = (count / maxFiles) * (BOX - 30);
         const pick = () => onSelect?.(n.id);
@@ -89,13 +100,12 @@ export function Fig34Features({ map, selected = null, pinned = [], onSelect, fal
             onBlur={() => setHover(null)}
             style={{ cursor: 'pointer', outline: 'none', opacity: near && !near.has(n.id) ? 0.3 : 1 }}
           >
-            <rect x={x - 4} y={y} width={BOX + 8} height={ROW - 8} style={{ fill: INK.paper, stroke: on ? INK.lamp : 'none', strokeWidth: STROKE.ink }} />
-            <T x={x} y={y + NAME_Y} color={on ? INK.lamp : INK.fg}>{fit(n.name, BOX - 12)}</T>
-            {pinnedIds.has(n.id) && <rect x={x + BOX - 4} y={y + NAME_Y - 7} width={5} height={5} style={{ fill: INK.lamp }} />}
-            <line x1={x} x2={x + BOX - 30} y1={y + RULE_Y} y2={y + RULE_Y} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
-            <line x1={x} x2={x + len} y1={y + RULE_Y} y2={y + RULE_Y} style={{ stroke: on ? INK.lamp : INK.muted, strokeWidth: STROKE.heavy }} />
-            <line x1={x + len} x2={x + len} y1={y + RULE_Y - 3} y2={y + RULE_Y + 3} style={{ stroke: on ? INK.lamp : INK.muted, strokeWidth: STROKE.hair }} />
-            <T x={x + BOX} y={y + RULE_Y + 4} anchor="end" color={INK.faint}>{count}</T>
+            <rect x={x - 4} y={y} width={BOX + 8} height={ROW - 8} style={{ fill: inv ? INK.fg : INK.paper, stroke: on ? INK.lamp : 'none', strokeWidth: STROKE.emphasis }} />
+            <T x={x} y={y + NAME_Y} color={inv ? INK.paper : on ? INK.lamp : INK.fg}>{fit(n.name, BOX - 12)}</T>
+            <line x1={x} x2={x + BOX - 30} y1={y + RULE_Y} y2={y + RULE_Y} style={{ stroke: inv ? INK.paper : INK.edge, strokeWidth: STROKE.hair, opacity: inv ? 0.4 : 1 }} />
+            <line x1={x} x2={x + len} y1={y + RULE_Y} y2={y + RULE_Y} style={{ stroke: ink, strokeWidth: STROKE.heavy }} />
+            <line x1={x + len} x2={x + len} y1={y + RULE_Y - 3} y2={y + RULE_Y + 3} style={{ stroke: ink, strokeWidth: STROKE.hair }} />
+            <T x={x + BOX} y={y + RULE_Y + 4} anchor="end" color={inv ? INK.paper : INK.faint}>{count}</T>
           </g>
         );
       })}

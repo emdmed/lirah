@@ -10,6 +10,8 @@ describe('featureMapStatus', () => {
     expect(featureMapStatus({ map: null }, false, null)).toBe('none');
     expect(featureMapStatus({ map, commitsBehind: 0, newFiles: 0 }, false, null)).toBe('fresh');
     expect(featureMapStatus({ map, commitsBehind: null, newFiles: null }, false, null)).toBe('fresh');
+    expect(featureMapStatus({ map: { ...map, gitSha: 'abc' }, commitsBehind: null, newFiles: null }, false, null)).toBe('stale');
+    expect(featureMapStatus({ map, commitsBehind: 0, newFiles: 0, missingFiles: 2 }, false, null)).toBe('stale');
     expect(featureMapStatus({ map, commitsBehind: 2, newFiles: 0 }, false, null)).toBe('stale');
     expect(featureMapStatus({ map, commitsBehind: 0, newFiles: 1 }, false, null)).toBe('stale');
     expect(featureMapStatus({ map }, false, 'boom')).toBe('failed');

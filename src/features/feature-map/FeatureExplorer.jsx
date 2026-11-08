@@ -6,7 +6,7 @@ import { errorMessage } from '../../lib/errorMessage';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { useFeatureMap } from './useFeatureMap';
-import { markFeatureInTree, pinFeature, selectFeature, unpinFeature, useTabFeatures } from './useTabFeatures';
+import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } from './useTabFeatures';
 import { Fig34Features } from './Fig34Features';
 import { copyFeatureFiles, FeatureRow } from './FeaturesPane';
 
@@ -46,9 +46,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
     select(shown[Math.max(0, Math.min(shown.length - 1, (i < 0 ? -1 : i) + step))].id);
   };
   const pinned = (f) => pinnedFeatures.some((p) => p.id === f.id);
-  const togglePin = (f) => (pinned(f)
-    ? unpinFeature(activeTabId, f.id)
-    : pinFeature(activeTabId, projectPath, f).catch((e) => toast.error(errorMessage(e))));
+  const togglePin = (f) => togglePinFeature(activeTabId, projectPath, f).catch((e) => toast.error(errorMessage(e)));
   const reveal = (path) => { onOpenChange(false); onReveal?.(path); };
 
   return (
@@ -56,14 +54,14 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
       <DialogContent
         size="full"
         className="flex flex-col gap-0 overflow-hidden"
-        status={`${all.length} features`}
-        hints={[{ keys: ['↑', '↓'], label: 'move' }]}
+        status={`${all.length} features${pinnedFeatures.length ? ` · ${pinnedFeatures.length} in context` : ''}`}
+        hints={[{ keys: ['↑', '↓'], label: 'move' }, { keys: ['↵'], label: feature && pinned(feature) ? 'remove from context' : 'add to context' }]}
         onOpenAutoFocus={(e) => { e.preventDefault(); filterRef.current?.focus(); }}
       >
         <DialogTitle>Features</DialogTitle>
         <DialogDescription className="sr-only">The project's feature map: pick a feature to see its files, what it uses and what uses it.</DialogDescription>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)_320px] gap-x-5 pt-1">
+        <div className="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)_320px] gap-x-6 2xl:grid-cols-[240px_minmax(0,1fr)_360px] pt-1">
           <nav className="flex min-h-0 flex-col gap-2" aria-label="Features">
             <Input
               ref={filterRef}
@@ -71,6 +69,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); move(e.key === 'ArrowDown' ? 1 : -1); }
+                if (e.key === 'Enter' && feature) { e.preventDefault(); togglePin(feature); }
               }}
               placeholder="filter by name or alias"
               aria-label="Filter features"
@@ -83,6 +82,8 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
                   feature={f}
                   largest={largest}
                   selected={f.id === selectedFeature}
+                  pinned={pinned(f)}
+                  ruler={false}
                   onSelect={() => select(f.id)}
                   onPin={() => togglePin(f)}
                   onCopy={() => copyFeatureFiles(f, toast)}
@@ -92,8 +93,11 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
             </div>
           </nav>
 
+          {/* A floor under the drawing, so a narrow window scrolls it instead of dropping it for the fallback. */}
           <div className="min-h-0 overflow-auto">
-            <Fig34Features map={fm.map} selected={selectedFeature} pinned={pinnedFeatures} onSelect={select} />
+            <div style={{ minWidth: 560 }}>
+              <Fig34Features map={fm.map} selected={selectedFeature} pinned={pinnedFeatures} onSelect={select} />
+            </div>
           </div>
 
           <FeatureSheet
@@ -138,11 +142,11 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
         {feature.description && <p className="mt-1 text-muted-foreground">{feature.description}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button onClick={onPin} aria-pressed={pinned} className={cn(BTN, pinned && 'text-[var(--ins-lamp)]')}>{pinned ? 'in context' : 'add to context'}</button>
+        <button onClick={onPin} aria-pressed={pinned} title={pinned ? 'Remove from context (↵)' : 'Add to context: its files go with every prompt (↵)'} className={cn(BTN, pinned && 'text-foreground')}>{pinned ? 'in context ×' : 'add to context'}</button>
         <button onClick={onMark} title="Mark its files and folders in the file tree (nothing opens)" className={BTN}>mark in tree</button>
         <button onClick={onCopy} className={BTN}>copy files</button>
       </div>
-      <dl className="grid grid-cols-[80px_minmax(0,1fr)] gap-x-2 gap-y-1">
+      <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-2 gap-y-1">
         <dt className="text-muted-foreground">triggered by</dt>
         <dd>{[feature.name, ...(feature.aliases || [])].filter(Boolean).join(', ')}</dd>
         <dt className="text-muted-foreground">uses</dt>
@@ -154,13 +158,14 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
         <div className="text-muted-foreground">
           {files.length} file{files.length === 1 ? '' : 's'}
           {files.length > HOOK_CAP && <span className="text-[var(--ins-warn)]"> · hook sends {HOOK_CAP}</span>}
+          {entries.size > 0 && <span> · ◆ entry point</span>}
         </div>
         {[...folders].map(([dir, paths]) => (
           <div key={dir} className="mt-2">
             <div className="text-[11px] text-muted-foreground">{dir}/</div>
             {paths.map((p) => (
               <button key={p} onClick={() => onReveal(p)} title={`show ${p} in the file tree`} className="flex w-full gap-1.5 pl-2 text-left cursor-pointer hover:text-foreground">
-                <span className="w-2 text-[var(--ins-lamp)]" aria-label={entries.has(p) ? 'entry point' : undefined}>{entries.has(p) ? '◆' : ''}</span>
+                <span className="w-2 shrink-0 text-foreground" aria-label={entries.has(p) ? 'entry point' : undefined}>{entries.has(p) ? '◆' : ''}</span>
                 <span className="truncate">{p.slice(p.lastIndexOf('/') + 1)}</span>
               </button>
             ))}

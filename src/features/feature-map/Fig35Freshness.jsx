@@ -15,14 +15,14 @@ const MAX_TICKS = 40; // past this the ticks blur into a bar; the boxed count st
 const short = (sha) => (sha ? String(sha).slice(0, 7) : '?');
 
 /** `gitSha` is the map's build commit, `head` the repo's HEAD; counts are numbers or null. */
-export function Fig35Freshness({ gitSha, head, commitsBehind, newFiles, fallback = null }) {
+export function Fig35Freshness({ gitSha, head, commitsBehind, newFiles, missingFiles, fallback = null }) {
   const compact = useFigureCompact();
   const commits = commitsBehind || 0;
   const files = newFiles || 0;
   const ticks = Math.min(commits, MAX_TICKS);
   const count = `${commits} commit${commits === 1 ? '' : 's'}`;
   const boxW = textWidth(count) + 10;
-  const label = `Feature map built at ${short(gitSha)}, ${count} behind HEAD ${short(head)}, ${files} new file${files === 1 ? '' : 's'} unplaced`;
+  const label = `Feature map built at ${short(gitSha)}, ${count} behind HEAD ${short(head)}, ${files} new file${files === 1 ? '' : 's'} unplaced${missingFiles > 0 ? `, ${missingFiles} mapped file${missingFiles === 1 ? '' : 's'} missing` : ''}`;
 
   return (
     <Figure
@@ -53,7 +53,7 @@ export function Fig35Freshness({ gitSha, head, commitsBehind, newFiles, fallback
           <Dim x1={X0} x2={X1} y={DIM} />
           <rect x={(X0 + X1 - boxW) / 2} y={DIM - 8} width={boxW} height={16} style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
           <T x={(X0 + X1) / 2} y={DIM + 4} anchor="middle" color={INK.warn}>{count}</T>
-          <T x={X0} y={74} color={files ? INK.warn : INK.faint}>{`${files} new file${files === 1 ? '' : 's'} unplaced`}</T>
+          <T x={X0} y={74} color={files || missingFiles ? INK.warn : INK.faint}>{`${files} new file${files === 1 ? '' : 's'} unplaced${missingFiles > 0 ? ` · ${missingFiles} missing` : ''}`}</T>
         </>
       )}
     </Figure>

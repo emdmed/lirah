@@ -65,13 +65,16 @@ export function TabPlanTier({ plan, onOpen }) {
       title={`${title}\nOpen the plan`}
       className="group/well ins-well ml-6 flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px] outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
     >
-      <span className="flex h-4 min-w-0 items-center gap-2">
-        {plan.split === SPLIT_STATUS.RUNNING ? (
-          <Scanner />
-        ) : (
-          <Lamp state={lampState} blink={running} label={tag || (running ? 'in progress' : 'idle')} />
-        )}
-        <span className="min-w-0 truncate text-foreground group-hover/well:text-[var(--ins-lamp)]">{title}</span>
+      {/* The title is what the card is for: it wraps to two lines instead of cutting mid-sentence. */}
+      <span className="flex min-w-0 items-start gap-2 leading-4">
+        <span className="flex h-4 shrink-0 items-center">
+          {plan.split === SPLIT_STATUS.RUNNING ? (
+            <Scanner />
+          ) : (
+            <Lamp state={lampState} blink={running} label={tag || (running ? 'in progress' : 'idle')} />
+          )}
+        </span>
+        <span className="min-w-0 line-clamp-2 break-words text-foreground group-hover/well:text-[var(--ins-lamp)]">{title}</span>
         {tag && (
           <span
             className={cn(

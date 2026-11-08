@@ -698,6 +698,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       )}
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
+        {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
+        {projectPath && (tab === 'plans' || tab === 'tasks' || tab === 'features') && (
+          <div className="ins-legend text-[11px] text-muted-foreground px-2 pt-1.5 truncate shrink-0" title={projectPath}>
+            {projectPath.split('/').filter(Boolean).pop()}
+          </div>
+        )}
         {tab === 'tabs' ? (
           <TabsSummaryPane onNewTab={onNewTab} />
         ) : tab === 'agents' ? (

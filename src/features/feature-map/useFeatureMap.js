@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { buildFeatureMapPrompt, buildFeatureMapUpdatePrompt } from '../compact/featureMapPrompt';
 
 // One build per project, shared by every caller (the FEATURES tab, the palette).
@@ -22,16 +23,17 @@ export function buildFeatureMap(projectDir, rebuild = false) {
     .finally(() => { building.delete(projectDir); notify(); });
 }
 
-export function featureMapStatus({ map, commitsBehind, newFiles }, isBuilding, error) {
+export function featureMapStatus({ map, commitsBehind, newFiles, missingFiles }, isBuilding, error) {
   if (isBuilding) return 'building';
   if (error) return 'failed';
   if (!map) return 'none';
-  return commitsBehind > 0 || newFiles > 0 ? 'stale' : 'fresh';
+  if (map.gitSha && commitsBehind == null) return 'stale'; // build commit unreachable (rebased, branch deleted)
+  return commitsBehind > 0 || newFiles > 0 || missingFiles > 0 ? 'stale' : 'fresh';
 }
 
-/** The project's feature map and its build state: { map, head, commitsBehind, newFiles, status, error, build(rebuild), reload() }. */
+/** The project's feature map and its build state: { map, head, commitsBehind, newFiles, missingFiles, status, error, build(rebuild), reload() }. */
 export function useFeatureMap(projectPath) {
-  const [data, setData] = useState({ map: null, head: null, commitsBehind: null, newFiles: null });
+  const [data, setData] = useState({ map: null, head: null, commitsBehind: null, newFiles: null, missingFiles: null });
   const [loadError, setLoadError] = useState(null);
   const [nonce, setNonce] = useState(0);
   const v = useSyncExternalStore(subscribe, () => version);
@@ -47,6 +49,14 @@ export function useFeatureMap(projectPath) {
       .catch((e) => { if (live) setLoadError(String(e)); });
     return () => { live = false; };
   }, [projectPath, isBuilding, v, nonce]);
+
+  // Commits, checkouts, pulls and new files all move the freshness counts.
+  useEffect(() => {
+    let unlisten = null;
+    let cancelled = false;
+    listen('git-stats-changed', () => setNonce((n) => n + 1)).then((fn) => { if (cancelled) fn(); else unlisten = fn; });
+    return () => { cancelled = true; unlisten?.(); };
+  }, []);
 
   const error = buildError ?? loadError;
   const build = useCallback((rebuild) => buildFeatureMap(projectPath, rebuild), [projectPath]);

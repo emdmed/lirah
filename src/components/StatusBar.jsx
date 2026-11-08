@@ -394,6 +394,7 @@ export const StatusBar = memo(({
               <TooltipContent title="Agent" hint="Ctrl+K">{cliName} · click to change the CLI</TooltipContent>
             </Tooltip>
           )}
+          {selectedCli && <span className="ins-sep-star" aria-hidden="true" />}
           {onToggleCompaction && (
             <CompactionSwitch enabled={compactionEnabled} onToggle={onToggleCompaction} />
           )}
@@ -410,6 +411,7 @@ export const StatusBar = memo(({
         </div>
 
         {/* Settings, the final anchor */}
+        <span className="ins-sep-star" aria-hidden="true" />
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>

@@ -62,6 +62,13 @@ export async function pinFeature(tabId, projectPath, feature) {
   update(tabId, { pinned: [...pinned, { id: feature.id, name: String(feature.name || feature.id), files: rel.filter((_, i) => found[i]) }] });
 }
 
+/** Pins the feature, or unpins it if it is already pinned. */
+export function togglePinFeature(tabId, projectPath, feature) {
+  if (!getTabFeatures(tabId).pinned.some((f) => f.id === feature.id)) return pinFeature(tabId, projectPath, feature);
+  unpinFeature(tabId, feature.id);
+  return Promise.resolve();
+}
+
 export function unpinFeature(tabId, id) {
   update(tabId, { pinned: getTabFeatures(tabId).pinned.filter((f) => f.id !== id) });
 }

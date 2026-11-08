@@ -14,7 +14,7 @@ import { useToast } from '../toast';
 import { useDialog } from '../dialogs/DialogProvider';
 import { EmptyPlate } from '../../components/EmptyState';
 import { Fig35Freshness } from './Fig35Freshness';
-import { markFeatureInTree, pinFeature, selectFeature, useTabFeatures } from './useTabFeatures';
+import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } from './useTabFeatures';
 
 const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer';
 
@@ -26,7 +26,7 @@ export function copyFeatureFiles(f, toast) {
 /** The FEATURES section: the map's state on top, then its features by file count. `fm` is useFeatureMap(projectPath). */
 export function FeaturesPane({ projectPath, fm }) {
   const { activeTabId } = useTabManager();
-  const { selectedFeature } = useTabFeatures(activeTabId);
+  const { selectedFeature, pinnedFeatures } = useTabFeatures(activeTabId);
   const toast = useToast();
   const dialog = useDialog();
   // This pane sits outside the tab's dialog scope, so open into the tab by id.
@@ -48,6 +48,7 @@ export function FeaturesPane({ projectPath, fm }) {
     [fm.map],
   );
   const largest = features[0]?.files?.length || 1;
+  const togglePin = (f) => togglePinFeature(activeTabId, projectPath, f).catch((e) => toast.error(errorMessage(e)));
 
   // While this tab is open the tree marks the selected feature; leaving it clears them.
   const markFiles = features.find((f) => f.id === selectedFeature)?.files;
@@ -66,6 +67,10 @@ export function FeaturesPane({ projectPath, fm }) {
           e.preventDefault();
           explore();
         }
+        // p on a row adds the feature to the prompt or takes it out, as p pins a file in the tree.
+        const id = e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.closest?.('[data-feature-id]')?.dataset.featureId;
+        const f = id && features.find((x) => x.id === id);
+        if (f) { e.preventDefault(); togglePin(f); }
       }}
     >
       <StatusLine fm={fm} onBuild={build} onExplore={explore} />
@@ -75,8 +80,9 @@ export function FeaturesPane({ projectPath, fm }) {
           feature={f}
           largest={largest}
           selected={selectedFeature === f.id}
+          pinned={pinnedFeatures.some((p) => p.id === f.id)}
           onSelect={() => selectFeature(activeTabId, selectedFeature === f.id ? null : f.id)}
-          onPin={() => pinFeature(activeTabId, projectPath, f).catch((e) => toast.error(errorMessage(e)))}
+          onPin={() => togglePin(f)}
           onCopy={() => copyFeatureFiles(f, toast)}
           onExplore={() => { selectFeature(activeTabId, f.id); explore(); }}
         />
@@ -107,7 +113,8 @@ function StatusLine({ fm, onBuild, onExplore }) {
             head={fm.head}
             commitsBehind={fm.commitsBehind}
             newFiles={fm.newFiles}
-            fallback={<span className="text-[var(--ins-warn)]">{fm.commitsBehind || 0} commits behind · {fm.newFiles || 0} new files</span>}
+            missingFiles={fm.missingFiles}
+            fallback={<span className="text-[var(--ins-warn)]">{fm.commitsBehind || 0} commits behind · {fm.newFiles || 0} new files{fm.missingFiles > 0 ? ` · ${fm.missingFiles} missing` : ''}</span>}
           />
           <button onClick={() => onBuild(false)} className={BTN}>update</button>
           <button onClick={() => onBuild(true)} className={BTN}>rebuild</button>
@@ -133,14 +140,29 @@ function Building() {
   return <><Scanner label="building the feature map" /><span>building · {formatTimer(now - start)}</span></>;
 }
 
-export function FeatureRow({ feature, largest, selected, onSelect, onPin, onCopy, onExplore }) {
+/** A feature row; a pinned feature's name is inverse video (it is in the prompt). `ruler={false}` prints the count bare. */
+export function FeatureRow({ feature, largest, selected, pinned, ruler = true, onSelect, onPin, onCopy, onExplore }) {
   const count = feature.files?.length || 0;
   const name = String(feature.name || feature.id);
   return (
-    <div className={cn('group flex items-center gap-2 px-2.5 py-1 text-[11px]', selected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/40')}>
+    <div data-feature-id={feature.id} className={cn('group flex items-center gap-2 px-2.5 py-1 text-[11px]', selected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/40')}>
       <button onClick={onSelect} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left cursor-pointer">
-        <span className="min-w-0 flex-1 truncate" title={feature.description || name}>{name}</span>
-        <CountRuler count={count} max={largest} />
+        <span className="min-w-0 flex-1 truncate" title={feature.description || name}>
+          <span className={cn(pinned && 'bg-foreground px-1 text-background')}>{name}</span>
+        </span>
+        {ruler ? <CountRuler count={count} max={largest} /> : <span className="shrink-0 tabular-nums text-muted-foreground">{count}</span>}
+      </button>
+      <button
+        onClick={onPin}
+        aria-pressed={!!pinned}
+        aria-label={pinned ? `Remove ${name} from context` : `Add ${name} to context`}
+        title={pinned ? 'Remove from context (p)' : 'Add to context: its files go with every prompt (p)'}
+        className={cn(
+          'w-3 shrink-0 text-center leading-none cursor-pointer text-muted-foreground hover:text-foreground focus-visible:opacity-100',
+          !pinned && !selected && 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+        )}
+      >
+        {pinned ? '×' : '+'}
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -149,7 +171,7 @@ export function FeatureRow({ feature, largest, selected, onSelect, onPin, onCopy
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={onPin} className="cursor-pointer text-xs">add to context</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onPin} className="cursor-pointer text-xs">{pinned ? 'remove from context' : 'add to context'}</DropdownMenuItem>
           <DropdownMenuItem onSelect={onCopy} className="cursor-pointer text-xs">copy file list</DropdownMenuItem>
           {onExplore && <DropdownMenuItem onSelect={onExplore} className="cursor-pointer text-xs">explore</DropdownMenuItem>}
         </DropdownMenuContent>
