@@ -14,7 +14,7 @@ export function TurnTrail({ turn, summary, root, open, onToggle, onAttach }) {
         title={open ? 'Hide files' : 'Show the files it edited'}
         tabIndex={-1}
         className={cn(
-          'min-w-0 truncate tabular-nums hover:text-[var(--ins-lamp)]',
+          'h-4 min-w-0 truncate text-left leading-4 tabular-nums hover:text-[var(--ins-lamp)]',
           summary.running && 'text-[var(--ins-lamp)]',
         )}
       >

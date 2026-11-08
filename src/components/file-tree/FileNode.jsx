@@ -22,6 +22,7 @@ export function FileNode({
   gitDeleted,
   gitStatus,
   agentMark,
+  featureMark,
   onActivateFile,
   onTogglePin,
   onViewFile,
@@ -73,9 +74,10 @@ export function FileNode({
         </span>
 
         {/* Git stats badge, then the agent mark, at the row end */}
-        {(hasGitChanges || agentMark) && (
+        {(hasGitChanges || agentMark || featureMark > 0) && (
           <span className="ml-auto pl-1.5 shrink-0 flex items-center">
             {hasGitChanges && <GitStatsBadge stats={stats} />}
+            {featureMark > 0 && <span className="pl-1 text-foreground leading-none" style={{ fontSize: 'var(--font-sm)' }} title="A file of the selected feature">◆</span>}
             <AgentMark mark={agentMark} />
           </span>
         )}

@@ -90,6 +90,7 @@ function resetGuard(state, prompt, project, featureFiles = []) {
 // Features the prompt names, from .orchestration/tools/features.json (built by
 // the `:features build` palette command): a feature counts when its name, id or
 // an alias appears as whole words. Only files that still exist; absolute paths.
+// Must agree with src/features/feature-map/matchFeatures.js (the UI's copy).
 const FEATURES_MAX = 3;
 const FEATURE_FILES_MAX = 40;
 function promptFeatures(prompt, project) {

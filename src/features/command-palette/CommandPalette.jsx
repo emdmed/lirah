@@ -14,9 +14,9 @@ const LINE_HINTS = [
 
 /**
  * Vim-style command line. `commands` is a list of
- *   { id, aliases?, hint, options?: string[] | () => string[], run(arg) }
+ *   { id, aliases?, hint, options?: string[] | () => string[], argOptional?, run(arg) }
  * A command with `options` takes one argument, which the line completes from
- * that list (`:theme gru` → `:theme gruvbox`). A command with a keyboard
+ * that list (`:theme gru` → `:theme gruvbox`); with `argOptional` it also runs bare. A command with a keyboard
  * shortcut in src/lib/shortcuts.js shows its keys at the end of its row.
  */
 export function CommandPalette({ open, onClose, commands }) {
@@ -86,7 +86,7 @@ export function CommandPalette({ open, onClose, commands }) {
 
   const submit = () => {
     const s = suggestions[selected];
-    if (exact && (!exact.options || arg)) {
+    if (exact && (!exact.options || arg || exact.argOptional)) {
       // Typed in full: run as typed, but prefer the highlighted choice so a
       // partial argument (`:theme gru`) resolves to the completed one.
       run(exact, typingArg && s?.arg != null ? s.arg : arg || undefined);

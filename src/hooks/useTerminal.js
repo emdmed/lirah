@@ -10,6 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getTerminalSession, rememberTerminalSession, forgetTerminalSession } from '../lib/terminalSessions';
 import { workspaceOfTab } from '../lib/workspaceStore';
 import { useToast } from '../features/toast';
+import { trackTyped } from '../features/tabs/typedLine';
 import { getScrollback, subscribeTerminalPrefs } from '../lib/terminalPrefs';
 import { perfFirstOutput, perfInput, perfOutputWritten } from '../lib/perf';
 import { markTerminalInput, markTerminalOutput, setSessionTerminal } from '../features/tabs/terminalActivity';
@@ -409,6 +410,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         const dataDisposable = terminal.onData((data) => {
           perfInput();
           markTerminalInput(id);
+          trackTyped(id, data);
           invoke('write_to_terminal', { sessionId: id, data }).catch((error) => {
             console.error('Failed to write to terminal:', error);
           });

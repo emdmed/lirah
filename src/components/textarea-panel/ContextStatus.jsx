@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, memo } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, memo } from "react";
 import { cn } from "@/lib/utils";
 import { TokenCostEstimate } from "../../features/token-budget/TokenCostEstimate";
 import { basename } from "../../utils/pathUtils";
@@ -13,7 +13,16 @@ import { KeyChord } from "../instrument/Keycap";
 import { Lamp } from "../instrument/Lamp";
 import { FrameHints } from "../instrument/FrameHints";
 import { Fig32FilesByIntent } from "./Fig32FilesByIntent";
-import { focusPane } from "../../hooks/usePaneShortcuts";
+import { Fig36FeatureFiles } from "../../features/feature-map/Fig36FeatureFiles";
+import { focusPane, findVisiblePane } from "../../hooks/usePaneShortcuts";
+import { PickerRow } from "../ui/picker";
+import { matches } from "../../lib/shortcuts";
+import { useToast } from "../../features/toast";
+import { errorMessage } from "../../lib/errorMessage";
+import { useFeatureMap } from "../../features/feature-map/useFeatureMap";
+import { matchFeatures } from "../../features/feature-map/matchFeatures";
+import { pinFeature, unpinFeature, useTabFeatures } from "../../features/feature-map/useTabFeatures";
+import { getTypedLine, subscribeTypedLine } from "../../features/tabs/typedLine";
 
 const NO_REPOS = [];
 const NO_FILES = new Set();
@@ -29,10 +38,15 @@ const TYPING = 'input, textarea, select, [contenteditable="true"]';
 // A ghost jumps to the pane that fills its row.
 const GHOSTS = [
   { row: 'files', label: 'pick files', keys: ['alt', '1'], shortcut: 'Alt+1', pane: 1, title: 'Pick files in the files pane' },
+  { row: 'features', label: 'add feature', keys: ['alt', '5'], shortcut: 'Alt+5', title: 'Pin a feature from the feature map' },
   { row: 'repos', label: "link a tab's repo", keys: ['alt', '4'], shortcut: 'Alt+4', pane: 4, title: "Link another tab's repo from the workspace pane" },
 ];
 // Dashed in every state, so a ghost never passes for a real chip; hover and
 // focus brighten it, and focus adds the ring real chips use.
+// The hook's caps on feature context (buildPrompt and matchFeatures use them too).
+const FEATURES_MAX = 3;
+const FEATURE_FILES_MAX = 40;
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 pl-1.5 pr-1 border border-dashed border-[var(--ins-faint)] font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground hover:border-[var(--ins-legend)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:text-foreground focus-visible:border-[var(--ins-legend)]";
 
 /**
@@ -88,6 +102,9 @@ export const ContextStatus = memo(function ContextStatus({
   attachedSummary = null,
   onInsert,
   onOpenBox,
+  tabId,
+  sessionId,
+  featureProject,
 }) {
   const fileCount = selectedFiles?.size || 0;
   const hasContext = !!promptBase?.text;
@@ -100,6 +117,61 @@ export const ContextStatus = memo(function ContextStatus({
     selectedElements?.forEach((els) => { count += els.length; });
     return count;
   }, [selectedElements]);
+
+  // Feature map context: pinned features (sent as FEATURE lines) and the ones
+  // the prompt being typed names, which the hook adds on submit.
+  const toast = useToast();
+  const rootRef = useRef(null);
+  const manifestRef = useRef(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const featureMap = useFeatureMap(featureProject);
+  const mapFeatures = featureMap.map?.features;
+  const hasMap = Array.isArray(mapFeatures) && mapFeatures.length > 0;
+  const { pinnedFeatures } = useTabFeatures(tabId);
+  // A key of the matches, so keystrokes that change nothing don't re-render.
+  const matchKey = useSyncExternalStore(subscribeTypedLine, () => (hasMap
+    ? matchFeatures(featureMap.map, getTypedLine(sessionId)).map((m) => `${m.id}\t${m.word}\t${m.files.length}`).join('\n')
+    : ''));
+  const matched = useMemo(() => {
+    if (!matchKey) return [];
+    const pinnedIds = new Set(pinnedFeatures.map((f) => f.id));
+    return matchFeatures(featureMap.map, getTypedLine(sessionId)).filter((m) => !pinnedIds.has(m.id));
+  }, [matchKey, pinnedFeatures, featureMap.map, sessionId]);
+  const pin = (id) => {
+    const f = mapFeatures?.find((x) => x.id === id);
+    if (f) pinFeature(tabId, featureProject, f).catch((e) => toast.error(errorMessage(e)));
+  };
+  const featureChips = useMemo(() => pinnedFeatures.map((f) => ({
+    key: `feature:${f.id}`,
+    tag: 'feature',
+    name: f.name,
+    detail: plural(f.files.length, 'file'),
+    title: f.files.join('\n'),
+    onRemove: () => unpinFeature(tabId, f.id),
+  })), [pinnedFeatures, tabId]);
+  // What goes, as the hook caps it: pinned and matched are capped apart.
+  const pinnedSent = pinnedFeatures.slice(0, FEATURES_MAX);
+  const featureCount = pinnedSent.length + matched.length;
+  const featureFiles = Math.min(FEATURE_FILES_MAX, pinnedSent.reduce((n, f) => n + f.files.length, 0))
+    + matched.reduce((n, m) => n + m.files.length, 0);
+
+  // Alt+5 opens the picker in the tab on screen. Capture, so xterm can't take it.
+  useEffect(() => {
+    if (!hasMap) return undefined;
+    const onKeyDown = (e) => {
+      if (!matches('add-feature', e)) return;
+      if (!rootRef.current || findVisiblePane(3) !== rootRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPickerOpen(true);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [hasMap]);
+  const closePicker = () => {
+    setPickerOpen(false);
+    manifestRef.current?.focus({ preventScroll: true });
+  };
 
   const repoChips = useMemo(() => linkedRepos.map((r) => ({
     key: `repo:${r.path}`,
@@ -128,6 +200,9 @@ export const ContextStatus = memo(function ContextStatus({
     lamp = hookDelivers ? 'on' : undefined;
   } else {
     status = 'nothing attached · prompts go as typed';
+  }
+  if (featureCount > 0 && !attachedSummary) {
+    status += ` · ${plural(featureCount, 'feature')} · ${plural(featureFiles, 'file')}`;
   }
 
   // Keep lives in the files pane's context header; here only while it's closed.
@@ -190,6 +265,40 @@ export const ContextStatus = memo(function ContextStatus({
       </ManifestRow>,
     );
   }
+  if (hasMap && (featureChips.length > 0 || matched.length > 0)) {
+    rows.push(
+      <ManifestRow key="features" label="features">
+        <div className="flex flex-wrap gap-1">
+          {featureChips.length > 0 && (
+            <ContextChips {...chipProps} selectedFiles={NO_FILES} selectedElements={NO_ELEMENTS} extras={featureChips} />
+          )}
+          {featureChips.length > 0 && <Fig36FeatureFiles features={pinnedFeatures} className="basis-full" />}
+          {matched.length > 0 && (
+            <ul className="flex flex-wrap gap-1" aria-label="Features your prompt names, added on submit">
+              {matched.map((m) => (
+                <li
+                  key={m.id}
+                  className="inline-flex items-center shrink-0 max-w-full h-5 border border-dashed border-[var(--ins-faint)] font-mono text-[11px] leading-none"
+                  title={`"${m.word}" in your prompt · the hook adds ${plural(m.files.length, 'file')} on submit`}
+                >
+                  <span className="pl-1 text-muted-foreground">{m.word}</span>
+                  <span className="px-1 truncate text-foreground">{m.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => pin(m.id)}
+                    aria-label={`Pin ${m.name} to the context`}
+                    className="h-5 px-1.5 shrink-0 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    pin
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </ManifestRow>,
+    );
+  }
   if (repoChips.length > 0) {
     rows.push(
       <ManifestRow key="repos" label="repos">
@@ -225,11 +334,11 @@ export const ContextStatus = memo(function ContextStatus({
   } else {
     manifest = (
       <dl className="flex flex-col gap-y-2">
-        {GHOSTS.map((g) => (
+        {GHOSTS.filter((g) => g.row !== 'features' || hasMap).map((g) => (
           <ManifestRow key={g.row} label={g.row}>
             <button
               type="button"
-              onClick={() => focusPane(g.pane)}
+              onClick={() => (g.pane ? focusPane(g.pane) : setPickerOpen(true))}
               title={g.title}
               aria-label={g.title}
               aria-keyshortcuts={g.shortcut}
@@ -246,7 +355,7 @@ export const ContextStatus = memo(function ContextStatus({
   }
 
   return (
-    <div data-pane="3" data-title="[3] context" data-legend className="group/ctx tui-pane flex flex-col px-4 pt-[22px] pb-[18px] gap-3" onKeyDown={onPaneKeyDown}>
+    <div ref={rootRef} data-pane="3" data-title="[3] context" data-legend className="group/ctx tui-pane flex flex-col px-4 pt-[22px] pb-[18px] gap-3" onKeyDown={onPaneKeyDown}>
       <PaneLegend
         index={3}
         title="Context"
@@ -266,12 +375,22 @@ export const ContextStatus = memo(function ContextStatus({
         // Alt+3 lands here (data-pane-focus), so the pane keys work at once
         // and the list scrolls with the arrow keys. The lit pane frame and
         // its key hints show the focus.
+        ref={manifestRef}
         tabIndex={0}
         data-pane-focus
         className="min-h-[48px] max-h-[112px] overflow-y-auto pr-1 -mx-1.5 px-1.5 focus:outline-none"
       >
         {manifest}
       </section>
+
+      {pickerOpen && hasMap && (
+        <FeaturePicker
+          features={mapFeatures}
+          pinnedIds={new Set(pinnedFeatures.map((f) => f.id))}
+          onAdd={(f) => { pin(f.id); closePicker(); }}
+          onClose={closePicker}
+        />
+      )}
 
       {/* One bank, left-aligned: what shapes the context, a star, then what
           happens to it. */}
@@ -360,6 +479,64 @@ export const ContextStatus = memo(function ContextStatus({
     </div>
   );
 });
+
+// `+ add feature`: filter the map by name or alias, ↑ ↓ to move, Enter pins,
+// Esc closes. Already pinned features are left out.
+function FeaturePicker({ features, pinnedIds, onAdd, onClose }) {
+  const [query, setQuery] = useState('');
+  const [cursor, setCursor] = useState(0);
+  const listId = useId();
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return features.filter((f) => f?.id && !pinnedIds.has(f.id)
+      && (!q || [f.name, f.id, ...(Array.isArray(f.aliases) ? f.aliases : [])].some((w) => String(w ?? '').toLowerCase().includes(q))));
+  }, [features, pinnedIds, query]);
+  const at = Math.min(cursor, shown.length - 1);
+  const onKeyDown = (e) => {
+    if (e.key === 'ArrowDown') setCursor(Math.min(at + 1, shown.length - 1));
+    else if (e.key === 'ArrowUp') setCursor(Math.max(at - 1, 0));
+    else if (e.key === 'Enter') { if (shown[at]) onAdd(shown[at]); }
+    else if (e.key === 'Escape') onClose();
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  return (
+    <div className="edge-engraved -mx-1.5 flex flex-col" onKeyDown={onKeyDown}>
+      <input
+        autoFocus
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
+        onBlur={(e) => { if (!e.currentTarget.parentElement.contains(e.relatedTarget)) onClose(); }}
+        placeholder="add feature · filter by name or alias"
+        aria-label="Filter features by name or alias"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls={listId}
+        aria-activedescendant={shown[at] ? `${listId}-${at}` : undefined}
+        className="h-7 px-3 bg-transparent font-mono text-[12px] text-foreground placeholder:text-muted-foreground border-b border-[var(--ins-edge)] focus:outline-none"
+      />
+      <div id={listId} role="listbox" aria-label="Features" className="max-h-40 overflow-y-auto py-1">
+        {shown.length === 0 ? (
+          <p className="px-3.5 py-1 font-mono text-[11px] text-muted-foreground">no feature matches</p>
+        ) : shown.map((f, i) => (
+          <PickerRow
+            key={f.id}
+            id={`${listId}-${i}`}
+            tabIndex={-1}
+            glyph={i === at ? '›' : ''}
+            name={String(f.name || f.id)}
+            path={Array.isArray(f.aliases) ? f.aliases.join(', ') : ''}
+            tag={plural(Array.isArray(f.files) ? f.files.length : 0, 'file')}
+            selected={i === at}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onAdd(f)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // One kind of context: a printed label in a fixed column, its items beside it.
 function ManifestRow({ label, children }) {

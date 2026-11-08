@@ -27,32 +27,11 @@ export function isSettledPlan(plan) {
 }
 
 /**
- * A tab's finished plans folded into one muted line (DESIGN rule 10). One plan
- * keeps its title; several become a count, with the titles in the tooltip.
+ * A tab row's plan tier: the plan its agent is working through, in a well, at
+ * one fixed height. With nothing live it shows the latest finished plan and
+ * `note` in place of the chunk in flight.
  */
-export function SettledPlans({ plans, onOpen }) {
-  if (plans.length === 0) return null;
-  const one = plans.length === 1 ? plans[0] : null;
-  const { done, total } = one ? planStatus(one) : {};
-  return (
-    <div className="flex min-w-0 pl-6 text-[11px] text-muted-foreground">
-      <RowAction
-        tabIndex={-1}
-        onClick={() => onOpen(plans[0].id)}
-        title={`${plans.map((p) => p.title || UNTITLED_PLAN).join('\n')}\nOpen the plan`}
-        className="min-w-0 truncate tabular-nums hover:text-[var(--ins-lamp)]"
-      >
-        {one ? `plan complete: ${one.title || UNTITLED_PLAN} · ${done}/${total}` : `${plans.length} plans complete`}
-      </RowAction>
-    </div>
-  );
-}
-
-/**
- * A tab row's plan tier: the plan its agent is working through, in a well.
- * Finished runs go to SettledPlans instead.
- */
-export function TabPlanTier({ plan, onOpen }) {
+export function TabPlanTier({ plan, note, onOpen }) {
   const { done, total, running, tag, lampState } = planStatus(plan);
   const title = plan.title || UNTITLED_PLAN;
   const ap = plan.autopilot;
@@ -65,12 +44,15 @@ export function TabPlanTier({ plan, onOpen }) {
       title={`${title}\nOpen the plan`}
       className="group/well ins-well ml-6 flex min-w-0 flex-col gap-1.5 px-2 py-1.5 text-[11px] outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
     >
-      <span className="flex h-4 min-w-0 items-center gap-2">
-        {plan.split === SPLIT_STATUS.RUNNING ? (
-          <Scanner />
-        ) : (
-          <Lamp state={lampState} blink={running} label={tag || (running ? 'in progress' : 'idle')} />
-        )}
+      {/* One line, so every card is the same height; the full title is in the tooltip. */}
+      <span className="flex min-w-0 items-start gap-2 leading-4">
+        <span className="flex h-4 shrink-0 items-center">
+          {plan.split === SPLIT_STATUS.RUNNING ? (
+            <Scanner />
+          ) : (
+            <Lamp state={lampState} blink={running} label={tag || (running ? 'in progress' : 'idle')} />
+          )}
+        </span>
         <span className="min-w-0 truncate text-foreground group-hover/well:text-[var(--ins-lamp)]">{title}</span>
         {tag && (
           <span
@@ -83,17 +65,19 @@ export function TabPlanTier({ plan, onOpen }) {
           </span>
         )}
       </span>
-      {plan.split === SPLIT_STATUS.DONE && total > 0 && (
-        <Fig16Chunks
-          plan={plan}
-          label={`${done} of ${total} chunks implemented`}
-          fallback={<ProgressReadout plan={plan} done={done} total={total} paper="var(--ins-well)" />}
-        />
-      )}
-      {now && <span className="line-clamp-2 min-w-0 break-words text-muted-foreground">{now}</span>}
-      {(ap?.status === AUTOPILOT_STATUS.PAUSED || ap?.status === AUTOPILOT_STATUS.FAILED) && (
-        <span className="self-end text-muted-foreground group-hover/well:text-[var(--ins-lamp)]">open plan to resume ›</span>
-      )}
+      {/* Every part keeps its room while empty, so the card never changes height. */}
+      <Fig16Chunks
+        plan={plan}
+        blank={plan.split !== SPLIT_STATUS.DONE || total === 0}
+        label={`${done} of ${total} chunks implemented`}
+        fallback={<ProgressReadout plan={plan} done={done} total={total} paper="var(--ins-well)" />}
+      />
+      <span className="flex h-8 min-w-0 items-end gap-2 leading-4 text-muted-foreground">
+        <span className="line-clamp-2 min-w-0 flex-1 self-start break-words">{note ?? now}</span>
+        {(ap?.status === AUTOPILOT_STATUS.PAUSED || ap?.status === AUTOPILOT_STATUS.FAILED) && (
+          <span className="shrink-0 group-hover/well:text-[var(--ins-lamp)]">resume ›</span>
+        )}
+      </span>
     </RowAction>
   );
 }

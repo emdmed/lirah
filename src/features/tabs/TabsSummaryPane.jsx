@@ -21,7 +21,6 @@ import { ROW_KEYS, TabRow } from './TabRow';
 import { rowKeys } from './rowKeys';
 import { useTabPlans } from '../plans/useTabPlans';
 import { PlanRow } from '../plans/PlanRow';
-import { isSettledPlan } from '../plans/TabPlanTier';
 import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
@@ -173,10 +172,10 @@ export function TabsSummaryPane({ onNewTab }) {
         kinds.push(activity.kind);
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
         const trailOpen = !!summary && openTrail === tab.id;
-        // Nothing live and not the tab you're on: one line is enough.
-        const compact = !active && !LIVE.has(activity.kind) && queuePos < 0 && !trailOpen
-          && renamingId !== tab.id && roleMenuId !== tab.id
-          && !tabPlans?.some((p) => !isSettledPlan(p));
+        // Only the tab you're on or the row you've selected unfolds, so rows never
+        // jump as agents start and stop; the lamp and queue outline still show live state.
+        const compact = !active && tab.id !== focusedId && !trailOpen
+          && renamingId !== tab.id && roleMenuId !== tab.id;
         if (tab.id === focusedId) {
           focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary });
         }
@@ -203,7 +202,6 @@ export function TabsSummaryPane({ onNewTab }) {
             turn={turn}
             summaryText={summary?.text}
             summaryRunning={!!summary?.running}
-            summaryStale={!!summary?.stale}
             trailOpen={trailOpen}
             plans={tabPlans}
             compact={compact}

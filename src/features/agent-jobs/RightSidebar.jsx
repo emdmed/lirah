@@ -33,6 +33,8 @@ import { useRepoRoot } from '../plans/planRepoRoot';
 import { CHUNK_STATUS } from '../plans/planModel';
 import { TasksPane } from '../tasks/TasksPane';
 import { useOpenTaskCount } from '../tasks/TasksContext';
+import { FeaturesPane } from '../feature-map/FeaturesPane';
+import { useFeatureMap } from '../feature-map/useFeatureMap';
 
 // Loaded on first open, mounted only while open.
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
@@ -125,6 +127,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const { workspaceTabs, activeWorkspaceId, activeTabId } = useTabManager();
   const dialog = useDialog();
   const openTasks = useOpenTaskCount(activeWorkspaceId);
+  const featureMap = useFeatureMap(projectPath);
   const waitingTabs = useAttentionQueue(workspaceTabs).length;
   const toast = useToast();
   const confirm = useConfirm();
@@ -597,7 +600,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
         // [ ] cycle sections. Alt is allowed and AltGraph excused: ISO layouts type [ ] with AltGr.
         if ((e.key === '[' || e.key === ']') && (e.getModifierState('AltGraph') || !(e.ctrlKey || e.metaKey))) {
-          const sections = ['tabs', 'jobs', 'plans', 'tasks', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
+          const sections = ['tabs', 'jobs', 'plans', 'tasks', 'features', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
           const step = e.key === ']' ? 1 : -1;
           e.preventDefault();
           setTab(sections[(sections.indexOf(tab) + step + sections.length) % sections.length]);
@@ -656,6 +659,13 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
+        <TabButton
+          active={tab === 'features'}
+          onClick={() => setTab('features')}
+          label="features"
+          count={featureMap.map?.features?.length || 0}
+          countTone={featureMap.status === 'stale' ? 'text-[var(--ins-warn)]' : undefined}
+        />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
@@ -688,6 +698,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       )}
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
+        {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
+        {projectPath && (tab === 'plans' || tab === 'tasks' || tab === 'features') && (
+          <div className="ins-legend text-[11px] text-muted-foreground px-2 pt-1.5 truncate shrink-0" title={projectPath}>
+            {projectPath.split('/').filter(Boolean).pop()}
+          </div>
+        )}
         {tab === 'tabs' ? (
           <TabsSummaryPane onNewTab={onNewTab} />
         ) : tab === 'agents' ? (
@@ -696,6 +712,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <PlansPane projectPath={projectPath} />
         ) : tab === 'tasks' ? (
           <TasksPane projectPath={projectPath} />
+        ) : tab === 'features' ? (
+          <FeaturesPane projectPath={projectPath} fm={featureMap} />
         ) : (
           <>
             {visibleJobs.length === 0 ? (

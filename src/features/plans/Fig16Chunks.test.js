@@ -15,6 +15,13 @@ describe('chunkRuler', () => {
     expect(chunkRuler(plan).states).toEqual(['done', 'done', 'fault', 'todo']);
   });
 
+  it('marks a paused run that needs you, but not a blocked one', () => {
+    const chunks = [chunk('c1', 'implemented'), chunk('c2', 'in-progress'), chunk('c3', 'pending')];
+    const paused = (reason) => chunkRuler({ autopilot: { status: 'paused', reason, chunkId: 'c2' }, chunks }).states;
+    expect(paused('needs-input')).toEqual(['done', 'fault', 'todo']);
+    expect(paused('blocked')).toEqual(['done', 'live', 'todo']);
+  });
+
   it('keeps the live star while a run is going', () => {
     const plan = {
       autopilot: { status: 'running', chunkId: 'c2' },

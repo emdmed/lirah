@@ -9,7 +9,7 @@ import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
 import { useToast } from '../toast/ToastContext';
 import { IS_WINDOWS } from '../../utils/pathUtils';
-import { buildFeatureMapPrompt, buildFeatureMapUpdatePrompt } from '../compact/featureMapPrompt';
+import { buildFeatureMap } from '../feature-map/useFeatureMap';
 import {
   addStartupProject, getStartup, removeStartupProject, setStartupMode,
 } from '../agent-control/actions';
@@ -46,7 +46,7 @@ export function useTabCommands({
 }) {
   const { setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen, setAutoChangelogDialogOpen,
     setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setShowHelp,
-    setSettingsOpen } = dialogs;
+    setSettingsOpen, setFeatureExplorerOpen } = dialogs;
   const { sandboxEnabled, networkIsolation, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend } = settings;
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
   const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster } = useTabActions();
@@ -101,14 +101,15 @@ export function useTabCommands({
       } },
       // Runs for minutes, so it reports by toast instead of holding the palette.
       // `build` updates the map from git's changes (a full build the first time); `rebuild` redoes it all.
-      { id: 'features', hint: 'map this project\'s features to their files (agents get them when a prompt names one)', options: ['build', 'rebuild'], run: (arg) => {
+      // Without an argument it opens the explorer.
+      { id: 'features', hint: 'explore the feature map, or build|rebuild it (agents get a feature\'s files when a prompt names it)', options: ['build', 'rebuild'], argOptional: true, run: (arg) => {
         if (arg && arg !== 'build' && arg !== 'rebuild') throw new Error(`no features action "${arg}"`);
         if (!projectPath) throw new Error('no project in this tab');
-        toastInfo('Mapping features to files…');
-        const updatePrompt = arg === 'rebuild' ? null : buildFeatureMapUpdatePrompt();
-        invoke('build_feature_map', { projectDir: projectPath, prompt: buildFeatureMapPrompt(), updatePrompt })
+        if (!arg) { setFeatureExplorerOpen(true); return; }
+        buildFeatureMap(projectPath, arg === 'rebuild')
           .then((summary) => toastSuccess(`${summary} → .orchestration/tools/features.json`))
           .catch((e) => toastError(`Feature map failed: ${e}`));
+        toastInfo('Mapping features to files…');
       } },
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));
@@ -212,6 +213,6 @@ export function useTabCommands({
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
     toggleSandbox, toggleNetwork, onToggleGitFilter, onToggleMarkdownFilter, setSidebarOpen, setTextareaVisible,
     setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen, setAutoChangelogDialogOpen,
-    setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setShowHelp, setSettingsOpen,
+    setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setShowHelp, setSettingsOpen, setFeatureExplorerOpen,
     toastSuccess, toastInfo, toastError]);
 }

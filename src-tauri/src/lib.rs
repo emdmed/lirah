@@ -210,6 +210,7 @@ pub fn run(initial_path: Option<String>) {
             // Plans
             plans::split_plan,
             feature_map::build_feature_map,
+            feature_map::read_feature_map,
             plans::format_task,
             plans::delete_plan_file,
             plans::remove_plan_workdir,

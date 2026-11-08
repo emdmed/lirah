@@ -40,6 +40,7 @@ export const SHORTCUTS = [
 
   // Panes & views
   { id: 'pane-focus', keys: ['Alt', '1-4'], description: 'Focus Pane', category: 'Panes & Views', note: 'files · terminal · prompt · jobs', hint: { bar: 'always', label: 'panes' }, match: (e) => alt(e) && !e.shiftKey && /^Digit[1-4]$/.test(e.code) },
+  { id: 'add-feature', keys: ['Alt', '5'], description: 'Add a feature to the context', category: 'Panes & Views', note: 'context pane, when the project has a feature map', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit5' },
   { id: 'nav-mode', keys: ['Ctrl', 'S'], description: 'Navigation Mode', category: 'Panes & Views', note: 'stops a running agent, asks first', match: (e) => e.ctrlKey && e.key === 's' },
   { id: 'palette', keys: ['Ctrl', ':'], description: 'Command Palette', category: 'Panes & Views', note: 'or : outside a text field', hint: { bar: 'ctrl', label: 'commands' } },
   { id: 'bookmarks', keys: ['Ctrl', 'P'], description: 'Starred projects', category: 'Panes & Views', paletteCommand: 'marks' },

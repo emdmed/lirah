@@ -34,6 +34,8 @@ pub async fn build_feature_map(
 
 fn build(dir: &str, prompt: &str, update_prompt: Option<&str>) -> Result<String, String> {
     let path = map_path(dir);
+    // Read before the model runs: a checkout mid-build must not relabel the map.
+    let head = git(dir, &["rev-parse", "--short", "HEAD"]).filter(|s| !s.is_empty());
     exclude_orchestration_from_git(dir); // else features.json itself shows up as a new file
     let update = update_prompt.zip(read_map(&path)).and_then(|(p, map)| plan_update(dir, map).map(|u| (p, u)));
     let (mut map, summary) = match update {
@@ -55,14 +57,42 @@ fn build(dir: &str, prompt: &str, update_prompt: Option<&str>) -> Result<String,
         .map_or(0, |d| d.as_millis() as u64);
     map["version"] = 1.into();
     map["generatedAt"] = now.into(); // unix ms
-    map["gitSha"] = git(dir, &["rev-parse", "--short", "HEAD"])
-        .filter(|s| !s.is_empty())
-        .map_or(Value::Null, Into::into);
+    map["gitSha"] = head.map_or(Value::Null, Into::into);
 
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| format!("Failed to create {}: {}", path.display(), e))?;
     let json = serde_json::to_string_pretty(&map).map_err(|e| e.to_string())?;
     std::fs::write(&path, json + "\n").map_err(|e| format!("Failed to write features.json: {}", e))?;
     Ok(summary)
+}
+
+/// The saved map (null when there is none) and how far it lags HEAD:
+/// `{ map, head, commitsBehind, newFiles, missingFiles }`. The counts are null when the
+/// map's `gitSha` is missing or unreachable.
+#[tauri::command]
+pub async fn read_feature_map(project_dir: String) -> Result<Value, String> {
+    crate::ipc::blocking("read_feature_map", move || Ok(read_with_freshness(&project_dir))).await
+}
+
+fn read_with_freshness(dir: &str) -> Value {
+    let map = read_map(&map_path(dir));
+    let sha = map.as_ref().and_then(|m| m["gitSha"].as_str()).map(String::from);
+    let behind = sha.as_ref().and_then(|s| git(dir, &["rev-list", "--count", &format!("{}..HEAD", s), "--", "."]));
+    let counts = map.clone().zip(sha).and_then(|(mut m, s)| {
+        let mut c = changes_since(dir, &s)?;
+        c.added.retain(|p| !p.starts_with(".orchestration/")); // in case the hook never excluded it
+        // Map files gone from the tree, e.g. after checking out a branch without them.
+        let listed: HashSet<&str> = m["features"].as_array().into_iter().flatten()
+            .filter_map(|f| f["files"].as_array()).flatten().filter_map(Value::as_str).collect();
+        let missing = c.deleted.iter().filter(|p| listed.contains(p.as_str())).count();
+        Some((apply_changes(&mut m, &c).len(), missing))
+    });
+    serde_json::json!({
+        "map": map,
+        "head": git(dir, &["rev-parse", "--short", "HEAD"]),
+        "commitsBehind": behind.and_then(|n| n.parse::<u64>().ok()),
+        "newFiles": counts.map(|c| c.0),
+        "missingFiles": counts.map(|c| c.1),
+    })
 }
 
 fn map_path(dir: &str) -> PathBuf {
@@ -79,9 +109,7 @@ fn read_map(path: &Path) -> Option<Value> {
 /// files the model must place, and a summary; None means do a full build instead.
 fn plan_update(dir: &str, mut map: Value) -> Option<(Value, Vec<String>, String)> {
     let sha = map["gitSha"].as_str()?.to_string();
-    let mut changes = parse_name_status(&git(dir, &["diff", "--name-status", "-M", &sha, "--"])?);
-    let untracked = git(dir, &["ls-files", "--others", "--exclude-standard"])?;
-    changes.added.extend(untracked.lines().filter(|l| !l.is_empty()).map(String::from));
+    let changes = changes_since(dir, &sha)?;
     let new_files = apply_changes(&mut map, &changes);
     if new_files.len() > UPDATE_MAX_NEW_FILES {
         return None;
@@ -93,6 +121,14 @@ fn plan_update(dir: &str, mut map: Value) -> Option<(Value, Vec<String>, String)
         changes.deleted.len()
     );
     Some((map, new_files, summary))
+}
+
+/// Git's changes since `sha`, untracked files counted as added.
+fn changes_since(dir: &str, sha: &str) -> Option<Changes> {
+    let mut changes = parse_name_status(&git(dir, &["diff", "--relative", "--name-status", "-M", sha, "--"])?);
+    let untracked = git(dir, &["ls-files", "--others", "--exclude-standard"])?;
+    changes.added.extend(untracked.lines().filter(|l| !l.is_empty()).map(String::from));
+    Some(changes)
 }
 
 #[derive(Default)]
@@ -317,5 +353,87 @@ mod tests {
         assert_eq!(saved["features"][0]["files"], json!(["src/a.js", "src/new.js"]));
         assert_eq!(saved["version"], 1);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_reports_how_far_the_map_lags_head() {
+        let dir = std::env::temp_dir().join(format!("lirah-feature-map-read-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let d = dir.to_str().unwrap();
+        let sh = |args: &[&str]| assert!(git(d, args).is_some(), "git {:?}", args);
+        let commit = |f: &str| {
+            std::fs::write(dir.join(f), f).unwrap();
+            sh(&["add", "."]);
+            sh(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", f]);
+        };
+        sh(&["init", "-q"]);
+        exclude_orchestration_from_git(d); // else the map gets committed and blocks the checkout
+        commit("a.js");
+
+        // No file.
+        let r = read_with_freshness(d);
+        assert!(r["map"].is_null() && r["commitsBehind"].is_null() && r["newFiles"].is_null(), "{}", r);
+        assert!(r["head"].is_string());
+
+        // Fresh.
+        let sha = git(d, &["rev-parse", "--short", "HEAD"]).unwrap();
+        let map = json!({ "gitSha": sha, "features": [{ "id": "x", "name": "X", "files": ["a.js"] }], "ignored": ["c.js"] });
+        std::fs::create_dir_all(map_path(d).parent().unwrap()).unwrap();
+        std::fs::write(map_path(d), map.to_string()).unwrap();
+        let r = read_with_freshness(d);
+        assert_eq!((r["commitsBehind"].clone(), r["newFiles"].clone()), (json!(0), json!(0)), "{}", r);
+        assert_eq!(r["map"]["features"][0]["id"], "x");
+        assert_eq!(r["head"], sha);
+
+        // Two commits behind: one new file, one already ignored.
+        commit("b.js");
+        commit("c.js");
+        let r = read_with_freshness(d);
+        assert_eq!((r["commitsBehind"].clone(), r["newFiles"].clone()), (json!(2), json!(1)), "{}", r);
+        assert_ne!(r["head"], sha);
+        assert_eq!(r["missingFiles"], json!(0), "{}", r);
+
+        // Map built on a branch with b.js, then checked out back to the first commit.
+        let b_sha = git(d, &["rev-parse", "--short", "HEAD"]).unwrap();
+        let map = json!({ "gitSha": b_sha, "features": [{ "id": "x", "name": "X", "files": ["a.js", "b.js"] }], "ignored": ["c.js"] });
+        std::fs::write(map_path(d), map.to_string()).unwrap();
+        sh(&["checkout", "-q", &sha]);
+        let r = read_with_freshness(d);
+        assert_eq!((r["commitsBehind"].clone(), r["newFiles"].clone(), r["missingFiles"].clone()), (json!(0), json!(0), json!(1)), "{}", r);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn freshness_is_scoped_to_a_project_in_a_repo_subfolder() {
+        let root = std::env::temp_dir().join(format!("lirah-feature-map-sub-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let dir = root.join("app");
+        std::fs::create_dir_all(&dir).unwrap();
+        let (r, d) = (root.to_str().unwrap(), dir.to_str().unwrap());
+        let sh = |args: &[&str]| assert!(git(r, args).is_some(), "git {:?}", args);
+        let commit = |path: &std::path::Path| {
+            std::fs::write(path, path.to_str().unwrap()).unwrap(); // distinct content, so no rename detection
+            sh(&["add", "."]);
+            sh(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]);
+        };
+        sh(&["init", "-q"]);
+        exclude_orchestration_from_git(d);
+        commit(&dir.join("a.js"));
+        let sha = git(d, &["rev-parse", "--short", "HEAD"]).unwrap();
+        let map = json!({ "gitSha": sha, "features": [{ "id": "x", "name": "X", "files": ["a.js"] }] });
+        std::fs::create_dir_all(map_path(d).parent().unwrap()).unwrap();
+        std::fs::write(map_path(d), map.to_string()).unwrap();
+
+        // Outside the project: no effect.
+        commit(&root.join("other.txt"));
+        let f = read_with_freshness(d);
+        assert_eq!((f["commitsBehind"].clone(), f["newFiles"].clone(), f["missingFiles"].clone()), (json!(0), json!(0), json!(0)), "{}", f);
+
+        // Inside: a deleted file matches the map's project-relative path.
+        sh(&["rm", "-q", "app/a.js"]);
+        commit(&dir.join("b.js"));
+        let f = read_with_freshness(d);
+        assert_eq!((f["commitsBehind"].clone(), f["newFiles"].clone(), f["missingFiles"].clone()), (json!(1), json!(1), json!(1)), "{}", f);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
