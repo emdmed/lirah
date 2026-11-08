@@ -120,11 +120,11 @@ export function SidebarFileSelection({
           )}
           <Button
             variant="ghost"
-            size="sm"
+            size="panel"
             onClick={onClearAllFiles}
-            className="h-5 px-1.5 text-[11px] font-mono text-muted-foreground hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive"
           >
-            <Xmark className="w-3 h-3 mr-0.5" />
+            <Xmark />
             clear
           </Button>
         </div>

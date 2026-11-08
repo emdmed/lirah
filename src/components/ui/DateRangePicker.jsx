@@ -43,10 +43,8 @@ export function DateRangePicker({ value, onChange, className = '' }) {
           <Button
             key={preset.label}
             variant="ghost"
-            size="sm"
+            size="xs"
             aria-pressed={activePreset === preset.label}
-            className="h-6 font-mono px-2"
-            style={{ fontSize: 'var(--font-xs)' }}
             onClick={() => handlePreset(preset)}
           >
             {preset.label}
@@ -54,10 +52,8 @@ export function DateRangePicker({ value, onChange, className = '' }) {
         ))}
         <Button
           variant="ghost"
-          size="sm"
+          size="xs"
           aria-pressed={showCustom}
-          className="h-6 font-mono px-2"
-          style={{ fontSize: 'var(--font-xs)' }}
           onClick={() => setShowCustom(!showCustom)}
         >
           Custom

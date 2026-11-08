@@ -80,11 +80,10 @@ export function TemplateSelector({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            size="xs"
+            size="panel"
             data-lit={activeParts.length > 0 || undefined}
             aria-label={`Instructions (${OPEN_KEYS})${activeParts.length ? `: ${activeParts.join(', ')}` : ''}`}
             title={triggerTitle}
-            className="gap-1 px-1.5"
           >
             <span>instructions</span>
             <NavArrowDown className="h-3 w-3" />

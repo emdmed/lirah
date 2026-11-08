@@ -791,8 +791,8 @@ const DiffLine = memo(function DiffLine({
       {showCopyButton && (
         <Button
           variant="ghost"
-          size="xs"
-          className="absolute right-1 top-0.5 h-5 opacity-0 group-hover:opacity-100 transition-opacity"
+          size="panel"
+          className="absolute right-1 top-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
           title={isCopied ? 'Copied!' : 'Copy chunk'}
           onClick={(e) => {
             e.stopPropagation();

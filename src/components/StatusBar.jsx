@@ -330,13 +330,12 @@ export const StatusBar = memo(({
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="xs"
+                      size="panel"
                       onClick={() => {
                         import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
                           openUrl(availableUpdate.url);
                         });
                       }}
-                      className="gap-1.5 px-1 h-5 before:content-none after:content-none"
                     >
                       <Lamp state="ok" />
                       <span className="text-muted-foreground">update {availableUpdate.version}</span>
@@ -371,7 +370,7 @@ export const StatusBar = memo(({
         {AUTO_COMMIT_CHIP[autoCommitStage] && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="xs" onClick={onShowAutoCommit} className="gap-1.5 px-1 h-5 lowercase before:content-none after:content-none">
+              <Button variant="ghost" size="panel" onClick={onShowAutoCommit} className="lowercase">
                 <Lamp state={AUTO_COMMIT_CHIP[autoCommitStage].lamp} blink={AUTO_COMMIT_CHIP[autoCommitStage].blink} />
                 commit · {AUTO_COMMIT_CHIP[autoCommitStage].label}
               </Button>
@@ -386,7 +385,7 @@ export const StatusBar = memo(({
           {selectedCli && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="xs" onClick={onOpenCliSettings} className="gap-1.5 px-1 h-5 lowercase before:content-none after:content-none">
+                <Button variant="ghost" size="panel" onClick={onOpenCliSettings} className="lowercase">
                   <Lamp state={sessionId ? 'on' : 'off'} />
                   {cliName}
                 </Button>
@@ -416,7 +415,7 @@ export const StatusBar = memo(({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="xs" className="px-1.5" aria-label="Settings and actions">
+                <Button variant="ghost" size="panel" aria-label="Settings and actions">
                   <span className="text-muted-foreground">settings</span>
                 </Button>
               </DropdownMenuTrigger>

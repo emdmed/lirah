@@ -674,22 +674,19 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       {tab === 'jobs' && selected.size > 0 && (
         <div className="flex flex-col gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border bg-sidebar-accent/40">
           <div className="flex items-center gap-2">
-            <button
+            <PanelButton
+              variant="default"
+              icon={GitMerge}
               onClick={handleReconcile}
-              disabled={reconciling}
-              className="flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] hover:bg-[var(--ins-lamp)] hover:text-[var(--ins-panel)] disabled:opacity-60 cursor-pointer"
+              busy={reconciling}
+              className="flex-1"
               title="Merge the selected jobs with an agent that resolves conflicts and verifies the combined result"
             >
-              {reconciling ? <Scanner /> : <GitMerge className="h-3 w-3" />}
               Reconcile {selected.size}
-            </button>
-            <button
-              onClick={() => setSelected(new Set())}
-              disabled={reconciling}
-              className="text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer disabled:opacity-60"
-            >
+            </PanelButton>
+            <PanelButton onClick={() => setSelected(new Set())} disabled={reconciling}>
               Clear
-            </button>
+            </PanelButton>
           </div>
           <span className="text-[11px] leading-snug text-muted-foreground">
             An agent merges them in an isolated worktree and verifies the build. Review before applying.

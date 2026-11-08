@@ -230,7 +230,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-1 text-xs font-mono">
+                  <Button variant="ghost" size="sm">
                     <Download width={12} height={12} />
                     Export
                   </Button>
@@ -253,17 +253,11 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-8 gap-1 text-xs font-mono"
                 onClick={handleRefresh}
-                disabled={refreshing}
+                busy={refreshing}
               >
-                {refreshing ? (
-                  <Scanner />
-                ) : (
-                  <span className="w-3 h-3" />
-                )}
                 Refresh
               </Button>
             </div>

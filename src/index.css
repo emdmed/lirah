@@ -450,15 +450,6 @@ body {
   font-weight: 300;
 }
 
-/* Rail words stay lowercase mono: its ghost keys don't take the italic verb face. */
-.ins-rail .ins-key-verb {
-  font-family: var(--font-mono);
-  font-style: normal;
-  font-weight: 400;
-  /* The verbs' 13px is for Spectral; in mono it would outsize the rail's other words. */
-  font-size: inherit;
-}
-
 /* Numeric readouts: fixed-width columns in the lamp colour. */
 .tube {
   font-variant-numeric: tabular-nums;
@@ -483,8 +474,8 @@ body {
 /*
   .tui-btn is the inline button: text-only ones render as [label], the TUI
   idiom; icon ones are a bare icon. Only .tui-btn draws brackets. Kept in the
-  components layer so utilities on older markup (`text-[11px]`, `hover:…`,
-  `before:content-none`) still win.
+  components layer so utilities on older markup (`text-[11px]`, `hover:…`)
+  still win.
 */
 @layer components {
   /* Empty-orbit plate (EmptyPlate in EmptyState.jsx). */
@@ -1229,18 +1220,6 @@ body {
     background: color-mix(in srgb, var(--color-foreground) 85%, var(--ins-panel, var(--color-background)));
     color: var(--ins-panel, var(--color-background));
   }
-
-  /* Secondary actions print as italic verbs (pair with .ins-name): no tint,
-     a dotted underline on hover. Icons carry no underline. */
-  .ins-key-verb:hover {
-    background: transparent;
-    text-decoration: underline dotted var(--ins-faint);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 4px;
-  }
-
-  /* Spectral sets small next to the mono; the panel verbs take a step up. */
-  .ins-key-panel.ins-key-verb { font-size: 13px; }
 
   /* Outline: the action beside the primary. */
   .ins-key-outline {

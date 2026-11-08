@@ -18,8 +18,6 @@ const buttonVariants = cva(
         default: "ins-key-primary",
         outline: "ins-key-outline",
         ghost: "ins-key-ghost",
-        // shortcut: alias of ghost for the one remaining site; removed with the bar migration.
-        secondary: "ins-key-ghost",
         destructive: "ins-key-danger",
         "destructive-fill": "ins-key-danger-fill",
         link: "ins-link text-primary",

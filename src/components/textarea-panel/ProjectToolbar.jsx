@@ -14,7 +14,7 @@ export function ProjectToolbar({ projectPath, onLoadGroup, onSaveGroup, fileCoun
     <div className="flex items-center gap-0.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="xs" className="gap-1 px-1.5" aria-label="Project actions and context sets">
+          <Button variant="ghost" size="panel" aria-label="Project actions and context sets">
             {label}
             <NavArrowDown className="h-3 w-3" />
           </Button>

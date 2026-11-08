@@ -87,7 +87,7 @@ export function TextareaArea({
                 onClick={onClearContext}
                 disabled={!sessionId}
                 aria-label="Clear CLI context"
-                className="px-1.5 before:content-none after:content-none text-muted-foreground"
+                className="px-1.5 text-muted-foreground"
               >
                 <Undo className="h-3 w-3" />
               </Button>

@@ -4,7 +4,7 @@ import { Lamp } from "../instrument/Lamp";
 
 // A readout line, not a key bank: an open/pressed segment reads in full
 // foreground rather than sitting on the key's latched tint.
-const SEGMENT = "gap-1 font-mono font-normal before:content-none after:content-none aria-pressed:bg-transparent aria-pressed:text-foreground";
+const SEGMENT = "gap-1 font-mono font-normal aria-pressed:bg-transparent aria-pressed:text-foreground";
 // sm: the prompt box's mode line. md: the context pane's controls, on the
 // app's 24px / 11px control scale.
 const SEGMENT_SIZE = { sm: "h-4 px-1 text-[11px]", md: "h-6 px-1.5 text-[11px]" };
@@ -57,7 +57,7 @@ export function ModeClear({ onClick, label }) {
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="h-4 w-4 p-0 text-[11px] font-mono text-muted-foreground hover:text-foreground before:content-none after:content-none"
+      className="h-4 w-4 p-0 text-[11px] font-mono text-muted-foreground hover:text-foreground"
     >
       ×
     </Button>

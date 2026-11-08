@@ -48,7 +48,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
           )}
         </button>
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-5 px-1 gap-1" style={{ fontSize: 'var(--font-xs)' }} onClick={resetFilters}>
+          <Button variant="ghost" size="panel" onClick={resetFilters}>
             <Xmark width={10} height={10} />
             Reset
           </Button>

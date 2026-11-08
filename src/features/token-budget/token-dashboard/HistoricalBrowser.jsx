@@ -143,9 +143,8 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-1 shrink-0">
             <Button
-              variant="outline"
-              size="sm"
-              className="h-6 text-xs font-mono px-2"
+              variant="ghost"
+              size="xs"
               disabled={page === 0}
               onClick={() => setPage(p => p - 1)}
             >
@@ -155,9 +154,8 @@ export function HistoricalBrowser({ sessions, projects, models, colors }) {
               Page {page + 1} / {totalPages}
             </span>
             <Button
-              variant="outline"
-              size="sm"
-              className="h-6 text-xs font-mono px-2"
+              variant="ghost"
+              size="xs"
               disabled={page >= totalPages - 1}
               onClick={() => setPage(p => p + 1)}
             >

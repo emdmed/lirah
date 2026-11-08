@@ -95,12 +95,11 @@ function WorkflowRow({ workflow, projectPath, orchestrationCheck, onRefresh, toa
       {workflow.cdnAvailable && !workflow.localInstalled ? (
         <Button
           variant="ghost"
-          size="xs"
-          className="h-5 px-1.5 text-[11px] gap-1"
+          size="panel"
           onClick={handleInstall}
-          disabled={installing}
+          busy={installing}
         >
-          {installing ? <Scanner /> : <Download className="w-2.5 h-2.5" />}
+          {!installing && <Download className="w-2.5 h-2.5" />}
           Install
         </Button>
       ) : (

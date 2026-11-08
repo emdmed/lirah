@@ -152,7 +152,6 @@ export function InstrumentKit() {
           <div className="flex flex-wrap items-center gap-2 pb-2">
             <Button size="xs" className="gap-1 px-1.5"><Send className="h-3 w-3" />send</Button>
             <Button variant="ghost" size="xs">ghost</Button>
-            <Button variant="secondary" size="xs">secondary</Button>
             <Button variant="outline" size="sm">outline</Button>
             <Button variant="destructive" size="xs">delete</Button>
             <Button variant="ghost" size="xs" aria-pressed="true">pressed</Button>

@@ -102,7 +102,6 @@ export function FileStateSelector({ value, onValueChange, className, showKeyboar
       type="single"
       value={value}
       onValueChange={onValueChange}
-      variant="outline"
       className={cn("inline-flex gap-px", className)}
     >
       {states.map((state) => {
