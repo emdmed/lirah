@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MoreHoriz } from 'iconoir-react';
+import { Copy } from 'iconoir-react';
 import '@/components/instrument/calibrated';
 import { useCalSvg } from '@/components/instrument/useCalSvg';
 import { useFigureCompact } from '@/components/instrument/figure';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Lamp } from '../../components/instrument/Lamp';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { formatAgo, formatTimer } from '../../lib/formatDuration';
 import { errorMessage } from '../../lib/errorMessage';
@@ -17,6 +16,7 @@ import { EmptyPlate } from '../../components/EmptyState';
 import { Fig35Freshness } from './Fig35Freshness';
 import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } from './useTabFeatures';
 
+const ICON = 'inline-flex h-4 w-4 items-center justify-center leading-none cursor-pointer text-muted-foreground hover:text-[var(--ins-lamp)] focus-visible:opacity-100';
 const BTN = 'tui-btn text-[11px] text-muted-foreground hover:text-foreground cursor-pointer';
 
 export function copyFeatureFiles(f, toast) {
@@ -160,38 +160,38 @@ function Building() {
 export function FeatureRow({ feature, largest, selected, pinned, ruler = true, onSelect, onPin, onCopy, onExplore }) {
   const count = feature.files?.length || 0;
   const name = String(feature.name || feature.id);
+  // Actions keep their width while hidden, so the rulers stay put as the pointer moves down the list.
+  const hide = !selected && 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100';
   return (
-    <div data-feature-id={feature.id} className={cn('group flex items-center gap-2 px-2.5 py-1 text-[11px]', selected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/40')}>
-      <button onClick={onSelect} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left cursor-pointer">
-        <span className="min-w-0 flex-1 truncate" title={feature.description || name}>
-          <span className={cn(pinned && 'bg-foreground px-1 text-background')}>{name}</span>
-        </span>
-        {ruler ? <CountRuler count={count} max={largest} /> : <span className="shrink-0 tabular-nums text-muted-foreground">{count}</span>}
-      </button>
-      <button
-        onClick={onPin}
-        aria-pressed={!!pinned}
-        aria-label={pinned ? `Remove ${name} from context` : `Add ${name} to context`}
-        title={pinned ? 'Remove from context (p)' : 'Add to context: its files go with every prompt (p)'}
-        className={cn(
-          'w-3 shrink-0 text-center leading-none cursor-pointer text-muted-foreground hover:text-foreground focus-visible:opacity-100',
-          !pinned && !selected && 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-        )}
-      >
-        {pinned ? '×' : '+'}
-      </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="text-muted-foreground hover:text-foreground cursor-pointer" aria-label={`Actions for ${name}`}>
-            <MoreHoriz className="h-3.5 w-3.5" />
+    <div data-feature-id={feature.id} className={cn('group px-2.5 py-1 text-[11px]', selected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/40')}>
+      <div className="flex items-center gap-2">
+        <button onClick={onSelect} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left cursor-pointer">
+          <span className="min-w-0 flex-1 truncate" title={feature.description || name}>
+            <span className={cn(pinned && 'bg-foreground px-1 text-background')}>{name}</span>
+          </span>
+          {ruler ? <CountRuler count={count} max={largest} /> : <span className="shrink-0 tabular-nums text-muted-foreground">{count}</span>}
+        </button>
+        <span className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={onPin}
+            aria-pressed={!!pinned}
+            aria-label={pinned ? `Remove ${name} from context` : `Add ${name} to context`}
+            title={pinned ? 'Remove from context (p)' : 'Add to context: its files go with every prompt (p)'}
+            className={cn(ICON, pinned ? 'hover:text-[var(--ins-fault)]' : hide)}
+          >
+            {pinned ? '×' : '+'}
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={onPin} className="cursor-pointer text-xs">{pinned ? 'remove from context' : 'add to context'}</DropdownMenuItem>
-          <DropdownMenuItem onSelect={onCopy} className="cursor-pointer text-xs">copy file list</DropdownMenuItem>
-          {onExplore && <DropdownMenuItem onSelect={onExplore} className="cursor-pointer text-xs">explore</DropdownMenuItem>}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <button onClick={onCopy} aria-label={`Copy ${name}'s file list`} title="Copy file list" className={cn(ICON, hide)}>
+            <Copy className="h-3 w-3" />
+          </button>
+          {onExplore && (
+            <button onClick={onExplore} aria-label={`Explore ${name}`} title="Explore in the map (f)" className={cn(ICON, hide)}>
+              ⤢
+            </button>
+          )}
+        </span>
+      </div>
+      {selected && feature.description && <p className="mt-0.5 pr-14 text-muted-foreground">{feature.description}</p>}
     </div>
   );
 }

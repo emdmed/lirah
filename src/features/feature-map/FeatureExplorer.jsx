@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogGroup, DialogTitle } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { cn } from '../../lib/utils';
 import { errorMessage } from '../../lib/errorMessage';
@@ -94,8 +94,8 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
           </nav>
 
           {/* A floor under the drawing, so a narrow window scrolls it instead of dropping it for the fallback. */}
-          <div className="min-h-0 overflow-auto">
-            <div style={{ minWidth: 560 }}>
+          <div className="flex min-h-0 flex-col overflow-auto">
+            <div className="my-auto" style={{ minWidth: 560 }}>
               <Fig34Features map={fm.map} selected={selectedFeature} pinned={pinnedFeatures} onSelect={select} />
             </div>
           </div>
@@ -129,49 +129,62 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
     folders.set(dir, [...(folders.get(dir) || []), p]);
   }
   const links = (ids) => (ids.length ? ids.map((id) => (
-    <button key={id} onClick={() => onSelect(id)} className="mr-2 underline decoration-dotted cursor-pointer hover:text-foreground">
+    <button key={id} onClick={() => onSelect(id)} className="text-left underline decoration-dotted underline-offset-2 cursor-pointer hover:text-foreground">
       {byId.get(id).name || id}
     </button>
   )) : <span className="text-muted-foreground">none</span>);
 
   return (
-    <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto text-xs" aria-label={`${feature.name || feature.id} details`}>
-      <div>
-        {feature.area?.length > 0 && <div className="text-[11px] text-muted-foreground">{feature.area.join(' · ')}</div>}
-        <h3 className="text-sm text-foreground">{feature.name || feature.id}</h3>
-        {feature.description && <p className="mt-1 text-muted-foreground">{feature.description}</p>}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button onClick={onPin} aria-pressed={pinned} title={pinned ? 'Remove from context (↵)' : 'Add to context: its files go with every prompt (↵)'} className={cn(BTN, pinned && 'text-foreground')}>{pinned ? 'in context ×' : 'add to context'}</button>
-        <button onClick={onMark} title="Mark its files and folders in the file tree (nothing opens)" className={BTN}>mark in tree</button>
-        <button onClick={onCopy} className={BTN}>copy files</button>
-      </div>
-      <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-2 gap-y-1">
-        <dt className="text-muted-foreground">triggered by</dt>
-        <dd>{[feature.name, ...(feature.aliases || [])].filter(Boolean).join(', ')}</dd>
-        <dt className="text-muted-foreground">uses</dt>
-        <dd>{links(uses)}</dd>
-        <dt className="text-muted-foreground">used by</dt>
-        <dd>{links(usedBy)}</dd>
-      </dl>
-      <div>
-        <div className="text-muted-foreground">
-          {files.length} file{files.length === 1 ? '' : 's'}
-          {files.length > HOOK_CAP && <span className="text-[var(--ins-warn)]"> · hook sends {HOOK_CAP}</span>}
-          {entries.size > 0 && <span> · ◆ entry point</span>}
+    <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1 text-xs" aria-label={`${feature.name || feature.id} details`}>
+      <header className="flex flex-col gap-1.5">
+        {feature.area?.length > 0 && <div className="ins-legend text-[11px] text-muted-foreground">{feature.area.join(' · ')}</div>}
+        <h3 className="ins-name text-lg leading-tight text-foreground">{feature.name || feature.id}</h3>
+        {feature.description && <p className="text-muted-foreground">{feature.description}</p>}
+        <div className="mt-1 flex flex-wrap gap-2">
+          <button onClick={onPin} aria-pressed={pinned} title={pinned ? 'Remove from context (↵)' : 'Add to context: its files go with every prompt (↵)'} className={cn(BTN, pinned && 'text-foreground')}>{pinned ? 'in context ×' : 'add to context'}</button>
+          <button onClick={onMark} title="Mark its files and folders in the file tree (nothing opens)" className={BTN}>mark in tree</button>
+          <button onClick={onCopy} className={BTN}>copy files</button>
         </div>
+      </header>
+
+      <section className="flex flex-col gap-2">
+        <DialogGroup label="relations" />
+        <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-2 gap-y-1.5">
+          <dt className="text-muted-foreground">triggered by</dt>
+          <dd className="text-muted-foreground">{[feature.name, ...(feature.aliases || [])].filter(Boolean).join(' · ')}</dd>
+          <dt className="text-muted-foreground">uses</dt>
+          <dd className="flex flex-col items-start gap-0.5">{links(uses)}</dd>
+          <dt className="text-muted-foreground">used by</dt>
+          <dd className="flex flex-col items-start gap-0.5">{links(usedBy)}</dd>
+        </dl>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <DialogGroup label="files">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {files.length}
+            {files.length > HOOK_CAP && <span className="text-[var(--ins-warn)]"> · hook sends {HOOK_CAP}</span>}
+            {entries.size > 0 && <span> · ◆ entry point</span>}
+          </span>
+        </DialogGroup>
         {[...folders].map(([dir, paths]) => (
-          <div key={dir} className="mt-2">
-            <div className="text-[11px] text-muted-foreground">{dir}/</div>
-            {paths.map((p) => (
-              <button key={p} onClick={() => onReveal(p)} title={`show ${p} in the file tree`} className="flex w-full gap-1.5 pl-2 text-left cursor-pointer hover:text-foreground">
-                <span className="w-2 shrink-0 text-foreground" aria-label={entries.has(p) ? 'entry point' : undefined}>{entries.has(p) ? '◆' : ''}</span>
-                <span className="truncate">{p.slice(p.lastIndexOf('/') + 1)}</span>
-              </button>
-            ))}
+          <div key={dir} className="flex flex-col">
+            <div className="flex items-baseline gap-2 text-[11px] text-muted-foreground">
+              <span className="truncate">{dir}/</span>
+              <span className="ml-auto tabular-nums text-[var(--ins-faint)]">{paths.length}</span>
+            </div>
+            {/* Files hang on a dotted guide, like the file tree's meridians. */}
+            <div className="ml-1 mt-0.5 border-l border-dotted border-[var(--ins-faint)] pl-2">
+              {paths.map((p) => (
+                <button key={p} onClick={() => onReveal(p)} title={`show ${p} in the file tree`} className="flex w-full gap-1.5 py-px text-left cursor-pointer hover:text-foreground">
+                  <span className="w-2 shrink-0 text-foreground" aria-label={entries.has(p) ? 'entry point' : undefined}>{entries.has(p) ? '◆' : ''}</span>
+                  <span className="truncate">{p.slice(p.lastIndexOf('/') + 1)}</span>
+                </button>
+              ))}
+            </div>
           </div>
         ))}
-      </div>
+      </section>
     </aside>
   );
 }

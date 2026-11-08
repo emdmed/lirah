@@ -1,13 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100">
-  <!-- Lirah app icon master: the bare lyre (Ithil's crescent, tall horns) with one body in its ring,
-       ivory on a graphite tile, the body in gold. Mirrors src/components/LirahMark.jsx with fixed colours.
+  <!-- Lirah app icon master ("champagne", chosen 2026-11-08): the bare lyre (Ithil's crescent, tall horns) with one body
+       in its ring, deep slate on a pale-gold superellipse tile. Mirrors src/components/LirahMark.jsx with fixed colours.
        Regenerate the raster set:
        rsvg-convert -w 1024 -h 1024 src-tauri/icons/icon.svg -o /tmp/lirah.png && npx tauri icon /tmp/lirah.png -o /tmp/lirah-icons
        then copy only the files already in src-tauri/icons/. public/lirah.svg (favicon) is a copy of this file. -->
-  <rect x="4" y="4" width="92" height="92" rx="21" fill="#3A3A3A"/>
-  <g transform="translate(50 50) scale(.78) translate(-50 -50)">
-    <path fill="#F4F1EA" transform="translate(50 52) scale(.86) translate(-50 -49.5)" d="M22 8C24 34 12 48 14 64C16 84 32 94 50 94C68 94 84 84 86 64C88 48 76 34 78 8C77 34 70 48 70 60C70 74 62 80 50 80C38 80 30 74 30 60C30 48 23 34 22 8Z"/>
-    <circle cx="50" cy="27" r="9.5" fill="none" stroke="#F4F1EA" stroke-width="2"/>
-    <circle cx="50" cy="27" r="4.4" fill="#DCB662"/>
-  </g>
+<defs>
+<linearGradient id="t" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#EEDCAE"/><stop offset="1" stop-color="#D3B475"/></linearGradient>
+</defs>
+<path d="M96.00 50.00L95.97 64.13L95.90 68.64L95.77 71.90L95.60 74.54L95.37 76.79L95.09 78.76L94.75 80.51L94.37 82.10L93.92 83.54L93.43 84.86L92.87 86.07L92.26 87.19L91.59 88.22L90.85 89.17L90.05 90.05L89.17 90.85L88.22 91.59L87.19 92.26L86.07 92.87L84.86 93.43L83.54 93.92L82.10 94.37L80.51 94.75L78.76 95.09L76.79 95.37L74.54 95.60L71.90 95.77L68.64 95.90L64.13 95.97L50.00 96.00L35.87 95.97L31.36 95.90L28.10 95.77L25.46 95.60L23.21 95.37L21.24 95.09L19.49 94.75L17.90 94.37L16.46 93.92L15.14 93.43L13.93 92.87L12.81 92.26L11.78 91.59L10.83 90.85L9.95 90.05L9.15 89.17L8.41 88.22L7.74 87.19L7.13 86.07L6.57 84.86L6.08 83.54L5.63 82.10L5.25 80.51L4.91 78.76L4.63 76.79L4.40 74.54L4.23 71.90L4.10 68.64L4.03 64.13L4.00 50.00L4.03 35.87L4.10 31.36L4.23 28.10L4.40 25.46L4.63 23.21L4.91 21.24L5.25 19.49L5.63 17.90L6.08 16.46L6.57 15.14L7.13 13.93L7.74 12.81L8.41 11.78L9.15 10.83L9.95 9.95L10.83 9.15L11.78 8.41L12.81 7.74L13.93 7.13L15.14 6.57L16.46 6.08L17.90 5.63L19.49 5.25L21.24 4.91L23.21 4.63L25.46 4.40L28.10 4.23L31.36 4.10L35.87 4.03L50.00 4.00L64.13 4.03L68.64 4.10L71.90 4.23L74.54 4.40L76.79 4.63L78.76 4.91L80.51 5.25L82.10 5.63L83.54 6.08L84.86 6.57L86.07 7.13L87.19 7.74L88.22 8.41L89.17 9.15L90.05 9.95L90.85 10.83L91.59 11.78L92.26 12.81L92.87 13.93L93.43 15.14L93.92 16.46L94.37 17.90L94.75 19.49L95.09 21.24L95.37 23.21L95.60 25.46L95.77 28.10L95.90 31.36L95.97 35.87Z" fill="url(#t)"/>
+<g transform="translate(50 51) scale(.8) translate(-50 -50)" fill="#182125">
+<path d="M22 8C24 34 12 48 14 64C16 84 32 94 50 94C68 94 84 84 86 64C88 48 76 34 78 8C77 34 70 48 70 60C70 74 62 80 50 80C38 80 30 74 30 60C30 48 23 34 22 8Z" transform="translate(50 52) scale(.86) translate(-50 -49.5)"/>
+<circle cx="50" cy="27" r="9.5" fill="none" stroke="#182125" stroke-width="2.4"/>
+<circle cx="50" cy="27" r="4.6"/>
+</g>
 </svg>

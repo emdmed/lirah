@@ -212,8 +212,13 @@ fn update_prompt_text(instructions: &str, map: &Value, new_files: &[String]) -> 
 /// so later updates don't ask about them again.
 fn merge_new_files(map: &mut Value, out: &str, new_files: &[String]) -> Result<(), String> {
     let answer = json_in(out)?;
-    if !answer["features"].is_null() {
-        check_features(&answer["features"])?;
+    match &answer["features"] {
+        // An empty list is the normal "no new features" answer the update prompt asks for.
+        Value::Null => {}
+        Value::Array(f) if f.is_empty() => {}
+        f => {
+            check_features(f)?;
+        }
     }
     let features = map["features"].as_array_mut().ok_or("features.json has no feature list")?;
     for f in answer["features"].as_array().into_iter().flatten() {
@@ -324,6 +329,9 @@ mod tests {
         assert_eq!(map["features"][0]["files"], json!(["src/a.js", "src/new.js", "src/b.js"]));
         assert_eq!(map["features"][1]["id"], "tasks");
         assert_eq!(map["ignored"], json!(["src/util.js", "src/y.js"]));
+
+        merge_new_files(&mut map, r#"{"files": {"src/c.js": ["plans"]}, "features": []}"#, &["src/c.js".into()]).unwrap();
+        assert_eq!(map["features"][0]["files"][3], "src/c.js");
     }
 
     #[test]

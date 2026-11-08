@@ -72,21 +72,12 @@ function buildElementsSections(selectedElements, currentPath) {
   return elementsOutput;
 }
 
-// Same caps as the hook's FEATURE lines (src-tauri/src/compaction/hook.js).
-const FEATURES_MAX = 3;
-const FEATURE_FILES_MAX = 40;
-
 // Pinned features' files are project-relative and already filtered to existing ones.
 function buildFeatureLines(pinnedFeatures) {
-  const lines = [];
-  let budget = FEATURE_FILES_MAX;
-  for (const f of (pinnedFeatures || []).slice(0, FEATURES_MAX)) {
-    if (budget <= 0) break;
-    const files = (f.files || []).slice(0, budget);
-    budget -= files.length;
-    if (files.length) lines.push(`FEATURE ${f.name}: ${files.join(', ')}`);
-  }
-  return lines;
+  // Pinned on purpose, so every path goes: they are paths, not contents.
+  return (pinnedFeatures || [])
+    .filter((f) => f.files?.length)
+    .map((f) => `FEATURE ${f.name}: ${f.files.join(', ')}`);
 }
 
 /**

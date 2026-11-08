@@ -5,7 +5,7 @@ vi.mock('../features/file-groups', () => ({ LARGE_FILE_INSTRUCTION: '' }));
 const { buildPrompt } = await import('./buildPrompt');
 
 describe('buildPrompt features section', () => {
-  it('sends pinned features as FEATURE lines, capped at 3 features and 40 files', () => {
+  it('sends every pinned feature and file as FEATURE lines', () => {
     const many = Array.from({ length: 45 }, (_, i) => `src/f${i}.js`);
     const { sections, text } = buildPrompt({
       textareaContent: '',
@@ -19,8 +19,9 @@ describe('buildPrompt features section', () => {
     const lines = sections.find((s) => s.id === 'features').body.split('\n');
     expect(lines[0]).toBe('FEATURES (from .orchestration/tools/features.json). Start from these files:');
     expect(lines[1]).toBe('FEATURE Alpha: src/a.js, src/b.js');
-    expect(lines[2].split(', ')).toHaveLength(38);
-    expect(lines).toHaveLength(3);
+    expect(lines[2].split(', ')).toHaveLength(45);
+    expect(lines[3]).toBe('FEATURE Extra: src/x.js');
+    expect(lines).toHaveLength(4);
     expect(text).toContain('FEATURE Alpha:');
   });
 

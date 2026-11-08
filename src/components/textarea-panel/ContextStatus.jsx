@@ -43,9 +43,6 @@ const GHOSTS = [
 ];
 // Dashed in every state, so a ghost never passes for a real chip; hover and
 // focus brighten it, and focus adds the ring real chips use.
-// The hook's caps on feature context (buildPrompt and matchFeatures use them too).
-const FEATURES_MAX = 3;
-const FEATURE_FILES_MAX = 40;
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 pl-1.5 pr-1 border border-dashed border-[var(--ins-faint)] font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground hover:border-[var(--ins-legend)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:text-foreground focus-visible:border-[var(--ins-legend)]";
 
@@ -149,10 +146,9 @@ export const ContextStatus = memo(function ContextStatus({
     title: f.files.join('\n'),
     onRemove: () => unpinFeature(tabId, f.id),
   })), [pinnedFeatures, tabId]);
-  // What goes, as the hook caps it: pinned and matched are capped apart.
-  const pinnedSent = pinnedFeatures.slice(0, FEATURES_MAX);
-  const featureCount = pinnedSent.length + matched.length;
-  const featureFiles = Math.min(FEATURE_FILES_MAX, pinnedSent.reduce((n, f) => n + f.files.length, 0))
+  // What goes: every pinned file, plus the hook's matches (matchFeatures caps those).
+  const featureCount = pinnedFeatures.length + matched.length;
+  const featureFiles = pinnedFeatures.reduce((n, f) => n + f.files.length, 0)
     + matched.reduce((n, m) => n + m.files.length, 0);
 
   // Alt+5 opens the picker in the tab on screen. Capture, so xterm can't take it.
