@@ -29,10 +29,11 @@ export function featureMapStatus({ map, commitsBehind, newFiles }, isBuilding, e
   return commitsBehind > 0 || newFiles > 0 ? 'stale' : 'fresh';
 }
 
-/** The project's feature map and its build state: { map, head, commitsBehind, newFiles, status, error, build(rebuild) }. */
+/** The project's feature map and its build state: { map, head, commitsBehind, newFiles, status, error, build(rebuild), reload() }. */
 export function useFeatureMap(projectPath) {
   const [data, setData] = useState({ map: null, head: null, commitsBehind: null, newFiles: null });
   const [loadError, setLoadError] = useState(null);
+  const [nonce, setNonce] = useState(0);
   const v = useSyncExternalStore(subscribe, () => version);
   const isBuilding = building.has(projectPath);
   const buildError = buildErrors.get(projectPath) ?? null;
@@ -45,9 +46,10 @@ export function useFeatureMap(projectPath) {
       .then((d) => { if (live) { setData(d); setLoadError(null); } })
       .catch((e) => { if (live) setLoadError(String(e)); });
     return () => { live = false; };
-  }, [projectPath, isBuilding, v]);
+  }, [projectPath, isBuilding, v, nonce]);
 
   const error = buildError ?? loadError;
   const build = useCallback((rebuild) => buildFeatureMap(projectPath, rebuild), [projectPath]);
-  return { ...data, status: featureMapStatus(data, isBuilding, error), error, build };
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  return { ...data, status: featureMapStatus(data, isBuilding, error), error, build, reload };
 }
