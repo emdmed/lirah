@@ -9,7 +9,7 @@ import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
 import { useToast } from '../toast/ToastContext';
 import { IS_WINDOWS } from '../../utils/pathUtils';
-import { buildFeatureMapPrompt, buildFeatureMapUpdatePrompt } from '../compact/featureMapPrompt';
+import { buildFeatureMap } from '../feature-map/useFeatureMap';
 import {
   addStartupProject, getStartup, removeStartupProject, setStartupMode,
 } from '../agent-control/actions';
@@ -104,11 +104,10 @@ export function useTabCommands({
       { id: 'features', hint: 'map this project\'s features to their files (agents get them when a prompt names one)', options: ['build', 'rebuild'], run: (arg) => {
         if (arg && arg !== 'build' && arg !== 'rebuild') throw new Error(`no features action "${arg}"`);
         if (!projectPath) throw new Error('no project in this tab');
-        toastInfo('Mapping features to files…');
-        const updatePrompt = arg === 'rebuild' ? null : buildFeatureMapUpdatePrompt();
-        invoke('build_feature_map', { projectDir: projectPath, prompt: buildFeatureMapPrompt(), updatePrompt })
+        buildFeatureMap(projectPath, arg === 'rebuild')
           .then((summary) => toastSuccess(`${summary} → .orchestration/tools/features.json`))
           .catch((e) => toastError(`Feature map failed: ${e}`));
+        toastInfo('Mapping features to files…');
       } },
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));
