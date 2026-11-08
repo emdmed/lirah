@@ -132,7 +132,7 @@ export function NewPlanDialog({ open, onOpenChange, onCreate, onSendPrompt, send
               aria-label="Load a plan from a file path"
               className="h-8 text-xs"
             />
-            <Button type="button" variant="ghost" size="sm" onClick={handleLoad} disabled={!path.trim()}>
+            <Button type="button" variant="outline" size="sm" onClick={handleLoad} disabled={!path.trim()}>
               Load
             </Button>
           </div>
@@ -142,13 +142,13 @@ export function NewPlanDialog({ open, onOpenChange, onCreate, onSendPrompt, send
           )}
 
           <DialogFooter>
-            <Button type="button" variant="ghost" size="sm" onClick={close}>
+            <Button type="button" variant="outline" size="sm" onClick={close}>
               Cancel
             </Button>
             {onSendPrompt && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={handleSendPrompt}
                 disabled={!canSend}

@@ -81,7 +81,7 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="ghost" size="sm" onClick={handleCancel}>
+            <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={!files?.length}>

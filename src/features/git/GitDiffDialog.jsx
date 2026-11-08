@@ -361,15 +361,12 @@ export function GitDiffDialog({
             </Button>
             <Button
               size="sm"
-              disabled={annotations.length === 0 || sendingAnnotations}
+              disabled={annotations.length === 0}
+              busy={sendingAnnotations}
               onClick={() => onSendAnnotations?.()}
               title="Re-run the agent in this worktree with every note attached"
             >
-              {sendingAnnotations ? (
-                <Scanner className="mr-1" />
-              ) : (
-                <Send className="w-3 h-3 mr-1" />
-              )}
+              {!sendingAnnotations && <Send className="w-3 h-3" />}
               Send {annotations.length || ''}
             </Button>
           </div>

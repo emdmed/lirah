@@ -536,10 +536,10 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
         </div>
 
         <DialogFooter className="shrink-0">
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="px-3 text-xs">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleRun} disabled={!canRun} className="px-3 text-xs">
+          <Button size="sm" onClick={handleRun} disabled={!canRun}>
             {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
           </Button>
         </DialogFooter>

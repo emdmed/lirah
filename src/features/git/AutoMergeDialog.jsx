@@ -237,17 +237,16 @@ export function AutoMergeDialog({ autoMerge }) {
 
         <DialogFooter className="shrink-0">
           {settled ? (
-            <Button variant="ghost" size="sm" onClick={cancel} className="px-3 text-xs">
+            <Button variant="outline" size="sm" onClick={cancel}>
               Close
             </Button>
           ) : (
             <>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={cancel}
                 disabled={stage === 'merging'}
-                className="px-3 text-xs"
               >
                 Cancel
               </Button>
@@ -255,7 +254,6 @@ export function AutoMergeDialog({ autoMerge }) {
                 size="sm"
                 onClick={confirm}
                 disabled={!canMerge}
-                className="px-3 text-xs"
               >
                 {stage === 'merging' ? 'Merging…' : 'Merge'}
               </Button>

@@ -68,7 +68,7 @@ function ConfirmDialog({ request, settle }) {
           )}
           {request.facts?.length > 0 && <ConfirmFacts facts={request.facts} />}
           <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => settle(false)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => settle(false)}>Cancel</Button>
             <Button
               variant={fault ? 'destructive-fill' : 'default'}
               size="sm"

@@ -167,7 +167,7 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleExport} disabled={exportFormat === 'csv' && rangeCount === 0}>

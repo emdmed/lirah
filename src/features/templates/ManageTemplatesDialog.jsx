@@ -187,7 +187,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
               )}
 
               <DialogFooter>
-                <Button type="button" variant="ghost" size="sm" onClick={handleCancel}>
+                <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
                   Cancel
                 </Button>
                 <Button type="submit" size="sm">
@@ -201,7 +201,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
         <DialogFooter className="flex-shrink-0">
           {!isAdding && !editingId && (
             <>
-              <Button variant="ghost" size="sm" onClick={handleClose}>
+              <Button variant="outline" size="sm" onClick={handleClose}>
                 Done
               </Button>
               <Button size="sm" onClick={handleStartAdd}>

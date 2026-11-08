@@ -113,10 +113,10 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={handleReset} className="sm:mr-auto">
+          <Button variant="outline" size="sm" onClick={handleReset} className="sm:mr-auto">
             Reset alerts
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleSave}>

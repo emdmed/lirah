@@ -96,7 +96,7 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="ghost" size="sm" onClick={handleCancel}>
+            <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
             <Button type="submit" size="sm">

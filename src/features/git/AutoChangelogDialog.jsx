@@ -89,7 +89,7 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleSave}>

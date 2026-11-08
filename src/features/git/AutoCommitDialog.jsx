@@ -275,17 +275,16 @@ export function AutoCommitDialog({ autoCommit }) {
 
         <DialogFooter className="shrink-0">
           {settled ? (
-            <Button variant="ghost" size="sm" onClick={cancel} className="px-3 text-xs">
+            <Button variant="outline" size="sm" onClick={cancel}>
               Close
             </Button>
           ) : (
             <>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={cancel}
                 disabled={stage === 'committing'}
-                className="px-3 text-xs"
               >
                 Cancel
               </Button>
@@ -293,7 +292,6 @@ export function AutoCommitDialog({ autoCommit }) {
                 size="sm"
                 onClick={() => (canCommit ? confirm(commitMessage) : quickCommit())}
                 disabled={!canCommit && !canQueue}
-                className="px-3 text-xs"
               >
                 {stage === 'committing' ? 'Committing…'
                   : queued ? 'Commits when ready'
