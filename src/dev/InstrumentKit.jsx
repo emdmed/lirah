@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Keycap, KeyChord } from '../components/instrument/Keycap';
 import { Lamp, JOB_LAMP } from '../components/instrument/Lamp';
@@ -43,6 +43,10 @@ const KIT_TABS = [
 // Kit-only file tree rows (depth, name, agent mark) and plan chunks (body, title).
 const KIT_TREE = [[0, 'src/', null], [1, 'limiter.ts', 'edit-live'], [1, 'schema.ts', 'edit'], [1, 'login.ts', 'read-live'], [1, 'routes.ts', 'read'], [0, 'README.md', null]];
 const KIT_CHUNKS = [['done', 'Bundle fonts'], ['done', 'Reticle Lamp'], ['live', 'Orbit Scanner'], ['next', 'Pane legends'], ['queued', 'Status rail', true]];
+
+// Buttons sheet: every role (inline = .tui-btn, no variant) by every state.
+const BUTTON_ROLES = [['primary', 'default'], ['outline', 'outline'], ['ghost', 'ghost'], ['destructive', 'destructive'], ['destructive-fill', 'destructive-fill'], ['inline', null], ['link', 'link']];
+const BUTTON_STATES = [['rest', {}], ['pressed', { 'aria-pressed': true }], ['focus', { 'data-focus': '' }], ['disabled', { disabled: true }], ['busy', { busy: true }], ['lit', { 'data-lit': '' }]];
 
 // Component sheet for the orrery-plate primitives. Mounted
 // instead of the app when the URL carries `?kit` (dev only, see main.jsx).
@@ -91,6 +95,43 @@ export function InstrumentKit() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        <section className="tui-pane col-span-2 px-3" data-legend>
+          <PaneLegend index={16} title="Buttons" note="role × state" />
+          <div className="grid w-fit grid-cols-[repeat(7,max-content)] items-center gap-x-4 gap-y-2 py-2">
+            <span />
+            {BUTTON_STATES.map(([state]) => <span key={state} className="ins-legend">{state}</span>)}
+            {BUTTON_ROLES.map(([role, variant]) => (
+              <Fragment key={role}>
+                <span className="ins-legend">{role}</span>
+                {BUTTON_STATES.map(([state, props]) => (
+                  <span key={state}>
+                    {variant
+                      ? <Button variant={variant} size="sm" {...props}>{role === 'destructive-fill' ? 'delete' : 'commit'}</Button>
+                      : <button type="button" className="tui-btn" {...(props.busy ? { disabled: true, 'aria-busy': true } : props)}>commit</button>}
+                  </span>
+                ))}
+              </Fragment>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--ins-edge)] py-2">
+            <span className="ins-legend w-12">sizes</span>
+            {['panel', 'xs', 'sm', 'default', 'lg'].map((size) => <Button key={size} variant="outline" size={size}>{size}</Button>)}
+            {['icon-panel', 'icon-xs', 'icon-sm', 'icon', 'icon-lg'].map((size) => (
+              <Button key={size} variant="ghost" size={size} aria-label={size}><Refresh /></Button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--ins-edge)] py-2">
+            <span className="ins-legend w-12">panel</span>
+            <PanelButton icon={JournalPage} latched={latch} onClick={() => setLatch((v) => !v)}>md</PanelButton>
+            <PanelButton icon={Refresh} aria-label="Sync" />
+            <PanelButton variant="default" icon={Send}>send</PanelButton>
+            <PanelButton busy>sync</PanelButton>
+            <PanelButton disabled>off</PanelButton>
+            <SegmentBank label="Range" value={range} onChange={setRange} options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]} />
+            <SplitKey onClick={() => {}} onChoose={() => {}} chooseLabel="Choose agent">▶ Launch Claude Code</SplitKey>
+          </div>
+        </section>
+
         <section className="tui-pane px-3" data-legend>
           <PaneLegend index={1} title="Keycaps" />
           <div className="flex flex-wrap items-center gap-2 py-2">
@@ -145,30 +186,6 @@ export function InstrumentKit() {
               <span className="ins-legend">Net</span>
               <ToggleSwitch checked={net} onChange={setNet} label="Network" tone="warn" disabled={!sandbox} />
             </span>
-            <PanelButton icon={JournalPage} latched={latch} onClick={() => setLatch((v) => !v)}>md</PanelButton>
-            <PanelButton icon={Refresh} aria-label="Sync" />
-            <PanelButton disabled>off</PanelButton>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 pb-2">
-            <Button size="xs" className="gap-1 px-1.5"><Send className="h-3 w-3" />send</Button>
-            <Button variant="ghost" size="xs">ghost</Button>
-            <Button variant="outline" size="sm">outline</Button>
-            <Button variant="destructive" size="xs">delete</Button>
-            <Button variant="ghost" size="xs" aria-pressed="true">pressed</Button>
-            <Button variant="link" size="xs">link</Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 pb-2">
-            {['xs', 'sm', 'default', 'lg'].map((size) => (
-              <Button key={size} size={size}>{size}</Button>
-            ))}
-            {['xs', 'sm', 'default', 'lg'].map((size) => (
-              <Button key={size} variant="ghost" size={size}>{size}</Button>
-            ))}
-            {['icon-xs', 'icon-sm', 'icon', 'icon-lg'].map((size) => (
-              <Button key={size} variant="ghost" size={size} aria-label={size}><Refresh /></Button>
-            ))}
-            <Button disabled>disabled</Button>
-            <Button variant="ghost" disabled>disabled</Button>
           </div>
         </section>
 
@@ -193,11 +210,9 @@ export function InstrumentKit() {
           <PaneLegend index={8} title="Controls" />
           <div className="flex flex-col gap-3 py-2">
             <div className="flex flex-wrap items-center gap-4">
-              <SplitKey onClick={() => {}} onChoose={() => {}} chooseLabel="Choose agent">▶ Launch Claude Code</SplitKey>
               <HoldButton onConfirm={() => {}} onFallback={() => {}}>hold to delete</HoldButton>
               <span className="flex items-center gap-1.5"><Checkbox checked={check} onCheckedChange={setCheck} id="kit-check" /><label htmlFor="kit-check">keep</label></span>
             </div>
-            <SegmentBank label="Range" value={range} onChange={setRange} options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]} />
             <Detent label="Detail level" value={detail} onChange={setDetail} options={[{ value: 'symbols', label: 'symbols' }, { value: 'signatures', label: 'signatures' }, { value: 'skeleton', label: 'skeleton' }]} className="max-w-[240px]" />
             <StepSlider label="Scrollback" value={scroll} onChange={setScroll} warnFrom={2} steps={[{ value: 1000, label: '1,000 lines', short: '1k' }, { value: 10000, label: '10,000 lines', short: '10k' }, { value: 50000, label: '50,000 lines', short: '50k' }, { value: 200000, label: '200,000 lines', short: '200k' }]} />
           </div>

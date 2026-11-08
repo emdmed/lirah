@@ -552,7 +552,8 @@ body {
     cursor: default;
   }
 
-  .tui-btn:focus-visible {
+  .tui-btn:focus-visible,
+  .tui-btn[data-focus] {
     outline: 1px solid var(--ins-legend);
     outline-offset: 4px;
     border-radius: 2px;
@@ -1269,7 +1270,9 @@ body {
     color: var(--ins-panel, var(--color-background));
   }
 
-  .ins-key:focus-visible {
+  /* [data-focus] shows the ring on the kit sheet (/?kit) without tabbing. */
+  .ins-key:focus-visible,
+  .ins-key[data-focus] {
     outline: 1px solid var(--ins-legend);
     outline-offset: 2px;
   }
