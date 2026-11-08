@@ -65,6 +65,31 @@ fn build(dir: &str, prompt: &str, update_prompt: Option<&str>) -> Result<String,
     Ok(summary)
 }
 
+/// The saved map (null when there is none) and how far it lags HEAD:
+/// `{ map, head, commitsBehind, newFiles }`. The two counts are null when the
+/// map's `gitSha` is missing or unreachable.
+#[tauri::command]
+pub async fn read_feature_map(project_dir: String) -> Result<Value, String> {
+    crate::ipc::blocking("read_feature_map", move || Ok(read_with_freshness(&project_dir))).await
+}
+
+fn read_with_freshness(dir: &str) -> Value {
+    let map = read_map(&map_path(dir));
+    let sha = map.as_ref().and_then(|m| m["gitSha"].as_str()).map(String::from);
+    let behind = sha.as_ref().and_then(|s| git(dir, &["rev-list", "--count", &format!("{}..HEAD", s)]));
+    let new_files = map.clone().zip(sha).and_then(|(mut m, s)| {
+        let mut c = changes_since(dir, &s)?;
+        c.added.retain(|p| !p.starts_with(".orchestration/")); // in case the hook never excluded it
+        Some(apply_changes(&mut m, &c).len())
+    });
+    serde_json::json!({
+        "map": map,
+        "head": git(dir, &["rev-parse", "--short", "HEAD"]),
+        "commitsBehind": behind.and_then(|n| n.parse::<u64>().ok()),
+        "newFiles": new_files,
+    })
+}
+
 fn map_path(dir: &str) -> PathBuf {
     Path::new(dir).join(".orchestration").join("tools").join("features.json")
 }
@@ -79,9 +104,7 @@ fn read_map(path: &Path) -> Option<Value> {
 /// files the model must place, and a summary; None means do a full build instead.
 fn plan_update(dir: &str, mut map: Value) -> Option<(Value, Vec<String>, String)> {
     let sha = map["gitSha"].as_str()?.to_string();
-    let mut changes = parse_name_status(&git(dir, &["diff", "--name-status", "-M", &sha, "--"])?);
-    let untracked = git(dir, &["ls-files", "--others", "--exclude-standard"])?;
-    changes.added.extend(untracked.lines().filter(|l| !l.is_empty()).map(String::from));
+    let changes = changes_since(dir, &sha)?;
     let new_files = apply_changes(&mut map, &changes);
     if new_files.len() > UPDATE_MAX_NEW_FILES {
         return None;
@@ -93,6 +116,14 @@ fn plan_update(dir: &str, mut map: Value) -> Option<(Value, Vec<String>, String)
         changes.deleted.len()
     );
     Some((map, new_files, summary))
+}
+
+/// Git's changes since `sha`, untracked files counted as added.
+fn changes_since(dir: &str, sha: &str) -> Option<Changes> {
+    let mut changes = parse_name_status(&git(dir, &["diff", "--name-status", "-M", sha, "--"])?);
+    let untracked = git(dir, &["ls-files", "--others", "--exclude-standard"])?;
+    changes.added.extend(untracked.lines().filter(|l| !l.is_empty()).map(String::from));
+    Some(changes)
 }
 
 #[derive(Default)]
@@ -316,6 +347,45 @@ mod tests {
         let saved = read_map(&map_path(d)).unwrap();
         assert_eq!(saved["features"][0]["files"], json!(["src/a.js", "src/new.js"]));
         assert_eq!(saved["version"], 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_reports_how_far_the_map_lags_head() {
+        let dir = std::env::temp_dir().join(format!("lirah-feature-map-read-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let d = dir.to_str().unwrap();
+        let sh = |args: &[&str]| assert!(git(d, args).is_some(), "git {:?}", args);
+        let commit = |f: &str| {
+            std::fs::write(dir.join(f), f).unwrap();
+            sh(&["add", "."]);
+            sh(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", f]);
+        };
+        sh(&["init", "-q"]);
+        commit("a.js");
+
+        // No file.
+        let r = read_with_freshness(d);
+        assert!(r["map"].is_null() && r["commitsBehind"].is_null() && r["newFiles"].is_null(), "{}", r);
+        assert!(r["head"].is_string());
+
+        // Fresh.
+        let sha = git(d, &["rev-parse", "--short", "HEAD"]).unwrap();
+        let map = json!({ "gitSha": sha, "features": [{ "id": "x", "name": "X", "files": ["a.js"] }], "ignored": ["c.js"] });
+        std::fs::create_dir_all(map_path(d).parent().unwrap()).unwrap();
+        std::fs::write(map_path(d), map.to_string()).unwrap();
+        let r = read_with_freshness(d);
+        assert_eq!((r["commitsBehind"].clone(), r["newFiles"].clone()), (json!(0), json!(0)), "{}", r);
+        assert_eq!(r["map"]["features"][0]["id"], "x");
+        assert_eq!(r["head"], sha);
+
+        // Two commits behind: one new file, one already ignored.
+        commit("b.js");
+        commit("c.js");
+        let r = read_with_freshness(d);
+        assert_eq!((r["commitsBehind"].clone(), r["newFiles"].clone()), (json!(2), json!(1)), "{}", r);
+        assert_ne!(r["head"], sha);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
