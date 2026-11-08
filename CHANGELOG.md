@@ -4,6 +4,18 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-09
+
+### Changed
+
+- **One button set** - Every button now uses one of a few familiar roles: filled for the main action, outline for the action beside it (Cancel in dialogs), ghost for tools in bars, rows and pane headers, red for destructive actions, and bracketed text for inline actions. Secondary buttons have a visible frame instead of an italic word, and button labels are mono.
+- **Focus is an ink ring** - Keyboard focus on buttons and links is an ink ring set 2px off, no longer gold. Gold is kept for live work and things waiting on you.
+- **Segmented controls and the launch bar** - Segmented controls sit in one frame with the chosen option tinted. The launch bar's split key is a filled primary.
+- **Busy buttons** - A button that is running shows the orbit scanner and stays readable instead of greying out.
+- **App icon** - The Lirah icon is a deep slate lyre on a pale-gold tile.
+- **Pinned features send every file** - Features pinned to a prompt now send all their files, without the 3-feature / 40-file cap. The feature explorer gets an orbit layout, a restyled details sheet and hover actions on its rows.
+- **Context chips** - Chips are split into hairline click areas and spaced further apart.
+
 ## [0.19.0] - 2026-11-08
 
 ### Added
