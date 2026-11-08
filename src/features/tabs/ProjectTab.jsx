@@ -1145,6 +1145,9 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               attachedSummary={attachedSummary}
               onInsert={insertContext}
               onOpenBox={openPromptBox}
+              tabId={tabId}
+              sessionId={terminalSessionId}
+              featureProject={projectPath}
             />
           )
         }

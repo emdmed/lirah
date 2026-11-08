@@ -36,7 +36,7 @@ const REMOVE = "flex items-center justify-center shrink-0 text-muted-foreground 
  * EDIT/READ/COPY state, click to cycle; led by a reticle, then the detail
  * level and tokens when `fileSymbols` (useFileSymbols) knows them) and
  * picked code elements. `extras`
- * adds other things the prompt carries ({ key, tag, name, title, onRemove }:
+ * adds other things the prompt carries ({ key, tag, name, detail, title, onRemove }:
  * linked repos, the instruction template), so the list can be the
  * whole manifest.
  */
@@ -124,10 +124,11 @@ export function ContextChips({
           </li>
         );
       })}
-      {extras.map(({ key, tag, name, title, onRemove }) => (
+      {extras.map(({ key, tag, name, detail, title, onRemove }) => (
         <li key={key} className={cn(CHIP, sz.chip)} title={title || name}>
           <span className="pl-1 text-muted-foreground">{tag}</span>
           <span className="px-1 truncate text-foreground">{name}</span>
+          {detail && <span className="pr-1 shrink-0 whitespace-nowrap text-[var(--ins-faint)]">{detail}</span>}
           {onRemove && (
             <button type="button" onClick={onRemove} aria-label={`Remove ${name} from context`} className={cn(REMOVE, sz.remove)}>
               ×
