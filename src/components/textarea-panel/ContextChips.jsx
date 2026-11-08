@@ -10,17 +10,17 @@ const CHIP = "inline-flex items-center shrink-0 max-w-full edge-engraved font-mo
 // sm: the prompt box. md: the context pane, where the tag (click to cycle)
 // and the × sit side by side and need 20px to be hit apart.
 const SIZES = {
-  sm: { chip: "h-4 text-[11px]", tag: "h-4 px-1", remove: "h-4 w-4", list: "max-h-[76px]" },
-  md: { chip: "h-5 text-[11px]", tag: "h-5 px-1.5", remove: "h-5 w-5 text-[13px]", list: "max-h-[68px]" },
+  sm: { chip: "h-4 text-[11px]", tag: "h-4 px-1", remove: "h-4 w-4", list: "gap-1 max-h-[76px]" },
+  md: { chip: "h-5 text-[11px]", tag: "h-5 px-1.5", remove: "h-5 w-5 text-[13px]", list: "gap-1.5 max-h-[68px]" },
 };
 // EDIT is the default intent: printed in ink, so colour marks only the
 // files that differ from it.
 const DEFAULT_STATE = 'modify';
 const DEFAULT_TAG = 'text-foreground';
 // EDIT chips carry the ink frame: the chip-sized form of the files pane's
-// inverse video (DESIGN rule 9). An inline shadow, since .edge-engraved draws
-// its hairline the same way and would win over a utility.
-const INK_FRAME = { boxShadow: "inset 0 0 0 1px var(--color-foreground)" };
+// inverse video (DESIGN rule 9). An outline, since it paints above the
+// segment hairlines (an inset shadow sits under them and showed gaps).
+const INK_FRAME = { outline: "1px solid var(--color-foreground)", outlineOffset: "-1px" };
 // Under 300 lines the whole file is sent (see buildPrompt).
 const LEVEL_SHORT = { symbols: "sym", signatures: "sig", skeleton: "skel" };
 function fileLevel(fileSymbols, abs) {
@@ -29,7 +29,12 @@ function fileLevel(fileSymbols, abs) {
   const mode = fileSymbols.getLineCount(abs) >= 300 ? fileSymbols.getFileViewMode(abs) : "whole";
   return tokens[mode] == null ? null : `${LEVEL_SHORT[mode] || "full"} ${fmtTokens(tokens[mode])}`;
 }
-const REMOVE = "flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+// A hairline before each control splits a chip into its hit zones: name, intent, ×.
+const SEGMENT = "shadow-[inset_1px_0_0_var(--tui-line)] hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+const REMOVE = cn(SEGMENT, "flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground");
+// The lamp's crosshair overhangs its ring by 4px; the margins keep it off the frame and the name.
+const LAMP = "ml-2 mr-1 shrink-0";
+const NAME = "px-1.5 truncate max-w-[32ch] text-foreground";
 
 /**
  * The prompt's attached context as removable chips: files (with their
@@ -82,26 +87,26 @@ export function ContextChips({
   }
 
   return (
-    <ul className={cn("flex flex-wrap gap-1 overflow-y-auto", sz.list)} aria-label="Context attached to the prompt">
+    <ul className={cn("flex flex-wrap overflow-y-auto", sz.list)} aria-label="Context attached to the prompt">
       {files.map(({ abs, name, rel, state }) => {
         const next = FILE_STATE_ORDER[(FILE_STATE_ORDER.indexOf(state) + 1) % FILE_STATE_ORDER.length];
         const on = state === DEFAULT_STATE;
         const level = fileLevel(fileSymbols, abs);
         return (
           <li key={abs} className={cn(CHIP, sz.chip)} style={on ? INK_FRAME : undefined} title={rel}>
-            <Lamp state="on" className={cn("ml-1 shrink-0", !on && "ins-lamp-muted")} />
-            <span className="px-1 truncate text-foreground">{name}</span>
+            <Lamp state="on" className={cn(LAMP, !on && "ins-lamp-muted")} />
+            <span className={NAME}>{name}</span>
             <button
               type="button"
               onClick={() => onSetFileState?.(abs, next)}
               disabled={!onSetFileState}
               aria-label={`${name}: ${FILE_STATE_LABELS[state]}. Change to ${FILE_STATE_LABELS[next]}`}
               title={onSetFileState ? `${FILE_STATE_LABELS[state]} · click to cycle ${FILE_STATE_ORDER.map((s) => FILE_STATE_LABELS[s]).join(' → ')}` : undefined}
-              className={cn(sz.tag, "shrink-0 lowercase focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", on ? DEFAULT_TAG : "text-muted-foreground")}
+              className={cn(sz.tag, SEGMENT, "shrink-0 lowercase hover:text-foreground disabled:hover:bg-transparent", on ? DEFAULT_TAG : "text-muted-foreground")}
             >
               {FILE_STATE_LABELS[state]}
             </button>
-            {level && <span className="pr-1 shrink-0 whitespace-nowrap text-[var(--ins-faint)]">{level}</span>}
+            {level && <span className="pr-1.5 shrink-0 whitespace-nowrap tabular-nums text-[var(--ins-faint)]">{level}</span>}
             {onRemoveFile && (
               <button type="button" onClick={() => onRemoveFile(abs)} aria-label={`Remove ${name} from context`} className={cn(REMOVE, sz.remove)}>
                 ×
@@ -114,8 +119,8 @@ export function ContextChips({
         const lines = el.line === el.endLine ? `${el.line}` : `${el.line}-${el.endLine}`;
         return (
           <li key={`${filePath}:${el.key}`} className={cn(CHIP, sz.chip)} title={`${rel}:${lines} (${el.type})`}>
-            <span className="pl-1 text-muted-foreground">{el.type}</span>
-            <span className="px-1 truncate text-foreground">{el.displayName}</span>
+            <span className="pl-1.5 text-muted-foreground">{el.type}</span>
+            <span className={NAME}>{el.displayName}</span>
             {onRemoveElement && (
               <button type="button" onClick={() => onRemoveElement(filePath, el.key)} aria-label={`Remove ${el.displayName} from context`} className={cn(REMOVE, sz.remove)}>
                 ×
@@ -126,9 +131,9 @@ export function ContextChips({
       })}
       {extras.map(({ key, tag, name, detail, title, onRemove }) => (
         <li key={key} className={cn(CHIP, sz.chip)} title={title || name}>
-          <span className="pl-1 text-muted-foreground">{tag}</span>
-          <span className="px-1 truncate text-foreground">{name}</span>
-          {detail && <span className="pr-1 shrink-0 whitespace-nowrap text-[var(--ins-faint)]">{detail}</span>}
+          <span className="pl-1.5 text-muted-foreground">{tag}</span>
+          <span className={NAME}>{name}</span>
+          {detail && <span className="pr-1.5 shrink-0 whitespace-nowrap tabular-nums text-[var(--ins-faint)]">{detail}</span>}
           {onRemove && (
             <button type="button" onClick={onRemove} aria-label={`Remove ${name} from context`} className={cn(REMOVE, sz.remove)}>
               ×

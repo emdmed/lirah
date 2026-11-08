@@ -2152,6 +2152,8 @@ body {
 
   /* The title holds; a crowded right end shrinks (its min-w-0 children truncate). */
   .ins-pane-legend > :first-child { flex-shrink: 0; }
+  /* The lamp's crosshair overhangs its ring by 4px; the gap alone (6px) let it touch the italic title. */
+  .ins-pane-legend .ins-lamp { margin-inline: 3px; }
   .ins-pane-legend > :last-child { min-width: 0; }
 
   /* Name: italic Spectral, sized to sit in the 14px legend row. */
