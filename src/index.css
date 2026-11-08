@@ -317,8 +317,8 @@ body {
 }
 
 /* No rounded corners anywhere except true dots and the opted-in keycaps
-   (.ins-round). */
-*:not(.rounded-full):not(.ins-round) {
+   (.ins-round), and .tui-btn for its focus ring. */
+*:not(.rounded-full):not(.ins-round):not(.tui-btn) {
   border-radius: 0 !important;
 }
 
@@ -481,9 +481,10 @@ body {
 }
 
 /*
-  Text-only buttons render as [label], the TUI button idiom; icon buttons are a
-  bare icon. Kept in the components layer so a utility such as
-  `before:content-none` can opt a button out (status line segments do).
+  .tui-btn is the inline button: text-only ones render as [label], the TUI
+  idiom; icon ones are a bare icon. Only .tui-btn draws brackets. Kept in the
+  components layer so utilities on older markup (`text-[11px]`, `hover:…`,
+  `before:content-none`) still win.
 */
 @layer components {
   /* Empty-orbit plate (EmptyPlate in EmptyState.jsx). */
@@ -538,6 +539,32 @@ body {
 
   .tui-dialog-empty {
     padding: 4px 0;
+  }
+
+  .tui-btn {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    font-size: var(--font-xs);
+    color: var(--color-muted-foreground);
+    cursor: pointer;
+    transition: color 200ms var(--ins-ease);
+  }
+
+  .tui-btn:hover,
+  .tui-btn[aria-pressed="true"] {
+    color: var(--color-foreground);
+  }
+
+  .tui-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .tui-btn:focus-visible {
+    outline: 1px solid var(--ins-legend);
+    outline-offset: 4px;
+    border-radius: 2px;
   }
 
   .tui-btn:not(:has(svg))::before {
@@ -2129,49 +2156,39 @@ body {
     color: var(--ins-warn);
   }
 
-  /* Segment bank (SegmentBank.jsx): printed keys side by side with no box.
-     The chosen one takes the latch tint and an ink underline. */
+  /* Segment bank (SegmentBank.jsx): keys in one frame, hairlines between.
+     The chosen one takes a tint and prints ink. */
   .ins-seg {
     display: inline-flex;
-    align-items: center;
-    gap: 2px;
+    align-items: stretch;
+    width: fit-content;
+    border: 1px solid var(--ins-edge-strong);
+    border-radius: 2px;
+  }
+
+  .ins-seg > .ins-key {
+    border: 0;
+  }
+
+  .ins-seg > .ins-key + .ins-key {
+    border-left: 1px solid var(--ins-edge-strong);
   }
 
   .ins-seg > .ins-key[aria-checked="true"],
   .ins-seg-key[aria-selected="true"] {
     color: var(--color-foreground);
-    background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
-    box-shadow: inset 0 -1px 0 var(--ins-legend);
+    background: color-mix(in srgb, var(--color-foreground) 12%, transparent);
   }
 
-  /* Split key (SplitKey.jsx): a primary action and its chooser under one
-     lamp hairline. */
+  /* Split key (SplitKey.jsx): two primary keys, a panel-colour hairline
+     between them. */
   .ins-split {
     display: inline-flex;
     align-items: stretch;
-    border: 1px solid color-mix(in srgb, var(--ins-lamp) 70%, var(--ins-edge-strong));
-    border-radius: 2px;
-    transition: border-color 200ms var(--ins-ease);
-  }
-
-  .ins-split:hover,
-  .ins-split:focus-within {
-    border-color: var(--ins-lamp);
-  }
-
-  .ins-split > .ins-key {
-    border: 0;
-    border-radius: 0;
-    color: var(--ins-lamp);
-  }
-
-  .ins-split > .ins-key:hover {
-    background: color-mix(in srgb, var(--ins-lamp) 8%, transparent);
-    color: var(--ins-lamp);
   }
 
   .ins-split > .ins-key + .ins-key {
-    border-left: 1px solid color-mix(in srgb, var(--ins-lamp) 35%, transparent);
+    border-left-color: color-mix(in srgb, var(--ins-panel, var(--color-background)) 40%, transparent);
   }
 
   /* Pane legend: keycap + legend on the top border line, status + lamp on
