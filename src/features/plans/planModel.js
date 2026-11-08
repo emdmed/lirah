@@ -79,7 +79,7 @@ const HALT_WORD = {
   [HALT_REASON.BLOCKED]: 'blocked',
 };
 export function haltWord(ap) {
-  if (ap?.status === AUTOPILOT_STATUS.PAUSED) return ap.reason === HALT_REASON.BLOCKED ? 'blocked' : 'needs you';
+  if (ap?.status === AUTOPILOT_STATUS.PAUSED) return ap.reason === HALT_REASON.BLOCKED ? 'waiting' : 'needs you';
   return HALT_WORD[ap?.reason] ?? 'error';
 }
 

@@ -8,7 +8,7 @@ import { Scanner } from './instrument/Scanner';
 
 // A faint count after a filter key's label; nothing until the tree reports.
 const KeyCount = ({ value }) =>
-  value == null ? null : <span className="text-faint tabular-nums">{value}</span>;
+  value == null ? null : <span className="text-muted-foreground tabular-nums">{value}</span>;
 
 // Sync button face while the tree reloads.
 const SyncBusy = () => <Scanner />;

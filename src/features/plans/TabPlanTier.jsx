@@ -91,6 +91,9 @@ export function TabPlanTier({ plan, onOpen }) {
         />
       )}
       {now && <span className="line-clamp-2 min-w-0 break-words text-muted-foreground">{now}</span>}
+      {(ap?.status === AUTOPILOT_STATUS.PAUSED || ap?.status === AUTOPILOT_STATUS.FAILED) && (
+        <span className="self-end text-muted-foreground group-hover/well:text-[var(--ins-lamp)]">open plan to resume ›</span>
+      )}
     </RowAction>
   );
 }

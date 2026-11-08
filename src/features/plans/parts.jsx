@@ -216,8 +216,8 @@ export const AUTOPILOT_LAMP = {
   [AUTOPILOT_STATUS.OFF]: { state: 'off' },
 };
 
-/** A run's lamp. Blocked is a fault everywhere; only a pause that waits on you is gold. */
+/** A run's lamp. Blocked is a warning (the run didn't break, the agent waits on something); only a pause that waits on you is gold. */
 export function autopilotLamp(ap) {
-  if (ap?.status === AUTOPILOT_STATUS.PAUSED && ap.reason === HALT_REASON.BLOCKED) return { state: 'fault' };
+  if (ap?.status === AUTOPILOT_STATUS.PAUSED && ap.reason === HALT_REASON.BLOCKED) return { state: 'warn' };
   return AUTOPILOT_LAMP[ap?.status] || AUTOPILOT_LAMP[AUTOPILOT_STATUS.PAUSED];
 }

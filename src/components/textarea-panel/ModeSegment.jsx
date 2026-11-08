@@ -77,8 +77,8 @@ const INPUT_MODES = [
 /**
  * Where prompts are typed: in the terminal (the context pane shows what goes
  * with them) or in Lirah's prompt box. A framed pair of keys in the pane's
- * legend, the same in both views; the current one is held down (tint + lamp
- * ink). A radiogroup: arrows switch.
+ * legend, the same in both views; the current one is held down (tint + full
+ * ink; a preference, not live state, so no gold). A radiogroup: arrows switch.
  */
 export function InputModeSwitch({ mode, onChange }) {
   const pick = (value) => { if (value !== mode) onChange(value); };
@@ -104,7 +104,7 @@ export function InputModeSwitch({ mode, onChange }) {
               type="button"
               role="radio"
               aria-checked={on}
-              data-lit={on || undefined}
+              data-latched={on || undefined}
               tabIndex={on ? 0 : -1}
               title={title}
               onClick={() => pick(value)}

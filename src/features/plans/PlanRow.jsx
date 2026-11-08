@@ -14,7 +14,7 @@ export function planStatus(plan) {
   const ap = plan.autopilot;
   const tag = ap?.status === AUTOPILOT_STATUS.RUNNING ? 'auto-pilot' : AUTOPILOT_LIVE.has(ap?.status) ? haltWord(ap) : undefined;
   const lampState = plan.split === SPLIT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.FAILED ? 'fault'
-    : ap?.status === AUTOPILOT_STATUS.PAUSED ? (ap.reason === HALT_REASON.BLOCKED ? 'fault' : 'wait')
+    : ap?.status === AUTOPILOT_STATUS.PAUSED ? (ap.reason === HALT_REASON.BLOCKED ? 'warn' : 'wait')
       : running ? 'on' : total > 0 && done === total ? 'ok' : 'off';
   return { done, total, running, tag, lampState };
 }

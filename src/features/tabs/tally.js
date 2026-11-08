@@ -1,5 +1,5 @@
 // The pane's closing line: every tab in exactly one bucket, first match wins.
-// A resting tab whose auto-pilot run failed or is blocked counts as stopped.
+// A resting tab whose auto-pilot run failed counts as stopped; a blocked one needs you.
 const BUCKETS = [
   { label: 'run stopped', className: 'text-[var(--ins-fault)]', has: (k) => k === 'failed' },
   { label: 'needs you', className: 'text-[var(--ins-warn)]', has: (k) => k === 'permission' },
