@@ -166,6 +166,9 @@
   /* Outlines of controls that sit on a well (switch track, checkbox): strong
      enough to read as a control, >= 3:1 against the well. */
   --ins-edge-ctl:    color-mix(in srgb, var(--color-foreground) 42%, var(--color-background));
+  /* The outline button's frame, the only thing that marks it as a button:
+     >= 3:1 against the panel (WCAG 1.4.11). */
+  --ins-edge-key:    color-mix(in srgb, var(--color-foreground) 50%, var(--color-background));
   --ins-ok:          var(--color-ok, #98BB6C);
   --ins-warn:        var(--color-warn, #E6C384);
   --ins-fault:       var(--color-fault, #E82424);
@@ -230,6 +233,7 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
 :root[data-theme="light"] {
   --ins-gutter: color-mix(in srgb, var(--color-background) 92%, var(--color-foreground));
   --ins-legend: color-mix(in srgb, var(--color-foreground) 92%, var(--color-background));
+  --ins-edge-key: color-mix(in srgb, var(--color-foreground) 63%, var(--color-background));
   --ins-well:   color-mix(in srgb, var(--color-background) 95%, var(--color-foreground));
   --ins-glow:   4px;
 }
@@ -1188,14 +1192,13 @@ body {
     background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
   }
 
-  .ins-key:is([data-latched], [data-lit], [aria-pressed="true"], [data-state="on"]) {
-    color: var(--ins-lamp);
+  /* On / pressed prints ink; gold is only for live work or waiting. */
+  .ins-key:is([data-latched], [aria-pressed="true"], [data-state="on"]) {
+    color: var(--color-foreground);
   }
 
-  /* A latching panel key carries its own lamp, which says "on"; printing the
-     legend in the lamp colour too would say it twice. */
-  .ins-key[data-latched] {
-    color: var(--color-foreground);
+  .ins-key[data-lit] {
+    color: var(--ins-lamp);
   }
 
   /* Primary: a solid ink key, legend knocked out in the panel colour. */
@@ -1223,23 +1226,68 @@ body {
   /* Spectral sets small next to the mono; the panel verbs take a step up. */
   .ins-key-panel.ins-key-verb { font-size: 13px; }
 
+  /* Outline: the action beside the primary. */
+  .ins-key-outline {
+    border-color: var(--ins-edge-key);
+  }
+
+  .ins-key-outline:hover {
+    border-color: var(--ins-legend);
+    background: color-mix(in srgb, var(--color-foreground) 4%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .ins-key-outline:is(:active, [aria-pressed="true"], [data-state="on"], [aria-checked="true"]) {
+    border-color: var(--color-foreground);
+    background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
+    color: var(--color-foreground);
+  }
+
+  /* Ghost: tools in bars and rows; the base key's rest and hover. */
+  .ins-key-ghost:is(:active, [aria-pressed="true"], [data-state="on"], [aria-checked="true"]) {
+    background: color-mix(in srgb, var(--color-foreground) 9%, transparent);
+    color: var(--color-foreground);
+  }
+
+  /* Danger: a fault outline. */
   .ins-key-danger {
+    border-color: color-mix(in srgb, var(--ins-fault) 55%, transparent);
     color: var(--ins-fault);
   }
 
   .ins-key-danger:hover {
+    border-color: var(--ins-fault);
     background: color-mix(in srgb, var(--ins-fault) 10%, transparent);
     color: var(--ins-fault);
   }
 
+  /* Danger filled: the one destructive confirm. */
+  .ins-key-danger-fill {
+    border-color: var(--ins-fault);
+    background: var(--ins-fault);
+    color: var(--ins-panel, var(--color-background));
+  }
+
+  .ins-key-danger-fill:hover {
+    border-color: color-mix(in srgb, var(--ins-fault) 85%, var(--color-foreground));
+    background: color-mix(in srgb, var(--ins-fault) 85%, var(--color-foreground));
+    color: var(--ins-panel, var(--color-background));
+  }
+
   .ins-key:focus-visible {
-    outline: 1px solid var(--ins-lamp);
-    outline-offset: 1px;
+    outline: 1px solid var(--ins-legend);
+    outline-offset: 2px;
   }
 
   .ins-key:disabled {
     cursor: default;
     opacity: 0.5;
+  }
+
+  /* Busy: disabled while it runs, but not greyed out. */
+  .ins-key[aria-busy="true"] {
+    cursor: default;
+    opacity: 1;
   }
 
   .ins-key-panel {

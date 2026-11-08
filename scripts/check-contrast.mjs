@@ -73,6 +73,7 @@ function tokens(theme) {
   const t = theme.terminal;
   return {
     panel: bg,
+    edgeKey: light ? mix(fg, 0.63, bg) : mix(fg, 0.5, bg),
     fg,
     muted: parse(theme.ui.mutedForeground),
     gutter: light ? mix(bg, 0.92, fg) : mix(bg, 0.78, BLACK),
@@ -98,6 +99,8 @@ for (const [key, theme] of Object.entries(themes)) {
   check('legend on gutter >= 4.5:1', contrast(k.legend, k.gutter) >= 4.5, r(contrast(k.legend, k.gutter)));
   // Menus: the focused item's ink outline and a destructive item's fault text.
   check('menu focus outline (legend) on panel >= 3:1', contrast(k.legend, k.panel) >= 3, r(contrast(k.legend, k.panel)));
+  // The outline button's frame is the only thing that marks it (WCAG 1.4.11).
+  check('edge-key (outline frame) on panel >= 3:1', contrast(k.edgeKey, k.panel) >= 3, r(contrast(k.edgeKey, k.panel)));
   // Fault is a theme status colour, not tuned for small text; report it so a
   // palette change can lift it, but don't fail on it.
   const faultText = contrast(k.fault, k.panel);
