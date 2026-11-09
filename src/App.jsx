@@ -38,6 +38,7 @@ function App() {
   // opencode loads its plugins globally, so the "Agent state hook" setting
   // installs or removes Lirah's. Claude Code's is left out per launch instead.
   const [agentStateHook] = useSetting('agentStateHook');
+  const [zenMode, setZenMode] = useSetting('zenMode');
   useEffect(() => {
     invoke('set_opencode_agent_plugin', { enabled: agentStateHook })
       .catch((error) => console.warn('Failed to update the opencode agent plugin:', error));
@@ -145,6 +146,13 @@ function App() {
         jumpToNext();
         return;
       }
+      // Alt+Z: Zen mode (also :zen and the Appearance setting)
+      if (matches('zen-toggle', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setZenMode((z) => !z);
+        return;
+      }
       // Ctrl+T: new tab. Stopped here so no tab-level listener (document
       // capture, which runs after this) also acts on it. The new tab's
       // terminal takes focus once it's ready (ProjectTab's activation effect).
@@ -165,12 +173,12 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext]);
+  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode]);
 
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
-        <TabBar />
+        {!zenMode && <TabBar />}
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
@@ -193,7 +201,10 @@ function App() {
               <FirstTabChooser onOpenProject={(path) => addTab(path)} />
             )}
           </div>
-          <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
+          {/* Hidden, not unmounted, in Zen so its section, fold and open review survive the toggle. */}
+          <div style={{ display: zenMode ? 'none' : 'contents' }}>
+            <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
+          </div>
         </div>
 
         <KeyHintBar />

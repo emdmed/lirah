@@ -674,6 +674,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   });
   // Only Claude Code with the agent-state plugin loaded attaches it itself.
   const [agentStateHook] = useSetting('agentStateHook');
+  // Zen hides the files pane and context status; their stored state stays as is.
+  const [zenMode] = useSetting('zenMode');
   const hookDelivers = settings.selectedCli === 'claude-code' && agentStateHook;
   // Other CLIs: type the context into the terminal; the user adds the prompt.
   const insertContext = useCallback(async () => {
@@ -1047,7 +1049,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
       <Layout
         sidebar={
-          sidebar.sidebarOpen && (
+          !zenMode && sidebar.sidebarOpen && (
             <LeftSidebar
               sidebar={sidebar}
               search={sidebarSearch}
@@ -1121,7 +1123,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
             />
-          ) : (
+          ) : !zenMode && (
             <ContextStatus
               selectedFiles={fileSelection.selectedFiles}
               fileSymbols={fileSymbolsHook}

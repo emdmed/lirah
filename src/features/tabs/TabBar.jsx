@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSetting } from "../settings/settingsStore";
 
 const STATUS_SLOT_ID = "tabbar-status-slot";
 
@@ -8,10 +9,13 @@ const STATUS_SLOT_ID = "tabbar-status-slot";
 // only the active tab mounts them.
 export function TabBarStatusSlot({ active, children }) {
   const [slot, setSlot] = useState(null);
+  // Zen unmounts the tab bar; look the slot up again so we never portal into
+  // a detached node, and render nothing while it's gone.
+  const [zenMode] = useSetting('zenMode');
   useEffect(() => {
     setSlot(document.getElementById(STATUS_SLOT_ID));
-  }, []);
-  if (!active || !slot) return null;
+  }, [zenMode]);
+  if (!active || !slot?.isConnected) return null;
   return createPortal(children, slot);
 }
 

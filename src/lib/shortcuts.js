@@ -48,6 +48,7 @@ export const SHORTCUTS = [
   { id: 'shell', keys: ['Alt', 'T'], description: 'Fullscreen Shell', category: 'Panes & Views', note: 'again to close', hint: { bar: 'always', label: 'shell' }, paletteCommand: 'shell', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyT' },
   { id: 'nvim', keys: ['Alt', 'N'], description: 'Open Nvim', category: 'Panes & Views', note: 'secondary terminal', paletteCommand: 'nvim', match: (e) => alt(e) && key('n')(e) },
   { id: 'quick-task', keys: ['Alt', 'Q'], description: 'Quick Task', category: 'Panes & Views', note: 'adds to this workspace\'s tasks', paletteCommand: 'task', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyQ' },
+  { id: 'zen-toggle', keys: ['Alt', 'Z'], description: 'Toggle Zen Mode', category: 'Panes & Views', note: 'hides panes and the top rail', paletteCommand: 'zen', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyZ' },
   { id: 'help', keys: ['Ctrl', 'H'], description: 'Toggle This Dialog', category: 'Panes & Views', hint: { bar: 'ctrl', label: 'help' }, paletteCommand: 'help', match: (e) => e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'h' },
 
   // Prompt

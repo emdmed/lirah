@@ -7,6 +7,7 @@ import { useWatcher } from '../watcher';
 import { useTabActions } from './TabContext';
 import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
+import { getSettings, setSetting } from '../settings/settingsStore';
 import { useToast } from '../toast/ToastContext';
 import { IS_WINDOWS } from '../../utils/pathUtils';
 import { buildFeatureMap } from '../feature-map/useFeatureMap';
@@ -125,6 +126,7 @@ export function useTabCommands({
       { id: 'merge', hint: 'merge this branch into a base branch', run: () => onAutoMerge() },
 
       // Files & panes
+      { id: 'zen', hint: 'zen mode: only the terminal', options: ['on', 'off'], run: (arg) => setSetting('zenMode', onOff(arg, getSettings().zenMode)) },
       { id: 'shell', hint: 'fullscreen shell in this project', run: () => toggleShell() },
       { id: 'git', hint: 'show only git changes', run: () => onToggleGitFilter() },
       { id: 'md', hint: 'show only markdown files', run: () => onToggleMarkdownFilter() },
