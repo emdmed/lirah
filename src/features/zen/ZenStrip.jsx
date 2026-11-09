@@ -19,6 +19,8 @@ import { TurnTrail } from '../tabs/TurnTrail';
 import { useAttentionQueue } from '../tabs/useAgentAttention';
 import { setSetting, useSetting } from '../settings/settingsStore';
 import { cn } from '../../lib/utils';
+import { FilesDrawer } from './FilesDrawer';
+import { toggleDrawer } from './zenDrawerStore';
 
 const noop = () => {};
 const NODE = { done: 'bg-foreground/60', live: 'bg-[var(--ins-lamp)]', fault: 'bg-[var(--ins-fault)]', todo: 'border border-muted-foreground/60' };
@@ -99,7 +101,14 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
               plan {progress.done}/{progress.total}
             </Button>
           )}
-          <Button variant="ghost" className={GHOST} onClick={noop} title={`${touched.edit} edited · ${touched.read} read this turn`}>
+          {/* Only the active tab's strip is the drawer's anchor (every tab renders one). */}
+          <Button
+            variant="ghost"
+            className={GHOST}
+            data-zen-segment={isActive ? 'files' : undefined}
+            onClick={() => toggleDrawer('files')}
+            title={`${touched.edit} edited · ${touched.read} read this turn (Alt+1)`}
+          >
             files
             {touched.edit > 0 && <><Lamp state="on" blink={touched.editLive} />{touched.edit}</>}
             {touched.read > 0 && (
@@ -148,6 +157,7 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
           </span>
         )}
       </div>
+      {isActive && <FilesDrawer files={files} root={root} />}
     </div>
   );
 }
