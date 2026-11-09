@@ -8,6 +8,7 @@ import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
 import { ZEN_LINE_MARK_SLOT_ID } from "../zen/ZenLine";
+import { ZenStrip } from "../zen/ZenStrip";
 import { LirahMark } from "../../components/LirahMark";
 import { LeftSidebar } from "../../components/LeftSidebar";
 import { usePromptTemplates } from "../templates";
@@ -1235,6 +1236,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           cliRunning={cliRunning === tabCliProcess(settings.selectedCli)}
           master={master}
         />
+        {zenMode && <ZenStrip tabId={tabId} isActive={isActive} cliName={cliRunning} branchName={branchName} />}
         {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}
           sessionId={terminalSessionId}
