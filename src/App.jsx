@@ -9,6 +9,7 @@ import { SubagentProvider } from "./contexts/SubagentContext";
 import { RightSidebar } from "./features/agent-jobs/RightSidebar";
 import { usePaneShortcuts } from "./hooks/usePaneShortcuts";
 import { KeyHintBar } from "./components/KeyHintBar";
+import { ZenLine } from "./features/zen/ZenLine";
 import { ToastContainer, useToast } from "./features/toast";
 import { useUpdateChecker } from "./hooks/useUpdateChecker";
 import { DevProfiler } from "./components/DevProfiler";
@@ -207,6 +208,8 @@ function App() {
           </div>
         </div>
 
+        {zenMode && <ZenLine />}
+        {/* Fixed overlay: on Ctrl hold it covers the Zen line too. */}
         <KeyHintBar />
         <ToastContainer />
 

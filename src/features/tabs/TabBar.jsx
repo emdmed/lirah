@@ -4,17 +4,17 @@ import { useSetting } from "../settings/settingsStore";
 
 const STATUS_SLOT_ID = "tabbar-status-slot";
 
-// Renders the active tab's status controls into the tab bar's right side.
-// Children are always evaluated by the caller (they may contain hooks), but
-// only the active tab mounts them.
-export function TabBarStatusSlot({ active, children }) {
+// Renders the active tab's status controls into the tab bar's right side (or
+// into another slot by id, e.g. the Zen line's). Children are always evaluated
+// by the caller (they may contain hooks), but only the active tab mounts them.
+export function TabBarStatusSlot({ active, children, slotId = STATUS_SLOT_ID }) {
   const [slot, setSlot] = useState(null);
-  // Zen unmounts the tab bar; look the slot up again so we never portal into
-  // a detached node, and render nothing while it's gone.
+  // Zen swaps the tab bar for the Zen line; look the slot up again so we never
+  // portal into a detached node, and render nothing while it's gone.
   const [zenMode] = useSetting('zenMode');
   useEffect(() => {
-    setSlot(document.getElementById(STATUS_SLOT_ID));
-  }, [zenMode]);
+    setSlot(document.getElementById(slotId));
+  }, [zenMode, slotId]);
   if (!active || !slot?.isConnected) return null;
   return createPortal(children, slot);
 }

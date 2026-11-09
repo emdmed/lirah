@@ -7,6 +7,8 @@ import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
+import { ZEN_LINE_MARK_SLOT_ID } from "../zen/ZenLine";
+import { LirahMark } from "../../components/LirahMark";
 import { LeftSidebar } from "../../components/LeftSidebar";
 import { usePromptTemplates } from "../templates";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -1157,6 +1159,10 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           )
         }
         statusBar={
+          <>
+          <TabBarStatusSlot active={isActive} slotId={ZEN_LINE_MARK_SLOT_ID}>
+            <LirahMark size={16} lit={!!terminalSessionId} />
+          </TabBarStatusSlot>
           <TabBarStatusSlot active={isActive}>
           <StatusBar
             viewMode={viewMode}
@@ -1188,6 +1194,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
             availableUpdate={availableUpdate}
           />
           </TabBarStatusSlot>
+          </>
         }
         secondaryTerminal={
           secondary.secondaryVisible && (
