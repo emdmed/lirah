@@ -24,7 +24,7 @@ export const ZEN_LINE_MARK_SLOT_ID = 'zen-line-mark-slot';
 // The active tab portals today's tokens in here (its token stats live in the tab).
 export const ZEN_LINE_TOKENS_SLOT_ID = 'zen-line-tokens-slot';
 
-const ITEM = 'shrink-0 px-1 hover:text-foreground focus-ring';
+const ITEM = 'inline-flex h-5 shrink-0 items-center px-1 hover:text-foreground focus-ring';
 
 // Zen's bottom line: stands in for the header, so it drags the window and
 // carries the window controls (on hover, at the right; at the left on macOS).
@@ -55,11 +55,12 @@ export function ZenLine() {
 
   return (
     <div
-      className="group flex items-center gap-3 h-8 px-2 shrink-0 select-none text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
+      className="group flex items-center gap-4 h-8 px-2 shrink-0 select-none text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
       {...drag}
     >
       {IS_MAC && controls}
       <div id={ZEN_LINE_MARK_SLOT_ID} className="flex items-center shrink-0" />
+      <span className="flex shrink-0 items-center">
       {workspaces.map((w) => (
         <button
           key={w.id}
@@ -71,6 +72,7 @@ export function ZenLine() {
           {w.name}
         </button>
       ))}
+      </span>
       <span data-zen-segment="tabs" className="flex shrink-0 items-center gap-1 text-muted-foreground">
         <button type="button" className={ITEM} onClick={() => toggleDrawer('tabs')} title="Tabs (Alt+4)">tabs</button>
         {workspaceTabs.map((tab) => {
@@ -83,19 +85,21 @@ export function ZenLine() {
           );
           const queued = tab.id !== activeTabId && queue.some((q) => q.tabId === tab.id);
           const column = columns.indexOf(tab.id) + 1;
+          // The digit says which column; with one column it says nothing.
+          const digit = columns.length > 1 && column > 0;
           return (
             <button
               key={tab.id}
               type="button"
-              className="inline-flex items-center gap-px focus-ring"
+              className="inline-flex h-5 min-w-4 shrink-0 items-center justify-center gap-1 px-[3px] focus-ring"
               title={`${tabName(tab)} · ${activity.label}${column ? ` · column ${column}` : ''}`}
               aria-label={`${tabName(tab)}, ${activity.label}${column ? `, column ${column}` : ''}`}
               aria-current={tab.id === activeTabId || undefined}
               onClick={() => switchTab(tab.id)}
             >
               <Lamp {...activityLamp(activity.kind, queued)} />
-              {column > 0 && (
-                <span aria-hidden className={cn('text-[9px] leading-none tabular-nums', tab.id === activeTabId && 'text-foreground')}>{column}</span>
+              {digit && (
+                <span aria-hidden className={cn('text-[11px] leading-none tabular-nums', tab.id === activeTabId && 'text-[var(--ins-lamp)]')}>{column}</span>
               )}
             </button>
           );

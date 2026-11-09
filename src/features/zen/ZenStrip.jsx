@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GitBranch } from 'iconoir-react';
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 import { ContextMoon } from '../../components/instrument/ContextMoon';
@@ -91,10 +90,7 @@ export function ZenStrip({ tabId, isActive, visible = isActive, cliName, branchN
         <span aria-hidden="true" className={cn('w-4 shrink-0 text-center font-mono tabular-nums', isActive && 'text-[var(--ins-lamp)]')}>{index + 1}</span>
         <span className="ins-name min-w-0 truncate text-[13px] italic leading-5 text-foreground">{tabDisplayName(tab, bookmarks)}</span>
         {branchName && (
-          <span className="flex min-w-0 items-center gap-1 font-mono" title={`branch ${branchName}`}>
-            <GitBranch className="h-3 w-3 shrink-0" />
-            <span className="truncate">{branchName}</span>
-          </span>
+          <span className="min-w-0 truncate font-mono" title={`branch ${branchName}`}>{branchName}</span>
         )}
         <span className="inline-flex w-[15px] shrink-0 justify-center" title={`${activity.label}${activity.since ? ` · ${activity.since}` : ''}`}>
           <Lamp {...activityLamp(activity.kind, queued)} label={activity.label} />
@@ -151,7 +147,7 @@ export function ZenStrip({ tabId, isActive, visible = isActive, cliName, branchN
         </span>
       </div>
       {/* Turn row. Folded, it is hidden but keeps its height so the terminal never resizes. */}
-      <div className={cn('flex h-5 min-w-0 items-center gap-3', folded && 'invisible')}>
+      <div className={cn('flex h-5 min-w-0 items-center gap-3 pl-6', folded && 'invisible')}>
         <span className="flex min-w-0 flex-1 items-center gap-1 [&>div]:pl-0">
           {permission ? (
             <>
