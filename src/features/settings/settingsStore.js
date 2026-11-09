@@ -24,6 +24,8 @@ export const SETTINGS_DEFAULTS = {
   showTitleBar: true,
   // Window-wide: hide the panes and top rail, leaving the terminal and Zen's own chrome.
   zenMode: false,
+  // Zen's strip shows only its name row; the turn row's height stays reserved.
+  zenStripFolded: false,
   keepFilesAfterSend: false,
   // Launch the CLI automatically when a starred (bookmarked) repo is opened.
   // Never applies to tabs restored at startup: that isn't a deliberate act.

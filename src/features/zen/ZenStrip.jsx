@@ -10,9 +10,18 @@ import { activityLamp, tabActivity } from '../tabs/tabActivity';
 import { getTabContextFill } from '../tabs/tabContextFill';
 import { useTabPlans } from '../plans/useTabPlans';
 import { isSettledPlan } from '../plans/TabPlanTier';
-import { planProgress } from '../plans/planModel';
+import { chunkRuler } from '../plans/Fig16Chunks';
+import { CHUNK_STATUS, planProgress } from '../plans/planModel';
+import { getTabSession } from '../tabs/terminalActivity';
+import { getLastTurn } from '../tabs/agentHookState';
+import { turnSummary } from '../tabs/tabActivity';
+import { TurnTrail } from '../tabs/TurnTrail';
+import { useAttentionQueue } from '../tabs/useAgentAttention';
+import { setSetting, useSetting } from '../settings/settingsStore';
+import { cn } from '../../lib/utils';
 
 const noop = () => {};
+const NODE = { done: 'bg-foreground/60', live: 'bg-[var(--ins-lamp)]', fault: 'bg-[var(--ins-fault)]', todo: 'border border-muted-foreground/60' };
 const GHOST = 'h-5 gap-1.5 px-1.5 text-[11px] font-mono tabular-nums text-muted-foreground';
 
 // Agent edits and reads this turn under `root`, and whether any is still running.
@@ -37,6 +46,8 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
   const ownTab = useMemo(() => (tab ? [tab] : []), [tab]);
   const plans = useTabPlans(ownTab, tabId).byTab[tabId];
   const { files } = useAgentFileActivity(isActive);
+  const queue = useAttentionQueue(workspaceTabs);
+  const folded = useSetting('zenStripFolded');
 
   // The tabs pane's 1s clock, for activity and its "since".
   const [now, setNow] = useState(() => Date.now());
@@ -53,9 +64,22 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
   const progress = plan && planProgress(plan);
   const touched = countFiles(files, root);
   const fill = cliName ? getTabContextFill(tabId) : null;
+  // Same rules as the tabs pane row: a permission question replaces the turn,
+  // and a tab waiting on you (not the one you're on) is framed in lamp gold.
+  const queued = !isActive && queue.some((q) => q.tabId === tabId);
+  const permission = activity.kind === 'permission';
+  const turn = cliName ? getLastTurn(getTabSession(tabId)) : null;
+  const summary = turnSummary(turn, now);
+  const ruler = plan && chunkRuler(plan);
+  const liveChunk = ruler?.live >= 0 ? plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED)[ruler.live] : null;
 
   return (
-    <div className="flex h-10 shrink-0 flex-col px-2 text-[11px] text-muted-foreground">
+    <div
+      className={cn(
+        'flex h-10 shrink-0 flex-col px-2 text-[11px] text-muted-foreground',
+        (permission || queued) && 'outline-solid outline-1 -outline-offset-1 outline-[var(--ins-lamp)]',
+      )}
+    >
       <div className="flex h-5 min-w-0 items-center gap-2">
         <span aria-hidden="true" className="w-4 shrink-0 text-center font-mono tabular-nums">{index + 1}</span>
         <span className="ins-name min-w-0 truncate text-[13px] italic leading-5 text-foreground">{tabDisplayName(tab, bookmarks)}</span>
@@ -66,7 +90,7 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
           </span>
         )}
         <span className="inline-flex w-[15px] shrink-0 justify-center" title={`${activity.label}${activity.since ? ` · ${activity.since}` : ''}`}>
-          <Lamp {...activityLamp(activity.kind, false)} label={activity.label} />
+          <Lamp {...activityLamp(activity.kind, queued)} label={activity.label} />
         </span>
 
         <span className="ml-auto flex shrink-0 items-center gap-1">
@@ -89,10 +113,41 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
               <ContextMoon ratio={fill} />
             </Button>
           )}
+          <Button
+            variant="ghost"
+            className={GHOST}
+            aria-expanded={!folded}
+            onClick={() => setSetting('zenStripFolded', !folded)}
+            title={folded ? 'Show the turn row' : 'Fold the turn row'}
+          >
+            <span className={cn('inline-block transition-transform', folded && '-rotate-90')}>▾</span>
+          </Button>
         </span>
       </div>
-      {/* Turn row: filled in a later step. */}
-      <div className="h-5" />
+      {/* Turn row. Folded, it is hidden but keeps its height so the terminal never resizes. */}
+      <div className={cn('flex h-5 min-w-0 items-center gap-3', folded && 'invisible')}>
+        <span className="flex min-w-0 flex-1 items-center gap-1 [&>div]:pl-0">
+          {permission ? (
+            <>
+              <span className="ins-name min-w-0 truncate text-xs text-[var(--ins-lamp)]">{activity.question ?? activity.label}</span>
+              {activity.since && <span className="shrink-0 tabular-nums text-[var(--ins-lamp)]">· {activity.since}</span>}
+            </>
+          ) : summary ? (
+            // Files open in the files drawer, so the trail never unfolds here.
+            <TurnTrail turn={turn} summary={summary} root={root} open={false} onToggle={noop} onAttach={noop} />
+          ) : (
+            <span>no turn yet</span>
+          )}
+        </span>
+        {ruler && ruler.total > 0 && (
+          <span className="flex min-w-0 max-w-[50%] items-center gap-2" title={`${ruler.done} of ${ruler.total} chunks implemented`}>
+            <span aria-hidden="true" className="flex shrink-0 items-center gap-[3px]">
+              {ruler.states.map((st, i) => <span key={i} className={cn('h-1.5 w-1.5', NODE[st])} />)}
+            </span>
+            {liveChunk && <span className="min-w-0 truncate">chunk {liveChunk.n} · {liveChunk.title}</span>}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
