@@ -1,8 +1,17 @@
 # Lirah
 
-A native desktop workspace for CLI coding agents. Lirah runs your agent (Claude Code, opencode, or headless Codex, Gemini, Cursor and Amp) in a real terminal and builds what a session needs around it: file context, prompts, git, token budgets, background jobs and multi-step plans.
+**Agents write the code. You keep the engineering.**
 
-Lirah doesn't wrap or replace the agent. The terminal stays in the centre, and everything else is a pane, a key or a `:` command away.
+Plan the feature, choose what the agent reads, review every diff before it lands. Claude Code or opencode runs unchanged in a real terminal, with your own CLI, login and plan; Codex, Gemini, Cursor and Amp run as background jobs. Lirah tracks the plan, the context and the cost around them.
+
+Measured against Claude Code alone on Lirah's own codebase, questions that span several files cost **24% less** and finish **16% faster** with Lirah's symbol index (Sonnet on Claude Code, with and without the index, 3 runs per task). [How we measured](https://github.com/emdmed/agentic-orchestration-workflows/tree/main/evals).
+
+- **Plan to reviewed commits.** Split a plan into chunks; each lands as its own commit, your review notes become the fix prompt, and any chunk rolls back on its own.
+- **Control what the agent reads.** Send each file as full text, signatures or a skeleton, and see the token cost before you send.
+- **Review before anything lands.** Background jobs run in their own worktrees; you read the diff and apply the one you want. Lirah never pushes or pulls.
+- **Know what it costs.** A context meter per tab, and daily or weekly token budgets per project.
+
+No telemetry, no account, MIT licensed. Website: [lira.dev](https://lira.dev).
 
 Built with **Tauri 2**, **React 19** and **xterm.js**. Linux is the primary platform. macOS and Windows builds exist, without the sandbox.
 
@@ -46,7 +55,7 @@ The bundles land in `src-tauri/target/release/bundle/`. To open a directory at s
 - Four numbered panes, focused with Alt+1–4: **[1] Files**, **[2] Terminal**, **[3] Prompt**, **[4] Workspace**. A secondary terminal (Ctrl+\`) opens beside the main one.
 - Up to 8 project tabs, each with its own PTY, CLI, sandbox and sidebar state. Tabs persist and boot lazily when you return to them.
 - Tab rows show a context-fill moon, an activity lamp, the branch, the files the agent edited in its last turn, and the plan the tab is working through.
-- Agent hooks (installed automatically for Claude Code and opencode) report working, permission, waiting and done states. Alt+A jumps to the next agent waiting on you, and desktop notifications follow.
+- Agent hooks (installed automatically for Claude Code and opencode) report working, permission, waiting and done states. Any other CLI that reports its state over OSC 7501 gets the same tab status. Alt+A jumps to the next agent waiting on you, and desktop notifications follow.
 - Terminals survive a webview reload: sessions detach, reattach and replay their output.
 
 ### Terminal
@@ -91,6 +100,7 @@ The bundles land in `src-tauri/target/release/bundle/`. To open a directory at s
 - Paste a plan or import the repo's `*_plan.md` files. An agent splits the plan into chunks.
 - For each chunk: implement it in the tab's agent (one commit per chunk), review it with notes, roll back, skip or reorder.
 - **Auto-pilot** (`:autopilot`) chains chunks unattended. It pauses on questions, permission prompts, a missing commit, or when the agent hooks go silent.
+- Each plan shows its stage, links its pull request through `gh` when it's installed, and closes its task once the commits reach the base branch.
 
 ### Tokens and budget
 - A context meter in the status bar for the tab's Claude session, subagents included.
