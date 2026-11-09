@@ -42,6 +42,20 @@ function onListKey(e) {
   rows[j]?.scrollIntoView({ block: 'nearest' });
 }
 
+// What a tab row shows: another tab working here, then a stopped auto-pilot
+// run (in the plan card's own word and lamp), else the tab's own activity.
+// The Zen line uses it too, so its lamps match the rows.
+export function rowActivity(own, workLabel, tabPlans) {
+  if (workLabel && !OWN_BUSY.has(own.kind)) return { kind: 'remote', label: workLabel };
+  const stopped = tabPlans?.map((p) => p.autopilot)
+    .filter((ap) => ap?.status === AUTOPILOT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.PAUSED)
+    .sort((a, b) => (autopilotLamp(b).state === 'fault') - (autopilotLamp(a).state === 'fault'))[0];
+  if (stopped && !LIVE.has(own.kind)) {
+    return { kind: autopilotLamp(stopped).state === 'fault' ? 'failed' : 'permission', label: `auto-pilot ${haltWord(stopped)}`, since: own.since };
+  }
+  return own;
+}
+
 export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
   const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
   const closable = tabs.length > 1;
@@ -181,14 +195,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
         const turn = cli[tab.id] ? getLastTurn(getTabSession(tab.id)) : null;
         const summary = turnSummary(turn, now);
         const tabPlans = plans.byTab[tab.id];
-        // A stopped run speaks for a resting tab, in the plan card's own word and lamp.
-        const stopped = tabPlans?.map((p) => p.autopilot)
-          .filter((ap) => ap?.status === AUTOPILOT_STATUS.FAILED || ap?.status === AUTOPILOT_STATUS.PAUSED)
-          .sort((a, b) => (autopilotLamp(b).state === 'fault') - (autopilotLamp(a).state === 'fault'))[0];
-        const activity = workLabel && !OWN_BUSY.has(own.kind) ? { kind: 'remote', label: workLabel }
-          : stopped && !LIVE.has(own.kind)
-            ? { kind: autopilotLamp(stopped).state === 'fault' ? 'failed' : 'permission', label: `auto-pilot ${haltWord(stopped)}`, since: own.since }
-            : own;
+        const activity = rowActivity(own, workLabel, tabPlans);
         kinds.push(activity.kind);
         if (activity.kind === 'failed') faulted.push({ id: tab.id, name: tabName(tab) });
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);

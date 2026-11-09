@@ -7,7 +7,9 @@ import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
-import { ZEN_LINE_MARK_SLOT_ID } from "../zen/ZenLine";
+import { ZEN_LINE_MARK_SLOT_ID, ZEN_LINE_TOKENS_SLOT_ID } from "../zen/ZenLine";
+import { formatTokenCount } from "../token-budget/tokenCalculations";
+import { format } from "date-fns";
 import { ZenStrip } from "../zen/ZenStrip";
 import { LirahMark } from "../../components/LirahMark";
 import { LeftSidebar } from "../../components/LeftSidebar";
@@ -83,6 +85,13 @@ import { Lamp } from "../../components/instrument/Lamp.jsx";
 // cwd monitor then persists home over the tab's restored path — so anything
 // that treats currentPath as a filesystem path must go through this guard.
 // Loaded on first open, mounted only while open.
+
+// Billable in+out across today's sessions, as the budget figure counts them.
+function todayTokens(stats) {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  return (stats?.daily_activity || []).filter((r) => r.date === today)
+    .reduce((n, r) => n + (r.billable_input_tokens || 0) + (r.billable_output_tokens || 0), 0);
+}
 
 function isRealPath(p) {
   return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
@@ -1163,6 +1172,9 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           <>
           <TabBarStatusSlot active={isActive} slotId={ZEN_LINE_MARK_SLOT_ID}>
             <LirahMark size={16} lit={!!terminalSessionId} />
+          </TabBarStatusSlot>
+          <TabBarStatusSlot active={isActive} slotId={ZEN_LINE_TOKENS_SLOT_ID}>
+            <span title="Billable tokens today in this project">today {formatTokenCount(todayTokens(projectStats))}</span>
           </TabBarStatusSlot>
           <TabBarStatusSlot active={isActive}>
           <StatusBar
