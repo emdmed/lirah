@@ -2151,6 +2151,28 @@ body {
     background: color-mix(in srgb, var(--color-foreground) 12%, transparent);
   }
 
+  /* Section tab: no fill. The chosen one draws an ink underline over the
+     strip's bottom rule, joining it to the panel below. Ink, not gold:
+     choosing a tab is not live state. */
+  .ins-tab {
+    color: var(--color-muted-foreground);
+    transition: color 220ms ease-out, box-shadow 220ms ease-out;
+  }
+  .ins-tab:hover { color: var(--color-foreground); box-shadow: inset 0 -1px 0 0 var(--ins-edge-strong); }
+  .ins-tab[aria-selected="true"] {
+    color: var(--color-foreground);
+    box-shadow: inset 0 -2px 0 0 var(--color-foreground);
+    transition-duration: 90ms;
+  }
+  .ins-tab:focus-visible { outline: 1px solid var(--ins-edge-focus); outline-offset: -1px; }
+  .ins-tab-flag {
+    width: 4px;
+    height: 4px;
+    margin-bottom: 0.4em;
+    align-self: center;
+    background: var(--ins-warn);
+  }
+
   /* Split key (SplitKey.jsx): two primary keys, a panel-colour hairline
      between them. */
   .ins-split {

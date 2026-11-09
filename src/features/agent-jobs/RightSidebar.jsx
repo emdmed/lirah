@@ -676,7 +676,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           onClick={() => setTab('features')}
           label="features"
           count={featureMap.map?.features?.length || 0}
-          countTone={featureMap.status === 'stale' ? 'text-[var(--ins-warn)]' : undefined}
+          flag={featureMap.status === 'stale' ? 'Feature map is stale' : undefined}
         />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
@@ -869,21 +869,26 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   );
 }
 
-function TabButton({ active, onClick, label, count, lamp = false, countTone = 'text-foreground' }) {
+// A section tab: ink underline on the pane's rule when chosen. Counts stay
+// quiet unless chosen or toned (waiting tabs); `flag` adds a warn mark.
+function TabButton({ active, onClick, label, count, lamp = false, countTone, flag }) {
   return (
     <button
       onClick={onClick}
       role="tab"
       aria-selected={active}
       aria-controls="workspace-section"
-      className={cn(
-        'ins-legend ins-seg-key flex items-center gap-1.5 px-1.5 pt-0.5 pb-2 cursor-pointer',
-        !active && 'text-muted-foreground hover:text-foreground'
-      )}
+      title={`${flag ? `${flag} · ` : ''}[ ] to switch sections`}
+      className="ins-legend ins-tab flex items-center gap-1.5 px-1.5 pt-0.5 pb-2 cursor-pointer"
     >
       {lamp && <Lamp state="on" />}
       {label}
-      {count > 0 && <span className={cn('tabular-nums', countTone)}>{count}</span>}
+      {count > 0 && (
+        <span className={cn('tabular-nums', countTone || (active ? 'text-foreground' : 'text-muted-foreground/80'))}>{count}</span>
+      )}
+      {flag && (
+        <span aria-label={flag} className="ins-tab-flag" />
+      )}
     </button>
   );
 }
