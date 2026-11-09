@@ -7,7 +7,7 @@ import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { activityLamp } from './tabActivity';
 import { RowAction } from './RowAction';
-import { rowKeys } from './rowKeys';
+import { isStoppedRun, rowKeys } from './rowKeys';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Lamp } from '../../components/instrument/Lamp';
 import { RenameField } from './RenameField';
@@ -85,6 +85,7 @@ export const ROW_KEYS = [
   { keys: ['a'], label: 'attach' },
   { keys: ['f'], label: 'folder' },
   { keys: ['o'], label: 'plan' },
+  { keys: ['p'], label: 'resume' },
   { keys: ['e'], label: 'edits' },
   { keys: ['t'], label: 'role' },
   { keys: ['r'], label: 'rename' },
@@ -136,6 +137,7 @@ export const TabRow = memo(function TabRow({
       attach: () => actions.attachEdits(edited),
       edits: () => actions.toggleTrail(tab.id),
       plan: () => actions.openPlan(tab.id, (livePlans[0] ?? plans[0]).id),
+      resume: () => actions.resumePlan(plans.find(isStoppedRun)),
       link: () => actions.toggleLink(tab, name, linked),
       rename: () => actions.startRename(tab.id),
       close: () => actions.closeTab(tab.id),
@@ -361,7 +363,14 @@ export const TabRow = memo(function TabRow({
 
           {/* Tier 4: the plan its agent is working through, or the last one it finished. */}
           {cardPlans.map((plan) => (
-            <TabPlanTier key={plan.id} plan={plan} note={livePlans.length ? undefined : settledNote} onOpen={() => actions.openPlan(tab.id, plan.id)} />
+            <TabPlanTier
+              key={plan.id}
+              plan={plan}
+              note={livePlans.length ? undefined : settledNote}
+              onOpen={() => actions.openPlan(tab.id, plan.id)}
+              onResume={() => actions.resumePlan(plan)}
+              onStop={() => actions.stopPlan(plan)}
+            />
           ))}
         </>
       )}

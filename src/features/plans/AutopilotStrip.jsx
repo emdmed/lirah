@@ -101,17 +101,20 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
           Answer in the terminal and the run carries on by itself, or resume to nudge the agent.
         </p>
       )}
+      {/* Tiered: resume is the one key that gets a stopped run going; stop sits apart. */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {tabOpen && (
-          <PanelButton icon={Terminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
-        )}
-        {(ap.status === AUTOPILOT_STATUS.PAUSED || ap.status === AUTOPILOT_STATUS.FAILED) && (
-          <PanelButton icon={Play} onClick={onResume} title={tabOpen ? 'Carry on in the same tab' : 'Carry on in this tab'}>
+        {stopped && (
+          <PanelButton variant="default" icon={Play} onClick={onResume} title={tabOpen ? 'Carry on in the same tab' : 'Carry on in this tab'}>
             resume
           </PanelButton>
         )}
-        <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
-        {options && <span className="ml-auto">{options}</span>}
+        {tabOpen && (
+          <PanelButton variant="outline" icon={Terminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
+        )}
+        <span className="ml-auto flex items-center gap-1.5">
+          {options}
+          <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
+        </span>
       </div>
       {stopped && loop}
     </div>

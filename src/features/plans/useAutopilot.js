@@ -175,12 +175,23 @@ export function useAutopilot({
     }
   }, [clearTabContext]);
 
-  // Send the next chunk, or finish.
+  // Send the next chunk, or finish. A pending chunk already committed (the
+  // agent ran ahead while the app was closed) is adopted, not sent again.
   const advance = useCallback(async (repoRoot, planId) => {
-    const plan = findPlan(repoRoot, planId);
+    let plan = findPlan(repoRoot, planId);
+    let nextId = nextChunkId(plan);
+    while (plan?.autopilot?.status === AUTOPILOT_STATUS.RUNNING && nextId
+      && plan.chunks.find((c) => c.id === nextId)?.status === CHUNK_STATUS.PENDING) {
+      const res = await checkChunk(repoRoot, planId, nextId);
+      if (res.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, res.error);
+      if (!res.found) break;
+      plan = findPlan(repoRoot, planId);
+      const after = nextChunkId(plan);
+      if (after === nextId) break; // not marked after all: send it rather than loop
+      nextId = after;
+    }
     const ap = plan?.autopilot;
     if (ap?.status !== AUTOPILOT_STATUS.RUNNING) return;
-    const nextId = nextChunkId(plan);
     if (!nextId) {
       const { done } = planProgress(plan);
       const commits = plan.chunks.reduce((n, c) => n + (c.status === CHUNK_STATUS.IMPLEMENTED ? c.commits.length : 0), 0);
@@ -198,7 +209,7 @@ export function useAutopilot({
       if (clear) await clearContext(planId, ap.tabId);
       await implementChunk(repoRoot, planId, nextId, ap.tabId, { autopilot: true });
     });
-  }, [findPlan, setAutopilot, announce, implementChunk, sendOrHalt, clearContext]);
+  }, [findPlan, setAutopilot, announce, implementChunk, sendOrHalt, clearContext, checkChunk, halt]);
 
   // Pick up where the run is: the current chunk if it is still in flight
   // (committed → move on; agent idle → nudge), else the next one.

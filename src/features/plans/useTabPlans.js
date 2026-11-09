@@ -5,7 +5,8 @@ import { planProgress, planTabId, runRank, SPLIT_STATUS } from './planModel';
 
 /**
  * Plans for the tabs pane: the ones working in each open tab (tab id ->
- * plans), and the active tab's repo's plans with work left and no tab.
+ * plans), the active tab's repo's plans with work left and no tab, and each
+ * plan's repo root (plan id -> root).
  */
 export function useTabPlans(tabs, activeTabId) {
   const roots = useRepoRoots(tabs.map((t) => t.projectPath));
@@ -21,8 +22,10 @@ export function useTabPlans(tabs, activeTabId) {
   return useMemo(() => {
     const open = new Set(tabs.map((t) => t.id));
     const byTab = {};
-    for (const plans of Object.values(plansByRepo || {})) {
+    const rootOf = new Map();
+    for (const [root, plans] of Object.entries(plansByRepo || {})) {
       for (const plan of plans) {
+        rootOf.set(plan.id, root);
         const tabId = planTabId(plan);
         if (open.has(tabId)) (byTab[tabId] ||= []).push(plan);
       }
@@ -38,6 +41,6 @@ export function useTabPlans(tabs, activeTabId) {
       })
       .sort((a, b) => runRank(a) - runRank(b));
 
-    return { byTab, loose };
+    return { byTab, loose, rootOf };
   }, [tabs, plansByRepo, activeRoot]);
 }

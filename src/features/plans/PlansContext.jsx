@@ -15,7 +15,7 @@ import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
 import { sendSaved } from './sentPrompts';
 import {
-  captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, rollbackChunk as revertChunk, strayCommits,
+  adoptedFacts, captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, rollbackChunk as revertChunk, strayCommits,
 } from './planGitOps';
 import {
   chunkBases, cleanupGit, defaultBranch, planGit, prepareGit, withRepos,
@@ -90,11 +90,14 @@ export function PlansProvider({ children }) {
   }, []);
 
   // Look for the chunk's commits since it was started. Found → implemented;
-  // not found while in progress → the agent stopped without committing.
+  // not found while in progress → the agent stopped without committing. A
+  // pending chunk (never sent) is checked too: found, it was committed ahead
+  // of the run and is adopted, with a base and times read from its commits.
   const checkChunk = useCallback(async (repoRoot, planId, chunkId) => {
     const { plan, chunk } = findChunk(repoRoot, planId, chunkId);
     const bases = plan && chunk ? chunkBases(plan, chunk) : {};
-    if (!plan || Object.keys(bases).length === 0 || checkingRef.current.has(chunkId)) return { found: false };
+    const unsent = chunk?.status === CHUNK_STATUS.PENDING;
+    if (!plan || (Object.keys(bases).length === 0 && !unsent) || checkingRef.current.has(chunkId)) return { found: false };
     checkingRef.current.add(chunkId);
     try {
       const commitsByRepo = await chunkCommits(plan, chunk);
@@ -113,6 +116,7 @@ export function PlansProvider({ children }) {
           .map(([root, shas]) => [root, shas.filter((sha) => !seen.has(sha))]));
         const found = await commitDecisions(plan, fresh);
         const strayRoots = Object.keys(strays);
+        const adopted = unsent ? await adoptedFacts(plan, commitsByRepo) : null;
         updatePlan(repoRoot, planId, (p) => ({
           // Repos the agent committed in join the plan: later chunks are checked, reviewed and rolled back there too.
           ...(strayRoots.length > 0 && { git: withRepos(planGit(p), strayRoots) }),
@@ -124,8 +128,11 @@ export function PlansProvider({ children }) {
               decisions: seen.size > 0
                 ? [...(c.decisions ?? []), ...found.filter((d) => !c.decisions?.includes(d))]
                 : found,
+              ...(adopted && { now: adopted.doneAt }),
             }),
-            baseShas: { ...chunkBases(p, c), ...strayBases },
+            baseShas: { ...chunkBases(p, c), ...adopted?.baseShas, ...strayBases },
+            // Adopted: it ran from when the chunk before it finished.
+            ...(adopted && { startedAt: adoptedStart(p, adopted.doneAt) }),
           })),
         }));
         return { found: true, commits };
@@ -478,6 +485,12 @@ export function PlansProvider({ children }) {
       <PlansStateContext.Provider value={plansByRepo}>{children}</PlansStateContext.Provider>
     </PlansActionsContext.Provider>
   );
+}
+
+/** When an adopted chunk began: the latest finish before its own, else its finish. */
+function adoptedStart(plan, doneAt) {
+  const before = plan.chunks.map((c) => c.doneAt).filter((t) => t && t <= doneAt);
+  return before.length ? Math.max(...before) : doneAt;
 }
 
 export function usePlansActions() {

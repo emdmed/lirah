@@ -17,20 +17,47 @@ const sinceArg = (chunk) => `--since=@${Math.floor((chunk.startedAt ?? Date.now(
 /**
  * The chunk's commits since it started, by repo root (oldest first), found by
  * its trailer. A repo that joined the plan after the chunk started has no
- * base sha for it, so there the search goes by time.
+ * base sha for it, so there the search goes by time. A chunk never sent
+ * (pending) is searched in the branch's whole history: the trailer names the
+ * plan and the chunk, so only an agent that ran ahead (the app closed mid-run)
+ * can have made it. Rolled-back chunks stay ranged: their reverted commits
+ * still carry the trailer.
  */
 export async function chunkCommits(plan, chunk) {
   const bases = chunkBases(plan, chunk);
   const commitsByRepo = {};
   for (const repo of planGit(plan).repos) {
     const base = bases[repo.root];
-    if (!base && !chunk.startedAt) continue;
+    const unsent = chunk.status === CHUNK_STATUS.PENDING;
+    if (!base && !chunk.startedAt && !unsent) continue;
+    const range = base ? `${base}..HEAD` : unsent ? null : sinceArg(chunk);
     const shas = (await gitLines(workPath(repo), [
-      'log', base ? `${base}..HEAD` : sinceArg(chunk), '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
+      'log', ...(range ? [range] : []), '--format=%H', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`,
     ])).reverse();
     if (shas.length > 0) commitsByRepo[repo.root] = shas;
   }
   return commitsByRepo;
+}
+
+/**
+ * What a chunk found already committed without being sent lacks: each repo's
+ * base (the parent of its first commit, so reviews and rollback have a range)
+ * and when it was done (its last commit's time, ms).
+ */
+export async function adoptedFacts(plan, commitsByRepo) {
+  const baseShas = {};
+  let doneAt = 0;
+  for (const [root, shas] of Object.entries(commitsByRepo)) {
+    if (!shas?.length) continue;
+    const repo = planGit(plan).repos.find((r) => r.root === root);
+    const path = repo ? workPath(repo) : root;
+    // A root commit has no parent; the review then falls back to the commits alone.
+    const base = (await git(path, ['rev-parse', '--verify', '--quiet', `${shas[0]}^`]).catch(() => '')).trim();
+    if (base) baseShas[root] = base;
+    const at = Number((await git(path, ['log', '-1', '--format=%ct', shas.at(-1)])).trim()) * 1000;
+    if (at > doneAt) doneAt = at;
+  }
+  return { baseShas, doneAt: doneAt || Date.now() };
 }
 
 /**

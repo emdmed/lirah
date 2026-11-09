@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { plural } from '../../lib/plural';
 import { useBookmarks } from '../bookmarks';
@@ -20,6 +20,7 @@ import { useDragReorder } from './useDragReorder';
 import { ROW_KEYS, TabRow } from './TabRow';
 import { rowKeys } from './rowKeys';
 import { useTabPlans } from '../plans/useTabPlans';
+import { usePlansActions } from '../plans/PlansContext';
 import { PlanRow } from '../plans/PlanRow';
 import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
@@ -63,6 +64,10 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
     [dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt],
   );
   const plans = useTabPlans(tabs, activeTabId);
+  const { resumeAutopilot, stopAutopilot } = usePlansActions();
+  // Read at click time, so the row actions stay stable while plans update (rows are memoized).
+  const rootOf = useRef(plans.rootOf);
+  rootOf.current = plans.rootOf;
 
   const commitRename = useCallback((tab, value) => {
     const name = value.trim();
@@ -120,6 +125,16 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
 
   const toggleTrail = useCallback((id) => setOpenTrail((open) => (open === id ? null : id)), []);
 
+  // A stopped run on a row resumes in its own tab, which the row is: no tab to pick, no setup.
+  const resumePlan = useCallback(async (plan) => {
+    try {
+      await resumeAutopilot(rootOf.current.get(plan.id), plan.id, plan.autopilot.tabId);
+    } catch (e) {
+      toast.error(`Auto-pilot didn't resume: ${e?.message || e}`);
+    }
+  }, [resumeAutopilot, toast]);
+  const stopPlan = useCallback((plan) => stopAutopilot(rootOf.current.get(plan.id), plan.id), [stopAutopilot]);
+
   const actions = useMemo(() => ({
     switchTab,
     openPlan,
@@ -133,7 +148,9 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
     attachEdits,
     toggleTrail,
     setRoleMenu: setRoleMenuId,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail]);
+    resumePlan,
+    stopPlan,
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan]);
 
   const kinds = [];
   let focusKeys = null;

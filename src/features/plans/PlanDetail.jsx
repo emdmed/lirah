@@ -180,6 +180,22 @@ export function PlanDetail({ plan }) {
     </label>
   );
 
+  const strip = plan.autopilot && (
+    <AutopilotStrip
+      plan={plan}
+      tabOpen={tabs.some((t) => t.id === plan.autopilot?.tabId)}
+      busy={reviewingAll}
+      onResume={() => pane.resume(plan)}
+      onStop={() => stopAutopilot(repoRoot, plan.id)}
+      onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
+      onGoToTab={() => switchTab(plan.autopilot.tabId)}
+      onReviewAll={() => pane.reviewAll(plan)}
+      options={piloted ? freshContext : null}
+    />
+  );
+  // Running, paused or failed: what the run needs from you comes before the plan's identity.
+  const runUp = [AUTOPILOT_STATUS.RUNNING, AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED].includes(plan.autopilot?.status);
+
   return (
     <div className="flex flex-col">
       <div className="flex flex-col px-3 pt-2 pb-3.5">
@@ -254,7 +270,9 @@ export function PlanDetail({ plan }) {
           </form>
         )}
 
-        {/* Identity first: the title, and what the plan is for. */}
+        {runUp && <div className="mt-3">{strip}</div>}
+
+        {/* Identity next: the title, and what the plan is for. */}
         <h3 className="mt-3 text-[13px] leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1 text-[11px] leading-relaxed text-muted-foreground" />}
 
@@ -299,21 +317,8 @@ export function PlanDetail({ plan }) {
             </div>
           )}
 
-          {plan.autopilot && (
-            <div>
-              <AutopilotStrip
-                plan={plan}
-                tabOpen={tabs.some((t) => t.id === plan.autopilot?.tabId)}
-                busy={reviewingAll}
-                onResume={() => pane.resume(plan)}
-                onStop={() => stopAutopilot(repoRoot, plan.id)}
-                onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
-                onGoToTab={() => switchTab(plan.autopilot.tabId)}
-                onReviewAll={() => pane.reviewAll(plan)}
-                options={piloted ? freshContext : null}
-              />
-            </div>
-          )}
+          {/* A settled run (done or off) is a line here; a live one sits at the top. */}
+          {plan.autopilot && !runUp && <div>{strip}</div>}
           {/* The run bank, under the run's status: the primary key, with its one
               option beside it. During a run the option moves into the strip,
               beside stop. While a chunk is stuck its fix is the primary key, so

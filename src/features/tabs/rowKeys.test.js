@@ -15,4 +15,12 @@ describe('rowKeys', () => {
     expect(keys).not.toContain('a');
     expect(keys).not.toContain('e');
   });
+
+  it('offers resume only while a run on the row is paused or failed', () => {
+    const plan = (status) => ({ autopilot: { status } });
+    expect(letters({ plans: [plan('paused')] })).toContain('p');
+    expect(letters({ plans: [plan('done'), plan('failed')] })).toContain('p');
+    expect(letters({ plans: [plan('running')] })).not.toContain('p');
+    expect(letters({ plans: [] })).not.toContain('p');
+  });
 });

@@ -1,3 +1,9 @@
+import { AUTOPILOT_STATUS } from '../plans/planModel';
+
+/** A paused or failed auto-pilot run: the one thing on a tab row that resume fixes. */
+export const isStoppedRun = (plan) => plan.autopilot?.status === AUTOPILOT_STATUS.PAUSED
+  || plan.autopilot?.status === AUTOPILOT_STATUS.FAILED;
+
 /**
  * The keys a focused row answers to right now, most telling first: `on` is the
  * e.key values, `keys` what the hint shows. Drives the row's key handler and
@@ -6,6 +12,7 @@
  */
 export function rowKeys({ active, closable, edited, plans, summary }) {
   return [
+    plans?.some(isStoppedRun) && { keys: ['p'], on: ['p'], label: 'resume' },
     edited && { keys: ['a'], on: ['a'], label: 'attach' },
     summary && edited && { keys: ['e'], on: ['e'], label: 'edits' },
     plans?.length > 0 && { keys: ['o'], on: ['o'], label: 'plan' },

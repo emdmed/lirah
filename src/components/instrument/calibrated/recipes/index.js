@@ -13,3 +13,4 @@ import './timelineToned';
 import './diffRow';
 import './spanRow';
 import './positionRow';
+import './loopPlate';
