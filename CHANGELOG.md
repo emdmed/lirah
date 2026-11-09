@@ -4,6 +4,23 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-11-09
+
+### Fixed
+
+- **No more stutter every few seconds with several tabs open** - The background check for running agents no longer re-renders every tab each time it polls.
+- **Typing in tasks stays smooth** - The quick-add box no longer re-renders every task's notes on each keystroke.
+- **Huge diffs no longer freeze the window** - A diff that takes longer than half a second to compute (a regenerated lockfile, a minified bundle) is shown as one replaced block.
+- **Smoother sidebars** - Streaming job output no longer re-renders the open sidebar section. Dragging a sidebar refits the terminal and figures when you pause instead of on every frame.
+- **Fewer git runs** - The feature map only reloads for its own project's changes, not every project's.
+- **File tree keeps its place** - Deleting a tracked file updates the tree without the loading flash or losing scroll position.
+- **Lighter animations and diff map** - Live race lanes crawl in steps instead of repainting every frame, and the diff map no longer re-lays out its labels while you scroll.
+
+### Changed
+
+- **README** - A new introduction: what Lirah is for, how its gains were measured, and its main features.
+- **Commit preview** - The dashed subject-limit line is gone from the commit log figure; characters past the limit are still red.
+
 ## [0.20.0] - 2026-11-09
 
 ### Changed
