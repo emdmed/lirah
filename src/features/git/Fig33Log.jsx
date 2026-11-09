@@ -1,12 +1,12 @@
-import { DASH, Figure, INK, Node, STROKE, T, CH, useFigureCompact } from '@/components/instrument/figure';
+import { Figure, INK, Node, STROKE, T, CH, useFigureCompact } from '@/components/instrument/figure';
 import { formatAgo } from '@/lib/formatDuration';
 
 // FIG.33: the commit about to land, set on top of the branch's last commits
 // as `git log --oneline` reads: a rail with one node per commit, the hash,
 // how long ago, and the subject. The new commit is the lit node; its subject
 // is in ink, the older ones muted, so the new line reads against the repo's
-// own style. A hairline at the subject limit marks where a line runs long;
-// characters past it are in the fault colour. Compact drops hash and age.
+// own style. Characters past the subject limit are in the fault colour.
+// Compact drops hash and age.
 
 const ROW = 18;
 const TOP = 26;
@@ -49,13 +49,6 @@ export function Fig33Log({ subject, max, commits = [], branch, now = Date.now(),
       label={label}
       paper="var(--ins-panel)"
     >
-      {/* The limit, drawn first so text with a halo breaks it. */}
-      <path
-        d={`M${limitX} ${TOP - 12}V${H - 2}`}
-        style={{ fill: 'none', stroke: over ? INK.fault : INK.edgeStrong, strokeWidth: STROKE.hair, strokeDasharray: over ? undefined : DASH.fine }}
-      />
-      {!compact && <T x={limitX + 4} y={TOP - 14} color={over ? INK.fault : INK.faint}>{max}</T>}
-
       {/* The rail runs from the new commit down past the oldest shown. */}
       {rows.length > 1 && (
         <path
