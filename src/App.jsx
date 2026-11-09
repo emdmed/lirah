@@ -176,6 +176,9 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode]);
 
+  // shortcut: only the focused tab is visible until chunk 14 fills this from zenColumns.
+  const visibleTabIds = [activeTabId];
+
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
@@ -183,14 +186,18 @@ function App() {
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-            {tabs.map(tab => (
+            {tabs.map(tab => {
+              const column = visibleTabIds.indexOf(tab.id);
+              return (
               <DevProfiler key={tab.id} id={`ProjectTab:${tab.label}`}>
                 <ProjectTab
                   tabId={tab.id}
                   workspaceId={tab.workspaceId}
                   projectPath={tab.projectPath}
                   isActive={tab.id === activeTabId}
-                  visible={tab.id === activeTabId}
+                  visible={column >= 0}
+                  column={Math.max(column, 0)}
+                  columns={visibleTabIds.length}
                   compactionHook={!!tab.compactionHook}
                   launchOnStart={!!tab.launch}
                   background={!!tab.background}
@@ -198,7 +205,8 @@ function App() {
                   availableUpdate={availableUpdate}
                 />
               </DevProfiler>
-            ))}
+              );
+            })}
             {showFirstTabChooser && workspaceTabs.length === 0 && !activeTab?.master && (
               <FirstTabChooser onOpenProject={(path) => addTab(path)} />
             )}

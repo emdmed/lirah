@@ -152,8 +152,9 @@ const MASTER_PROMPT = 'You are the agent in this Lirah workspace\'s workspace te
   + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the workspace terminal" section.';
 
 // visible: on screen (layout, polls, fit, rendering). isActive: focused (keys,
-// palette, status slot, dialogs, terminal focus). Only the focused tab is visible today.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visible = isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
+// palette, status slot, dialogs, terminal focus). column/columns: this visible
+// tab's slot among the side-by-side visible tabs.
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visible = isActive, column = 0, columns = 1, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -176,6 +177,8 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
   const style = {
     position: 'absolute',
     inset: 0,
+    // Visible tabs split the box into equal columns; hidden ones keep the full box.
+    ...(visible && columns > 1 && { left: `${(column * 100) / columns}%`, width: `${100 / columns}%` }),
     display: 'flex',
     flexDirection: 'column',
     transform: visible ? 'none' : 'translateX(-200vw)',
