@@ -85,7 +85,7 @@ function chunkSegments(chunks, open) {
 export function PlanDetail({ plan }) {
   const pane = usePlanPane();
   const { repoRoot } = pane;
-  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan } = usePlansActions();
+  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan, shelvePlan } = usePlansActions();
   const { tabs, switchTab, addTab } = useTabManager();
   const toast = useToast();
   const reviewingAll = useBusy(BUSY.REVIEW_ALL);
@@ -232,6 +232,12 @@ export function PlanDetail({ plan }) {
                 {started ? 're-chunk' : 're-split'}
               </PanelButton>
             )}
+            <PanelButton
+              onClick={() => shelvePlan(repoRoot, plan.id, !plan.shelved)}
+              title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Take this plan out of the tabs pane; it stays here'}
+            >
+              {plan.shelved ? 'unshelve' : 'shelve'}
+            </PanelButton>
             <PanelButton onClick={() => pane.deletePlan(plan)} title="Delete this plan (asks first)">delete</PanelButton>
           </span>
         </div>

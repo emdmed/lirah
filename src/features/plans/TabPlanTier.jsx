@@ -1,4 +1,4 @@
-import { Play, Square } from 'iconoir-react';
+import { Archive, Play, Square } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -32,9 +32,10 @@ export function isSettledPlan(plan) {
  * A tab row's plan tier: the plan its agent is working through, in a well, at
  * one fixed height. With nothing live it shows the latest finished plan and
  * `note` in place of the chunk in flight. A stopped run gets resume (the primary
- * key, also `p` on the row) and stop, in the card's last row.
+ * key, also `p` on the row) and stop, in the card's last row. Shelve takes the
+ * card off the tab without deleting the plan.
  */
-export function TabPlanTier({ plan, note, onOpen, onResume, onStop }) {
+export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve }) {
   const { done, total, running, tag, lampState } = planStatus(plan);
   const title = plan.title || UNTITLED_PLAN;
   const ap = plan.autopilot;
@@ -77,14 +78,19 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop }) {
       />
       <span className="flex h-8 min-w-0 items-end gap-2 leading-4 text-muted-foreground">
         <span className="line-clamp-2 min-w-0 flex-1 self-start break-words">{note ?? now}</span>
-        {(ap?.status === AUTOPILOT_STATUS.PAUSED || ap?.status === AUTOPILOT_STATUS.FAILED) && (
+        {ap?.status !== AUTOPILOT_STATUS.RUNNING && (
           <span className="flex shrink-0 items-center gap-1">
+            <RowAction onClick={onShelve} title="Take this plan off the tab; it stays under all plans" className={buttonVariants({ variant: 'ghost', size: 'panel' })}>
+              <Archive aria-hidden="true" />shelve
+            </RowAction>
+            {(ap?.status === AUTOPILOT_STATUS.PAUSED || ap?.status === AUTOPILOT_STATUS.FAILED) && (<>
             <RowAction onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)" className={buttonVariants({ variant: 'ghost', size: 'panel' })}>
               <Square aria-hidden="true" />stop
             </RowAction>
             <RowAction onClick={onResume} title="Carry on in this tab (p)" className={buttonVariants({ variant: 'default', size: 'panel' })}>
               <Play aria-hidden="true" />resume
             </RowAction>
+            </>)}
           </span>
         )}
       </span>

@@ -52,7 +52,7 @@ export function PlanRow({ plan, onOpen }) {
           </span>
         )}
         {plan.split === SPLIT_STATUS.DONE && !tag && (
-          <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">{stageLabel(plan)}</span>
+          <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">{plan.shelved ? 'shelved' : stageLabel(plan)}</span>
         )}
         {plan.split !== SPLIT_STATUS.DONE && (
           <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">

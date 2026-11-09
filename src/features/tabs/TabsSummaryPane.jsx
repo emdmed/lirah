@@ -64,7 +64,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
     [dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt],
   );
   const plans = useTabPlans(tabs, activeTabId);
-  const { resumeAutopilot, stopAutopilot } = usePlansActions();
+  const { resumeAutopilot, stopAutopilot, shelvePlan } = usePlansActions();
   // Read at click time, so the row actions stay stable while plans update (rows are memoized).
   const rootOf = useRef(plans.rootOf);
   rootOf.current = plans.rootOf;
@@ -134,6 +134,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
     }
   }, [resumeAutopilot, toast]);
   const stopPlan = useCallback((plan) => stopAutopilot(rootOf.current.get(plan.id), plan.id), [stopAutopilot]);
+  const shelve = useCallback((plan) => shelvePlan(rootOf.current.get(plan.id), plan.id, true), [shelvePlan]);
 
   const actions = useMemo(() => ({
     switchTab,
@@ -150,7 +151,8 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
     setRoleMenu: setRoleMenuId,
     resumePlan,
     stopPlan,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan]);
+    shelvePlan: shelve,
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve]);
 
   const kinds = [];
   let focusKeys = null;

@@ -475,6 +475,12 @@ export function PlansProvider({ children }) {
     stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
   });
 
+  // Out of the tabs pane, not deleted. A live run is turned off first, so nothing runs out of sight.
+  const shelvePlan = useCallback((repoRoot, planId, shelved) => {
+    if (shelved && isAutopilotLive(findPlan(repoRoot, planId)?.autopilot)) stopAutopilot(repoRoot, planId);
+    updatePlan(repoRoot, planId, { shelved });
+  }, [findPlan, stopAutopilot, updatePlan]);
+
   const actions = useMemo(() => ({
     loadRepo,
     getPlans,
@@ -501,6 +507,7 @@ export function PlansProvider({ children }) {
     resumeAutopilot,
     stopAutopilot,
     dismissAutopilot,
+    shelvePlan,
     revealRun,
     setGitConfig,
     addPlanRepo,
@@ -510,7 +517,7 @@ export function PlansProvider({ children }) {
     reopenGit,
   }), [loadRepo, getPlans, createPlan, replaceSource, rechunk, ensurePlanFile, sendPlanRevise, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
     implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
-    dismissAutopilot, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
+    dismissAutopilot, shelvePlan, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
 
   return (
     <PlansActionsContext.Provider value={actions}>

@@ -6,7 +6,7 @@ import { planProgress, planTabId, runRank, SPLIT_STATUS } from './planModel';
 /**
  * Plans for the tabs pane: the ones working in each open tab (tab id ->
  * plans), the active tab's repo's plans with work left and no tab, and each
- * plan's repo root (plan id -> root).
+ * plan's repo root (plan id -> root). Shelved plans stay out of both lists.
  */
 export function useTabPlans(tabs, activeTabId) {
   const roots = useRepoRoots(tabs.map((t) => t.projectPath));
@@ -27,14 +27,14 @@ export function useTabPlans(tabs, activeTabId) {
       for (const plan of plans) {
         rootOf.set(plan.id, root);
         const tabId = planTabId(plan);
-        if (open.has(tabId)) (byTab[tabId] ||= []).push(plan);
+        if (!plan.shelved && open.has(tabId)) (byTab[tabId] ||= []).push(plan);
       }
     }
     for (const list of Object.values(byTab)) list.sort((a, b) => runRank(a) - runRank(b));
 
     const loose = (plansByRepo?.[activeRoot] || [])
       .filter((plan) => {
-        if (open.has(planTabId(plan))) return false;
+        if (plan.shelved || open.has(planTabId(plan))) return false;
         if (plan.split !== SPLIT_STATUS.DONE) return true;
         const { done, total } = planProgress(plan);
         return done < total;

@@ -10,7 +10,7 @@ import { usePlanFiles } from './usePlanFiles';
 import { usePlanLifecycleSync } from './planLifecycle';
 import { FoundPlansSection } from './FoundPlansSection';
 import { EmptyLine, NewRow } from './parts';
-import { runRank, UNTITLED_PLAN } from './planModel';
+import { PLAN_STAGE, planStage, runRank, UNTITLED_PLAN } from './planModel';
 import { planGit } from './planGit';
 import { uncommittedFiles } from './planGitOps';
 import { basename } from '../../utils/pathUtils';
@@ -45,6 +45,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
 
   const [openPlanId, setOpenPlanId] = useState(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [showTucked, setShowTucked] = useState(false);
   const [busy, setBusy] = useState(null); // the BUSY key of the action in flight
 
   const openPlan = plans?.find((p) => p.id === openPlanId) || null;
@@ -252,6 +253,10 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
     return <div className="flex justify-center py-4"><Scanner size="md" label="Loading plans" /></div>;
   }
 
+  const sorted = [...plans].sort((a, b) => runRank(a) - runRank(b));
+  const tucked = sorted.filter(isTucked).length;
+  const shown = showTucked ? sorted : sorted.filter((p) => !isTucked(p));
+
   return (
     <>
       {openPlan ? (
@@ -271,8 +276,19 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
                 <span className="engraved-label">plans</span>
                 <span className="font-mono tabular-nums">{plans.length}</span>
                 <span className="truncate">· {basename(repoRoot)}</span>
+                {tucked > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTucked((v) => !v)}
+                    aria-pressed={showTucked}
+                    className="tui-btn ml-auto shrink-0"
+                    title={showTucked ? 'Hide finished and shelved plans' : 'Show finished and shelved plans'}
+                  >
+                    {showTucked ? 'hide' : 'show'} {tucked} done/shelved
+                  </button>
+                )}
               </div>
-              {[...plans].sort((a, b) => runRank(a) - runRank(b)).map((plan) => (
+              {shown.map((plan) => (
                 <PlanRow key={plan.id} plan={plan} onOpen={() => setOpenPlanId(plan.id)} />
               ))}
             </div>
@@ -290,3 +306,10 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
     </>
   );
 });
+
+// Done or shelved plans stay out of the list until asked for. An open PR still needs you.
+export function isTucked(plan) {
+  if (plan.shelved) return true;
+  const stage = planStage(plan);
+  return stage === PLAN_STAGE.MERGED || stage === PLAN_STAGE.IMPLEMENTED;
+}

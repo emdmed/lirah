@@ -370,6 +370,7 @@ export const TabRow = memo(function TabRow({
               onOpen={() => actions.openPlan(tab.id, plan.id)}
               onResume={() => actions.resumePlan(plan)}
               onStop={() => actions.stopPlan(plan)}
+              onShelve={() => actions.shelvePlan(plan)}
             />
           ))}
         </>
