@@ -79,6 +79,11 @@ export const SETTINGS_ROWS = [
     words: 'window controls title bar header minimize maximize close chrome',
   },
   {
+    id: 'zen-mode', section: 'appearance', kind: 'toggle', key: 'zenMode',
+    label: 'Zen mode', hint: 'Hide the panes and top rail. The terminal stays, with a status strip, a bottom line and drawers.',
+    words: 'zen mode focus distraction free minimal hide panes chrome',
+  },
+  {
     id: 'figures', section: 'appearance', kind: 'choice', key: 'figures',
     label: 'Figures', hint: 'Full prints scales and values. Compact keeps the marks only.',
     words: 'figures drawings diagrams compact full calibrated',

@@ -22,6 +22,8 @@ export const SETTINGS_DEFAULTS = {
   sandboxEnabled: false,
   networkIsolation: false,
   showTitleBar: true,
+  // Window-wide: hide the panes and top rail, leaving the terminal and Zen's own chrome.
+  zenMode: false,
   keepFilesAfterSend: false,
   // Launch the CLI automatically when a starred (bookmarked) repo is opened.
   // Never applies to tabs restored at startup: that isn't a deliberate act.

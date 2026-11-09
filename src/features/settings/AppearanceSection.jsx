@@ -67,6 +67,7 @@ const FIGURE_OPTIONS = [
 export function AppearanceSection({ active, showTitleBar, onShowTitleBarChange }) {
   const { currentTheme, themes, changeTheme } = useTheme();
   const [figures, setFigures] = useSetting('figures');
+  const [zenMode, setZenMode] = useSetting('zenMode');
   const figuresRow = SETTINGS_ROW.figures;
   return (
     <Section section={SECTIONS.find((s) => s.id === 'appearance')} active={active}>
@@ -74,6 +75,7 @@ export function AppearanceSection({ active, showTitleBar, onShowTitleBarChange }
         <ThemeList themes={themes} value={currentTheme} onChange={changeTheme} />
       </Row>
       <ToggleRow row={SETTINGS_ROW['title-bar']} value={showTitleBar} onChange={onShowTitleBarChange} />
+      <ToggleRow row={SETTINGS_ROW['zen-mode']} value={zenMode} onChange={setZenMode} />
       <Row id={figuresRow.id} sectionId="appearance" label={figuresRow.label} hint={figuresRow.hint}>
         <Detent
           label={figuresRow.label}
