@@ -52,9 +52,8 @@ function Readout({ info, contextFill, autoCommit, lamp, label }) {
   if (autoCommit && autoCommit !== 'done') {
     diff = <AutoCommitMark stage={autoCommit} />;
   } else if (info?.branch) {
-    diff = info.files === 0 ? (
-      'clean'
-    ) : (
+    // Clean is the resting state: an empty slot says it.
+    diff = info.files === 0 ? null : (
       <span className="inline-flex" title={`${plural(info.files, 'file')} changed · +${info.added} −${info.deleted}`}>
         {info.added || info.deleted
           ? <DiffBar added={info.added} removed={info.deleted} side={24} fmt={compactCount} />
@@ -215,13 +214,14 @@ export const TabRow = memo(function TabRow({
       )}
       {/* Tier 1: what it is and what it is doing. */}
       <div className="flex h-5 min-w-0 items-center gap-2">
-        {/* Boxed tab number, 16px wide so the tiers below line up at pl-6. */}
+        {/* Tab number, 16px wide so the tiers below line up at pl-6. Boxed only
+            while it waits on you; otherwise a plain ordinal, not a keycap. */}
         <span
           aria-hidden="true"
-          title={queued ? `Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A` : undefined}
+          title={queued ? `Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A` : index < 9 ? `Ctrl+${index + 1}` : undefined}
           className={cn(
             'inline-flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[11px] tabular-nums',
-            queued ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]' : 'border-[var(--ins-edge-strong)] text-muted-foreground',
+            queued ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]' : 'border-transparent text-muted-foreground',
           )}
         >
           {index + 1}

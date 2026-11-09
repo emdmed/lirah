@@ -51,7 +51,7 @@ const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 pl-1.5 pr-1 border 
  * The prompt pane without the prompt: a manifest of what Lirah appends to the
  * next prompt typed in the terminal, one labelled row per kind of context.
  *
- *   [3] CONTEXT  sends with your next prompt ✦ ───── type prompts in terminal|box
+ *   [3] CONTEXT  sends with your next prompt ✦ ───── terminal|prompt box
  *
  *     FILES          [EDIT app.jsx ×] [READ README.md ×]
  *     CODE           [fn parse ×]
@@ -330,7 +330,7 @@ export const ContextStatus = memo(function ContextStatus({
     );
   } else {
     manifest = (
-      <dl className="flex flex-col gap-y-2">
+      <dl className="flex flex-col gap-y-1">
         {GHOSTS.filter((g) => g.row !== 'features' || hasMap).map((g) => (
           <ManifestRow key={g.row} label={g.row}>
             <button
@@ -352,7 +352,7 @@ export const ContextStatus = memo(function ContextStatus({
   }
 
   return (
-    <div ref={rootRef} data-pane="3" data-title="[3] context" data-legend className="group/ctx tui-pane flex flex-col px-4 pt-[22px] pb-[18px] gap-3" onKeyDown={onPaneKeyDown}>
+    <div ref={rootRef} data-pane="3" data-title="[3] context" data-legend className="group/ctx tui-pane flex flex-col px-4 pt-[22px] pb-[18px] gap-2" onKeyDown={onPaneKeyDown}>
       <PaneLegend
         index={3}
         title="Context"
@@ -538,7 +538,7 @@ function FeaturePicker({ features, pinnedIds, onAdd, onClose }) {
 // One kind of context: a printed label in a fixed column, its items beside it.
 function ManifestRow({ label, children }) {
   return (
-    <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-x-4">
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-x-3">
       <dt className="ins-legend h-5 flex items-center text-muted-foreground">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>

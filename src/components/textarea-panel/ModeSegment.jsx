@@ -88,8 +88,7 @@ export function InputModeSwitch({ mode, onChange }) {
     pick(mode === 'terminal' ? 'box' : 'terminal');
   };
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="text-[11px] text-muted-foreground" aria-hidden="true">type prompts in</span>
+    <span className="inline-flex items-center">
       <span
         role="radiogroup"
         aria-label="Where you type prompts"

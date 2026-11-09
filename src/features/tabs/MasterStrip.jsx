@@ -80,7 +80,7 @@ function WorkerFan({ workers }) {
 // up while any tab works. Hidden when the pane is too narrow to hold it.
 function BusyBox({ busy, total }) {
   return (
-    <span className="hidden shrink-0 items-center @[300px]:flex">
+    <span className="hidden shrink-0 items-center @[300px]:flex" title={`${busy} of ${total} tabs it drives are busy`}>
       <span className="h-px w-2.5 bg-[var(--ins-faint)]" />
       <span className="mr-1 size-[3px] rounded-full bg-[var(--ins-faint)]" />
       <span

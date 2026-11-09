@@ -155,6 +155,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
   }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve]);
 
   const kinds = [];
+  const faulted = []; // tabs whose run stopped, for the closing line
   let focusKeys = null;
 
   return (
@@ -189,6 +190,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
             ? { kind: autopilotLamp(stopped).state === 'fault' ? 'failed' : 'permission', label: `auto-pilot ${haltWord(stopped)}`, since: own.since }
             : own;
         kinds.push(activity.kind);
+        if (activity.kind === 'failed') faulted.push({ id: tab.id, name: tabName(tab) });
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
         const trailOpen = !!summary && openTrail === tab.id;
         // Only the tab you're on or the row you've selected unfolds, so rows never
@@ -262,6 +264,21 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
               {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
               <span className={t.className}>{t.n}</span>
               <span className="text-muted-foreground">{t.label}</span>
+              {/* Name the stopped tab; clicking selects its row, which unfolds the reason and resume. */}
+              {t.label === 'run stopped' && faulted.length > 0 && (
+                <button
+                  type="button"
+                  className="ins-name cursor-pointer text-xs text-foreground hover:text-[var(--ins-fault)] focus-ring"
+                  title="Show the stopped run"
+                  onClick={(e) => {
+                    const row = e.currentTarget.closest('.group\\/list')?.querySelector(`[data-tab-row="${faulted[0].id}"]`);
+                    row?.focus();
+                    row?.scrollIntoView({ block: 'nearest' });
+                  }}
+                >
+                  {faulted[0].name}{faulted.length > 1 ? ` +${faulted.length - 1}` : ''}
+                </button>
+              )}
             </span>
           ))}
         </span>

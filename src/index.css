@@ -146,16 +146,17 @@
   does: lamps for live state, and keycaps for keys. Every value derives from the active theme.
 */
 :root {
-  --ins-gutter:      color-mix(in srgb, var(--color-background) 78%, #000);
+  /* 70%: at 78% the face and gutter sat ~1.1:1 and resting panes melted into the sky. */
+  --ins-gutter:      color-mix(in srgb, var(--color-background) 70%, #000);
   --ins-panel:       var(--color-background);
   --ins-raised:      color-mix(in srgb, var(--color-background) 94%, var(--color-foreground));
   --ins-well:        color-mix(in srgb, var(--color-background) 88%, #000);
   --ins-glass:       var(--color-terminal-bg, var(--color-background));
   --ins-edge:        color-mix(in srgb, var(--color-background) 84%, var(--color-foreground));
   --ins-edge-strong: color-mix(in srgb, var(--color-background) 70%, var(--color-foreground));
-  /* The focused pane's frame: edge-strong warmed toward the lamp, so focus
-     reads at a glance without flooding the pane. */
-  --ins-edge-focus:  color-mix(in srgb, var(--ins-lamp) 45%, var(--ins-edge-strong));
+  /* The focused pane's frame is ink, not gold: focus is not live state. Its
+     key number carries the gold. */
+  --ins-edge-focus:  var(--ins-edge-ctl);
   --ins-legend:      color-mix(in srgb, var(--color-foreground) 85%, var(--color-background));
   --ins-lamp:        var(--color-lamp, var(--color-primary));
   --ins-lamp-off:    color-mix(in srgb, var(--color-foreground) 18%, var(--color-background));
