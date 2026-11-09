@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { matches } from '../lib/shortcuts';
 import { requestJobsPane } from '../features/agent-jobs/jobsPane';
+import { getSettings } from '../features/settings/settingsStore';
+import { toggleDrawer } from '../features/zen/zenDrawerStore';
 
 // Panes are numbered like lazygit's: [1] files, [2] terminal, [3] prompt, [4] jobs.
 // Each pane root carries data-pane="N"; an element inside it marked
@@ -47,6 +49,13 @@ function focusPane4Content() {
 export function usePaneShortcuts() {
   useEffect(() => {
     const onKeyDown = (e) => {
+      // In Zen the jobs pane is hidden: Alt+4 is the tabs drawer.
+      if (getSettings().zenMode && matches('zen-tabs', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleDrawer('tabs');
+        return;
+      }
       if (!matches('pane-focus', e)) return;
       e.preventDefault();
       e.stopPropagation();

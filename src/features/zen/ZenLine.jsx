@@ -14,6 +14,10 @@ import { activityLamp, remoteLabel, remoteWork, tabActivity } from '../tabs/tabA
 import { rowActivity } from '../tabs/TabsSummaryPane';
 import { useTabPlans } from '../plans/useTabPlans';
 import { useAgentJobs } from '../agent-jobs/AgentJobsContext';
+import { useEffect } from 'react';
+import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
+import { ZenDrawer } from './ZenDrawer';
+import { closeDrawer, toggleDrawer } from './zenDrawerStore';
 
 // The active tab portals its LirahMark (lit while its session runs) in here.
 export const ZEN_LINE_MARK_SLOT_ID = 'zen-line-mark-slot';
@@ -66,8 +70,8 @@ export function ZenLine() {
           {w.name}
         </button>
       ))}
-      <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-        tabs
+      <span data-zen-segment="tabs" className="flex shrink-0 items-center gap-1 text-muted-foreground">
+        <button type="button" className={ITEM} onClick={() => toggleDrawer('tabs')} title="Tabs (Alt+4)">tabs</button>
         {workspaceTabs.map((tab) => {
           const work = remote[tab.id];
           const workFrom = work && tabs.find((t) => t.id === work.fromTabId);
@@ -106,6 +110,18 @@ export function ZenLine() {
       <div className="flex-1 self-stretch" {...drag} />
       <KeyChord keys={shortcutKeys('zen-toggle')} label="zen" />
       {!IS_MAC && controls}
+      <TabsDrawer activeTabId={activeTabId} />
     </div>
+  );
+}
+
+// The workspace pane's tab rows, with their keys (j/k, Enter, row keys).
+// Switching tab closes it, so you land in the new tab's terminal.
+function TabsDrawer({ activeTabId }) {
+  useEffect(() => () => closeDrawer('tabs'), [activeTabId]);
+  return (
+    <ZenDrawer id="tabs" title="tabs" keys={shortcutKeys('zen-tabs')} className="w-[28rem]" focus={`[data-tab-row="${activeTabId}"]`}>
+      <TabsSummaryPane />
+    </ZenDrawer>
   );
 }
