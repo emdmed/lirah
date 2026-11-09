@@ -178,7 +178,9 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
     position: 'absolute',
     inset: 0,
     // Visible tabs split the box into equal columns; hidden ones keep the full box.
-    ...(visible && columns > 1 && { left: `${(column * 100) / columns}%`, width: `${100 / columns}%` }),
+    // Always set: dropping `left` would clear the left that `inset` set (leaving Zen broke the layout).
+    left: visible && columns > 1 ? `${(column * 100) / columns}%` : 0,
+    width: visible && columns > 1 ? `${100 / columns}%` : '100%',
     display: 'flex',
     flexDirection: 'column',
     transform: visible ? 'none' : 'translateX(-200vw)',
