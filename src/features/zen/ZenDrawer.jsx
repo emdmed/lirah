@@ -26,7 +26,8 @@ export function ZenDrawer({ id, focus, className, children, ...pane }) {
   useEffect(() => {
     if (!isOpen || !pos) return;
     const el = ref.current;
-    (el.querySelector(focus) ?? el.querySelector('button, [tabindex]:not([tabindex="-1"])'))?.focus({ preventScroll: true });
+    // An empty drawer (nothing to focus) takes focus itself, so Esc still reaches it.
+    (el.querySelector(focus) ?? el.querySelector('button, [tabindex]:not([tabindex="-1"])') ?? el).focus({ preventScroll: true });
     const onPointer = (e) => {
       // Menus and dialogs a row opens are portalled out of the drawer but belong to it.
       if (e.target.closest?.('[data-radix-popper-content-wrapper], [role="dialog"], [role="menu"]')) return;
@@ -59,6 +60,7 @@ export function ZenDrawer({ id, focus, className, children, ...pane }) {
       data-state="open"
       className={`ins-pop fixed z-50 flex flex-col max-h-[60vh] overflow-y-auto ${className ?? ''}`}
       style={pos}
+      tabIndex={-1}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !e.defaultPrevented) {
           e.preventDefault();

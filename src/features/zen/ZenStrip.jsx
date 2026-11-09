@@ -52,7 +52,7 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
   const plans = byTab[tabId];
   const { files } = useAgentFileActivity(isActive);
   const queue = useAttentionQueue(workspaceTabs);
-  const folded = useSetting('zenStripFolded');
+  const [folded] = useSetting('zenStripFolded');
 
   // The tabs pane's 1s clock, for activity and its "since".
   const [now, setNow] = useState(() => Date.now());
