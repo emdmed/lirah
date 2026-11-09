@@ -19,12 +19,14 @@ function findFocusTarget(pane) {
   return null;
 }
 
-/** The pane N of the tab currently on screen. Inactive tabs stay laid out
- *  (visibility:hidden, moved off-screen), so offsetParent alone can't tell. */
+/** The pane N of the focused tab, or the first one on screen for panes outside
+ *  tabs (jobs). Hidden tabs stay laid out (moved off-screen), so offsetParent
+ *  alone can't tell, and several tabs can be on screen at once. */
 export function findVisiblePane(n) {
-  return [...document.querySelectorAll(`[data-pane="${n}"]`)].find(
+  const shown = [...document.querySelectorAll(`[data-pane="${n}"]`)].filter(
     (el) => el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden',
-  ) || null;
+  );
+  return shown.find((el) => el.closest('[data-tab-active]')) || shown[0] || null;
 }
 
 export function focusPane(n) {

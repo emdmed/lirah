@@ -151,7 +151,9 @@ const MASTER_PROMPT = 'You are the agent in this Lirah workspace\'s workspace te
   + 'the user asks you for work and you hand it to them with `lirah tabs send` and collect it with `lirah tabs wait`, '
   + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the workspace terminal" section.';
 
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
+// visible: on screen (layout, polls, fit, rendering). isActive: focused (keys,
+// palette, status slot, dialogs, terminal focus). Only the focused tab is visible today.
+export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visible = isActive, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -176,8 +178,8 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
-    transform: isActive ? 'none' : 'translateX(-200vw)',
-    zIndex: isActive ? 1 : 0,
+    transform: visible ? 'none' : 'translateX(-200vw)',
+    zIndex: visible ? 1 : 0,
   };
 
   // The switch itself is just the style above. Re-rendering the tab contents
@@ -186,25 +188,29 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   // frame showing the new tab has painted, so it appears before React gets
   // to it.
   const [innerActive, setInnerActive] = useState(isActive);
+  const [innerVisible, setInnerVisible] = useState(visible);
   useEffect(() => {
-    if (innerActive === isActive) return;
+    if (innerActive === isActive && innerVisible === visible) return;
     let timer = 0;
     const raf = requestAnimationFrame(() => {
-      timer = setTimeout(() => startTransition(() => setInnerActive(isActive)), 0);
+      timer = setTimeout(() => startTransition(() => {
+        setInnerActive(isActive);
+        setInnerVisible(visible);
+      }), 0);
     });
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(timer);
     };
-  }, [isActive, innerActive]);
+  }, [isActive, innerActive, visible, innerVisible]);
 
   // Restored tabs boot on first activation, not at startup: each one spawns a
   // PTY, a WebGL context and its pollers, so N persisted tabs used to cost N
   // of everything before the user looked at any but one. Once booted a tab
   // stays mounted, as before.
   // A background tab (woken by the master agent) boots without being shown.
-  const [booted, setBooted] = useState(isActive || background);
-  if ((innerActive || background) && !booted) setBooted(true);
+  const [booted, setBooted] = useState(visible || background);
+  if ((innerVisible || background) && !booted) setBooted(true);
 
   // Latched once the tab is first ready (shell up, agent started and drawn);
   // until then the placeholder covers the pane. A shell or agent that never
@@ -223,10 +229,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider initialFiles={draft?.files}>
-        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, draft, tabId, workspaceId, innerActive, projectPath, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -257,14 +263,14 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, tabI
   }, [isActive]);
 
   return (
-    <div ref={paneRef} style={style} aria-hidden={!isActive} data-tab-pane data-tab-active={isActive || undefined}>
+    <div ref={paneRef} style={style} aria-hidden={!visible} data-tab-pane data-tab-active={isActive || undefined}>
       {content}
       {!ready && <TabBootPlaceholder projectPath={projectPath} stage={bootStage} />}
     </div>
   );
 });
 
-function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -388,17 +394,17 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
 
   const sidebarSearch = useSidebarSearch();
   // Polled while active: the terminal legend shows the Claude mark while claude runs.
-  const cliRunning = useCliRunning(terminalSessionId, isActive);
+  const cliRunning = useCliRunning(terminalSessionId, visible);
 
   const treeView = useTreeView({
     terminalSessionId,
     setCurrentPath,
     initializeSearch: sidebarSearch.initializeSearch,
     searchResults: sidebarSearch.searchResults,
-    isActive,
+    isActive: visible,
     // A running agent can't cd the shell, and in the sandbox the cwd lookup
     // would read the agent's own child processes, so follow only a bare shell.
-    followCwd: isActive && sidebar.sidebarOpen && viewMode === 'tree' && cliRunning === null,
+    followCwd: visible && sidebar.sidebarOpen && viewMode === 'tree' && cliRunning === null,
   });
 
   // Terminate any running CLI process in the terminal before navigation
@@ -418,7 +424,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     }
   }, [terminalSessionId]);
 
-  const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, isActive && !!currentPath && !secondary.secondaryFullscreen);
+  const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, visible && !!currentPath && !secondary.secondaryFullscreen);
 
   const compaction = useCompactionHook({ tabId, terminalSessionId, enabled: compactionHook });
 
@@ -464,7 +470,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
 
   useEffect(() => {
     const id = terminalSessionId;
-    if (!(settings.autoLaunchCli || launchRequested) || !(isActive || background) || !terminalReady || !id || freshShellRef.current !== id) return;
+    if (!(settings.autoLaunchCli || launchRequested) || !(visible || background) || !terminalReady || !id || freshShellRef.current !== id) return;
     const cancel = (e) => {
       // Keys typed in another tab (the master) must not cancel a background launch.
       if (!isActive) return;
@@ -486,7 +492,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
       clearTimeout(timer);
       window.removeEventListener('keydown', cancel, true);
     };
-  }, [settings.autoLaunchCli, launchRequested, isActive, background, terminalReady, terminalSessionId, launchFresh, onReady]);
+  }, [settings.autoLaunchCli, launchRequested, isActive, visible, background, terminalReady, terminalSessionId, launchFresh, onReady]);
 
   // When the boot placeholder can lift. Without an agent on its way (auto-launch
   // off, or a shell reclaimed after a reload), as soon as the shell is up.
@@ -787,7 +793,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   useEffect(() => () => clearFeatures(), [clearFeatures]);
 
   // Get current git branch
-  const branchName = useBranchName(secondary.secondaryFullscreen ? null : resolvedProjectDir, isActive);
+  const branchName = useBranchName(secondary.secondaryFullscreen ? null : resolvedProjectDir, visible);
 
   // Keyboard shortcuts
   const { templateDropdownOpen, setTemplateDropdownOpen } = useTextareaShortcuts({
@@ -835,7 +841,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
   // Ink-style TUI (e.g. Claude Code) repaints against the pre-switch size
   // and the visible canvas keeps stale pixels until the next full redraw.
   useEffect(() => {
-    if (!isActive || !terminalReady) return;
+    if (!visible || !terminalReady) return;
     perfTabSwitchStep('tab-updated');
     let raf1 = 0;
     let raf2 = 0;
@@ -843,14 +849,14 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
       setTimeout(() => perfTabSwitchStep('tab-updated-painted', { last: true }), 0);
       raf2 = requestAnimationFrame(() => {
         terminalRef.current?.resize?.();
-        terminalRef.current?.focus?.();
+        if (isActive) terminalRef.current?.focus?.();
       });
     });
     return () => {
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isActive, terminalReady]);
+  }, [visible, isActive, terminalReady]);
 
   // Refs keep these callbacks stable across stage changes.
   const autoCommitStageRef = useRef(autoCommit.stage);
@@ -1074,7 +1080,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               currentPath={currentPath}
               featureMarks={featureMarks}
               folders={folders}
-              fileWatchingEnabled={fileWatchingEnabled && isActive && !secondary.secondaryFullscreen}
+              fileWatchingEnabled={fileWatchingEnabled && visible && !secondary.secondaryFullscreen}
               // The prompt box or the context status always holds the
               // selection, so a file click selects it (with its modify /
               // don't-modify / example state) instead of typing its path.
@@ -1090,7 +1096,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               onGitChanges={handleGitChanges}
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
-              isActive={isActive}
+              isActive={visible}
             />
           )
         }
@@ -1225,7 +1231,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
               onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
               onFocusModeChange={handleFocusModeChange}
               initialCommand={secondary.pendingCommand}
-              isActive={isActive}
+              isActive={visible}
             />
           )
         }
@@ -1234,7 +1240,7 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
           key={terminalKey}
           ref={terminalRef}
           theme={theme.terminal}
-          isActive={isActive}
+          isActive={visible}
           onSessionReady={handleSessionReady}
           onReady={handleTerminalReady}
           onSearchFocus={handleSearchFocus}
@@ -1252,21 +1258,21 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
         {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}
           sessionId={terminalSessionId}
-          isActive={isActive}
+          isActive={visible}
           selectedCli={settings.selectedCli}
           onLaunch={launchClaude}
           onChangeCli={openCliSettings}
         />}
         <NoPluginBanner
           sessionId={terminalSessionId}
-          isActive={isActive}
+          isActive={visible}
           selectedCli={settings.selectedCli}
           onRelaunch={relaunchCli}
         />
       </Layout>
 
       {/* The tabs pane draws each tab's context fill as a moon. */}
-      <TabContextFillSync tabId={tabId} isActive={isActive} tokenUsageStore={tokenUsageStore} terminalSessionId={terminalSessionId} />
+      <TabContextFillSync tabId={tabId} isActive={visible} tokenUsageStore={tokenUsageStore} terminalSessionId={terminalSessionId} />
       {isActive && (
         <CommandPalette open={palette.open} onClose={palette.close} commands={commands} />
       )}

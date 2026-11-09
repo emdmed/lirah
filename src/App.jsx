@@ -190,6 +190,7 @@ function App() {
                   workspaceId={tab.workspaceId}
                   projectPath={tab.projectPath}
                   isActive={tab.id === activeTabId}
+                  visible={tab.id === activeTabId}
                   compactionHook={!!tab.compactionHook}
                   launchOnStart={!!tab.launch}
                   background={!!tab.background}
