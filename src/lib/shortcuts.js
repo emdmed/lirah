@@ -43,6 +43,7 @@ export const SHORTCUTS = [
   { id: 'zen-files', keys: ['Alt', '1'], description: 'Files Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit1' },
   { id: 'zen-tabs', keys: ['Alt', '4'], description: 'Tabs Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit4' },
   { id: 'zen-plan', keys: ['Alt', '6'], description: 'Plan Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit6' },
+  { id: 'zen-context', keys: ['Alt', '7'], description: 'Context Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit7' },
   { id: 'add-feature', keys: ['Alt', '5'], description: 'Add a feature to the context', category: 'Panes & Views', note: 'context pane, when the project has a feature map', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit5' },
   { id: 'nav-mode', keys: ['Ctrl', 'S'], description: 'Navigation Mode', category: 'Panes & Views', note: 'stops a running agent, asks first', match: (e) => e.ctrlKey && e.key === 's' },
   { id: 'palette', keys: ['Ctrl', ':'], description: 'Command Palette', category: 'Panes & Views', note: 'or : outside a text field', hint: { bar: 'ctrl', label: 'commands' } },

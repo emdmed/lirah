@@ -21,6 +21,7 @@ import { setSetting, useSetting } from '../settings/settingsStore';
 import { cn } from '../../lib/utils';
 import { FilesDrawer } from './FilesDrawer';
 import { PlanDrawer } from './PlanDrawer';
+import { ContextDrawer } from './ContextDrawer';
 import { toggleDrawer } from './zenDrawerStore';
 
 const noop = () => {};
@@ -126,7 +127,13 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
             )}
           </Button>
           {fill != null && (
-            <Button variant="ghost" className={GHOST} onClick={noop} title={`Context ${Math.round(fill * 100)}% full`}>
+            <Button
+              variant="ghost"
+              className={GHOST}
+              data-zen-segment={isActive ? 'context' : undefined}
+              onClick={() => toggleDrawer('context')}
+              title={`Context ${Math.round(fill * 100)}% full (Alt+7)`}
+            >
               <ContextMoon ratio={fill} />
             </Button>
           )}
@@ -167,6 +174,7 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
       </div>
       {isActive && <FilesDrawer files={files} root={root} />}
       {isActive && plan && <PlanDrawer plan={plan} repoRoot={rootOf.get(plan.id)} />}
+      {isActive && <ContextDrawer projectPath={root} />}
     </div>
   );
 }
