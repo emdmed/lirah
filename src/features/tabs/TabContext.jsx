@@ -6,7 +6,7 @@ import { getTabSession } from "./terminalActivity";
 import { deleteWorkspaceFolder, getSavedWorkspaces, saveWorkspaces } from "../../lib/workspaceStore";
 import { perfTabSwitchStart, perfTabSwitchStep } from "../../lib/perf";
 import { invoke } from "@tauri-apps/api/core";
-import { getEffectiveSettings } from "../settings/settingsStore";
+import { getEffectiveSettings, getSettings } from "../settings/settingsStore";
 import { formatDuration } from "../../lib/formatDuration";
 import { tildePath } from "../../components/ui/picker";
 import { assertColumnRoom, placeColumn } from "../zen/zenColumns";
@@ -203,13 +203,19 @@ export function TabProvider({ children }) {
       if (idx === -1) return prev;
       const next = prev.filter(t => t.id !== tabId);
       if (next.length === 0) return prev; // Don't remove last tab here; lifecycle handles it
+      const ws = prev[idx].workspaceId;
+      // A closed tab's Zen column closes with it (else focus-follow would refill it).
+      const cols = workspacesRef.current.find((w) => w.id === ws)?.zenColumns ?? [];
+      const col = cols.indexOf(tabId);
+      const restCols = cols.filter((id) => id !== tabId && next.some((t) => t.id === id));
+      if (col >= 0) setWorkspaces((p) => p.map((w) => (w.id === ws ? { ...w, zenColumns: restCols } : w)));
       // If removing the active tab, switch to the adjacent one in its
-      // workspace; the workspace may be left empty.
+      // workspace (in Zen, the neighbouring column); the workspace may be left empty.
       if (tabId === activeTabIdRef.current) {
-        const ws = prev[idx].workspaceId;
         const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws && !t.master);
         const after = next.slice(idx).filter((t) => t.workspaceId === ws && !t.master);
-        setActiveTabId((after[0] || before[before.length - 1])?.id || null);
+        const neighbour = getSettings().zenMode && col >= 0 && restCols[Math.min(col, restCols.length - 1)];
+        setActiveTabId(neighbour || (after[0] || before[before.length - 1])?.id || null);
       }
       return next;
     });

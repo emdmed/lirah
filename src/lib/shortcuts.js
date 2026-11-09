@@ -15,7 +15,7 @@
 //                   component of its own (palette, prompt, terminal, files
 //                   pane) don't have one yet.
 //
-// Handlers: App.jsx (tabs, Alt+A), usePaneShortcuts (Alt+1-4, Zen drawers),
+// Handlers: App.jsx (tabs, Alt+A, Zen columns), usePaneShortcuts (Alt+1-4, Zen drawers),
 // useTabShortcuts (incl. Ctrl+Shift+E), useViewModeShortcuts,
 // useTextareaShortcuts, useHelpShortcut, useBookmarksShortcut,
 // useCommandPalette, useTerminal's key handler (Ctrl+F/G/Shift+F with the
@@ -36,6 +36,7 @@ export const SHORTCUTS = [
   { id: 'tab-next', keys: ['Ctrl', 'Tab'], description: 'Next Tab', category: 'Tabs', note: '+Shift for previous', match: (e) => mod(e) && e.key === 'Tab' },
   { id: 'tab-goto', keys: ['Ctrl', '1-9'], description: 'Go to Tab N', category: 'Tabs', hint: { bar: 'ctrl', label: 'go to tab' }, match: (e) => mod(e) && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9' },
   { id: 'workspace-next', keys: ['Alt', 'W'], description: 'Next Workspace', category: 'Tabs', note: '+Shift for previous', match: (e) => alt(e) && e.code === 'KeyW' },
+  { id: 'zen-column', keys: ['Ctrl', 'Alt', '1-3'], description: 'Focus Zen Column', category: 'Tabs', note: 'Zen mode, left to right', match: (e) => e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey && /^Digit[1-3]$/.test(e.code) },
   { id: 'attention-jump', keys: ['Alt', 'A'], description: 'Jump to Agent Waiting on You', category: 'Tabs', note: 'repeat for the next', paletteCommand: 'waiting', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyA' },
 
   // Panes & views

@@ -32,7 +32,8 @@ const ITEM = 'shrink-0 px-1 hover:text-foreground focus-ring';
 export function ZenLine() {
   const [showTitleBar] = useSetting('showTitleBar');
   const drag = showTitleBar ? { 'data-tauri-drag-region': true } : {};
-  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace } = useTabManager();
+  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, zenColumns, switchTab, switchWorkspace } = useTabManager();
+  const columns = zenColumns.length ? zenColumns : [activeTabId];
   const { bookmarks } = useBookmarks();
   // Same sources as the tabs pane, so every lamp matches its row.
   const { cli, now } = useTabsSummary(tabs);
@@ -81,17 +82,21 @@ export function ZenLine() {
             plans.byTab[tab.id],
           );
           const queued = tab.id !== activeTabId && queue.some((q) => q.tabId === tab.id);
+          const column = columns.indexOf(tab.id) + 1;
           return (
             <button
               key={tab.id}
               type="button"
-              className="inline-flex focus-ring"
-              title={`${tabName(tab)} · ${activity.label}`}
-              aria-label={`${tabName(tab)}, ${activity.label}`}
+              className="inline-flex items-center gap-px focus-ring"
+              title={`${tabName(tab)} · ${activity.label}${column ? ` · column ${column}` : ''}`}
+              aria-label={`${tabName(tab)}, ${activity.label}${column ? `, column ${column}` : ''}`}
               aria-current={tab.id === activeTabId || undefined}
               onClick={() => switchTab(tab.id)}
             >
               <Lamp {...activityLamp(activity.kind, queued)} />
+              {column > 0 && (
+                <span aria-hidden className={cn('text-[9px] leading-none tabular-nums', tab.id === activeTabId && 'text-foreground')}>{column}</span>
+              )}
             </button>
           );
         })}

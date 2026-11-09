@@ -140,6 +140,15 @@ function App() {
         switchWorkspace(workspaces[(idx + step) % workspaces.length].id);
         return;
       }
+      // Ctrl+Alt+1-3: focus Zen column N
+      if (matches('zen-column', e)) {
+        const id = zenMode && zenColumns[Number(e.code.slice(5)) - 1];
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        switchTab(id);
+        return;
+      }
       // Alt+A: next tab whose agent is waiting on you
       if (matches('attention-jump', e)) {
         e.preventDefault();
@@ -174,7 +183,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode]);
+  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode, zenMode, zenColumns]);
 
   // In Zen the workspace's columns are on screen (they always hold the focused tab).
   const visibleTabIds = zenMode && zenColumns.length > 0 ? zenColumns : [activeTabId];
