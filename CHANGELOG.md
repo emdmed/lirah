@@ -4,6 +4,20 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-09
+
+### Added
+
+- **Auto-pilot catches up after the app closes** - If the agent kept committing chunks while Lirah was closed, the plan picks them up as soon as it loads. The paused run then says which chunks are done and that resume sends the next one.
+- **Resume from tab rows** - A paused auto-pilot run can be resumed from its tab row.
+
+### Changed
+
+- **Clearer auto-pilot loop** - All four steps of the loop drawing are named (implement, check, nudge, next), and the chips no longer carry numbers that read as chunk numbers. The drawing shows only while the run is going. A paused run shows its message and resume instead of a red mark.
+- **Less repetition in the plan pane** - During a run the timeline drops its count and "slowest" note, and the plan git drawing shrinks to one line, so the chunk list shows without scrolling.
+- **Button roles in plans** - Stop no longer looks like a checkbox, "go to tab" is a plain tool, a finished plan's "review all" is the main action, and the revise, chunk edit and decisions forms use a filled save with an outline cancel.
+- **Plainer messages** - Commits read as "chunk 11 · title", and a paused run says "Resume to pick up where it stopped".
+
 ## [0.20.1] - 2026-11-09
 
 ### Fixed
