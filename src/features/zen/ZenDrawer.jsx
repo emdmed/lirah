@@ -20,7 +20,12 @@ export function ZenDrawer({ id, focus, className, children, ...pane }) {
   useLayoutEffect(() => {
     if (!isOpen) return setPos(null);
     const r = anchor?.getBoundingClientRect();
-    setPos({ left: Math.max(GAP, r?.left ?? GAP), bottom: window.innerHeight - (r?.top ?? window.innerHeight) + GAP });
+    const bottom = window.innerHeight - (r?.top ?? window.innerHeight) + GAP;
+    // A strip's drawer spans its column; the line's drawers keep their own width.
+    const col = anchor?.closest('[data-tab-pane]')?.getBoundingClientRect();
+    setPos(col
+      ? { left: col.left + GAP, width: col.width - 2 * GAP, bottom }
+      : { left: Math.max(GAP, r?.left ?? GAP), bottom });
   }, [isOpen, anchor]);
 
   useEffect(() => {

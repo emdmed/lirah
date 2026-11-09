@@ -56,7 +56,7 @@ export function rowActivity(own, workLabel, tabPlans) {
   return own;
 }
 
-export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
+export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHints }) {
   const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
@@ -292,7 +292,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
         {focusKeys && (
           <span className="flex basis-full flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground">
             <FrameHints
-              hints={[
+              hints={rowHints ?? [
                 { keys: ['↵'], label: 'switch' },
                 ...focusKeys.slice(0, 2),
                 { keys: ['[', ']'], label: 'section' },

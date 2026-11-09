@@ -7,14 +7,14 @@ import { formatDuration } from '../../lib/formatDuration';
 import { cn } from '../../lib/utils';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { useBookmarks } from '../bookmarks';
-import { tabDisplayName, useTabManager } from '../tabs/TabContext';
+import { tabDisplayName, useTabActions, useTabManager } from '../tabs/TabContext';
 import { useTabsSummary } from '../tabs/useTabsSummary';
 import { requestAttentionJump, useAttentionQueue } from '../tabs/useAgentAttention';
 import { activityLamp, remoteLabel, remoteWork, tabActivity } from '../tabs/tabActivity';
 import { rowActivity } from '../tabs/TabsSummaryPane';
 import { useTabPlans } from '../plans/useTabPlans';
 import { useAgentJobs } from '../agent-jobs/AgentJobsContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 import { ZenDrawer } from './ZenDrawer';
 import { closeDrawer, toggleDrawer } from './zenDrawerStore';
@@ -115,13 +115,43 @@ export function ZenLine() {
   );
 }
 
-// The workspace pane's tab rows, with their keys (j/k, Enter, row keys).
-// Switching tab closes it, so you land in the new tab's terminal.
+// Column keys on a selected row, ahead of the row's own (x closes there).
+const COLUMN_HINTS = [
+  { keys: ['↵'], label: 'swap in' },
+  { keys: ['1–3'], label: 'column' },
+  { keys: ['x'], label: 'off screen' },
+];
+
+// The workspace pane's tab rows, with their keys (j/k, row keys) plus the
+// column keys above. Switching tab closes it, so you land in the new tab's terminal.
 function TabsDrawer({ activeTabId }) {
   useEffect(() => () => closeDrawer('tabs'), [activeTabId]);
+  const { placeZenColumn: put, dropZenColumn: drop, switchTab } = useTabActions();
+  const [notice, setNotice] = useState(null);
+
+  const onKeyDownCapture = (e) => {
+    const id = e.target.dataset?.tabRow;
+    if (!id || e.ctrlKey || e.metaKey || e.altKey) return;
+    const act = e.key === 'Enter' ? () => { put(id, null); switchTab(id); }
+      : ['1', '2', '3'].includes(e.key) ? () => put(id, Number(e.key) - 1)
+        : e.key === 'x' ? () => drop(id) : null;
+    if (!act) return setNotice(null);
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      act();
+      setNotice(null);
+    } catch (err) {
+      setNotice(err.message);
+    }
+  };
+
   return (
     <ZenDrawer id="tabs" title="tabs" keys={shortcutKeys('zen-tabs')} className="w-[28rem]" focus={`[data-tab-row="${activeTabId}"]`}>
-      <TabsSummaryPane />
+      <div className="flex flex-1 flex-col" onKeyDownCapture={onKeyDownCapture}>
+        {notice && <div role="status" className="px-3 py-1.5 text-xs text-[var(--ins-lamp)] edge-b-engraved">{notice}</div>}
+        <TabsSummaryPane rowHints={COLUMN_HINTS} />
+      </div>
     </ZenDrawer>
   );
 }

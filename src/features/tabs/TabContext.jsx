@@ -9,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getEffectiveSettings } from "../settings/settingsStore";
 import { formatDuration } from "../../lib/formatDuration";
 import { tildePath } from "../../components/ui/picker";
+import { assertColumnRoom, placeColumn } from "../zen/zenColumns";
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -47,6 +48,13 @@ export function followFocus(cols, prev, next) {
   const i = out.indexOf(prev);
   out[i >= 0 ? i : out.length - 1] = next;
   return out;
+}
+
+// Saved columns lag focus by one effect, so follow it here too; closed tabs drop out.
+function zenColumnsOf(workspaces, workspaceId, activeTabId, tabs) {
+  const ws = workspaces.find((w) => w.id === workspaceId);
+  const cols = followFocus(ws?.zenColumns, ws?.activeTabId, activeTabId) ?? [];
+  return cols.filter((id) => tabs.some((t) => t.id === id && t.workspaceId === workspaceId));
 }
 
 // The workspace's master terminal: a tab of its own, kept out of the tab list,
@@ -271,6 +279,40 @@ export function TabProvider({ children }) {
     setWorkspaces((prev) => prev.map((w) => (w.id === ws ? { ...w, zenColumns: ids.slice(0, 3) } : w)));
   }, []);
 
+  // The columns on screen now (the focused tab alone when none are saved).
+  const currentZenColumns = () => {
+    const focused = activeTabIdRef.current;
+    const cols = zenColumnsOf(workspacesRef.current, activeWorkspaceIdRef.current, focused, tabsRef.current);
+    return cols.length ? cols : [focused];
+  };
+
+  // Puts a tab into Zen column `slot` (0-based; null = the focused one's), adding
+  // a column past the end. Throws the reason when it refuses (too narrow).
+  const placeZenColumn = useCallback((tabId, slot) => {
+    const cols = currentZenColumns();
+    const focused = activeTabIdRef.current;
+    const out = placeColumn(cols, focused, tabId, slot);
+    if (out.length > cols.length) assertColumnRoom(out.length);
+    setZenColumns(out);
+    // The focused tab is always on screen; pushed off, focus goes to the new one.
+    if (!out.includes(focused)) switchTab(tabId);
+  }, [setZenColumns, switchTab]);
+
+  // The active workspace's tabs at call time, for actions that must not re-render on every tab change.
+  const getWorkspaceTabs = useCallback(() => tabsRef.current
+    .filter((t) => t.workspaceId === activeWorkspaceIdRef.current && !t.master), []);
+
+  // Takes a tab off screen; the last column stays.
+  const dropZenColumn = useCallback((tabId) => {
+    const cols = currentZenColumns();
+    const i = cols.indexOf(tabId);
+    if (i < 0) throw new Error('not on screen');
+    if (cols.length === 1) throw new Error('the last column stays on screen');
+    const out = cols.filter((id) => id !== tabId);
+    setZenColumns(out);
+    if (tabId === activeTabIdRef.current) switchTab(out[Math.min(i, out.length - 1)]);
+  }, [setZenColumns, switchTab]);
+
   // A new, empty workspace, switched to.
   const addWorkspace = useCallback((name) => {
     const ws = createWorkspace(name?.trim() || `ws${workspacesRef.current.length + 1}`);
@@ -429,15 +471,16 @@ export function TabProvider({ children }) {
     renameWorkspace,
     removeWorkspace,
     setZenColumns,
+    placeZenColumn,
+    dropZenColumn,
+    getWorkspaceTabs,
   }), [addTab, setTabNote, wakeTab, openMaster, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
-    switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace, setZenColumns]);
+    switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace, setZenColumns, placeZenColumn, dropZenColumn, getWorkspaceTabs]);
 
-  // Saved columns lag focus by one effect, so follow it here too; closed tabs drop out.
-  const zenColumns = useMemo(() => {
-    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
-    const cols = followFocus(ws?.zenColumns, ws?.activeTabId, activeTabId) ?? [];
-    return cols.filter((id) => tabs.some((t) => t.id === id && t.workspaceId === activeWorkspaceId));
-  }, [workspaces, activeWorkspaceId, activeTabId, tabs]);
+  const zenColumns = useMemo(
+    () => zenColumnsOf(workspaces, activeWorkspaceId, activeTabId, tabs),
+    [workspaces, activeWorkspaceId, activeTabId, tabs],
+  );
 
   // `tabs` is every tab, of all workspaces; `workspaceTabs` the active one's.
   const value = useMemo(
