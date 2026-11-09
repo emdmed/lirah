@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, isAutopilotLive, newChunks, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
+  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, HALT_REASON, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
   toRolledBack, UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
@@ -60,11 +60,14 @@ export function PlansProvider({ children }) {
     onLoad: (repoRoot, plans) => {
       for (const plan of plans) {
         if (plan.split === SPLIT_STATUS.QUEUED) runSplit(repoRoot, plan.id);
+        // A run the app closed on is caught up in order (catchUp checks its in-progress chunk).
+        const restarted = plan.autopilot?.reason === HALT_REASON.APP_RESTARTED;
         for (const chunk of plan.chunks) {
           if (chunk.status === CHUNK_STATUS.IN_PROGRESS && chunk.doneRequested) {
             markChunkDone(repoRoot, plan.id, chunk.id, chunk.doneRequested.result ?? null);
-          } else if (chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.awaitingFix) checkChunk(repoRoot, plan.id, chunk.id);
+          } else if (chunk.awaitingFix || (chunk.status === CHUNK_STATUS.IN_PROGRESS && !restarted)) checkChunk(repoRoot, plan.id, chunk.id);
         }
+        if (restarted) catchUp(repoRoot, plan.id);
       }
     },
   });
@@ -151,6 +154,35 @@ export function PlansProvider({ children }) {
       checkingRef.current.delete(chunkId);
     }
   }, [findChunk, updatePlan, tabRepoRoots]);
+
+  // The app closed mid-run while the agent kept going: adopt every chunk
+  // committed since, in plan order, so the paused run shows what's really done.
+  const catchUp = useCallback(async (repoRoot, planId) => {
+    const adopted = [];
+    for (const c of findPlan(repoRoot, planId)?.chunks ?? []) {
+      if (c.status === CHUNK_STATUS.IMPLEMENTED || c.status === CHUNK_STATUS.SKIPPED) continue;
+      if (c.status === CHUNK_STATUS.IN_PROGRESS && c.doneRequested) break; // markChunkDone has it
+      const res = await checkChunk(repoRoot, planId, c.id);
+      if (!res.found) break;
+      adopted.push(c);
+    }
+    const plan = findPlan(repoRoot, planId);
+    if (!adopted.length || plan?.autopilot?.reason !== HALT_REASON.APP_RESTARTED) return;
+    const { done, total } = planProgress(plan);
+    const [a, b] = [adopted[0].n, adopted.at(-1).n];
+    const which = a === b ? `chunk ${a} is` : `chunks ${a}–${b} are`;
+    const next = plan.chunks.find((c) => c.id === nextChunkId(plan));
+    updatePlan(repoRoot, planId, (p) => ({
+      autopilot: done === total
+        ? { ...p.autopilot, status: AUTOPILOT_STATUS.DONE, chunkId: null, reason: null, message: null, endedAt: Date.now(), at: Date.now() }
+        : {
+          ...p.autopilot,
+          chunkId: adopted.at(-1).id,
+          message: `The app closed mid-run, but the agent kept going: ${which} committed and checked in.${next ? ` Resume sends chunk ${next.n}.` : ''}`,
+          at: Date.now(),
+        },
+    }));
+  }, [findPlan, checkChunk, updatePlan]);
 
   // An in-progress chunk done with nothing to commit; `result` is what the
   // agent said it did, `decisions` the Decision: lines of its reply. Commits

@@ -368,8 +368,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
                 />
               </Field>
               <div className="flex gap-1.5 pt-0.5">
-                <PanelButton icon={Check} onClick={saveEdit}>save</PanelButton>
-                <PanelButton onClick={() => setEditing(false)}>cancel</PanelButton>
+                <PanelButton variant="default" icon={Check} onClick={saveEdit}>save</PanelButton>
+                <PanelButton variant="outline" onClick={() => setEditing(false)}>cancel</PanelButton>
               </div>
             </div>
           ) : (
@@ -395,8 +395,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
                       autoFocus
                     />
                     <div className="flex gap-1.5 pt-1">
-                      <PanelButton icon={Check} onClick={saveDecisions}>save</PanelButton>
-                      <PanelButton onClick={() => setDecisionsDraft(null)}>cancel</PanelButton>
+                      <PanelButton variant="default" icon={Check} onClick={saveDecisions}>save</PanelButton>
+                      <PanelButton variant="outline" onClick={() => setDecisionsDraft(null)}>cancel</PanelButton>
                     </div>
                   </Spec>
                 ) : chunk.decisions?.length > 0 && (

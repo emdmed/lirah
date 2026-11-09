@@ -1,5 +1,5 @@
 import { formatDuration } from '../../lib/formatDuration';
-import { Eye, Play, Square, Terminal } from 'iconoir-react';
+import { Eye, Play, Terminal } from 'iconoir-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { autopilotLamp, Prose } from './parts';
@@ -16,7 +16,8 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
   // Counted like the progress readout: skipped chunks are left out.
   const pos = pilotPosition(plan);
   const chunk = pos?.chunk;
-  const at = pos ? `chunk ${pos.index} of ${pos.total}` : null;
+  // Stopped between chunks, the one it points at is finished: say so.
+  const at = pos ? `chunk ${pos.index} of ${pos.total}${!running && chunk.status === CHUNK_STATUS.IMPLEMENTED ? ' done' : ''}` : null;
   const elapsed = running && chunk?.status === CHUNK_STATUS.IN_PROGRESS && chunk.startedAt ? formatDuration(now - chunk.startedAt) : null;
   const took = ap.startedAt && ap.endedAt ? formatDuration(ap.endedAt - ap.startedAt) : null;
   // The run as a whole: how long it has gone, and what's left after this chunk.
@@ -52,7 +53,8 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
           <span className={`min-w-0 truncate tabular-nums ${ap.status === AUTOPILOT_STATUS.DONE ? 'text-[var(--ins-ok)]' : 'text-muted-foreground'}`} role="status">{headline}</span>
           <span className="ml-auto flex items-center gap-1.5">
             {ap.status === AUTOPILOT_STATUS.DONE && (
-              <PanelButton icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
+              // A finished plan's one main action.
+              <PanelButton variant="default" icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
                 review all
               </PanelButton>
             )}
@@ -86,7 +88,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
         <span className="min-w-0 truncate tabular-nums text-foreground" role="status">{headline}</span>
         {runLineEl}
       </div>
-      {/* The loop drawing; too narrow, the headline is enough. Stopped, it follows the fix. */}
+      {/* The loop drawing, only while it turns; too narrow, the headline is enough. Stopped, the message says it. */}
       {!stopped && loop}
       {/* Why it stopped is what you came back for: full ink, more room. */}
       {ap.message && (
@@ -109,14 +111,14 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
           </PanelButton>
         )}
         {tabOpen && (
-          <PanelButton variant="outline" icon={Terminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
+          <PanelButton icon={Terminal} onClick={onGoToTab} title="Switch to the tab running the plan">go to tab</PanelButton>
         )}
         <span className="ml-auto flex items-center gap-1.5">
           {options}
-          <PanelButton icon={Square} onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
+          {options && <span aria-hidden="true" className="h-3.5 w-px bg-[var(--ins-edge)]" />}
+          <PanelButton onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)">stop</PanelButton>
         </span>
       </div>
-      {stopped && loop}
     </div>
   );
 }

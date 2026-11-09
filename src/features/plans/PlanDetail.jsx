@@ -176,7 +176,7 @@ export function PlanDetail({ plan }) {
         onCheckedChange={(v) => updatePlan(repoRoot, plan.id, { clearBetweenChunks: !!v })}
       />
       fresh context
-      {!piloted && <span className="text-muted-foreground">· /clear before each chunk</span>}
+      {plan.autopilot?.status !== AUTOPILOT_STATUS.RUNNING && <span className="text-muted-foreground">· /clear before each chunk</span>}
     </label>
   );
 
@@ -264,8 +264,8 @@ export function PlanDetail({ plan }) {
               autoFocus
             />
             <div className="flex gap-1.5">
-              <PanelButton type="submit" disabled={!reviseNotes.trim() || revising}>send to agent</PanelButton>
-              <PanelButton onClick={() => setShowRevise(false)}>cancel</PanelButton>
+              <PanelButton type="submit" variant="default" disabled={!reviseNotes.trim() || revising}>send to agent</PanelButton>
+              <PanelButton variant="outline" onClick={() => setShowRevise(false)}>cancel</PanelButton>
             </div>
           </form>
         )}
@@ -312,7 +312,8 @@ export function PlanDetail({ plan }) {
               {plan.autopilot?.status === AUTOPILOT_STATUS.DONE ? (
                 <ProgressReadout plan={plan} done={done} total={total} />
               ) : (
-                <Fig20Timeline plan={plan} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
+                // A live run's strip already says where it is: no second count.
+                <Fig20Timeline plan={plan} showCount={!runUp} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
               )}
             </div>
           )}

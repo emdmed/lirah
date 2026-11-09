@@ -6,7 +6,7 @@ import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 import { listBranches, planGit } from './planGit';
-import { AUTOPILOT_STATUS } from './planModel';
+import { isAutopilotLive } from './planModel';
 import { Fig21PlanGit, middleTruncate } from './Fig21PlanGit';
 
 const SELECT = 'h-6 min-w-0 pl-1.5 font-mono text-[11px] text-foreground';
@@ -43,7 +43,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
   const cfg = planGit(plan);
   const { bookmarks } = useBookmarks();
   const locked = !!cfg.preparedAt;
-  const running = plan.autopilot?.status === AUTOPILOT_STATUS.RUNNING;
+  const live = isAutopilotLive(plan.autopilot);
   const removed = !!cfg.removedAt;
   const candidates = bookmarks.filter((b) => !cfg.repos.some((r) => r.root === b.path || b.path.startsWith(`${r.root}/`)));
   const where = cfg.worktrees ? 'worktrees' : 'in place';
@@ -147,8 +147,8 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
   return (
     // Settled config is a metadata line; only the open form gets a well.
     <div className={cn('flex min-w-0 flex-col gap-1.5 text-[11px]', open && 'ins-well -mx-1 px-2 py-1.5')}>
-      {/* While auto-pilot runs, the chunk list shows the commits landing. */}
-      {locked && !removed && !running ? <Fig21PlanGit plan={plan} fallback={summary} /> : running ? headlineRow : (
+      {/* While a run is live (running or waiting on you), the chunk list shows the commits: one line here. */}
+      {locked && !removed && !live ? <Fig21PlanGit plan={plan} fallback={summary} /> : live ? headlineRow : (
         <>
           {headlineRow}
           {locked && showRepos && repoRows}

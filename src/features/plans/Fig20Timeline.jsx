@@ -2,7 +2,7 @@ import { CalRecipe } from '@/components/instrument/calibrated';
 import { FIGURES, figNumber } from '@/components/instrument/figure';
 import { formatDuration } from '../../lib/formatDuration';
 import { useTick } from '../../hooks/useTick';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, planProgress } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, planProgress } from './planModel';
 
 // FIG.20: the plan's working time as Lirah's timelineToned recipe (the
 // calibrated timeline recipe plus breaks, a tail and a count;
@@ -59,8 +59,8 @@ export function planTimeline(plan, now = Date.now()) {
   const idle = inWindow ? Math.max(0, total - work) : null;
 
   const done = spans.filter((s) => !s.live);
-  // A look back, so it waits until auto-pilot isn't running.
-  const slowest = !running && done.length >= 2 ? done.reduce((a, s) => (s.dur > a.dur ? s : a)) : null;
+  // A look back, so it waits until the run is over (a paused run still needs you).
+  const slowest = !isAutopilotLive(ap) && done.length >= 2 ? done.reduce((a, s) => (s.dur > a.dur ? s : a)) : null;
   // Ahead: a chunk sent but not committed (outside a live run), and what's left after it.
   const stuck = liveChunk ? null : plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS) ?? null;
   const left = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.IMPLEMENTED && c.status !== CHUNK_STATUS.SKIPPED

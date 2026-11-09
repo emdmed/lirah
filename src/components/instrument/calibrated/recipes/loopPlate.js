@@ -5,8 +5,9 @@
 // edges are 2px mitred lines, faint ahead and ink once run, with a solid
 // head on each straight; a skipped nudge's two edges are dashed. Each
 // station is a 16px step chip: filled once done, a lamp outline while live,
-// red where a run stopped. Only the station the run is at is named, with its
-// clock. The lap reads on an inverted chip at the centre. Under the plate,
+// red where a run stopped. Every station is named beside its chip, so the
+// chips carry no numbers to mistake for chunks; the one the run is at is
+// named in its ink, with its clock. The lap reads on an inverted chip at the centre. Under the plate,
 // the commit line: the run's newest commit (sha on an inverted chip, then
 // its subject) on a leader to CHECK, which reads it; dashed while there is none.
 //
@@ -31,18 +32,17 @@ const BOLD = 'font-weight="600"';
 const txt = (x, y, s, fill, anchor = 'start', extra = '') =>
   `<text x="${x}" y="${y}" fill="${fill}" text-anchor="${anchor}" ${extra}>${C.esc(s)}</text>`;
 
-function chip(x, y, n, state) {
+function chip(x, y, state) {
   if (state === 'done' || state === 'fault') {
     const ink = state === 'done' ? 'var(--fg)' : 'var(--fault)';
-    return `<rect x="${x - 8}" y="${y - 8}" width="16" height="16" fill="${ink}"/>` + txt(x, y + 4, n, PAPER, 'middle', BOLD);
+    return `<rect x="${x - 8}" y="${y - 8}" width="16" height="16" fill="${ink}"/>`;
   }
   if (state === 'live') {
     return `<rect x="${x - 7.25}" y="${y - 7.25}" width="14.5" height="14.5" fill="${PAPER}" stroke="var(--live)" stroke-width="1.5"/>`
-      + txt(x, y + 4, n, 'var(--live)', 'middle', BOLD);
+      + `<rect x="${x - 3}" y="${y - 3}" width="6" height="6" fill="var(--live)"/>`;
   }
   const dash = state === 'skip' ? ' stroke-dasharray="2 2"' : '';
-  return `<rect x="${x - 7.5}" y="${y - 7.5}" width="15" height="15" fill="${PAPER}" stroke="var(--edge-strong)"${dash}/>`
-    + txt(x, y + 4, n, 'var(--muted)', 'middle');
+  return `<rect x="${x - 7.5}" y="${y - 7.5}" width="15" height="15" fill="${PAPER}" stroke="var(--edge-strong)"${dash}/>`;
 }
 
 function loopPlate(o) {
@@ -64,17 +64,20 @@ function loopPlate(o) {
 
   const cw = C.textWidth(o.centre) + 14;
   g += `<rect x="${228 - cw / 2}" y="24" width="${cw}" height="16" fill="var(--fg)"/>` + txt(228, 36, o.centre, PAPER, 'middle', BOLD);
-  AT.forEach(([x, y], i) => { g += chip(x, y, i + 1, states[i]); });
+  AT.forEach(([x, y], i) => { g += chip(x, y, states[i]); });
 
-  // The one name on the drawing, knocked out of whatever line runs under it.
-  if (at >= 0) {
-    const name = NAMES[at] + (o.clock ? ` ${o.clock}` : '');
-    const ink = states[at] === 'fault' ? 'var(--fault)' : 'var(--live)';
-    const [x, y, anchor] = [[190, 16, 'start'], [350, 36, 'start'], [266, 56, 'end'], [106, 36, 'end']][at];
+  // Each station's name, knocked out of whatever line runs under it; the
+  // current one in its ink, with its clock.
+  NAMES.forEach((base, i) => {
+    const here = i === at;
+    const name = base + (here && o.clock ? ` ${o.clock}` : '');
+    const ink = !here ? 'var(--muted)' : states[i] === 'fault' ? 'var(--fault)' : 'var(--live)';
+    const [x, y, anchor] = [[190, 16, 'start'], [350, 36, 'start'], [266, 56, 'end'], [106, 36, 'end']][i];
     const w = C.textWidth(name) + 8;
     const x0 = anchor === 'end' ? x - w + 4 : x - 4;
-    g += `<rect x="${x0}" y="${y - 10}" width="${w}" height="13" fill="${PAPER}"/>` + txt(x, y, name, ink, anchor, `${BOLD} letter-spacing="0.4"`);
-  }
+    g += `<rect x="${x0}" y="${y - 10}" width="${w}" height="13" fill="${PAPER}"/>`
+      + txt(x, y, name, ink, anchor, here ? `${BOLD} letter-spacing="0.4"` : 'letter-spacing="0.4"');
+  });
 
   // The commit line, ending on a leader up to CHECK's side.
   const y = 78;

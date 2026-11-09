@@ -220,7 +220,7 @@ export function normalizeLoadedPlan(p) {
         ...p.autopilot,
         status: AUTOPILOT_STATUS.PAUSED,
         reason: HALT_REASON.APP_RESTARTED,
-        message: 'The app was closed during the run. Open the plan and resume it.',
+        message: 'The app closed during the run. Resume to pick up where it stopped.',
       },
     };
   }
