@@ -39,6 +39,16 @@ function loadWorkspaces(saved, tabs) {
   return { workspaces, tabs: placed };
 }
 
+// Zen columns follow focus: a tab focused outside them takes the slot of the
+// tab focused before it (the last slot when that one is not a column).
+export function followFocus(cols, prev, next) {
+  if (!cols?.length || !next || cols.includes(next)) return cols;
+  const out = [...cols];
+  const i = out.indexOf(prev);
+  out[i >= 0 ? i : out.length - 1] = next;
+  return out;
+}
+
 // The workspace's master terminal: a tab of its own, kept out of the tab list,
 // whose agent orchestrates the workspace's tabs. Null until first opened.
 export function masterTabOf(tabs, workspaceId) {
@@ -144,7 +154,9 @@ export function TabProvider({ children }) {
   useEffect(() => {
     if (!activeTabId) return;
     setWorkspaces((prev) => (prev.some((w) => w.id === activeWorkspaceId && w.activeTabId !== activeTabId)
-      ? prev.map((w) => (w.id === activeWorkspaceId ? { ...w, activeTabId } : w))
+      ? prev.map((w) => (w.id === activeWorkspaceId
+        ? { ...w, activeTabId, zenColumns: followFocus(w.zenColumns, w.activeTabId, activeTabId) }
+        : w))
       : prev));
   }, [activeTabId, activeWorkspaceId]);
 
@@ -251,6 +263,12 @@ export function TabProvider({ children }) {
     activeWorkspaceIdRef.current = workspaceId;
     setActiveWorkspaceId(workspaceId);
     setActiveTabId(tabId);
+  }, []);
+
+  // Zen's columns of the active workspace: up to three tab ids, left to right.
+  const setZenColumns = useCallback((ids) => {
+    const ws = activeWorkspaceIdRef.current;
+    setWorkspaces((prev) => prev.map((w) => (w.id === ws ? { ...w, zenColumns: ids.slice(0, 3) } : w)));
   }, []);
 
   // A new, empty workspace, switched to.
@@ -410,13 +428,21 @@ export function TabProvider({ children }) {
     openWorkspace,
     renameWorkspace,
     removeWorkspace,
+    setZenColumns,
   }), [addTab, setTabNote, wakeTab, openMaster, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
-    switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace]);
+    switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace, setZenColumns]);
+
+  // Saved columns lag focus by one effect, so follow it here too; closed tabs drop out.
+  const zenColumns = useMemo(() => {
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    const cols = followFocus(ws?.zenColumns, ws?.activeTabId, activeTabId) ?? [];
+    return cols.filter((id) => tabs.some((t) => t.id === id && t.workspaceId === activeWorkspaceId));
+  }, [workspaces, activeWorkspaceId, activeTabId, tabs]);
 
   // `tabs` is every tab, of all workspaces; `workspaceTabs` the active one's.
   const value = useMemo(
-    () => ({ tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, openedStartup: !!startupProjects, ...actions }),
-    [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, startupProjects, actions],
+    () => ({ tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, zenColumns, startupPending, openedStartup: !!startupProjects, ...actions }),
+    [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, zenColumns, startupPending, startupProjects, actions],
   );
 
   return (

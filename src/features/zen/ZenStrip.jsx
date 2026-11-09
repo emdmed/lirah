@@ -42,7 +42,9 @@ function countFiles(files, root) {
 // Zen's strip under the terminal: a name row (which tab, what it is doing,
 // its plan, files and context) over a turn row. Fixed 40px so the terminal
 // never resizes as it fills. cliName is the agent running in its terminal.
-export function ZenStrip({ tabId, isActive, cliName, branchName }) {
+// visible: its column is on screen (clock and file marks run); isActive: the
+// focused column (gold digit, drawers).
+export function ZenStrip({ tabId, isActive, visible = isActive, cliName, branchName }) {
   const { workspaceTabs } = useTabManager();
   const { bookmarks } = useBookmarks();
   const index = workspaceTabs.findIndex((t) => t.id === tabId);
@@ -50,17 +52,17 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
   const ownTab = useMemo(() => (tab ? [tab] : []), [tab]);
   const { byTab, rootOf } = useTabPlans(ownTab, tabId);
   const plans = byTab[tabId];
-  const { files } = useAgentFileActivity(isActive);
+  const { files } = useAgentFileActivity(visible);
   const queue = useAttentionQueue(workspaceTabs);
   const [folded] = useSetting('zenStripFolded');
 
   // The tabs pane's 1s clock, for activity and its "since".
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!isActive) return undefined;
+    if (!visible) return undefined;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [isActive]);
+  }, [visible]);
 
   if (!tab) return null;
   const root = tab.projectPath.replace(/\/+$/, '');
@@ -86,7 +88,7 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
       )}
     >
       <div className="flex h-5 min-w-0 items-center gap-2">
-        <span aria-hidden="true" className="w-4 shrink-0 text-center font-mono tabular-nums">{index + 1}</span>
+        <span aria-hidden="true" className={cn('w-4 shrink-0 text-center font-mono tabular-nums', isActive && 'text-[var(--ins-lamp)]')}>{index + 1}</span>
         <span className="ins-name min-w-0 truncate text-[13px] italic leading-5 text-foreground">{tabDisplayName(tab, bookmarks)}</span>
         {branchName && (
           <span className="flex min-w-0 items-center gap-1 font-mono" title={`branch ${branchName}`}>

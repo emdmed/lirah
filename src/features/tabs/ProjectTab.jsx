@@ -183,7 +183,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
     flexDirection: 'column',
     transform: visible ? 'none' : 'translateX(-200vw)',
     zIndex: visible ? 1 : 0,
+    // Side by side, the focused column wears the ink frame.
+    ...(visible && columns > 1 && isActive && { outline: '1px solid var(--color-foreground)', outlineOffset: -1 }),
   };
+  const { switchTab } = useTabActions();
 
   // The switch itself is just the style above. Re-rendering the tab contents
   // for the new isActive (both tabs, ~25 ms each), the work that follows it
@@ -266,7 +269,15 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
   }, [isActive]);
 
   return (
-    <div ref={paneRef} style={style} aria-hidden={!visible} data-tab-pane data-tab-active={isActive || undefined}>
+    <div
+      ref={paneRef}
+      style={style}
+      aria-hidden={!visible}
+      data-tab-pane
+      data-tab-active={isActive || undefined}
+      // A click in another column focuses it.
+      onPointerDownCapture={visible && !isActive ? () => switchTab(tabId) : undefined}
+    >
       {content}
       {!ready && <TabBootPlaceholder projectPath={projectPath} stage={bootStage} />}
     </div>
@@ -1257,7 +1268,7 @@ function ProjectTabInner({ draft, projectPath, isActive, visible, tabId, workspa
           cliRunning={cliRunning === tabCliProcess(settings.selectedCli)}
           master={master}
         />
-        {zenMode && <ZenStrip tabId={tabId} isActive={isActive} cliName={cliRunning} branchName={branchName} />}
+        {zenMode && <ZenStrip tabId={tabId} isActive={isActive} visible={visible} cliName={cliRunning} branchName={branchName} />}
         {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}
           sessionId={terminalSessionId}

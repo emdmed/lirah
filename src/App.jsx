@@ -23,7 +23,7 @@ import { useSetting } from "./features/settings/settingsStore";
 import { useAgentControl } from "./features/agent-control/useAgentControl";
 
 function App() {
-  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, openedStartup, addTab, requestCloseTab, switchTab, switchWorkspace } = useTabManager();
+  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, zenColumns, startupPending, openedStartup, addTab, requestCloseTab, switchTab, switchWorkspace } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
@@ -176,8 +176,8 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode]);
 
-  // shortcut: only the focused tab is visible until chunk 14 fills this from zenColumns.
-  const visibleTabIds = [activeTabId];
+  // In Zen the workspace's columns are on screen (they always hold the focused tab).
+  const visibleTabIds = zenMode && zenColumns.length > 0 ? zenColumns : [activeTabId];
 
   return (
     <SubagentProvider tabs={tabs}>
