@@ -153,7 +153,15 @@ function TabsDrawer({ activeTabId }) {
 
   return (
     <ZenDrawer id="tabs" title="tabs" keys={shortcutKeys('zen-tabs')} className="w-[28rem]" focus={`[data-tab-row="${activeTabId}"]`}>
-      <div className="flex flex-1 flex-col" onKeyDownCapture={onKeyDownCapture}>
+      <div
+        className="flex flex-1 flex-col"
+        onKeyDownCapture={onKeyDownCapture}
+        // The row under the pointer takes the keys, so 1–3/↵/x act on the row you point at.
+        onPointerMove={(e) => {
+          const row = e.target.closest?.('[data-tab-row]');
+          if (row && row !== document.activeElement && !row.contains(document.activeElement)) row.focus({ preventScroll: true });
+        }}
+      >
         {notice && <div role="status" className="px-3 py-1.5 text-xs text-[var(--ins-lamp)] edge-b-engraved">{notice}</div>}
         <TabsSummaryPane rowHints={COLUMN_HINTS} />
       </div>
