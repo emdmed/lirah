@@ -20,6 +20,7 @@ import { useAttentionQueue } from '../tabs/useAgentAttention';
 import { setSetting, useSetting } from '../settings/settingsStore';
 import { cn } from '../../lib/utils';
 import { FilesDrawer } from './FilesDrawer';
+import { PlanDrawer } from './PlanDrawer';
 import { toggleDrawer } from './zenDrawerStore';
 
 const noop = () => {};
@@ -46,7 +47,8 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
   const index = workspaceTabs.findIndex((t) => t.id === tabId);
   const tab = workspaceTabs[index];
   const ownTab = useMemo(() => (tab ? [tab] : []), [tab]);
-  const plans = useTabPlans(ownTab, tabId).byTab[tabId];
+  const { byTab, rootOf } = useTabPlans(ownTab, tabId);
+  const plans = byTab[tabId];
   const { files } = useAgentFileActivity(isActive);
   const queue = useAttentionQueue(workspaceTabs);
   const folded = useSetting('zenStripFolded');
@@ -97,7 +99,13 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
 
         <span className="ml-auto flex shrink-0 items-center gap-1">
           {progress && (
-            <Button variant="ghost" className={GHOST} onClick={noop} title={plan.title || 'plan'}>
+            <Button
+              variant="ghost"
+              className={GHOST}
+              data-zen-segment={isActive ? 'plan' : undefined}
+              onClick={() => toggleDrawer('plan')}
+              title={`${plan.title || 'plan'} (Alt+6)`}
+            >
               plan {progress.done}/{progress.total}
             </Button>
           )}
@@ -158,6 +166,7 @@ export function ZenStrip({ tabId, isActive, cliName, branchName }) {
         )}
       </div>
       {isActive && <FilesDrawer files={files} root={root} />}
+      {isActive && plan && <PlanDrawer plan={plan} repoRoot={rootOf.get(plan.id)} />}
     </div>
   );
 }

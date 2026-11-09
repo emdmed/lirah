@@ -49,8 +49,8 @@ function focusPane4Content() {
 export function usePaneShortcuts() {
   useEffect(() => {
     const onKeyDown = (e) => {
-      // In Zen the files and jobs panes are hidden: Alt+1 and Alt+4 open drawers.
-      const drawer = getSettings().zenMode && ['files', 'tabs'].find((id) => matches(`zen-${id}`, e));
+      // In Zen the panes are hidden: Alt+1, Alt+4 and Alt+6 open drawers.
+      const drawer = getSettings().zenMode && ['files', 'tabs', 'plan'].find((id) => matches(`zen-${id}`, e));
       if (drawer) {
         e.preventDefault();
         e.stopPropagation();
