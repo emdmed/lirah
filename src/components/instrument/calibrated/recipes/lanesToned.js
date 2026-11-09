@@ -28,7 +28,8 @@ function lanesToned(o) {
     const xs = X(s), xe = X(Math.max(s, Math.min(T, l.end))), xt = X(Math.max(s, Math.min(TT, l.end)));
     g += K.t(x0 - 10, y + 4, l.name, live ? 'fg' : 'mu', 'end');
     if (xt > xs) g += K.line(xs, y, xt, y, c, { w: 2 });
-    if (live && land) g += K.line(xe, y, x1, y, 'fa', { dash: '2 4' }).replace('<line', '<line data-crawl');
+    // data-crawl-steps, not the kit's data-crawl: a smooth dashoffset crawl repaints the SVG every frame (see calibrated.css).
+    if (live && land) g += K.line(xe, y, x1, y, 'fa', { dash: '2 4' }).replace('<line', '<line data-crawl-steps');
     /* the moving node is drawn under the start node, so at the start only that shows */
     if (!land && T > s) g += K.node(xe, y, live ? 'live' : 'todo');
     if (T >= s) g += K.node(xs, y, 'done');

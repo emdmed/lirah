@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSeededSetting } from "../features/settings/settingsStore";
+import { setPaneDrag } from "../lib/paneDrag";
 
 const clampWidth = (x) => Math.min(Math.max(200, x), 600);
 
@@ -18,6 +19,7 @@ export function useSidebar({ resetTypeChecker }) {
   const handleResizeStart = useCallback((e) => {
     e.preventDefault();
     setIsResizing(true);
+    setPaneDrag(true);
     let frame = 0;
     let pending = null;
     const apply = () => {
@@ -30,6 +32,7 @@ export function useSidebar({ resetTypeChecker }) {
     };
     const endDrag = () => {
       cancelAnimationFrame(frame);
+      setPaneDrag(false);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       endDragRef.current = null;

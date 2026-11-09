@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { buildFeatureMapPrompt, buildFeatureMapUpdatePrompt } from '../compact/featureMapPrompt';
@@ -58,12 +58,29 @@ export function useFeatureMap(projectPath) {
   useEffect(() => {
     let unlisten = null;
     let cancelled = false;
-    listen('git-stats-changed', () => setNonce((n) => n + 1)).then((fn) => { if (cancelled) fn(); else unlisten = fn; });
+    // Payload is the watched folder: this project or a folder inside it. Skip other projects.
+    const onEvent = ({ payload }) => {
+      if (projectPath && typeof payload === 'string' && !relatedPaths(payload, projectPath)) return;
+      setNonce((n) => n + 1);
+    };
+    listen('git-stats-changed', onEvent).then((fn) => { if (cancelled) fn(); else unlisten = fn; });
     return () => { cancelled = true; unlisten?.(); };
-  }, []);
+  }, [projectPath]);
 
   const error = buildError ?? loadError;
   const build = useCallback((rebuild) => buildFeatureMap(projectPath, rebuild), [projectPath]);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
-  return { ...data, status: featureMapStatus(data, isBuilding, error), error, build, reload };
+  // Stable between renders so memoized consumers (FeaturesPane) skip unrelated re-renders.
+  return useMemo(
+    () => ({ ...data, status: featureMapStatus(data, isBuilding, error), error, build, reload }),
+    [data, isBuilding, error, build, reload],
+  );
+}
+
+/** True when one path is the other or contains it. */
+export function relatedPaths(a, b) {
+  const norm = (p) => p.replace(/[\\/]+$/, '');
+  const x = norm(a);
+  const y = norm(b);
+  return x === y || x.startsWith(`${y}/`) || y.startsWith(`${x}/`) || x.startsWith(`${y}\\`) || y.startsWith(`${x}\\`);
 }

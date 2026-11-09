@@ -314,7 +314,7 @@ export function useTreeView({ terminalSessionId, setCurrentPath, initializeSearc
 
           // If the payload is empty or missing, fall back to full reload
           if (!hasCreated && !hasDeleted) {
-            loadTreeData();
+            loadTreeData({ silent: true });
             return;
           }
 

@@ -558,7 +558,8 @@ function ProjectTabInner({ draft, projectPath, isActive, tabId, workspaceId, com
     // A file that stops being untracked (staged/committed) still exists, so
     // only additions, deletions and restored deletions change the tree.
     if (changes.newDeleted.length > 0 || changes.noLongerUntracked.some(c => c.status === 'deleted')) {
-      treeView.loadTreeData();
+      // Silent: keep the tree mounted (scroll, open folders) instead of flashing the spinner.
+      treeView.loadTreeData({ silent: true });
     } else if (changes.newUntracked.length > 0) {
       treeView.handleIncrementalUpdate(changes, currentPath);
     }

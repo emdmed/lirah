@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { plural } from '../../lib/plural';
 import { useBookmarks } from '../bookmarks';
@@ -41,7 +41,7 @@ function onListKey(e) {
   rows[j]?.scrollIntoView({ block: 'nearest' });
 }
 
-export function TabsSummaryPane({ onNewTab }) {
+export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab }) {
   const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
@@ -261,4 +261,4 @@ export function TabsSummaryPane({ onNewTab }) {
       </div>
     </div>
   );
-}
+});

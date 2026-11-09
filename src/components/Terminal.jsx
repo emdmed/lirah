@@ -4,6 +4,7 @@ import { TerminalSearchBar } from './TerminalSearchBar';
 import { PaneLegend } from './instrument/PaneLegend';
 import { ClaudeMark } from './ClaudeMark';
 import { tabCliLabel } from '../lib/agentClis';
+import { paneDragAware } from '../lib/paneDrag';
 
 export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, cli = 'claude-code', cliRunning = false, master = false }, ref) => {
   const terminalRef = useRef(null);
@@ -47,13 +48,16 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
   useEffect(() => {
     if (!terminalRef.current) return;
 
-    const resizeObserver = new ResizeObserver(debouncedResize);
+    // A sidebar drag would refit (and reflow scrollback) every frame; wait for it to pause.
+    const [onBoxResize, cancelSettle] = paneDragAware(debouncedResize);
+    const resizeObserver = new ResizeObserver(onBoxResize);
     resizeObserver.observe(terminalRef.current);
-    window.addEventListener('resize', debouncedResize);
+    window.addEventListener('resize', onBoxResize);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', debouncedResize);
+      window.removeEventListener('resize', onBoxResize);
+      cancelSettle();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [debouncedResize]);

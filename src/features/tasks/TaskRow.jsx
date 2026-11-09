@@ -87,7 +87,7 @@ export const TaskRow = memo(function TaskRow({
         </span>
         <button
           type="button"
-          onClick={onToggleOpen}
+          onClick={() => onToggleOpen(task.id)}
           aria-expanded={open}
           className={cn(
             'min-w-0 flex-1 text-left text-[13px] leading-[18px] cursor-pointer outline-none',
@@ -190,7 +190,8 @@ export const TaskRow = memo(function TaskRow({
   );
 });
 
-function TaskNotes({ notes, className }) {
+// Memoized: rows still re-render while dragging, and markdown parsing is the costly part.
+const TaskNotes = memo(function TaskNotes({ notes, className }) {
   return (
     <div className={cn('markdown-body markdown-compact pl-5 text-muted-foreground', className)}>
       <Suspense fallback={<p className="whitespace-pre-wrap">{notes}</p>}>
@@ -198,7 +199,7 @@ function TaskNotes({ notes, className }) {
       </Suspense>
     </div>
   );
-}
+});
 
 // The story rendered; click it to edit the whole text in one field. Saved on
 // blur or Ctrl+Enter, Esc puts it back.

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { memo, useState, useMemo, useEffect } from 'react';
 import { usePageVisible } from '../hooks/usePageVisible';
 import { EmptyLine } from '../features/plans/parts';
 import { Sparks, SidebarCollapse, SidebarExpand, Xmark, ChatBubble } from 'iconoir-react';
@@ -138,7 +138,7 @@ function TabGroup({ tabLabel, agents, onDismiss, now }) {
 }
 
 // Body-only subagent list (no shell/header) — reused by the tabbed right sidebar.
-export function SubagentList() {
+export const SubagentList = memo(function SubagentList() {
   const { allSubagents, totalActiveCount, dismissedIds, dismiss } = useSubagentContext();
 
   const [now, setNow] = useState(Date.now());
@@ -193,7 +193,7 @@ export function SubagentList() {
       ))}
     </>
   );
-}
+});
 
 export function AgentSidebar() {
   const {

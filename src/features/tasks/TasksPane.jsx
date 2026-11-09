@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavArrowDown, NavArrowRight } from 'iconoir-react';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { errorMessage } from '../../lib/errorMessage';
@@ -29,7 +29,7 @@ import { useProjectScope } from './useProjectScope';
 const PlanContextsDialog = lazyNamed(() => import('./PlanContextsDialog'), 'PlanContextsDialog');
 
 /** The backlog: this workspace's tasks or the global ones, a key away from a plan. */
-export function TasksPane({ projectPath }) {
+export const TasksPane = memo(function TasksPane({ projectPath }) {
   const { scope: projectScope, isRepo } = useProjectScope(projectPath);
   const { tabs, activeTabId, workspaces, activeWorkspaceId } = useTabManager();
   const [view, setView] = useState('project'); // 'project' (this workspace) | 'global'
@@ -222,6 +222,10 @@ export function TasksPane({ projectPath }) {
   const projectCount = view === 'global' ? count(otherTasks) : count(tasks);
   const globalCount = view === 'global' ? count(tasks) : count(otherTasks);
 
+  // Stable so the memoized TaskRows skip re-rendering while the quick-add box is typed in.
+  const handleChunkMode = useCallback((mode) => setAutoChunk(mode === 'chunks'), [setAutoChunk]);
+  const openContexts = useCallback(() => setContextsOpen(true), []);
+
   const renderRow = (task, index, rowDrag) => (
     <TaskRow
       key={task.id}
@@ -231,7 +235,7 @@ export function TasksPane({ projectPath }) {
       cursor={cursorIndex === (rowDrag ? index : openTasks.length + index)}
       drag={rowDrag}
       moveLabel={moveLabel}
-      onToggleOpen={() => toggleOpen(task.id)}
+      onToggleOpen={toggleOpen}
       formatting={formatting.has(task.id)}
       onEdit={handleEdit}
       onPlan={handlePlan}
@@ -240,8 +244,8 @@ export function TasksPane({ projectPath }) {
       onRemove={handleRemove}
       onOpenPlan={handleOpenPlan}
       chunkMode={isRepo ? (chunkSetting ? 'chunks' : 'file') : null}
-      onChunkMode={(mode) => setAutoChunk(mode === 'chunks')}
-      onEditContexts={() => setContextsOpen(true)}
+      onChunkMode={handleChunkMode}
+      onEditContexts={openContexts}
     />
   );
 
@@ -337,7 +341,7 @@ export function TasksPane({ projectPath }) {
       </Suspense>
     </div>
   );
-}
+});
 
 function ScopeLabel({ label, count }) {
   return (

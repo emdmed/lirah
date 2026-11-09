@@ -12,6 +12,8 @@ import { useFigureCompact } from '../../components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 
+const NO_FILES = []; // stable default: a fresh [] would rebuild the nav callbacks every render
+
 /**
  * Side-by-side git diff in a full-size dialog: a pane that takes over the
  * window. The file name is the legend, counts sit in the status corner and
@@ -37,7 +39,7 @@ export function GitDiffDialog({
   repoPath,
   baseRef,
   headRef,
-  changedFiles = [],
+  changedFiles = NO_FILES,
   onFileChange,
   annotations = [],
   onAddAnnotation,

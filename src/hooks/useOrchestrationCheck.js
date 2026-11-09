@@ -61,9 +61,9 @@ export function useOrchestrationCheck() {
         entry.hooks?.some(h => h.command?.includes('guard-explore.sh'))
       ));
 
-      const classifyExists = await invoke('path_exists', { path: `${hooksDir}/classify.sh` });
-      const maintainExists = await invoke('path_exists', { path: `${hooksDir}/maintain.sh` });
-      const guardExists = await invoke('path_exists', { path: `${hooksDir}/guard-explore.sh` });
+      const [classifyExists, maintainExists, guardExists] = await Promise.all(
+        ['classify.sh', 'maintain.sh', 'guard-explore.sh'].map((f) => invoke('path_exists', { path: `${hooksDir}/${f}` }))
+      );
 
       const allInstalled = classify && maintain && guard && classifyExists && maintainExists && guardExists;
 
@@ -116,11 +116,10 @@ export function useOrchestrationCheck() {
 
     // Check scripts
     const scriptNames = ['compaction.js', 'dep-graph.js', 'symbols.js'];
-    for (const name of scriptNames) {
-      const path = `${projectPath}/.orchestration/tools/scripts/${name}`;
-      const exists = await invoke('path_exists', { path });
-      status.scripts[name] = exists ? 'installed' : 'missing';
-    }
+    const scriptsExist = await Promise.all(scriptNames.map((name) =>
+      invoke('path_exists', { path: `${projectPath}/.orchestration/tools/scripts/${name}` })
+    ));
+    scriptNames.forEach((name, i) => { status.scripts[name] = scriptsExist[i] ? 'installed' : 'missing'; });
 
     // Check workflows
     try {

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { plural } from '../../lib/plural';
 import { Figure, Hatch, INK, Leader, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
 
@@ -79,41 +80,122 @@ export function Fig25DiffMap({
   totalLines, chunks, folds = [], view, notes = [], height = 320, onJump, onRemoveNote, marksOnly = false,
 }) {
   const compact = useFigureCompact() || marksOnly;
-  if (!(totalLines > 0) || chunks.length === 0) return null;
-
+  const empty = !(totalLines > 0) || chunks.length === 0;
   const L = height;
   const Y1 = Y0 + L;
   const y = (row) => Y0 + (Math.min(Math.max(row, 0), totalLines) / totalLines) * L;
-  const added = chunks.reduce((s, c) => s + c.added, 0);
-  const removed = chunks.reduce((s, c) => s + c.removed, 0);
 
-  // Labels: every change and note, largest first when they can't all fit.
-  const room = Math.floor((L + 24) / (14 + GAP));
-  const noteItems = notes.map((n) => {
-    const lines = wrap(n.note, NOTE_CHARS, 2);
-    return { kind: 'note', n, lines, ay: y(n.row), h: 19 + 13 * lines.length };
-  });
-  const budget = Math.max(0, room - noteItems.reduce((s, it) => s + Math.ceil(it.h / (14 + GAP)), 0));
-  const ranked = [...chunks].sort((a, b) => (b.added + b.removed) - (a.added + a.removed));
-  const shown = new Set(ranked.slice(0, budget));
-  const changeItems = chunks.filter((c) => shown.has(c)).map((c) => ({
-    kind: 'change', c, ay: (y(c.start) + y(c.end + 1)) / 2, h: 14,
-  }));
-  const items = [...changeItems, ...noteItems].sort((a, b) => a.ay - b.ay);
-  const fits = stack(items, Y0 - 6, Y1 + 8);
-  const unlabelled = chunks.length - changeItems.length;
+  // Everything but the view bracket: laid out when the diff, notes or size
+  // change, not on every scroll frame (view changes per frame).
+  const fixed = useMemo(() => {
+    if (empty) return null;
+    const added = chunks.reduce((s, c) => s + c.added, 0);
+    const removed = chunks.reduce((s, c) => s + c.removed, 0);
 
-  // Fold lengths go in whatever label space is left.
-  const foldItems = [];
-  if (!compact && fits) {
-    for (const f of folds) {
-      const len = f.end - f.start + 1;
-      const ay = (y(f.start) + y(f.end + 1)) / 2;
-      const it = { ay, y: ay - 7, h: 14, len };
-      const clear = [...items, ...foldItems].every((o) => it.y + it.h + GAP <= o.y || o.y + o.h + GAP <= it.y);
-      if (clear && y(f.end + 1) - y(f.start) >= 6) foldItems.push(it);
+    // Labels: every change and note, largest first when they can't all fit.
+    const room = Math.floor((L + 24) / (14 + GAP));
+    const noteItems = notes.map((n) => {
+      const lines = wrap(n.note, NOTE_CHARS, 2);
+      return { kind: 'note', n, lines, ay: y(n.row), h: 19 + 13 * lines.length };
+    });
+    const budget = Math.max(0, room - noteItems.reduce((s, it) => s + Math.ceil(it.h / (14 + GAP)), 0));
+    const ranked = [...chunks].sort((a, b) => (b.added + b.removed) - (a.added + a.removed));
+    const shown = new Set(ranked.slice(0, budget));
+    const changeItems = chunks.filter((c) => shown.has(c)).map((c) => ({
+      kind: 'change', c, ay: (y(c.start) + y(c.end + 1)) / 2, h: 14,
+    }));
+    const items = [...changeItems, ...noteItems].sort((a, b) => a.ay - b.ay);
+    const fits = stack(items, Y0 - 6, Y1 + 8);
+    const unlabelled = chunks.length - changeItems.length;
+
+    // Fold lengths go in whatever label space is left.
+    const foldItems = [];
+    if (!compact && fits) {
+      for (const f of folds) {
+        const len = f.end - f.start + 1;
+        const ay = (y(f.start) + y(f.end + 1)) / 2;
+        const it = { ay, y: ay - 7, h: 14, len };
+        const clear = [...items, ...foldItems].every((o) => it.y + it.h + GAP <= o.y || o.y + o.h + GAP <= it.y);
+        if (clear && y(f.end + 1) - y(f.start) >= 6) foldItems.push(it);
+      }
     }
-  }
+
+    // The strip: the file top to bottom, folds hatched, changes filled, a dot per note.
+    const strip = (
+      <>
+        <rect x={SX} y={Y0} width={SW} height={L} style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
+        {folds.map((f) => (
+          <Hatch key={`f${f.start}`} x={SX} y={y(f.start)} width={SW} height={Math.max(1, y(f.end + 1) - y(f.start))} stroke="" />
+        ))}
+        {chunks.map((c) => {
+          const top = y(c.start);
+          const h = Math.max(3, y(c.end + 1) - top);
+          return <rect key={`c${c.start}`} x={SX + 1.5} y={Math.min(top, Y1 - h)} width={SW - 3} height={h} style={{ fill: INK.fg }} />;
+        })}
+        {notes.map((n) => (
+          <circle key={`n${n.id}`} cx={SX + SW + 3} cy={y(n.row)} r={2} style={{ fill: INK.paper, stroke: INK.lamp, strokeWidth: STROKE.hair }} />
+        ))}
+      </>
+    );
+
+    const labels = compact ? null : (
+      <>
+        {/* Fold lengths. */}
+        {foldItems.map((f) => (
+          <T key={`fl${f.ay}`} x={SX + SW + 8} y={f.y + 11} color={INK.faint}>{`${f.len} unchanged`}</T>
+        ))}
+
+        {/* Changes and notes on leaders. */}
+        {items.map((it) => {
+          const iy = it.y + (it.kind === 'note' ? 9 : it.h / 2);
+          const from = it.kind === 'note' ? [SX + SW + 3, it.ay] : [SX + SW + 1, it.ay];
+          const pts = Math.abs(iy - it.ay) < 1
+            ? [from, [LX - 5, it.ay]]
+            : [from, [SX + SW + 8, it.ay], [LX - 12, iy], [LX - 5, iy]];
+          if (it.kind === 'change') {
+            const { c } = it;
+            const r = range(c.from, c.to);
+            const ax = LX + textWidth(r) + 7;
+            const at = c.added > 0 ? `+${c.added}` : '';
+            return (
+              <g key={`l${c.start}`}>
+                <Leader points={pts} dot={false} />
+                <T x={LX} y={it.y + 11} color={INK.fg}>{r}</T>
+                {at && <T x={ax} y={it.y + 11} color={INK.ok}>{at}</T>}
+                {c.removed > 0 && <T x={ax + (at ? textWidth(at) + 6 : 0)} y={it.y + 11} color={INK.fault}>{`−${c.removed}`}</T>}
+              </g>
+            );
+          }
+          const { n } = it;
+          const bw = MAP_W - LX;
+          const chars = Math.floor((bw - 14) / 7);
+          return (
+            <g key={`b${n.id}`}>
+              <Leader points={pts} dot={false} color={INK.lamp} />
+              <rect x={LX} y={it.y} width={bw} height={it.h} style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
+              <T x={LX + 7} y={it.y + 13}>{clip(`note · ${range(n.from, n.to)}`, chars - 2)}</T>
+              {it.lines.map((line, i) => (
+                <T key={i} x={LX + 7} y={it.y + 26 + 13 * i} color={INK.fg}>{line}</T>
+              ))}
+              {onRemoveNote && (
+                <g onClick={() => onRemoveNote(n.id)} style={{ cursor: 'pointer' }}>
+                  <title>Remove note</title>
+                  <rect x={MAP_W - 16} y={it.y + 1} width={15} height={15} style={{ fill: 'transparent' }} />
+                  <T x={MAP_W - 8.5} y={it.y + 13} anchor="middle" color={INK.faint}>×</T>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </>
+    );
+
+    return { added, removed, unlabelled, strip, labels };
+    // y depends only on totalLines and L, both deps.
+  }, [empty, totalLines, L, chunks, folds, notes, compact, onRemoveNote]);
+
+  if (empty) return null;
+  const { added, removed, unlabelled, strip, labels } = fixed;
 
   const { major, minor } = steps(totalLines);
   const minorPx = (minor / totalLines) * L;
@@ -148,20 +230,7 @@ export function Fig25DiffMap({
 
   const marks = (
     <g>
-      {/* The strip: the file top to bottom, folds hatched, changes filled. */}
-      <rect x={SX} y={Y0} width={SW} height={L} style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
-      {folds.map((f) => (
-        <Hatch key={`f${f.start}`} x={SX} y={y(f.start)} width={SW} height={Math.max(1, y(f.end + 1) - y(f.start))} stroke="" />
-      ))}
-      {chunks.map((c) => {
-        const top = y(c.start);
-        const h = Math.max(3, y(c.end + 1) - top);
-        return <rect key={`c${c.start}`} x={SX + 1.5} y={Math.min(top, Y1 - h)} width={SW - 3} height={h} style={{ fill: INK.fg }} />;
-      })}
-      {/* Notes: a dot on the strip's edge at their line. */}
-      {notes.map((n) => (
-        <circle key={`n${n.id}`} cx={SX + SW + 3} cy={y(n.row)} r={2} style={{ fill: INK.paper, stroke: INK.lamp, strokeWidth: STROKE.hair }} />
-      ))}
+      {strip}
       {/* What is on screen, bracketed in the lamp. */}
       {view && (
         <path
@@ -229,53 +298,7 @@ export function Fig25DiffMap({
             <T x={SX - 15} y={viewLabelY} anchor="end" color={INK.lamp}>view</T>
           )}
 
-          {/* Fold lengths. */}
-          {foldItems.map((f) => (
-            <T key={`fl${f.ay}`} x={SX + SW + 8} y={f.y + 11} color={INK.faint}>{`${f.len} unchanged`}</T>
-          ))}
-
-          {/* Changes and notes on leaders. */}
-          {items.map((it) => {
-            const iy = it.y + (it.kind === 'note' ? 9 : it.h / 2);
-            const from = it.kind === 'note' ? [SX + SW + 3, it.ay] : [SX + SW + 1, it.ay];
-            const pts = Math.abs(iy - it.ay) < 1
-              ? [from, [LX - 5, it.ay]]
-              : [from, [SX + SW + 8, it.ay], [LX - 12, iy], [LX - 5, iy]];
-            if (it.kind === 'change') {
-              const { c } = it;
-              const r = range(c.from, c.to);
-              const ax = LX + textWidth(r) + 7;
-              const at = c.added > 0 ? `+${c.added}` : '';
-              return (
-                <g key={`l${c.start}`}>
-                  <Leader points={pts} dot={false} />
-                  <T x={LX} y={it.y + 11} color={INK.fg}>{r}</T>
-                  {at && <T x={ax} y={it.y + 11} color={INK.ok}>{at}</T>}
-                  {c.removed > 0 && <T x={ax + (at ? textWidth(at) + 6 : 0)} y={it.y + 11} color={INK.fault}>{`−${c.removed}`}</T>}
-                </g>
-              );
-            }
-            const { n } = it;
-            const bw = MAP_W - LX;
-            const chars = Math.floor((bw - 14) / 7);
-            return (
-              <g key={`b${n.id}`}>
-                <Leader points={pts} dot={false} color={INK.lamp} />
-                <rect x={LX} y={it.y} width={bw} height={it.h} style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
-                <T x={LX + 7} y={it.y + 13}>{clip(`note · ${range(n.from, n.to)}`, chars - 2)}</T>
-                {it.lines.map((line, i) => (
-                  <T key={i} x={LX + 7} y={it.y + 26 + 13 * i} color={INK.fg}>{line}</T>
-                ))}
-                {onRemoveNote && (
-                  <g onClick={() => onRemoveNote(n.id)} style={{ cursor: 'pointer' }}>
-                    <title>Remove note</title>
-                    <rect x={MAP_W - 16} y={it.y + 1} width={15} height={15} style={{ fill: 'transparent' }} />
-                    <T x={MAP_W - 8.5} y={it.y + 13} anchor="middle" color={INK.faint}>×</T>
-                  </g>
-                )}
-              </g>
-            );
-          })}
+          {labels}
 
           {/* The file's total. */}
           <rect x={0} y={SUM_Y} width={MAP_W} height={32} style={{ fill: INK.paper, stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />

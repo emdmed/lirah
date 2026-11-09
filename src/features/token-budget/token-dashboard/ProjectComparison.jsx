@@ -11,6 +11,11 @@ const SORT_OPTIONS = [
   { key: 'name', label: 'Name' },
 ];
 
+function SortIcon({ active, dir }) {
+  if (!active) return <Sort width={10} height={10} className="opacity-30" />;
+  return dir === 'asc' ? <ArrowUp width={10} height={10} /> : <ArrowDown width={10} height={10} />;
+}
+
 export function ProjectComparison({ projects, totals, colors }) {
   const [sortKey, setSortKey] = useState('totalCost');
   const [sortDir, setSortDir] = useState('desc');
@@ -43,11 +48,6 @@ export function ProjectComparison({ projects, totals, colors }) {
       return sortDir === 'asc' ? va - vb : vb - va;
     });
   }, [projects, sortKey, sortDir, search]);
-
-  const SortIcon = ({ col }) => {
-    if (sortKey !== col) return <Sort width={10} height={10} className="opacity-30" />;
-    return sortDir === 'asc' ? <ArrowUp width={10} height={10} /> : <ArrowDown width={10} height={10} />;
-  };
 
   const columns = [
     { key: 'name', label: 'Project', width: 'flex-1 min-w-[120px]' },
@@ -91,7 +91,7 @@ export function ProjectComparison({ projects, totals, colors }) {
               onClick={() => handleSort(col.key)}
             >
               {col.label}
-              <SortIcon col={col.key} />
+              <SortIcon active={sortKey === col.key} dir={sortDir} />
             </button>
           ))}
         </div>

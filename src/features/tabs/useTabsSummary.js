@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { TAB_CLI_PROCESSES } from '../../lib/agentClis';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -21,6 +21,12 @@ function normPath(p) {
 
 function sameJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+// Key-order independent: detect_pty_clis returns a Rust HashMap, whose key order changes per call.
+function sameFlat(a, b) {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => k in b && a[k] === b[k]);
 }
 
 // --- Which sessions have a CLI agent running under their shell ---
@@ -49,7 +55,7 @@ async function pollCli() {
     } catch { /* keep {}: treat all as not running */ }
   }
   cliInFlight = false;
-  cliStore.set((prev) => (sameJson(prev, next) ? prev : next));
+  cliStore.set((prev) => (sameFlat(prev, next) ? prev : next));
   if (cliWatchers.size) cliTimer = setTimeout(pollCli, CLI_POLL_MS);
 }
 
@@ -76,7 +82,8 @@ export function useCliRunning(sessionId, enabled = true) {
     if (!enabled || !sessionId) return undefined;
     return watchCli(() => [sessionId]);
   }, [enabled, sessionId]);
-  return useStore(cliStore)[sessionId];
+  // Only this session's value, so other tabs' changes don't re-render this one.
+  return useSyncExternalStore(cliStore.subscribe, () => cliStore.get()[sessionId]);
 }
 
 /**

@@ -66,7 +66,7 @@ export function DiffContent({
   const compact = useFigureCompact();
   const [collapsedRegions, setCollapsedRegions] = useState(new Set());
   const [selectedLines, setSelectedLines] = useState(new Set());
-  const [selectionAnchor, setSelectionAnchor] = useState(null);
+  const selectionAnchor = useRef(null);
   const [copiedChunk, setCopiedChunk] = useState(null);
   const contentRef = useRef(null);
 
@@ -98,7 +98,10 @@ export function DiffContent({
       };
     }
 
-    const changes = diffLines(oldContent, newContent);
+    // Huge rewrites (lockfiles, minified bundles) can take seconds on the main
+    // thread; past 500ms jsdiff returns undefined and we show it as one replaced block.
+    const changes = diffLines(oldContent, newContent, { timeout: 500 })
+      ?? [{ removed: true, value: oldContent }, { added: true, value: newContent }];
     const oldLines = [];
     const newLines = [];
     let oldLineNum = 1;
@@ -290,12 +293,14 @@ export function DiffContent({
   const visibleLines = useMemo(() => {
     const lines = [];
     let i = 0;
+    // Collapsed regions by start line: a lookup per line instead of a scan of every region.
+    const collapsedAt = new Map(
+      collapsibleRegions.filter(r => collapsedRegions.has(r.id)).map(r => [r.start, r])
+    );
 
     while (i < maxLines) {
       // Check if this line starts a collapsed region
-      const collapsedRegion = collapsibleRegions.find(
-        r => collapsedRegions.has(r.id) && i === r.start
-      );
+      const collapsedRegion = collapsedAt.get(i);
 
       if (collapsedRegion) {
         // Add a collapse placeholder
@@ -376,6 +381,15 @@ export function DiffContent({
     };
   }, [container]);
 
+  // The diff map's strip fills the scroll pane's height.
+  const [paneHeight, setPaneHeight] = useState(0);
+  useEffect(() => {
+    if (!container) return undefined;
+    const ro = new ResizeObserver(() => setPaneHeight(container.clientHeight));
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [container]);
+
   // Report the current selection upward as a line range + snippet. The new side
   // is authoritative (it's what the agent wrote); deleted lines fall back to the
   // old side so a note can still be pinned to them.
@@ -406,10 +420,10 @@ export function DiffContent({
 
   // Handle line selection via event delegation
   const handleLineClick = useCallback((lineIndex, e) => {
-    if (e.shiftKey && selectionAnchor !== null) {
+    if (e.shiftKey && selectionAnchor.current !== null) {
       // Range selection
-      const start = Math.min(selectionAnchor, lineIndex);
-      const end = Math.max(selectionAnchor, lineIndex);
+      const start = Math.min(selectionAnchor.current, lineIndex);
+      const end = Math.max(selectionAnchor.current, lineIndex);
       const newSelection = new Set();
       for (let i = start; i <= end; i++) {
         newSelection.add(i);
@@ -417,7 +431,7 @@ export function DiffContent({
       setSelectedLines(newSelection);
     } else {
       // Single selection or toggle
-      setSelectionAnchor(lineIndex);
+      selectionAnchor.current = lineIndex;
       setSelectedLines(prev => {
         const newSet = new Set(prev);
         if (newSet.has(lineIndex)) {
@@ -429,7 +443,7 @@ export function DiffContent({
         return newSet;
       });
     }
-  }, [selectionAnchor]);
+  }, []);
 
   // Event delegation handler for container clicks
   const handleContainerClick = useCallback((e) => {
@@ -569,6 +583,8 @@ export function DiffContent({
             onJump={jumpToRow}
             onRemoveNote={onRemoveNote}
             marksOnly={!wide}
+            // Pane minus the sticky offset and the map's own chrome (scale ends, total box, caption, padding).
+            height={paneHeight ? Math.max(160, paneHeight - 28 - (wide && !compact ? 120 : 20)) : undefined}
           />
         </div>
       )}

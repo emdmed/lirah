@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { errorMessage } from '../../lib/errorMessage';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -30,7 +30,7 @@ const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDi
 const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog');
 
 /** The plans of the active tab's repo: a list, or one plan's chunks. */
-export function PlansPane({ projectPath }) {
+export const PlansPane = memo(function PlansPane({ projectPath }) {
   const { repoRoot, checked } = useRepoRoot(projectPath);
   const {
     plans, createPlan, replaceSource, deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix,
@@ -289,4 +289,4 @@ export function PlansPane({ projectPath }) {
       </Suspense>
     </>
   );
-}
+});

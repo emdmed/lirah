@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFigureCompact } from '../figure/Figure';
 import { Calibrated } from './kit';
+import { paneDragAware } from '../../../lib/paneDrag';
 
 // A calibrated recipe (Calibrated.recipes[name]) drawn into an <svg>.
 // The first draw replays the recipe's motion once it is half in view
@@ -29,9 +30,11 @@ export function CalRecipe({ recipe, data: given, transition, replayKey, title, m
     const el = wrapRef.current;
     if (!el) return undefined;
     setWidth(el.getBoundingClientRect().width);
-    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    // A fitted recipe redraws at every width, so during a sidebar drag it waits for a pause.
+    const [onResize, cancelSettle] = paneDragAware(([entry]) => setWidth(entry.contentRect.width));
+    const ro = new ResizeObserver(onResize);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); cancelSettle(); };
   }, []);
 
   // The recipe with the app's title as a caption under it.

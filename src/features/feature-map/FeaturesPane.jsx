@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { Copy } from 'iconoir-react';
 import '@/components/instrument/calibrated';
 import { useCalSvg } from '@/components/instrument/useCalSvg';
@@ -23,7 +23,7 @@ export function copyFeatureFiles(f, toast) {
 }
 
 /** The FEATURES section: the map's state on top, then its features by file count. `fm` is useFeatureMap(projectPath). */
-export function FeaturesPane({ projectPath, fm }) {
+export const FeaturesPane = memo(function FeaturesPane({ projectPath, fm }) {
   const { activeTabId } = useTabManager();
   const { selectedFeature, pinnedFeatures } = useTabFeatures(activeTabId);
   const toast = useToast();
@@ -97,7 +97,7 @@ export function FeaturesPane({ projectPath, fm }) {
       ))}
     </div>
   );
-}
+});
 
 function StatusLine({ fm, done, onBuild, onExplore }) {
   const { status, map } = fm;

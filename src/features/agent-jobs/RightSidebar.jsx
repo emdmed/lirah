@@ -36,6 +36,7 @@ import { useOpenTaskCount } from '../tasks/TasksContext';
 import { FeaturesPane } from '../feature-map/FeaturesPane';
 import { useFeatureMap } from '../feature-map/useFeatureMap';
 import { buttonVariants } from '../../components/ui/button';
+import { setPaneDrag } from '../../lib/paneDrag';
 
 // Collapsed-rail keys stack a count over a word, so they take the ghost role with no fixed size.
 const RAIL_KEY = cn(buttonVariants({ variant: 'ghost', size: null }), 'flex-col gap-0.5 w-6 px-0.5 py-1');
@@ -214,6 +215,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     };
     const onUp = () => {
       cancelAnimationFrame(frame);
+      setPaneDrag(false);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
@@ -227,6 +229,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    setPaneDrag(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   };

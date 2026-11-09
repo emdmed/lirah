@@ -46,6 +46,15 @@ const TIME_RANGES = [
   { value: 'monthly', label: 'Monthly' },
 ];
 
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-mono">
+      <Scanner size="md" className="mr-2" />
+      Loading...
+    </div>
+  );
+}
+
 export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, refreshStats, projectPath, theme }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('daily');
@@ -184,13 +193,6 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
     const name = family[0].toUpperCase() + family.slice(1);
     return minor ? `${name} ${major}.${minor}` : `${name} ${major}`;
   };
-
-  const LoadingSpinner = () => (
-    <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-mono">
-      <Scanner size="md" className="mr-2" />
-      Loading...
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -50,3 +50,15 @@
   width: 100%;
   height: auto;
 }
+
+/* Live race tails (lanesToned): one dash unit every 200ms, like the kit's
+   1.2s crawl, but stepped so WebKit repaints 5 times a second instead of 60. */
+[data-crawl-steps] {
+  animation: cal-crawl-steps 1.2s steps(6) infinite;
+}
+@keyframes cal-crawl-steps {
+  to { stroke-dashoffset: -6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-crawl-steps] { animation: none; }
+}
