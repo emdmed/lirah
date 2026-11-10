@@ -30,6 +30,7 @@ export function planGit(plan) {
 
 export const workPath = (repo) => repo.workPath || repo.root;
 export const isMultiRepo = (plan) => planGit(plan).repos.length > 1;
+export const isNoGit = (plan) => !!plan.git?.noGit;
 
 /** `cfg` plus `roots` it doesn't list yet, worked in place and already set up. */
 export function withRepos(cfg, roots) {

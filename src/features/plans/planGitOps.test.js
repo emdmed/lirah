@@ -12,7 +12,8 @@ vi.mock('@tauri-apps/api/core', () => ({
   }),
 }));
 
-const { adoptedFacts, chunkCommits } = await import('./planGitOps');
+const { adoptedFacts, captureBaseShas, chunkCommits } = await import('./planGitOps');
+const { noGitConfig } = await import('./planModel');
 
 const plan = { id: 'p1', repoRoot: '/r', chunks: [] };
 
@@ -32,5 +33,13 @@ describe('commits made ahead of the run', () => {
 
   it('gives an adopted chunk a base before its first commit and its last commit\'s time', async () => {
     expect(await adoptedFacts(plan, { '/r': ['sha1', 'sha2'] })).toEqual({ baseShas: { '/r': 'base0' }, doneAt: 1_700_000_000_000 });
+  });
+});
+
+describe('no-git plans', () => {
+  it('capture no base shas and never call git', async () => {
+    calls.length = 0;
+    expect(await captureBaseShas(noGitConfig('/x'))).toEqual({});
+    expect(calls).toEqual([]);
   });
 });
