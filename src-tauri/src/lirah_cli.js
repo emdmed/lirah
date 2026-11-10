@@ -525,7 +525,8 @@ function gitOut(cwd, args) {
 function repoRoot(cwd = process.cwd()) {
   const slashed = (p) => p.replaceAll("\\", "/"); // Windows paths use backslashes
   const prefix = `${slashed(join(lirahDir(), "plan-worktrees"))}/`;
-  if (slashed(cwd).startsWith(prefix)) {
+  const fold = (p) => (process.platform === "win32" ? p.toLowerCase() : p); // drive letter case
+  if (fold(slashed(cwd)).startsWith(fold(prefix))) {
     try {
       const marker = join(prefix, slashed(cwd).slice(prefix.length).split("/")[0], ".lirah-plan.json");
       const owner = JSON.parse(readFileSync(marker, "utf8"))?.repoRoot;
