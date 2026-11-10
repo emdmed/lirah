@@ -188,5 +188,5 @@ export function usePlanRunActions({
     }
   }, [plans, toggleSeq, openPlan, setOpenPlanId, repoRoot, stopAutopilot, handleResume, handleAutopilot, toast]);
 
-  return { prepareFor, handleImplement, handleAutopilot, handleResume };
+  return { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume };
 }

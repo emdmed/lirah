@@ -10,8 +10,6 @@ import { basename } from '../../utils/pathUtils';
 import { BUSY } from './PlanPaneContext';
 import { usePlanRunActions } from './usePlanRunActions';
 import { usePlanReview } from './usePlanReview';
-import { getTabSession } from '../tabs/terminalActivity';
-import { getAgentHookState } from '../tabs/agentHookState';
 
 /**
  * The plans pane's handlers for PlanPaneProvider (confirm, set up git or toast
@@ -23,7 +21,7 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, sendPlanFix, startAutopilot,
     resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit, sendPlanRevise, rechunk, updatePlan,
   } = usePlansActions();
-  const { tabs, activeTabId, addTab, switchTab } = useTabManager();
+  const { tabs, addTab, switchTab } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
   const [busy, setBusy] = useState(null); // the BUSY key of the action in flight
@@ -39,12 +37,12 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     }
   }, [toast]);
 
-  const { prepareFor, handleImplement, handleAutopilot, handleResume } = usePlanRunActions({
+  const { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume } = usePlanRunActions({
     repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, addTab, switchTab, confirm, toast,
     ensureGit, updatePlan, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
   });
   const { handleReview, handleReviewAll, diffProps } = usePlanReview({
-    repoRoot, plans, withBusy, prepareFor, sendFix, sendPlanFix, activeTabId, toast,
+    repoRoot, plans, withBusy, prepareFor, sendFix, sendPlanFix, toast,
   });
 
   const handleCheck = useCallback((plan, chunk) => withBusy(BUSY.chunk(chunk.id), async () => {
@@ -150,24 +148,18 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     }
   }, [confirm, withBusy, reopenGit, repoRoot, toast]);
 
-  // Typed into the active tab's terminal, so ask first when no agent is there.
+  // Typed into the plan's tab, so ask first when no agent is there or it is busy.
   const handleRevise = useCallback(async (plan, notes) => {
-    if (!getAgentHookState(getTabSession(activeTabId))) {
-      const ok = await confirm({
-        title: 'No agent detected in this tab',
-        description: 'The change requests are typed into this tab\'s terminal. Launch Claude there first (Ctrl+K), or send anyway if it is already running.',
-        confirmLabel: 'Send anyway',
-        destructive: false,
-      });
-      if (!ok) return false;
-    }
+    const tabId = await withBusy(BUSY.REVISE, () => prepareFor(plan));
+    if (!tabId) return false;
+    if (!(await confirmSend(plan, null, tabId))) return false;
     const sent = await withBusy(BUSY.REVISE, async () => {
-      await sendPlanRevise(repoRoot, plan.id, notes, activeTabId);
+      await sendPlanRevise(repoRoot, plan.id, notes, tabId);
       return true;
     });
     if (sent) toast.success('Sent. Re-chunk once the agent has updated the plan file.');
     return !!sent;
-  }, [activeTabId, confirm, withBusy, sendPlanRevise, repoRoot, toast]);
+  }, [prepareFor, confirmSend, withBusy, sendPlanRevise, repoRoot, toast]);
 
   const handleRechunk = useCallback((plan) => withBusy(BUSY.REVISE, () => rechunk(repoRoot, plan.id)),
     [withBusy, rechunk, repoRoot]);
