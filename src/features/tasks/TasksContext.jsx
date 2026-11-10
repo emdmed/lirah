@@ -1,14 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
-import { lastSepIndex } from '../../utils/pathUtils';
 import { usePlansActions } from '../plans/PlansContext';
 import { buildTaskPlanPrompt } from '../plans/planPrompts';
 import { getSettings } from '../settings/settingsStore';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { planContext } from './planContexts';
 import {
-  buildFormatPrompt, GLOBAL, isOpen, newTask, parseFormatted, planFileName, reorderSubset, TASK_STATUS, taskText,
+  buildFormatPrompt, GLOBAL, isOpen, newTask, parseFormatted, planFilePath, planRootOf, reorderSubset, TASK_STATUS, taskText,
 } from './taskModel';
 import { useTaskStore } from './useTaskStore';
 import { useTaskPlanLinks } from './useTaskPlanLinks';
@@ -91,13 +90,13 @@ export function TasksProvider({ children }) {
 
   /**
    * Send the task to the agent in `tabId` to plan, with a plan context in
-   * front. The plan is to be saved in `root` as `<title>_plan.md`; with
+   * front. The plan is to be saved in `root/lirah/plans` as `<title>_plan.md`; with
    * `autoChunk` it is imported and split into chunks once written.
    */
   const planTask = useCallback(async (scope, id, { tabId, root, contextId, autoChunk = false }) => {
     const task = find(scope, id);
     if (!task) throw new Error('Task not found');
-    const planPath = `${root}/${planFileName(task)}`;
+    const planPath = planFilePath(root, task);
     const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, planPath, autoChunk });
     const send = getTabPrompt(tabId)?.send;
     if (!send) throw new Error('that tab has no prompt to send to');
@@ -115,7 +114,7 @@ export function TasksProvider({ children }) {
     if (!task?.planPath) throw new Error('This task has no plan file');
     const text = source ?? await invoke('read_file_content', { path: task.planPath });
     if (!text.trim()) throw new Error('The plan file is empty');
-    const root = task.planPath.slice(0, lastSepIndex(task.planPath));
+    const root = planRootOf(task.planPath);
     const planId = await createPlan(root, {
       source: text,
       importedFrom: { path: task.planPath, hash: hash8(text) },

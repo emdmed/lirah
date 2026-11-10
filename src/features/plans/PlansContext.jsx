@@ -285,8 +285,8 @@ export function PlansProvider({ children }) {
     if (!plan) throw new Error('Plan not found');
     const known = plan.importedFrom?.path;
     if (known && await invoke('path_exists', { path: known }).catch(() => false)) return known;
-    let path = known || `${repoRoot}/${plan.slug}_plan.md`;
-    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${repoRoot}/${plan.slug}-${plan.id}_plan.md`;
+    let path = known || `${repoRoot}/lirah/plans/${plan.slug}_plan.md`;
+    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${repoRoot}/lirah/plans/${plan.slug}-${plan.id}_plan.md`;
     await invoke('write_file_content', { path, content: plan.source });
     updatePlan(repoRoot, planId, { importedFrom: { path, hash: hash8(plan.source) } });
     return path;
