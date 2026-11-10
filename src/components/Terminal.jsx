@@ -6,7 +6,7 @@ import { ClaudeMark } from './ClaudeMark';
 import { tabCliLabel } from '../lib/agentClis';
 import { paneDragAware } from '../lib/paneDrag';
 
-export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, cli = 'claude-code', cliRunning = false, master = false }, ref) => {
+export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, cli = 'claude-code', cliRunning = false, master = false, paneIndex = 2, name }, ref) => {
   const terminalRef = useRef(null);
   const { handleResize, sessionId, reattached, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive, reattachKey);
@@ -81,12 +81,12 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       }}
     >
       <PaneLegend
-        index={2}
-        title={master ? 'Workspace terminal' : 'Terminal'}
+        index={paneIndex}
+        title={master ? 'Workspace terminal' : (name ?? 'Terminal')}
         status={cli === 'claude-code'
           ? <ClaudeMark idle={!cliRunning} />
           : <span className={cliRunning ? 'text-foreground' : undefined}>{tabCliLabel(cli)}</span>}
-        note={[cli === 'claude-code' ? 'claude' : null, projectDir?.split(/[\\/]/).filter(Boolean).pop()].filter(Boolean).join(' · ') || undefined}
+        note={[cli === 'claude-code' ? 'claude' : null, !name && projectDir?.split(/[\\/]/).filter(Boolean).pop()].filter(Boolean).join(' · ') || undefined}
         lit={isFocused}
       />
       {/* The screen carries the inset; the ref div stays unpadded so FitAddon

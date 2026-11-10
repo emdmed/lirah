@@ -14,7 +14,7 @@ import { activityLamp, remoteLabel, remoteWork, tabActivity } from '../tabs/tabA
 import { rowActivity } from '../tabs/TabsSummaryPane';
 import { useTabPlans } from '../plans/useTabPlans';
 import { useAgentJobs } from '../agent-jobs/AgentJobsContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 import { ZenDrawer } from './ZenDrawer';
 import { closeDrawer, toggleDrawer } from './zenDrawerStore';
@@ -23,6 +23,9 @@ import { closeDrawer, toggleDrawer } from './zenDrawerStore';
 export const ZEN_LINE_MARK_SLOT_ID = 'zen-line-mark-slot';
 // The active tab portals today's tokens in here (its token stats live in the tab).
 export const ZEN_LINE_TOKENS_SLOT_ID = 'zen-line-tokens-slot';
+
+// A faint star between the line's groups, as in the status bar.
+const SEP_STAR = <span className="ins-sep-star" aria-hidden="true" />;
 
 const ITEM = 'inline-flex h-5 shrink-0 items-center px-1 hover:text-foreground focus-ring';
 
@@ -55,12 +58,12 @@ export function ZenLine() {
 
   return (
     <div
-      className="group flex items-center gap-4 h-8 px-2 shrink-0 select-none text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
+      className="group flex items-center gap-3 h-8 px-3 shrink-0 select-none text-xs font-mono bg-[var(--tui-bar)] shadow-[inset_0_1px_0_0_var(--tui-line)]"
       {...drag}
     >
       {IS_MAC && controls}
       <div id={ZEN_LINE_MARK_SLOT_ID} className="flex items-center shrink-0" />
-      <span className="flex shrink-0 items-center">
+      <span className="flex shrink-0 items-center gap-2">
       {workspaces.map((w) => (
         <button
           key={w.id}
@@ -73,7 +76,8 @@ export function ZenLine() {
         </button>
       ))}
       </span>
-      <span data-zen-segment="tabs" className="flex shrink-0 items-center gap-1 text-muted-foreground">
+      {SEP_STAR}
+      <span data-zen-segment="tabs" className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
         <button type="button" className={ITEM} onClick={() => toggleDrawer('tabs')} title="Tabs (Alt+4)">tabs</button>
         {workspaceTabs.map((tab) => {
           const work = remote[tab.id];
@@ -91,7 +95,7 @@ export function ZenLine() {
             <button
               key={tab.id}
               type="button"
-              className="inline-flex h-5 min-w-4 shrink-0 items-center justify-center gap-1 px-[3px] focus-ring"
+              className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center gap-1 px-1 focus-ring"
               title={`${tabName(tab)} · ${activity.label}${column ? ` · column ${column}` : ''}`}
               aria-label={`${tabName(tab)}, ${activity.label}${column ? `, column ${column}` : ''}`}
               aria-current={tab.id === activeTabId || undefined}
@@ -99,22 +103,25 @@ export function ZenLine() {
             >
               <Lamp {...activityLamp(activity.kind, queued)} />
               {digit && (
-                <span aria-hidden className={cn('text-[11px] leading-none tabular-nums', tab.id === activeTabId && 'text-[var(--ins-lamp)]')}>{column}</span>
+                <span aria-hidden className={cn('text-[11px] leading-none tabular-nums', tab.id === activeTabId && 'text-foreground')}>{column}</span>
               )}
             </button>
           );
         })}
       </span>
+      {waitingTab && SEP_STAR}
       {waitingTab && (
         <button type="button" className={cn(ITEM, 'text-[var(--ins-lamp)]')} onClick={requestAttentionJump} title="Jump to it (Alt+A)">
           {tabName(waitingTab)} waits {formatDuration(Math.max(1, Math.round((now - waiting.at) / 60000)) * 60000)}
         </button>
       )}
+      {running > 0 && SEP_STAR}
       {running > 0 && (
         <span className="flex shrink-0 items-center gap-1 text-muted-foreground" title={`${running} agent job${running > 1 ? 's' : ''} running`}>
           <Lamp {...jobLamp('running')} />jobs {running}
         </span>
       )}
+      {SEP_STAR}
       <div id={ZEN_LINE_TOKENS_SLOT_ID} className="flex items-center shrink-0 text-muted-foreground tabular-nums" />
       <div className="flex-1 self-stretch" {...drag} />
       <KeyChord keys={shortcutKeys('zen-toggle')} label="zen" />
@@ -137,12 +144,15 @@ function TabsDrawer({ activeTabId }) {
   useEffect(() => () => closeDrawer('tabs'), [activeTabId]);
   const { placeZenColumn: put, dropZenColumn: drop, switchTab } = useTabActions();
   const [notice, setNotice] = useState(null);
+  // The row under the pointer: 1–3 put it in that column. Hover never selects or unfolds a row.
+  const hovered = useRef(null);
 
   const onKeyDownCapture = (e) => {
-    const id = e.target.dataset?.tabRow;
+    const column = ['1', '2', '3'].includes(e.key);
+    const id = (column && hovered.current) || e.target.dataset?.tabRow;
     if (!id || e.ctrlKey || e.metaKey || e.altKey) return;
     const act = e.key === 'Enter' ? () => { put(id, null); switchTab(id); }
-      : ['1', '2', '3'].includes(e.key) ? () => put(id, Number(e.key) - 1)
+      : column ? () => put(id, Number(e.key) - 1)
         : e.key === 'x' ? () => drop(id) : null;
     if (!act) return setNotice(null);
     e.preventDefault();
@@ -160,13 +170,10 @@ function TabsDrawer({ activeTabId }) {
       <div
         className="flex flex-1 flex-col"
         onKeyDownCapture={onKeyDownCapture}
-        // The row under the pointer takes the keys, so 1–3/↵/x act on the row you point at.
-        onPointerMove={(e) => {
-          const row = e.target.closest?.('[data-tab-row]');
-          if (row && row !== document.activeElement && !row.contains(document.activeElement)) row.focus({ preventScroll: true });
-        }}
+        onPointerMove={(e) => { hovered.current = e.target.closest?.('[data-tab-row]')?.dataset.tabRow ?? null; }}
+        onPointerLeave={() => { hovered.current = null; }}
       >
-        {notice && <div role="status" className="px-3 py-1.5 text-xs text-[var(--ins-lamp)] edge-b-engraved">{notice}</div>}
+        {notice && <div role="status" className="px-3 py-1.5 text-xs text-foreground edge-b-engraved">{notice}</div>}
         <TabsSummaryPane rowHints={COLUMN_HINTS} />
       </div>
     </ZenDrawer>

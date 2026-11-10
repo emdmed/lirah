@@ -17,7 +17,7 @@ import { usePromptTemplates } from "../templates";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useWatcher } from "../watcher";
 import { useBookmarks } from "../bookmarks";
-import { useTabActions } from "./TabContext";
+import { tabDisplayName, useTabActions } from "./TabContext";
 import { invoke } from "@tauri-apps/api/core";
 import { useBranchName } from "../git/useBranchName";
 import { registerTabSession, getTabSession, getLastOutputAt } from "./terminalActivity";
@@ -154,7 +154,7 @@ const MASTER_PROMPT = 'You are the agent in this Lirah workspace\'s workspace te
 // visible: on screen (layout, polls, fit, rendering). isActive: focused (keys,
 // palette, status slot, dialogs, terminal focus). column/columns: this visible
 // tab's slot among the side-by-side visible tabs.
-export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visible = isActive, column = 0, columns = 1, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
+export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, label, isActive, visible = isActive, column = 0, columns = 1, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -185,8 +185,6 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
     flexDirection: 'column',
     transform: visible ? 'none' : 'translateX(-200vw)',
     zIndex: visible ? 1 : 0,
-    // Side by side, the focused column wears the ink frame.
-    ...(visible && columns > 1 && isActive && { outline: '1px solid var(--color-foreground)', outlineOffset: -1 }),
   };
   const { switchTab } = useTabActions();
 
@@ -237,10 +235,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider initialFiles={draft?.files}>
-        <ProjectTabInner draft={draft} projectPath={projectPath} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner draft={draft} projectPath={projectPath} customLabel={customLabel} label={label} zenKey={columns > 1 ? column + 1 : null} rightEdge={column === columns - 1} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, customLabel, label, column, columns, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -286,7 +284,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, isActive, visi
   );
 });
 
-function ProjectTabInner({ draft, projectPath, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, rightEdge, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -1082,6 +1080,7 @@ function ProjectTabInner({ draft, projectPath, isActive, visible, tabId, workspa
     <TokenBudgetProvider workspaceId={workspaceId} tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
       <Layout
+        rightGutter={zenMode && rightEdge}
         sidebar={
           !zenMode && sidebar.sidebarOpen && (
             <LeftSidebar
@@ -1269,8 +1268,10 @@ function ProjectTabInner({ draft, projectPath, isActive, visible, tabId, workspa
           cli={settings.selectedCli}
           cliRunning={cliRunning === tabCliProcess(settings.selectedCli)}
           master={master}
+          paneIndex={zenMode ? zenKey : 2}
+          name={zenMode ? tabDisplayName({ customLabel, label, projectPath }, bookmarks) : undefined}
         />
-        {zenMode && <ZenStrip tabId={tabId} isActive={isActive} visible={visible} cliName={cliRunning} branchName={branchName} />}
+        {zenMode && <ZenStrip tabId={tabId} zenKey={zenKey} isActive={isActive} visible={visible} cliName={cliRunning} branchName={branchName} />}
         {!settings.autoLaunchCli && <LaunchAgentPrompt
           tabId={tabId}
           sessionId={terminalSessionId}

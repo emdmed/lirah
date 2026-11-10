@@ -42,8 +42,8 @@ function countFiles(files, root) {
 // its plan, files and context) over a turn row. Fixed 40px so the terminal
 // never resizes as it fills. cliName is the agent running in its terminal.
 // visible: its column is on screen (clock and file marks run); isActive: the
-// focused column (gold digit, drawers).
-export function ZenStrip({ tabId, isActive, visible = isActive, cliName, branchName }) {
+// focused column (ink digit, drawers). zenKey: its column number, null with one column.
+export function ZenStrip({ tabId, zenKey, isActive, visible = isActive, cliName, branchName }) {
   const { workspaceTabs } = useTabManager();
   const { bookmarks } = useBookmarks();
   const index = workspaceTabs.findIndex((t) => t.id === tabId);
@@ -87,7 +87,7 @@ export function ZenStrip({ tabId, isActive, visible = isActive, cliName, branchN
       )}
     >
       <div className="flex h-5 min-w-0 items-center gap-2">
-        <span aria-hidden="true" className={cn('w-4 shrink-0 text-center font-mono tabular-nums', isActive && 'text-[var(--ins-lamp)]')}>{index + 1}</span>
+        {zenKey && <span aria-hidden="true" className={cn('w-4 shrink-0 text-center font-mono tabular-nums', isActive && 'text-foreground')}>{zenKey}</span>}
         <span className="ins-name min-w-0 truncate text-[13px] italic leading-5 text-foreground">{tabDisplayName(tab, bookmarks)}</span>
         {branchName && (
           <span className="min-w-0 truncate font-mono" title={`branch ${branchName}`}>{branchName}</span>

@@ -203,6 +203,8 @@ function App() {
                   tabId={tab.id}
                   workspaceId={tab.workspaceId}
                   projectPath={tab.projectPath}
+                  customLabel={tab.customLabel}
+                  label={tab.label}
                   isActive={tab.id === activeTabId}
                   visible={column >= 0}
                   column={Math.max(column, 0)}

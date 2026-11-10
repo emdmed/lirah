@@ -51,7 +51,7 @@ export const SKY = (
   </svg>
 );
 
-export function Layout({ sidebar, children, statusBar, textarea, secondaryTerminal }) {
+export function Layout({ rightGutter = false, sidebar, children, statusBar, textarea, secondaryTerminal }) {
   return (
     <div className="relative p-0 flex flex-col w-full h-full bg-[var(--ins-gutter)]">
       {SKY}
@@ -60,7 +60,8 @@ export function Layout({ sidebar, children, statusBar, textarea, secondaryTermin
           spacing is 6px of padding plus that inset; the sidebar's resize
           handle is the 12px gap to its right. */}
       {/* relative: lifts the panes over the sky */}
-      <div className="relative flex flex-1 min-h-0 pl-3 pt-1.5 pb-1.5">
+      {/* Zen hides the right sidebar that normally makes the right gutter. */}
+      <div className={`relative flex flex-1 min-h-0 pl-3 pt-1.5 pb-1.5${rightGutter ? ' pr-3' : ''}`}>
         {sidebar}
         {/* min-w-0: without it this row's floor is xterm's canvas width, so a
             narrowing window can't shrink it — it overflows, FitAddon measures
