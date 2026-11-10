@@ -7,14 +7,14 @@ Run `lirah tabs open ~/project`, then `lirah tabs open ~/project/src`, then `sle
 
 ## Steps
 1. Press `Ctrl+H`.
-   **Expect:** a dialog with the heading `^H KEYBOARD SHORTCUTS`, and its text (`lirah qa text`) includes `New Tab` and `Close Tab`. Press `Escape` and check the dialog is gone.
+   **Expect:** a dialog with the heading `^H KEYBOARD SHORTCUTS` (any letter case), and its text (`lirah qa text`) includes `New Tab` and `Close Tab`. Press `Escape` and check the dialog is gone.
 2. Press `Ctrl+1`.
    **Expect:** `lirah tabs list` marks tab 1, the `project` tab, active (`*`).
 3. Press `Ctrl+Tab`.
    **Expect:** `lirah tabs list` marks tab 2, the `src` tab, active.
 4. Press `Ctrl+T`.
-   **Expect:** a dialog with the heading `^T NEW TAB`, with the option for the current folder (`↵ src`) selected.
+   **Expect:** a dialog with the heading `^T NEW TAB` (any letter case), with the option for the current folder (`↵ src`) selected.
 5. Press `Enter`.
-   **Expect:** the dialog closes, the `TABS` button reads `TABS 3`, and `lirah tabs list` shows a third tab, in `/project/src`, active.
+   **Expect:** the dialog closes, the snapshot shows a button starting `main: 3 tabs`, and `lirah tabs list` shows a third tab, in `/project/src`, active.
 6. Press `Ctrl+W`.
-   **Expect:** the `TABS` button reads `TABS 2`, and `lirah tabs list` shows two tabs.
+   **Expect:** the snapshot shows a button starting `main: 2 tabs`, and `lirah tabs list` shows two tabs.

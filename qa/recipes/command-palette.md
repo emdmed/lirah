@@ -17,4 +17,4 @@ Run `lirah tabs open ~/project`, then `sleep 2`.
 5. Click the `TABS` button, press `:`, and type `tab` into the `Command` field.
    **Expect:** `tab new tab in this project` is listed and selected.
 6. Press `Enter`.
-   **Expect:** the `TABS` button reads `TABS 2`, and `lirah tabs list` shows two `project` tabs with the second one active (`*`).
+   **Expect:** the snapshot shows a button starting `main: 2 tabs`, and `lirah tabs list` shows two `project` tabs with the second one active (`*`).

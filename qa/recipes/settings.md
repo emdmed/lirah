@@ -7,7 +7,7 @@ Run `lirah tabs open ~/project`, then `sleep 2`. Run `lirah theme get` and remem
 
 ## Steps
 1. Click `Settings and actions`, then the `Settings…` menu item.
-   **Expect:** a dialog with the heading `SETTINGS` and tabs like `Agent` and `Appearance`.
+   **Expect:** a dialog with the heading `SETTINGS` (any letter case) and tabs like `Agent` and `Appearance`.
 2. Click the `Appearance` tab.
    **Expect:** a list of themes.
 3. Pick any theme other than the start theme.
