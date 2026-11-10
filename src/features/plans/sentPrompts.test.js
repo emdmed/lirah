@@ -7,7 +7,7 @@ vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onCloseReq
 const { invoke } = await import('@tauri-apps/api/core');
 const { sendSaved } = await import('./sentPrompts');
 
-const plan = { id: 'p1', workspaceId: 'w1' };
+const plan = { id: 'p1', repoRoot: '/r' };
 const chunk = { n: 3 };
 
 describe('sendSaved', () => {
@@ -18,7 +18,7 @@ describe('sendSaved', () => {
     const send = vi.fn();
     const entry = await sendSaved(send, plan, chunk, 'fix', 'hello', 42);
     expect(send).toHaveBeenCalledWith('hello');
-    const file = '/h/.lirah/workspaces/w1/plans/p1/prompts/3-fix-42.md';
+    const file = '/r/lirah/plans/p1/prompts/3-fix-42.md';
     expect(invoke).toHaveBeenCalledWith('write_file_content', { path: file, content: 'hello' });
     expect(entry).toEqual({ kind: 'fix', at: 42, file });
   });

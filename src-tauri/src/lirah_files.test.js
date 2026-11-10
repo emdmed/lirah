@@ -2,7 +2,7 @@ import { it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { read, write, resolveWorkspace, lirahDir } from './lirah_files.js';
+import { read, write, list, resolveWorkspace, lirahDir } from './lirah_files.js';
 
 // os.homedir() reads USERPROFILE on Windows, HOME elsewhere.
 const oldHome = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
@@ -80,4 +80,13 @@ it('resolves the workspace from the env, else the deepest tab containing the cwd
   expect(resolveWorkspace('/home/x/api', { LIRAH_WORKSPACE: 'old' })).toBe('w2');
   rmSync(join(home, '.lirah/workspaces/w1'), { recursive: true });
   expect(resolveWorkspace('/home/x/web', {})).toBeNull();
+});
+
+it('reads, writes and lists under an absolute base instead of ~/.lirah', () => {
+  const base = join(home, 'repo/lirah/plans');
+  expect(write('p1/plan.json', { chunks: [] }, 0, base).revision).toBe(1);
+  expect(read('p1/plan.json', base)).toEqual({ chunks: [], version: 1, revision: 1 });
+  expect(list('p1', base)).toEqual(['plan.json']);
+  expect(read('p1/plan.json')).toBeNull();
+  expect(() => read('p1/plan.json', 'rel/base')).toThrow(/invalid store base/);
 });

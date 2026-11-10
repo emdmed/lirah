@@ -15,7 +15,7 @@ function titleBeyondName(title, name) {
   return rest || title;
 }
 
-/** `*_plan.md` files at the repo root, one key away from becoming plans. */
+/** .md files in lirah/plans and `*_plan.md` files at the repo root, one key away from becoming plans. */
 export function FoundPlansSection({ files, importFile, deleteFile }) {
   const toast = useToast();
   const [busy, setBusy] = useState(null); // path being imported, or 'all'
@@ -61,7 +61,7 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
         <span className="engraved-label">found here</span>
         <span className="font-mono tabular-nums">{files.length}</span>
       </div>
-      <div className="px-3 pb-1 text-[11px] text-muted-foreground"># plan files at the project root</div>
+      <div className="px-3 pb-1 text-[11px] text-muted-foreground"># plan files in the project</div>
       {files.map((file) => {
         const changed = file.state === 'changed';
         const title = titleBeyondName(file.title, file.name);

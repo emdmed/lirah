@@ -71,7 +71,8 @@ pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result
 }
 
 /// Delete a plan file that was imported out of a repo. Only a `.md` file
-/// directly inside `repo_root` qualifies, so a bad path can't reach anything else.
+/// directly inside `repo_root` or `repo_root/lirah/plans` qualifies, so a bad
+/// path can't reach anything else.
 #[tauri::command]
 pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), String> {
     crate::ipc::blocking("delete_plan_file", move || {
@@ -84,8 +85,10 @@ pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), Str
         let is_md = file
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
-        if !is_md || file.parent() != Some(root.as_path()) || !file.is_file() {
-            return Err("Only a .md file at the repo root can be removed".to_string());
+        let plans = root.join("lirah").join("plans");
+        let parent = file.parent();
+        if !is_md || !(parent == Some(root.as_path()) || parent == Some(plans.as_path())) || !file.is_file() {
+            return Err("Only a .md file at the repo root or in lirah/plans can be removed".to_string());
         }
         std::fs::remove_file(&file).map_err(|e| format!("Failed to delete plan file: {}", e))
     })

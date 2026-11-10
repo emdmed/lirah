@@ -7,9 +7,9 @@ import { markdownTitle } from './planPrompts';
 const PLAN_FILE = /(^|[_-])plan\.md$/i;
 
 /**
- * Plan files sitting at the repo root (where they used to be saved), so they
- * can be imported instead of pasted. Root only: that's where they live, and it
- * keeps the scan to one directory read. Ignored files are included on purpose.
+ * Plan files in `<repo>/lirah/plans` (every .md) and at the repo root (where
+ * they used to be saved; `*_plan.md` only), so they can be imported instead of
+ * pasted. Two directory reads, no recursion. Ignored files are included on purpose.
  * Each entry is `new` (never imported) or `changed` (edited since its import).
  */
 export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
@@ -27,15 +27,15 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
     const plans = plansRef.current;
     let cancelled = false;
     (async () => {
-      let entries = [];
-      try {
-        entries = await invoke('read_directory', { path: repoRoot });
-      } catch {
-        return;
-      }
+      const list = (path) => invoke('read_directory', { path }).catch(() => []); // a missing folder is fine
+      const [rootEntries, planEntries] = await Promise.all([list(repoRoot), list(`${repoRoot}/lirah/plans`)]);
+      const entries = [
+        ...planEntries.filter((e) => /\.md$/i.test(e.name)),
+        ...rootEntries.filter((e) => PLAN_FILE.test(e.name)),
+      ];
       const found = [];
       for (const entry of entries) {
-        if (entry.is_dir || !PLAN_FILE.test(entry.name)) continue;
+        if (entry.is_dir) continue;
         let source;
         try {
           source = await invoke('read_file_content', { path: entry.path });
