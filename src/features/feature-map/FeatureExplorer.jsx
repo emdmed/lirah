@@ -51,7 +51,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="full"
-        className="flex flex-col gap-0 overflow-hidden"
+        className="flex flex-col gap-0"
         status={`${all.length} features${pinnedFeatures.length ? ` · ${pinnedFeatures.length} in context` : ''}`}
         hints={[{ keys: ['↑', '↓'], label: 'move' }, { keys: ['↵'], label: feature && pinned(feature) ? 'remove from context' : 'add to context' }]}
         onOpenAutoFocus={(e) => { e.preventDefault(); filterRef.current?.focus(); }}

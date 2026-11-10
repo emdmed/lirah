@@ -304,7 +304,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="md"
-        className="max-w-[95vw] max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        className="max-w-[95vw] max-h-[85vh] flex flex-col gap-4"
         status={checkedFiles.length > 0 ? plural(checkedFiles.length, 'file') : undefined}
         hints={[{ keys: ['^', '↵'], label: candidateCount > 1 ? 'race' : 'run' }]}
         escLabel="cancel"

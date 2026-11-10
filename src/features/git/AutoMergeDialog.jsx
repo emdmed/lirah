@@ -82,7 +82,7 @@ export function AutoMergeDialog({ autoMerge }) {
       <DialogContent
         size="lg"
         fig="11"
-        className="max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        className="max-h-[85vh] flex flex-col gap-4"
         keys={['alt', 'M']}
         lamp={lamp}
         status={status}
@@ -158,7 +158,7 @@ export function AutoMergeDialog({ autoMerge }) {
         )}
 
         {(stage === 'ready' || stage === 'merging') && (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="-mx-3 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3">
             <section className="flex flex-col gap-1">
               <DialogGroup label="Merge into" />
               <ul role="listbox" aria-label="Base branch" className="-mx-3 max-h-[18vh] overflow-y-auto">
