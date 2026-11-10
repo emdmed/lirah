@@ -4,6 +4,16 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-10
+
+### Added
+
+- **Lirah CLI on Windows** - The `lirah` command now works on Windows through a `lirah.cmd` wrapper, and the app serves its control channel on a named pipe so the CLI can talk to a running instance.
+
+### Fixed
+
+- **Work log on Windows** - Changed files are now matched correctly when tool paths and git paths use different separators.
+
 ## [0.23.0] - 2026-11-10
 
 ### Added
