@@ -35,3 +35,7 @@ fn app_form(s: &str) -> String {
 #[cfg(test)]
 #[path = "paths_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "paths_roots_tests.rs"]
+mod roots_tests;

@@ -1184,3 +1184,11 @@ mod descendants_tests;
 #[cfg(test)]
 #[path = "tokens_tests.rs"]
 mod path_tests;
+
+#[cfg(test)]
+#[path = "tokens_msys_tests.rs"]
+mod msys_tests;
+
+#[cfg(test)]
+#[path = "tokens_procstart_tests.rs"]
+mod procstart_tests;
