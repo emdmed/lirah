@@ -11,7 +11,7 @@ A cheap model (Haiku) uses a real, throwaway Lirah instance the way a user would
 
 - The dev setup from the main README (`npm install`, a Rust toolchain, the Tauri system packages), since QA runs `tauri dev`.
 - The [Claude Code](https://claude.com/claude-code) CLI on your `PATH` and logged in (`claude`). Recipes run on Haiku, billed to that account, about $0.005 each.
-- Linux or macOS with a desktop session: the app opens a window, and the control socket the agent drives it through is Unix-only. Tested on Linux.
+- Linux or macOS with a desktop session: the app opens a window. The control channel exists on Windows too (a named pipe), but `scripts/qa.mjs` is Unix-only: it looks for a `.sock` file in the temp profile, sets `HOME` and joins `PATH` with `:`. Tested on Linux.
 
 ## Running
 
