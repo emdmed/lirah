@@ -11,15 +11,21 @@ use serde_json::{json, Value};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 /// Fixed loopback port (dynamic range) shared with the `hooks.json` builder.
 pub const HOOK_PORT: u16 = 49731;
 pub const TOKEN_ENV: &str = "LIRAH_HOOK_TOKEN";
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
+/// A whole request (headers and body) must arrive within this, so a client
+/// that drips bytes cannot hold its thread.
+const REQUEST_DEADLINE: Duration = Duration::from_secs(10);
+/// Headers are read (and the token checked) only within these limits.
+const MAX_HEADER_BYTES: u64 = 16 * 1024;
+const MAX_HEADERS: usize = 64;
 /// A hook body is one event; anything bigger is refused.
 const MAX_BODY: usize = 1024 * 1024;
 
@@ -40,7 +46,14 @@ pub fn token() -> Option<&'static str> {
                 .and_then(|mut f| f.write_all(fresh.as_bytes()));
             match created {
                 Ok(()) => Some(fresh),
-                Err(_) => fs::read_to_string(&path).ok().map(|t| t.trim().to_string()).filter(|t| !t.is_empty()),
+                // Another instance won the race; it may not have written the value yet.
+                Err(_) => (0..5).find_map(|_| {
+                    let t = fs::read_to_string(&path).ok()?.trim().to_string();
+                    if t.is_empty() {
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                    Some(t).filter(|t| !t.is_empty())
+                }),
             }
         })
         .as_deref()
@@ -52,25 +65,49 @@ struct Request {
     body: Vec<u8>,
 }
 
-fn read_request(stream: TcpStream) -> Option<Request> {
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    reader.read_line(&mut line).ok()?;
-    let (mut token, mut session, mut len) = (String::new(), String::new(), 0usize);
-    loop {
-        line.clear();
-        reader.read_line(&mut line).ok()?;
-        let line = line.trim_end();
-        if line.is_empty() {
-            break;
+/// A stream whose every read stops at the request's deadline.
+struct Deadline<'a> {
+    stream: &'a TcpStream,
+    end: Instant,
+}
+
+impl Read for Deadline<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let left = self.end.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(std::io::ErrorKind::TimedOut.into());
         }
-        let (name, value) = line.split_once(':')?;
-        let value = value.trim();
-        match name.to_ascii_lowercase().as_str() {
-            "x-lirah-token" => token = value.to_string(),
-            "x-lirah-session" => session = value.to_string(),
-            "content-length" => len = value.parse().ok()?,
-            _ => {}
+        self.stream.set_read_timeout(Some(left.min(READ_TIMEOUT)))?;
+        (&*self.stream).read(buf)
+    }
+}
+
+fn read_request(stream: &TcpStream, deadline: Duration) -> Option<Request> {
+    let mut reader = BufReader::new(Deadline { stream, end: Instant::now() + deadline });
+    let (mut token, mut session, mut len) = (String::new(), String::new(), 0usize);
+    {
+        // Capped, so an unauthenticated client cannot make us buffer headers forever.
+        let mut head = (&mut reader).take(MAX_HEADER_BYTES);
+        let mut line = String::new();
+        head.read_line(&mut line).ok()?; // request line
+        for count in 0.. {
+            line.clear();
+            // Empty read: closed or over the cap before the blank line.
+            if head.read_line(&mut line).ok()? == 0 || count >= MAX_HEADERS {
+                return None;
+            }
+            let line = line.trim_end();
+            if line.is_empty() {
+                break;
+            }
+            let (name, value) = line.split_once(':')?;
+            let value = value.trim();
+            match name.to_ascii_lowercase().as_str() {
+                "x-lirah-token" => token = value.to_string(),
+                "x-lirah-session" => session = value.to_string(),
+                "content-length" => len = value.parse().ok()?,
+                _ => {}
+            }
         }
     }
     if len > MAX_BODY {
@@ -142,23 +179,23 @@ fn respond(
     (200, reply)
 }
 
-fn handle(app: &AppHandle, expected: &str, mut stream: TcpStream) {
-    let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
-    let _ = stream.set_write_timeout(Some(READ_TIMEOUT));
-    let Some(req) = stream.try_clone().ok().and_then(read_request) else { return };
-    let (status, body) = respond(
-        expected,
-        &req,
-        switched_off(),
-        pending_context,
-        |session, payload| crate::agent_hooks::emit_hook(app, session, payload),
-    );
-    let body = body.map(|b| b.to_string()).unwrap_or_default();
-    let _ = write!(
-        stream,
-        "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    );
+/// A thread per connection, so a stalled client blocks no one else.
+fn serve(listener: TcpListener, deadline: Duration, handler: Arc<dyn Fn(&Request) -> (u16, Option<Value>) + Send + Sync>) {
+    for mut stream in listener.incoming().flatten() {
+        let handler = handler.clone();
+        let _ = thread::Builder::new().name("hook-server-conn".into()).spawn(move || {
+            let _ = stream.set_write_timeout(Some(READ_TIMEOUT));
+            let Some(req) = read_request(&stream, deadline) else { return };
+            let (status, body) = handler(&req);
+            let body = body.map(|b| b.to_string()).unwrap_or_default();
+            let content_type = if body.is_empty() { "" } else { "Content-Type: application/json\r\n" };
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status} X\r\n{content_type}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+        });
+    }
 }
 
 pub fn start(app: AppHandle) {
@@ -173,13 +210,12 @@ pub fn start(app: AppHandle) {
             return;
         }
     };
-    // One connection at a time keeps a terminal's events in order; each is a
-    // loopback request that finishes in microseconds (slow clients time out).
-    let _ = thread::Builder::new().name("hook-server".into()).spawn(move || {
-        for stream in listener.incoming().flatten() {
-            handle(&app, token, stream);
-        }
+    let handler = Arc::new(move |req: &Request| {
+        respond(token, req, switched_off(), pending_context, |session, payload| {
+            crate::agent_hooks::emit_hook(&app, session, payload)
+        })
     });
+    let _ = thread::Builder::new().name("hook-server".into()).spawn(move || serve(listener, REQUEST_DEADLINE, handler));
 }
 
 #[cfg(test)]
@@ -255,7 +291,74 @@ mod tests {
         let mut client = TcpStream::connect(addr).unwrap();
         let body = r#"{"a":1}"#;
         write!(client, "POST /h HTTP/1.1\r\nX-Lirah-Token: tok\r\nx-lirah-session: s1\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
-        let r = read_request(listener.accept().unwrap().0).unwrap();
+        let r = read_request(&listener.accept().unwrap().0, REQUEST_DEADLINE).unwrap();
         assert_eq!((r.token.as_str(), r.session.as_str(), r.body.as_slice()), ("tok", "s1", body.as_bytes()));
+    }
+
+    /// A server running the real `respond`, on a free port; events are dropped.
+    fn spawn_server(deadline: Duration) -> std::net::SocketAddr {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handler = Arc::new(|r: &Request| respond("tok", r, false, |_, _| None, |_, _| {}));
+        thread::spawn(move || serve(listener, deadline, handler));
+        addr
+    }
+
+    /// Send `raw`, keep the connection open, and read until the server closes.
+    fn exchange(addr: std::net::SocketAddr, raw: &str) -> String {
+        let mut c = TcpStream::connect(addr).unwrap();
+        c.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        c.write_all(raw.as_bytes()).unwrap();
+        let mut out = String::new();
+        let _ = c.read_to_string(&mut out);
+        out
+    }
+
+    const OK_REQ: &str = "POST /hook HTTP/1.1\r\nX-Lirah-Token: tok\r\nX-Lirah-Session: s1\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
+
+    #[test]
+    fn a_stalled_client_does_not_block_a_valid_request() {
+        let addr = spawn_server(Duration::from_secs(2));
+        let mut stalled = TcpStream::connect(addr).unwrap();
+        stalled.write_all(b"POST /hook HTTP/1.1\r\nX-Lirah-Tok").unwrap();
+        let start = Instant::now();
+        let reply = exchange(addr, OK_REQ);
+        assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+        assert!(!reply.contains("Content-Type"), "empty body has no content type");
+        assert!(start.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn a_client_that_never_finishes_is_cut_off_at_the_deadline_not_the_read_timeout() {
+        let addr = spawn_server(Duration::from_millis(400));
+        let start = Instant::now();
+        // The read timeout is 5s, so only the total deadline can close this in time.
+        assert_eq!(exchange(addr, "POST /hook HTTP/1.1\r\nX-A: 1\r\n"), "");
+        assert!(start.elapsed() < Duration::from_secs(3), "took {:?}", start.elapsed());
+    }
+
+    #[test]
+    fn oversize_content_length_is_refused() {
+        let addr = spawn_server(Duration::from_secs(2));
+        let raw = format!("POST /hook HTTP/1.1\r\nX-Lirah-Token: tok\r\nContent-Length: {}\r\n\r\n", MAX_BODY + 1);
+        assert_eq!(exchange(addr, &raw), "");
+    }
+
+    #[test]
+    fn too_many_or_too_large_headers_are_refused() {
+        let addr = spawn_server(Duration::from_secs(2));
+        let many = format!("POST /hook HTTP/1.1\r\n{}\r\n", "X-A: 1\r\n".repeat(MAX_HEADERS + 1));
+        assert_eq!(exchange(addr, &many), "");
+        let big = format!("POST /hook HTTP/1.1\r\nX-A: {}\r\n\r\n", "a".repeat(MAX_HEADER_BYTES as usize));
+        assert_eq!(exchange(addr, &big), "");
+    }
+
+    #[test]
+    fn missing_content_length_is_an_empty_body_not_a_hang() {
+        let addr = spawn_server(Duration::from_secs(2));
+        let start = Instant::now();
+        let reply = exchange(addr, "POST /hook HTTP/1.1\r\nX-Lirah-Token: tok\r\nX-Lirah-Session: s1\r\n\r\n");
+        assert!(reply.starts_with("HTTP/1.1 400"), "{reply}");
+        assert!(start.elapsed() < Duration::from_secs(1));
     }
 }
