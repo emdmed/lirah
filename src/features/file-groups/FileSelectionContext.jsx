@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useMemo, useCallback } from 'react';
-import { getRelativePath, basename } from '../../utils/pathUtils';
+import { getRelativePath, basename, joinPath } from '../../utils/pathUtils';
 
 const FileSelectionContext = createContext(undefined);
 
@@ -110,7 +110,7 @@ export function FileSelectionProvider({ children, initialFiles = [] }) {
   const handleLoadFileGroup = useCallback((group, mode = 'replace') => {
     const merge = mode === 'add';
     const incoming = group.files.map(file => ({
-      absolutePath: `${currentPath}/${file.relativePath}`,
+      absolutePath: joinPath(currentPath, file.relativePath),
       state: file.state,
     }));
     // Work out the additions from current state up front: updaters must stay

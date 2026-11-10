@@ -1,16 +1,22 @@
+import { normalizePath, parentDir, basename } from '../../../utils/pathUtils';
+
 /**
+import { normalizePath, parentDir, basename } from '../../../utils/pathUtils';
  * Recursively filters tree nodes to show only files with git changes
  * Also adds deleted files that aren't in the filesystem tree
  * @param {Array} nodes - Array of tree nodes to filter
  * @param {Map} gitStatsMap - Map of file paths to git stats
  * @returns {Array} Filtered array of nodes
  */
-export function filterTreeByGitChanges(nodes, gitStatsMap) {
+export function filterTreeByGitChanges(nodes, rawGitStatsMap) {
+  // Compare in the canonical form: stats keys may come in the backend's style.
+  const gitStatsMap = new Map([...rawGitStatsMap].map(([k, v]) => [normalizePath(k), v]));
+
   // Collect all existing paths in the tree
   const existingPaths = new Set();
   const collectPaths = (nodeList) => {
     for (const node of nodeList) {
-      existingPaths.add(node.path);
+      existingPaths.add(normalizePath(node.path));
       if (node.is_dir && node.children) {
         collectPaths(node.children);
       }
@@ -22,13 +28,12 @@ export function filterTreeByGitChanges(nodes, gitStatsMap) {
   const deletedFilesByDir = new Map();
   for (const [filePath, stats] of gitStatsMap.entries()) {
     if (stats.status === 'deleted' && !existingPaths.has(filePath)) {
-      const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
-      if (!deletedFilesByDir.has(parentDir)) {
-        deletedFilesByDir.set(parentDir, []);
+      const dir = parentDir(filePath);
+      if (!deletedFilesByDir.has(dir)) {
+        deletedFilesByDir.set(dir, []);
       }
-      const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-      deletedFilesByDir.get(parentDir).push({
-        name: fileName,
+      deletedFilesByDir.get(dir).push({
+        name: basename(filePath),
         path: filePath,
         is_dir: false,
         is_deleted: true,
@@ -41,7 +46,7 @@ export function filterTreeByGitChanges(nodes, gitStatsMap) {
     const result = nodeList
       .map(node => {
         // Check if this file has git changes
-        const hasChanges = gitStatsMap.has(node.path);
+        const hasChanges = gitStatsMap.has(normalizePath(node.path));
 
         // For directories, recursively filter children
         let filteredChildren = node.children;
@@ -49,7 +54,7 @@ export function filterTreeByGitChanges(nodes, gitStatsMap) {
           filteredChildren = filterNodes(node.children, node.path);
 
           // Add any deleted files that belong in this directory
-          const deletedInThisDir = deletedFilesByDir.get(node.path) || [];
+          const deletedInThisDir = deletedFilesByDir.get(normalizePath(node.path)) || [];
           if (deletedInThisDir.length > 0) {
             filteredChildren = [...filteredChildren, ...deletedInThisDir];
           }
@@ -75,8 +80,7 @@ export function filterTreeByGitChanges(nodes, gitStatsMap) {
   // Get the root path from the first node's parent
   let rootPath = '';
   if (nodes.length > 0) {
-    const firstPath = nodes[0].path;
-    rootPath = firstPath.substring(0, firstPath.lastIndexOf('/'));
+    rootPath = parentDir(nodes[0].path);
   }
 
   // Start filtering and add deleted files at root level if any

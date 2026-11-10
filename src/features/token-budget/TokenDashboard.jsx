@@ -27,6 +27,7 @@ import { formatCost } from './tokenCalculations';
 import { Fig29Spend } from './Fig29Spend';
 import { DEFAULT_MODEL } from '../../config/pricing';
 import { scanAllProjects, getAllSessions } from '../../utils/projectScanner';
+import { basename } from '../../utils/pathUtils';
 
 const ProjectComparison = lazy(() => import('./token-dashboard/ProjectComparison').then(m => ({ default: m.ProjectComparison })));
 const HistoricalBrowser = lazy(() => import('./token-dashboard/HistoricalBrowser').then(m => ({ default: m.HistoricalBrowser })));
@@ -328,7 +329,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
               <div className="shrink-0">
                 <Fig29Spend
                   models={modelBreakdown.map((mb) => ({ name: formatModelName(mb.model), cost: mb.cost, tokens: mb.tokens }))}
-                  scope={projectPath ? projectPath.split('/').filter(Boolean).pop() : undefined}
+                  scope={projectPath ? basename(projectPath) : undefined}
                   fallback={(
                     <div className="flex flex-col gap-3">
                       <div>

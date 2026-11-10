@@ -19,6 +19,41 @@ export function toNative(p, windows = IS_WINDOWS) {
   return windows && p ? normalizePath(p).replace(/\//g, '\\') : p;
 }
 
+/** `rel` under `base`, in the canonical form. */
+export function joinPath(base, rel) {
+  return `${normalizePath(base)}/${normalizePath(rel).replace(/^(?:\.\/)+|^\/+/, '')}`;
+}
+
+/** Rooted: `/x`, `\x`, `C:\x` or `C:/x`. */
+export function isAbsolute(p) {
+  return /^(?:[A-Za-z]:)?[\\/]/.test(p);
+}
+
+/** Directory part (with its trailing `/`, '' when none) and file name, canonical. */
+export function splitDirName(p) {
+  const n = normalizePath(p) ?? '';
+  const i = n.lastIndexOf('/');
+  return { dir: n.slice(0, i + 1), name: n.slice(i + 1) };
+}
+
+/** The folder holding `p`, without trailing `/` ('' when none). */
+export function parentDir(p) {
+  return splitDirName(p).dir.replace(/\/$/, '');
+}
+
+/** Non-empty segments of `p` (a drive letter is the first one). */
+export function pathSegments(p) {
+  return (normalizePath(p) ?? '').split('/').filter(Boolean);
+}
+
+/** Every folder above `p`, nearest first (never the bare root). */
+export function ancestorDirs(p) {
+  const n = normalizePath(p) ?? '';
+  const out = [];
+  for (let i = n.lastIndexOf('/'); i > 0; i = n.lastIndexOf('/', i - 1)) out.push(n.slice(0, i));
+  return out;
+}
+
 /** Last path segment, ignoring trailing slashes; `fallback` when there is none (e.g. '/'). */
 export function basename(p, fallback = '') {
   return p.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || fallback;

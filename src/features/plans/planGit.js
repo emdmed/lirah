@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { basename } from '../../utils/pathUtils';
+import { basename, pathSegments } from '../../utils/pathUtils';
 import { errorMessage } from '../../lib/errorMessage';
 import { currentBranch, dirtyCount, git, gitLines, worktreeAdd, worktreeRemove } from '../../lib/git';
 import { planWorktreesDir, planWorktreesRoot } from '../../lib/lirahPaths';
@@ -164,7 +164,7 @@ export async function cleanupGit(plan) {
 export async function planWorktreeOwner(home, path) {
   const prefix = `${planWorktreesRoot(home)}/`;
   if (!path?.startsWith(prefix)) return null;
-  const dir = path.slice(prefix.length).split('/')[0];
+  const dir = pathSegments(path.slice(prefix.length))[0] ?? '';
   try {
     const raw = await invoke('read_file_content', { path: `${prefix}${dir}/${MARKER}` });
     return JSON.parse(raw)?.repoRoot || null;

@@ -2,6 +2,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { usePageVisible } from "../../hooks/usePageVisible";
+import { normalizePath } from '../../utils/pathUtils';
+
+/** The backend's stats object as a Map keyed by canonical path (the file tree's form). */
+export function toGitStatsMap(statsData) {
+  return new Map(Object.entries(statsData).map(([path, stats]) => [normalizePath(path), stats]));
+}
 
 /**
  * Custom hook to fetch and manage git statistics for files
@@ -21,7 +27,7 @@ export function useGitStats(currentPath, enabled = true, onGitChanges) {
     if (!currentPath || !enabled) return;
     try {
       const statsData = await invoke('get_git_stats', { path: currentPath });
-      const newStats = new Map(Object.entries(statsData));
+      const newStats = toGitStatsMap(statsData);
 
       // Detect specific git changes for targeted updates
       if (onGitChangesRef.current) {

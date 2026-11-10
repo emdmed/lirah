@@ -6,6 +6,7 @@ import { useContextBreakdown } from './useContextBreakdown';
 import { Fig23Sources } from './Fig23Sources';
 import { getContextFill } from '@/config/models';
 import { CONTEXT_GROUPS, groupColor, groupLabel, sharePct, shortLabel } from './contextGroups';
+import { lastSepIndex } from '../../utils/pathUtils';
 
 const TOP_GROUPS = 5;
 const TOP_ITEMS = 3;
@@ -147,7 +148,7 @@ function displayLabel(label, projectPath) {
   const home = projectPath?.match(/^(\/home\/[^/]+|\/Users\/[^/]+)/)?.[1];
   if (home) s = s.split(home + '/').join('~/');
   if (s.includes('/') && s.length > 34) {
-    const tail = s.slice(s.lastIndexOf('/'));
+    const tail = s.slice(lastSepIndex(s));
     const keep = Math.max(34 - tail.length - 1, 6);
     s = `${s.slice(0, keep)}…${tail.length > 26 ? '…' + tail.slice(-25) : tail}`;
   }

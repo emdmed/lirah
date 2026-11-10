@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { cn } from '../../lib/utils';
-import { basename, getRelativePath } from '../../utils/pathUtils';
+import { basename, getRelativePath, splitDirName } from '../../utils/pathUtils';
 import { useFileGroups } from '../file-groups';
 import { usePromptTemplates } from '../templates';
 import { usePinnedFiles } from '../pinned-files';
@@ -391,7 +391,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                   const meta = SOURCE_META[f.source] || SOURCE_META.selected;
                   const Icon = meta.icon;
                   const isOn = checked.has(f.relativePath);
-                  const slash = f.relativePath.lastIndexOf('/');
+                  const { dir, name } = splitDirName(f.relativePath);
                   return (
                     <label
                       key={f.relativePath}
@@ -399,8 +399,8 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                     >
                       <Checkbox checked={isOn} onCheckedChange={() => toggleFile(f.relativePath)} />
                       <span className={cn('min-w-0 flex-1 truncate text-[11px]', !isOn && 'opacity-50')}>
-                        <span className="text-muted-foreground">{f.relativePath.slice(0, slash + 1)}</span>
-                        <span className="text-foreground">{f.relativePath.slice(slash + 1)}</span>
+                        <span className="text-muted-foreground">{dir}</span>
+                        <span className="text-foreground">{name}</span>
                       </span>
                       <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={`From ${meta.label}`}>
                         <Icon className="h-2.5 w-2.5" aria-hidden="true" />

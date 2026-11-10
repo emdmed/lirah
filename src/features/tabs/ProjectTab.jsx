@@ -49,7 +49,7 @@ import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
 import { summarizeContext } from "../../components/textarea-panel/contextSummary";
-import { escapeShellPath } from "../../utils/pathUtils";
+import { escapeShellPath, isAbsolute, basename } from '../../utils/pathUtils';
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
@@ -94,7 +94,7 @@ function todayTokens(stats) {
 }
 
 function isRealPath(p) {
-  return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
+  return !!p && isAbsolute(p);
 }
 
 // A callback whose identity never changes but always runs the latest `fn`.
@@ -126,7 +126,7 @@ const BOOT_PLACEHOLDER_MAX_MS = 20_000;
 // shell spawns, then the agent starts. Same vocabulary as the startup splash,
 // at pane scale.
 function TabBootPlaceholder({ projectPath, stage }) {
-  const name = projectPath?.split('/').filter(Boolean).pop() || 'project';
+  const name = basename(projectPath ?? '', 'project');
   return (
     <div
       role="status"

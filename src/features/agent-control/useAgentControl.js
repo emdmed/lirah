@@ -28,6 +28,7 @@ import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
   resolveTab, resolveTabPath, resolveTheme, settingsSchema,
 } from './actions';
+import { basename } from '../../utils/pathUtils';
 
 // Worker tab id -> when the master last sent it a prompt; tabs.wait waits for a turn ending after it.
 const sentAt = new Map();
@@ -570,7 +571,7 @@ export function useAgentControl() {
         } else {
           id = await createPlan(repo, { source, importedFrom, workspaceId: callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId });
         }
-        live.current.toast.info(`Claude imported plan ${path.split('/').pop()}`);
+        live.current.toast.info(`Claude imported plan ${basename(path)}`);
         return `${existing && id === existing.id ? 'updated' : 'imported'} ${id}; splitting into chunks (see \`lirah plans show ${id}\`)`;
       },
       // The plan's file and what to change in it, for the calling agent to edit; then plans.rechunk.

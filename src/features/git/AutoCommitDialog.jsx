@@ -7,6 +7,7 @@ import { DiffBar } from '../../components/instrument/DiffBar';
 import { Fig33Log } from './Fig33Log';
 import { StepOrbit } from './StepOrbit';
 import { cn } from '../../lib/utils';
+import { splitDirName } from '../../utils/pathUtils';
 
 // `git status -s` style: one letter per file, coloured by kind.
 const STATUS = {
@@ -69,9 +70,7 @@ function FileList({ files, className }) {
     <ul className={cn('overflow-y-auto py-1', className)}>
       {files.map((f) => {
         const { code, color } = statusOf(f.status);
-        const slash = f.path.lastIndexOf('/');
-        const dir = slash >= 0 ? f.path.slice(0, slash + 1) : '';
-        const base = slash >= 0 ? f.path.slice(slash + 1) : f.path;
+        const { dir, name: base } = splitDirName(f.path);
         return (
           <li
             key={f.path}

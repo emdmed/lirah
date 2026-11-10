@@ -1,4 +1,5 @@
 // Files a shell command reads or writes, best effort, for the file tree's
+import { isAbsolute, normalizePath, joinPath, pathSegments, splitDirName } from '../../utils/pathUtils';
 // agent marks: agents often read with `cat -n f | sed -n 1,80p` instead of
 // their Read tool. Not a shell parser; it errs toward missing a file rather
 // than marking a wrong one.
@@ -22,7 +23,7 @@ const VALUE_OPTS = {
   awk: ['-F', '-f', '-v'],
 };
 const GLOB = /[*?[]/;
-const PATHLIKE = /^[\w@%+=:,./~*?[\]-]+$/;
+const PATHLIKE = /^[\w@%+=:,.\\/~*?[\]-]+$/;
 
 // Words of one command, split on unquoted whitespace, with quotes removed.
 // Unquoted operators (| && || ; > >>) come back as their own words.
@@ -40,7 +41,7 @@ function words(command) {
     const c = command[i];
     if (quote) {
       if (c === quote) quote = null;
-      else if (c === '\\' && quote === '"' && i + 1 < command.length) cur += command[++i];
+      else if (c === '\\' && quote === '"' && '$`"\\\n'.includes(command[i + 1] ?? '')) cur += command[++i];
       else cur += c;
     } else if (c === '"' || c === "'") {
       quote = c;
@@ -63,24 +64,26 @@ function words(command) {
   return out;
 }
 
+// Canonical result. shortcut: a UNC path loses its leading `//`; upgrade if agents ever name one.
 function resolve(base, p) {
-  const parts = (p.startsWith('/') ? p : `${base}/${p}`).split('/');
+  const full = isAbsolute(p) ? normalizePath(p) : joinPath(base, p);
+  const root = full.match(/^[A-Za-z]:/)?.[0] ?? '';
   const stack = [];
-  for (const part of parts) {
-    if (!part || part === '.') continue;
+  for (const part of pathSegments(full.slice(root.length))) {
+    if (part === '.') continue;
     if (part === '..') stack.pop();
     else stack.push(part);
   }
-  return `/${stack.join('/')}`;
+  return `${root}/${stack.join('/')}`;
 }
 
 // A glob marks the folder it lists: `hooks/*.sh` -> `hooks`.
 function target(base, text) {
   if (!PATHLIKE.test(text) || /^\d+$/.test(text) || /^[\w-]+=/.test(text) || text.startsWith('~') || text === '/dev/null') return null;
   if (GLOB.test(text)) {
-    const dir = text.split('/').slice(0, -1);
-    if (dir.length === 0 || dir.some((part) => GLOB.test(part))) return null;
-    return resolve(base, dir.join('/'));
+    const { dir } = splitDirName(text);
+    if (!normalizePath(dir) || GLOB.test(dir)) return null;
+    return resolve(base, dir);
   }
   return resolve(base, text);
 }
@@ -89,10 +92,10 @@ function target(base, text) {
 // only when cwd is unknown).
 export function bashFileTargets(command, cwd) {
   if (typeof command !== 'string') return [];
-  let base = typeof cwd === 'string' && cwd.startsWith('/') ? cwd.replace(/\/+$/, '') : null;
+  let base = typeof cwd === 'string' && isAbsolute(cwd) ? normalizePath(cwd) : null;
   const found = new Map();
   const add = (text, kind) => {
-    if (!base && !text.startsWith('/')) return;
+    if (!base && !isAbsolute(text)) return;
     const path = target(base || '/', text);
     if (!path || path === base) return;
     if (found.get(path) !== 'edit') found.set(path, kind);

@@ -7,6 +7,7 @@ import { KeyChord } from '../../components/instrument/Keycap';
 import { LirahMark } from '../../components/LirahMark';
 import { SKY } from '../../components/Layout';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
+import { isAbsolute } from '../../utils/pathUtils';
 
 // The orrery: starred projects as bodies on orbits tilted -11deg around the mark, like the site's.
 const W = 760;
@@ -57,7 +58,7 @@ function place(i) {
 }
 
 const parentDir = (path) => tildePath(path.replace(/\/[^/]+\/?$/, '') || '/');
-const isPath = (q) => q.startsWith('/');
+const isPath = (q) => isAbsolute(q);
 
 // Shown in place of the tabs when Lirah starts with none (first launch, or
 // every startup project missing). Nothing opens until the user picks the

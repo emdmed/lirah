@@ -1,4 +1,5 @@
 // Features a prompt names, ported from promptFeatures in
+import { isAbsolute } from '../../utils/pathUtils';
 // src-tauri/src/compaction/hook.js. The two must agree: change both together.
 // A feature counts when its name, id or an alias (3+ chars) appears as whole
 // words; at most 3 features and 40 files in total. Paths stay project-relative.
@@ -21,7 +22,7 @@ export function matchFeatures(map, prompt) {
     const word = names.find((n) => text.includes(` ${n} `));
     if (!word) continue;
     const files = (Array.isArray(f.files) ? f.files : [])
-      .filter((p) => typeof p === 'string' && !p.startsWith('/') && !/^[a-zA-Z]:/.test(p) && !p.split(/[\\/]/).includes('..'))
+      .filter((p) => typeof p === 'string' && !isAbsolute(p) && !/^[a-zA-Z]:/.test(p) && !p.split(/[\\/]/).includes('..'))
       .slice(0, budget);
     budget -= files.length;
     hits.push({ id: f.id, name: String(f.name || f.id), word, files });

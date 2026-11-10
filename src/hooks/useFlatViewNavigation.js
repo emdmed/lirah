@@ -1,12 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { lastSepIndex } from '../utils/pathUtils';
 
 const IS_WINDOWS = navigator.platform.startsWith('Win');
 const SEP = IS_WINDOWS ? '\\' : '/';
-
-function lastSepIndex(p) {
-  return Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-}
 
 function isRoot(p) {
   if (!p) return true;

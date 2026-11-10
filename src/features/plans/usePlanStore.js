@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { list, load, onExternalChange, remove, save } from '../../lib/fileStore';
 import { getSavedWorkspaces } from '../../lib/workspaceStore';
 import { normalizeLoadedPlan } from './planModel';
+import { pathSegments } from '../../utils/pathUtils';
 
 // The plans state and its files: one ~/.lirah/workspaces/<id>/plans/<plan-id>/plan.json
 // per plan, in the folder of the workspace it was made in (plan.workspaceId).
@@ -69,7 +70,7 @@ export function usePlanStore({ onLoad } = {}) {
   useEffect(() => onExternalChange(
     (rel) => /^workspaces\/[^/]+\/plans\/[^/]+\/plan\.json$/.test(rel),
     (doc, rel) => {
-      const [, ws, , id] = rel.split('/');
+      const [, ws, , id] = pathSegments(rel);
       const { version, revision, ...raw } = doc ?? {};
       // Not normalizeLoadedPlan: that is for startup (it fails running splits, pauses autopilot).
       const plan = doc?.repoRoot ? { ...raw, workspaceId: ws } : null;

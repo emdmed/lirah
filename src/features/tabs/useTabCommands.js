@@ -10,7 +10,7 @@ import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
 import { getSettings, setSetting } from '../settings/settingsStore';
 import { useToast } from '../toast/ToastContext';
-import { IS_WINDOWS } from '../../utils/pathUtils';
+import { IS_WINDOWS, isAbsolute } from '../../utils/pathUtils';
 import { buildFeatureMap } from '../feature-map/useFeatureMap';
 import {
   addStartupProject, getStartup, removeStartupProject, setStartupMode,
@@ -65,7 +65,7 @@ export function useTabCommands({
         if (!projectPath) throw new Error('no project in this tab; give a path');
         return projectPath;
       }
-      if (path.startsWith('/') || path === '~' || path.startsWith('~/')) return path;
+      if (isAbsolute(path) || path === '~' || path.startsWith('~/')) return path;
       if (!projectPath) throw new Error(`path must be absolute, not "${path}"`);
       return `${projectPath.replace(/\/+$/, '')}/${path}`;
     };

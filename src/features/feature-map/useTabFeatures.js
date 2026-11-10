@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { createEmitter } from '../../lib/createStore';
+import { isAbsolute, pathSegments } from '../../utils/pathUtils';
 
 // Each tab's feature context: `selected` (feature id shown in the explorer and
 // tree) and `pinned` ([{ id, name, files }], sent as FEATURE lines). Module
@@ -39,7 +40,7 @@ export function treeMarks(projectPath, files) {
   const folders = new Map();
   const fileSet = new Set();
   for (const rel of files) {
-    const parts = rel.split('/').filter(Boolean);
+    const parts = pathSegments(rel);
     fileSet.add(`${root}/${parts.join('/')}`);
     for (let i = 1; i < parts.length; i++) {
       const dir = `${root}/${parts.slice(0, i).join('/')}`;
@@ -56,7 +57,7 @@ export function treeMarks(projectPath, files) {
  */
 export async function pinFeature(tabId, projectPath, feature) {
   const rel = (Array.isArray(feature.files) ? feature.files : [])
-    .filter((p) => typeof p === 'string' && !p.startsWith('/') && !/^[a-zA-Z]:/.test(p) && !p.split(/[\\/]/).includes('..'));
+    .filter((p) => typeof p === 'string' && !isAbsolute(p) && !/^[a-zA-Z]:/.test(p) && !p.split(/[\\/]/).includes('..'));
   const found = await Promise.all(rel.map((p) => invoke('path_exists', { path: `${projectPath}/${p}` }).catch(() => false)));
   const pinned = getTabFeatures(tabId).pinned.filter((f) => f.id !== feature.id);
   update(tabId, { pinned: [...pinned, { id: feature.id, name: String(feature.name || feature.id), files: rel.filter((_, i) => found[i]) }] });

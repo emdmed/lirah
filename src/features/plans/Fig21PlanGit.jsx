@@ -33,7 +33,7 @@ export function middleTruncate(text, max = 36) {
 export function shortWorkPath(path, max) {
   const i = path.indexOf('/.lirah/');
   const tilde = i >= 0 ? `~${path.slice(i)}` : path;
-  const repo = tilde.slice(tilde.lastIndexOf('/') + 1);
+  const repo = basename(tilde);
   const options = [tilde, `~/.lirah/plan-worktrees/…/${repo}`, `~/…/${repo}`];
   return options.find((o) => o.length <= max && (o === tilde || tilde.includes('/plan-worktrees/')))
     ?? `…/${middleTruncate(repo, Math.max(1, max - 2))}`;

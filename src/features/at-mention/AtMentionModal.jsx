@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo, memo } from 'react';
-import { getRelativePath } from '../../utils/pathUtils';
+import { getRelativePath, splitDirName } from '../../utils/pathUtils';
 import { FloatPane } from '../../components/ui/float-pane';
 import { PickerRow } from '../../components/ui/picker';
 
@@ -45,14 +45,7 @@ export const AtMentionModal = memo(function AtMentionModal({
   }
 
   // Split a relative path into directory part and filename
-  const splitPath = (relativePath) => {
-    const lastSlash = relativePath.lastIndexOf('/');
-    if (lastSlash === -1) return { dir: '', name: relativePath };
-    return {
-      dir: relativePath.substring(0, lastSlash + 1),
-      name: relativePath.substring(lastSlash + 1),
-    };
-  };
+  const splitPath = splitDirName;
 
   // Light the matched part of the filename
   const highlightMatch = (name, q) => {
