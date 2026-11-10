@@ -31,9 +31,11 @@ pub fn token() -> Option<&'static str> {
             let path = crate::util::lirah_dir()?.join("hook-token");
             let _ = fs::create_dir_all(path.parent()?);
             let fresh = format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple());
-            let created = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
+            let mut options = fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+            let created = options
                 .open(&path)
                 .and_then(|mut f| f.write_all(fresh.as_bytes()));
             match created {

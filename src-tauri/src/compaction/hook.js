@@ -51,7 +51,7 @@ async function readPayload() {
 }
 
 // Files the user attached in Lirah (prompt box, or the context mirrored for a
-// prompt typed in the terminal by agent_state_hook.js) already say where to
+// prompt typed in the terminal by hook_server.rs) already say where to
 // look, so such a prompt gets no compaction and no guard. The markers are
 // buildPrompt.js's FILES and ELEMENTS sections.
 const ATTACHED_FILES_RE = /^(CAN_MODIFY|DO_NOT_MODIFY|USE_AS_EXAMPLE): |^ELEMENTS from /m;
