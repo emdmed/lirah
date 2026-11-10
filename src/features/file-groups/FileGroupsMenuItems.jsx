@@ -3,7 +3,6 @@ import { plural } from '../../lib/plural';
 import { EditPencil, Plus, Refresh, Repeat, FloppyDisk, Trash } from 'iconoir-react';
 import {
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -126,9 +125,6 @@ export function FileGroupsMenuItems({ projectPath, onLoadGroup, onSaveGroup, has
 
   return (
     <>
-      <DropdownMenuLabel>
-        Saved context for this project
-      </DropdownMenuLabel>
       {groups.length === 0 ? (
         <DropdownMenuItem disabled className="text-[11px] text-muted-foreground">
           No context sets saved

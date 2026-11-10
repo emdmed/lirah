@@ -25,6 +25,20 @@ pub async fn format_task(project_dir: String, prompt: String) -> Result<String, 
     .await
 }
 
+/// Summarize the work log (prompt from src/features/worklog/worklogSummary.js)
+/// with one of the models the work log pane offers. No tools: text only.
+#[tauri::command]
+pub async fn summarize_worklog(project_dir: String, prompt: String, model: String) -> Result<String, String> {
+    // The model goes into a shell command line, so only these names pass.
+    if !matches!(model.as_str(), "haiku" | "sonnet" | "opus") {
+        return Err(format!("unknown model: {model}"));
+    }
+    crate::ipc::blocking("summarize_worklog", move || {
+        claude_print(&format!("claude --print --model {model}"), &project_dir, &prompt)
+    })
+    .await
+}
+
 /// Run a headless claude command with `prompt` on stdin; stdout on success.
 pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result<String, String> {
     let mut child = crate::util::login_shell_command(cmd)

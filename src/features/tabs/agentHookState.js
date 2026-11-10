@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createEmitter } from '../../lib/createStore';
 import { bashFileTargets } from './bashFileTargets';
+import { endEntry, startEntry } from '../worklog/worklogStore';
 
 // What each terminal's agent last said about itself through its hooks (see
 // src-tauri/src/agent_hooks.rs) or an OSC 7501 report (programStatus.js). Plain module state like terminalActivity.js:
@@ -217,6 +218,7 @@ export async function settleIfInterrupted(sessionId) {
   settleFiles(sessionId);
   const turn = turns.get(sessionId)?.at(-1);
   if (turn && !turn.endedAt) turn.endedAt = Date.now();
+  endEntry(sessionId, turn?.edited);
   setState(sessionId, { state: 'waiting', message: 'interrupted' }, 'transcript');
   return true;
 }
@@ -241,8 +243,10 @@ export function startAgentHookListener() {
     } else if (hookEvent === 'Stop') {
       settleFiles(sessionId);
     }
-    if (hookEvent === 'UserPromptSubmit') startTurn(sessionId, now);
-    else if (hookEvent === 'PostToolUse') recordTool(sessionId, payload, now);
+    if (hookEvent === 'UserPromptSubmit') {
+      startTurn(sessionId, now);
+      startEntry(sessionId, { prompt: payload.prompt, cwd: payload.cwd });
+    } else if (hookEvent === 'PostToolUse') recordTool(sessionId, payload, now);
 
     let turnMs = null;
     if (hookEvent === 'Stop') {
@@ -251,6 +255,9 @@ export function startAgentHookListener() {
         turn.endedAt = now;
         turnMs = now - turn.startedAt;
       }
+      endEntry(sessionId, turn?.edited);
+    } else if (hookEvent === 'SessionEnd') {
+      endEntry(sessionId, getLastTurn(sessionId)?.edited);
     }
 
     const next = nextState(payload);
@@ -314,6 +321,7 @@ export function acknowledgeAgent(sessionId) {
 }
 
 export function clearAgentHookState(sessionId) {
+  endEntry(sessionId, getLastTurn(sessionId)?.edited);
   states.delete(sessionId);
   touches.delete(sessionId);
   turns.delete(sessionId);

@@ -145,7 +145,7 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="full"
-        className="flex flex-col gap-0 overflow-hidden"
+        className="flex flex-col gap-0"
         status={filtering
           ? `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'}`
           : section(activeId)?.title.toLowerCase()}

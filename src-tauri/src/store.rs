@@ -125,6 +125,30 @@ pub fn write_at(base: &Path, rel: &str, data: Value, expected_revision: Option<u
     Ok(doc)
 }
 
+/// Append one line to a plain text log (JSON lines, not a store doc), creating
+/// it and its folder. One write call per line, with O_APPEND, so writers in
+/// other processes (another instance, the CLI) never interleave inside a line.
+pub fn append_at(base: &Path, rel: &str, line: &str) -> Result<(), StoreError> {
+    if line.contains('\n') {
+        return Err(io("store_append takes a single line"));
+    }
+    let path = resolve(base, rel)?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(io)?;
+    }
+    let mut file = fs::OpenOptions::new().create(true).append(true).open(&path).map_err(io)?;
+    file.write_all(format!("{line}\n").as_bytes()).map_err(|e| io(format!("{}: {e}", path.display())))
+}
+
+/// A plain text file's contents, or None if it does not exist.
+pub fn read_text_at(base: &Path, rel: &str) -> Result<Option<String>, StoreError> {
+    match fs::read_to_string(resolve(base, rel)?) {
+        Ok(text) => Ok(Some(text)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(io(format!("{rel}: {e}"))),
+    }
+}
+
 /// Delete a file or a whole folder. Missing is not an error.
 pub fn delete_at(base: &Path, rel: &str) -> Result<(), StoreError> {
     let path = resolve(base, rel)?;
@@ -184,6 +208,16 @@ pub async fn store_delete(rel: String) -> Result<(), StoreError> {
 #[tauri::command]
 pub async fn store_list(rel: String) -> Result<Vec<String>, StoreError> {
     run("store_list", move |b| list_at(&b, &rel)).await
+}
+
+#[tauri::command]
+pub async fn store_append(rel: String, line: String) -> Result<(), StoreError> {
+    run("store_append", move |b| append_at(&b, &rel, &line)).await
+}
+
+#[tauri::command]
+pub async fn store_read_text(rel: String) -> Result<Option<String>, StoreError> {
+    run("store_read_text", move |b| read_text_at(&b, &rel)).await
 }
 
 #[cfg(test)]
@@ -336,4 +370,16 @@ mod tests {
         let b = temp_base();
         assert!(write_at(&b, "t.json", json!([1, 2]), None).is_err());
     }
+
+    #[test]
+    fn appends_lines_and_reads_them_back() {
+        let b = temp_base();
+        assert_eq!(read_text_at(&b, "worklog/2026-11.jsonl").unwrap(), None);
+        append_at(&b, "worklog/2026-11.jsonl", r#"{"a":1}"#).unwrap();
+        append_at(&b, "worklog/2026-11.jsonl", r#"{"a":2}"#).unwrap();
+        assert_eq!(read_text_at(&b, "worklog/2026-11.jsonl").unwrap().as_deref(), Some("{\"a\":1}\n{\"a\":2}\n"));
+        assert!(append_at(&b, "worklog/x.jsonl", "two\nlines").is_err());
+        assert!(append_at(&b, "../x.jsonl", "{}").is_err());
+    }
+
 }

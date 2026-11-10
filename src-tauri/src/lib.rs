@@ -212,6 +212,7 @@ pub fn run(initial_path: Option<String>) {
             feature_map::build_feature_map,
             feature_map::read_feature_map,
             plans::format_task,
+            plans::summarize_worklog,
             plans::delete_plan_file,
             plans::remove_plan_workdir,
             plans::last_assistant_text,
@@ -222,6 +223,8 @@ pub fn run(initial_path: Option<String>) {
             store::store_write,
             store::store_delete,
             store::store_list,
+            store::store_append,
+            store::store_read_text,
         ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

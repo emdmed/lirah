@@ -162,7 +162,7 @@ export function AutoCommitDialog({ autoCommit }) {
       <DialogContent
         size="lg"
         fig="33"
-        className="max-h-[85vh] flex flex-col gap-4 overflow-hidden"
+        className="max-h-[85vh] flex flex-col gap-4"
         keys={['^', '⇧', '␣']}
         lamp={lamp}
         status={status}
@@ -221,7 +221,7 @@ export function AutoCommitDialog({ autoCommit }) {
         )}
 
         {showWork && (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="-mx-3 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3">
             {/* The message is what you review, so it leads. */}
             <section className="flex flex-col gap-2">
               <DialogGroup label={<label htmlFor="autocommit-message">Commit message</label>} />

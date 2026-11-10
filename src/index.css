@@ -960,13 +960,6 @@ body {
   background-repeat: no-repeat;
 }
 
-/* Dialogs that clip their body still show the ticks.
-   shortcut: WebKit may ignore overflow-clip-margin, then these clip the side ticks. */
-.tui-dialog.overflow-hidden {
-  overflow: clip;
-  overflow-clip-margin: 14px;
-}
-
 /* Only simple titles move into the frame; a structured header (icon box,
    subtitle) stays in flow below the line. */
 .tui-dialog [data-slot="dialog-title"]:not(.sr-only):not(:has(div, p)) {

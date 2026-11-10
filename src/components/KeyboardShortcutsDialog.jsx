@@ -68,7 +68,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange, section }) {
       <DialogContent
         size='lg'
         fig="15"
-        className='max-h-[80vh] flex flex-col overflow-hidden'
+        className='max-h-[80vh] flex flex-col'
         keys={['^', 'H']}
         status={`${COUNT} shortcuts`}
         hints={[{ keys: [':'], label: 'run any action by name' }]}

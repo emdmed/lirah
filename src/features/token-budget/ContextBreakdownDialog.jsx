@@ -9,7 +9,7 @@ export function ContextBreakdownDialog({ open, onOpenChange, tokenUsage, project
       <DialogContent
         size="full"
         lamp="on"
-        className="max-w-[1200px] max-h-[820px] p-0 flex flex-col gap-0 overflow-hidden font-mono"
+        className="max-w-[1200px] max-h-[820px] p-0 flex flex-col gap-0 font-mono"
         instant
       >
         <DialogTitle>Context</DialogTitle>

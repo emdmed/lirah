@@ -4,6 +4,17 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-10
+
+### Added
+
+- **Work log pane** - Records each Claude Code prompt you send and the files it changed, so you can look back over a session.
+
+### Fixed
+
+- **Dialog frames** - Auto commit, Auto merge, Settings, Keyboard shortcuts, Features, Run background agent and Context breakdown now show the corner ticks like every other dialog. Auto commit and Auto merge no longer show a stray horizontal scrollbar or a cut-off message box edge.
+- **Menus** - Dropdown menus have a solid background, and the context sets menu drops its redundant label.
+
 ## [0.22.1] - 2026-11-10
 
 ### Fixed
