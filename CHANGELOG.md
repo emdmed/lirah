@@ -4,6 +4,10 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Plans** - Each plan runs in its own tab, opened on the first send and reused after that.
+
 ## [0.24.0] - 2026-11-10
 
 ### Added
