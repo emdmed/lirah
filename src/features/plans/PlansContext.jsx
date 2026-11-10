@@ -252,6 +252,7 @@ export function PlansProvider({ children }) {
       split: SPLIT_STATUS.RUNNING,
       splitError: null,
       chunks: [],
+      tabId: null,
       git: top ? defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')) : noGitConfig(repoRoot),
       createdAt: Date.now(),
       updatedAt: Date.now(),

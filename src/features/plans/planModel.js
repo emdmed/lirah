@@ -170,10 +170,12 @@ const RUN_URGENCY = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1
 export const runRank = (plan) => RUN_URGENCY[plan.autopilot?.status] ?? 3;
 
 /**
- * The tab the plan is working in: its auto-pilot run's (finished runs count
- * until dismissed), else the tab of a chunk in flight or awaiting its fix.
+ * The tab the plan is working in: its own dedicated tab, else its auto-pilot
+ * run's (finished runs count until dismissed), else the tab of a chunk in
+ * flight or awaiting its fix.
  */
 export function planTabId(plan) {
+  if (plan.tabId) return plan.tabId;
   const ap = plan.autopilot;
   if (ap?.tabId && ap.status !== AUTOPILOT_STATUS.OFF) return ap.tabId;
   return plan.chunks.find((c) => c.tabId && (c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix))?.tabId ?? null;
