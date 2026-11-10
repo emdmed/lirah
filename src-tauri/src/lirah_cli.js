@@ -77,8 +77,10 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  Task commands take --global to work on the
                                  global list instead of this tab's project.
   lirah plans [list]             list this tab's repo plans and their progress
+                                 (plans and their files: <repo>/lirah/plans)
   lirah plans show <plan>        a plan's chunks and their state
-  lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+  lirah plans import <file>      import a file in lirah/plans, or a *_plan.md
+                                 anywhere, as a plan (split into chunks)
   lirah plans revise <plan> <notes>
                                  the plan's file and a prompt to change it as
                                  asked; edit the file, then re-chunk
