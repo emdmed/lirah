@@ -29,7 +29,15 @@ fn app_form(s: &str) -> String {
     if b.len() >= 2 && b[0].is_ascii_lowercase() && b[1] == b':' {
         s[..1].make_ascii_uppercase();
     }
-    s.trim_end_matches('/').to_string()
+    let t = s.trim_end_matches('/');
+    // A root keeps its slash: `/` and `C:/` (while a bare `C:` stays `C:`).
+    if t.is_empty() && !s.is_empty() {
+        "/".to_string()
+    } else if t.len() == 2 && t.ends_with(':') && s.len() > 2 {
+        format!("{t}/")
+    } else {
+        t.to_string()
+    }
 }
 
 #[cfg(test)]

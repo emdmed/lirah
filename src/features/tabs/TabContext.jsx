@@ -10,7 +10,7 @@ import { getEffectiveSettings, getSettings } from "../settings/settingsStore";
 import { formatDuration } from "../../lib/formatDuration";
 import { tildePath } from "../../components/ui/picker";
 import { assertColumnRoom, placeColumn } from "../zen/zenColumns";
-import { pathSegments, basename } from '../../utils/pathUtils';
+import { commonFolder, basename } from '../../utils/pathUtils';
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -62,14 +62,6 @@ function zenColumnsOf(workspaces, workspaceId, activeTabId, tabs) {
 // whose agent orchestrates the workspace's tabs. Null until first opened.
 export function masterTabOf(tabs, workspaceId) {
   return tabs.find((t) => t.workspaceId === workspaceId && t.master) || null;
-}
-
-// The deepest folder holding all of these paths ("/" at worst).
-function commonFolder(paths) {
-  const parts = paths.map(pathSegments);
-  const shared = [];
-  for (let i = 0; parts.every((p) => i < p.length && p[i] === parts[0][i]); i++) shared.push(parts[0][i]);
-  return /^[A-Za-z]:$/.test(shared[0] ?? '') ? shared.join('/') : `/${shared.join('/')}`;
 }
 
 // `launch` asks the tab to start its agent once its shell is up, even with

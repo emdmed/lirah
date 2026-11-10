@@ -226,10 +226,35 @@ fn filetime_matches_start(proc_start: &str, start_unix_secs: u64) -> bool {
         .is_some_and(|ms| (ms / 1000).abs_diff(start_unix_secs) <= 1)
 }
 
+/// The registry's `procStart` against the process's start time. A value we
+/// cannot read as a FILETIME proves nothing against the session, so the
+/// check is skipped (like a missing cwd); a readable one must match.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn proc_start_ok(proc_start: Option<&str>, start_unix_secs: u64) -> bool {
+    match proc_start.and_then(|s| s.parse::<u64>().ok()).and_then(filetime_to_unix_ms) {
+        Some(ms) => (ms / 1000).abs_diff(start_unix_secs) <= 1,
+        None => true,
+    }
+}
+
 /// The same folder, whatever the path style (`C:` and `c:/a`, trailing slash).
 #[cfg_attr(not(windows), allow(dead_code))]
 fn same_cwd(a: &str, b: &str) -> bool {
-    let canon = |s: &str| crate::paths::to_app(Path::new(s)).trim_end_matches('/').to_string();
+    let canon = |s: &str| {
+        let s = crate::paths::to_app(Path::new(s));
+        // Git Bash writes a drive folder as `/c/x`: the same folder as `C:/x`.
+        let s = match s.strip_prefix('/') {
+            Some(rest)
+                if cfg!(windows)
+                    && rest.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+                    && matches!(rest.as_bytes().get(1), None | Some(b'/')) =>
+            {
+                format!("{}:{}", rest[..1].to_ascii_uppercase(), &rest[1..])
+            }
+            _ => s,
+        };
+        s.trim_end_matches('/').to_string()
+    };
     let (a, b) = (canon(a), canon(b));
     if cfg!(windows) { a.eq_ignore_ascii_case(&b) } else { a == b }
 }
@@ -292,10 +317,8 @@ fn session_of_pid(pid: u32, registry: &Path) -> Option<LiveClaudeSession> {
         ProcessRefreshKind::nothing().with_cwd(UpdateKind::Always),
     );
     let process = sys.process(Pid::from_u32(pid))?;
-    if let Some(ref expected) = live.proc_start {
-        if !filetime_matches_start(expected, process.start_time()) {
-            return None;
-        }
+    if !proc_start_ok(live.proc_start.as_deref(), process.start_time()) {
+        return None;
     }
     if let Some(cwd) = process.cwd() {
         if !same_cwd(&live.cwd, &cwd.to_string_lossy()) {

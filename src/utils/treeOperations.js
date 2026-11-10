@@ -119,7 +119,7 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath, { lazy 
     };
 
     // Root-level file
-    if (parentPath === normalizedRoot) {
+    if (parentPath === normalizedRoot.replace(/\/$/, '')) {
       newNode.depth = 0;
       newData = [...newData, newNode];
       newData.sort(compareTreeEntries);

@@ -1,7 +1,6 @@
 import { normalizePath, parentDir, basename } from '../../../utils/pathUtils';
 
 /**
-import { normalizePath, parentDir, basename } from '../../../utils/pathUtils';
  * Recursively filters tree nodes to show only files with git changes
  * Also adds deleted files that aren't in the filesystem tree
  * @param {Array} nodes - Array of tree nodes to filter

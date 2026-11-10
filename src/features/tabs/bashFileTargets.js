@@ -1,8 +1,9 @@
 // Files a shell command reads or writes, best effort, for the file tree's
-import { isAbsolute, normalizePath, joinPath, pathSegments, splitDirName } from '../../utils/pathUtils';
 // agent marks: agents often read with `cat -n f | sed -n 1,80p` instead of
 // their Read tool. Not a shell parser; it errs toward missing a file rather
 // than marking a wrong one.
+
+import { isAbsolute, normalizePath, joinPath, pathSegments, splitDirName } from '../../utils/pathUtils';
 
 const READERS = new Set([
   'cat', 'head', 'tail', 'sed', 'awk', 'less', 'more', 'wc', 'nl', 'bat',
@@ -47,7 +48,9 @@ function words(command) {
       quote = c;
       quoted = true;
     } else if (c === '\\' && i + 1 < command.length) {
-      cur += command[++i];
+      // `C:\x\y` is a path, not escapes; elsewhere a backslash escapes the next character.
+      if (/^[A-Za-z]:/.test(cur)) cur += c;
+      else cur += command[++i];
     } else if (/\s/.test(c)) {
       push();
       if (c === '\n') out.push({ op: ';' });
@@ -94,8 +97,11 @@ export function bashFileTargets(command, cwd) {
   if (typeof command !== 'string') return [];
   let base = typeof cwd === 'string' && isAbsolute(cwd) ? normalizePath(cwd) : null;
   const found = new Map();
+  const winBase = /^[A-Za-z]:/.test(base ?? '');
   const add = (text, kind) => {
     if (!base && !isAbsolute(text)) return;
+    // A backslash separates only in a Windows path; on unix it is part of a name.
+    if (text.includes('\\') && !winBase && !/^[A-Za-z]:/.test(text)) return;
     const path = target(base || '/', text);
     if (!path || path === base) return;
     if (found.get(path) !== 'edit') found.set(path, kind);

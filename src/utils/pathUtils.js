@@ -11,7 +11,10 @@ export function normalizePath(p) {
   let s = p.replace(/\\/g, '/');
   if (s.startsWith('//?/UNC/')) s = '/' + s.slice(7);
   else if (s.startsWith('//?/')) s = s.slice(4);
-  return s.replace(/^[a-z]:/, (d) => d.toUpperCase()).replace(/\/+$/, '');
+  s = s.replace(/^[a-z]:/, (d) => d.toUpperCase());
+  const t = s.replace(/\/+$/, '');
+  if (t === '' && s) return '/'; // the unix root keeps its slash
+  return /^[A-Za-z]:$/.test(t) && s.length > t.length ? `${t}/` : t; // so does a drive root
 }
 
 /** Native style, for the few edges that need it (shell, file manager). Not for app state. */
@@ -21,7 +24,7 @@ export function toNative(p, windows = IS_WINDOWS) {
 
 /** `rel` under `base`, in the canonical form. */
 export function joinPath(base, rel) {
-  return `${normalizePath(base)}/${normalizePath(rel).replace(/^(?:\.\/)+|^\/+/, '')}`;
+  return `${normalizePath(base).replace(/\/$/, '')}/${normalizePath(rel).replace(/^(?:\.\/)+|^\/+/, '')}`;
 }
 
 /** Rooted: `/x`, `\x`, `C:\x` or `C:/x`. */
@@ -44,6 +47,15 @@ export function parentDir(p) {
 /** Non-empty segments of `p` (a drive letter is the first one). */
 export function pathSegments(p) {
   return (normalizePath(p) ?? '').split('/').filter(Boolean);
+}
+
+/** The deepest folder holding all `paths` (`/` or a drive root at worst). */
+export function commonFolder(paths) {
+  const parts = paths.map(pathSegments);
+  const shared = [];
+  for (let i = 0; parts.every((p) => i < p.length && p[i] === parts[0][i]); i++) shared.push(parts[0][i]);
+  if (/^[A-Za-z]:$/.test(shared[0] ?? '')) return shared.length > 1 ? shared.join('/') : `${shared[0]}/`;
+  return `/${shared.join('/')}`;
 }
 
 /** Every folder above `p`, nearest first (never the bare root). */
@@ -74,8 +86,9 @@ export function escapeShellPath(path) {
 export function getRelativePath(absolutePath, cwdPath) {
   const normalizedCwd = normalizePath(cwdPath);
   const normalizedFile = normalizePath(absolutePath);
-  if (normalizedFile.startsWith(normalizedCwd + '/')) {
-    return normalizedFile.slice(normalizedCwd.length + 1);
+  const cwdDir = normalizedCwd.replace(/\/$/, '');
+  if (normalizedFile.startsWith(cwdDir + '/')) {
+    return normalizedFile.slice(cwdDir.length + 1);
   }
   if (normalizedFile === normalizedCwd) return '.';
   return absolutePath;
