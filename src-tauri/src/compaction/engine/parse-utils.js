@@ -401,7 +401,7 @@ export const SKIP_DIRECTORIES = new Set([
  * @returns {string}
  */
 export function getGitSha(dir) {
-  try { return execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
+  try { return execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf-8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
   catch { return 'unknown'; }
 }
 

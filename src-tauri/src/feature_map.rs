@@ -272,7 +272,7 @@ fn check_features(features: &Value) -> Result<usize, String> {
 
 /// Trimmed stdout of a git command in `dir`; None when it fails.
 fn git(dir: &str, args: &[&str]) -> Option<String> {
-    let out = std::process::Command::new("git")
+    let out = crate::util::hidden_command("git")
         .args(["-C", dir, "-c", "core.quotePath=false"])
         .args(args)
         .output()

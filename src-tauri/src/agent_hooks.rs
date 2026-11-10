@@ -1,23 +1,18 @@
 //! Agent state from the agents' own hooks instead of guesses from terminal output.
 //!
-//! Every terminal is spawned with `LIRAH_PTY_SESSION` (its session id) and
-//! `LIRAH_AGENT_EVENTS` (the events directory). The hooks installed here run
-//! inside the agent, so they inherit both. Each one appends the agent's hook
-//! payload as a JSON line to `<events dir>/<session id>.jsonl`. The watcher
-//! below tails those files and emits `agent-hook` events for the frontend to
-//! map onto tab state. Outside Lirah the variables are unset and the hooks
-//! exit at once, so a global install is harmless.
+//! Every terminal is spawned with `LIRAH_PTY_SESSION` (its session id),
+//! `LIRAH_HOOK_TOKEN` and `LIRAH_AGENT_EVENTS` (the events directory).
 //!
-//! - Claude Code: a plugin the launcher loads with `--plugin-dir`. Plugin hooks
-//!   run alongside the user's own; a `--settings` file would replace their
-//!   `hooks` key instead.
-//! - opencode: a global plugin that forwards session events the same way.
+//! - Claude Code: a plugin the launcher loads with `--plugin-dir` registers
+//!   `http` hooks that post each event to `hook_server` (which also carries the
+//!   prompt box's selected context back on UserPromptSubmit). Plugin hooks run
+//!   alongside the user's own; a `--settings` file would replace their `hooks`
+//!   key instead.
+//! - opencode: a global plugin appends events as JSON lines to
+//!   `<events dir>/<session id>.jsonl`; the watcher below tails those files.
 //!
-//! The same Claude Code hook also carries the prompt box's selected context
-//! (files, elements, repos, template) into prompts typed straight
-//! into the terminal: the frontend mirrors it to
-//! `<prompt context dir>/<session id>.md` and the hook adds that file to the
-//! prompt on UserPromptSubmit.
+//! Both end as `agent-hook` events for the frontend to map onto tab state. The
+//! prompt box mirrors its context to `<prompt context dir>/<session id>.md`.
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
@@ -38,8 +33,7 @@ pub const WORKSPACE_ENV: &str = "LIRAH_WORKSPACE";
 /// payload and is skipped rather than buffered.
 const MAX_LINE: usize = 64 * 1024;
 
-const HOOK_JS: &str = include_str!("agent_state_hook.js");
-// The hook is an ES module; this makes Node load it as one on any version.
+// The CLI is an ES module; this makes Node load it as one on any version.
 const HOOKS_PACKAGE_JSON: &str = "{\"type\":\"module\"}\n";
 /// The `lirah` CLI (an ES module, so its folder gets the same package.json)
 /// and the sh wrapper that puts it on PATH as `lirah`.
@@ -161,6 +155,9 @@ pub fn session_env(session_id: &str) -> Vec<(String, String)> {
         (EVENTS_ENV.to_string(), dir.to_string_lossy().into_owned()),
         (PROMPT_CONTEXT_ENV.to_string(), context.to_string_lossy().into_owned()),
     ];
+    if let Some(token) = crate::hook_server::token() {
+        env.push((crate::hook_server::TOKEN_ENV.to_string(), token.to_string()));
+    }
     if let Some(sock) = crate::agent_control::socket_path() {
         env.push((CONTROL_ENV.to_string(), sock.to_string_lossy().into_owned()));
     }
@@ -185,7 +182,7 @@ pub fn remove_session_log(session_id: &str) {
 }
 
 /// Session ids are UUIDs; anything else must not become a path.
-fn prompt_context_path(session_id: &str) -> Option<PathBuf> {
+pub(crate) fn prompt_context_path(session_id: &str) -> Option<PathBuf> {
     let valid = !session_id.is_empty()
         && session_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
     if !valid {
@@ -241,7 +238,7 @@ fn prune_stale_logs(events: &Path) {
     }
 }
 
-/// Write the hook script and the Claude Code plugin that registers it. The
+/// Write the `lirah` CLI and the Claude Code plugin manifest. The
 /// opencode plugin follows the setting (set_opencode_agent_plugin). Not a
 /// wipe of the events directory: another Lirah instance may be using it.
 fn install() -> Result<(), String> {
@@ -253,12 +250,8 @@ fn install() -> Result<(), String> {
     fs::create_dir_all(&context).map_err(|e| e.to_string())?;
     prune_stale_logs(&context);
 
-    let hooks_dir = lirah.join("hooks");
-    let script = hooks_dir.join("agent-state.js");
-    write_if_changed(&script, HOOK_JS).map_err(|e| e.to_string())?;
-    write_if_changed(&hooks_dir.join("package.json"), HOOKS_PACKAGE_JSON).map_err(|e| e.to_string())?;
-    // Left by builds that shipped the hook as a shell script.
-    let _ = fs::remove_file(hooks_dir.join("agent-state.sh"));
+    // Left by builds that ran agent-state.js as a command hook; Claude Code now posts to hook_server.
+    let _ = fs::remove_dir_all(lirah.join("hooks"));
 
     install_cli(&lirah.join("bin")).map_err(|e| e.to_string())?;
 
@@ -330,6 +323,11 @@ struct AgentHookEvent {
     payload: serde_json::Value,
 }
 
+/// Hand a hook event to the frontend (shared by the tailer and the HTTP listener).
+pub fn emit_hook(app: &AppHandle, session_id: String, payload: serde_json::Value) {
+    let _ = app.emit("agent-hook", AgentHookEvent { session_id, payload });
+}
+
 /// Read whatever complete lines were appended to `path` since `offset`.
 fn read_new_lines(path: &Path, offset: &mut u64) -> Vec<serde_json::Value> {
     crate::claude::transcript::read_lines_from(path, offset)
@@ -390,10 +388,7 @@ pub fn start(app: AppHandle) {
                 }
                 let offset = offsets.entry(path.clone()).or_insert(0);
                 for payload in read_new_lines(&path, offset) {
-                    let _ = app.emit(
-                        "agent-hook",
-                        AgentHookEvent { session_id: session_id.clone(), payload },
-                    );
+                    emit_hook(&app, session_id.clone(), payload);
                 }
             }
         })
@@ -411,6 +406,19 @@ fn merge_hooks(hooks: &mut serde_json::Map<String, serde_json::Value>, add: serd
     }
 }
 
+/// The agent-state events as `http` hooks to hook_server: token and session go
+/// as headers from the terminal's env (the `url` cannot take env vars).
+fn claude_http_hooks() -> serde_json::Value {
+    let hook = serde_json::json!([{ "hooks": [{
+        "type": "http",
+        "url": format!("http://127.0.0.1:{}/hook", crate::hook_server::HOOK_PORT),
+        "timeout": 5,
+        "headers": { "X-Lirah-Token": format!("${}", crate::hook_server::TOKEN_ENV), "X-Lirah-Session": format!("${SESSION_ENV}") },
+        "allowedEnvVars": [crate::hook_server::TOKEN_ENV, SESSION_ENV],
+    }] }]);
+    CLAUDE_EVENTS.iter().map(|e| (e.to_string(), hook.clone())).collect()
+}
+
 /// Compose Lirah's one Claude Code plugin (~/.lirah/claude-plugin) and return
 /// its directory, or None when nothing is installed. Every hook is always in;
 /// each script reads its own switch (agentStateHook, compactionHook) from
@@ -422,12 +430,7 @@ fn write_base_plugin(agent_control: bool) -> Result<Option<String>, String> {
         return Ok(None); // startup install failed
     }
     let mut hooks = serde_json::Map::new();
-    let script = crate::util::lirah_dir().ok_or("No home directory")?.join("hooks").join("agent-state.js");
-    if script.exists() {
-        // The script runs in milliseconds; the timeout only bounds a wedged disk.
-        let command = serde_json::json!([{ "type": "command", "command": crate::util::node_command(&script), "timeout": 5 }]);
-        merge_hooks(&mut hooks, CLAUDE_EVENTS.iter().map(|e| (e.to_string(), serde_json::json!([{ "hooks": command }]))).collect());
-    }
+    merge_hooks(&mut hooks, claude_http_hooks());
     if let Some(add) = crate::compaction::claude_hooks() {
         merge_hooks(&mut hooks, add);
     }
@@ -461,7 +464,6 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use std::process::{Command, Stdio};
 
     #[test]
     fn merge_hooks_keeps_every_part_of_a_shared_event() {
@@ -473,32 +475,18 @@ mod tests {
     }
 
     #[test]
-    fn hook_logs_payload_without_tool_response() {
-        if Command::new("node").arg("--version").output().is_err() {
-            return; // no Node on this machine
+    fn claude_events_are_http_hooks_with_token_and_session_headers() {
+        let hooks = claude_http_hooks();
+        assert_eq!(hooks.as_object().unwrap().len(), CLAUDE_EVENTS.len());
+        for event in CLAUDE_EVENTS {
+            let hook = &hooks[*event][0]["hooks"][0];
+            assert_eq!(hook["type"], "http");
+            assert_eq!(hook["url"], format!("http://127.0.0.1:{}/hook", crate::hook_server::HOOK_PORT));
+            assert_eq!(hook["headers"]["X-Lirah-Token"], "$LIRAH_HOOK_TOKEN");
+            assert_eq!(hook["headers"]["X-Lirah-Session"], "$LIRAH_PTY_SESSION");
+            assert_eq!(hook["allowedEnvVars"], serde_json::json!(["LIRAH_HOOK_TOKEN", "LIRAH_PTY_SESSION"]));
+            assert!(hook.get("onFailure").is_none());
         }
-        let dir = std::env::temp_dir().join(format!("lirah-hook-js-{}", std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("hook.js"), HOOK_JS).unwrap();
-        fs::write(dir.join("package.json"), HOOKS_PACKAGE_JSON).unwrap();
-        let run = |session: Option<&str>| {
-            let mut cmd = Command::new("node");
-            cmd.arg(dir.join("hook.js")).env(EVENTS_ENV, &dir).env_remove(SESSION_ENV).stdin(Stdio::piped());
-            if let Some(s) = session { cmd.env(SESSION_ENV, s); }
-            let mut child = cmd.spawn().unwrap();
-            child.stdin.take().unwrap()
-                .write_all(b"{\"hook_event_name\":\"PostToolUse\",\n\"tool_name\":\"Read\",\"tool_response\":{\"content\":\"big\"}}")
-                .unwrap();
-            assert!(child.wait().unwrap().success());
-        };
-
-        run(None);
-        assert!(!dir.join("s1.jsonl").exists());
-
-        run(Some("s1"));
-        let log = fs::read_to_string(dir.join("s1.jsonl")).unwrap();
-        assert_eq!(log, "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\"}\n");
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
