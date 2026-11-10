@@ -177,47 +177,53 @@ pub fn list_at(base: &Path, rel: &str) -> Result<Vec<String>, StoreError> {
     Ok(names)
 }
 
-fn base() -> Result<PathBuf, StoreError> {
-    crate::util::lirah_dir().ok_or_else(|| io("no home directory"))
+/// ~/.lirah, or `custom` when it is an absolute path to an existing folder.
+fn base(custom: Option<String>) -> Result<PathBuf, StoreError> {
+    match custom.map(PathBuf::from) {
+        None => crate::util::lirah_dir().ok_or_else(|| io("no home directory")),
+        Some(p) if p.is_absolute() && p.is_dir() => Ok(p),
+        Some(_) => Err(io("invalid base")),
+    }
 }
 
 async fn run<T: Send + 'static>(
     command: &'static str,
+    custom: Option<String>,
     body: impl FnOnce(PathBuf) -> Result<T, StoreError> + Send + 'static,
 ) -> Result<T, StoreError> {
-    crate::ipc::blocking(command, move || Ok(base().and_then(body)))
+    crate::ipc::blocking(command, move || Ok(base(custom).and_then(body)))
         .await
         .map_err(io)?
 }
 
 #[tauri::command]
-pub async fn store_read(rel: String) -> Result<Option<Value>, StoreError> {
-    run("store_read", move |b| read_at(&b, &rel)).await
+pub async fn store_read(base: Option<String>, rel: String) -> Result<Option<Value>, StoreError> {
+    run("store_read", base, move |b| read_at(&b, &rel)).await
 }
 
 #[tauri::command]
-pub async fn store_write(rel: String, data: Value, expected_revision: Option<u64>) -> Result<Value, StoreError> {
-    run("store_write", move |b| write_at(&b, &rel, data, expected_revision)).await
+pub async fn store_write(base: Option<String>, rel: String, data: Value, expected_revision: Option<u64>) -> Result<Value, StoreError> {
+    run("store_write", base, move |b| write_at(&b, &rel, data, expected_revision)).await
 }
 
 #[tauri::command]
-pub async fn store_delete(rel: String) -> Result<(), StoreError> {
-    run("store_delete", move |b| delete_at(&b, &rel)).await
+pub async fn store_delete(base: Option<String>, rel: String) -> Result<(), StoreError> {
+    run("store_delete", base, move |b| delete_at(&b, &rel)).await
 }
 
 #[tauri::command]
-pub async fn store_list(rel: String) -> Result<Vec<String>, StoreError> {
-    run("store_list", move |b| list_at(&b, &rel)).await
+pub async fn store_list(base: Option<String>, rel: String) -> Result<Vec<String>, StoreError> {
+    run("store_list", base, move |b| list_at(&b, &rel)).await
 }
 
 #[tauri::command]
 pub async fn store_append(rel: String, line: String) -> Result<(), StoreError> {
-    run("store_append", move |b| append_at(&b, &rel, &line)).await
+    run("store_append", None, move |b| append_at(&b, &rel, &line)).await
 }
 
 #[tauri::command]
-pub async fn store_read_text(rel: String) -> Result<Option<String>, StoreError> {
-    run("store_read_text", move |b| read_text_at(&b, &rel)).await
+pub async fn store_read_text(base: Option<String>, rel: String) -> Result<Option<String>, StoreError> {
+    run("store_read_text", base, move |b| read_text_at(&b, &rel)).await
 }
 
 #[cfg(test)]
@@ -380,6 +386,24 @@ mod tests {
         assert_eq!(read_text_at(&b, "worklog/2026-11.jsonl").unwrap().as_deref(), Some("{\"a\":1}\n{\"a\":2}\n"));
         assert!(append_at(&b, "worklog/x.jsonl", "two\nlines").is_err());
         assert!(append_at(&b, "../x.jsonl", "{}").is_err());
+    }
+
+    #[test]
+    fn custom_base_must_be_an_existing_absolute_folder() {
+        assert_eq!(base(Some("relative/dir".into())), Err(io("invalid base")));
+        let missing = temp_base();
+        assert_eq!(base(Some(missing.to_string_lossy().into())), Err(io("invalid base")));
+    }
+
+    #[test]
+    fn custom_base_still_rejects_traversal() {
+        let b = temp_base();
+        fs::create_dir_all(&b).unwrap();
+        let custom = base(Some(b.to_string_lossy().into())).unwrap();
+        assert_eq!(custom, b);
+        assert!(read_at(&custom, "../x.json").is_err());
+        assert!(write_at(&custom, "a/../../x.json", json!({}), None).is_err());
+        fs::remove_dir_all(&b).unwrap();
     }
 
 }
