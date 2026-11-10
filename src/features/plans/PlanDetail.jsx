@@ -21,7 +21,7 @@ import { useUncommitted } from './useUncommitted';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
-import { planGit } from './planGit';
+import { isNoGit, planGit } from './planGit';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { FrameHints } from '../../components/instrument/FrameHints';
@@ -163,7 +163,8 @@ export function PlanDetail({ plan }) {
   const [showFiles, setShowFiles] = useState(false);
   const filesOpen = showFiles;
   const commitFiles = usePlanCommitFiles(plan, filesOpen);
-  const hasCommits = plan.chunks.some((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
+  const noGit = isNoGit(plan);
+  const hasCommits = !noGit && plan.chunks.some((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
 
   // Read before each chunk, so it can change during a run.
   const freshContext = (
@@ -189,7 +190,7 @@ export function PlanDetail({ plan }) {
       onStop={() => stopAutopilot(repoRoot, plan.id)}
       onDismiss={() => dismissAutopilot(repoRoot, plan.id)}
       onGoToTab={() => switchTab(plan.autopilot.tabId)}
-      onReviewAll={() => pane.reviewAll(plan)}
+      onReviewAll={noGit ? null : () => pane.reviewAll(plan)}
       options={piloted ? freshContext : null}
     />
   );
@@ -351,6 +352,9 @@ export function PlanDetail({ plan }) {
 
       {/* Setup: one line under a hairline; the form opens on demand. */}
       <section aria-label="Plan git" className="px-3 pt-3 pb-3.5 edge-t-engraved">
+        {noGit ? (
+          <span className="engraved-label text-[11px]">no git · chunks finish on PLAN-STATUS</span>
+        ) : (
         <PlanGitSection
           plan={plan}
           busy={settingUpGit}
@@ -361,6 +365,7 @@ export function PlanDetail({ plan }) {
           onRemoveWorktrees={() => pane.removeWorktrees(plan)}
           onReopen={started || isAutopilotLive(plan.autopilot) ? null : () => pane.reopenGit(plan)}
         />
+        )}
       </section>
 
       {plan.split === SPLIT_STATUS.RUNNING && (
