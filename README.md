@@ -97,7 +97,7 @@ The bundles land in `src-tauri/target/release/bundle/`. To open a directory at s
 - **Reconcile** merges several jobs in an integration worktree. A watchdog stops any job stuck for 15 minutes.
 
 ### Plans and auto-pilot (Workspace → plans)
-- Paste a plan or import the repo's `*_plan.md` files. An agent splits the plan into chunks.
+- Paste a plan or import `.md` plan files from `~/.lirah/plans/<YYYY-MM>/`. An agent splits the plan into chunks.
 - For each chunk: implement it in the tab's agent (one commit per chunk), review it with notes, roll back, skip or reorder.
 - **Auto-pilot** (`:autopilot`) chains chunks unattended. It pauses on questions, permission prompts, a missing commit, or when the agent hooks go silent.
 - Each plan shows its stage, links its pull request through `gh` when it's installed, and closes its task once the commits reach the base branch.

@@ -21,7 +21,7 @@ import { buildTaskPlanPrompt } from '../plans/planPrompts';
 import { requestPlanFocus } from '../plans/plansPaneEvents';
 import { planContext } from './planContexts';
 import { useTasks } from './TasksContext';
-import { GLOBAL, isOpen, planFileName, splitTaskText, TASK_STATUS } from './taskModel';
+import { GLOBAL, isOpen, planFilePath, splitTaskText, TASK_STATUS } from './taskModel';
 import { subscribeQuickTask, takeQuickTask } from './tasksPaneEvents';
 import { TaskRow } from './TaskRow';
 import { useProjectScope } from './useProjectScope';
@@ -134,7 +134,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       toast.success(`Sent to ${tabName}: ${autoChunk ? 'the plan is split into chunks once written' : `the plan goes to ${basename(planPath)}`}`);
     } catch (e) {
       // Not sent: the prompt is still useful on the clipboard.
-      const planPath = `${projectScope}/${planFileName(task)}`;
+      const planPath = planFilePath(await invoke('get_home_dir').catch(() => '~'), task);
       const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, planPath, autoChunk });
       const copied = await navigator.clipboard.writeText(text).then(() => true, () => false);
       toast.error(`Couldn't send the task: ${errorMessage(e)}.${copied ? ' The prompt is on the clipboard.' : ''}`);

@@ -2,6 +2,8 @@
 // helpers only; the store and the pane do the I/O.
 
 import { shortId } from '../../lib/ids';
+import { lastSepIndex } from '../../utils/pathUtils';
+import { planFilesDir } from '../plans/planModel';
 import { slugify } from '../plans/planPrompts';
 
 export const TASK_STATUS = {
@@ -25,6 +27,7 @@ export function newTask({ title, notes = '', repos = [] }) {
     status: TASK_STATUS.BACKLOG,
     repos: cleanRepos(repos), // the repo roots (or folders) the task is about
     planPath: null, // where the agent was asked to save the plan
+    planRoot: null, // the repo the plan is for (the file sits in ~/.lirah/plans)
     planId: null, // the plan it was imported as
     planTabId: null, // the tab whose agent writes the plan
     autoChunk: false, // import the plan and split it into chunks once written
@@ -46,6 +49,7 @@ export function normalizeTask(raw) {
     status: STATUSES.has(t.status) ? t.status : TASK_STATUS.BACKLOG,
     repos: cleanRepos(t.repos),
     planPath: typeof t.planPath === 'string' ? t.planPath : null,
+    planRoot: typeof t.planRoot === 'string' ? t.planRoot : null,
     planId: typeof t.planId === 'string' ? t.planId : null,
     planTabId: typeof t.planTabId === 'string' ? t.planTabId : null,
     autoChunk: t.autoChunk === true,
@@ -60,6 +64,12 @@ export const isOpen = (task) => task.status !== TASK_STATUS.DONE;
 export function planFileName(task) {
   return `${slugify(task.title).replace(/-/g, '_') || 'task'}_plan.md`;
 }
+
+/** Where a task's plan file goes: `<home>/.lirah/plans/<YYYY-MM>/<title>_plan.md` (this month). */
+export const planFilePath = (home, task, now = Date.now()) => `${planFilesDir(home, now)}/${planFileName(task)}`;
+
+/** The repo a task's plan is for; older tasks saved the file at the repo root. */
+export const planRootOf = (task) => task.planRoot || task.planPath.slice(0, lastSepIndex(task.planPath));
 
 /**
  * Move one of `ids` (the rows on screen, in order) from index `from` to `to`

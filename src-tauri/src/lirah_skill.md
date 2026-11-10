@@ -98,7 +98,8 @@ lirah ping                     check that Lirah is reachable
 ```
 
 `<plan>` is an index from `lirah plans`, an id or a title; `<chunk>` is its
-number or id.
+number or id. Plans and their files live in `~/.lirah/plans/<YYYY-MM>/`
+(the month the plan was made), not in the repo: a plan may span repos.
 `<job>` is an index from `lirah jobs` or a job id. An index from `lirah jobs --all`
 needs `--all` again.
 `<tab>` is `.` (this tab), an index from `lirah tabs`, a tab id or a tab name.
@@ -165,8 +166,8 @@ tabs are your workers:
 - For startup projects to open at launch, the mode must be `projects`:
   `lirah startup mode projects`.
 - Paths are resolved against your current directory.
-- After writing a `*_plan.md` the user wants run in Lirah, import it with
-  `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
+- Write plans the user wants run in Lirah as `~/.lirah/plans/<YYYY-MM>/<topic>_plan.md`
+  (this month), then import it with `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
 - When the user wants a plan changed: `lirah plans revise <plan> "<what to change>"`,
   edit only the file it names, then `lirah plans rechunk <plan>`. Don't implement
   anything while revising.

@@ -297,3 +297,15 @@ export function toRolledBack(revertShas) {
     doneAt: null,
   };
 }
+
+/** The month folder a plan lives in, `YYYY-MM` in local time, from its createdAt. */
+export function planMonth(ts = Date.now()) {
+  const d = new Date(ts ?? Date.now());
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** A plan's folder under ~/.lirah: `plans/<YYYY-MM>/<id>`. */
+export const planDir = (plan) => `plans/${planMonth(plan.createdAt)}/${plan.id}`;
+
+/** Where plan .md files go: `<home>/.lirah/plans/<YYYY-MM>` (the month of `ts`). */
+export const planFilesDir = (home, ts) => `${home}/.lirah/plans/${planMonth(ts)}`;
