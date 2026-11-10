@@ -27,12 +27,14 @@ vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onCloseReq
 
 const { startEntry, endEntry, parseStatus, parseLog, readLog, monthFile } = await import('./worklogStore.js');
 
+// git reports forward slashes, also on Windows.
+const tmp = (prefix) => realpathSync(mkdtempSync(join(tmpdir(), prefix))).replaceAll('\\', '/');
 const sh = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 let repo;
 let n = 0;
 beforeEach(() => {
   disk = new Map();
-  repo = realpathSync(mkdtempSync(join(tmpdir(), 'worklog-')));
+  repo = tmp('worklog-');
   sh(repo, 'init', '-q', '-b', 'main');
   sh(repo, 'config', 'user.email', 't@t');
   sh(repo, 'config', 'user.name', 't');
@@ -78,7 +80,7 @@ describe('worklog', () => {
   });
 
   it('keeps prompts from every repo in one log', async () => {
-    const other = realpathSync(mkdtempSync(join(tmpdir(), 'worklog-other-')));
+    const other = tmp('worklog-other-');
     sh(other, 'init', '-q', '-b', 'dev');
     await turn('in repo', () => {});
     await startEntry('o', { prompt: 'in other', cwd: other });
