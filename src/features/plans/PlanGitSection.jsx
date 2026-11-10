@@ -198,12 +198,14 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         </select>
       )}
 
-      {locked && cfg.worktrees && !removed && (
+      {locked && !removed && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <PanelButton icon={Terminal} onClick={onOpenTab} title={`Open a tab in ${cfg.workDir}`}>open tab</PanelButton>
-          <PanelButton icon={FolderMinus} onClick={onRemoveWorktrees} disabled={busy} title="Remove the worktrees (the branches stay)">
-            remove worktrees
-          </PanelButton>
+          <PanelButton icon={Terminal} onClick={onOpenTab} title="Go to the plan's terminal (opens one if closed)">plan tab</PanelButton>
+          {cfg.worktrees && (
+            <PanelButton icon={FolderMinus} onClick={onRemoveWorktrees} disabled={busy} title="Remove the worktrees (the branches stay)">
+              remove worktrees
+            </PanelButton>
+          )}
         </div>
       )}
     </div>

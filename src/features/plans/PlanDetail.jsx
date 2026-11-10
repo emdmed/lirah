@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavArrowLeft, Play, Refresh } from 'iconoir-react';
+import { NavArrowLeft, Play, Refresh, Terminal } from 'iconoir-react';
 import { Lamp } from '../../components/instrument/Lamp';
 import { SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -21,7 +21,7 @@ import { useUncommitted } from './useUncommitted';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
-import { isNoGit, planGit } from './planGit';
+import { isNoGit } from './planGit';
 import { useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { FrameHints } from '../../components/instrument/FrameHints';
@@ -86,7 +86,7 @@ export function PlanDetail({ plan }) {
   const pane = usePlanPane();
   const { repoRoot } = pane;
   const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan, shelvePlan } = usePlansActions();
-  const { tabs, switchTab, addTab } = useTabManager();
+  const { tabs, switchTab } = useTabManager();
   const toast = useToast();
   const reviewingAll = useBusy(BUSY.REVIEW_ALL);
   const settingUpGit = useBusy(BUSY.GIT_SETUP);
@@ -353,7 +353,12 @@ export function PlanDetail({ plan }) {
       {/* Setup: one line under a hairline; the form opens on demand. */}
       <section aria-label="Plan git" className="px-3 pt-3 pb-3.5 edge-t-engraved">
         {noGit ? (
-          <span className="engraved-label text-[11px]">no git · chunks finish on PLAN-STATUS</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="engraved-label min-w-0 flex-1 truncate text-[11px]">no git · chunks finish on PLAN-STATUS</span>
+            <PanelButton icon={Terminal} onClick={() => pane.openPlanTab(plan)} className="shrink-0" title="Go to the plan's terminal (opens one if closed)">
+              plan tab
+            </PanelButton>
+          </div>
         ) : (
         <PlanGitSection
           plan={plan}
@@ -361,7 +366,7 @@ export function PlanDetail({ plan }) {
           onChange={(patch) => setGitConfig(repoRoot, plan.id, patch)}
           onAddRepo={(path) => pane.addRepo(plan, path)}
           onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
-          onOpenTab={() => addTab(planGit(plan).workDir)}
+          onOpenTab={() => pane.openPlanTab(plan)}
           onRemoveWorktrees={() => pane.removeWorktrees(plan)}
           onReopen={started || isAutopilotLive(plan.autopilot) ? null : () => pane.reopenGit(plan)}
         />

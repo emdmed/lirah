@@ -164,6 +164,12 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
   const handleRechunk = useCallback((plan) => withBusy(BUSY.REVISE, () => rechunk(repoRoot, plan.id)),
     [withBusy, rechunk, repoRoot]);
 
+  // Focus the plan's tab, or open one (setting up git and launching Claude) when it's closed.
+  const handleOpenPlanTab = useCallback((plan) => {
+    if (plan.tabId && tabs.some((t) => t.id === plan.tabId)) switchTab(plan.tabId);
+    else withBusy(BUSY.GIT_SETUP, () => prepareFor(plan));
+  }, [tabs, switchTab, withBusy, prepareFor]);
+
   const closePlan = useCallback(() => setOpenPlanId(null), []);
   const paneActions = useMemo(() => ({
     repoRoot,
@@ -183,8 +189,9 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     reopenGit: handleReopenGit,
     revise: handleRevise,
     rechunk: handleRechunk,
+    openPlanTab: handleOpenPlanTab,
   }), [repoRoot, closePlan, handleImplement, handleCheck, handleMarkDone, handleCommit, handleReview, handleRollback, handleAutopilot,
-    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit, handleRevise, handleRechunk]);
+    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit, handleRevise, handleRechunk, handleOpenPlanTab]);
 
   return { busy, paneActions, diffProps };
 }
