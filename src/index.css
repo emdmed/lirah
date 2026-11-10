@@ -2459,13 +2459,16 @@ button.ins-link {
   mix-blend-mode: normal;
 }
 :root[data-zen-shift]::view-transition-old(root) { animation: none; }
+/* Enter duration in both directions: leaving Zen mounts the prompt pane, whose
+   own ins-pane-enter fade would otherwise pop in after a shorter shift. The
+   settle is twice the usual one so a whole-layout swap reads as motion. */
 :root[data-zen-shift="in"]::view-transition-new(root) {
-  animation: ins-zen-in var(--ins-dur-base) var(--ins-ease-out) both;
-  --zen-from: var(--ins-settle);
+  animation: ins-zen-in var(--ins-dur-enter) var(--ins-ease-out) both;
+  --zen-from: calc(2 * var(--ins-settle) - 1);
 }
 :root[data-zen-shift="out"]::view-transition-new(root) {
-  animation: ins-zen-in var(--ins-dur-quick) var(--ins-ease-out) both;
-  --zen-from: calc(2 - var(--ins-settle));
+  animation: ins-zen-in var(--ins-dur-enter) var(--ins-ease-out) both;
+  --zen-from: calc(3 - 2 * var(--ins-settle));
 }
 @keyframes ins-zen-in {
   from { opacity: 0; transform: scale(var(--zen-from)); }
