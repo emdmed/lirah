@@ -1,23 +1,21 @@
 //! Control socket for the `lirah` CLI: lets the agent in a tab configure Lirah.
 //!
-//! The app listens on `~/.lirah/control/<pid>.sock`. A client writes one JSON
+//! The app listens on `~/.lirah/control/<pid>.sock` (a Unix socket), or on the
+//! named pipe `\\.\pipe\lirah-control-<pid>` on Windows. A client writes one JSON
 //! line `{session, cmd, args}` and reads one JSON line back, `{ok, data}` or
 //! `{ok: false, error}`. The server doesn't act on requests itself: it emits an
 //! `agent-control` event `{id, sessionId, cmd, args}` to the frontend, which
 //! applies the command and answers through `agent_control_reply`. A request the
 //! frontend doesn't answer within `REPLY_TIMEOUT` gets an error reply.
 //!
-//! One socket per process, so a dev build and an installed app can run side by
-//! side; sockets left by processes that are gone are removed at startup.
-//!
-//! Unix only for now: on Windows there's no socket, `socket_path` is `None`,
-//! and `start` does nothing.
-
-#![cfg_attr(not(unix), allow(dead_code, unused_imports))]
+//! One socket or pipe per process, so a dev build and an installed app can run
+//! side by side. Sockets left by processes that are gone are removed at
+//! startup; a pipe vanishes with its process.
 
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+#[cfg(unix)]
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 #[cfg(unix)]
@@ -52,19 +50,24 @@ fn pending() -> &'static Mutex<HashMap<u64, Sender<Value>>> {
     PENDING.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+#[cfg(unix)]
 fn control_dir() -> Option<PathBuf> {
     crate::util::lirah_dir().map(|d| d.join("control"))
 }
 
-/// This process's control socket path. Tabs get it in their environment so the
-/// CLI talks to the app that owns the tab.
+/// This process's control socket path (a pipe name on Windows). Tabs get it in
+/// their environment so the CLI talks to the app that owns the tab.
+#[cfg(unix)]
 pub fn socket_path() -> Option<PathBuf> {
-    if cfg!(not(unix)) {
-        return None;
-    }
     control_dir().map(|d| d.join(format!("{}.sock", std::process::id())))
 }
 
+#[cfg(windows)]
+pub fn socket_path() -> Option<PathBuf> {
+    Some(PathBuf::from(format!(r"\\.\pipe\lirah-control-{}", std::process::id())))
+}
+
+#[cfg(unix)]
 fn pid_alive(pid: u32) -> bool {
     if cfg!(target_os = "linux") {
         Path::new(&format!("/proc/{pid}")).exists()
@@ -80,6 +83,7 @@ fn pid_alive(pid: u32) -> bool {
 }
 
 /// Remove sockets whose owning process is gone.
+#[cfg(unix)]
 fn remove_stale_sockets(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     let own = std::process::id();
@@ -100,10 +104,6 @@ fn remove_stale_sockets(dir: &Path) {
         }
     }
 }
-
-/// No control socket on Windows yet.
-#[cfg(not(unix))]
-pub fn start(_app: AppHandle) {}
 
 /// Bind the control socket and serve it on a background thread.
 #[cfg(unix)]
@@ -142,29 +142,93 @@ pub fn start(app: AppHandle) {
         .ok();
 }
 
-/// Remove this process's socket. Called when the app exits.
+/// Remove this process's socket. Called when the app exits. A pipe goes away
+/// with the process.
 pub fn stop() {
+    #[cfg(unix)]
     if let Some(path) = socket_path() {
         let _ = fs::remove_file(path);
     }
 }
 
-#[cfg(unix)]
-fn handle(app: AppHandle, stream: UnixStream) {
-    let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
-    let reply = match read_request(&stream) {
-        Ok(req) => relay(&app, req),
-        Err(e) => json!({ "ok": false, "error": e }),
-    };
-    let mut stream = stream;
-    let mut line = reply.to_string();
-    line.push('\n');
-    let _ = stream.write_all(line.as_bytes());
-    let _ = stream.flush();
+/// Listen on this process's named pipe and serve it on a background thread.
+#[cfg(windows)]
+pub fn start(app: AppHandle) {
+    let Some(path) = socket_path() else { return };
+    match listen(&path) {
+        Ok(listener) => serve(listener, move |event| app.emit("agent-control", event)),
+        Err(e) => eprintln!("[agent_control] can't listen on {}: {e}", path.display()),
+    }
+}
+
+/// Refuses remote clients: interprocess' default for pipes.
+#[cfg(windows)]
+fn listen(path: &Path) -> std::io::Result<interprocess::local_socket::Listener> {
+    use interprocess::local_socket::{prelude::*, GenericFilePath, ListenerOptions};
+    ListenerOptions::new().name(path.to_fs_name::<GenericFilePath>()?).create_sync()
+}
+
+/// `emit` hands a request to the frontend (the `agent-control` event).
+#[cfg(windows)]
+fn serve(
+    listener: interprocess::local_socket::Listener,
+    emit: impl Fn(Value) -> tauri::Result<()> + Clone + Send + 'static,
+) {
+    use interprocess::local_socket::traits::ListenerExt as _;
+    thread::Builder::new()
+        .name("agent-control".into())
+        .spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(stream) = stream else { continue };
+                let emit = emit.clone();
+                let _ = thread::Builder::new()
+                    .name("agent-control-conn".into())
+                    .spawn(move || handle(stream, &emit));
+            }
+        })
+        .ok();
 }
 
 #[cfg(unix)]
-fn read_request(stream: &UnixStream) -> Result<Request, String> {
+fn handle(app: AppHandle, stream: UnixStream) {
+    let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
+    let reply = answer(&|event| app.emit("agent-control", event), read_request(&stream));
+    write_reply(&stream, reply);
+}
+
+/// Pipes have no read timeout: the request is read on a helper thread, which
+/// ends when the client closes the pipe.
+#[cfg(windows)]
+fn handle(stream: interprocess::local_socket::Stream, emit: &dyn Fn(Value) -> tauri::Result<()>) {
+    let stream = std::sync::Arc::new(stream);
+    let (tx, rx) = mpsc::channel();
+    let reader = stream.clone();
+    let _ = thread::Builder::new()
+        .name("agent-control-read".into())
+        .spawn(move || {
+            let _ = tx.send(read_request(&*reader));
+        });
+    let request = rx
+        .recv_timeout(READ_TIMEOUT)
+        .unwrap_or_else(|_| Err("timed out reading request".into()));
+    write_reply(&*stream, answer(emit, request));
+}
+
+fn answer(emit: &dyn Fn(Value) -> tauri::Result<()>, request: Result<Request, String>) -> Value {
+    match request {
+        Ok(req) => relay(emit, req),
+        Err(e) => json!({ "ok": false, "error": e }),
+    }
+}
+
+fn write_reply(mut out: impl Write, reply: Value) {
+    let mut line = reply.to_string();
+    line.push('\n');
+    let _ = out.write_all(line.as_bytes());
+    let _ = out.flush();
+}
+
+fn read_request(stream: impl Read) -> Result<Request, String> {
     let mut reader = BufReader::new(stream.take(MAX_REQUEST));
     let mut line = String::new();
     reader
@@ -176,7 +240,7 @@ fn read_request(stream: &UnixStream) -> Result<Request, String> {
     serde_json::from_str(line.trim()).map_err(|e| format!("bad request: {e}"))
 }
 
-fn relay(app: &AppHandle, req: Request) -> Value {
+fn relay(emit: &dyn Fn(Value) -> tauri::Result<()>, req: Request) -> Value {
     // Answered here so `lirah ping` checks the socket without the frontend.
     if req.cmd == "ping" {
         return json!({ "ok": true, "data": "pong" });
@@ -195,7 +259,7 @@ fn relay(app: &AppHandle, req: Request) -> Value {
         "cmd": req.cmd,
         "args": req.args,
     });
-    if let Err(e) = app.emit("agent-control", event) {
+    if let Err(e) = emit(event) {
         take_pending(id);
         return json!({ "ok": false, "error": format!("couldn't reach Lirah: {e}") });
     }
@@ -232,4 +296,41 @@ pub fn agent_control_reply(
     };
     let _ = tx.send(reply);
     Ok(())
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use interprocess::local_socket::{prelude::*, GenericFilePath, Stream};
+
+    /// A server on its own pipe whose frontend never answers.
+    fn server(name: &str) -> PathBuf {
+        let path = PathBuf::from(format!(r"\\.\pipe\lirah-control-test-{}-{name}", std::process::id()));
+        serve(listen(&path).unwrap(), |_| Ok(()));
+        path
+    }
+
+    fn ask(path: &Path, request: &str) -> Value {
+        let stream = Stream::connect(path.to_fs_name::<GenericFilePath>().unwrap()).unwrap();
+        (&stream).write_all(request.as_bytes()).unwrap();
+        let mut reply = String::new();
+        BufReader::new(&stream).read_line(&mut reply).unwrap();
+        serde_json::from_str(&reply).unwrap()
+    }
+
+    #[test]
+    fn ping_round_trip_over_the_pipe() {
+        let path = server("ping");
+        assert_eq!(ask(&path, "{\"cmd\":\"ping\"}
+"), json!({ "ok": true, "data": "pong" }));
+    }
+
+    #[test]
+    fn request_that_is_not_json_gets_an_error_reply() {
+        let path = server("garbage");
+        let reply = ask(&path, "not json
+");
+        assert_eq!(reply["ok"], false);
+        assert!(reply["error"].as_str().unwrap().starts_with("bad request"), "{reply}");
+    }
 }

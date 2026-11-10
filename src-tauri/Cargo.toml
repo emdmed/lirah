@@ -36,6 +36,7 @@ tauri-plugin-window-state = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32_System_Threading"] }
+interprocess = "2.4.8"
 
 [profile.release]
 lto = true

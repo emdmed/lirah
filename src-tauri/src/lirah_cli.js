@@ -159,7 +159,7 @@ function request(cmd, args, { fallback = false } = {}) {
   const socketPath = process.env.LIRAH_CONTROL;
   if (!socketPath) {
     if (fallback) return Promise.resolve(UNREACHABLE);
-    fail("not running inside a Lirah tab (LIRAH_CONTROL is unset)");
+    fail("Lirah isn't reachable (LIRAH_CONTROL is unset): run this from a tab of a running Lirah");
   }
   const payload = { session: process.env.LIRAH_PTY_SESSION || null, cmd, args };
   return new Promise((resolve) => {
