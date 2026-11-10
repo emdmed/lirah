@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -26,6 +27,8 @@ const REQUEST_DEADLINE: Duration = Duration::from_secs(10);
 /// Headers are read (and the token checked) only within these limits.
 const MAX_HEADER_BYTES: u64 = 16 * 1024;
 const MAX_HEADERS: usize = 64;
+/// Live connection threads; stalled clients cannot spawn threads without bound.
+const MAX_CONNECTIONS: usize = 64;
 /// A hook body is one event; anything bigger is refused.
 const MAX_BODY: usize = 1024 * 1024;
 
@@ -93,12 +96,15 @@ fn read_request(stream: &TcpStream, deadline: Duration) -> Option<Request> {
         for count in 0.. {
             line.clear();
             // Empty read: closed or over the cap before the blank line.
-            if head.read_line(&mut line).ok()? == 0 || count >= MAX_HEADERS {
+            if head.read_line(&mut line).ok()? == 0 {
                 return None;
             }
             let line = line.trim_end();
             if line.is_empty() {
                 break;
+            }
+            if count >= MAX_HEADERS {
+                return None;
             }
             let (name, value) = line.split_once(':')?;
             let value = value.trim();
@@ -179,11 +185,28 @@ fn respond(
     (200, reply)
 }
 
-/// A thread per connection, so a stalled client blocks no one else.
+/// Counts a live connection thread; decrements when the thread ends.
+struct Live(Arc<AtomicUsize>);
+
+impl Drop for Live {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// A thread per connection, so a stalled client blocks no one else; above
+/// `MAX_CONNECTIONS` live threads a new connection is closed unanswered.
 fn serve(listener: TcpListener, deadline: Duration, handler: Arc<dyn Fn(&Request) -> (u16, Option<Value>) + Send + Sync>) {
+    let live = Arc::new(AtomicUsize::new(0));
     for mut stream in listener.incoming().flatten() {
         let handler = handler.clone();
+        live.fetch_add(1, Ordering::SeqCst);
+        let guard = Live(live.clone());
+        if live.load(Ordering::SeqCst) > MAX_CONNECTIONS {
+            continue; // guard drops, stream closes
+        }
         let _ = thread::Builder::new().name("hook-server-conn".into()).spawn(move || {
+            let _guard = guard;
             let _ = stream.set_write_timeout(Some(READ_TIMEOUT));
             let Some(req) = read_request(&stream, deadline) else { return };
             let (status, body) = handler(&req);
@@ -351,6 +374,25 @@ mod tests {
         assert_eq!(exchange(addr, &many), "");
         let big = format!("POST /hook HTTP/1.1\r\nX-A: {}\r\n\r\n", "a".repeat(MAX_HEADER_BYTES as usize));
         assert_eq!(exchange(addr, &big), "");
+    }
+
+    #[test]
+    fn exactly_max_headers_is_accepted() {
+        let addr = spawn_server(Duration::from_secs(2));
+        let raw = format!("POST /hook HTTP/1.1\r\nX-Lirah-Token: tok\r\nX-Lirah-Session: s1\r\nContent-Length: 7\r\n{}\r\n{{\"a\":1}}", "X-A: 1\r\n".repeat(MAX_HEADERS - 3));
+        assert!(exchange(addr, &raw).starts_with("HTTP/1.1 200"));
+    }
+
+    #[test]
+    fn connections_above_the_cap_are_closed_and_slots_free_up() {
+        let addr = spawn_server(Duration::from_millis(1500));
+        let held: Vec<TcpStream> = (0..MAX_CONNECTIONS).map(|_| TcpStream::connect(addr).unwrap()).collect();
+        thread::sleep(Duration::from_millis(300));
+        // Over the cap: closed with no reply, even though the request is valid.
+        assert_eq!(exchange(addr, OK_REQ), "");
+        drop(held);
+        thread::sleep(Duration::from_millis(300));
+        assert!(exchange(addr, OK_REQ).starts_with("HTTP/1.1 200"));
     }
 
     #[test]
