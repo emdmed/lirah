@@ -14,6 +14,7 @@ mod ipc;
 mod watch_registry;
 mod agent_hooks;
 mod agent_control;
+mod hook_server;
 mod feature_map;
 mod plans;
 mod util;
@@ -118,6 +119,7 @@ pub fn run(initial_path: Option<String>) {
 
             agent_hooks::start(app.handle().clone());
             agent_control::start(app.handle().clone());
+            hook_server::start(app.handle().clone());
             compaction::start();
             // The window starts hidden and the page shows it once its splash
             // has painted. If the page never gets that far, show it anyway.

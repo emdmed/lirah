@@ -161,6 +161,9 @@ pub fn session_env(session_id: &str) -> Vec<(String, String)> {
         (EVENTS_ENV.to_string(), dir.to_string_lossy().into_owned()),
         (PROMPT_CONTEXT_ENV.to_string(), context.to_string_lossy().into_owned()),
     ];
+    if let Some(token) = crate::hook_server::token() {
+        env.push((crate::hook_server::TOKEN_ENV.to_string(), token.to_string()));
+    }
     if let Some(sock) = crate::agent_control::socket_path() {
         env.push((CONTROL_ENV.to_string(), sock.to_string_lossy().into_owned()));
     }
@@ -185,7 +188,7 @@ pub fn remove_session_log(session_id: &str) {
 }
 
 /// Session ids are UUIDs; anything else must not become a path.
-fn prompt_context_path(session_id: &str) -> Option<PathBuf> {
+pub(crate) fn prompt_context_path(session_id: &str) -> Option<PathBuf> {
     let valid = !session_id.is_empty()
         && session_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
     if !valid {
@@ -330,6 +333,11 @@ struct AgentHookEvent {
     payload: serde_json::Value,
 }
 
+/// Hand a hook event to the frontend (shared by the tailer and the HTTP listener).
+pub fn emit_hook(app: &AppHandle, session_id: String, payload: serde_json::Value) {
+    let _ = app.emit("agent-hook", AgentHookEvent { session_id, payload });
+}
+
 /// Read whatever complete lines were appended to `path` since `offset`.
 fn read_new_lines(path: &Path, offset: &mut u64) -> Vec<serde_json::Value> {
     crate::claude::transcript::read_lines_from(path, offset)
@@ -390,10 +398,7 @@ pub fn start(app: AppHandle) {
                 }
                 let offset = offsets.entry(path.clone()).or_insert(0);
                 for payload in read_new_lines(&path, offset) {
-                    let _ = app.emit(
-                        "agent-hook",
-                        AgentHookEvent { session_id: session_id.clone(), payload },
-                    );
+                    emit_hook(&app, session_id.clone(), payload);
                 }
             }
         })
