@@ -197,9 +197,9 @@ fn handle(app: AppHandle, stream: UnixStream) {
     write_reply(&stream, reply);
 }
 
-/// Pipes have no read timeout: the request is read on a helper thread, and a
-/// read still pending at the deadline is cancelled so the thread and the pipe
-/// instance are freed.
+/// Pipes have no read timeout: the request is read on a helper thread. At the
+/// deadline no new read may start, and a pending one is cancelled (again, until
+/// the thread is gone) so the thread and the pipe instance are freed.
 #[cfg(windows)]
 fn handle(
     stream: interprocess::local_socket::Stream,
@@ -207,24 +207,45 @@ fn handle(
     emit: &dyn Fn(Value) -> tauri::Result<()>,
 ) {
     use std::os::windows::io::{AsHandle, AsRawHandle};
-    let stream = std::sync::Arc::new(stream);
+    use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+
+    /// Reads the pipe until `timed_out` is set.
+    struct Gated(Arc<interprocess::local_socket::Stream>, Arc<AtomicBool>);
+    impl Read for Gated {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.1.load(Ordering::SeqCst) {
+                return Err(std::io::ErrorKind::TimedOut.into());
+            }
+            (&*self.0).read(buf)
+        }
+    }
+
+    let stream = Arc::new(stream);
+    let timed_out = Arc::new(AtomicBool::new(false));
     let (tx, rx) = mpsc::channel();
-    let reader = stream.clone();
+    let reader = Gated(stream.clone(), timed_out.clone());
     let _ = thread::Builder::new()
         .name("agent-control-read".into())
         .spawn(move || {
-            let _ = tx.send(read_request(&*reader));
+            let _ = tx.send(read_request(reader));
         });
     let request = rx.recv_timeout(read_timeout).unwrap_or_else(|_| {
+        timed_out.store(true, Ordering::SeqCst);
         let interprocess::local_socket::Stream::NamedPipe(pipe) = &*stream;
-        // SAFETY: the handle lives as long as `stream`; a cancel with no
-        // pending I/O is harmless.
-        let _ = unsafe {
-            windows::Win32::System::IO::CancelIoEx(
-                windows::Win32::Foundation::HANDLE(pipe.as_handle().as_raw_handle()),
-                None,
-            )
-        };
+        let started = std::time::Instant::now();
+        // The reader holds the other `Arc`. A cancel can miss a read that starts
+        // after it, so repeat until the thread is gone, but not forever.
+        while Arc::strong_count(&stream) > 1 && started.elapsed() < Duration::from_millis(500) {
+            // SAFETY: the handle lives as long as `stream`; a cancel with no
+            // pending I/O is harmless.
+            let _ = unsafe {
+                windows::Win32::System::IO::CancelIoEx(
+                    windows::Win32::Foundation::HANDLE(pipe.as_handle().as_raw_handle()),
+                    None,
+                )
+            };
+            thread::sleep(Duration::from_millis(20));
+        }
         Err("timed out reading request".into())
     });
     write_reply(&*stream, answer(emit, request));
@@ -371,6 +392,22 @@ mod tests {
         line.clear();
         assert_eq!(reader.read_line(&mut line).unwrap_or(0), 0);
         assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn client_that_stalls_mid_line_is_answered_then_closed() {
+        let path = server_with("partial", Duration::from_millis(300), |_| Ok(()));
+        let stream = Stream::connect(path.to_fs_name::<GenericFilePath>().unwrap()).unwrap();
+        (&stream).write_all(b"{\"cmd\":\"pi").unwrap();
+        let started = std::time::Instant::now();
+        let mut reader = BufReader::new(&stream);
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        assert!(line.contains("timed out"), "{line}");
+        // EOF only once every handle on the instance is dropped, the reader thread's included.
+        line.clear();
+        assert_eq!(reader.read_line(&mut line).unwrap_or(0), 0);
+        assert!(started.elapsed() < Duration::from_secs(3));
     }
 
     #[test]
