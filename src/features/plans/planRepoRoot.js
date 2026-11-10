@@ -4,14 +4,19 @@ import { repoTop } from '../../lib/git';
 import { planWorktreeOwner } from './planGit';
 
 // A tab inside a plan's worktrees shows the plans of the repo that owns them.
-export async function resolveRepoRoot(projectPath) {
+async function gitRoot(projectPath) {
   const home = await invoke('get_home_dir').catch(() => null);
   const owner = home ? await planWorktreeOwner(home, projectPath) : null;
   if (owner) return owner;
-  return repoTop(projectPath);
+  return repoTop(projectPath).catch(() => null);
 }
 
-/** The repo whose plans `projectPath` shows, and whether that was looked up yet. */
+/** The folder whose plans `projectPath` shows: its repo's root, or the folder itself outside git. */
+export async function resolveRepoRoot(projectPath) {
+  return (await gitRoot(projectPath)) || projectPath;
+}
+
+/** The folder whose plans `projectPath` shows (see resolveRepoRoot), and whether that was looked up yet. */
 export function useRepoRoot(projectPath) {
   const [repoRoot, setRepoRoot] = useState(null);
   const [checked, setChecked] = useState(false);
@@ -30,10 +35,10 @@ export function useRepoRoot(projectPath) {
   return { repoRoot, checked };
 }
 
-// Found roots, by folder. Misses aren't kept: the folder may become a repo.
+// Found repo roots, by folder. Misses aren't kept: the folder may become a repo.
 const rootCache = new Map();
 
-/** The repo root of each of `paths` (path -> root), once resolved; repos only. */
+/** The plan root of each of `paths` (path -> root), once resolved; outside git, the folder itself. */
 export function useRepoRoots(paths) {
   const key = [...new Set(paths.filter(Boolean))].sort().join('\n');
   const [roots, setRoots] = useState({});
@@ -42,13 +47,13 @@ export function useRepoRoots(paths) {
     const list = key ? key.split('\n') : [];
     Promise.all(list.map(async (path) => {
       if (!rootCache.has(path)) {
-        const root = await resolveRepoRoot(path).catch(() => null);
+        const root = await gitRoot(path);
         if (root) rootCache.set(path, root);
       }
-      return [path, rootCache.get(path) ?? null];
+      return [path, rootCache.get(path) ?? path];
     })).then((entries) => {
       if (cancelled) return;
-      const next = Object.fromEntries(entries.filter(([, root]) => root));
+      const next = Object.fromEntries(entries);
       setRoots((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     });
     return () => {

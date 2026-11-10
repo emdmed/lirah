@@ -38,8 +38,7 @@ const LAMP = {
  * One task. Click (or Enter on the cursor) opens it: the story in full, a
  * click away from editing. `formatting` is on while a model rewrites it; the plan button sends it to the active tab's agent with the default
  * plan context, its arrow picks another and what follows the plan:
- * `chunkMode` 'chunks' (import and split it) or 'file' (leave the file), null
- * outside a git repo, where only the file is possible. `drag` is
+ * `chunkMode` 'chunks' (import and split it) or 'file' (leave the file). `drag` is
  * useDragReorder's result, null for rows that don't reorder (done tasks).
  */
 export const TaskRow = memo(function TaskRow({
@@ -119,20 +118,14 @@ export const TaskRow = memo(function TaskRow({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[240px]">
                   <DropdownMenuLabel className="text-xs">Then</DropdownMenuLabel>
-                  {chunkMode ? (
-                    <DropdownMenuRadioGroup value={chunkMode} onValueChange={onChunkMode}>
-                      <DropdownMenuRadioItem value="chunks" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
-                        Split into chunks
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="file" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
-                        Keep the plan file
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  ) : (
-                    <p className="px-2 pb-1.5 text-[11px] leading-snug text-muted-foreground">
-                      Keep the plan file. Chunks need a git repository.
-                    </p>
-                  )}
+                  <DropdownMenuRadioGroup value={chunkMode} onValueChange={onChunkMode}>
+                    <DropdownMenuRadioItem value="chunks" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
+                      Split into chunks
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="file" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
+                      Keep the plan file
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-xs">Plan with</DropdownMenuLabel>
                   <DropdownMenuSeparator />
