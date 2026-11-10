@@ -25,7 +25,8 @@ pub fn get_shell_kind() -> &'static str {
 
 #[tauri::command]
 pub fn get_home_dir() -> Result<String, String> {
-    crate::util::home_dir_string()
+    crate::util::home_dir()
+        .map(|p| crate::paths::to_app(&p))
         .ok_or_else(|| "Could not determine home directory".into())
 }
 
@@ -53,7 +54,7 @@ pub fn path_exists(path: String) -> bool {
 #[tauri::command]
 pub async fn open_in_file_manager(path: String) -> Result<(), String> {
     crate::ipc::blocking("open_in_file_manager", move || {
-        let p = std::fs::canonicalize(&path)
+        let p = crate::paths::canonical(std::path::Path::new(&path))
             .map_err(|e| format!("Cannot open {}: {}", path, e))?;
         if !p.is_dir() {
             return Err(format!("Not a folder: {}", p.display()));

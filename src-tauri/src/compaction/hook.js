@@ -144,7 +144,8 @@ function isContinuation(prompt, state) {
 function promptFiles(prompt, project) {
   const named = new Set();
   const unresolved = [];
-  const tokens = new Set([...String(prompt || '').matchAll(/[\w.@~/-]*[\w-]\.[A-Za-z]\w{0,9}\b/g)].map((m) => m[0]));
+  // A Windows prompt names paths with backslashes and a drive: same file, in `/` form.
+  const tokens = new Set([...String(prompt || '').matchAll(/[\w.@~:/\\-]*[\w-]\.[A-Za-z]\w{0,9}\b/g)].map((m) => m[0].replace(/\\/g, '/')));
   for (const token of [...tokens].slice(0, 50)) {
     const path = isAbsolute(token) ? resolve(token) : resolve(project, token);
     let isFile = false;

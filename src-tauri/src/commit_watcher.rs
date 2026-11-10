@@ -158,7 +158,7 @@ pub fn start_watcher(
                             serde_json::json!({
                                 "branch": branch,
                                 "commit_hash": new_hash,
-                                "repo_path": repo_path_clone.to_string_lossy(),
+                                "repo_path": crate::paths::to_app(&repo_path_clone),
                             }),
                         );
                     }

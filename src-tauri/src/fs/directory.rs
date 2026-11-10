@@ -49,7 +49,7 @@ pub(crate) fn dir_key(path: &Path) -> Option<DirKey> {
 
 #[cfg(not(unix))]
 pub(crate) fn dir_key(path: &Path) -> Option<DirKey> {
-    path.canonicalize().ok()
+    crate::paths::canonical(path).ok()
 }
 
 /// On Windows, hidden/system directories and reparse points (symlinks,
@@ -116,7 +116,7 @@ fn list_dir(dir: &Path, gitignore: bool) -> Result<Vec<DirectoryEntry>, String> 
         }
         result.push(DirectoryEntry {
             name,
-            path: path.to_string_lossy().to_string(),
+            path: crate::paths::to_app(&path),
             is_dir,
         });
     };
@@ -235,7 +235,7 @@ fn walk_breadth_first(root: &Path, max_depth: usize, max_files: usize) -> Recurs
                 continue;
             }
         };
-        let parent_path = dir.to_string_lossy().to_string();
+        let parent_path = crate::paths::to_app(&dir);
 
         for entry in read {
             let entry = match entry {
@@ -283,7 +283,7 @@ fn walk_breadth_first(root: &Path, max_depth: usize, max_files: usize) -> Recurs
             }
             entries.push(RecursiveDirectoryEntry {
                 name,
-                path: path.to_string_lossy().to_string(),
+                path: crate::paths::to_app(&path),
                 is_dir,
                 depth,
                 parent_path: parent_path.clone(),

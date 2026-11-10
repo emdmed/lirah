@@ -181,7 +181,7 @@ pub async fn install_user_plugin(id: String, name: String, folder: String, promp
             let _ = fs::remove_dir_all(&tmp);
             e.to_string()
         })?;
-        Ok(dir.to_string_lossy().into_owned())
+        Ok(crate::paths::to_app(&dir))
     })
     .await
 }

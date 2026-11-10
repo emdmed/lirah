@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io::BufRead;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -181,14 +181,63 @@ fn descendant_pids(root: u32) -> Vec<u32> {
     out
 }
 
-#[cfg(not(target_os = "linux"))]
+/// All descendants of `root`, from the parent links sysinfo reads.
+#[cfg(windows)]
+fn descendant_pids(root: u32) -> Vec<u32> {
+    use sysinfo::{ProcessesToUpdate, System};
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+    let mut out: Vec<u32> = Vec::new();
+    let mut queue = vec![root];
+    while let Some(pid) = queue.pop() {
+        for (child, process) in sys.processes() {
+            let child = child.as_u32();
+            if process.parent().map(|p| p.as_u32()) == Some(pid) && child != root && !out.contains(&child) {
+                out.push(child);
+                queue.push(child);
+            }
+        }
+    }
+    out
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
 fn descendant_pids(_root: u32) -> Vec<u32> {
     Vec::new()
+}
+
+/// 100 ns ticks between the FILETIME epoch (1601) and the unix epoch (1970).
+const FILETIME_UNIX_EPOCH: u64 = 116_444_736_000_000_000;
+
+/// A Windows FILETIME as unix milliseconds; None before 1970.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn filetime_to_unix_ms(filetime: u64) -> Option<u64> {
+    filetime.checked_sub(FILETIME_UNIX_EPOCH).map(|t| t / 10_000)
+}
+
+/// Does the registry's `procStart` (a FILETIME on Windows) say the process
+/// started at `start_unix_secs`? A reused pid starts later, so it fails.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn filetime_matches_start(proc_start: &str, start_unix_secs: u64) -> bool {
+    proc_start
+        .parse::<u64>()
+        .ok()
+        .and_then(filetime_to_unix_ms)
+        .is_some_and(|ms| (ms / 1000).abs_diff(start_unix_secs) <= 1)
+}
+
+/// The same folder, whatever the path style (`C:` and `c:/a`, trailing slash).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn same_cwd(a: &str, b: &str) -> bool {
+    let canon = |s: &str| crate::paths::to_app(Path::new(s)).trim_end_matches('/').to_string();
+    let (a, b) = (canon(a), canon(b));
+    if cfg!(windows) { a.eq_ignore_ascii_case(&b) } else { a == b }
 }
 
 /// Pid of a host process inside its innermost pid namespace — the last
 /// column of `NSpid:` in /proc/<pid>/status. Differs from the host pid when
 /// the terminal is sandboxed with bwrap --unshare-pid.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn namespaced_pid(status: &str) -> Option<u32> {
     status
         .lines()
@@ -200,6 +249,7 @@ fn namespaced_pid(status: &str) -> Option<u32> {
 /// Start time field of /proc/<pid>/stat. The comm field may contain spaces
 /// and parens, so count fields after the last ')': state is field 3,
 /// starttime field 22.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn proc_start_time(stat: &str) -> Option<&str> {
     stat.rsplit_once(')')?.1.split_whitespace().nth(19)
 }
@@ -208,21 +258,56 @@ fn proc_start_time(stat: &str) -> Option<&str> {
 fn live_session_for_pty(pty_pid: u32) -> Option<LiveClaudeSession> {
     let home = crate::util::home_dir()?;
     let registry = PathBuf::from(home).join(".claude").join("sessions");
-    descendant_pids(pty_pid).into_iter().find_map(|pid| {
-        let status = fs::read_to_string(format!("/proc/{}/status", pid)).ok()?;
-        let inner_pid = namespaced_pid(&status).unwrap_or(pid);
-        let raw = fs::read_to_string(registry.join(format!("{}.json", inner_pid))).ok()?;
-        let live = serde_json::from_str::<LiveClaudeSession>(&raw).ok()?;
-        // Sandboxed tabs each start their own pid namespace, so several can
-        // write the same <pid>.json; only accept the entry for this process.
-        if let Some(ref expected) = live.proc_start {
-            let stat = fs::read_to_string(format!("/proc/{}/stat", pid)).ok()?;
-            if proc_start_time(&stat)? != expected {
-                return None;
-            }
+    descendant_pids(pty_pid).into_iter().find_map(|pid| session_of_pid(pid, &registry))
+}
+
+#[cfg(target_os = "linux")]
+fn session_of_pid(pid: u32, registry: &Path) -> Option<LiveClaudeSession> {
+    let status = fs::read_to_string(format!("/proc/{}/status", pid)).ok()?;
+    let inner_pid = namespaced_pid(&status).unwrap_or(pid);
+    let raw = fs::read_to_string(registry.join(format!("{}.json", inner_pid))).ok()?;
+    let live = serde_json::from_str::<LiveClaudeSession>(&raw).ok()?;
+    // Sandboxed tabs each start their own pid namespace, so several can
+    // write the same <pid>.json; only accept the entry for this process.
+    if let Some(ref expected) = live.proc_start {
+        let stat = fs::read_to_string(format!("/proc/{}/stat", pid)).ok()?;
+        if proc_start_time(&stat)? != expected {
+            return None;
         }
-        Some(live)
-    })
+    }
+    Some(live)
+}
+
+/// Windows reuses pids fast: the entry must carry this process's start time
+/// (a FILETIME) and, when the OS tells us, its cwd.
+#[cfg(windows)]
+fn session_of_pid(pid: u32, registry: &Path) -> Option<LiveClaudeSession> {
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    let raw = fs::read_to_string(registry.join(format!("{}.json", pid))).ok()?;
+    let live = serde_json::from_str::<LiveClaudeSession>(&raw).ok()?;
+    let mut sys = System::new();
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
+        false,
+        ProcessRefreshKind::nothing().with_cwd(UpdateKind::Always),
+    );
+    let process = sys.process(Pid::from_u32(pid))?;
+    if let Some(ref expected) = live.proc_start {
+        if !filetime_matches_start(expected, process.start_time()) {
+            return None;
+        }
+    }
+    if let Some(cwd) = process.cwd() {
+        if !same_cwd(&live.cwd, &cwd.to_string_lossy()) {
+            return None;
+        }
+    }
+    Some(live)
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
+fn session_of_pid(_pid: u32, _registry: &Path) -> Option<LiveClaudeSession> {
+    None
 }
 
 fn usage_from_session(session: SessionInfo, tab_bound: bool) -> TokenUsage {
@@ -759,7 +844,7 @@ fn build_session_info(path: &PathBuf, c: &CachedSession) -> SessionInfo {
     });
     SessionInfo {
         session_id: c.session_id.clone(),
-        session_file: path.to_string_lossy().to_string(),
+        session_file: crate::paths::to_app(path),
         model: c.model.clone(),
         input_tokens: t.input,
         output_tokens: t.output,

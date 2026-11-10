@@ -224,7 +224,7 @@ fn get_git_diff_stats(repo_path: &Path) -> Result<HashMap<String, GitStats>, Str
             .contains(&relative_path)
             .then(|| "deleted".to_string());
         stats_map.insert(
-            git_root.join(&relative_path).to_string_lossy().to_string(),
+            crate::paths::to_app(&git_root.join(&relative_path)),
             GitStats {
                 added,
                 deleted,
@@ -235,7 +235,7 @@ fn get_git_diff_stats(repo_path: &Path) -> Result<HashMap<String, GitStats>, Str
 
     for (i, relative_path) in status.untracked.iter().enumerate() {
         let absolute_path = git_root.join(relative_path);
-        let key = absolute_path.to_string_lossy().to_string();
+        let key = crate::paths::to_app(&absolute_path);
         if stats_map.contains_key(&key) {
             continue;
         }
@@ -267,8 +267,7 @@ pub async fn get_git_stats(
         };
 
         // Canonical cache key; the fs watcher invalidates with the same key.
-        let canonical_path = repo_path
-            .canonicalize()
+        let canonical_path = crate::paths::canonical(&repo_path)
             .unwrap_or_else(|_| repo_path.clone());
 
         // The state lock is only held for the cache lookups, never across git.

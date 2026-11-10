@@ -126,8 +126,8 @@ pub async fn get_context_breakdown(session_file: String) -> Result<ContextBreakd
 /// Only Claude transcripts under ~/.claude/projects may be read.
 fn checked_session_path(session_file: &str) -> Result<PathBuf, String> {
     let home = crate::util::home_dir().ok_or("Could not get home directory")?;
-    let root = home.join(".claude").join("projects").canonicalize().map_err(|e| e.to_string())?;
-    let path = Path::new(session_file).canonicalize().map_err(|e| format!("{}: {}", session_file, e))?;
+    let root = crate::paths::canonical(&home.join(".claude").join("projects")).map_err(|e| e.to_string())?;
+    let path = crate::paths::canonical(Path::new(session_file)).map_err(|e| format!("{}: {}", session_file, e))?;
     if !path.starts_with(&root) || !is_jsonl(&path) {
         return Err("Not a Claude session transcript".into());
     }
@@ -224,7 +224,7 @@ pub fn breakdown(path: &Path) -> Result<ContextBreakdown, String> {
     } else {
         from_request(&log)
     };
-    out.session_file = path.to_string_lossy().into_owned();
+    out.session_file = crate::paths::to_app(&path);
     Ok(out)
 }
 

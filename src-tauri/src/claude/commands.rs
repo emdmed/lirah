@@ -449,7 +449,7 @@ fn build_session_entry_from_file(
 
     Ok(ClaudeSessionEntry {
         session_id: session_id.to_string(),
-        full_path: path.to_string_lossy().to_string(),
+        full_path: crate::paths::to_app(&path),
         first_prompt,
         summary,
         message_count,
@@ -804,7 +804,7 @@ fn build_subagent_watcher(
                 let is_subagent = event
                     .paths
                     .iter()
-                    .any(|p| p.to_string_lossy().contains("/subagents/"));
+                    .any(|p| crate::paths::to_app(p).contains("/subagents/"));
                 if is_subagent {
                     let _ = event_tx.send(());
                 }
