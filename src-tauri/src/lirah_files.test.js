@@ -4,15 +4,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { read, write, resolveWorkspace, lirahDir } from './lirah_files.js';
 
-const oldHome = process.env.HOME;
+// os.homedir() reads USERPROFILE on Windows, HOME elsewhere.
+const oldHome = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
 let home;
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'lirah-cli-'));
   process.env.HOME = home;
+  process.env.USERPROFILE = home;
 });
 afterEach(() => rmSync(home, { recursive: true, force: true }));
 afterAll(() => {
-  process.env.HOME = oldHome;
+  for (const [k, v] of Object.entries(oldHome)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
 });
 
 it('uses the temp HOME', () => {

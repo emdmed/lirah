@@ -13,7 +13,7 @@ let project;
 const lirah = (...args) => execFileSync('node', [CLI, ...args], {
   cwd: project,
   encoding: 'utf8',
-  env: { PATH: process.env.PATH, HOME: home },
+  env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home },
 });
 const file = (rel) => JSON.parse(readFileSync(join(home, '.lirah', rel), 'utf8'));
 const put = (rel, doc) => {
