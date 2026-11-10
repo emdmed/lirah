@@ -668,7 +668,8 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
         }
       }
       pendingDimsRef.current = { rows, cols };
-      if (immediate) {
+      // A Zen shift holds its veil until the terminals repaint; don't debounce that wait.
+      if (immediate || document.documentElement.dataset.zenShift) {
         flushSigwinch();
         return;
       }

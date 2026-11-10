@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
-import { flushSync } from 'react-dom';
 import { createEmitter } from '../../lib/createStore';
 import { load as loadFile, onExternalChange, save as saveFile } from '../../lib/fileStore';
 import { getWorkspaceData, setWorkspaceData } from '../../lib/workspaceStore';
+import { getLastAnyOutputAt } from '../tabs/terminalActivity';
 
 // App preferences in one module-level store, persisted to ~/.lirah/settings.json.
 // The old localStorage blob (SETTINGS_KEY) only seeds that file on first start
@@ -325,18 +325,93 @@ export function setSetting(key, value) {
   else emit();
 }
 
-// Zen on/off swaps the whole layout, so it renders inside a view transition:
-// the new layout fades in over a snapshot of the old (see [data-zen-shift] in
-// index.css). The state is already set, so a quick second toggle reads it.
-let shift = 0;
-function zenShift(on) {
-  if (typeof document === 'undefined' || !document.startViewTransition) return emit();
-  const root = document.documentElement;
-  const id = ++shift;
-  root.dataset.zenShift = on ? 'in' : 'out';
-  document.startViewTransition(() => flushSync(emit)).finished.finally(() => {
-    if (id === shift) delete root.dataset.zenShift;
+// Zen on/off swaps the whole layout under the boot splash (index.html), worn as
+// a bare veil in the terminal's colour. It covers fast while the arrival hairline
+// draws over the edge the chrome folds into (the bottom line's going in, the top
+// rail's coming out), the layout swaps and the terminals repaint behind it, then
+// it reveals slowly. The state is already set, so a second toggle while covered
+// just re-renders under the same veil.
+const SPLASH_IN_MS = 120;
+const SPLASH_OUT_MS = 280;
+const RULE_MS = 200; // the hairline's draw, from the alt-Z chord's side
+// The chrome's own edge rule: the Zen line's top pixel, the top rail's bottom one (both h-8).
+const CHROME_EDGE = '31px';
+// The hold ends once the terminals have gone quiet after the SIGWINCH repaint:
+// at least HOLD_MIN (so the hairline finishes), QUIET with no output, never past HOLD_MAX.
+const HOLD_MIN_MS = RULE_MS - SPLASH_IN_MS;
+const HOLD_QUIET_MS = 60;
+const HOLD_MAX_MS = 320;
+let zenPhase = null; // 'covering' | 'covered'
+let fadeId = 0; // a newer fade stops the older one's frame loop
+
+const easeOut = (k) => 1 - (1 - k) ** 2;
+const expoOut = (k) => (k >= 1 ? 1 : 1 - 2 ** (-10 * k));
+
+// Stepped per frame, not CSS: WebKitGTK paints the last frame of a CSS opacity
+// transition at its start value, so a CSS fade flashes the veil once at each end.
+function fadeSplash(el, from, to, ms, rule) {
+  const id = ++fadeId;
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const step = (now) => {
+      if (id !== fadeId) return resolve();
+      const k = Math.min(1, (now - t0) / ms);
+      el.style.opacity = String(from + (to - from) * easeOut(k));
+      if (rule) rule((now - t0) / RULE_MS);
+      if (k < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
   });
+}
+
+function terminalsSettled(rule) {
+  const t0 = Date.now();
+  const p0 = performance.now() - SPLASH_IN_MS;
+  return new Promise((resolve) => {
+    const check = () => {
+      const now = Date.now();
+      rule((performance.now() - p0) / RULE_MS);
+      const quiet = now - Math.max(t0, getLastAnyOutputAt()) >= HOLD_QUIET_MS;
+      if ((now - t0 >= HOLD_MIN_MS && quiet) || now - t0 >= HOLD_MAX_MS) resolve();
+      else requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+}
+
+async function zenShift(on) {
+  const splash = typeof document !== 'undefined' && document.getElementById('splash');
+  if (!splash) return emit();
+  if (zenPhase === 'covering') return; // the pending emit reads the latest state
+  if (zenPhase === 'covered') return emit();
+  zenPhase = 'covering';
+  const root = document.documentElement;
+  root.dataset.zenShift = on ? 'in' : 'out';
+  const line = splash.querySelector('.zen-rule');
+  line.style.top = on ? 'auto' : CHROME_EDGE;
+  line.style.bottom = on ? CHROME_EDGE : 'auto';
+  // Reduced motion: the hairline is drawn whole and only the veil fades.
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rule = (k) => { line.style.transform = `scaleX(${still ? 1 : expoOut(Math.min(1, k))})`; };
+  // Caught mid-reveal, it covers again from where it is.
+  const from = splash.hidden ? 0 : Number(splash.style.opacity) || 0;
+  rule(0);
+  splash.style.transition = 'none';
+  splash.style.opacity = String(from);
+  splash.classList.remove('is-done', 'is-ready');
+  splash.classList.add('is-zen');
+  splash.hidden = false;
+  await fadeSplash(splash, from, 1, SPLASH_IN_MS, rule);
+  zenPhase = 'covered';
+  emit();
+  await terminalsSettled(rule);
+  rule(1);
+  zenPhase = null;
+  await fadeSplash(splash, 1, 0, SPLASH_OUT_MS);
+  if (zenPhase) return; // a new shift took the veil
+  splash.hidden = true;
+  delete root.dataset.zenShift;
 }
 
 // Setters are created once per key so callers can list them as stable deps.

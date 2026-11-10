@@ -48,6 +48,14 @@
       #splash .word { font: 600 30px/1 'Grenze Gotisch', serif; }
       #splash .note { font: 10px/1 'Geist Mono', monospace; letter-spacing: 1px; text-transform: uppercase; opacity: .55; min-height: 10px; }
       #splash.is-done { opacity: 0; pointer-events: none; }
+      #splash[hidden] { display: none; }
+      /* Zen shifts reuse the splash as a bare veil on the terminal's colour: no
+         mark, only the arrival hairline (as .ins-arrive) laid over the edge the
+         chrome folds into. settingsStore drives it; the tokens exist by then. */
+      #splash.is-zen { background: var(--ins-glass); }
+      #splash .zen-rule { display: none; position: absolute; left: 0; right: 0; height: 1px; background: var(--color-foreground); transform-origin: right; transform: scaleX(0); }
+      #splash.is-zen .mark { display: none; }
+      #splash.is-zen .zen-rule { display: block; }
       @keyframes splash-orbit { to { stroke-dashoffset: 0; } }
       @media (prefers-reduced-motion: reduce) {
         #splash, #splash .mark { transition: none; }
@@ -89,6 +97,7 @@
         <div class="word">Lirah</div>
         <div class="note" id="splash-note"></div>
       </div>
+      <div class="zen-rule"></div>
     </div>
     <script>
       // Show the window once the splash background has painted. The window

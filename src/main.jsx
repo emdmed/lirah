@@ -87,8 +87,9 @@ Promise.all([firstFrame, document.fonts.ready, window.__splashReady ?? Promise.r
     const wait = Math.max(0, revealedAt + SPLASH_MIN_VISIBLE_MS - performance.now());
     setTimeout(() => {
       const splash = document.getElementById("splash");
-      if (!splash) return;
+      // A Zen shift started during boot owns the splash now and hides it itself.
+      if (!splash || document.documentElement.dataset.zenShift) return;
       splash.classList.add("is-done");
-      setTimeout(() => splash.remove(), 300);
+      setTimeout(() => { splash.hidden = true; }, 300); // kept: Zen shifts reuse it
     }, wait);
   });

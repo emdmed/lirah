@@ -15,9 +15,12 @@ export function markTerminalInput(sessionId) {
   if (sessionId) lastInputAt.set(sessionId, Date.now());
 }
 
+let lastAnyOutputAt = 0; // any session, echoes included: the Zen shift waits for quiet
+
 export function markTerminalOutput(sessionId) {
   if (!sessionId) return;
   const now = Date.now();
+  lastAnyOutputAt = now;
   if (now - (lastInputAt.get(sessionId) || 0) < ECHO_WINDOW_MS) return;
   lastOutputAt.set(sessionId, now);
 }
@@ -46,6 +49,10 @@ export function getSessionTerminal(sessionId) {
 
 export function getTabSession(tabId) {
   return tabSessions.get(tabId) || null;
+}
+
+export function getLastAnyOutputAt() {
+  return lastAnyOutputAt;
 }
 
 export function getLastOutputAt(sessionId) {
