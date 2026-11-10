@@ -488,3 +488,7 @@ mod tests {
         assert_eq!(branch_from_head("0123456789abcdef\n"), None);
     }
 }
+
+#[cfg(test)]
+#[path = "git_tests.rs"]
+mod path_tests;

@@ -122,3 +122,7 @@ fn process_cwd(
         Err("Getting terminal cwd is not supported on this platform".to_string())
     }
 }
+
+#[cfg(test)]
+#[path = "cwd_tests.rs"]
+mod path_tests;

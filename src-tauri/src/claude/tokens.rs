@@ -1091,3 +1091,11 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+#[path = "tokens_descendants_tests.rs"]
+mod descendants_tests;
+
+#[cfg(test)]
+#[path = "tokens_tests.rs"]
+mod path_tests;

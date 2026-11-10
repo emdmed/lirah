@@ -410,3 +410,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 }
+
+#[cfg(test)]
+#[path = "directory_tests.rs"]
+mod path_tests;
