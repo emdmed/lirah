@@ -3,11 +3,11 @@
 // prints the reply. Run `lirah help` for the commands.
 //
 // With the app closed (its socket gone), settings (but not the sensitive ones:
-// sandbox, network, hooks, agent control), theme, startup, tasks list/add/done
-// and plans list/show/import/revise/rechunk/done read and write the ~/.lirah files
-// directly; what needs the app (a plan's split, checking a chunk's commits)
-// is left queued in the file and done when Lirah loads the repo's plans (at once
-// if it is open and has them loaded: it reloads ~/.lirah files changed outside it).
+// sandbox, network, hooks, agent control), theme, startup and tasks list/add/done
+// read and write the ~/.lirah files directly, and plans list/show/import/revise/
+// rechunk/done the repo's lirah/plans folder; what needs the app (a plan's split,
+// checking a chunk's commits) is left queued in the file and done when Lirah
+// loads the repo's plans (at once if it is open and has them loaded: it watches both).
 //
 // Any other `lirah <cmd> [positional...] [--key value | --key=value | --flag]`
 // is sent as is: positionals go in args._; flag values are parsed as JSON when
@@ -15,9 +15,9 @@
 // is true.
 import { connect } from "node:net";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve as resolvePath } from "node:path";
+import { dirname, join, resolve as resolvePath } from "node:path";
 import { lirahDir, list, read, resolveWorkspace, revisionOf, write } from "./lirah_files.js";
 
 const CLIENT_TIMEOUT_MS = 70_000; // the app gives up on its side after 60 s
@@ -555,31 +555,39 @@ function readTasks(scope) {
   return { tasks: Array.isArray(tasks) ? tasks.filter((t) => t && typeof t === "object") : [], revision: revisionOf(doc) };
 }
 
-// Every plan of `repo`, from every workspace, newest first (the app's order).
+const PLANS = "lirah/plans";
+const planRel = (id) => `${PLANS}/${id}/plan.json`;
+
+// As ensure_plans_dir in fs_watcher.rs: the folder, with a .gitignore keeping the data folders out of git.
+function ensurePlansDir(repo) {
+  mkdirSync(join(repo, PLANS), { recursive: true });
+  try {
+    writeFileSync(join(repo, PLANS, ".gitignore"), "*/\n", { flag: "wx" });
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+  }
+}
+
+// Every plan in `repo`'s lirah/plans, newest first (the app's order).
 function repoPlans(repo) {
   const plans = [];
-  for (const ws of read("workspaces/index.json")?.workspaces ?? []) {
-    let ids = [];
+  // Plan ids have no dot; the .md files there do.
+  for (const id of list(PLANS, repo).filter((n) => !n.includes("."))) {
+    let doc;
     try {
-      ids = list(`workspaces/${ws}/plans`);
+      doc = read(planRel(id), repo);
     } catch {
-      continue;
+      continue; // one broken plan must not hide the others
     }
-    for (const id of ids) {
-      let doc;
-      try {
-        doc = read(`workspaces/${ws}/plans/${id}/plan.json`);
-      } catch {
-        continue; // one broken plan must not hide the others
-      }
-      if (doc?.repoRoot === repo && Array.isArray(doc.chunks)) plans.push({ ...doc, workspaceId: ws });
-    }
+    if (Array.isArray(doc?.chunks)) plans.push(doc);
   }
   return plans.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
-const savePlan = (plan) => write(`workspaces/${plan.workspaceId}/plans/${plan.id}/plan.json`,
-  { ...plan, updatedAt: Date.now() }, revisionOf(plan));
+function savePlan(plan, expectedRevision = revisionOf(plan)) {
+  ensurePlansDir(plan.repoRoot);
+  return write(planRel(plan.id), { ...plan, updatedAt: Date.now() }, expectedRevision, plan.repoRoot);
+}
 
 function findPlan(plans, ref) {
   const text = String(ref ?? "").trim();
@@ -888,7 +896,7 @@ const LOCAL = {
     const slug = slugify(title);
     const now = Date.now();
     const plan = {
-      id: shortId("p"), slug, title, summary: "", repoRoot: repo, workspaceId: workspace(), source, importedFrom,
+      id: shortId("p"), slug, title, summary: "", repoRoot: repo, workspaceId: resolveWorkspace(), source, importedFrom,
       split: "queued", splitError: null, chunks: [],
       // As defaultGitConfig in planModel.js.
       git: {
@@ -897,7 +905,7 @@ const LOCAL = {
       },
       createdAt: now, updatedAt: now,
     };
-    write(`workspaces/${plan.workspaceId}/plans/${plan.id}/plan.json`, plan, 0);
+    savePlan(plan, 0);
     return `imported ${plan.id}; ${QUEUED}`;
   },
   "plans.revise": (args, [ref = args.plan, ...words]) => {
@@ -909,8 +917,9 @@ const LOCAL = {
     const known = plan.importedFrom?.path;
     let path = known;
     if (!known || !existsSync(known)) {
-      path = known || `${repo}/${plan.slug}_plan.md`;
-      if (!known && existsSync(path)) path = `${repo}/${plan.slug}-${plan.id}_plan.md`;
+      path = known || `${repo}/${PLANS}/${plan.slug}_plan.md`;
+      if (!known && existsSync(path)) path = `${repo}/${PLANS}/${plan.slug}-${plan.id}_plan.md`;
+      mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, plan.source);
       savePlan({ ...plan, importedFrom: { path, hash: hash8(plan.source) } });
     }

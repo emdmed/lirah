@@ -1,4 +1,5 @@
-// File layer for the `lirah` CLI: JSON files under ~/.lirah with the same
+// File layer for the `lirah` CLI: JSON files under ~/.lirah (or an absolute
+// `base` folder, e.g. a repo for its lirah/plans) with the same
 // rules as store.rs. Each file is a JSON object whose top-level `version` and
 // `revision` keys belong to the store. Writes go to a temp file in the same
 // folder and are renamed over the target; a write naming an expected revision
@@ -24,17 +25,18 @@ export class StoreError extends Error {
 // Read at call time so tests (and a changed HOME) see the right folder.
 export const lirahDir = () => join(homedir(), ".lirah");
 
-function storePath(rel) {
+function storePath(rel, base) {
   const parts = typeof rel === "string" ? rel.split("/") : [];
   if (!rel || isAbsolute(rel) || parts.some((p) => p === "" || p === "." || p === "..")) {
     throw new StoreError("io", { message: `invalid store path: ${JSON.stringify(rel)}` });
   }
-  return join(lirahDir(), ...parts);
+  if (base != null && !isAbsolute(base)) throw new StoreError("io", { message: `invalid store base: ${JSON.stringify(base)}` });
+  return join(base ?? lirahDir(), ...parts);
 }
 
 /** The doc at `rel`, migrated, or null when it does not exist. */
-export function read(rel) {
-  const path = storePath(rel);
+export function read(rel, base) {
+  const path = storePath(rel, base);
   let text;
   try {
     text = readFileSync(path, "utf8");
@@ -71,12 +73,12 @@ export const revisionOf = (doc) => (Number.isInteger(doc?.revision) && doc.revis
  * the file's revision differs; null/undefined skips the check.
  * shortcut: no lock between processes, same as store.rs; a write racing the app can slip past the check.
  */
-export function write(rel, data, expectedRevision = null) {
-  const path = storePath(rel);
+export function write(rel, data, expectedRevision = null, base) {
+  const path = storePath(rel, base);
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new StoreError("io", { message: "store data must be a JSON object" });
   }
-  const current = read(rel);
+  const current = read(rel, base);
   const revision = revisionOf(current);
   if (expectedRevision !== null && expectedRevision !== undefined && expectedRevision !== revision) {
     throw new StoreError("conflict", { current });
@@ -102,8 +104,8 @@ export function write(rel, data, expectedRevision = null) {
 }
 
 /** Entry names of the folder at `rel`, sorted, dotfiles left out; [] when missing (as store_list). */
-export function list(rel) {
-  const path = storePath(rel);
+export function list(rel, base) {
+  const path = storePath(rel, base);
   try {
     return readdirSync(path).filter((n) => !n.startsWith(".")).sort();
   } catch (e) {
