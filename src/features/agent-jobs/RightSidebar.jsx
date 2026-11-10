@@ -32,6 +32,7 @@ import { usePlans } from '../plans/PlansContext';
 import { useRepoRoot } from '../plans/planRepoRoot';
 import { CHUNK_STATUS } from '../plans/planModel';
 import { TasksPane } from '../tasks/TasksPane';
+import { WorklogPane } from '../worklog/WorklogPane';
 import { useOpenTaskCount } from '../tasks/TasksContext';
 import { FeaturesPane } from '../feature-map/FeaturesPane';
 import { useFeatureMap } from '../feature-map/useFeatureMap';
@@ -612,7 +613,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
         // [ ] cycle sections. Alt is allowed and AltGraph excused: ISO layouts type [ ] with AltGr.
         if ((e.key === '[' || e.key === ']') && (e.getModifierState('AltGraph') || !(e.ctrlKey || e.metaKey))) {
-          const sections = ['tabs', 'jobs', 'plans', 'tasks', 'features', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
+          const sections = ['tabs', 'jobs', 'plans', 'tasks', 'log', 'features', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
           const step = e.key === ']' ? 1 : -1;
           e.preventDefault();
           setTab(sections[(sections.indexOf(tab) + step + sections.length) % sections.length]);
@@ -671,6 +672,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
+        <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" />
         <TabButton
           active={tab === 'features'}
           onClick={() => setTab('features')}
@@ -721,6 +723,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <PlansPane projectPath={projectPath} />
         ) : tab === 'tasks' ? (
           <TasksPane projectPath={projectPath} />
+        ) : tab === 'log' ? (
+          <WorklogPane projectPath={projectPath} />
         ) : tab === 'features' ? (
           <FeaturesPane projectPath={projectPath} fm={featureMap} />
         ) : (

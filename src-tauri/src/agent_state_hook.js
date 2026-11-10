@@ -60,8 +60,8 @@ async function main() {
         // Tells Lirah to reset the selection, as after a prompt-box send.
         payload.lirah_context = true;
       }
-      // The prompt can be long and Lirah doesn't read it.
-      delete payload.prompt;
+      // Kept for the work log; capped so a pasted file doesn't bloat the events file.
+      if (typeof payload.prompt === 'string') payload.prompt = payload.prompt.slice(0, 2000);
     }
     line = JSON.stringify(payload);
   } catch {

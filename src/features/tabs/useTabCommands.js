@@ -159,6 +159,7 @@ export function useTabCommands({
         requestPlanChunkCommand(arg || 'next');
       } },
       { id: 'tasks', hint: 'tasks: this workspace\'s tasks and the global tasks', run: () => requestTasksPane('toggle') },
+      { id: 'log', aliases: ['worklog'], hint: 'work log: every Claude Code prompt, by repo and branch, with the files it changed', run: () => requestJobsPane('toggle', 'log') },
       { id: 'task', hint: 'add a task (type it after the command to prefill)', run: (arg) => requestQuickTask(arg) },
       { id: 'autopilot', aliases: ['ap'], hint: 'plans: run or stop auto-pilot on the open plan', run: () => requestAutopilotToggle() },
       { id: 'marks', aliases: ['bookmarks'], hint: 'bookmarked directories', run: () => setBookmarksPaletteOpen(true) },

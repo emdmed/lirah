@@ -73,6 +73,8 @@ export const SETTINGS_DEFAULTS = {
   autoChunkTaskPlans: true,
   // How a model rewrites a saved task; empty = a user story (see tasks/taskModel.js).
   taskFormatPrompt: '',
+  // The model the work log pane summarizes with: 'haiku', 'sonnet' or 'opus'.
+  worklogSummaryModel: 'haiku',
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',
