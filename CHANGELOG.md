@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-10
+
+### Fixed
+
+- **Smooth Zen transition** - Switching Zen on or off now dims the screen to the terminal's colour for a moment while a thin line draws across the edge where the panes go, then fades back in once the terminal has redrawn. Before, the layout jumped, the terminal went blank and its text popped in after the fade, and the prompt box arrived late. Reduced motion keeps the dim and draws the line whole.
+
 ## [0.22.0] - 2026-11-10
 
 ### Added
