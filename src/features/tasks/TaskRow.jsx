@@ -101,7 +101,7 @@ export const TaskRow = memo(function TaskRow({
         {/* Closed rows float the actions over the title's end so hidden buttons don't steal its width. */}
         <span className={cn(
           'flex shrink-0 items-center gap-0.5',
-          !open && 'absolute right-3 top-2 h-[18px] bg-[color-mix(in_srgb,var(--foreground)_5%,var(--ins-panel))] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+          !open && 'absolute right-3 top-2 h-[18px] [--strip:color-mix(in_srgb,var(--color-foreground)_5%,var(--pane-bg,var(--ins-panel)))] bg-[var(--strip)] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-gradient-to-r before:from-transparent before:to-[var(--strip)] before:content-[""]',
         )}>
           {!done && (
             <span className="flex items-center">
