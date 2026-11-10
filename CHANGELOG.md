@@ -4,6 +4,19 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-10
+
+### Added
+
+- **Zen mode** - Alt+Z (or `:zen`) hides the tab bar, sidebars and status bar so only the terminal is left. A strip above each terminal shows the tab, its branch and the current turn, and a line at the bottom holds workspaces, tabs, waiting agents, running jobs and today's tokens. Files, tabs, plan and context open as drawers from that line. Switching in and out fades and settles the layout.
+- **Zen columns** - Show up to three tabs side by side from the tabs drawer (1-3 on a row, or `:column`). Ctrl+Alt+1-3 focuses a column, and Alt+A jumps to the tab that waits for you.
+- **Shelve plans** - Take a plan off its tab from the tab card or the plan detail. A shelved plan stays under all plans, and a running auto-pilot is stopped first. Done and shelved plans are hidden behind a show/hide toggle.
+
+### Changed
+
+- **Quieter tabs and context panes** - The summary footer names the stopped run, idle rows drop the "clean" readout and numbered key boxes, the context list is tighter, and the focused pane frame is ink instead of gold.
+- **Sidebar section tabs** - Underlined tabs that join the strip rule, with quiet counts and a small mark when the feature map is stale.
+
 ## [0.21.0] - 2026-11-09
 
 ### Added
