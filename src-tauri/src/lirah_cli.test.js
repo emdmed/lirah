@@ -10,10 +10,11 @@ const CLI = join(dirname(fileURLToPath(import.meta.url)), 'lirah_cli.js');
 let home;
 let project;
 
-const lirah = (...args) => execFileSync('node', [CLI, ...args], {
-  cwd: project,
+const lirah = (...args) => lirahIn(project, ...args);
+const lirahIn = (cwd, ...args) => execFileSync('node', [CLI, ...args], {
+  cwd,
   encoding: 'utf8',
-  env: { PATH: process.env.PATH, HOME: home },
+  env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home },
 });
 const file = (rel) => JSON.parse(readFileSync(join(home, '.lirah', rel), 'utf8'));
 const put = (rel, doc) => {
@@ -98,4 +99,13 @@ it('edits startup projects in settings.json', () => {
   expect(file('settings.json')).toMatchObject({ startupMode: 'projects', startupProjects: [{ path: project, name: 'P', launch: true }] });
   expect(lirah('startup', 'remove', project).trim()).toBe(`removed ${project}`);
   expect(lirah('startup', 'clear').trim()).toBe('no startup projects to clear');
+});
+
+it('finds the owning repo from inside a plan worktree, whatever the drive letter case', () => {
+  const wt = join(home, '.lirah', 'plan-worktrees', 'pw1');
+  const cwd = wt.replace(/^[a-z]:/i, (d) => d[0] === d[0].toUpperCase() ? d.toLowerCase() : d.toUpperCase());
+  put('plan-worktrees/pw1/.lirah-plan.json', { repoRoot: project });
+  put('workspaces/w1/workspace.json', { id: 'w1', name: 'W', tabs: [{ id: 'tab1', projectPath: cwd }] });
+  lirahIn(cwd, 'tasks', 'add', 'From a worktree');
+  expect(file('workspaces/w1/tasks.json').tasks[0].repos).toEqual([project]);
 });

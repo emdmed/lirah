@@ -137,7 +137,9 @@ export async function endEntry(sessionId, toolEdited = []) {
   const before = await ctx.snap;
   const files = before ? await changedSince(ctx.root, before).catch(() => new Set()) : new Set();
   // Edit/Write paths cover files outside the repo, and folders outside git.
-  for (const abs of edited) files.add(abs.startsWith(`${ctx.base}/`) ? abs.slice(ctx.base.length + 1) : abs);
+  // Git reports forward slashes; the tools' paths are native, backslashed on Windows.
+  const base = ctx.base.replaceAll('\\', '/');
+  for (const p of edited) { const abs = p.replaceAll('\\', '/'); files.add(abs.startsWith(`${base}/`) ? abs.slice(base.length + 1) : abs); }
   // In the start's month file, so a turn across midnight on the 1st stays whole.
   return append(monthFile(ctx.at), { type: 'end', id: ctx.id, at: Date.now(), files: [...files].sort() });
 }

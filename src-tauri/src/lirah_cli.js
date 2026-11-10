@@ -159,7 +159,7 @@ function request(cmd, args, { fallback = false } = {}) {
   const socketPath = process.env.LIRAH_CONTROL;
   if (!socketPath) {
     if (fallback) return Promise.resolve(UNREACHABLE);
-    fail("not running inside a Lirah tab (LIRAH_CONTROL is unset)");
+    fail("Lirah isn't reachable (LIRAH_CONTROL is unset): run this from a tab of a running Lirah");
   }
   const payload = { session: process.env.LIRAH_PTY_SESSION || null, cmd, args };
   return new Promise((resolve) => {
@@ -360,7 +360,7 @@ function printStartup(data) {
 function absolutePath(raw, usage) {
   if (raw === undefined || raw === "" || raw === true) fail(`missing path: ${usage}`);
   let text = String(raw);
-  if (text === "~" || text.startsWith("~/")) text = homedir() + text.slice(1);
+  if (text === "~" || text.startsWith("~/") || text.startsWith("~\\")) text = homedir() + text.slice(1);
   return resolvePath(text);
 }
 
@@ -523,10 +523,12 @@ function gitOut(cwd, args) {
 // The repo whose plans this shell sees, as resolveRepoRoot: a plan worktree's
 // owner, else the git top, else the folder itself.
 function repoRoot(cwd = process.cwd()) {
-  const prefix = `${join(lirahDir(), "plan-worktrees")}/`;
-  if (cwd.startsWith(prefix)) {
+  const slashed = (p) => p.replaceAll("\\", "/"); // Windows paths use backslashes
+  const prefix = `${slashed(join(lirahDir(), "plan-worktrees"))}/`;
+  const fold = (p) => (process.platform === "win32" ? p.toLowerCase() : p); // drive letter case
+  if (fold(slashed(cwd)).startsWith(fold(prefix))) {
     try {
-      const marker = join(prefix, cwd.slice(prefix.length).split("/")[0], ".lirah-plan.json");
+      const marker = join(prefix, slashed(cwd).slice(prefix.length).split("/")[0], ".lirah-plan.json");
       const owner = JSON.parse(readFileSync(marker, "utf8"))?.repoRoot;
       if (owner) return owner;
     } catch {

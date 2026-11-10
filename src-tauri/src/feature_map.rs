@@ -420,7 +420,7 @@ mod tests {
         let (r, d) = (root.to_str().unwrap(), dir.to_str().unwrap());
         let sh = |args: &[&str]| assert!(git(r, args).is_some(), "git {:?}", args);
         let commit = |path: &std::path::Path| {
-            std::fs::write(path, path.to_str().unwrap()).unwrap(); // distinct content, so no rename detection
+            std::fs::write(path, format!("{}\n", path.file_name().unwrap().to_str().unwrap()).repeat(20)).unwrap(); // distinct lines, so no rename detection
             sh(&["add", "."]);
             sh(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]);
         };

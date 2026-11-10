@@ -16,7 +16,7 @@ const run = (script, payload, extraEnv = {}) => execFileSync('node', [script], {
   cwd: project,
   input: JSON.stringify(payload),
   encoding: 'utf8',
-  env: { PATH: process.env.PATH, HOME: home, LIRAH_PTY_SESSION: SESSION, CLAUDE_PROJECT_DIR: project, ...extraEnv },
+  env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home, LIRAH_PTY_SESSION: SESSION, CLAUDE_PROJECT_DIR: project, ...extraEnv },
 });
 
 beforeEach(() => {

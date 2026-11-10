@@ -211,7 +211,7 @@ mod tests {
 
         prompt("fix the render bug in Widget.jsx");
         if has_git {
-            let named = fs::read_to_string(state.join("prompt_files")).unwrap();
+            let named = fs::read_to_string(state.join("prompt_files")).unwrap().replace('\\', "/");
             assert!(named.contains("src/deep/Widget.jsx"), "{}", named);
         }
         fs::write(state.join("unlocked"), "").unwrap();
@@ -258,7 +258,7 @@ mod tests {
 
         let out = prompt("the plan splitter drops the last chunk");
         assert!(out.contains("FEATURE Plans: src/plans/split.js\n"), "{}", out);
-        let named = fs::read_to_string(state.join("prompt_files")).unwrap();
+        let named = fs::read_to_string(state.join("prompt_files")).unwrap().replace('\\', "/");
         assert!(named.contains("src/plans/split.js"), "{}", named);
         assert!(!named.contains("outside"), "{}", named);
 

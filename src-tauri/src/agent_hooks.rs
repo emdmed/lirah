@@ -47,6 +47,8 @@ const LIRAH_CLI_JS: &str = include_str!("lirah_cli.js");
 const LIRAH_FILES_JS: &str = include_str!("lirah_files.js");
 const LIRAH_SKILL_MD: &str = include_str!("lirah_skill.md");
 const LIRAH_WRAPPER: &str = "#!/bin/sh\nexec node \"$(dirname \"$0\")/lirah.js\" \"$@\"\n";
+#[cfg(windows)]
+const LIRAH_CMD_WRAPPER: &str = "@node \"%~dp0lirah.js\" %*\r\n";
 
 /// Claude Code hook events that change what a tab should show. PostToolUse
 /// feeds the per-turn record of what the agent edited, read and ran.
@@ -283,6 +285,8 @@ fn install_cli(bin: &Path) -> std::io::Result<()> {
     write_if_changed(&bin.join("package.json"), HOOKS_PACKAGE_JSON)?;
     let wrapper = bin.join("lirah");
     write_if_changed(&wrapper, LIRAH_WRAPPER)?;
+    #[cfg(windows)]
+    write_if_changed(&bin.join("lirah.cmd"), LIRAH_CMD_WRAPPER)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -495,6 +499,21 @@ mod tests {
         let log = fs::read_to_string(dir.join("s1.jsonl")).unwrap();
         assert_eq!(log, "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\"}\n");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn install_cli_writes_the_wrappers() {
+        let bin = std::env::temp_dir().join(format!("lirah-cli-bin-{}", std::process::id()));
+        install_cli(&bin).unwrap();
+        assert_eq!(
+            fs::read_to_string(bin.join("lirah")).unwrap(),
+            "#!/bin/sh\nexec node \"$(dirname \"$0\")/lirah.js\" \"$@\"\n"
+        );
+        // cmd needs CRLF line ends
+        assert_eq!(bin.join("lirah.cmd").exists(), cfg!(windows));
+        #[cfg(windows)]
+        assert_eq!(fs::read_to_string(bin.join("lirah.cmd")).unwrap(), "@node \"%~dp0lirah.js\" %*\r\n");
+        let _ = fs::remove_dir_all(&bin);
     }
 
     #[test]

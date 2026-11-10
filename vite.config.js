@@ -56,6 +56,10 @@ export default defineConfig(async () => {
       'process.env': {}
     },
 
+    test: {
+      setupFiles: ['./vitest.setup.js'],
+    },
+
     build: {
       // The webview's engine, not a generic browser baseline: WebView2
       // (Chromium) on Windows, WebKit on macOS and Linux.
