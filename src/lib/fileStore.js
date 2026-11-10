@@ -174,6 +174,8 @@ try {
   // onCloseRequested awaits this, then destroys the window (needs core:window:allow-destroy).
   getCurrentWindow().onCloseRequested(() => flush());
   listen('lirah-files-changed', (e) => reloadChanged(e.payload)).catch(() => {});
+  // Payload: [{ base: '<repo>/lirah/plans', rel: '<id>/plan.json' }], from watch_repo_plans.
+  listen('lirah-repo-files-changed', (e) => e.payload.forEach(({ base, rel }) => reloadChanged([rel], base))).catch(() => {});
   invoke('start_lirah_watcher')?.catch?.((e) => console.warn('Failed to watch ~/.lirah:', e));
 } catch {
   // Not running inside Tauri (plain vite or tests).

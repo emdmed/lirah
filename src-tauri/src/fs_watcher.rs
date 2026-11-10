@@ -413,7 +413,19 @@ pub fn stop_fs_watcher(
 /// Quiet period and longest batch for "lirah-files-changed".
 const LIRAH_QUIET: Duration = Duration::from_millis(200);
 const LIRAH_MAX_WAIT: Duration = Duration::from_millis(1000);
-static LIRAH_WATCHER_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// The one ~/.lirah watcher; `watch_repo_plans` adds repo folders to it.
+static LIRAH_WATCHER: std::sync::Mutex<Option<RecommendedWatcher>> = std::sync::Mutex::new(None);
+/// Repo `lirah/plans` folders being watched, as passed to the watcher.
+static REPO_PLAN_DIRS: std::sync::Mutex<BTreeSet<PathBuf>> = std::sync::Mutex::new(BTreeSet::new());
+
+/// One changed file in a "lirah-repo-files-changed" event.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+struct RepoFileChange {
+    /// The watched folder, `<repo>/lirah/plans` (what `watch_repo_plans` returned).
+    base: String,
+    /// Path relative to `base`, e.g. "<id>/plan.json".
+    rel: String,
+}
 
 /// Watch the store's JSON files under ~/.lirah (the root, workspaces/ and
 /// tasks/, not the worktrees) and emit "lirah-files-changed" with their paths
@@ -421,14 +433,73 @@ static LIRAH_WATCHER_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic:
 /// skips them by revision. Starts once; later calls do nothing.
 #[tauri::command]
 pub fn start_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
-    use std::sync::atomic::Ordering;
-    if LIRAH_WATCHER_STARTED.swap(true, Ordering::SeqCst) {
-        return Ok(());
+    let mut slot = LIRAH_WATCHER.lock().map_err(|e| e.to_string())?;
+    if slot.is_none() {
+        *slot = Some(build_lirah_watcher(app_handle)?);
     }
-    build_lirah_watcher(app_handle).inspect_err(|_| LIRAH_WATCHER_STARTED.store(false, Ordering::SeqCst))
+    Ok(())
 }
 
-fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
+/// Create `<repo_root>/lirah/plans` (with a `.gitignore` of "*/" if it has
+/// none), watch it recursively and emit "lirah-repo-files-changed" for its
+/// JSON files. Returns the folder, the `base` events carry. Repeat calls only
+/// return it.
+#[tauri::command]
+pub fn watch_repo_plans(repo_root: String, app_handle: AppHandle) -> Result<String, String> {
+    let dir = ensure_plans_dir(Path::new(&repo_root))
+        .map_err(|e| format!("Failed to create lirah/plans in {repo_root}: {e}"))?;
+    let base = dir.to_string_lossy().into_owned();
+    let mut slot = LIRAH_WATCHER.lock().map_err(|e| e.to_string())?;
+    if slot.is_none() {
+        *slot = Some(build_lirah_watcher(app_handle)?);
+    }
+    let mut dirs = REPO_PLAN_DIRS.lock().map_err(|e| e.to_string())?;
+    if !dirs.contains(&dir) {
+        let watcher = slot.as_mut().expect("set above");
+        watcher
+            .watch(&dir, RecursiveMode::Recursive)
+            .map_err(|e| format!("Failed to watch {base}: {e}"))?;
+        dirs.insert(dir);
+    }
+    Ok(base)
+}
+
+/// `<repo_root>/lirah/plans`, created, with a `.gitignore` that keeps the
+/// per-plan data folders out of git. An existing `.gitignore` is left alone.
+fn ensure_plans_dir(repo_root: &Path) -> std::io::Result<PathBuf> {
+    let dir = repo_root.join("lirah").join("plans");
+    std::fs::create_dir_all(&dir)?;
+    match std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join(".gitignore")) {
+        Ok(mut f) => std::io::Write::write_all(&mut f, b"*/\n")?,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(e) => return Err(e),
+    }
+    Ok(dir)
+}
+
+/// Split changed paths into ~/.lirah rels and repo-folder changes. Repo
+/// folders win, since a repo may live under ~/.lirah (worktrees).
+fn sort_changes(
+    changed: &BTreeSet<PathBuf>,
+    lirah: &Path,
+    repo_dirs: &BTreeSet<PathBuf>,
+) -> (Vec<String>, Vec<RepoFileChange>) {
+    let mut rels = Vec::new();
+    let mut repo = Vec::new();
+    for p in changed {
+        if let Some((dir, rel)) = repo_dirs.iter().find_map(|d| Some((d, p.strip_prefix(d).ok()?))) {
+            repo.push(RepoFileChange {
+                base: dir.to_string_lossy().into_owned(),
+                rel: rel.to_string_lossy().into_owned(),
+            });
+        } else if let Ok(rel) = p.strip_prefix(lirah) {
+            rels.push(rel.to_string_lossy().into_owned());
+        }
+    }
+    (rels, repo)
+}
+
+fn build_lirah_watcher(app_handle: AppHandle) -> Result<RecommendedWatcher, String> {
     let base = crate::util::lirah_dir().ok_or("no home directory")?;
     let (tx, rx) = mpsc::channel::<PathBuf>();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
@@ -456,19 +527,61 @@ fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to watch {}: {e}", dir.display()))?;
     }
     thread::spawn(move || {
-        let _watcher = watcher; // lives as long as the app
         while let Ok(first) = rx.recv() {
             let mut changed = BTreeSet::from([first]);
             drain_debounced(&rx, Instant::now(), LIRAH_QUIET, LIRAH_MAX_WAIT, |p| {
                 changed.insert(p);
             });
-            let rels: Vec<String> = changed
-                .iter()
-                .filter_map(|p| p.strip_prefix(&base).ok())
-                .map(|p| p.to_string_lossy().into_owned())
-                .collect();
-            let _ = app_handle.emit("lirah-files-changed", rels);
+            let repo_dirs = REPO_PLAN_DIRS.lock().map(|d| d.clone()).unwrap_or_default();
+            let (rels, repo) = sort_changes(&changed, &base, &repo_dirs);
+            if !rels.is_empty() {
+                let _ = app_handle.emit("lirah-files-changed", rels);
+            }
+            if !repo.is_empty() {
+                let _ = app_handle.emit("lirah-repo-files-changed", repo);
+            }
         }
     });
-    Ok(())
+    Ok(watcher)
+}
+
+#[cfg(test)]
+mod lirah_watcher_tests {
+    use super::*;
+
+    #[test]
+    fn ensure_plans_dir_writes_gitignore_once() {
+        let root = std::env::temp_dir().join(format!("lirah-plans-dir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let dir = ensure_plans_dir(&root).unwrap();
+        assert_eq!(dir, root.join("lirah/plans"));
+        let gi = dir.join(".gitignore");
+        assert_eq!(std::fs::read_to_string(&gi).unwrap(), "*/\n");
+        std::fs::write(&gi, "custom\n").unwrap();
+        ensure_plans_dir(&root).unwrap();
+        assert_eq!(std::fs::read_to_string(&gi).unwrap(), "custom\n");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn sort_changes_prefers_repo_dirs() {
+        let lirah = PathBuf::from("/h/.lirah");
+        let repo = PathBuf::from("/h/.lirah/worktrees/r/lirah/plans");
+        let dirs = BTreeSet::from([repo.clone(), PathBuf::from("/src/app/lirah/plans")]);
+        let changed = BTreeSet::from([
+            lirah.join("tasks/t.json"),
+            repo.join("p1/plan.json"),
+            PathBuf::from("/src/app/lirah/plans/p2/plan.json"),
+            PathBuf::from("/elsewhere/x.json"),
+        ]);
+        let (rels, repo_changes) = sort_changes(&changed, &lirah, &dirs);
+        assert_eq!(rels, vec!["tasks/t.json"]);
+        assert_eq!(
+            repo_changes,
+            vec![
+                RepoFileChange { base: repo.to_string_lossy().into(), rel: "p1/plan.json".into() },
+                RepoFileChange { base: "/src/app/lirah/plans".into(), rel: "p2/plan.json".into() },
+            ]
+        );
+    }
 }
