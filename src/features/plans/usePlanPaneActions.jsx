@@ -21,9 +21,9 @@ import { getAgentHookState } from '../tabs/agentHookState';
 export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId }) {
   const {
     deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, sendPlanFix, startAutopilot,
-    resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit, sendPlanRevise, rechunk,
+    resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit, sendPlanRevise, rechunk, updatePlan,
   } = usePlansActions();
-  const { tabs, activeTabId, addTab } = useTabManager();
+  const { tabs, activeTabId, addTab, switchTab } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
   const [busy, setBusy] = useState(null); // the BUSY key of the action in flight
@@ -40,8 +40,8 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
   }, [toast]);
 
   const { prepareFor, handleImplement, handleAutopilot, handleResume } = usePlanRunActions({
-    repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, activeTabId, addTab, confirm, toast,
-    ensureGit, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
+    repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, addTab, switchTab, confirm, toast,
+    ensureGit, updatePlan, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
   });
   const { handleReview, handleReviewAll, diffProps } = usePlanReview({
     repoRoot, plans, withBusy, prepareFor, sendFix, sendPlanFix, activeTabId, toast,
