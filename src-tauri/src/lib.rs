@@ -18,6 +18,8 @@ mod hook_server;
 mod feature_map;
 mod plans;
 mod util;
+#[allow(dead_code)] // unused until the backend migration (spec 0026 step 3)
+mod paths;
 mod compaction;
 mod user_plugins;
 mod store;

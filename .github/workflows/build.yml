@@ -167,6 +167,7 @@ jobs:
           npm run build
           npm run check:bundle
           npm run check:async-commands
+          npm run check:paths
 
       # ═══════════════════════════════════════════════════════════════════
       # TAURI BUILD
