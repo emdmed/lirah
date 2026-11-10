@@ -1662,7 +1662,7 @@ function walkFiles(dir, rootDir = dir, files = []) {
 function gitFiles(rootPath) {
   let out;
   try {
-    const git = (...a) => execFileSync('git', a, { cwd: rootPath, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
+    const git = (...a) => execFileSync('git', a, { cwd: rootPath, encoding: 'utf-8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
     if (git('rev-parse', '--is-inside-work-tree').trim() !== 'true') return null;
     try { git('check-ignore', '-q', '.'); return null; } catch {} // exit 1 → rootPath not ignored
     out = git('ls-files', '-z', '--cached', '--others', '--exclude-standard');

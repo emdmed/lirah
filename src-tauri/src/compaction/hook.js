@@ -29,7 +29,7 @@ const fingerprintFile = (project) => join(toolsDir(project), '.compaction_finger
 const lockFile = (project) => join(toolsDir(project), '.compaction_building');
 
 function runEngine(project, timeout) {
-  const r = spawnSync(process.execPath, [ENGINE, project], { stdio: 'ignore', timeout });
+  const r = spawnSync(process.execPath, [ENGINE, project], { stdio: 'ignore', windowsHide: true, timeout });
   return r.status === 0;
 }
 
@@ -156,7 +156,7 @@ function promptFiles(prompt, project) {
     let tracked = [];
     try {
       tracked = execFileSync('git', ['-C', project, 'ls-files', '--cached', '--others', '--exclude-standard'],
-        { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024, timeout: 3000 }).toString().split('\n').filter(Boolean);
+        { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, maxBuffer: 64 * 1024 * 1024, timeout: 3000 }).toString().split('\n').filter(Boolean);
     } catch {}
     for (const token of unresolved) {
       const matches = tracked.filter((f) => f === token || f.endsWith('/' + token));
@@ -211,14 +211,14 @@ function building(project) {
 
 function buildInBackground(project, fingerprint) {
   if (building(project)) return;
-  const child = spawn(process.execPath, [SELF, '--build', project, fingerprint], { detached: true, stdio: 'ignore' });
+  const child = spawn(process.execPath, [SELF, '--build', project, fingerprint], { detached: true, stdio: 'ignore', windowsHide: true });
   child.unref();
   writeFileSync(lockFile(project), String(child.pid));
 }
 
 // Keep the generated files out of git.
 function excludeFromGit(project) {
-  const git = (...args) => execFileSync('git', ['-C', project, ...args], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  const git = (...args) => execFileSync('git', ['-C', project, ...args], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).toString().trim();
   try { git('rev-parse', '--git-dir'); } catch { return; }
   try { git('check-ignore', '-q', '.orchestration/tools/x'); return; } catch {}
   try {
