@@ -150,7 +150,7 @@ tabs are your workers:
   else when it next loads them.
 - The workspace is `$LIRAH_WORKSPACE` (set in Lirah tabs), else the workspace with
   a tab open on the deepest folder containing your current directory. The repo
-  is your current directory's.
+  is your current directory's git repo, or the folder itself when it isn't in one.
 
 ## Notes
 
@@ -172,6 +172,8 @@ tabs are your workers:
   anything while revising.
 - When you finish the plan chunk you were sent, commit, then run
   `lirah plans done <plan> <chunk>`. With nothing to commit, pass `--result`.
+  Plans also work in folders without git: there, don't commit; end your reply
+  with `PLAN-STATUS: done — <what you did>` and the chunk is marked implemented.
 - When a plan looks stuck or broken, debug it:
   1. `lirah plans debug <plan>` to see what's wrong.
   2. `lirah plans debug <plan> --fix`, which applies the safe repairs and checks again.

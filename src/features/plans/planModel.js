@@ -238,6 +238,11 @@ export function defaultGitConfig(repoRoot, slug, base) {
   };
 }
 
+/** A plan in a folder with no git repo: no repos, worked in place, nothing to prepare. */
+export function noGitConfig(root) {
+  return { noGit: true, worktrees: false, branch: '', repos: [], workDir: root, preparedAt: 1 };
+}
+
 // --- Chunk patches ---
 
 /** Sent to the agent in `tabId`, from `baseShas` (each repo's HEAD; `primaryRoot`'s is baseSha). */

@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, HALT_REASON, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
+  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, HALT_REASON, noGitConfig, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
   toRolledBack, UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
@@ -240,6 +240,7 @@ export function PlansProvider({ children }) {
     await loadRepo(repoRoot);
     const title = markdownTitle(source);
     const slug = slugify(title);
+    const top = await repoTop(repoRoot).catch(() => null);
     const plan = {
       id: shortId('p'),
       slug,
@@ -252,7 +253,7 @@ export function PlansProvider({ children }) {
       split: SPLIT_STATUS.RUNNING,
       splitError: null,
       chunks: [],
-      git: defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')),
+      git: top ? defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')) : noGitConfig(repoRoot),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };

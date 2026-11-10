@@ -30,7 +30,7 @@ const PlanContextsDialog = lazyNamed(() => import('./PlanContextsDialog'), 'Plan
 
 /** The backlog: this workspace's tasks or the global ones, a key away from a plan. */
 export const TasksPane = memo(function TasksPane({ projectPath }) {
-  const { scope: projectScope, isRepo } = useProjectScope(projectPath);
+  const { scope: projectScope } = useProjectScope(projectPath);
   const { tabs, activeTabId, workspaces, activeWorkspaceId } = useTabManager();
   const [view, setView] = useState('project'); // 'project' (this workspace) | 'global'
   const scope = view === 'global' ? GLOBAL : activeWorkspaceId;
@@ -46,9 +46,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
   const [openId, setOpenId] = useState(null);
   const [showDone, setShowDone] = useState(false);
   const [contextsOpen, setContextsOpen] = useState(false);
-  const [chunkSetting, setAutoChunk] = useSetting('autoChunkTaskPlans');
-  // Chunks live in the plans pane, which needs git.
-  const autoChunk = isRepo && chunkSetting;
+  const [autoChunk, setAutoChunk] = useSetting('autoChunkTaskPlans');
 
   // Quick add: Enter saves; Shift+Enter starts a new line.
   const [text, setText] = useState('');
@@ -243,7 +241,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       onMove={handleMove}
       onRemove={handleRemove}
       onOpenPlan={handleOpenPlan}
-      chunkMode={isRepo ? (chunkSetting ? 'chunks' : 'file') : null}
+      chunkMode={autoChunk ? 'chunks' : 'file'}
       onChunkMode={handleChunkMode}
       onEditContexts={openContexts}
     />

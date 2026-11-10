@@ -10,6 +10,7 @@ import { FrameHints } from '../../components/instrument/FrameHints';
 import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
+import { isNoGit } from './planGit';
 import { useToast } from '../toast';
 import { useDialogStore } from '../dialogs/DialogProvider';
 import { basename } from '../../utils/pathUtils';
@@ -154,6 +155,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   const canReview = implemented && chunk.commits?.length > 0 && !busy;
   const pending = chunk.status === CHUNK_STATUS.PENDING;
   const handing = chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && !busy;
+  const noGit = isNoGit(plan);
   const canMarkDone = chunk.status === CHUNK_STATUS.IN_PROGRESS && !pilotRunning && !busy;
   const resetChunk = () => onPatch({ status: CHUNK_STATUS.PENDING, needsCommit: false });
   // Keys on the focused row: i implement, s skip, e edit, r review, x delete;
@@ -162,8 +164,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
     if (e.ctrlKey || e.metaKey || e.altKey || editing || editingDecisions) return;
     if (e.shiftKey && e.key !== 'C' && e.key !== 'R') return;
     const act = {
-      c: handing && (() => pane.check(plan, chunk)),
-      C: handing && (() => pane.commit(plan, chunk)),
+      c: handing && !noGit && (() => pane.check(plan, chunk)),
+      C: handing && !noGit && (() => pane.commit(plan, chunk)),
       d: canMarkDone && (() => pane.markDone(plan, chunk)),
       R: handing && resetChunk,
       i: canImplement && (() => pane.implement(plan, chunk)),
@@ -181,7 +183,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   };
   const rowKeys = [
     canImplement && 'i', (pending || skipped) && 's', pending && 'e', canReview && 'r', pending && 'x',
-    handing && 'c', handing && 'Shift+C', canMarkDone && 'd', handing && 'Shift+R',
+    handing && !noGit && 'c', handing && !noGit && 'Shift+C', canMarkDone && 'd', handing && 'Shift+R',
   ].filter(Boolean);
   const saveEdit = () => {
     if (draft.title.trim()) onPatch({ title: draft.title.trim(), details: draft.details });
@@ -205,7 +207,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         </PanelButton>
       )}
       {/* Printed in the order the note names them: the recommended one first. */}
-      {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && recommend !== 'done' && (
+      {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && !noGit && recommend !== 'done' && (
         <PanelButton
           onClick={() => pane.commit(plan, chunk)}
           disabled={busy}
@@ -227,7 +229,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
       )}
       {chunk.status === CHUNK_STATUS.IN_PROGRESS && !piloted && (
         <>
-          <PanelButton onClick={() => pane.check(plan, chunk)} disabled={busy} title="Look again for the chunk's commit (c)">check</PanelButton>
+          {!noGit && <PanelButton onClick={() => pane.check(plan, chunk)} disabled={busy} title="Look again for the chunk's commit (c)">check</PanelButton>}
           <PanelButton onClick={resetChunk} disabled={busy} title="Back to pending; the changes are kept (R)">
             reset
           </PanelButton>

@@ -1,6 +1,6 @@
 // Prompts the plans feature sends to an agent, and parsing of what comes back.
 
-import { isMultiRepo, planGit, workPath } from './planGit';
+import { isMultiRepo, isNoGit, planGit, workPath } from './planGit';
 import { CHUNK_STATUS } from './planModel';
 
 // Each chunk's commits carry this trailer, so they can be found in the log no
@@ -151,6 +151,11 @@ function decisionsBlock(plan, upTo = null) {
 // `allowDone`: the chunk itself, which may need no file changes (a check, a
 // test run); not a fix, which always changes something.
 function commitInstruction(plan, chunk, { allowDone = false } = {}) {
+  if (isNoGit(plan)) {
+    return `This folder isn't a git repository: don't run git or commit. When the chunk is done and working, end your reply with a line
+PLAN-STATUS: ${STATUS_DONE} — <one line on what you did>
+Just above it, add one line "Decision: <one line>" per choice a later chunk should know about: names, file locations, approaches you picked or rejected and why. Skip anything obvious from the code; add none if there's nothing worth passing on.`;
+  }
   return [
     `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
 git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chunkTrailer(plan, chunk)}"`,
@@ -215,7 +220,7 @@ export function buildFixPrompt(plan, chunk, notes) {
 /** Auto-pilot's one follow-up when the agent stopped without committing. */
 export function buildNudgePrompt(plan, chunk) {
   return [
-    `Chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}" isn't committed yet. Finish it if anything is left.`,
+    `Chunk ${chunk.n} ("${chunk.title}") of the plan "${plan.title}" ${isNoGit(plan) ? "isn't marked done yet" : "isn't committed yet"}. Finish it if anything is left.`,
     reposBlock(plan),
     commitInstruction(plan, chunk, { allowDone: true }),
     STATUS_INSTRUCTION,

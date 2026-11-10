@@ -196,7 +196,7 @@ export function useAgentControl() {
     const projectScope = async (sessionId) => {
       const tab = callerTab(live.current.tabManager.tabs, sessionId);
       if (!tab) throw new Error("can't tell which tab this is; pass --global for the global list");
-      return (await resolveRepoRoot(tab.projectPath).catch(() => null)) || tab.projectPath;
+      return resolveRepoRoot(tab.projectPath);
     };
     // Tasks are kept per workspace: the caller tab's workspace, or the global list.
     const workspaceScope = (sessionId) => {

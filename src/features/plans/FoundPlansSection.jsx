@@ -58,10 +58,10 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
   return (
     <div className="flex flex-col edge-b-engraved pb-1">
       <div className="flex items-center gap-2 px-3 pt-2.5 text-[11px] text-muted-foreground">
-        <span className="engraved-label">found in repo</span>
+        <span className="engraved-label">found here</span>
         <span className="font-mono tabular-nums">{files.length}</span>
       </div>
-      <div className="px-3 pb-1 text-[11px] text-muted-foreground"># plan files at the repo root</div>
+      <div className="px-3 pb-1 text-[11px] text-muted-foreground"># plan files at the project root</div>
       {files.map((file) => {
         const changed = file.state === 'changed';
         const title = titleBeyondName(file.title, file.name);

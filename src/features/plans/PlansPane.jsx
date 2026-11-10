@@ -25,7 +25,7 @@ const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog'
 
 /** The plans of the active tab's repo: a list, or one plan's chunks. */
 export const PlansPane = memo(function PlansPane({ projectPath }) {
-  const { repoRoot, checked } = useRepoRoot(projectPath);
+  const { repoRoot } = useRepoRoot(projectPath);
   const { plans, createPlan, replaceSource, updatePlan } = usePlans(repoRoot);
   usePlanLifecycleSync(repoRoot, plans, updatePlan);
   const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
@@ -70,9 +70,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
     await send(text);
   }, [activeTabId]);
 
-  if (!projectPath || (checked && !repoRoot)) {
-    return <EmptyLine hint="plans track commits, so they need a git repository">not a git repo</EmptyLine>;
-  }
+  if (!projectPath) return <EmptyLine hint="open a project tab to keep its plans">no project</EmptyLine>;
   if (!plans) {
     return <div className="flex justify-center py-4"><Scanner size="md" label="Loading plans" /></div>;
   }
