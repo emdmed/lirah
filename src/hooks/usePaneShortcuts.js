@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { matches } from '../lib/shortcuts';
 import { requestJobsPane } from '../features/agent-jobs/jobsPane';
+import { getSettings } from '../features/settings/settingsStore';
+import { toggleDrawer } from '../features/zen/zenDrawerStore';
 
 // Panes are numbered like lazygit's: [1] files, [2] terminal, [3] prompt, [4] jobs.
 // Each pane root carries data-pane="N"; an element inside it marked
@@ -17,12 +19,14 @@ function findFocusTarget(pane) {
   return null;
 }
 
-/** The pane N of the tab currently on screen. Inactive tabs stay laid out
- *  (visibility:hidden, moved off-screen), so offsetParent alone can't tell. */
+/** The pane N of the focused tab, or the first one on screen for panes outside
+ *  tabs (jobs). Hidden tabs stay laid out (moved off-screen), so offsetParent
+ *  alone can't tell, and several tabs can be on screen at once. */
 export function findVisiblePane(n) {
-  return [...document.querySelectorAll(`[data-pane="${n}"]`)].find(
+  const shown = [...document.querySelectorAll(`[data-pane="${n}"]`)].filter(
     (el) => el.offsetParent !== null && getComputedStyle(el).visibility !== 'hidden',
-  ) || null;
+  );
+  return shown.find((el) => el.closest('[data-tab-active]')) || shown[0] || null;
 }
 
 export function focusPane(n) {
@@ -47,6 +51,14 @@ function focusPane4Content() {
 export function usePaneShortcuts() {
   useEffect(() => {
     const onKeyDown = (e) => {
+      // In Zen the panes are hidden: Alt+1, Alt+4, Alt+6 and Alt+7 open drawers.
+      const drawer = getSettings().zenMode && ['files', 'tabs', 'plan', 'context'].find((id) => matches(`zen-${id}`, e));
+      if (drawer) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleDrawer(drawer);
+        return;
+      }
       if (!matches('pane-focus', e)) return;
       e.preventDefault();
       e.stopPropagation();

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 import { createEmitter } from '../../lib/createStore';
 import { load as loadFile, onExternalChange, save as saveFile } from '../../lib/fileStore';
 import { getWorkspaceData, setWorkspaceData } from '../../lib/workspaceStore';
@@ -22,6 +23,10 @@ export const SETTINGS_DEFAULTS = {
   sandboxEnabled: false,
   networkIsolation: false,
   showTitleBar: true,
+  // Window-wide: hide the panes and top rail, leaving the terminal and Zen's own chrome.
+  zenMode: false,
+  // Zen's strip shows only its name row; the turn row's height stays reserved.
+  zenStripFolded: false,
   keepFilesAfterSend: false,
   // Launch the CLI automatically when a starred (bookmarked) repo is opened.
   // Never applies to tabs restored at startup: that isn't a deliberate act.
@@ -316,7 +321,22 @@ export function setSetting(key, value) {
   if (Object.is(prev, next)) return;
   state = { ...state, [key]: next };
   persist(state);
-  emit();
+  if (key === 'zenMode') zenShift(next);
+  else emit();
+}
+
+// Zen on/off swaps the whole layout, so it renders inside a view transition:
+// the new layout fades in over a snapshot of the old (see [data-zen-shift] in
+// index.css). The state is already set, so a quick second toggle reads it.
+let shift = 0;
+function zenShift(on) {
+  if (typeof document === 'undefined' || !document.startViewTransition) return emit();
+  const root = document.documentElement;
+  const id = ++shift;
+  root.dataset.zenShift = on ? 'in' : 'out';
+  document.startViewTransition(() => flushSync(emit)).finished.finally(() => {
+    if (id === shift) delete root.dataset.zenShift;
+  });
 }
 
 // Setters are created once per key so callers can list them as stable deps.

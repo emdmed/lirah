@@ -662,6 +662,7 @@ const SETTINGS = Object.fromEntries([
   ["promptBoxOnStart", "agent", "Prompt box on new tabs", false],
   ["autoChunkTaskPlans", "agent", "Split task plans into chunks", true],
   ["showTitleBar", "appearance", "Window controls", true],
+  ["zenMode", "appearance", "Zen mode", false],
   ["figures", "appearance", "Figures", "full", { values: ["full", "compact"] }],
   ["scrollback", "terminal", "Scrollback", 10000, { values: [1000, 10000, 50000, 200000] }],
   ["autoCommitCli", "git", "Auto commit", "claude-code", { values: CLI_IDS }],

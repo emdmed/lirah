@@ -49,7 +49,7 @@ const withoutId = (set, id) => {
 const closeKey = (c) => `${c.id}:${c.status}:${c.awaitingFix ? 1 : 0}`;
 
 // j/k (or the arrows) step between chunk rows while one has focus.
-function onListKey(e) {
+export function onListKey(e) {
   if (!e.target.matches?.(ROW) || e.ctrlKey || e.metaKey || e.altKey) return;
   const step = { j: 1, ArrowDown: 1, k: -1, ArrowUp: -1 }[e.key];
   if (!step && e.key !== 'Home' && e.key !== 'End') return;

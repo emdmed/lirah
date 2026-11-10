@@ -9,6 +9,7 @@ import { SubagentProvider } from "./contexts/SubagentContext";
 import { RightSidebar } from "./features/agent-jobs/RightSidebar";
 import { usePaneShortcuts } from "./hooks/usePaneShortcuts";
 import { KeyHintBar } from "./components/KeyHintBar";
+import { ZenLine } from "./features/zen/ZenLine";
 import { ToastContainer, useToast } from "./features/toast";
 import { useUpdateChecker } from "./hooks/useUpdateChecker";
 import { DevProfiler } from "./components/DevProfiler";
@@ -22,7 +23,7 @@ import { useSetting } from "./features/settings/settingsStore";
 import { useAgentControl } from "./features/agent-control/useAgentControl";
 
 function App() {
-  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, startupPending, openedStartup, addTab, requestCloseTab, switchTab, switchWorkspace } = useTabManager();
+  const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, zenColumns, startupPending, openedStartup, addTab, requestCloseTab, switchTab, switchWorkspace } = useTabManager();
   usePaneShortcuts();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const toast = useToast();
@@ -38,6 +39,7 @@ function App() {
   // opencode loads its plugins globally, so the "Agent state hook" setting
   // installs or removes Lirah's. Claude Code's is left out per launch instead.
   const [agentStateHook] = useSetting('agentStateHook');
+  const [zenMode, setZenMode] = useSetting('zenMode');
   useEffect(() => {
     invoke('set_opencode_agent_plugin', { enabled: agentStateHook })
       .catch((error) => console.warn('Failed to update the opencode agent plugin:', error));
@@ -138,11 +140,27 @@ function App() {
         switchWorkspace(workspaces[(idx + step) % workspaces.length].id);
         return;
       }
+      // Ctrl+Alt+1-3: focus Zen column N
+      if (matches('zen-column', e)) {
+        const id = zenMode && zenColumns[Number(e.code.slice(5)) - 1];
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        switchTab(id);
+        return;
+      }
       // Alt+A: next tab whose agent is waiting on you
       if (matches('attention-jump', e)) {
         e.preventDefault();
         e.stopPropagation();
         jumpToNext();
+        return;
+      }
+      // Alt+Z: Zen mode (also :zen and the Appearance setting)
+      if (matches('zen-toggle', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setZenMode((z) => !z);
         return;
       }
       // Ctrl+T: new tab. Stopped here so no tab-level listener (document
@@ -165,22 +183,32 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext]);
+  }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode, zenMode, zenColumns]);
+
+  // In Zen the workspace's columns are on screen (they always hold the focused tab).
+  const visibleTabIds = zenMode && zenColumns.length > 0 ? zenColumns : [activeTabId];
 
   return (
     <SubagentProvider tabs={tabs}>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
-        <TabBar />
+        {!zenMode && <TabBar />}
 
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-            {tabs.map(tab => (
+            {tabs.map(tab => {
+              const column = visibleTabIds.indexOf(tab.id);
+              return (
               <DevProfiler key={tab.id} id={`ProjectTab:${tab.label}`}>
                 <ProjectTab
                   tabId={tab.id}
                   workspaceId={tab.workspaceId}
                   projectPath={tab.projectPath}
+                  customLabel={tab.customLabel}
+                  label={tab.label}
                   isActive={tab.id === activeTabId}
+                  visible={column >= 0}
+                  column={Math.max(column, 0)}
+                  columns={visibleTabIds.length}
                   compactionHook={!!tab.compactionHook}
                   launchOnStart={!!tab.launch}
                   background={!!tab.background}
@@ -188,14 +216,20 @@ function App() {
                   availableUpdate={availableUpdate}
                 />
               </DevProfiler>
-            ))}
+              );
+            })}
             {showFirstTabChooser && workspaceTabs.length === 0 && !activeTab?.master && (
               <FirstTabChooser onOpenProject={(path) => addTab(path)} />
             )}
           </div>
-          <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
+          {/* Hidden, not unmounted, in Zen so its section, fold and open review survive the toggle. */}
+          <div style={{ display: zenMode ? 'none' : 'contents' }}>
+            <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
+          </div>
         </div>
 
+        {zenMode && <ZenLine />}
+        {/* Fixed overlay: on Ctrl hold it covers the Zen line too. */}
         <KeyHintBar />
         <ToastContainer />
 

@@ -15,7 +15,7 @@
 //                   component of its own (palette, prompt, terminal, files
 //                   pane) don't have one yet.
 //
-// Handlers: App.jsx (tabs, Alt+A), usePaneShortcuts (Alt+1-4),
+// Handlers: App.jsx (tabs, Alt+A, Zen columns), usePaneShortcuts (Alt+1-4, Zen drawers),
 // useTabShortcuts (incl. Ctrl+Shift+E), useViewModeShortcuts,
 // useTextareaShortcuts, useHelpShortcut, useBookmarksShortcut,
 // useCommandPalette, useTerminal's key handler (Ctrl+F/G/Shift+F with the
@@ -36,10 +36,15 @@ export const SHORTCUTS = [
   { id: 'tab-next', keys: ['Ctrl', 'Tab'], description: 'Next Tab', category: 'Tabs', note: '+Shift for previous', match: (e) => mod(e) && e.key === 'Tab' },
   { id: 'tab-goto', keys: ['Ctrl', '1-9'], description: 'Go to Tab N', category: 'Tabs', hint: { bar: 'ctrl', label: 'go to tab' }, match: (e) => mod(e) && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9' },
   { id: 'workspace-next', keys: ['Alt', 'W'], description: 'Next Workspace', category: 'Tabs', note: '+Shift for previous', match: (e) => alt(e) && e.code === 'KeyW' },
+  { id: 'zen-column', keys: ['Ctrl', 'Alt', '1-3'], description: 'Focus Zen Column', category: 'Tabs', note: 'Zen mode, left to right', match: (e) => e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey && /^Digit[1-3]$/.test(e.code) },
   { id: 'attention-jump', keys: ['Alt', 'A'], description: 'Jump to Agent Waiting on You', category: 'Tabs', note: 'repeat for the next', paletteCommand: 'waiting', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyA' },
 
   // Panes & views
   { id: 'pane-focus', keys: ['Alt', '1-4'], description: 'Focus Pane', category: 'Panes & Views', note: 'files · terminal · prompt · jobs', hint: { bar: 'always', label: 'panes' }, match: (e) => alt(e) && !e.shiftKey && /^Digit[1-4]$/.test(e.code) },
+  { id: 'zen-files', keys: ['Alt', '1'], description: 'Files Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit1' },
+  { id: 'zen-tabs', keys: ['Alt', '4'], description: 'Tabs Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit4' },
+  { id: 'zen-plan', keys: ['Alt', '6'], description: 'Plan Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit6' },
+  { id: 'zen-context', keys: ['Alt', '7'], description: 'Context Drawer', category: 'Panes & Views', note: 'Zen mode, again to close', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit7' },
   { id: 'add-feature', keys: ['Alt', '5'], description: 'Add a feature to the context', category: 'Panes & Views', note: 'context pane, when the project has a feature map', match: (e) => alt(e) && !e.shiftKey && e.code === 'Digit5' },
   { id: 'nav-mode', keys: ['Ctrl', 'S'], description: 'Navigation Mode', category: 'Panes & Views', note: 'stops a running agent, asks first', match: (e) => e.ctrlKey && e.key === 's' },
   { id: 'palette', keys: ['Ctrl', ':'], description: 'Command Palette', category: 'Panes & Views', note: 'or : outside a text field', hint: { bar: 'ctrl', label: 'commands' } },
@@ -48,6 +53,7 @@ export const SHORTCUTS = [
   { id: 'shell', keys: ['Alt', 'T'], description: 'Fullscreen Shell', category: 'Panes & Views', note: 'again to close', hint: { bar: 'always', label: 'shell' }, paletteCommand: 'shell', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyT' },
   { id: 'nvim', keys: ['Alt', 'N'], description: 'Open Nvim', category: 'Panes & Views', note: 'secondary terminal', paletteCommand: 'nvim', match: (e) => alt(e) && key('n')(e) },
   { id: 'quick-task', keys: ['Alt', 'Q'], description: 'Quick Task', category: 'Panes & Views', note: 'adds to this workspace\'s tasks', paletteCommand: 'task', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyQ' },
+  { id: 'zen-toggle', keys: ['Alt', 'Z'], description: 'Toggle Zen Mode', category: 'Panes & Views', note: 'hides panes and the top rail', paletteCommand: 'zen', match: (e) => alt(e) && !e.shiftKey && e.code === 'KeyZ' },
   { id: 'help', keys: ['Ctrl', 'H'], description: 'Toggle This Dialog', category: 'Panes & Views', hint: { bar: 'ctrl', label: 'help' }, paletteCommand: 'help', match: (e) => e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'h' },
 
   // Prompt

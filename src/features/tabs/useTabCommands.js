@@ -4,9 +4,11 @@ import { requestJobsPane, requestTabsPane } from '../agent-jobs/jobsPane';
 import { requestAutopilotToggle, requestPlanChunkCommand, requestPlansPane } from '../plans/plansPaneEvents';
 import { requestQuickTask, requestTasksPane } from '../tasks/tasksPaneEvents';
 import { useWatcher } from '../watcher';
-import { useTabActions } from './TabContext';
+import { tabDisplayName, useTabActions } from './TabContext';
+import { useBookmarks } from '../bookmarks';
 import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
+import { getSettings, setSetting } from '../settings/settingsStore';
 import { useToast } from '../toast/ToastContext';
 import { IS_WINDOWS } from '../../utils/pathUtils';
 import { buildFeatureMap } from '../feature-map/useFeatureMap';
@@ -49,7 +51,8 @@ export function useTabCommands({
     setSettingsOpen, setFeatureExplorerOpen } = dialogs;
   const { sandboxEnabled, networkIsolation, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend } = settings;
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
-  const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster } = useTabActions();
+  const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster, placeZenColumn, dropZenColumn, getWorkspaceTabs } = useTabActions();
+  const { bookmarks } = useBookmarks();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const { success: toastSuccess, info: toastInfo, error: toastError } = useToast();
 
@@ -125,6 +128,17 @@ export function useTabCommands({
       { id: 'merge', hint: 'merge this branch into a base branch', run: () => onAutoMerge() },
 
       // Files & panes
+      { id: 'zen', hint: 'zen mode: only the terminal', options: ['on', 'off'], run: (arg) => setSetting('zenMode', onOff(arg, getSettings().zenMode)) },
+      // `:column 1|2|3|off [tab]`: the named tab (default this one) into that Zen column, or off screen.
+      { id: 'column', aliases: ['col'], hint: 'zen columns: put a tab (default this one) in column 1-3, or off screen', options: ['1', '2', '3', 'off'], run: (line) => {
+        const [slot = '', ...rest] = (line || '').trim().split(/\s+/);
+        const name = rest.join(' ').toLowerCase();
+        const tab = name ? getWorkspaceTabs().find((t) => tabDisplayName(t, bookmarks).toLowerCase().startsWith(name)) : { id: tabId };
+        if (!tab) throw new Error(`no tab "${name}" in this workspace`);
+        if (slot === 'off') return dropZenColumn(tab.id);
+        if (!['1', '2', '3'].includes(slot)) throw new Error(`use 1, 2, 3 or off${slot ? `, not "${slot}"` : ''}`);
+        placeZenColumn(tab.id, Number(slot) - 1);
+      } },
       { id: 'shell', hint: 'fullscreen shell in this project', run: () => toggleShell() },
       { id: 'git', hint: 'show only git changes', run: () => onToggleGitFilter() },
       { id: 'md', hint: 'show only markdown files', run: () => onToggleMarkdownFilter() },
@@ -207,7 +221,7 @@ export function useTabCommands({
       commands.push({ id: 'settings', aliases: ['prefs'], hint: 'all settings', run: () => setSettingsOpen(true) });
     }
     return commands;
-  }, [tabId, projectPath, addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
+  }, [tabId, projectPath, addTab, placeZenColumn, dropZenColumn, getWorkspaceTabs, bookmarks, requestCloseTab, openWorkspace, renameWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,
