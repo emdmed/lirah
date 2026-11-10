@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
+import { lastSepIndex } from '../../utils/pathUtils';
 import { usePlansActions, usePlansByRepo } from '../plans/PlansContext';
 import { requestPlanFocus } from '../plans/plansPaneEvents';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
 import { useToast } from '../toast';
-import { planRootOf, TASK_STATUS } from './taskModel';
+import { TASK_STATUS } from './taskModel';
 
 const POLL_MS = 4000;
 
+const dirname = (path) => path.slice(0, lastSepIndex(path));
 
 // The agent is still on its turn: the plan file may be rewritten yet.
 const BUSY_STATES = new Set(['working', 'permission']);
@@ -44,13 +46,13 @@ export function useTaskPlanLinks(tasksByScope, updateTask, importTaskPlan) {
   }, [tasksByScope]);
 
   // The plans of each folder a plan was saved in, to spot the import.
-  const roots = useMemo(() => [...new Set(linked.map(({ task }) => planRootOf(task.planPath)))].join('\n'), [linked]);
+  const roots = useMemo(() => [...new Set(linked.map(({ task }) => dirname(task.planPath)))].join('\n'), [linked]);
   useEffect(() => {
     for (const root of roots ? roots.split('\n') : []) loadRepo(root);
   }, [roots, loadRepo]);
 
   const findPlan = (task) => {
-    const plans = plansByRepo?.[planRootOf(task.planPath)];
+    const plans = plansByRepo?.[dirname(task.planPath)];
     if (!plans) return undefined; // not loaded yet
     return plans.find((p) => p.id === task.planId) || plans.find((p) => p.importedFrom?.path === task.planPath) || null;
   };

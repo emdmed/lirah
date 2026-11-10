@@ -74,8 +74,7 @@ lirah tasks move <id>          move between this project's list and the global l
 lirah plans [list]             list this tab's repo plans, their progress and stage
                                (planned, building, implemented, PR #N, merged)
 lirah plans show <plan>        a plan's chunks and their state
-lirah plans import <file>      import a plan file (in <repo>/lirah/plans, or a
-                               *_plan.md anywhere) as a plan (split into chunks)
+lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
 lirah plans revise <plan> <notes>
                                the plan's file and a prompt to change it as asked
 lirah plans rechunk <plan>     split the plan again from its file; done chunks stay
@@ -99,7 +98,7 @@ lirah ping                     check that Lirah is reachable
 ```
 
 `<plan>` is an index from `lirah plans`, an id or a title; `<chunk>` is its
-number or id. Plans and their files live in `<repo>/lirah/plans`.
+number or id.
 `<job>` is an index from `lirah jobs` or a job id. An index from `lirah jobs --all`
 needs `--all` again.
 `<tab>` is `.` (this tab), an index from `lirah tabs`, a tab id or a tab name.
@@ -166,8 +165,8 @@ tabs are your workers:
 - For startup projects to open at launch, the mode must be `projects`:
   `lirah startup mode projects`.
 - Paths are resolved against your current directory.
-- Write plans the user wants run in Lirah as `<repo>/lirah/plans/<topic>_plan.md`,
-  then import it with `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
+- After writing a `*_plan.md` the user wants run in Lirah, import it with
+  `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
 - When the user wants a plan changed: `lirah plans revise <plan> "<what to change>"`,
   edit only the file it names, then `lirah plans rechunk <plan>`. Don't implement
   anything while revising.

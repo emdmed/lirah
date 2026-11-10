@@ -1,7 +1,6 @@
 // One-time imports of data kept in older ~/.lirah layouts. migrations.json
 // lists the ones done; the old files are never changed and stay as a backup.
-import { invoke } from '@tauri-apps/api/core';
-import { list, load, repoFiles, save } from './fileStore';
+import { list, load, save } from './fileStore';
 import { getSavedWorkspaces } from './workspaceStore';
 import { getDraft, saveDraft } from './promptDrafts';
 import { loadText } from './storage';
@@ -50,25 +49,6 @@ async function repoFilesToWorkspaces(state) {
   }
 }
 
-// Copy workspaces/<ws>/plans/<id>/plan.json to <repoRoot>/lirah/plans/<id>/plan.json.
-// Prompt logs stay in ~/.lirah; an existing repo copy is never overwritten.
-async function plansToRepos({ workspaces }) {
-  for (const { id: ws } of workspaces) {
-    for (const id of await list(`workspaces/${ws}/plans`).catch(() => [])) {
-      const doc = await load(`workspaces/${ws}/plans/${id}/plan.json`).catch(() => null);
-      const repoRoot = doc?.repoRoot;
-      if (!repoRoot) continue;
-      if (!(await invoke('path_exists', { path: repoRoot }).catch(() => false))) {
-        console.warn(`Plan ${id} not copied: repo ${repoRoot} no longer exists`);
-        continue;
-      }
-      const files = repoFiles(await invoke('watch_repo_plans', { repoRoot })); // creates lirah/plans + .gitignore
-      if (await files.load(`${id}/plan.json`)) continue;
-      await files.save(`${id}/plan.json`, doc);
-    }
-  }
-}
-
 // The old global last prompt becomes the active tab's draft text, unless it has some.
 function lastPromptToDraft({ tabs, activeTabId }) {
   const text = loadText('nevo-terminal:last-prompt');
@@ -78,7 +58,7 @@ function lastPromptToDraft({ tabs, activeTabId }) {
   if (!draft.text) saveDraft(tabId, { ...draft, text });
 }
 
-const MIGRATIONS = { repoFilesToWorkspaces, plansToRepos, lastPromptToDraft };
+const MIGRATIONS = { repoFilesToWorkspaces, lastPromptToDraft };
 
 /** Run the migrations not done yet. Call after initWorkspaces, before the task and plan stores load. */
 export async function runMigrations() {

@@ -17,7 +17,6 @@ const lirahIn = (cwd, ...args) => execFileSync('node', [CLI, ...args], {
   env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home },
 });
 const file = (rel) => JSON.parse(readFileSync(join(home, '.lirah', rel), 'utf8'));
-const planFile = (id) => JSON.parse(readFileSync(join(project, 'lirah/plans', id, 'plan.json'), 'utf8'));
 const put = (rel, doc) => {
   mkdirSync(dirname(join(home, '.lirah', rel)), { recursive: true });
   writeFileSync(join(home, '.lirah', rel), JSON.stringify(doc));
@@ -49,42 +48,27 @@ it('adds, lists and finishes a task in the workspace file', () => {
 
 it('imports a plan with its split queued, and re-chunks it', () => {
   writeFileSync(join(project, 'x_plan.md'), '# Do X\n\nsteps');
-  expect(lirah('plans', 'list')).toContain('no plans');
   const id = /imported (p\w+);/.exec(lirah('plans', 'import', 'x_plan.md'))[1];
-  expect(readFileSync(join(project, 'lirah/plans/.gitignore'), 'utf8')).toBe('*/\n');
-  const plan = planFile(id);
+  const plan = file(`workspaces/w1/plans/${id}/plan.json`);
   expect(plan).toMatchObject({ title: 'Do X', slug: 'do-x', repoRoot: project, workspaceId: 'w1', split: 'queued', chunks: [] });
   expect(plan.git.branch).toBe('plan/do-x');
   expect(lirah('plans', 'import', 'x_plan.md')).toContain(`already imported as ${id}`);
   expect(lirah('plans', 'show', '1')).toContain('Do X');
   writeFileSync(join(project, 'x_plan.md'), '# Do X\n\nmore steps');
   lirah('plans', 'rechunk', id);
-  const after = planFile(id);
+  const after = file(`workspaces/w1/plans/${id}/plan.json`);
   expect(after.source).toContain('more steps');
   expect(after.revisions).toHaveLength(1);
 });
 
 it('asks the app to mark an in-progress chunk done', () => {
-  mkdirSync(join(project, 'lirah/plans/p1'), { recursive: true });
-  writeFileSync(join(project, 'lirah/plans/p1/plan.json'), JSON.stringify({
+  put('workspaces/w1/plans/p1/plan.json', {
     id: 'p1', title: 'P', repoRoot: project, split: 'done', createdAt: 1,
     chunks: [{ id: 'c1', n: 1, title: 'A', status: 'in-progress' }, { id: 'c2', n: 2, title: 'B', status: 'pending' }],
-  }));
+  });
   expect(lirah('plans', 'done', 'p1', '1', '--result', 'checked')).toContain('will be marked done');
-  expect(planFile('p1').chunks[0].doneRequested).toEqual({ result: 'checked' });
+  expect(file('workspaces/w1/plans/p1/plan.json').chunks[0].doneRequested).toEqual({ result: 'checked' });
   expect(() => lirah('plans', 'done', 'p1', '2')).toThrow(/only a chunk in progress/);
-});
-
-it('writes a pasted plan into lirah/plans when revising it', () => {
-  mkdirSync(join(project, 'lirah/plans/p2'), { recursive: true });
-  writeFileSync(join(project, 'lirah/plans/p2/plan.json'), JSON.stringify({
-    id: 'p2', slug: 'pasted', title: 'Pasted', repoRoot: project, source: '# Pasted\n\nbody', split: 'done', createdAt: 1, chunks: [],
-  }));
-  const path = join(project, 'lirah/plans/pasted_plan.md');
-  expect(lirah('plans', 'revise', 'p2', 'make', 'it', 'shorter')).toContain(path);
-  expect(readFileSync(path, 'utf8')).toBe('# Pasted\n\nbody');
-  expect(planFile('p2').importedFrom.path).toBe(path);
-  expect(lirah('plans', 'list')).toContain('Pasted');
 });
 
 it('writes the files even while a Lirah it cannot reach is running (the app reloads them)', () => {

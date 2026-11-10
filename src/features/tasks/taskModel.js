@@ -2,7 +2,6 @@
 // helpers only; the store and the pane do the I/O.
 
 import { shortId } from '../../lib/ids';
-import { lastSepIndex } from '../../utils/pathUtils';
 import { slugify } from '../plans/planPrompts';
 
 export const TASK_STATUS = {
@@ -60,15 +59,6 @@ export const isOpen = (task) => task.status !== TASK_STATUS.DONE;
 /** `add_dark_mode_plan.md`: matches the `*_plan.md` files the plans pane imports. */
 export function planFileName(task) {
   return `${slugify(task.title).replace(/-/g, '_') || 'task'}_plan.md`;
-}
-
-/** Where a task's plan file goes: `<root>/lirah/plans/<title>_plan.md`. */
-export const planFilePath = (root, task) => `${root}/lirah/plans/${planFileName(task)}`;
-
-/** The repo a plan file belongs to: its folder, minus a trailing `lirah/plans` (older files sit at the root). */
-export function planRootOf(planPath) {
-  const dir = planPath.slice(0, lastSepIndex(planPath));
-  return dir.replace(/[\\/]lirah[\\/]plans$/, '');
 }
 
 /**

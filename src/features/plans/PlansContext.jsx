@@ -31,8 +31,8 @@ import {
   slugify,
 } from './planPrompts';
 
-// Plans live in <repoRoot>/lirah/plans/<plan-id>/plan.json, one file per plan
-// (that folder's .gitignore keeps them out of git). Chunks are implemented by the tab's live agent,
+// Plans live in ~/.lirah/workspaces/<id>/plans/<plan-id>/plan.json, one file per plan,
+// never inside the repo itself. Chunks are implemented by the tab's live agent,
 // one commit each (found again by its Plan-Chunk trailer), so review is that
 // commit's diff and rollback is `git revert`.
 //
@@ -54,7 +54,7 @@ const PlansStateContext = createContext(null);
 
 export function PlansProvider({ children }) {
   const {
-    plansByRepo, stateRef, getHome, loadRepo, mutate, updatePlan, updateChunk, findPlan, findChunk,
+    plansByRepo, stateRef, getHome, loadRepo, mutate, keepWorkspaces, updatePlan, updateChunk, findPlan, findChunk,
   } = usePlanStore({
     // Chunks that finished while the app was closed, and what the CLI left queued then.
     onLoad: (repoRoot, plans) => {
@@ -73,11 +73,12 @@ export function PlansProvider({ children }) {
   });
   const checkingRef = useRef(new Set()); // chunk ids being checked
   const toast = useToast();
-  const { tabs, switchTab, activeWorkspaceId } = useTabManager();
+  const { tabs, switchTab, workspaces, activeWorkspaceId } = useTabManager();
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const activeWorkspaceRef = useRef(activeWorkspaceId);
   activeWorkspaceRef.current = activeWorkspaceId;
+  useEffect(() => { keepWorkspaces(workspaces.map((w) => w.id)); }, [workspaces, keepWorkspaces]);
   const tabRootsRef = useRef(new Map()); // tab folder -> repo root; misses aren't kept
 
   // The repos of the open tabs, where an agent may commit outside the plan's repos.
@@ -234,7 +235,7 @@ export function PlansProvider({ children }) {
     return stateRef.current[repoRoot] || [];
   }, [loadRepo, stateRef]);
 
-  // Made in `workspaceId`; the active workspace by default.
+  // Stored in `workspaceId`'s folder; the active workspace's by default.
   const createPlan = useCallback(async (repoRoot, { source, importedFrom = null, workspaceId = activeWorkspaceRef.current }) => {
     await loadRepo(repoRoot);
     const title = markdownTitle(source);
@@ -285,8 +286,8 @@ export function PlansProvider({ children }) {
     if (!plan) throw new Error('Plan not found');
     const known = plan.importedFrom?.path;
     if (known && await invoke('path_exists', { path: known }).catch(() => false)) return known;
-    let path = known || `${repoRoot}/lirah/plans/${plan.slug}_plan.md`;
-    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${repoRoot}/lirah/plans/${plan.slug}-${plan.id}_plan.md`;
+    let path = known || `${repoRoot}/${plan.slug}_plan.md`;
+    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${repoRoot}/${plan.slug}-${plan.id}_plan.md`;
     await invoke('write_file_content', { path, content: plan.source });
     updatePlan(repoRoot, planId, { importedFrom: { path, hash: hash8(plan.source) } });
     return path;
