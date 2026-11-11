@@ -894,7 +894,7 @@ const LOCAL = {
       split: "queued", splitError: null, chunks: [],
       // As defaultGitConfig in planModel.js.
       git: {
-        worktrees: false, branch: `plan/${slug}`, workDir: null, preparedAt: null,
+        worktrees: true, branch: `plan/${slug}`, workDir: null, preparedAt: null,
         repos: [{ root: repo, base: gitOut(repo, ["rev-parse", "--abbrev-ref", "HEAD"]), workPath: null, prepared: false }],
       },
       createdAt: now, updatedAt: now,

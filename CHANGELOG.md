@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-11-11
+
+### Changed
+
+- **Plans run in worktrees by default** - New plans start with "Run in worktrees" on, so your checkout stays untouched. Turn it off in the plan's git section before the first chunk is sent.
+
 ## [0.25.0] - 2026-11-11
 
 ### Changed

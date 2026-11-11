@@ -230,10 +230,10 @@ export function normalizeLoadedPlan(p) {
   return next;
 }
 
-/** A new plan's git settings: in place, on its own branch, from `base` in the one repo. */
+/** A new plan's git settings: in worktrees, on its own branch, from `base` in the one repo. */
 export function defaultGitConfig(repoRoot, slug, base) {
   return {
-    worktrees: false,
+    worktrees: true,
     branch: defaultBranch(slug),
     repos: [{ root: repoRoot, base, workPath: null, prepared: false }],
     workDir: null,
