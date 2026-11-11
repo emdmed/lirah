@@ -37,6 +37,7 @@ import { useTextareaShortcuts } from "../../hooks/useTextareaShortcuts";
 import { useHelpShortcut } from "../../hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "../bookmarks";
 import { useClaudeLauncher } from "../cli-selection";
+import { killCliAndResetTerminal } from "./terminalReset";
 import { useFileSymbols } from "../file-analysis/useFileSymbols";
 import { useTokenUsage } from "../token-budget/useTokenUsage";
 import { useTokenUsageValue } from "../token-budget/tokenUsageStore";
@@ -424,18 +425,24 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   // Terminate any running CLI process in the terminal before navigation
   const terminateCliProcess = useCallback(async () => {
     if (!terminalSessionId) return;
-    for (const cliName of TAB_CLI_PROCESSES) {
-      try {
-        const killed = await invoke('kill_pty_child_process', {
-          sessionId: terminalSessionId,
-          processName: cliName,
-        });
-        if (killed) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          return;
-        }
-      } catch { /* ignore errors */ }
-    }
+    const kill = async () => {
+      for (const cliName of TAB_CLI_PROCESSES) {
+        try {
+          const killed = await invoke('kill_pty_child_process', {
+            sessionId: terminalSessionId,
+            processName: cliName,
+          });
+          if (killed) return true;
+        } catch { /* ignore errors */ }
+      }
+      return false;
+    };
+    // A killed CLI leaves its terminal modes on (mouse tracking...): reset the display after the 300ms wait.
+    await killCliAndResetTerminal({
+      kill,
+      write: (data) => terminalRef.current?.writeDisplay?.(data),
+      delayMs: 300,
+    });
   }, [terminalSessionId]);
 
   const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, visible && !!currentPath && !secondary.secondaryFullscreen);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '../toast/ToastContext';
 import { getSettings } from '../settings/settingsStore';
+import { buildLaunchCommand } from './launchCommand';
 
 export const CLI_COMMANDS = {
   'claude-code': {
@@ -85,25 +86,28 @@ export function useClaudeLauncher(terminalSessionId, terminalRef, selectedCli = 
       // Compaction: acts only for tabs with compaction on. Both hooks read
       // their settings switch per call, so toggling needs no relaunch.
       // Agent control: the skill that teaches the agent the lirah command.
+      let base = null;
+      const plugins = [];
       if (selectedCli === 'claude-code') {
-        const base = await invoke('install_base_plugin', { agentControl: !!getSettings().agentControl }).catch(() => null);
-        // PowerShell also reads the curly quotes as quote characters; doubling any of them keeps the string whole.
-        const quote = (v) => `'${powershell ? v.replace(/['‘’‚‛]/g, '$&$&') : v.replace(/'/g, "'\\''")}'`;
-        if (base) command += ` --plugin-dir ${quote(base)}`;
-        if (resumeId) command += ` --resume ${quote(resumeId)}`;
-        if (systemPrompt) command += ` --append-system-prompt ${quote(systemPrompt)}`;
+        base = await invoke('install_base_plugin', { agentControl: !!getSettings().agentControl }).catch(() => null);
         // User plugins: rebuilt each launch from their folder; a broken one is skipped, not fatal.
         for (const p of (getSettings().plugins || []).filter((x) => x.enabled)) {
           try {
             const dir = await invoke('install_user_plugin', { id: p.id, name: p.name, folder: p.folder, prompt: p.prompt });
-            command += ` --plugin-dir ${quote(dir)} --add-dir ${quote(p.folder)}`;
+            plugins.push({ dir, folder: p.folder });
           } catch (e) {
             toastError(`Plugin ${p.name}: ${e?.message || e}`);
           }
         }
       }
-      // Clear the screen first so the agent starts on a clean terminal.
-      command = `${powershell ? 'Clear-Host;' : 'clear &&'} ${command}\r`;
+      command = buildLaunchCommand({
+        command,
+        base,
+        resumeId: selectedCli === 'claude-code' ? resumeId : undefined,
+        systemPrompt: selectedCli === 'claude-code' ? systemPrompt : undefined,
+        powershell,
+        plugins,
+      });
 
       console.log('Launching CLI with command:', command.trim());
 
