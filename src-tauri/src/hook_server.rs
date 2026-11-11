@@ -404,3 +404,7 @@ mod tests {
         assert!(start.elapsed() < Duration::from_secs(1));
     }
 }
+
+#[cfg(test)]
+#[path = "hook_server_session_start_tests.rs"]
+mod session_start_tests;

@@ -408,7 +408,7 @@ fn merge_hooks(hooks: &mut serde_json::Map<String, serde_json::Value>, add: serd
 
 /// The agent-state events as `http` hooks to hook_server: token and session go
 /// as headers from the terminal's env (the `url` cannot take env vars).
-fn claude_http_hooks() -> serde_json::Value {
+pub(crate) fn claude_http_hooks() -> serde_json::Value {
     let hook = serde_json::json!([{ "hooks": [{
         "type": "http",
         "url": format!("http://127.0.0.1:{}/hook", crate::hook_server::HOOK_PORT),
@@ -541,3 +541,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+#[path = "agent_hooks_session_start_tests.rs"]
+mod session_start_tests;
