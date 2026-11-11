@@ -4,6 +4,13 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-11-11
+
+### Changed
+
+- **Tab rows** - Long branch names are cut to one line, with the full name in the tooltip. Hovering a folded row swaps its diff and status readout for the row's buttons, so the tab name keeps its width.
+- **Default panes** - The files pane opens on tabs and the right pane opens on tasks.
+
 ## [0.25.1] - 2026-11-11
 
 ### Changed
