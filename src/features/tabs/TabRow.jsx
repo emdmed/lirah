@@ -167,6 +167,54 @@ export const TabRow = memo(function TabRow({
     workLabel,
   ].filter(Boolean).join(', ');
 
+  // Row actions sit on the branch line of an unfolded row, so they never
+  // squeeze the name; a one-line row keeps them beside the readout.
+  // `reserve` keeps their width while hidden, so hovering never rewraps the branch.
+  const rowActions = (reserve) => (
+    <span
+      className={cn(
+        'shrink-0 items-center gap-1.5',
+        reserve ? 'flex' : roleMenuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
+        reserve && !roleMenuOpen && 'invisible group-hover:visible group-focus-within:visible',
+      )}
+    >
+      {!tab.role && <RoleTagButton tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}
+
+      {!active && !linked && (
+        <RowAction
+          tabIndex={-1}
+          aria-pressed="false"
+          aria-label={linkLabel}
+          title="Link this repo into the current prompt (l)"
+          onClick={() => actions.toggleLink(tab, name, linked)}
+          className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
+        >
+          <Link className="h-3 w-3" />
+        </RowAction>
+      )}
+      <RowAction
+        tabIndex={-1}
+        aria-label={`Open ${name} in the file manager`}
+        title="Open folder in file manager (f)"
+        onClick={() => actions.openFolder(tab.projectPath)}
+        className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
+      >
+        <Folder className="h-3 w-3" />
+      </RowAction>
+      {closable && (
+        <RowAction
+          tabIndex={-1}
+          aria-label={`Close ${name}`}
+          title="Close tab (x)"
+          onClick={() => actions.closeTab(tab.id)}
+          className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-fault)]"
+        >
+          ×
+        </RowAction>
+      )}
+    </span>
+  );
+
   return (
     // A div, not a <button>: it holds the rename input and other controls.
     <div
@@ -264,49 +312,7 @@ export const TabRow = memo(function TabRow({
         )}
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
-          {/* Row actions sit beside the readout, never over it: the diff is
-              what you check before closing. */}
-          <span
-            className={cn(
-              'shrink-0 items-center gap-1.5',
-              roleMenuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
-            )}
-          >
-            {!tab.role && <RoleTagButton tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}
-
-            {!active && !linked && (
-              <RowAction
-                tabIndex={-1}
-                aria-pressed="false"
-                aria-label={linkLabel}
-                title="Link this repo into the current prompt (l)"
-                onClick={() => actions.toggleLink(tab, name, linked)}
-                className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
-              >
-                <Link className="h-3 w-3" />
-              </RowAction>
-            )}
-            <RowAction
-              tabIndex={-1}
-              aria-label={`Open ${name} in the file manager`}
-              title="Open folder in file manager (f)"
-              onClick={() => actions.openFolder(tab.projectPath)}
-              className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
-            >
-              <Folder className="h-3 w-3" />
-            </RowAction>
-            {closable && (
-              <RowAction
-                tabIndex={-1}
-                aria-label={`Close ${name}`}
-                title="Close tab (x)"
-                onClick={() => actions.closeTab(tab.id)}
-                className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-fault)]"
-              >
-                ×
-              </RowAction>
-            )}
-          </span>
+          {compact && rowActions(false)}
           <Readout
             info={info}
             contextFill={contextFill}
@@ -334,6 +340,7 @@ export const TabRow = memo(function TabRow({
             ) : (
               <span>no repo</span>
             )}
+            <span className="ml-auto pl-2">{rowActions(true)}</span>
           </div>
 
           {/* Tier 3: one status line, always there so the row keeps its height.

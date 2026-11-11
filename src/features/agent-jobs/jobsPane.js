@@ -1,6 +1,7 @@
 // Lets other parts of the app (status line, pane shortcuts, command palette)
 // open the jobs pane without sharing RightSidebar's state.
 import { APP_EVENTS, createRequest } from '../../lib/appEvents';
+import { getSettings, setSetting } from '../settings/settingsStore';
 
 export const jobsPaneRequest = createRequest(APP_EVENTS.jobsPane);
 
@@ -12,7 +13,8 @@ export function requestJobsPane(action = 'open', tab) {
   jobsPaneRequest.request({ action, tab });
 }
 
-/** @param {'open' | 'toggle'} action */
+/** The tabs list lives in the files pane: show it there (toggle goes back to files). */
 export function requestTabsPane(action = 'open') {
-  jobsPaneRequest.request({ action, tab: 'tabs' });
+  const toFiles = action === 'toggle' && getSettings().sidebarSection === 'tabs';
+  setSetting('sidebarSection', toFiles ? 'files' : 'tabs');
 }
