@@ -13,7 +13,7 @@ import { useAttentionQueue } from './useAgentAttention';
 import { RenameField } from './RenameField';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
-import { Plus } from 'iconoir-react';
+import { Add } from '@/components/icons';
 import { buttonVariants } from '@/components/ui/button';
 
 // The lamp on a background workspace whose agent waits on you.
@@ -204,7 +204,7 @@ export function WorkspaceRow() {
         )
       )}
       <PanelButton
-        icon={Plus}
+        icon={Add}
         onClick={() => addWorkspace()}
         title="New workspace"
         aria-label="New workspace"

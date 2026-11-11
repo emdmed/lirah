@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavArrowLeft, Play, Refresh, Terminal } from 'iconoir-react';
+import { ChevronLeft, Play, Refresh, Terminal } from '@/components/icons';
 import { Lamp } from '../../components/instrument/Lamp';
 import { SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -292,7 +292,7 @@ export function PlanDetail({ plan }) {
     <div className="flex flex-col">
       <div className="flex flex-col px-3 pt-2 pb-3.5">
         <div className="flex items-center gap-1.5">
-          <PanelButton icon={NavArrowLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
+          <PanelButton icon={ChevronLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
           <span className="ml-auto flex items-center gap-1">
             {/* Pressed, not latched: a view toggle has no lamp to light. */}
             <PanelButton

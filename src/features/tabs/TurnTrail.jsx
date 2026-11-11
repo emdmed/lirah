@@ -1,4 +1,4 @@
-import { Attachment } from 'iconoir-react';
+import { Attach } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { relativeTo } from './tabActivity';
@@ -34,7 +34,7 @@ export function TurnTrail({ turn, summary, root, open, onToggle, onAttach }) {
               title="Add these files to the current tab's prompt"
               className="flex items-center gap-1 self-start pt-0.5 hover:text-[var(--ins-lamp)]"
             >
-              <Attachment className="h-3 w-3" />
+              <Attach size={12} />
               attach {plural(turn.edited.size, 'file')} to prompt
             </RowAction>
           ) : (

@@ -56,10 +56,11 @@ export function rowActivity(own, workLabel, tabPlans) {
   return own;
 }
 
-export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHints }) {
+// `live`: false stops the polls and the clock (a hidden tab's copy of the pane).
+export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHints, live = true }) {
   const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab, togglePlanTerminal: flipPlanTerminal } = useTabManager();
   const closable = tabs.length > 1;
-  const { repo, cli, now } = useTabsSummary(tabs);
+  const { repo, cli, now } = useTabsSummary(tabs, live);
   const { bookmarks } = useBookmarks();
   const toast = useToast();
   const { linkedRepos } = useLinkedRepos(activeTabId);

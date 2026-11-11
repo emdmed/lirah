@@ -3,7 +3,7 @@ import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
 import { SelectedFileItem } from "../../components/textarea-panel/SelectedFileItem";
 import { useFileListKeyboardNav } from "../../hooks/useFileListKeyboardNav";
-import { Xmark } from "iconoir-react";
+import { Close } from "@/components/icons";
 
 /**
  * Instruction for large files to prevent full file reads
@@ -124,7 +124,7 @@ export function SidebarFileSelection({
             onClick={onClearAllFiles}
             className="text-muted-foreground hover:text-destructive"
           >
-            <Xmark />
+            <Close />
             clear
           </Button>
         </div>

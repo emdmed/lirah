@@ -4,8 +4,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { git } from '../../lib/git';
-import { chunkCommitsByRepo, planGit } from './planGit';
+import { dirtyCount, git } from '../../lib/git';
+import { chunkCommitsByRepo, planGit, workPath } from './planGit';
 import { chunkTrailer } from './planPrompts';
 import { CHUNK_STATUS, PLAN_STAGE, planStage } from './planModel';
 
@@ -55,16 +55,28 @@ export async function fetchPr(plan) {
   return list[0] ?? null;
 }
 
+// Removal is forced, so a worktree holding uncommitted work keeps it (and is left for the user).
+async function canRemoveWorktrees(plan) {
+  const cfg = planGit(plan);
+  if (!cfg.worktrees || cfg.removedAt) return false;
+  for (const repo of cfg.repos) {
+    if (workPath(repo) === repo.root) continue;
+    if (await dirtyCount(workPath(repo)).catch(() => 1)) return false;
+  }
+  return true;
+}
+
 const MAIN_BRANCHES = new Set(['main', 'master']);
 let ghWarned = false;
 
 /**
  * Keeps plan.pr and plan.merged current for the repo's implemented plans:
  * checked when they change, when the window gets focus (a PR merged in the
- * browser) and on every commit to main or master.
+ * browser) and on every commit to main or master. A merged plan's worktrees
+ * are removed, unless one has uncommitted changes.
  * shortcut: runs only while the plans pane shows the repo; move it to PlansProvider if merges go unnoticed.
  */
-export function usePlanLifecycleSync(repoRoot, plans, updatePlan) {
+export function usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees) {
   const waiting = useMemo(() => (plans || []).filter((p) => {
     const stage = planStage(p);
     return stage === PLAN_STAGE.IMPLEMENTED || stage === PLAN_STAGE.PR_OPEN;
@@ -99,6 +111,7 @@ export function usePlanLifecycleSync(repoRoot, plans, updatePlan) {
             ...(merged && { merged }),
           };
           if (Object.keys(patch).length > 0) updatePlan(repoRoot, plan.id, patch);
+          if (merged && await canRemoveWorktrees(plan)) await removeWorktrees(repoRoot, plan.id).catch(() => {});
         }
       } finally {
         running = false;

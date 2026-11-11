@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Sort, ArrowUp, ArrowDown, Search } from 'iconoir-react';
+import { ArrowDown, ArrowUp, Search, Sort } from '@/components/icons';
 import { formatCost, formatTokenCount } from '../tokenCalculations';
 import { EmptyPlate } from '@/components/EmptyState';
 
@@ -12,8 +12,8 @@ const SORT_OPTIONS = [
 ];
 
 function SortIcon({ active, dir }) {
-  if (!active) return <Sort width={10} height={10} className="opacity-30" />;
-  return dir === 'asc' ? <ArrowUp width={10} height={10} /> : <ArrowDown width={10} height={10} />;
+  if (!active) return <Sort size={10} className="opacity-30" />;
+  return dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />;
 }
 
 export function ProjectComparison({ projects, totals, colors }) {
@@ -64,7 +64,7 @@ export function ProjectComparison({ projects, totals, colors }) {
       {/* Search */}
       <div className="flex items-center gap-2 mb-2 shrink-0">
         <div className="relative flex-1">
-          <Search width={12} height={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={search}

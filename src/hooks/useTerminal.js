@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useImperativeHandle, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useImperativeHandle, useRef, useContext } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -17,6 +17,7 @@ import { markTerminalInput, markTerminalOutput, setSessionTerminal } from '../fe
 import { reportAgentState, settleIfInterrupted } from '../features/tabs/agentHookState';
 import { parseProgramStatus, PROGRAM_STATUS_REPLY } from '../features/tabs/programStatus';
 import { feedOutput } from '../features/tabs/outputTail';
+import { TabShownContext } from '../features/tabs/tabShown';
 import { isFocusMode } from '../lib/focusMode';
 import { IS_WINDOWS } from '../utils/pathUtils';
 import '@xterm/xterm/css/xterm.css';
@@ -571,6 +572,21 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       visibleRef.current = null;
     };
   }, [terminal, scheduleRepaint]);
+
+  // Draw what arrived while hidden in the frame that shows the tab. xterm
+  // resumes by itself, but only when its IntersectionObserver reports, which
+  // is after that frame: it showed the screen as it was when the tab was
+  // hidden, then jumped. Skipped when the terminal has no box (covered by a
+  // fullscreen terminal 2), where nothing would ever pause it again.
+  const { visible: tabShown } = useContext(TabShownContext);
+  useLayoutEffect(() => {
+    if (!tabShown || !terminal?.element?.offsetParent) return;
+    try {
+      terminal._core?._renderService?._handleIntersectionChange?.({ isIntersecting: true });
+    } catch (e) {
+      // xterm internals moved; its own observer still resumes it a frame later.
+    }
+  }, [tabShown, terminal]);
 
   // Repaint when the window itself comes back. Alt-tabbing away lets the
   // compositor occlude us and the browser evict our GL context; nothing about

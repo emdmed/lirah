@@ -1,8 +1,5 @@
 import { useMemo, memo } from 'react';
-import {
-  KeyCommand, Sparks, Terminal, StatsReport, Settings, GitCommit,
-  GitMerge, DocMagnifyingGlass, Compress, Erase
-} from 'iconoir-react';
+import { Agent, Clear, Collapse, Command, Commit, FindInFile, Merge, Settings, Stats, Terminal } from '@/components/icons';
 import { Scanner } from './instrument/Scanner';
 import { Button } from './ui/button';
 import {
@@ -29,7 +26,7 @@ import { Fig10Sandbox } from '../features/settings/Fig10Sandbox';
 import { useFigureCompact } from './instrument/figure';
 
 const CLI_DISPLAY = {
-  'claude-code': { name: 'claude', icon: Sparks },
+  'claude-code': { name: 'claude', icon: Agent },
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
@@ -210,19 +207,19 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
       <DropdownMenuContent side="bottom" align="center" className="w-64 text-xs">
         {crowded && onCompactContext && (
           <DropdownMenuItem onClick={onCompactContext} className="cursor-pointer py-1">
-            <Compress className="mr-2 w-3 h-3" />
+            <Collapse size={12} className="mr-2" />
             Compact (summarise and continue)
           </DropdownMenuItem>
         )}
         {onOpenContextDetails && (
           <DropdownMenuItem onClick={onOpenContextDetails} className="cursor-pointer py-1">
-            <DocMagnifyingGlass className="mr-2 w-3 h-3" />
+            <FindInFile size={12} className="mr-2" />
             Details…
           </DropdownMenuItem>
         )}
         {onOpenDashboard && (
           <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
-            <StatsReport className="mr-2 w-3 h-3" />
+            <Stats size={12} className="mr-2" />
             Token Metrics
             <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
           </DropdownMenuItem>
@@ -232,7 +229,7 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem destructive onClick={onClearContext} className="cursor-pointer py-1">
-              <Erase className="mr-2 w-3 h-3" />
+              <Clear size={12} className="mr-2" />
               Clear context
               <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
             </DropdownMenuItem>
@@ -425,29 +422,29 @@ export const StatusBar = memo(({
           {/* Preferences live in the Settings dialog; this menu keeps actions. */}
           <DropdownMenuContent align="end" className="w-56 text-xs">
             <DropdownMenuItem onClick={onOpenSettings} className="cursor-pointer py-1">
-              <Settings className="mr-2 w-3 h-3" />
+              <Settings size={12} className="mr-2" />
               Settings…
             </DropdownMenuItem>
             <DropdownMenuSeparator star />
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
-                <StatsReport className="mr-2 w-3 h-3" />
+                <Stats size={12} className="mr-2" />
                 Token Metrics
                 <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoCommit} className="cursor-pointer py-1">
-                <GitCommit className="mr-2 w-3 h-3" />
+                <Commit size={12} className="mr-2" />
                 Auto Commit…
                 <DropdownMenuShortcut keys={shortcutForCommand('commit')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoMerge} className="cursor-pointer py-1">
-                <GitMerge className="mr-2 w-3 h-3" />
+                <Merge size={12} className="mr-2" />
                 Auto Merge…
                 <DropdownMenuShortcut keys={shortcutForCommand('merge')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
-                <KeyCommand className="mr-2 w-3 h-3" />
+                <Command size={12} className="mr-2" />
                 Keyboard Shortcuts
                 <DropdownMenuShortcut keys={shortcutForCommand('help')} />
               </DropdownMenuItem>

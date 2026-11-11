@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Crown } from 'iconoir-react';
+import { Best } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -129,14 +129,13 @@ export function MasterStrip() {
       {/* The tab rows' 16px icon column, so the crown sits over their lamps and
           the label starts on their names' line (12 + 16 + 8 = 36px). */}
       <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">
-        <Crown
-          strokeWidth={1.75}
-          className={cn(
-            'h-3.5 w-3.5 transition-colors',
-            // Lamps warm fast and cool slowly.
-            live ? 'text-[var(--ins-lamp)] duration-[var(--ins-warm)]' : 'text-foreground duration-[var(--ins-cool)]',
-          )}
-        />
+        <Best
+     strokeWidth={1.75}
+     className={cn(
+      'h-3.5 w-3.5 transition-colors',
+      // Lamps warm fast and cool slowly.
+      live ? 'text-[var(--ins-lamp)] duration-[var(--ins-warm)]' : 'text-foreground duration-[var(--ins-cool)]',
+     )} />
       </span>
       {/* The pane's legend already says workspace. */}
       <span className="engraved-label shrink-0 text-foreground">

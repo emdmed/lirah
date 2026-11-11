@@ -1,4 +1,4 @@
-import { NavArrowDown } from 'iconoir-react';
+import { ChevronDown } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 
@@ -20,7 +20,7 @@ export function SplitKey({ children, onClick, onChoose, chooseLabel, className, 
         className={buttonVariants({ variant: 'default', size: 'icon-panel' })}
         data-icon-only
       >
-        <NavArrowDown aria-hidden="true" />
+        <ChevronDown aria-hidden="true" />
       </button>
     </span>
   );

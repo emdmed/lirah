@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { NavArrowLeft, NavArrowRight, Pin, PinSlash } from 'iconoir-react';
+import { ChevronLeft, ChevronRight, Pin, Unpin } from '@/components/icons';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Position } from '../../components/instrument/Position';
@@ -161,7 +161,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon-sm" disabled={!canGoPrev} onClick={goToPrev} aria-label="Previous file">
-                  <NavArrowLeft className="w-4 h-4" />
+                  <ChevronLeft size={16} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Previous file (Ctrl+[)</TooltipContent>
@@ -170,7 +170,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon-sm" disabled={!canGoNext} onClick={goToNext} aria-label="Next file">
-                  <NavArrowRight className="w-4 h-4" />
+                  <ChevronRight size={16} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Next file (Ctrl+])</TooltipContent>
@@ -189,7 +189,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
                 aria-label={pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
                 className={pinned ? 'text-[var(--ins-lamp)]' : ''}
               >
-                {pinned ? <PinSlash className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                {pinned ? <Unpin size={16} /> : <Pin size={16} />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>

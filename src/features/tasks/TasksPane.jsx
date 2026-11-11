@@ -1,5 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { NavArrowDown, NavArrowRight } from 'iconoir-react';
+import { ChevronDown, ChevronRight } from '@/components/icons';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { errorMessage } from '../../lib/errorMessage';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -324,7 +324,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
                 aria-expanded={showDone}
                 className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer edge-b-engraved"
               >
-                {showDone ? <NavArrowDown className="h-3 w-3" /> : <NavArrowRight className="h-3 w-3" />}
+                {showDone ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 <span className="engraved-label">done</span>
                 <span className="font-mono tabular-nums">{doneTasks.length}</span>
               </button>

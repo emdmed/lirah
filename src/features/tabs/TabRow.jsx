@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Folder, GitBranch, Link, Sparks } from 'iconoir-react';
+import { Agent, Branch, Folder, Link } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
@@ -189,7 +189,7 @@ export const TabRow = memo(function TabRow({
           onClick={() => actions.toggleLink(tab, name, linked)}
           className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
         >
-          <Link className="h-3 w-3" />
+          <Link size={12} />
         </RowAction>
       )}
       <RowAction
@@ -199,7 +199,7 @@ export const TabRow = memo(function TabRow({
         onClick={() => actions.openFolder(tab.projectPath)}
         className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
       >
-        <Folder className="h-3 w-3" />
+        <Folder size={12} />
       </RowAction>
       {closable && (
         <RowAction
@@ -307,7 +307,7 @@ export const TabRow = memo(function TabRow({
             onClick={() => actions.toggleLink(tab, name, linked)}
             className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[var(--ins-lamp)] hover:text-[var(--ins-fault)]"
           >
-            <Link className="h-3 w-3" />
+            <Link size={12} />
           </RowAction>
         )}
 
@@ -336,7 +336,7 @@ export const TabRow = memo(function TabRow({
                 title={`${info.branch}\nClick to copy`}
                 className="flex min-w-0 items-center gap-1 font-mono hover:text-[var(--ins-lamp)]"
               >
-                <GitBranch className="h-3 w-3 shrink-0" />
+                <Branch size={12} className="shrink-0" />
                 <span className="min-w-0 truncate">{info.branch}</span>
               </RowAction>
             ) : (
@@ -363,7 +363,7 @@ export const TabRow = memo(function TabRow({
             />
           ) : workLabel ? (
             <div className="flex h-4 min-w-0 items-center gap-1 pl-6 text-[11px] leading-4 text-[var(--ins-lamp)]">
-              <Sparks className="h-3 w-3 shrink-0" />
+              <Agent size={12} className="shrink-0" />
               <span className="min-w-0 truncate">{workLabel}</span>
             </div>
           ) : (

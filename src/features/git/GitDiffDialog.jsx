@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
-import { NavArrowLeft, NavArrowRight, Pin, PinSlash, ChatPlusIn, Send, Trash } from 'iconoir-react';
+import { ChevronLeft, ChevronRight, NewChat, Pin, Send, Trash, Unpin } from '@/components/icons';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
@@ -229,7 +229,7 @@ export function GitDiffDialog({
                   onClick={goToPrevFile}
                   aria-label="Previous file"
                 >
-                  <NavArrowLeft className="w-4 h-4" />
+                  <ChevronLeft size={16} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Previous file (Ctrl+[)</TooltipContent>
@@ -244,7 +244,7 @@ export function GitDiffDialog({
                   onClick={goToNextFile}
                   aria-label="Next file"
                 >
-                  <NavArrowRight className="w-4 h-4" />
+                  <ChevronRight size={16} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Next file (Ctrl+])</TooltipContent>
@@ -264,7 +264,7 @@ export function GitDiffDialog({
                 aria-label={pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}
                 className={pinned ? 'text-[var(--ins-lamp)]' : ''}
               >
-                {pinned ? <PinSlash className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                {pinned ? <Unpin size={16} /> : <Pin size={16} />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>{pinned ? 'Unpin from sidebar' : 'Pin to top of sidebar'}</TooltipContent>
@@ -321,7 +321,7 @@ export function GitDiffDialog({
                     onClick={() => onRemoveAnnotation?.(n.id)}
                     title="Remove note"
                   >
-                    <Trash className="w-3 h-3" />
+                    <Trash size={12} />
                   </Button>
                 </div>
               ))}
@@ -358,7 +358,7 @@ export function GitDiffDialog({
               onClick={addNote}
               title="Pin this note to the selected lines"
             >
-              <ChatPlusIn className="w-3 h-3 mr-1" />
+              <NewChat size={12} className="mr-1" />
               Add
             </Button>
             <Button
@@ -368,7 +368,7 @@ export function GitDiffDialog({
               onClick={() => onSendAnnotations?.()}
               title="Re-run the agent in this worktree with every note attached"
             >
-              {!sendingAnnotations && <Send className="w-3 h-3" />}
+              {!sendingAnnotations && <Send size={12} />}
               Send {annotations.length || ''}
             </Button>
           </div>

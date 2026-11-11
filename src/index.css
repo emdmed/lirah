@@ -2471,3 +2471,28 @@ button.ins-link {
     opacity: 0;
   }
 }
+
+/* Orrery icons (src/components/icons): 1px hairline at any size, square ends.
+   .b is the body, .dot a filled point, .d the dotted trail (16px and up). */
+@layer components {
+  .orrery {
+    display: inline-block;
+    flex-shrink: 0;
+    vertical-align: middle;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-linecap: butt;
+    stroke-linejoin: miter;
+    stroke-miterlimit: 8;
+  }
+  .orrery :not(.d) { vector-effect: non-scaling-stroke; }
+  .orrery .b, .orrery .dot { fill: currentColor; stroke: none; }
+  .orrery .d { stroke-dasharray: 0 3; stroke-linecap: round; stroke-width: 2.4; }
+  .orrery:not([data-trail]) .d { display: none; }
+  .orrery[data-lit] .b {
+    fill: var(--ins-lamp);
+    filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--ins-lamp) 70%, transparent));
+  }
+}

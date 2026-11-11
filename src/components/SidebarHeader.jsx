@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Input } from './ui/input';
 import { PanelButton } from './instrument/PanelButton';
-import { CompressLines, LongArrowUpLeft, Refresh } from 'iconoir-react';
+import { CollapseAll, ParentFolder, Refresh } from '@/components/icons';
 import { BookmarksDropdown } from '../features/bookmarks';
 import { Keycap } from './instrument/Keycap';
-import { Scanner } from './instrument/Scanner';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -12,8 +11,8 @@ import { cn } from '@/lib/utils';
 const KeyCount = ({ value }) =>
   value == null ? null : <span className="text-muted-foreground tabular-nums">{value}</span>;
 
-// Sync button face while the tree reloads.
-const SyncBusy = () => <Scanner />;
+// Sync button face while the tree reloads: the refresh body lights.
+const SyncBusy = (props) => <Refresh lit {...props} />;
 
 export function SidebarHeader({
   searchQuery,
@@ -80,7 +79,7 @@ export function SidebarHeader({
       {onNavigateParent && (
         <div className="mr-auto flex items-center gap-2 min-w-0 pr-2">
           <PanelButton
-            icon={LongArrowUpLeft}
+            icon={ParentFolder}
             onClick={onNavigateParent}
             title="Parent directory (Backspace)"
             aria-label="Go to parent directory"
@@ -113,7 +112,7 @@ export function SidebarHeader({
           {/* Printed keys have no box, so a wider step sets the icon group
               apart from the md/git filters. */}
           <PanelButton
-            icon={CompressLines}
+            icon={CollapseAll}
             className="ml-1.5"
             onClick={onCollapseAll}
             title="Collapse all folders (X)"

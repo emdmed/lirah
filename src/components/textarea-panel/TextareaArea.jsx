@@ -2,7 +2,7 @@ import { Textarea } from "../ui/textarea";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import { KeyChord } from "../instrument/Keycap";
-import { Send, Undo } from "iconoir-react";
+import { Send, Undo } from "@/components/icons";
 import { AtMentionModal } from "../../features/at-mention";
 import { useAutoGrow } from "../../hooks/useAutoGrow";
 import { useBlockCaret } from "../../hooks/useBlockCaret";
@@ -89,7 +89,7 @@ export function TextareaArea({
                 aria-label="Clear CLI context"
                 className="px-1.5 text-muted-foreground"
               >
-                <Undo className="h-3 w-3" />
+                <Undo size={12} />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Clear CLI Context (Ctrl+Shift+L)</TooltipContent>
@@ -108,7 +108,7 @@ export function TextareaArea({
                   className={`gap-1 px-1.5 disabled:opacity-100 disabled:bg-transparent disabled:text-muted-foreground ${isSendDisabled ? 'pointer-events-none' : ''}`}
                   aria-label={sendBlockedReason ? `Send to CLI — unavailable: ${sendBlockedReason}` : 'Send to CLI'}
                 >
-                  <Send className="h-3 w-3" />
+                  <Send size={12} />
                   send
                 </Button>
               </span>

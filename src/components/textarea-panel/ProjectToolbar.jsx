@@ -1,4 +1,4 @@
-import { NavArrowDown } from "iconoir-react";
+import { ChevronDown } from "@/components/icons";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ export function ProjectToolbar({ projectPath, onLoadGroup, onSaveGroup, fileCoun
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="panel" aria-label="Project actions and context sets">
             {label}
-            <NavArrowDown className="h-3 w-3" />
+            <ChevronDown size={12} />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-56 text-xs">

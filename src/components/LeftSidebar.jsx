@@ -12,6 +12,7 @@ import { useRowCursor } from "../hooks/useRowCursor";
 import { SegmentBank } from "./instrument/SegmentBank";
 import { useSetting } from "../features/settings/settingsStore";
 import { TabButton } from "./instrument/TabButton";
+import { Files, Terminal } from "@/components/icons";
 import { MasterStrip } from "../features/tabs/MasterStrip";
 import { TabsSummaryPane } from "../features/tabs/TabsSummaryPane";
 import { useTabManager } from "../features/tabs/TabContext";
@@ -38,8 +39,8 @@ function SectionSwitch({ section, onSection, filesPanel, onFilesPanel }) {
   const waiting = useAttentionQueue(workspaceTabs).length;
   return (
     <div role="tablist" aria-label="Files pane sections" className="flex items-end gap-2 px-1.5 h-9 shrink-0 edge-b-engraved">
-      <TabButton active={section === 'tabs'} onClick={() => onSection('tabs')} label="tabs" count={waiting} countTone="text-[var(--ins-warn)]" controls="files-section" hint="The workspace's tabs (:tabs)" />
-      <TabButton active={section === 'files'} onClick={() => onSection('files')} label="files" controls="files-section" hint="The project's files" />
+      <TabButton active={section === 'tabs'} onClick={() => onSection('tabs')} label="tabs" icon={Terminal} count={waiting} countTone="text-[var(--ins-warn)]" controls="files-section" hint="The workspace's tabs (:tabs)" />
+      <TabButton active={section === 'files'} onClick={() => onSection('files')} label="files" icon={Files} controls="files-section" hint="The project's files" />
       {section === 'files' && (
         <SegmentBank className="ml-auto self-center" label="Files view" value={filesPanel} onChange={onFilesPanel} options={FILES_PANELS} />
       )}
@@ -47,12 +48,12 @@ function SectionSwitch({ section, onSection, filesPanel, onFilesPanel }) {
   );
 }
 
-function TabsSection() {
+function TabsSection({ live }) {
   const dialog = useDialog();
   return (
     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col pb-1.5">
       <MasterStrip />
-      <TabsSummaryPane onNewTab={() => dialog.open('newTab', {}, null)} />
+      <TabsSummaryPane live={live} onNewTab={() => dialog.open('newTab', {}, null)} />
     </div>
   );
 }
@@ -144,8 +145,10 @@ export const LeftSidebar = memo(function LeftSidebar({
         />
         <SidebarContent id="files-section" role="tabpanel" aria-label={section} className="flex flex-col flex-1 min-h-0">
           <SectionSwitch section={section} onSection={setSection} filesPanel={filesPanel} onFilesPanel={setFilesPanel} />
-          {/* Tabs and features follow the active tab, so hidden tabs don't mount them. */}
-          {section === 'tabs' ? (isActive && <TabsSection />)
+          {/* Features follow the active tab, so hidden tabs don't mount them. The
+              tabs pane stays mounted, idle: a tab comes back with its rows drawn,
+              not with an empty pane that fills in a few frames later. */}
+          {section === 'tabs' ? <TabsSection live={isActive} />
           : !showTree ? (isActive && <FeaturesSection projectPath={projectPath} />)
           : <>
           <SidebarHeader

@@ -1,4 +1,4 @@
-import { Archive, Play, Square, Terminal } from 'iconoir-react';
+import { Archive, Play, Stop, Terminal } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -96,7 +96,7 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, on
             </RowAction>
             {(ap?.status === AUTOPILOT_STATUS.PAUSED || ap?.status === AUTOPILOT_STATUS.FAILED) && (<>
             <RowAction onClick={onStop} title="Turn auto-pilot off (the agent is not interrupted)" className={buttonVariants({ variant: 'ghost', size: 'panel' })}>
-              <Square aria-hidden="true" />stop
+              <Stop aria-hidden="true" />stop
             </RowAction>
             <RowAction onClick={onResume} title="Carry on in this tab (p)" className={buttonVariants({ variant: 'default', size: 'panel' })}>
               <Play aria-hidden="true" />resume

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTerminal } from '../hooks/useTerminal';
 import { SecondaryTerminalPicker } from './SecondaryTerminalPicker';
 import { TerminalSearchBar } from './TerminalSearchBar';
-import { Expand, Collapse } from 'iconoir-react';
+import { Collapse, Expand } from '@/components/icons';
 import { PaneLegend } from './instrument/PaneLegend';
 
 // Programs that take the whole window with every Lirah keybind off. They run
@@ -160,7 +160,7 @@ export const SecondaryTerminal = memo(forwardRef(({ theme, visible, onClose, onF
         title={fullscreen ? 'Restore' : 'Maximize'}
         aria-label={fullscreen ? 'Restore' : 'Maximize'}
       >
-        {fullscreen ? <Collapse className="size-2.5" /> : <Expand className="size-2.5" />}
+        {fullscreen ? <Collapse size={10} /> : <Expand size={10} />}
       </button>
       <SecondaryTerminalInstance
         ref={ref}

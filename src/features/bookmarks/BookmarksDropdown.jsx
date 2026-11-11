@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { Star, Xmark } from 'iconoir-react';
+import { Close, Star } from '@/components/icons';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { useBookmarks } from './BookmarksContext';
 import { buttonVariants } from '@/components/ui/button';
@@ -39,7 +39,7 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
         {onAdd && (
           <>
             <DropdownMenuItem onSelect={onAdd} className="cursor-pointer text-xs">
-              <Star className="w-3 h-3" />
+              <Star size={12} />
               Star this project
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -74,7 +74,7 @@ export function BookmarksDropdown({ onNavigate, onAdd }) {
                     title="Unstar project"
                     aria-label="Unstar project"
                   >
-                    <Xmark className="w-2.5 h-2.5" />
+                    <Close size={10} />
                   </button>
                 )}
               </DropdownMenuItem>

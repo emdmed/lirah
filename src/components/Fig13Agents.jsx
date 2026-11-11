@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Xmark } from 'iconoir-react';
+import { Close } from '@/components/icons';
 import { FIGURES, figNumber, useFigureCompact } from '@/components/instrument/figure';
 import { CalRecipe, Calibrated } from '@/components/instrument/calibrated';
 import { agentName, formatElapsed, truncate } from './agentLabels';
@@ -189,7 +189,7 @@ export function Fig13Agents({ agents, now, onDismiss, onOpenList, renderCard, cl
                 aria-label={`Dismiss ${name}`}
                 title="Dismiss"
               >
-                <Xmark />
+                <Close />
               </button>
             </div>
           );

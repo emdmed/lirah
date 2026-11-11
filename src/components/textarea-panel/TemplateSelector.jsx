@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { NavArrowDown, Xmark } from "iconoir-react";
+import { ChevronDown, Close } from "@/components/icons";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Keycap } from "../instrument/Keycap";
@@ -73,7 +73,7 @@ export function TemplateSelector({
           title={`Click to clear template  ·  ${OPEN_KEYS}`}
         >
           {selectedTemplate.title}
-          <Xmark className="h-2.5 w-2.5 flex-shrink-0 hover:opacity-70" />
+          <Close size={10} className="flex-shrink-0 hover:opacity-70" />
         </Badge>
       )}
       <DropdownMenu open={open} onOpenChange={onOpenChange}>
@@ -86,7 +86,7 @@ export function TemplateSelector({
             title={triggerTitle}
           >
             <span>instructions</span>
-            <NavArrowDown className="h-3 w-3" />
+            <ChevronDown size={12} />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-60 text-xs">

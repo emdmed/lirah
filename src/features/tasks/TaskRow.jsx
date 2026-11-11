@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
-import { Check, DataTransferBoth, NavArrowDown, Trash, Undo } from 'iconoir-react';
+import { Check, ChevronDown, Transfer, Trash, Undo } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -114,7 +114,7 @@ export const TaskRow = memo(function TaskRow({
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <PanelButton icon={NavArrowDown} title="Plan with another context" aria-label="Plan with another context" />
+                  <PanelButton icon={ChevronDown} title="Plan with another context" aria-label="Plan with another context" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[240px]">
                   <DropdownMenuLabel className="text-xs">Then</DropdownMenuLabel>
@@ -150,7 +150,7 @@ export const TaskRow = memo(function TaskRow({
             aria-label={done ? 'Back to the backlog' : 'Mark done'}
           />
           {moveLabel && (
-            <PanelButton icon={DataTransferBoth} onClick={() => onMove(task)} title={moveLabel} aria-label={moveLabel} />
+            <PanelButton icon={Transfer} onClick={() => onMove(task)} title={moveLabel} aria-label={moveLabel} />
           )}
           <PanelButton icon={Trash} onClick={() => onRemove(task)} title="Delete task" aria-label="Delete task" />
         </span>

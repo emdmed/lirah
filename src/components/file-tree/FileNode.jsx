@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Eye, Pin, PinSlash } from "iconoir-react";
+import { Pin, Unpin, View } from "@/components/icons";
 import { GitStatsBadge } from "../../features/git/GitStatsBadge";
 import { TreeGuide } from "./TreeGuide";
 import { AgentMark } from "./AgentMark";
@@ -97,7 +97,7 @@ export function FileNode({
           aria-label="View file"
           className={cn(buttonVariants({ variant: 'ghost', size: 'icon-panel' }), TREE_KEY, 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
         >
-          <Eye className="w-2.5 h-2.5" />
+          <View size={10} />
         </button>
       )}
 
@@ -115,11 +115,11 @@ export function FileNode({
           {/* A pinned row carries a quiet pin; hovering the button offers the unpin. */}
           {isPinned ? (
             <>
-              <Pin className="w-2.5 h-2.5 opacity-60 group-hover/pin:hidden" />
-              <PinSlash className="w-2.5 h-2.5 hidden group-hover/pin:block" />
+              <Pin size={10} className="opacity-60 group-hover/pin:hidden" />
+              <Unpin size={10} className="hidden group-hover/pin:block" />
             </>
           ) : (
-            <Pin className="w-2.5 h-2.5" />
+            <Pin size={10} />
           )}
         </button>
       )}

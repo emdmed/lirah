@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from './ui/sidebar';
-import { Folder, Page, PageMinus } from 'iconoir-react';
+import { File, Folder, RemoveFile } from '@/components/icons';
 import { isDimmedEntry } from './file-tree/utils/lsColors';
 
 export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex = null, registerList }) {
@@ -52,7 +52,7 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
                 >
                   <div className="flex items-center gap-1.5 w-full text-xs">
                     <span className="w-3 shrink-0" /> {/* cursor column */}
-                    <Folder className="w-3 h-3 shrink-0 text-muted-foreground" />
+                    <Folder size={12} className="shrink-0 text-muted-foreground" />
                     <span className="truncate text-foreground" title={item.name}>{item.name}</span>
                   </div>
                 </SidebarMenuButton>
@@ -66,9 +66,9 @@ export function FlatViewMenu({ folders, currentPath, onFolderClick, cursorIndex 
                 <span className="w-3 shrink-0 text-center text-git-deleted text-[11px] font-mono">{isDeleted && 'D'}</span>
                 <div className="flex items-center justify-start min-w-0 gap-1.5 flex-1">
                   {isDeleted ? (
-                    <PageMinus className="w-3 h-3 flex-shrink-0 text-git-deleted" />
+                    <RemoveFile size={12} className="flex-shrink-0 text-git-deleted" />
                   ) : (
-                    <Page className="w-3 h-3 flex-shrink-0" />
+                    <File size={12} className="flex-shrink-0" />
                   )}
                   <span className={`truncate ${isDeleted ? 'line-through text-git-deleted' : ''}`}>{item.name}</span>
                 </div>

@@ -10,18 +10,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Scanner } from '@/components/instrument/Scanner';
-import {
-  CheckCircle, WarningTriangle, XmarkCircle, Download,
-} from 'iconoir-react';
+import { Done, Download, Failed, Warning } from '@/components/icons';
 import { useToast } from '@/features/toast';
 import { EmptyPlate } from '@/components/EmptyState';
 
 const STATUS_ICON = {
-  installed: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
-  current: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-success)' }} />,
-  outdated: <WarningTriangle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-warning)' }} />,
-  missing: <XmarkCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-critical)' }} />,
-  updated: <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-status-info)' }} />,
+  installed: <Done size={14} style={{ color: 'var(--color-status-success)' }} />,
+  current: <Done size={14} style={{ color: 'var(--color-status-success)' }} />,
+  outdated: <Warning size={14} style={{ color: 'var(--color-status-warning)' }} />,
+  missing: <Failed size={14} style={{ color: 'var(--color-status-critical)' }} />,
+  updated: <Done size={14} style={{ color: 'var(--color-status-info)' }} />,
 };
 
 const STATUS_BADGE = {
@@ -99,7 +97,7 @@ function WorkflowRow({ workflow, projectPath, orchestrationCheck, onRefresh, toa
           onClick={handleInstall}
           busy={installing}
         >
-          {!installing && <Download className="w-2.5 h-2.5" />}
+          {!installing && <Download size={10} />}
           Install
         </Button>
       ) : (
@@ -212,7 +210,7 @@ export function OrchestrationDashboard({
                 <>
                   {!hooksStatus.installed && (
                     <div className="flex items-center gap-1.5 text-[11px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
-                      <WarningTriangle className="w-3 h-3" />
+                      <Warning size={12} />
                       Hooks not installed. Install globally via the orchestration setup guide.
                     </div>
                   )}
