@@ -37,6 +37,7 @@ import { useTextareaShortcuts } from "../../hooks/useTextareaShortcuts";
 import { useHelpShortcut } from "../../hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "../bookmarks";
 import { useClaudeLauncher } from "../cli-selection";
+import { launchOptions } from "./launchOptions";
 import { killCliAndResetTerminal } from "./terminalReset";
 import { useFileSymbols } from "../file-analysis/useFileSymbols";
 import { useTokenUsage } from "../token-budget/useTokenUsage";
@@ -147,11 +148,6 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-// Tells the workspace terminal's agent what it is for; the lirah skill has the how.
-const MASTER_PROMPT = 'You are the agent in this Lirah workspace\'s workspace terminal. The tabs listed by `lirah tabs` are your workers: '
-  + 'the user asks you for work and you hand it to them with `lirah tabs send` and collect it with `lirah tabs wait`, '
-  + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the workspace terminal" section.';
-
 // visible: on screen (layout, polls, fit, rendering). isActive: focused (keys,
 // palette, status slot, dialogs, terminal focus). column/columns: this visible
 // tab's slot among the side-by-side visible tabs.
@@ -459,7 +455,9 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   });
 
   // Claude launcher
-  const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+  const { launchClaude: launchCli, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+  // Every launch carries the tab's system prompt; extra arguments (click events) are ignored.
+  const launchClaude = useCallback(() => launchCli(launchOptions({ master })), [launchCli, master]);
   // A claude started by hand: stop it and start it again with the plugin.
   const relaunchCli = useCallback(async () => {
     await terminateCliProcess();
@@ -486,7 +484,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     const transcript = settings.selectedCli === 'claude-code' ? getTabTranscript(tabId) : null;
     const resume = transcript && await invoke('path_exists', { path: transcript }).catch(() => false);
     const resumeId = resume ? transcript.split(/[\\/]/).pop().replace(/\.jsonl$/, '') : null;
-    return launchClaude({ resumeId, systemPrompt: master ? MASTER_PROMPT : undefined });
+    return launchCli(launchOptions({ master, resumeId }));
   });
 
   useEffect(() => {
