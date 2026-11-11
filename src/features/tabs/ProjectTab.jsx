@@ -1209,7 +1209,8 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
             branchName={branchName}
             onToggleHelp={toggleHelp}
             selectedCli={settings.selectedCli}
-            onOpenCliSettings={openCliSettings}
+            onCliChange={settings.setSelectedCli}
+            cliAvailability={cliAvailability}
             showTitleBar={settings.showTitleBar}
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}
