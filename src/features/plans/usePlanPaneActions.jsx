@@ -21,7 +21,7 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     deletePlan, implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, sendPlanFix, startAutopilot,
     resumeAutopilot, stopAutopilot, addPlanRepo, ensureGit, removeWorktrees, reopenGit, sendPlanRevise, rechunk, updatePlan,
   } = usePlansActions();
-  const { tabs, addTab, switchTab } = useTabManager();
+  const { tabs, activeTabId, addTab, wakeTab, switchTab, togglePlanTerminal } = useTabManager();
   const confirm = useConfirm();
   const toast = useToast();
   const [busy, setBusy] = useState(null); // the BUSY key of the action in flight
@@ -38,7 +38,7 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
   }, [toast]);
 
   const { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume } = usePlanRunActions({
-    repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, addTab, switchTab, confirm, toast,
+    repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, activeTabId, addTab, wakeTab, switchTab, confirm, toast,
     ensureGit, updatePlan, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
   });
   const { handleReview, handleReviewAll, diffProps } = usePlanReview({
@@ -164,11 +164,11 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
   const handleRechunk = useCallback((plan) => withBusy(BUSY.REVISE, () => rechunk(repoRoot, plan.id)),
     [withBusy, rechunk, repoRoot]);
 
-  // Focus the plan's tab, or open one (setting up git and launching Claude) when it's closed.
+  // Flip the tab between its terminal and the plan's, opening the plan's
+  // (setting up git and launching Claude, shown) when it's closed.
   const handleOpenPlanTab = useCallback((plan) => {
-    if (plan.tabId && tabs.some((t) => t.id === plan.tabId)) switchTab(plan.tabId);
-    else withBusy(BUSY.GIT_SETUP, () => prepareFor(plan));
-  }, [tabs, switchTab, withBusy, prepareFor]);
+    if (!togglePlanTerminal(plan.tabId)) withBusy(BUSY.GIT_SETUP, () => prepareFor(plan));
+  }, [togglePlanTerminal, withBusy, prepareFor]);
 
   const closePlan = useCallback(() => setOpenPlanId(null), []);
   const paneActions = useMemo(() => ({

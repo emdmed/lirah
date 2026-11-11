@@ -1,4 +1,4 @@
-import { Archive, Play, Square } from 'iconoir-react';
+import { Archive, Play, Square, Terminal } from 'iconoir-react';
 import { cn } from '../../lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -33,9 +33,10 @@ export function isSettledPlan(plan) {
  * one fixed height. With nothing live it shows the latest finished plan and
  * `note` in place of the chunk in flight. A stopped run gets resume (the primary
  * key, also `p` on the row) and stop, in the card's last row. Shelve takes the
- * card off the tab without deleting the plan.
+ * card off the tab without deleting the plan. Terminal flips the tab between its
+ * own terminal and the plan's (null: the plan has none yet).
  */
-export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve }) {
+export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, onTerminal, terminalShown }) {
   const { done, total, running, tag, lampState } = planStatus(plan);
   const title = plan.title || UNTITLED_PLAN;
   const ap = plan.autopilot;
@@ -78,8 +79,18 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve }) 
       />
       <span className="flex h-8 min-w-0 items-end gap-2 leading-4 text-muted-foreground">
         <span className="line-clamp-2 min-w-0 flex-1 self-start break-words">{note ?? now}</span>
-        {ap?.status !== AUTOPILOT_STATUS.RUNNING && (
-          <span className="flex shrink-0 items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
+          {onTerminal && (
+            <RowAction
+              onClick={onTerminal}
+              aria-pressed={terminalShown}
+              title={terminalShown ? 'Back to this tab\'s terminal' : 'Show the plan\'s terminal in this tab'}
+              className={buttonVariants({ variant: 'ghost', size: 'panel' })}
+            >
+              <Terminal aria-hidden="true" />{terminalShown ? 'back' : 'terminal'}
+            </RowAction>
+          )}
+          {ap?.status !== AUTOPILOT_STATUS.RUNNING && (<>
             <RowAction onClick={onShelve} title="Take this plan off the tab; it stays under all plans" className={buttonVariants({ variant: 'ghost', size: 'panel' })}>
               <Archive aria-hidden="true" />shelve
             </RowAction>
@@ -91,8 +102,8 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve }) 
               <Play aria-hidden="true" />resume
             </RowAction>
             </>)}
-          </span>
-        )}
+          </>)}
+        </span>
       </span>
     </RowAction>
   );

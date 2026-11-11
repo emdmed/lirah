@@ -63,6 +63,15 @@ export function masterTabOf(tabs, workspaceId) {
   return tabs.find((t) => t.workspaceId === workspaceId && t.master) || null;
 }
 
+// A tab the tab list shows: not the master terminal, not a plan's terminal.
+export const isProjectTab = (t) => !t.master && !t.planHost;
+
+// Whether this plan terminal is what its project tab shows now.
+export const planTerminalShown = (tabs, planTabId) => {
+  const host = tabs.find((t) => t.id === tabs.find((p) => p.id === planTabId)?.planHost);
+  return !!host && host.showing === planTabId;
+};
+
 // The deepest folder holding all of these paths ("/" at worst).
 function commonFolder(paths) {
   const parts = paths.map((p) => p.split('/').filter(Boolean));
@@ -72,8 +81,9 @@ function commonFolder(paths) {
 }
 
 // `launch` asks the tab to start its agent once its shell is up, even with
-// auto-launch off; ProjectTab clears it as soon as it boots.
-function createTab(projectPath, { launch = false, name, workspaceId, master = false } = {}) {
+// auto-launch off; ProjectTab clears it as soon as it boots. `planHost` makes it
+// a plan's terminal: hidden, shown inside that project tab (its `showing`).
+function createTab(projectPath, { launch = false, name, workspaceId, master = false, planHost, background = false } = {}) {
   return {
     id: crypto.randomUUID(),
     projectPath,
@@ -82,6 +92,8 @@ function createTab(projectPath, { launch = false, name, workspaceId, master = fa
     ...(name?.trim() && { customLabel: name.trim() }),
     ...(launch && { launch: true }),
     ...(master && { master: true }),
+    ...(planHost && { planHost }),
+    ...(background && { background: true }),
   };
 }
 
@@ -136,7 +148,7 @@ export function TabProvider({ children }) {
     const fromTab = tabs.find((t) => t.id === activeTabId)?.workspaceId;
     return fromTab || (workspaces.some((w) => w.id === stored) ? stored : workspaces[0].id);
   });
-  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId && !t.master), [tabs, activeWorkspaceId]);
+  const workspaceTabs = useMemo(() => tabs.filter((t) => t.workspaceId === activeWorkspaceId && isProjectTab(t)), [tabs, activeWorkspaceId]);
 
   // Persist to workspaces/ (debounced; fileStore flushes on window close).
   // The active tab is saved as its workspace's activeTabId.
@@ -201,7 +213,10 @@ export function TabProvider({ children }) {
     setTabs(prev => {
       const idx = prev.findIndex(t => t.id === tabId);
       if (idx === -1) return prev;
-      const next = prev.filter(t => t.id !== tabId);
+      // A project tab's plan terminals close with it; a closed plan terminal stops showing.
+      const next = prev
+        .filter(t => t.id !== tabId && t.planHost !== tabId)
+        .map(t => (t.showing === tabId ? { ...t, showing: undefined } : t));
       if (next.length === 0) return prev; // Don't remove last tab here; lifecycle handles it
       const ws = prev[idx].workspaceId;
       // A closed tab's Zen column closes with it (else focus-follow would refill it).
@@ -212,8 +227,8 @@ export function TabProvider({ children }) {
       // If removing the active tab, switch to the adjacent one in its
       // workspace (in Zen, the neighbouring column); the workspace may be left empty.
       if (tabId === activeTabIdRef.current) {
-        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws && !t.master);
-        const after = next.slice(idx).filter((t) => t.workspaceId === ws && !t.master);
+        const before = prev.slice(0, idx).filter((t) => t.workspaceId === ws && isProjectTab(t));
+        const after = next.slice(idx).filter((t) => t.workspaceId === ws && isProjectTab(t));
         const neighbour = getSettings().zenMode && col >= 0 && restCols[Math.min(col, restCols.length - 1)];
         setActiveTabId(neighbour || (after[0] || before[before.length - 1])?.id || null);
       }
@@ -227,9 +242,12 @@ export function TabProvider({ children }) {
     const current = tabsRef.current;
     const tab = current.find((t) => t.id === tabId);
     if (!tab || current.length < 2) return false;
-    const sessionId = getTabSession(tabId);
+    // Its plan terminals close with it, so a busy one asks too.
+    const sessionId = [tab, ...current.filter((t) => t.planHost === tabId)]
+      .map((t) => getTabSession(t.id))
+      .find((id) => BUSY_STATES.has(getAgentHookState(id)?.state));
     const hook = getAgentHookState(sessionId);
-    if (!hook || !BUSY_STATES.has(hook.state)) return true;
+    if (!hook) return true;
     const branch = await invoke('get_current_branch', { repoPath: tab.projectPath }).catch(() => null);
     // Working counts from the turn's start (hook.at moves on every tool call);
     // a permission wait counts from when it began.
@@ -260,19 +278,39 @@ export function TabProvider({ children }) {
     return true;
   }, [confirmCloseTab, removeTab]);
 
-  // A tab in another workspace (Alt+A, a plan's tab) brings its workspace along.
+  // Which plan terminal a project tab shows in place of its own (null: its own).
+  const showPlanTerminal = useCallback((hostId, planTabId) => {
+    setTabs(prev => prev.map(t => (t.id === hostId ? { ...t, showing: planTabId || undefined } : t)));
+  }, []);
+
+  // A tab in another workspace (Alt+A) brings its workspace along. A plan's
+  // terminal shows inside its project tab, which becomes the active one.
   const switchTab = useCallback((tabId) => {
+    const target = tabsRef.current.find((t) => t.id === tabId);
+    if (target?.planHost) {
+      showPlanTerminal(target.planHost, tabId);
+      tabId = target.planHost;
+    }
     if (tabId !== activeTabIdRef.current) perfTabSwitchStart();
     const ws = tabsRef.current.find((t) => t.id === tabId)?.workspaceId;
     if (ws) setActiveWorkspaceId(ws);
     setActiveTabId(tabId);
-  }, []);
+  }, [showPlanTerminal]);
+
+  // Flips a project tab between its own terminal and this plan's. False: no such plan terminal.
+  const togglePlanTerminal = useCallback((planTabId) => {
+    const host = tabsRef.current.find((t) => t.id === tabsRef.current.find((p) => p.id === planTabId)?.planHost);
+    if (!host) return false;
+    if (host.showing === planTabId && host.id === activeTabIdRef.current) showPlanTerminal(host.id, null);
+    else switchTab(planTabId);
+    return true;
+  }, [showPlanTerminal, switchTab]);
 
   const switchWorkspace = useCallback((workspaceId) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     if (!ws || workspaceId === activeWorkspaceIdRef.current) return;
     const own = tabsRef.current.filter((t) => t.workspaceId === workspaceId);
-    const tabId = (own.find((t) => t.id === ws.activeTabId) || own.find((t) => !t.master))?.id || null;
+    const tabId = (own.find((t) => t.id === ws.activeTabId) || own.find(isProjectTab))?.id || null;
     if (tabId) perfTabSwitchStart();
     activeWorkspaceIdRef.current = workspaceId;
     setActiveWorkspaceId(workspaceId);
@@ -306,7 +344,7 @@ export function TabProvider({ children }) {
 
   // The active workspace's tabs at call time, for actions that must not re-render on every tab change.
   const getWorkspaceTabs = useCallback(() => tabsRef.current
-    .filter((t) => t.workspaceId === activeWorkspaceIdRef.current && !t.master), []);
+    .filter((t) => t.workspaceId === activeWorkspaceIdRef.current && isProjectTab(t)), []);
 
   // Takes a tab off screen; the last column stays.
   const dropZenColumn = useCallback((tabId) => {
@@ -380,7 +418,7 @@ export function TabProvider({ children }) {
   const reorderTab = useCallback((fromIndex, toIndex) => {
     const ws = activeWorkspaceIdRef.current;
     setTabs(prev => {
-      const shown = prev.filter((t) => t.workspaceId === ws);
+      const shown = prev.filter((t) => t.workspaceId === ws && isProjectTab(t));
       const moved = shown[fromIndex];
       const target = shown[toIndex];
       if (!moved || !target || moved === target) return prev;
@@ -460,6 +498,8 @@ export function TabProvider({ children }) {
     addTab,
     setTabNote,
     wakeTab,
+    showPlanTerminal,
+    togglePlanTerminal,
     openMaster,
     removeTab,
     confirmCloseTab,
@@ -480,7 +520,7 @@ export function TabProvider({ children }) {
     placeZenColumn,
     dropZenColumn,
     getWorkspaceTabs,
-  }), [addTab, setTabNote, wakeTab, openMaster, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
+  }), [addTab, setTabNote, wakeTab, showPlanTerminal, togglePlanTerminal, openMaster, removeTab, confirmCloseTab, requestCloseTab, clearTabLaunch, switchTab, reorderTab, updateTabPath, renameTab, setTabRole, setTabCompaction,
     switchWorkspace, addWorkspace, openWorkspace, renameWorkspace, removeWorkspace, setZenColumns, placeZenColumn, dropZenColumn, getWorkspaceTabs]);
 
   const zenColumns = useMemo(

@@ -98,7 +98,7 @@ The bundles land in `src-tauri/target/release/bundle/`. To open a directory at s
 
 ### Plans and auto-pilot (Workspace → plans)
 - Paste a plan or import `.md` plan files from `~/.lirah/plans/<YYYY-MM>/`. An agent splits the plan into chunks.
-- Each plan runs in its own tab, opened on the first send, reused after that and reopened if you close it. Chunks, review fixes, revisions and auto-pilot all go there.
+- Each plan runs in its own terminal inside the project tab you first send it from, so your own terminal stays free. It opens on the first send and is reused after that. Chunks, review fixes, revisions and auto-pilot all go there. The **terminal** button on the plan's card in the tab list, and on the plan in the plans view, flips the tab between your terminal and the plan's.
 - For each chunk: implement it (one commit per chunk), review it with notes, roll back, skip or reorder.
 - **Auto-pilot** (`:autopilot`) chains chunks unattended. It pauses on questions, permission prompts, a missing commit, or when the agent hooks go silent.
 - Each plan shows its stage, links its pull request through `gh` when it's installed, and closes its task once the commits reach the base branch.

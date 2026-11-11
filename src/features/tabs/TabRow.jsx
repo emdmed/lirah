@@ -371,6 +371,8 @@ export const TabRow = memo(function TabRow({
               onResume={() => actions.resumePlan(plan)}
               onStop={() => actions.stopPlan(plan)}
               onShelve={() => actions.shelvePlan(plan)}
+              terminalShown={!!plan.tabId && tab.showing === plan.tabId}
+              onTerminal={plan.tabId ? () => actions.togglePlanTerminal(tab.id, plan) : null}
             />
           ))}
         </>

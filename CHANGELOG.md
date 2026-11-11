@@ -6,7 +6,7 @@ All notable changes to Lirah will be documented in this file.
 
 ### Changed
 
-- **Plans** - Each plan runs in its own tab, opened on the first send and reused after that.
+- **Plans** - Each plan runs in its own terminal inside its project tab, opened on the first send and reused after that. A terminal button on the plan's card and in the plans view switches between your terminal and the plan's.
 
 ## [0.24.0] - 2026-11-10
 

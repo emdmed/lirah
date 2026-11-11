@@ -10,7 +10,7 @@ import { planGit, workPath } from './planGit';
 import { subscribeAutopilotToggle, takeAutopilotToggle } from './plansPaneEvents';
 import { BUSY } from './PlanPaneContext';
 
-// How long a new tab's Claude has to report in. Long enough for a first-run
+// How long a new plan terminal's Claude has to report in. Long enough for a first-run
 // "trust this folder?" prompt in a fresh worktree.
 const AGENT_START_TIMEOUT_MS = 120_000;
 // After it reports in, before typing into it.
@@ -35,24 +35,24 @@ function agentStarted(tabId, ms) {
 }
 
 /**
- * Sending chunks to the plan's own tab: opening that tab, the checks before a
- * send, a single chunk, auto-pilot start and resume, and the command palette's `:autopilot`.
+ * Sending chunks to the plan's own terminal (a second terminal inside the
+ * project tab it was first sent from): opening it, the checks before a send, a
+ * single chunk, auto-pilot start and resume, and the command palette's `:autopilot`.
  */
 export function usePlanRunActions({
-  repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, addTab, switchTab, confirm, toast,
+  repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, activeTabId, addTab, wakeTab, switchTab, confirm, toast,
   ensureGit, updatePlan, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
 }) {
-  // Before typing into the plan's tab: is there an agent, and is it free?
+  // Before typing into the plan's terminal: is there an agent, and is it free?
   // `chunk` is the one about to be sent; auto-pilot adopts a chunk in flight.
   const confirmSend = useCallback(async (plan, chunk, tabId) => {
-    switchTab(tabId);
     const agent = getAgentHookState(getTabSession(tabId));
     const other = chunk && plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS && c.id !== chunk.id);
     if (!agent) {
       return confirm({
-        title: 'No agent detected in the plan\'s tab',
+        title: 'No agent detected in the plan\'s terminal',
         description: chunk
-          ? 'The chunk prompt is typed into the plan\'s tab. Launch Claude there first (Ctrl+K), or send anyway if it is already running.'
+          ? 'The chunk prompt is typed into the plan\'s terminal. Show it (terminal), launch Claude there (Ctrl+K), or send anyway if it is already running.'
           // Auto-pilot hears when a chunk ends only through the hook plugin the launcher loads.
           : 'Auto-pilot follows the agent through Lirah\'s hooks, which load when Claude is launched with Ctrl+K. '
             + 'An agent started another way gets the first chunk, then the run pauses.',
@@ -71,7 +71,7 @@ export function usePlanRunActions({
       });
     }
     return true;
-  }, [switchTab, confirm]);
+  }, [confirm]);
 
   // Set up the plan's branch and worktrees. Null: setup failed (already said).
   const setUpGit = useCallback(async (plan) => {
@@ -89,22 +89,31 @@ export function usePlanRunActions({
     return cfg;
   }, [ensureGit, repoRoot, toast]);
 
-  // The plan's tab if it is still open, else a new one where the plan works,
-  // with Claude launched and ready. The tab's id, or null.
+  // The plan's terminal if it is running, else a new one inside the active
+  // project tab, where the plan works, shown until Claude is ready. Its id, or null.
   const ensurePlanTab = useCallback(async (plan, cfg) => {
-    if (plan.tabId && tabs.some((t) => t.id === plan.tabId)) return plan.tabId;
-    const tab = addTab(cfg.workDir || repoRoot, { launch: true, name: plan.title || UNTITLED_PLAN });
-    if (!tab) return null;
-    updatePlan(repoRoot, plan.id, { tabId: tab.id });
-    if (!(await agentStarted(tab.id, AGENT_START_TIMEOUT_MS))) {
-      toast.error(`Claude didn't start in the plan's tab "${plan.title || UNTITLED_PLAN}". Launch it there (Ctrl+K), then send again.`);
+    let id = plan.tabId && tabs.some((t) => t.id === plan.tabId) ? plan.tabId : null;
+    if (id && getTabSession(id)) return id;
+    if (id) {
+      wakeTab(id); // restored at startup, not booted yet: boots and launches Claude
+    } else {
+      const active = tabs.find((t) => t.id === activeTabId);
+      const host = active?.planHost || activeTabId;
+      if (!host) return null;
+      const tab = addTab(cfg.workDir || repoRoot, { name: plan.title || UNTITLED_PLAN, planHost: host, background: true, focus: false });
+      id = tab.id;
+      updatePlan(repoRoot, plan.id, { tabId: id });
+    }
+    switchTab(id); // shown while it starts, in case Claude asks to trust the folder
+    if (!(await agentStarted(id, AGENT_START_TIMEOUT_MS))) {
+      toast.error(`Claude didn't start in the plan's terminal "${plan.title || UNTITLED_PLAN}". Show it (terminal), launch Claude (Ctrl+K), then send again.`);
       return null;
     }
     await sleep(AGENT_SETTLE_MS);
-    return tab.id;
-  }, [tabs, addTab, updatePlan, repoRoot, toast]);
+    return id;
+  }, [tabs, activeTabId, addTab, wakeTab, switchTab, updatePlan, repoRoot, toast]);
 
-  // Set up git, then make sure the plan's tab is open. Its id, or null: don't send.
+  // Set up git, then make sure the plan's terminal is open. Its id, or null: don't send.
   const prepareFor = useCallback(async (plan) => {
     const cfg = await setUpGit(plan);
     return cfg ? ensurePlanTab(plan, cfg) : null;
@@ -130,7 +139,7 @@ export function usePlanRunActions({
       title: dirty ? `${dirty} uncommitted change${dirty === 1 ? '' : 's'} in the repo` : 'Run the plan on auto-pilot?',
       description: [
         dirty && 'The agent may commit them along with the first chunk. Commit or stash them first to keep chunks clean.',
-        `Chunks go to the plan's tab (opened in ${cfg.workDir || repoRoot} if needed) one at a time, each committed before the next.`,
+        `Chunks go to the plan's own terminal in this tab (opened in ${cfg.workDir || repoRoot} if needed) one at a time, each committed before the next.`,
         'You are notified when it finishes, needs you, or hits an error.',
         firstRun && 'Permission prompts pause the run: launch the agent with accept-edits to leave it unattended.',
       ].filter(Boolean).join(' '),

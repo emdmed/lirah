@@ -5,7 +5,7 @@ import { SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { PlanGitSection } from './PlanGitSection';
-import { ProgressReadout, Prose } from './parts';
+import { ProgressReadout, Prose, Section } from './parts';
 import { Checkbox } from '../../components/ui/checkbox';
 import {
   AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, PLAN_STAGE, planLifecycle, shortDate, planProgress, planStarted, SPLIT_STATUS,
@@ -21,8 +21,8 @@ import { useUncommitted } from './useUncommitted';
 import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
-import { isNoGit } from './planGit';
-import { useTabManager } from '../tabs/TabContext';
+import { isNoGit, planGit } from './planGit';
+import { planTerminalShown, useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { subscribePlanChunkCommand, takePlanChunkCommand } from './plansPaneEvents';
@@ -90,6 +90,8 @@ export function PlanDetail({ plan }) {
   const toast = useToast();
   const reviewingAll = useBusy(BUSY.REVIEW_ALL);
   const settingUpGit = useBusy(BUSY.GIT_SETUP);
+  const showingTerminal = planTerminalShown(tabs, plan.tabId);
+  const terminalTitle = showingTerminal ? 'Back to this tab\'s terminal' : 'Show the plan\'s terminal in this tab (opens one if closed)';
   const resplit = () => runSplit(repoRoot, plan.id);
   const { done, total } = planProgress(plan);
   const nextId = nextChunkId(plan);
@@ -164,6 +166,9 @@ export function PlanDetail({ plan }) {
   const filesOpen = showFiles;
   const commitFiles = usePlanCommitFiles(plan, filesOpen);
   const noGit = isNoGit(plan);
+  // The plan's terminal key: once git is set up (and not removed), or with no git at all.
+  const gitCfg = noGit ? null : planGit(plan);
+  const terminalKey = noGit || (!!gitCfg.preparedAt && !gitCfg.removedAt);
   const hasCommits = !noGit && plan.chunks.some((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
 
   // Read before each chunk, so it can change during a run.
@@ -197,206 +202,15 @@ export function PlanDetail({ plan }) {
   // Running, paused or failed: what the run needs from you comes before the plan's identity.
   const runUp = [AUTOPILOT_STATUS.RUNNING, AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED].includes(plan.autopilot?.status);
 
-  return (
-    <div className="flex flex-col">
-      <div className="flex flex-col px-3 pt-2 pb-3.5">
-        <div className="flex items-center gap-1.5">
-          <PanelButton icon={NavArrowLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
-          <span className="ml-auto flex items-center gap-1">
-            {/* Pressed, not latched: a view toggle has no lamp to light. */}
-            <PanelButton
-              aria-pressed={showSource}
-              data-latched={showSource || undefined}
-              aria-controls="plan-source"
-              onClick={() => setShowSource((v) => !v)}
-              title="Show the plan as it was pasted"
-            >
-              source
-            </PanelButton>
-            <PanelButton
-              aria-pressed={showRevise}
-              data-latched={showRevise || undefined}
-              aria-controls="plan-revise"
-              onClick={() => setShowRevise((v) => !v)}
-              title="Ask the agent in this tab to change the plan file"
-            >
-              revise
-            </PanelButton>
-            {plan.split !== SPLIT_STATUS.RUNNING && (
-              <PanelButton
-                onClick={() => pane.rechunk(plan)}
-                disabled={revising || chunkInFlight || piloted}
-                title={chunkInFlight || piloted ? 'Not while a chunk or auto-pilot is running'
-                  : started ? 'Split what isn\'t done yet again, from the plan file as it is now; finished chunks stay'
-                    : 'Split the plan again, from its file as it is now'}
-              >
-                {started ? 're-chunk' : 're-split'}
-              </PanelButton>
-            )}
-            <PanelButton
-              onClick={() => shelvePlan(repoRoot, plan.id, !plan.shelved)}
-              title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Take this plan out of the tabs pane; it stays here'}
-            >
-              {plan.shelved ? 'unshelve' : 'shelve'}
-            </PanelButton>
-            <PanelButton onClick={() => pane.deletePlan(plan)} title="Delete this plan (asks first)">delete</PanelButton>
-          </span>
-        </div>
-        {showSource && (
-          <pre id="plan-source" className="ins-well mt-2 max-h-72 overflow-auto whitespace-pre-wrap wrap-anywhere px-2 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
-            {plan.source}
-          </pre>
-        )}
-
-        {showRevise && (
-          <form
-            id="plan-revise"
-            className="mt-2 flex flex-col gap-1.5"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!reviseNotes.trim()) return;
-              if (await pane.revise(plan, reviseNotes)) {
-                setReviseNotes('');
-                setShowRevise(false);
-              }
-            }}
-          >
-            <textarea
-              aria-label="What should change in the plan"
-              value={reviseNotes}
-              onChange={(e) => setReviseNotes(e.target.value)}
-              rows={4}
-              placeholder="what should change in the plan? the agent edits only the plan file"
-              className="ins-well resize-y px-1.5 py-1 text-[11px] leading-relaxed text-foreground outline-none"
-              autoFocus
-            />
-            <div className="flex gap-1.5">
-              <PanelButton type="submit" variant="default" disabled={!reviseNotes.trim() || revising}>send to agent</PanelButton>
-              <PanelButton variant="outline" onClick={() => setShowRevise(false)}>cancel</PanelButton>
-            </div>
-          </form>
-        )}
-
-        {runUp && <div className="mt-3">{strip}</div>}
-
-        {/* Identity next: the title, and what the plan is for. */}
-        <h3 className="mt-3 text-[13px] leading-snug text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
-        {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1 text-[11px] leading-relaxed text-muted-foreground" />}
-
-        <LifecycleLine plan={plan} />
-
-        {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
-        {stuck && (
-          <button
-            type="button"
-            onClick={() => openChunk(stuck.id, { focus: true })}
-            title={`Go to chunk ${stuck.n}`}
-            className="ins-well mt-3 flex min-w-0 cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-[11px] outline-none hover:text-foreground focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
-          >
-            <Lamp state="wait" label="needs you" />
-            <span className="engraved-label shrink-0">needs you</span>
-            <span className="min-w-0 truncate tabular-nums text-foreground" role="status">
-              chunk {stuck.n} · no commit
-              <span className="text-muted-foreground">
-                {dirty == null ? '' : dirty.length > 0
-                  ? ` · ${dirty.length} uncommitted → commit`
-                  : ' · tree clean → mark done'}
-              </span>
-            </span>
-          </button>
-        )}
-      </div>
-
-      {/* Sections: each starts on a full-width hairline with the same padding,
-          so header, progress, git and chunks read as separate blocks. */}
-      {(total > 0 || plan.autopilot || canPilot) && (
-        <section aria-label="Progress" className="flex flex-col gap-3 px-3 pt-3 pb-3.5 edge-t-engraved">
-          {/* Where it stands: the route, one stop per chunk. */}
-          {total > 0 && (
-            <div>
-              {/* Full: the timeline, once a chunk has a time; until then the bar.
-                  A finished run's strip draws it below, so it isn't drawn twice. */}
-              {plan.autopilot?.status === AUTOPILOT_STATUS.DONE ? (
-                <ProgressReadout plan={plan} done={done} total={total} />
-              ) : (
-                // A live run's strip already says where it is: no second count.
-                <Fig20Timeline plan={plan} showCount={!runUp} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
-              )}
-            </div>
-          )}
-
-          {/* A settled run (done or off) is a line here; a live one sits at the top. */}
-          {plan.autopilot && !runUp && <div>{strip}</div>}
-          {/* The run bank, under the run's status: the primary key, with its one
-              option beside it. During a run the option moves into the strip,
-              beside stop. While a chunk is stuck its fix is the primary key, so
-              this one steps down to a plain key. */}
-          {canPilot && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <PanelButton
-                icon={Play}
-                onClick={() => pane.autopilot(plan)}
-                // The plan's one primary key: framed and lamp-lit.
-                variant={stuck ? undefined : 'default'}
-                title={handSent
-                  ? `Adopt chunk ${handSent.n} (asking the agent to commit it if needed), then implement the rest one after another, unattended`
-                  : 'Implement the remaining chunks one after another, unattended'}
-              >
-                {handSent ? `run on auto-pilot from ${handSent.n}` : 'run on auto-pilot'}
-              </PanelButton>
-              {freshContext}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Setup: one line under a hairline; the form opens on demand. */}
-      <section aria-label="Plan git" className="px-3 pt-3 pb-3.5 edge-t-engraved">
-        {noGit ? (
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="engraved-label min-w-0 flex-1 truncate text-[11px]">no git · chunks finish on PLAN-STATUS</span>
-            <PanelButton icon={Terminal} onClick={() => pane.openPlanTab(plan)} className="shrink-0" title="Go to the plan's terminal (opens one if closed)">
-              plan tab
-            </PanelButton>
-          </div>
-        ) : (
-        <PlanGitSection
-          plan={plan}
-          busy={settingUpGit}
-          onChange={(patch) => setGitConfig(repoRoot, plan.id, patch)}
-          onAddRepo={(path) => pane.addRepo(plan, path)}
-          onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
-          onOpenTab={() => pane.openPlanTab(plan)}
-          onRemoveWorktrees={() => pane.removeWorktrees(plan)}
-          onReopen={started || isAutopilotLive(plan.autopilot) ? null : () => pane.reopenGit(plan)}
-        />
-        )}
-      </section>
-
-      {plan.split === SPLIT_STATUS.RUNNING && (
-        <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
-          <Scanner size="md" />
-          splitting into chunks…
-        </div>
-      )}
-      {plan.split === SPLIT_STATUS.FAILED && (
-        <div className="flex flex-col items-start gap-1.5 px-3 py-2.5 text-[11px]">
-          <span className="flex items-center gap-2 text-foreground"><Lamp state="fault" /> split failed</span>
-          <span className="break-words text-[11px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
-          <PanelButton icon={Refresh} onClick={resplit}>re-split</PanelButton>
-        </div>
-      )}
-
-      {total > 0 && filesOpen && (
-        <div id="plan-files-by-chunk" className="px-3 py-2.5 edge-t-engraved">
-          <Fig22FilesByChunk plan={plan} files={commitFiles} />
-        </div>
-      )}
+  // A finished plan is read back chunk by chunk, so its breakdown leads.
+  const finished = total > 0 && done === total && !chunkInFlight;
+  const chunksBlock = (
+    <>
       {total > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 edge-t-engraved edge-b-engraved">
-          <span className="ins-legend">chunks</span>
-          <span aria-hidden="true" className="h-px flex-1 bg-[var(--ins-edge)]" />
-          <span className="font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-muted-foreground">
+        <Section
+          title="chunks"
+          className="pb-0"
+          aside={<span className="font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-muted-foreground">
             {plan.chunks.length}
             {hasCommits ? (
               <>
@@ -415,8 +229,14 @@ export function PlanDetail({ plan }) {
             ) : (
               fileCount > 0 && ` · ${fileCount} files`
             )}
-          </span>
-        </div>
+          </span>}
+        >
+          {filesOpen && (
+            <div id="plan-files-by-chunk" className="pb-1">
+              <Fig22FilesByChunk plan={plan} files={commitFiles} />
+            </div>
+          )}
+        </Section>
       )}
 
       <div className="group/list flex flex-col py-1.5" onKeyDown={onListKey}>
@@ -424,7 +244,8 @@ export function PlanDetail({ plan }) {
           // An unfolded run keeps its row, as the key that folds it again.
           const rows = chunkSegments(plan.chunks, open).flatMap((seg) => {
             if (!seg.run) return [{ key: seg.key, chunk: seg.chunk }];
-            const head = { key: seg.key, run: seg.run, unfolded: unfolded.has(seg.key) };
+            // A finished plan opens unfolded; the set then holds the runs you flipped.
+            const head = { key: seg.key, run: seg.run, unfolded: unfolded.has(seg.key) !== finished };
             return head.unfolded ? [head, ...seg.run.map((chunk) => ({ key: chunk.id, chunk }))] : [head];
           });
           // P6: the "took" lines of the rows on show share one scale, with its
@@ -465,6 +286,201 @@ export function PlanDetail({ plan }) {
           </div>
         )}
       </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col">
+      <div className="flex flex-col px-3 pt-2 pb-3.5">
+        <div className="flex items-center gap-1.5">
+          <PanelButton icon={NavArrowLeft} onClick={pane.closePlan} title="Back to all plans">plans</PanelButton>
+          <span className="ml-auto flex items-center gap-1">
+            {/* Pressed, not latched: a view toggle has no lamp to light. */}
+            <PanelButton
+              aria-pressed={showSource}
+              data-latched={showSource || undefined}
+              aria-controls="plan-source"
+              onClick={() => setShowSource((v) => !v)}
+              title="Show the plan as it was pasted"
+            >
+              source
+            </PanelButton>
+            <PanelButton
+              aria-pressed={showRevise}
+              data-latched={showRevise || undefined}
+              aria-controls="plan-revise"
+              onClick={() => setShowRevise((v) => !v)}
+              title="Ask the agent in this tab to change the plan file"
+            >
+              revise
+            </PanelButton>
+            <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-[var(--ins-edge)]" />
+            {plan.split !== SPLIT_STATUS.RUNNING && (
+              <PanelButton
+                onClick={() => pane.rechunk(plan)}
+                disabled={revising || chunkInFlight || piloted}
+                title={chunkInFlight || piloted ? 'Not while a chunk or auto-pilot is running'
+                  : started ? 'Split what isn\'t done yet again, from the plan file as it is now; finished chunks stay'
+                    : 'Split the plan again, from its file as it is now'}
+              >
+                {started ? 're-chunk' : 're-split'}
+              </PanelButton>
+            )}
+            <PanelButton
+              onClick={() => shelvePlan(repoRoot, plan.id, !plan.shelved)}
+              title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Take this plan out of the tabs pane; it stays here'}
+            >
+              {plan.shelved ? 'unshelve' : 'shelve'}
+            </PanelButton>
+            {/* Destructive goes last, set apart, and prints its fault on hover. */}
+            <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-[var(--ins-edge)]" />
+            <PanelButton onClick={() => pane.deletePlan(plan)} className="hover:text-[var(--ins-fault)]" title="Delete this plan (asks first)">delete</PanelButton>
+          </span>
+        </div>
+        {showSource && (
+          <pre id="plan-source" className="ins-well mt-2 max-h-72 overflow-auto whitespace-pre-wrap wrap-anywhere px-2 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            {plan.source}
+          </pre>
+        )}
+
+        {showRevise && (
+          <form
+            id="plan-revise"
+            className="mt-2 flex flex-col gap-1.5"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!reviseNotes.trim()) return;
+              if (await pane.revise(plan, reviseNotes)) {
+                setReviseNotes('');
+                setShowRevise(false);
+              }
+            }}
+          >
+            <textarea
+              aria-label="What should change in the plan"
+              value={reviseNotes}
+              onChange={(e) => setReviseNotes(e.target.value)}
+              rows={4}
+              placeholder="what should change in the plan? the agent edits only the plan file"
+              className="ins-well resize-y px-1.5 py-1 text-[11px] leading-relaxed text-foreground outline-none"
+              autoFocus
+            />
+            <div className="flex gap-1.5">
+              <PanelButton type="submit" variant="default" disabled={!reviseNotes.trim() || revising}>send to agent</PanelButton>
+              <PanelButton variant="outline" onClick={() => setShowRevise(false)}>cancel</PanelButton>
+            </div>
+          </form>
+        )}
+
+        {runUp && <div className="mt-3">{strip}</div>}
+
+        {/* Identity next: the title, and what the plan is for. */}
+        {/* The plan's name is a proper name: Spectral italic, the pane's largest type. */}
+        <h3 className="ins-name mt-3.5 text-[17px] leading-tight text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
+        {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground" />}
+
+        <LifecycleLine plan={plan} />
+
+        {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
+        {stuck && (
+          <button
+            type="button"
+            onClick={() => openChunk(stuck.id, { focus: true })}
+            title={`Go to chunk ${stuck.n}`}
+            className="ins-well mt-3 flex min-w-0 cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-[11px] outline-none hover:text-foreground focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
+          >
+            <Lamp state="wait" label="needs you" />
+            <span className="engraved-label shrink-0">needs you</span>
+            <span className="min-w-0 truncate tabular-nums text-foreground" role="status">
+              chunk {stuck.n} · no commit
+              <span className="text-muted-foreground">
+                {dirty == null ? '' : dirty.length > 0
+                  ? ` · ${dirty.length} uncommitted → commit`
+                  : ' · tree clean → mark done'}
+              </span>
+            </span>
+          </button>
+        )}
+      </div>
+
+      {finished && chunksBlock}
+
+      {/* Sections: each hangs from a ruled head (calibrated's section line), so
+          progress, run, git and chunks read as separate concerns. */}
+      {total > 0 && (
+        <Section title="progress">
+          {/* The timeline once a chunk has a time; until then the bar. A live
+              run's strip already says where it is: no second count. */}
+          <Fig20Timeline plan={plan} showCount={!runUp} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
+        </Section>
+      )}
+
+      {/* How the plan gets done: auto-pilot, and the plan's own terminal. */}
+      {((plan.autopilot && !runUp) || canPilot || terminalKey) && (
+        <Section
+          title="run"
+          aside={terminalKey && (
+            <PanelButton icon={Terminal} onClick={() => pane.openPlanTab(plan)} aria-pressed={showingTerminal} title={terminalTitle}>
+              {showingTerminal ? 'back' : 'terminal'}
+            </PanelButton>
+          )}
+        >
+          {/* A settled run (done or off) is a line here; a live one sits at the top. */}
+          {plan.autopilot && !runUp && strip}
+          {/* The run bank: the primary key, with its one option beside it.
+              During a run the option moves into the strip, beside stop. While
+              a chunk is stuck its fix is the primary key, so this one steps
+              down to an outline key. */}
+          {canPilot && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <PanelButton
+                icon={Play}
+                onClick={() => pane.autopilot(plan)}
+                variant={stuck ? 'outline' : 'default'}
+                title={handSent
+                  ? `Adopt chunk ${handSent.n} (asking the agent to commit it if needed), then implement the rest one after another, unattended`
+                  : 'Implement the remaining chunks one after another, unattended'}
+              >
+                {handSent ? `run on auto-pilot from ${handSent.n}` : 'run on auto-pilot'}
+              </PanelButton>
+              {freshContext}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* Setup: one line; the form opens on demand. */}
+      <Section title="git">
+        {noGit ? (
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground">no git · chunks finish on PLAN-STATUS</span>
+        ) : (
+        <PlanGitSection
+          plan={plan}
+          busy={settingUpGit}
+          onChange={(patch) => setGitConfig(repoRoot, plan.id, patch)}
+          onAddRepo={(path) => pane.addRepo(plan, path)}
+          onRemoveRepo={(root) => removePlanRepo(repoRoot, plan.id, root)}
+          onRemoveWorktrees={() => pane.removeWorktrees(plan)}
+          onReopen={started || isAutopilotLive(plan.autopilot) ? null : () => pane.reopenGit(plan)}
+        />
+        )}
+      </Section>
+
+      {plan.split === SPLIT_STATUS.RUNNING && (
+        <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
+          <Scanner size="md" />
+          splitting into chunks…
+        </div>
+      )}
+      {plan.split === SPLIT_STATUS.FAILED && (
+        <div className="flex flex-col items-start gap-1.5 px-3 py-2.5 text-[11px]">
+          <span className="flex items-center gap-2 text-foreground"><Lamp state="fault" /> split failed</span>
+          <span className="break-words text-[11px] leading-relaxed text-muted-foreground">{plan.splitError}</span>
+          <PanelButton icon={Refresh} onClick={resplit}>re-split</PanelButton>
+        </div>
+      )}
+
+      {!finished && chunksBlock}
     </div>
   );
 }

@@ -62,6 +62,25 @@ export function Prose({ text, clamp, className }) {
   );
 }
 
+/**
+ * A plan-detail block under calibrated's ruled section head (.cal-sec-h):
+ * ── NAME ──────────── aside. The head is the separator; the space above it
+ * is wider than below, so each block hangs from its own title.
+ */
+export function Section({ title, aside, className, children }) {
+  return (
+    <section aria-label={title} className={cn('flex flex-col gap-3 px-3 pt-5 pb-2', className)}>
+      <div className="flex min-h-5 min-w-0 items-center gap-2.5">
+        <span aria-hidden="true" className="w-3 shrink-0 border-t border-[var(--ins-edge-strong)]" />
+        <h4 className="shrink-0 font-[family-name:var(--font-legend)] text-[12px] leading-none tracking-[0.06em] text-foreground uppercase">{title}</h4>
+        <span aria-hidden="true" className="min-w-4 flex-1 border-t border-[var(--ins-edge-strong)]" />
+        {aside && <div className="flex min-w-0 shrink-0 items-center gap-1.5">{aside}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function Field({ label, children }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">

@@ -5,7 +5,6 @@ import { PanelButton } from '../../components/instrument/PanelButton';
 import { autopilotLamp, Prose } from './parts';
 import { useTick } from '../../hooks/useTick';
 import { Fig09Loop } from './Fig09Loop';
-import { Fig20Timeline } from './Fig20Timeline';
 import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, haltWord, pilotPosition } from './planModel';
 
 /** Where the auto-pilot run stands, and what you can do about it. */
@@ -61,15 +60,9 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
             <PanelButton onClick={onDismiss} title="Hide this auto-pilot status line (the plan is unchanged)">hide</PanelButton>
           </span>
         </div>
+        {/* The timeline is drawn in the progress section; the run's own numbers stay here. */}
         {ap.status === AUTOPILOT_STATUS.DONE && (
-          <Fig20Timeline
-            plan={plan}
-            showCount={false}
-            fallback={took && <span className="pl-[calc(8px+0.5rem)] tabular-nums text-muted-foreground">took {took}</span>}
-          />
-        )}
-        {ap.status === AUTOPILOT_STATUS.DONE && (
-          <span className="pl-[calc(8px+0.5rem)] tabular-nums text-muted-foreground">{tally}</span>
+          <span className="pl-[calc(8px+0.5rem)] tabular-nums text-muted-foreground">{[tally, took && `took ${took}`].filter(Boolean).join(' · ')}</span>
         )}
         {ap.message && <Prose text={ap.message} clamp={3} className="text-[11px] leading-relaxed text-muted-foreground" />}
       </div>
