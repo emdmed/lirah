@@ -1087,6 +1087,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
           !zenMode && sidebar.sidebarOpen && (
             <LeftSidebar
               sidebar={sidebar}
+              projectPath={projectPath}
               search={sidebarSearch}
               searchInputRef={searchInputRef}
               onSearchChange={handleSidebarSearchChange}

@@ -414,7 +414,7 @@ const LIRAH_QUIET: Duration = Duration::from_millis(200);
 const LIRAH_MAX_WAIT: Duration = Duration::from_millis(1000);
 static LIRAH_WATCHER_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-/// Watch the store's JSON files under ~/.lirah (the root, workspaces/ and
+/// Watch the store's JSON files under ~/.lirah (the root, workspaces/, plans/ and
 /// tasks/, not the worktrees) and emit "lirah-files-changed" with their paths
 /// relative to ~/.lirah. The app's own writes are reported too; the frontend
 /// skips them by revision. Starts once; later calls do nothing.
@@ -447,7 +447,7 @@ fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
     watcher
         .watch(&base, RecursiveMode::NonRecursive)
         .map_err(|e| format!("Failed to watch {}: {e}", base.display()))?;
-    for dir in ["workspaces", "tasks"] {
+    for dir in ["workspaces", "tasks", "plans"] {
         let dir = base.join(dir);
         let _ = std::fs::create_dir_all(&dir);
         watcher

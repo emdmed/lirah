@@ -28,7 +28,7 @@ export const FeaturesPane = memo(function FeaturesPane({ projectPath, fm }) {
   const { selectedFeature, pinnedFeatures } = useTabFeatures(activeTabId);
   const toast = useToast();
   const dialog = useDialog();
-  // This pane sits outside the tab's dialog scope, so open into the tab by id.
+  // Open into the active tab's dialog scope by id.
   const explore = () => dialog.open('featureExplorer', {}, activeTabId);
   const { reload } = fm;
   // The map can change outside the app (an agent, a CLI build), so re-read it when the tab opens.

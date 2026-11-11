@@ -70,24 +70,35 @@ pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result
     ))
 }
 
-/// Delete a plan file that was imported out of a repo. Only a `.md` file
-/// directly inside `repo_root` qualifies, so a bad path can't reach anything else.
+/// Delete a plan .md file. Only a `.md` file directly inside a month folder
+/// (`~/.lirah/plans/<YYYY-MM>/`) qualifies, so a bad path can't reach anything else.
 #[tauri::command]
-pub async fn delete_plan_file(path: String, repo_root: String) -> Result<(), String> {
+pub async fn delete_plan_file(path: String) -> Result<(), String> {
     crate::ipc::blocking("delete_plan_file", move || {
         let file = crate::paths::canonical(Path::new(&path))
             .map_err(|e| format!("Plan file not found: {}", e))?;
-        let root = crate::paths::canonical(Path::new(&repo_root))
-            .map_err(|e| format!("Repo not found: {}", e))?;
-        let is_md = file
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
-        if !is_md || file.parent() != Some(root.as_path()) || !file.is_file() {
-            return Err("Only a .md file at the repo root can be removed".to_string());
+        let plans = crate::util::lirah_dir()
+            .ok_or("no home directory")?
+            .join("plans");
+        let plans = crate::paths::canonical(&plans)
+            .map_err(|e| format!("Plans folder not found: {}", e))?;
+        if !is_plan_md(&plans, &file) || !file.is_file() {
+            return Err("Only a .md file in ~/.lirah/plans/<YYYY-MM> can be removed".to_string());
         }
         std::fs::remove_file(&file).map_err(|e| format!("Failed to delete plan file: {}", e))
     })
     .await
+}
+
+/// `file` is `<plans>/<YYYY-MM>/<name>.md`.
+fn is_plan_md(plans: &Path, file: &Path) -> bool {
+    let is_md = file.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
+    let Some(month) = file.parent() else { return false };
+    let month_ok = month.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+        let b = n.as_bytes();
+        b.len() == 7 && b[4] == b'-' && b.iter().enumerate().all(|(i, c)| i == 4 || c.is_ascii_digit())
+    });
+    is_md && month_ok && month.parent() == Some(plans)
 }
 
 /// Remove a plan's worktree folder (~/.lirah/plan-worktrees/<dir>) once its
@@ -154,4 +165,21 @@ pub async fn gh_pr_for_branch(repo_path: String, branch: String) -> Result<Strin
         Err(format!("gh failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plan_md;
+    use std::path::Path;
+
+    #[test]
+    fn only_md_files_in_a_month_folder() {
+        let plans = Path::new("/h/.lirah/plans");
+        assert!(is_plan_md(plans, Path::new("/h/.lirah/plans/2026-11/x_plan.md")));
+        assert!(!is_plan_md(plans, Path::new("/h/.lirah/plans/x_plan.md")));
+        assert!(!is_plan_md(plans, Path::new("/h/.lirah/plans/2026-11/p1/plan.md")));
+        assert!(!is_plan_md(plans, Path::new("/h/.lirah/plans/2026-11/plan.json")));
+        assert!(!is_plan_md(plans, Path::new("/h/.lirah/plans/repo-1234/x.md")));
+        assert!(!is_plan_md(plans, Path::new("/r/2026-11/x.md")));
+    }
 }

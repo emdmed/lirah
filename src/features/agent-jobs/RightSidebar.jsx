@@ -14,17 +14,15 @@ import { useConfirm, useDialog } from '../dialogs/DialogProvider';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
+import { TabButton } from '../../components/instrument/TabButton';
 import { Keycap } from '../../components/instrument/Keycap';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { Span, SpanRuler, SpanScale } from '../../components/instrument/Span';
-import { jobsPaneRequest } from './jobsPane';
-import { useAttentionQueue } from '../tabs/useAgentAttention';
+import { jobsPaneRequest, requestTabsPane } from './jobsPane';
 import { useAgentJobs } from './AgentJobsContext';
 import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { useTabManager } from '../tabs/TabContext';
-import { MasterStrip } from '../tabs/MasterStrip';
-import { TabsSummaryPane } from '../tabs/TabsSummaryPane';
 import { WorkspaceRow } from '../tabs/WorkspaceRow';
 import { PlansPane } from '../plans/PlansPane';
 import { EmptyLine, NewRow } from '../plans/parts';
@@ -34,8 +32,6 @@ import { CHUNK_STATUS } from '../plans/planModel';
 import { TasksPane } from '../tasks/TasksPane';
 import { WorklogPane } from '../worklog/WorklogPane';
 import { useOpenTaskCount } from '../tasks/TasksContext';
-import { FeaturesPane } from '../feature-map/FeaturesPane';
-import { useFeatureMap } from '../feature-map/useFeatureMap';
 import { buttonVariants } from '../../components/ui/button';
 import { setPaneDrag } from '../../lib/paneDrag';
 
@@ -133,15 +129,13 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const { workspaceTabs, activeWorkspaceId, activeTabId } = useTabManager();
   const dialog = useDialog();
   const openTasks = useOpenTaskCount(activeWorkspaceId);
-  const featureMap = useFeatureMap(projectPath);
-  const waitingTabs = useAttentionQueue(workspaceTabs).length;
   const toast = useToast();
   const confirm = useConfirm();
 
   // null = automatic: open, since the pane is where the tabs live. Only the
   // user folds it away (» or Alt+4); the rail keeps a new-tab key.
   const [collapsedOverride, setCollapsedOverride] = useState(null);
-  const [tab, setTab] = useState('tabs');
+  const [tab, setTab] = useState('tasks');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [review, setReview] = useState(null); // { jobId, filePath }
   // Review notes pinned to lines of the job being reviewed, sent back to the
@@ -534,10 +528,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             headless background run. */}
         <div className="mt-auto flex flex-col items-center gap-2">
           <button
-            onClick={() => {
-              setCollapsedOverride(false);
-              setTab('tabs');
-            }}
+            onClick={() => requestTabsPane('open')}
             type="button"
             className={RAIL_KEY}
             title="Show tabs"
@@ -613,7 +604,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
         // [ ] cycle sections. Alt is allowed and AltGraph excused: ISO layouts type [ ] with AltGr.
         if ((e.key === '[' || e.key === ']') && (e.getModifierState('AltGraph') || !(e.ctrlKey || e.metaKey))) {
-          const sections = ['tabs', 'jobs', 'plans', 'tasks', 'log', 'features', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
+          const sections = ['tasks', 'plans', 'log', 'jobs', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
           const step = e.key === ']' ? 1 : -1;
           e.preventDefault();
           setTab(sections[(sections.indexOf(tab) + step + sections.length) % sections.length]);
@@ -662,24 +653,15 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           </>
         }
       />
-      <MasterStrip />
 
-      {/* Tabs / jobs / agents switch; agents only while there are subagents. */}
+      {/* Section switch; agents only while there are subagents. Tabs and features live in the files pane. */}
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
       <div role="tablist" aria-label="Workspace sections" className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
-        <TabButton active={tab === 'tabs'} onClick={() => setTab('tabs')} label="tabs" count={waitingTabs} countTone="text-[var(--ins-warn)]" />
-        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
-        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
+        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" />
-        <TabButton
-          active={tab === 'features'}
-          onClick={() => setTab('features')}
-          label="features"
-          count={featureMap.map?.features?.length || 0}
-          flag={featureMap.status === 'stale' ? 'Feature map is stale' : undefined}
-        />
+        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
@@ -710,14 +692,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
         {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
-        {projectPath && (tab === 'plans' || tab === 'tasks' || tab === 'features') && (
+        {projectPath && (tab === 'plans' || tab === 'tasks') && (
           <div className="ins-legend text-[11px] text-muted-foreground px-2 pt-1.5 truncate shrink-0" title={projectPath}>
             {basename(projectPath)}
           </div>
         )}
-        {tab === 'tabs' ? (
-          <TabsSummaryPane onNewTab={onNewTab} />
-        ) : tab === 'agents' ? (
+        {tab === 'agents' ? (
           <SubagentList />
         ) : tab === 'plans' ? (
           <PlansPane projectPath={projectPath} />
@@ -725,8 +705,6 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <TasksPane projectPath={projectPath} />
         ) : tab === 'log' ? (
           <WorklogPane projectPath={projectPath} />
-        ) : tab === 'features' ? (
-          <FeaturesPane projectPath={projectPath} fm={featureMap} />
         ) : (
           <>
             {visibleJobs.length === 0 ? (
@@ -873,29 +851,6 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
   );
 }
 
-// A section tab: ink underline on the pane's rule when chosen. Counts stay
-// quiet unless chosen or toned (waiting tabs); `flag` adds a warn mark.
-function TabButton({ active, onClick, label, count, lamp = false, countTone, flag }) {
-  return (
-    <button
-      onClick={onClick}
-      role="tab"
-      aria-selected={active}
-      aria-controls="workspace-section"
-      title={`${flag ? `${flag} · ` : ''}[ ] to switch sections`}
-      className="ins-legend ins-tab flex items-center gap-1.5 px-1.5 pt-0.5 pb-2 cursor-pointer"
-    >
-      {lamp && <Lamp state="on" />}
-      {label}
-      {count > 0 && (
-        <span className={cn('tabular-nums', countTone || (active ? 'text-foreground' : 'text-muted-foreground/80'))}>{count}</span>
-      )}
-      {flag && (
-        <span aria-label={flag} className="ins-tab-flag" />
-      )}
-    </button>
-  );
-}
 
 // Plans in the active tab's repo that still have a chunk to do or underway.
 // A rolled-back chunk is back to to-do, so it counts as pending.

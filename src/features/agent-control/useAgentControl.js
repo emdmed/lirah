@@ -5,7 +5,7 @@ import { useToast } from '../toast';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getSettings, setSetting } from '../settings/settingsStore';
-import { masterTabOf, tabDisplayName, useTabManager } from '../tabs/TabContext';
+import { isProjectTab, masterTabOf, tabDisplayName, useTabManager } from '../tabs/TabContext';
 import { useBookmarks } from '../bookmarks';
 import { useTasksActions } from '../tasks/TasksContext';
 import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
@@ -116,7 +116,7 @@ export function useAgentControl() {
     const scope = (sessionId) => {
       const { tabs, activeWorkspaceId } = live.current.tabManager;
       const ws = callerTab(tabs, sessionId)?.workspaceId || activeWorkspaceId;
-      const own = tabs.filter((t) => t.workspaceId === ws && !t.master);
+      const own = tabs.filter((t) => t.workspaceId === ws && isProjectTab(t));
       return { tabs: own, master: masterTabOf(tabs, ws) };
     };
     // A worker tab of the caller's workspace, never the caller itself.

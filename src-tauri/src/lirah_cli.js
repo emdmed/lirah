@@ -15,9 +15,9 @@
 // is true.
 import { connect } from "node:net";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve as resolvePath } from "node:path";
+import { dirname, join, resolve as resolvePath } from "node:path";
 import { lirahDir, list, read, resolveWorkspace, revisionOf, write } from "./lirah_files.js";
 
 const CLIENT_TIMEOUT_MS = 70_000; // the app gives up on its side after 60 s
@@ -77,6 +77,7 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  Task commands take --global to work on the
                                  global list instead of this tab's project.
   lirah plans [list]             list this tab's repo plans and their progress
+                                 (plans and their files: ~/.lirah/plans/<YYYY-MM>)
   lirah plans show <plan>        a plan's chunks and their state
   lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
   lirah plans revise <plan> <notes>
@@ -555,31 +556,32 @@ function readTasks(scope) {
   return { tasks: Array.isArray(tasks) ? tasks.filter((t) => t && typeof t === "object") : [], revision: revisionOf(doc) };
 }
 
-// Every plan of `repo`, from every workspace, newest first (the app's order).
+// As planMonth/planDir in planModel.js: plans live in ~/.lirah/plans/<YYYY-MM>/<id>/, the month they were made.
+function planMonth(ts = Date.now()) {
+  const d = new Date(ts ?? Date.now());
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+const planRel = (plan) => `plans/${planMonth(plan.createdAt)}/${plan.id}/plan.json`;
+
+// Every plan of `repo`, newest first (the app's order).
 function repoPlans(repo) {
   const plans = [];
-  for (const ws of read("workspaces/index.json")?.workspaces ?? []) {
-    let ids = [];
-    try {
-      ids = list(`workspaces/${ws}/plans`);
-    } catch {
-      continue;
-    }
-    for (const id of ids) {
+  for (const month of list("plans").filter((m) => /^\d{4}-\d{2}$/.test(m))) {
+    // .md plan files sit beside the plan folders; plan ids have no dot.
+    for (const id of list(`plans/${month}`).filter((n) => !n.includes("."))) {
       let doc;
       try {
-        doc = read(`workspaces/${ws}/plans/${id}/plan.json`);
+        doc = read(`plans/${month}/${id}/plan.json`);
       } catch {
         continue; // one broken plan must not hide the others
       }
-      if (doc?.repoRoot === repo && Array.isArray(doc.chunks)) plans.push({ ...doc, workspaceId: ws });
+      if (doc?.repoRoot === repo && Array.isArray(doc.chunks)) plans.push(doc);
     }
   }
   return plans.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
-const savePlan = (plan) => write(`workspaces/${plan.workspaceId}/plans/${plan.id}/plan.json`,
-  { ...plan, updatedAt: Date.now() }, revisionOf(plan));
+const savePlan = (plan) => write(planRel(plan), { ...plan, updatedAt: Date.now() }, revisionOf(plan));
 
 function findPlan(plans, ref) {
   const text = String(ref ?? "").trim();
@@ -888,16 +890,16 @@ const LOCAL = {
     const slug = slugify(title);
     const now = Date.now();
     const plan = {
-      id: shortId("p"), slug, title, summary: "", repoRoot: repo, workspaceId: workspace(), source, importedFrom,
+      id: shortId("p"), slug, title, summary: "", repoRoot: repo, workspaceId: resolveWorkspace(), source, importedFrom,
       split: "queued", splitError: null, chunks: [],
       // As defaultGitConfig in planModel.js.
       git: {
-        worktrees: false, branch: `plan/${slug}`, workDir: null, preparedAt: null,
+        worktrees: true, branch: `plan/${slug}`, workDir: null, preparedAt: null,
         repos: [{ root: repo, base: gitOut(repo, ["rev-parse", "--abbrev-ref", "HEAD"]), workPath: null, prepared: false }],
       },
       createdAt: now, updatedAt: now,
     };
-    write(`workspaces/${plan.workspaceId}/plans/${plan.id}/plan.json`, plan, 0);
+    write(planRel(plan), plan, 0);
     return `imported ${plan.id}; ${QUEUED}`;
   },
   "plans.revise": (args, [ref = args.plan, ...words]) => {
@@ -909,8 +911,10 @@ const LOCAL = {
     const known = plan.importedFrom?.path;
     let path = known;
     if (!known || !existsSync(known)) {
-      path = known || `${repo}/${plan.slug}_plan.md`;
-      if (!known && existsSync(path)) path = `${repo}/${plan.slug}-${plan.id}_plan.md`;
+      const dir = join(lirahDir(), "plans", planMonth(plan.createdAt));
+      path = known || `${dir}/${plan.slug}_plan.md`;
+      if (!known && existsSync(path)) path = `${dir}/${plan.slug}-${plan.id}_plan.md`;
+      mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, plan.source);
       savePlan({ ...plan, importedFrom: { path, hash: hash8(plan.source) } });
     }

@@ -1,7 +1,7 @@
 import { forwardRef, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ContextMoon } from '@/components/instrument/ContextMoon';
-import { useTabManager } from '@/features/tabs/TabContext';
+import { isProjectTab, useTabManager } from '@/features/tabs/TabContext';
 import { getTabContextFill } from '@/features/tabs/tabContextFill';
 
 // Shared row grammar for pickers and palettes: one line per item.
@@ -47,7 +47,7 @@ export function useOpenTabsByPath() {
   const { tabs } = useTabManager();
   return useMemo(() => {
     const map = new Map();
-    tabs.forEach((t, i) => {
+    tabs.filter(isProjectTab).forEach((t, i) => {
       if (t.projectPath && !map.has(t.projectPath)) map.set(t.projectPath, { id: t.id, number: i + 1 });
     });
     return map;

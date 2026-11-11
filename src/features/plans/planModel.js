@@ -170,10 +170,13 @@ const RUN_URGENCY = { [AUTOPILOT_STATUS.FAILED]: 0, [AUTOPILOT_STATUS.PAUSED]: 1
 export const runRank = (plan) => RUN_URGENCY[plan.autopilot?.status] ?? 3;
 
 /**
- * The tab the plan is working in: its auto-pilot run's (finished runs count
- * until dismissed), else the tab of a chunk in flight or awaiting its fix.
+ * The tab the plan is working in: its own terminal (a hidden tab shown inside
+ * its project tab), else its auto-pilot
+ * run's (finished runs count until dismissed), else the tab of a chunk in
+ * flight or awaiting its fix.
  */
 export function planTabId(plan) {
+  if (plan.tabId) return plan.tabId;
   const ap = plan.autopilot;
   if (ap?.tabId && ap.status !== AUTOPILOT_STATUS.OFF) return ap.tabId;
   return plan.chunks.find((c) => c.tabId && (c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix))?.tabId ?? null;
@@ -227,10 +230,10 @@ export function normalizeLoadedPlan(p) {
   return next;
 }
 
-/** A new plan's git settings: in place, on its own branch, from `base` in the one repo. */
+/** A new plan's git settings: in worktrees, on its own branch, from `base` in the one repo. */
 export function defaultGitConfig(repoRoot, slug, base) {
   return {
-    worktrees: false,
+    worktrees: true,
     branch: defaultBranch(slug),
     repos: [{ root: repoRoot, base, workPath: null, prepared: false }],
     workDir: null,
@@ -297,3 +300,15 @@ export function toRolledBack(revertShas) {
     doneAt: null,
   };
 }
+
+/** The month folder a plan lives in, `YYYY-MM` in local time, from its createdAt. */
+export function planMonth(ts = Date.now()) {
+  const d = new Date(ts ?? Date.now());
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** A plan's folder under ~/.lirah: `plans/<YYYY-MM>/<id>`. */
+export const planDir = (plan) => `plans/${planMonth(plan.createdAt)}/${plan.id}`;
+
+/** Where plan .md files go: `<home>/.lirah/plans/<YYYY-MM>` (the month of `ts`). */
+export const planFilesDir = (home, ts) => `${home}/.lirah/plans/${planMonth(ts)}`;

@@ -8,7 +8,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { useTabManager } from './TabContext';
+import { isProjectTab, useTabManager } from './TabContext';
 import { useAttentionQueue } from './useAgentAttention';
 import { RenameField } from './RenameField';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -40,7 +40,7 @@ export function WorkspaceRow() {
   const wsOf = (q) => tabs.find((t) => t.id === q.tabId)?.workspaceId;
   const waiting = new Set(queue.map(wsOf));
   const blocked = new Set(queue.filter((q) => q.state === 'permission').map(wsOf));
-  const countOf = (ws) => tabs.filter((t) => t.workspaceId === ws.id && !t.master).length;
+  const countOf = (ws) => tabs.filter((t) => t.workspaceId === ws.id && isProjectTab(t)).length;
   const star = (ws) => ws.id !== activeWorkspaceId && waiting.has(ws.id) && <Waiting blocked={blocked.has(ws.id)} />;
 
   // Room for the inline list = legend width minus its left group and the other trailing

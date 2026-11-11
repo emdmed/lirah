@@ -47,6 +47,9 @@ export const SETTINGS_DEFAULTS = {
   sidebarOpen: true,
   sidebarWidth: 280,
   viewMode: 'flat',
+  // The files pane's section ('tabs' | 'files') and, under files, the tree or the feature map.
+  sidebarSection: 'tabs',
+  filesPanel: 'tree',
   // Terminal scrollback in lines (see lib/terminalPrefs.js).
   scrollback: 10000,
   // New tabs open the full prompt box instead of the one-line context status.
@@ -203,6 +206,8 @@ const VALIDATORS = {
     : undefined),
   plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
+  sidebarSection: (v) => (v === 'tabs' || v === 'files' ? v : undefined),
+  filesPanel: (v) => (v === 'tree' || v === 'features' ? v : undefined),
   bookmarks: cleanBookmarks,
   promptTemplates: cleanTemplates,
   planContexts: cleanPlanContexts,

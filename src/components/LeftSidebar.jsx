@@ -9,6 +9,16 @@ import { Scanner } from "./instrument/Scanner";
 import { Position } from "./instrument/Position";
 import { PaneLegend } from "./instrument/PaneLegend";
 import { useRowCursor } from "../hooks/useRowCursor";
+import { SegmentBank } from "./instrument/SegmentBank";
+import { useSetting } from "../features/settings/settingsStore";
+import { TabButton } from "./instrument/TabButton";
+import { MasterStrip } from "../features/tabs/MasterStrip";
+import { TabsSummaryPane } from "../features/tabs/TabsSummaryPane";
+import { useTabManager } from "../features/tabs/TabContext";
+import { useAttentionQueue } from "../features/tabs/useAgentAttention";
+import { FeaturesPane } from "../features/feature-map/FeaturesPane";
+import { useFeatureMap } from "../features/feature-map/useFeatureMap";
+import { useDialog } from "../features/dialogs/DialogProvider";
 import {
   Sidebar,
   SidebarContent,
@@ -20,8 +30,45 @@ import {
 // secondary-terminal state, none of which the sidebar shows. Every prop it
 // takes is stable at its source (the hook objects are memoized there, the
 // handlers are useCallbacks in ProjectTab).
+const FILES_PANELS = [{ value: 'tree', label: 'tree' }, { value: 'features', label: 'features' }];
+
+// Its own component so tab-manager updates re-render the switch, not the tree.
+function SectionSwitch({ section, onSection, filesPanel, onFilesPanel }) {
+  const { workspaceTabs } = useTabManager();
+  const waiting = useAttentionQueue(workspaceTabs).length;
+  return (
+    <div role="tablist" aria-label="Files pane sections" className="flex items-end gap-2 px-1.5 h-9 shrink-0 edge-b-engraved">
+      <TabButton active={section === 'tabs'} onClick={() => onSection('tabs')} label="tabs" count={waiting} countTone="text-[var(--ins-warn)]" controls="files-section" hint="The workspace's tabs (:tabs)" />
+      <TabButton active={section === 'files'} onClick={() => onSection('files')} label="files" controls="files-section" hint="The project's files" />
+      {section === 'files' && (
+        <SegmentBank className="ml-auto self-center" label="Files view" value={filesPanel} onChange={onFilesPanel} options={FILES_PANELS} />
+      )}
+    </div>
+  );
+}
+
+function TabsSection() {
+  const dialog = useDialog();
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col pb-1.5">
+      <MasterStrip />
+      <TabsSummaryPane onNewTab={() => dialog.open('newTab', {}, null)} />
+    </div>
+  );
+}
+
+function FeaturesSection({ projectPath }) {
+  const fm = useFeatureMap(projectPath);
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col pb-1.5">
+      <FeaturesPane projectPath={projectPath} fm={fm} />
+    </div>
+  );
+}
+
 export const LeftSidebar = memo(function LeftSidebar({
   sidebar,
+  projectPath,
   search,
   searchInputRef,
   onSearchChange,
@@ -63,6 +110,11 @@ export const LeftSidebar = memo(function LeftSidebar({
   const { typeCheckResults, checkingFiles, successfulChecks, checkFileTypes } = typeChecker;
   const { fileSymbols: symbols, getSymbolCount, getLineCount, getViewModeLabel, getLevelTokens, setFileViewMode, VIEW_MODES } = fileSymbols;
 
+  // Shared by every tab, so switching tabs never flips the pane.
+  const [section, setSection] = useSetting('sidebarSection');
+  const [filesPanel, setFilesPanel] = useSetting('filesPanel');
+  const showTree = section === 'files' && filesPanel === 'tree';
+
   // md and git counts for the header keys, reported by the tree.
   const [filterCounts, setFilterCounts] = useState(null);
 
@@ -79,17 +131,23 @@ export const LeftSidebar = memo(function LeftSidebar({
 
   return (
     <>
-      <Sidebar ref={sidebarRef} collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title="[1] files" data-legend style={{ width: sidebarWidth }}>
+      <Sidebar ref={sidebarRef} collapsible="none" className="tui-pane bg-transparent m-0 px-1 pt-[16px] pb-3 shrink-0 overflow-hidden h-full flex flex-col" data-pane="1" data-title={`[1] ${section}`} data-legend style={{ width: sidebarWidth }}>
         <PaneLegend
           index={1}
-          title="Files"
+          title={section === 'tabs' ? 'Tabs' : filesPanel === 'features' ? 'Features' : 'Files'}
           note={
-            cursorIndex != null && rowCount > 0 ? <Position index={cursorIndex} count={rowCount} width={48} />
+            !showTree ? null
+            : cursorIndex != null && rowCount > 0 ? <Position index={cursorIndex} count={rowCount} width={48} />
             : filtering && filterCounts?.total != null ? <span className="tabular-nums">{rowCount} <span className="text-faint">of {filterCounts.total}</span></span>
             : rowCount
           }
         />
-        <SidebarContent className="flex flex-col flex-1 min-h-0">
+        <SidebarContent id="files-section" role="tabpanel" aria-label={section} className="flex flex-col flex-1 min-h-0">
+          <SectionSwitch section={section} onSection={setSection} filesPanel={filesPanel} onFilesPanel={setFilesPanel} />
+          {/* Tabs and features follow the active tab, so hidden tabs don't mount them. */}
+          {section === 'tabs' ? (isActive && <TabsSection />)
+          : !showTree ? (isActive && <FeaturesSection projectPath={projectPath} />)
+          : <>
           <SidebarHeader
             onNavigateParent={viewMode === 'flat' ? onNavigateParent : undefined}
             currentPath={currentPath}
@@ -170,6 +228,7 @@ export const LeftSidebar = memo(function LeftSidebar({
               )}
             </SidebarGroupContent>
           </SidebarGroup>
+          </>}
 
           {selectedFiles.size > 0 && (
             <SidebarFileSelection

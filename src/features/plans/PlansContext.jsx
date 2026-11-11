@@ -6,7 +6,7 @@ import { currentBranch, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import {
   AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, HALT_REASON, noGitConfig, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
-  toRolledBack, UNTITLED_PLAN,
+  planFilesDir, toRolledBack, UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
@@ -31,8 +31,8 @@ import {
   slugify,
 } from './planPrompts';
 
-// Plans live in ~/.lirah/workspaces/<id>/plans/<plan-id>/plan.json, one file per plan,
-// never inside the repo itself. Chunks are implemented by the tab's live agent,
+// Plans live in ~/.lirah/plans/<YYYY-MM>/<plan-id>/plan.json, one file per plan,
+// beside their .md files, never inside a repo (a plan may span repos). Chunks are implemented by the tab's live agent,
 // one commit each (found again by its Plan-Chunk trailer), so review is that
 // commit's diff and rollback is `git revert`.
 //
@@ -54,7 +54,7 @@ const PlansStateContext = createContext(null);
 
 export function PlansProvider({ children }) {
   const {
-    plansByRepo, stateRef, getHome, loadRepo, mutate, keepWorkspaces, updatePlan, updateChunk, findPlan, findChunk,
+    plansByRepo, stateRef, getHome, loadRepo, mutate, updatePlan, updateChunk, findPlan, findChunk,
   } = usePlanStore({
     // Chunks that finished while the app was closed, and what the CLI left queued then.
     onLoad: (repoRoot, plans) => {
@@ -73,12 +73,11 @@ export function PlansProvider({ children }) {
   });
   const checkingRef = useRef(new Set()); // chunk ids being checked
   const toast = useToast();
-  const { tabs, switchTab, workspaces, activeWorkspaceId } = useTabManager();
+  const { tabs, switchTab, activeWorkspaceId } = useTabManager();
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const activeWorkspaceRef = useRef(activeWorkspaceId);
   activeWorkspaceRef.current = activeWorkspaceId;
-  useEffect(() => { keepWorkspaces(workspaces.map((w) => w.id)); }, [workspaces, keepWorkspaces]);
   const tabRootsRef = useRef(new Map()); // tab folder -> repo root; misses aren't kept
 
   // The repos of the open tabs, where an agent may commit outside the plan's repos.
@@ -253,6 +252,7 @@ export function PlansProvider({ children }) {
       split: SPLIT_STATUS.RUNNING,
       splitError: null,
       chunks: [],
+      tabId: null,
       git: top ? defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')) : noGitConfig(repoRoot),
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -286,12 +286,13 @@ export function PlansProvider({ children }) {
     if (!plan) throw new Error('Plan not found');
     const known = plan.importedFrom?.path;
     if (known && await invoke('path_exists', { path: known }).catch(() => false)) return known;
-    let path = known || `${repoRoot}/${plan.slug}_plan.md`;
-    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${repoRoot}/${plan.slug}-${plan.id}_plan.md`;
+    const dir = planFilesDir(await getHome(), plan.createdAt);
+    let path = known || `${dir}/${plan.slug}_plan.md`;
+    if (!known && await invoke('path_exists', { path }).catch(() => false)) path = `${dir}/${plan.slug}-${plan.id}_plan.md`;
     await invoke('write_file_content', { path, content: plan.source });
     updatePlan(repoRoot, planId, { importedFrom: { path, hash: hash8(plan.source) } });
     return path;
-  }, [findPlan, updatePlan]);
+  }, [findPlan, updatePlan, getHome]);
 
   // Re-chunk from the plan's file as it is now (plan.source when there's no file).
   const rechunk = useCallback(async (repoRoot, planId) => {

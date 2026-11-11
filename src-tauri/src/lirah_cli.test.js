@@ -46,28 +46,30 @@ it('adds, lists and finishes a task in the workspace file', () => {
   expect(file('tasks/global.json').tasks[0].title).toBe('Inbox item');
 });
 
+const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+
 it('imports a plan with its split queued, and re-chunks it', () => {
   writeFileSync(join(project, 'x_plan.md'), '# Do X\n\nsteps');
   const id = /imported (p\w+);/.exec(lirah('plans', 'import', 'x_plan.md'))[1];
-  const plan = file(`workspaces/w1/plans/${id}/plan.json`);
+  const plan = file(`plans/${thisMonth()}/${id}/plan.json`);
   expect(plan).toMatchObject({ title: 'Do X', slug: 'do-x', repoRoot: project, workspaceId: 'w1', split: 'queued', chunks: [] });
   expect(plan.git.branch).toBe('plan/do-x');
   expect(lirah('plans', 'import', 'x_plan.md')).toContain(`already imported as ${id}`);
   expect(lirah('plans', 'show', '1')).toContain('Do X');
   writeFileSync(join(project, 'x_plan.md'), '# Do X\n\nmore steps');
   lirah('plans', 'rechunk', id);
-  const after = file(`workspaces/w1/plans/${id}/plan.json`);
+  const after = file(`plans/${thisMonth()}/${id}/plan.json`);
   expect(after.source).toContain('more steps');
   expect(after.revisions).toHaveLength(1);
 });
 
 it('asks the app to mark an in-progress chunk done', () => {
-  put('workspaces/w1/plans/p1/plan.json', {
-    id: 'p1', title: 'P', repoRoot: project, split: 'done', createdAt: 1,
+  put('plans/2026-11/p1/plan.json', {
+    id: 'p1', title: 'P', repoRoot: project, split: 'done', createdAt: new Date(2026, 10, 5).getTime(),
     chunks: [{ id: 'c1', n: 1, title: 'A', status: 'in-progress' }, { id: 'c2', n: 2, title: 'B', status: 'pending' }],
   });
   expect(lirah('plans', 'done', 'p1', '1', '--result', 'checked')).toContain('will be marked done');
-  expect(file('workspaces/w1/plans/p1/plan.json').chunks[0].doneRequested).toEqual({ result: 'checked' });
+  expect(file('plans/2026-11/p1/plan.json').chunks[0].doneRequested).toEqual({ result: 'checked' });
   expect(() => lirah('plans', 'done', 'p1', '2')).toThrow(/only a chunk in progress/);
 });
 

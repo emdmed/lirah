@@ -196,7 +196,10 @@ function App() {
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
             {tabs.map(tab => {
-              const column = visibleTabIds.indexOf(tab.id);
+              // A plan's terminal takes its project tab's place while that tab shows it.
+              const host = tab.planHost ? tabs.find((t) => t.id === tab.planHost) : tab;
+              const shown = tab.planHost ? host?.showing === tab.id : !tab.showing;
+              const column = shown ? visibleTabIds.indexOf(host.id) : -1;
               return (
               <DevProfiler key={tab.id} id={`ProjectTab:${tab.label}`}>
                 <ProjectTab
@@ -205,7 +208,7 @@ function App() {
                   projectPath={tab.projectPath}
                   customLabel={tab.customLabel}
                   label={tab.label}
-                  isActive={tab.id === activeTabId}
+                  isActive={shown && host.id === activeTabId}
                   visible={column >= 0}
                   column={Math.max(column, 0)}
                   columns={visibleTabIds.length}

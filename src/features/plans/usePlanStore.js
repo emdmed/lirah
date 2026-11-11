@@ -1,32 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { list, load, onExternalChange, remove, save } from '../../lib/fileStore';
-import { getSavedWorkspaces } from '../../lib/workspaceStore';
-import { normalizeLoadedPlan } from './planModel';
+import { normalizeLoadedPlan, planDir } from './planModel';
 import { pathSegments } from '../../utils/pathUtils';
 
-// The plans state and its files: one ~/.lirah/workspaces/<id>/plans/<plan-id>/plan.json
-// per plan, in the folder of the workspace it was made in (plan.workspaceId).
+// The plans state and its files: one ~/.lirah/plans/<YYYY-MM>/<plan-id>/plan.json
+// per plan, in the month it was created (one global folder: a plan may span repos).
 // The folder listing is the index. In memory plans are grouped by repo root.
 
 const PERSIST_DEBOUNCE = 400;
 
-const plansDir = (ws) => `workspaces/${ws}/plans`;
-const planFile = (ws, id) => `${plansDir(ws)}/${id}/plan.json`;
+export const MONTH_DIR = /^\d{4}-\d{2}$/; // also skips the old plans/<repo>-<hash>/ backups
+const planFile = (plan) => `${planDir(plan)}/plan.json`;
 
-// Every saved workspace's plans, grouped by repoRoot.
-async function loadAllPlans() {
+// Every plan on disk, grouped by repoRoot.
+export async function loadAllPlans() {
   const byRepo = new Map();
-  for (const { id: ws } of getSavedWorkspaces().workspaces) {
-    const ids = await list(plansDir(ws)).catch(() => []);
-    const docs = await Promise.all(ids.map((id) => load(planFile(ws, id)).catch((e) => {
-      console.error(`Failed to read plan ${planFile(ws, id)}:`, e);
+  const months = (await list('plans').catch(() => [])).filter((m) => MONTH_DIR.test(m));
+  for (const month of months) {
+    const ids = await list(`plans/${month}`).catch(() => []);
+    // .md plan files sit beside the plan folders; plan ids have no dot.
+    const docs = await Promise.all(ids.filter((id) => !id.includes('.')).map((id) => load(`plans/${month}/${id}/plan.json`).catch((e) => {
+      console.error(`Failed to read plan plans/${month}/${id}:`, e);
       return null;
     })));
     for (const doc of docs) {
       if (!doc?.repoRoot) continue;
       const { version, revision, ...plan } = doc;
-      byRepo.set(plan.repoRoot, [...(byRepo.get(plan.repoRoot) ?? []), { ...plan, workspaceId: ws }]);
+      byRepo.set(plan.repoRoot, [...(byRepo.get(plan.repoRoot) ?? []), plan]);
     }
   }
   for (const plans of byRepo.values()) plans.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
@@ -68,12 +69,12 @@ export function usePlanStore({ onLoad } = {}) {
   // A plan changed on disk (`lirah plans import/revise/done`): swap it into its
   // repo's list if that repo is loaded, and run onLoad for its queued work.
   useEffect(() => onExternalChange(
-    (rel) => /^workspaces\/[^/]+\/plans\/[^/]+\/plan\.json$/.test(rel),
+    (rel) => /^plans\/\d{4}-\d{2}\/[^/]+\/plan\.json$/.test(rel),
     (doc, rel) => {
-      const [, ws, , id] = pathSegments(rel);
+      const [, , id] = pathSegments(rel);
       const { version, revision, ...raw } = doc ?? {};
       // Not normalizeLoadedPlan: that is for startup (it fails running splits, pauses autopilot).
-      const plan = doc?.repoRoot ? { ...raw, workspaceId: ws } : null;
+      const plan = doc?.repoRoot ? raw : null;
       const roots = Object.keys(stateRef.current).filter((root) =>
         root === plan?.repoRoot || stateRef.current[root].some((p) => p.id === id));
       if (!roots.length) return;
@@ -100,23 +101,14 @@ export function usePlanStore({ onLoad } = {}) {
     const was = new Map(prev.map((p) => [p.id, p]));
     for (const plan of next) {
       if (was.get(plan.id) === plan) continue;
-      save(planFile(plan.workspaceId, plan.id), plan, { debounce: PERSIST_DEBOUNCE })
+      save(planFile(plan), plan, { debounce: PERSIST_DEBOUNCE })
         .catch((e) => console.error('Failed to save plan:', e));
     }
     const kept = new Set(next.map((p) => p.id));
     for (const plan of prev) {
       if (kept.has(plan.id)) continue;
-      remove(`${plansDir(plan.workspaceId)}/${plan.id}`).catch((e) => console.error('Failed to delete plan folder:', e));
+      remove(planDir(plan)).catch((e) => console.error('Failed to delete plan folder:', e));
     }
-  }, []);
-
-  // Plans of deleted workspaces leave the state (their folder is gone already), so nothing saves them again.
-  const keepWorkspaces = useCallback((ids) => {
-    const live = new Set(ids);
-    const entries = Object.entries(stateRef.current);
-    if (entries.every(([, plans]) => plans.every((p) => live.has(p.workspaceId)))) return;
-    stateRef.current = Object.fromEntries(entries.map(([root, plans]) => [root, plans.filter((p) => live.has(p.workspaceId))]));
-    setPlansByRepo(stateRef.current);
   }, []);
 
   const updatePlan = useCallback((repoRoot, planId, patch) => {
@@ -144,6 +136,6 @@ export function usePlanStore({ onLoad } = {}) {
   }, [findPlan]);
 
   return {
-    plansByRepo, stateRef, getHome, loadRepo, mutate, keepWorkspaces, updatePlan, updateChunk, findPlan, findChunk,
+    plansByRepo, stateRef, getHome, loadRepo, mutate, updatePlan, updateChunk, findPlan, findChunk,
   };
 }

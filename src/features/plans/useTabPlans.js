@@ -20,21 +20,22 @@ export function useTabPlans(tabs, activeTabId) {
   const activeRoot = roots[tabs.find((t) => t.id === activeTabId)?.projectPath] ?? null;
 
   return useMemo(() => {
-    const open = new Set(tabs.map((t) => t.id));
+    // A plan's terminal counts as its project tab.
+    const hostOf = new Map(tabs.map((t) => [t.id, t.planHost || t.id]));
     const byTab = {};
     const rootOf = new Map();
     for (const [root, plans] of Object.entries(plansByRepo || {})) {
       for (const plan of plans) {
         rootOf.set(plan.id, root);
-        const tabId = planTabId(plan);
-        if (!plan.shelved && open.has(tabId)) (byTab[tabId] ||= []).push(plan);
+        const tabId = hostOf.get(planTabId(plan));
+        if (!plan.shelved && tabId) (byTab[tabId] ||= []).push(plan);
       }
     }
     for (const list of Object.values(byTab)) list.sort((a, b) => runRank(a) - runRank(b));
 
     const loose = (plansByRepo?.[activeRoot] || [])
       .filter((plan) => {
-        if (plan.shelved || open.has(planTabId(plan))) return false;
+        if (plan.shelved || hostOf.has(planTabId(plan))) return false;
         if (plan.split !== SPLIT_STATUS.DONE) return true;
         const { done, total } = planProgress(plan);
         return done < total;

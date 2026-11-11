@@ -57,7 +57,7 @@ export function rowActivity(own, workLabel, tabPlans) {
 }
 
 export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHints }) {
-  const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab } = useTabManager();
+  const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab, togglePlanTerminal: flipPlanTerminal } = useTabManager();
   const closable = tabs.length > 1;
   const { repo, cli, now } = useTabsSummary(tabs);
   const { bookmarks } = useBookmarks();
@@ -147,6 +147,10 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
       toast.error(`Auto-pilot didn't resume: ${e?.message || e}`);
     }
   }, [resumeAutopilot, toast]);
+  // The plan's terminal in its row's tab; a plan whose terminal was closed opens in the plans view instead.
+  const togglePlanTerminal = useCallback((tabId, plan) => {
+    if (!flipPlanTerminal(plan.tabId)) openPlan(tabId, plan.id);
+  }, [flipPlanTerminal, openPlan]);
   const stopPlan = useCallback((plan) => stopAutopilot(rootOf.current.get(plan.id), plan.id), [stopAutopilot]);
   const shelve = useCallback((plan) => shelvePlan(rootOf.current.get(plan.id), plan.id, true), [shelvePlan]);
 
@@ -166,7 +170,8 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     resumePlan,
     stopPlan,
     shelvePlan: shelve,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve]);
+    togglePlanTerminal,
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, togglePlanTerminal]);
 
   const kinds = [];
   const faulted = []; // tabs whose run stopped, for the closing line

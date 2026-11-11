@@ -2,15 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
 import { markdownTitle } from './planPrompts';
-
-// `overhaul_plan.md`, `smooth-improvements-plan.md`, `plan.md`.
-const PLAN_FILE = /(^|[_-])plan\.md$/i;
+import { loadAllPlans, MONTH_DIR } from './usePlanStore';
 
 /**
- * Plan files sitting at the repo root (where they used to be saved), so they
- * can be imported instead of pasted. Root only: that's where they live, and it
- * keeps the scan to one directory read. Ignored files are included on purpose.
- * Each entry is `new` (never imported) or `changed` (edited since its import).
+ * Plan .md files in ~/.lirah/plans/<YYYY-MM>/ (newest month first) not imported
+ * yet, or edited since, so they can be imported instead of pasted. The folder
+ * is global, so a file imported by any repo's plan counts as imported.
+ * Each entry is `new` (never imported) or `changed` (this repo's plan, edited since its import).
  */
 export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
   const [files, setFiles] = useState([]);
@@ -27,15 +25,17 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
     const plans = plansRef.current;
     let cancelled = false;
     (async () => {
-      let entries = [];
-      try {
-        entries = await invoke('read_directory', { path: repoRoot });
-      } catch {
-        return;
-      }
+      const list = (path) => invoke('read_directory', { path }).catch(() => []); // a missing folder is fine
+      const base = `${await invoke('get_home_dir')}/.lirah/plans`;
+      const months = (await list(base)).filter((e) => e.is_dir && MONTH_DIR.test(e.name)).sort((a, b) => b.name.localeCompare(a.name));
+      const entries = (await Promise.all(months.map((m) => list(m.path)))).flat().filter((e) => !e.is_dir && /\.md$/i.test(e.name));
+      // Imports made by other repos' plans, read from disk (this repo's are in `plans`).
+      const others = new Set([...(await loadAllPlans().catch(() => new Map())).entries()]
+        .filter(([root]) => root !== repoRoot)
+        .flatMap(([, ps]) => ps.map((p) => p.importedFrom?.path).filter(Boolean)));
       const found = [];
       for (const entry of entries) {
-        if (entry.is_dir || !PLAN_FILE.test(entry.name)) continue;
+        if (others.has(entry.path)) continue;
         let source;
         try {
           source = await invoke('read_file_content', { path: entry.path });
@@ -75,8 +75,8 @@ export function usePlanFiles({ repoRoot, plans, createPlan, replaceSource }) {
 
   // Offered after an import, so the choice comes once the plan is safe.
   const deleteFile = useCallback(
-    (file) => invoke('delete_plan_file', { path: file.path, repoRoot }),
-    [repoRoot],
+    (file) => invoke('delete_plan_file', { path: file.path }),
+    [],
   );
 
   return { files, importFile, deleteFile };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { cn } from '../../lib/utils';
-import { FolderMinus, Terminal, Xmark } from 'iconoir-react';
+import { FolderMinus, Xmark } from 'iconoir-react';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
@@ -39,7 +39,7 @@ function BaseSelect({ root, value, onChange }) {
 }
 
 /** How the plan uses git: worktrees or not, the branch, and each repo's base. */
-export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, onOpenTab, onRemoveWorktrees, onReopen }) {
+export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, onRemoveWorktrees, onReopen }) {
   const cfg = planGit(plan);
   const { bookmarks } = useBookmarks();
   const locked = !!cfg.preparedAt;
@@ -70,7 +70,6 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
 
   const headlineRow = (
     <div className="flex min-w-0 items-baseline gap-2">
-      <span className="ins-legend w-9 shrink-0">git</span>
       <span className="min-w-0 flex-1 truncate" title={locked ? headline : `${headline}. Set up when the first chunk is sent.`}>
         {parts.map((part, i) => (
           <span key={part.text} className={part.strong ? 'text-foreground' : 'text-muted-foreground'}>{i > 0 && ' · '}{part.text}</span>
@@ -198,13 +197,10 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
         </select>
       )}
 
-      {locked && cfg.worktrees && !removed && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <PanelButton icon={Terminal} onClick={onOpenTab} title={`Open a tab in ${cfg.workDir}`}>open tab</PanelButton>
-          <PanelButton icon={FolderMinus} onClick={onRemoveWorktrees} disabled={busy} title="Remove the worktrees (the branches stay)">
-            remove worktrees
-          </PanelButton>
-        </div>
+      {locked && !removed && cfg.worktrees && (
+        <PanelButton icon={FolderMinus} onClick={onRemoveWorktrees} disabled={busy} className="self-start" title="Remove the worktrees (the branches stay)">
+          remove worktrees
+        </PanelButton>
       )}
     </div>
   );

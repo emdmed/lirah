@@ -200,7 +200,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
           icon={Play}
           onClick={() => pane.implement(plan, chunk)}
           disabled={busy}
-          variant={isNext && primary ? 'default' : undefined}
+          // Primary when it's the pane's main key; otherwise outlined, a step above the ghost tools.
+          variant={isNext && primary ? 'default' : 'outline'}
           title="Send this chunk to the tab's agent"
         >
           implement

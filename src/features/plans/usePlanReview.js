@@ -14,7 +14,7 @@ function reviewRange(review) {
  * the agent as a fix prompt. `diffProps` are the GitDiffDialog's props while a
  * review is open, else null.
  */
-export function usePlanReview({ repoRoot, plans, withBusy, prepareFor, sendFix, sendPlanFix, activeTabId, toast }) {
+export function usePlanReview({ repoRoot, plans, withBusy, prepareFor, sendFix, sendPlanFix, toast }) {
   // { planId, chunkId (null: the whole plan), files, filePath, ranges }
   const [review, setReview] = useState(null);
   const [notes, setNotes] = useState([]);
@@ -41,13 +41,15 @@ export function usePlanReview({ repoRoot, plans, withBusy, prepareFor, sendFix, 
   const handleSendNotes = useCallback(async () => {
     if (!review || notes.length === 0) return;
     const plan = plans?.find((p) => p.id === review.planId);
-    if (plan && !(await prepareFor(plan))) return;
+    if (!plan) return;
+    const tabId = await prepareFor(plan);
+    if (!tabId) return;
     // Paths within one repo are ambiguous once the plan spans several.
-    const sent = plan && isMultiRepo(plan) ? notes.map((n) => ({ ...n, relPath: n.filePath })) : notes;
+    const sent = isMultiRepo(plan) ? notes.map((n) => ({ ...n, relPath: n.filePath })) : notes;
     setSendingNotes(true);
     try {
-      if (review.chunkId) await sendFix(repoRoot, review.planId, review.chunkId, sent, activeTabId);
-      else await sendPlanFix(repoRoot, review.planId, sent, activeTabId);
+      if (review.chunkId) await sendFix(repoRoot, review.planId, review.chunkId, sent, tabId);
+      else await sendPlanFix(repoRoot, review.planId, sent, tabId);
       setReview(null);
       setNotes([]);
       toast.success('Review notes sent to the agent');
@@ -56,7 +58,7 @@ export function usePlanReview({ repoRoot, plans, withBusy, prepareFor, sendFix, 
     } finally {
       setSendingNotes(false);
     }
-  }, [review, notes, plans, prepareFor, sendFix, sendPlanFix, repoRoot, activeTabId, toast]);
+  }, [review, notes, plans, prepareFor, sendFix, sendPlanFix, repoRoot, toast]);
 
   const diffProps = review && {
     open: true,

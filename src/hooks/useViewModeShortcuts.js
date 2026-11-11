@@ -2,8 +2,12 @@ import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useConfirm } from '../features/dialogs/DialogProvider';
 import { matches } from '../lib/shortcuts';
+import { setSetting } from '../features/settings/settingsStore';
 import { getAgentHookState } from '../features/tabs/agentHookState';
 import { getLastOutputAt } from '../features/tabs/terminalActivity';
+
+// Both views live under the files pane's files section; show it.
+const showFiles = () => { setSetting('sidebarSection', 'files'); setSetting('filesPanel', 'tree'); };
 
 // Output this recent from a terminal with no agent hooks counts as running.
 const RECENT_OUTPUT_MS = 2000;
@@ -77,6 +81,7 @@ export function useViewModeShortcuts({
 
         // Switch to nav mode (flat view)
         setViewMode('flat');
+        showFiles();
         setSidebarOpen(true);
         onLoadFlatView();
       }
@@ -104,6 +109,7 @@ export function useViewModeShortcuts({
 
         // Open tree view (closes flat if open)
         setViewMode('tree');
+        showFiles();
         setSidebarOpen(true);
         onLoadTreeView();
 

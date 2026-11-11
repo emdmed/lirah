@@ -4,6 +4,28 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-11-11
+
+### Changed
+
+- **Tab rows** - Long branch names are cut to one line, with the full name in the tooltip. Hovering a folded row swaps its diff and status readout for the row's buttons, so the tab name keeps its width.
+- **Default panes** - The files pane opens on tabs and the right pane opens on tasks.
+
+## [0.25.1] - 2026-11-11
+
+### Changed
+
+- **Plans run in worktrees by default** - New plans start with "Run in worktrees" on, so your checkout stays untouched. Turn it off in the plan's git section before the first chunk is sent.
+
+## [0.25.0] - 2026-11-11
+
+### Changed
+
+- **Files pane** - The tabs list and the feature map moved from the right pane into the files pane. A tabs / files switch sits at its top, and files has a tree / features toggle.
+- **Right pane** - Its sections are now tasks, plans, log and jobs, in that order.
+- **Plans** - Plans are stored in one global folder, `~/.lirah/plans/<YYYY-MM>/`, since a plan can span repos. Existing plans are copied there once.
+- **Plans** - Each plan runs in its own terminal inside its project tab, opened on the first send and reused after that. A terminal button on the plan's card and in the plans view switches between your terminal and the plan's.
+
 ## [0.24.0] - 2026-11-10
 
 ### Added
