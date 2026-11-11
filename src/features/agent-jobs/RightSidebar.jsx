@@ -135,7 +135,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   // null = automatic: open, since the pane is where the tabs live. Only the
   // user folds it away (» or Alt+4); the rail keeps a new-tab key.
   const [collapsedOverride, setCollapsedOverride] = useState(null);
-  const [tab, setTab] = useState('jobs');
+  const [tab, setTab] = useState('tasks');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [review, setReview] = useState(null); // { jobId, filePath }
   // Review notes pinned to lines of the job being reviewed, sent back to the

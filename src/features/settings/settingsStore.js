@@ -48,7 +48,7 @@ export const SETTINGS_DEFAULTS = {
   sidebarWidth: 280,
   viewMode: 'flat',
   // The files pane's section ('tabs' | 'files') and, under files, the tree or the feature map.
-  sidebarSection: 'files',
+  sidebarSection: 'tabs',
   filesPanel: 'tree',
   // Terminal scrollback in lines (see lib/terminalPrefs.js).
   scrollback: 10000,

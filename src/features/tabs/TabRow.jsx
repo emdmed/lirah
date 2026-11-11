@@ -47,7 +47,7 @@ function AutoCommitMark({ stage }) {
 }
 
 /** The row's right-hand readout: uncommitted lines, the context moon, the lamp. */
-function Readout({ info, contextFill, autoCommit, lamp, label }) {
+function Readout({ info, contextFill, autoCommit, lamp, label, className }) {
   let diff = null;
   if (autoCommit && autoCommit !== 'done') {
     diff = <AutoCommitMark stage={autoCommit} />;
@@ -63,7 +63,7 @@ function Readout({ info, contextFill, autoCommit, lamp, label }) {
   }
   // Fixed slots, so the moons line up down the pane whatever the counts are.
   return (
-    <span className="flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground">
+    <span className={cn('flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground', className)}>
       <span className="inline-flex min-w-[9ch] items-center justify-end">{diff}</span>
       <span className="inline-flex w-3 justify-center">
         {contextFill != null && <ContextMoon ratio={contextFill} />}
@@ -319,23 +319,25 @@ export const TabRow = memo(function TabRow({
             autoCommit={autoCommit}
             lamp={activityLamp(activity.kind, queued)}
             label={activity.label}
+            // A folded row's actions take the readout's place on hover, so the name keeps its width.
+            className={compact && (roleMenuOpen ? 'hidden' : 'group-hover:hidden group-focus-within:hidden')}
           />
         </span>
       </div>
 
       {!compact && (
         <>
-          {/* Tier 2: the branch, in full; long names wrap rather than clip. */}
+          {/* Tier 2: the branch, truncated; the full name is in the tooltip. */}
           <div className="flex min-w-0 pl-6 text-[11px] text-muted-foreground">
             {info?.branch ? (
               <RowAction
                 tabIndex={-1}
                 onClick={() => actions.copyBranch(info.branch)}
-                title="Copy branch name"
-                className="flex min-w-0 items-start gap-1 font-mono hover:text-[var(--ins-lamp)]"
+                title={`${info.branch}\nClick to copy`}
+                className="flex min-w-0 items-center gap-1 font-mono hover:text-[var(--ins-lamp)]"
               >
-                <GitBranch className="mt-[2px] h-3 w-3 shrink-0" />
-                <span className="min-w-0 break-all">{info.branch}</span>
+                <GitBranch className="h-3 w-3 shrink-0" />
+                <span className="min-w-0 truncate">{info.branch}</span>
               </RowAction>
             ) : (
               <span>no repo</span>
