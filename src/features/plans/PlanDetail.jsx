@@ -181,8 +181,7 @@ export function PlanDetail({ plan }) {
         checked={!!plan.clearBetweenChunks}
         onCheckedChange={(v) => updatePlan(repoRoot, plan.id, { clearBetweenChunks: !!v })}
       />
-      fresh context
-      {plan.autopilot?.status !== AUTOPILOT_STATUS.RUNNING && <span className="text-muted-foreground">· /clear before each chunk</span>}
+      clear context between chunks
     </label>
   );
 
@@ -432,7 +431,7 @@ export function PlanDetail({ plan }) {
               a chunk is stuck its fix is the primary key, so this one steps
               down to an outline key. */}
           {canPilot && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex items-center gap-3">
               <PanelButton
                 icon={Play}
                 onClick={() => pane.autopilot(plan)}

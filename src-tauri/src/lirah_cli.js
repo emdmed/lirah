@@ -686,6 +686,7 @@ const THEMES = [
   ["matte-black", "Matte Black"], ["hackerman", "Hackerman"], ["osaka-jade", "Osaka Jade"],
   ["ethereal", "Ethereal"], ["flexoki", "Flexoki Light"], ["catppuccin-latte", "Catppuccin Latte"],
   ["rivendell", "Rivendell"], ["lothlorien", "Lothlórien"], ["orrery", "Orrery"],
+  ["omarchy", "Omarchy"], // only exists on Omarchy (src/themes/omarchy.js)
 ];
 const DEFAULT_THEME = "tokyo-night";
 

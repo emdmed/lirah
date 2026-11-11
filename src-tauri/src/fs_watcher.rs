@@ -472,3 +472,55 @@ fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
     });
     Ok(())
 }
+
+/// Omarchy's active theme folder state: ~/.local/state/omarchy/current.
+fn omarchy_current_dir() -> Option<PathBuf> {
+    crate::util::home_dir().map(|h| h.join(".local/state/omarchy/current"))
+}
+
+/// The active Omarchy theme's colors.toml, or None when not running Omarchy.
+#[tauri::command]
+pub async fn omarchy_colors() -> Option<String> {
+    let path = omarchy_current_dir()?.join("theme/colors.toml");
+    crate::ipc::blocking("omarchy_colors", move || Ok::<_, String>(std::fs::read_to_string(path).ok()))
+        .await
+        .ok()
+        .flatten()
+}
+
+static OMARCHY_WATCHER_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Emit "omarchy-theme-changed" after `omarchy-theme-set` switches themes.
+/// It writes theme.name last, once the new theme folder is in place.
+/// Starts once; does nothing without Omarchy.
+#[tauri::command]
+pub fn start_omarchy_watcher(app_handle: AppHandle) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    let Some(dir) = omarchy_current_dir().filter(|d| d.is_dir()) else { return Ok(()) };
+    if OMARCHY_WATCHER_STARTED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let (tx, rx) = mpsc::channel::<()>();
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        let Ok(event) = res else { return };
+        if matches!(event.kind, EventKind::Access(_)) {
+            return;
+        }
+        if event.paths.iter().any(|p| p.file_name().is_some_and(|n| n == "theme.name")) {
+            let _ = tx.send(());
+        }
+    })
+    .map_err(|e| format!("Failed to create watcher: {e}"))?;
+    if let Err(e) = watcher.watch(&dir, RecursiveMode::NonRecursive) {
+        OMARCHY_WATCHER_STARTED.store(false, Ordering::SeqCst);
+        return Err(format!("Failed to watch {}: {e}", dir.display()));
+    }
+    thread::spawn(move || {
+        let _watcher = watcher; // lives as long as the app
+        while rx.recv().is_ok() {
+            drain_debounced(&rx, Instant::now(), LIRAH_QUIET, LIRAH_MAX_WAIT, |_| {});
+            let _ = app_handle.emit("omarchy-theme-changed", ());
+        }
+    });
+    Ok(())
+}

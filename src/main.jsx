@@ -23,6 +23,7 @@ import { perfMark } from "./lib/perf";
 import { initSettings } from "./features/settings/settingsStore";
 import { initWorkspaces } from "./lib/workspaceStore";
 import { runMigrations } from "./lib/migrations";
+import { initOmarchyTheme } from "./themes/omarchy";
 
 // Imports are hoisted, so this marks the point where every module has been
 // evaluated — the JS parse/eval cost sits before it.
@@ -34,7 +35,7 @@ const showKit = import.meta.env.DEV && new URLSearchParams(window.location.searc
 const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");
 
 // Settings and workspaces come from ~/.lirah; every reader expects them loaded.
-await Promise.all([initSettings(), initWorkspaces()]);
+await Promise.all([initSettings(), initWorkspaces(), initOmarchyTheme()]);
 // Old per-repo task and plan files move into workspaces once, before the stores read them.
 await runMigrations();
 
