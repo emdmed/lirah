@@ -76,27 +76,22 @@ fn kill_and_wait_returns_true_for_a_pid_that_does_not_exist() {
 }
 
 #[test]
-fn kill_and_wait_returns_false_when_the_pid_is_still_alive_after_the_timeout() {
-    // Timeout zero: the kill cannot have taken effect yet on Windows (145-200 ms
-    // measured), so the check right after it must report "not gone".
-    let child = spawn_sleeper();
-    let pid = child.id();
-    let was_gone = {
-        let ok = kill_and_wait(pid, Duration::ZERO);
-        // false means still alive when it returned; true is only valid if it really is gone.
-        if ok {
-            assert!(pid_gone(pid), "true with a live pid is the bug");
-        }
-        ok
-    };
-    #[cfg(windows)]
-    assert!(!was_gone, "TerminateProcess is async: with no time to wait it must say false");
-    let _ = was_gone;
+fn wait_until_gone_returns_false_when_the_process_stays_alive_past_the_timeout() {
+    // Deterministic: liveness is injected, no real process race.
+    let polls = std::cell::Cell::new(0);
+    let ok = wait_until_gone(Duration::from_millis(30), || {
+        polls.set(polls.get() + 1);
+        true
+    });
+    assert!(!ok);
+    assert!(polls.get() >= 1, "it must poll at least once");
 
-    // cleanup
-    let mut child = child;
-    let _ = child.kill();
-    let _ = child.wait();
+    polls.set(0);
+    assert!(!wait_until_gone(Duration::ZERO, || {
+        polls.set(polls.get() + 1);
+        true
+    }));
+    assert_eq!(polls.get(), 1, "zero timeout still polls once");
 }
 
 #[test]

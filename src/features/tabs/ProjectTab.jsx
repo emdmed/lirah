@@ -39,6 +39,7 @@ import { useBookmarksShortcut } from "../bookmarks";
 import { useClaudeLauncher } from "../cli-selection";
 import { launchOptions } from "./launchOptions";
 import { relaunchCli as relaunchInTab } from "./relaunch";
+import { killTabCli } from "./killTabCli";
 import { useFileSymbols } from "../file-analysis/useFileSymbols";
 import { useTokenUsage } from "../token-budget/useTokenUsage";
 import { useTokenUsageValue } from "../token-budget/tokenUsageStore";
@@ -421,25 +422,16 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   // Terminate any running CLI process in the terminal before navigation
   const terminateCliProcess = useCallback(async (launch) => {
     if (!terminalSessionId) return;
-    const kill = async () => {
-      for (const cliName of TAB_CLI_PROCESSES) {
-        try {
-          const killed = await invoke('kill_pty_child_process', {
-            sessionId: terminalSessionId,
-            processName: cliName,
-          });
-          if (killed) return true;
-        } catch { /* ignore errors */ }
-      }
-      return false;
-    };
     // A killed CLI leaves its terminal modes on (mouse tracking...): relaunchInTab resets
     // the display before and after the kill and Ctrl+C's the shell (see relaunch.js).
+    // The backend returns once the pid is gone, so only a short settle is left for the prompt.
+    // A CLI that cannot be stopped rejects: callers must not type into it.
     await relaunchInTab({
-      kill,
+      kill: () => killTabCli({ invoke, sessionId: terminalSessionId, names: TAB_CLI_PROCESSES }),
       writeDisplay: (data) => terminalRef.current?.writeDisplay?.(data),
       writePty: (data) => invoke('write_to_terminal', { sessionId: terminalSessionId, data }),
       launch,
+      delayMs: 150,
     });
   }, [terminalSessionId]);
 
@@ -462,8 +454,12 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   const launchClaude = useCallback(() => launchCli(launchOptions({ master })), [launchCli, master]);
   // A claude started by hand: stop it and start it again with the plugin.
   const relaunchCli = useCallback(async () => {
-    await terminateCliProcess(launchClaude);
-  }, [terminateCliProcess, launchClaude]);
+    try {
+      await terminateCliProcess(launchClaude);
+    } catch (error) {
+      toast.error(`Couldn't stop the CLI, try again: ${error?.message || error}`);
+    }
+  }, [terminateCliProcess, launchClaude, toast.error]);
 
   // Remember the conversation this tab's agent is in, for launchFresh after a restart.
   useEffect(() => {
