@@ -674,3 +674,7 @@ mod tests {
         let _ = child.wait();
     }
 }
+
+#[cfg(test)]
+#[path = "commands_kill_tests.rs"]
+mod kill_tests;
