@@ -21,6 +21,7 @@ import { GlobalDialogOutlet } from "./features/dialogs/GlobalDialogOutlet";
 import { useDialog } from "./features/dialogs/DialogProvider";
 import { useSetting } from "./features/settings/settingsStore";
 import { useAgentControl } from "./features/agent-control/useAgentControl";
+import { usePlanningMode } from "./features/planning/planningModeStore";
 
 function App() {
   const { tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, zenColumns, startupPending, openedStartup, addTab, requestCloseTab, switchTab, switchWorkspace } = useTabManager();
@@ -185,6 +186,8 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [tabs, workspaceTabs, workspaces, activeWorkspaceId, activeTabId, switchTab, switchWorkspace, requestCloseTab, handleNewTab, jumpToNext, setZenMode, zenMode, zenColumns]);
 
+  const planning = usePlanningMode(activeTabId);
+
   // In Zen the workspace's columns are on screen (they always hold the focused tab).
   const visibleTabIds = zenMode && zenColumns.length > 0 ? zenColumns : [activeTabId];
 
@@ -225,8 +228,8 @@ function App() {
               <FirstTabChooser onOpenProject={(path) => addTab(path)} />
             )}
           </div>
-          {/* Hidden, not unmounted, in Zen so its section, fold and open review survive the toggle. */}
-          <div style={{ display: zenMode ? 'none' : 'contents' }}>
+          {/* Hidden, not unmounted, in Zen and planning mode so its section, fold and open review survive the toggle. */}
+          <div style={{ display: zenMode || planning ? 'none' : 'contents' }}>
             <RightSidebar projectPath={activeTab?.projectPath} onNewTab={handleNewTab} />
           </div>
         </div>

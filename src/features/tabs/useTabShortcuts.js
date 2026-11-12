@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { matches } from '../../lib/shortcuts';
 import { requestQuickTask } from '../tasks/tasksPaneEvents';
+import { isPlanningMode, togglePlanningMode } from '../planning/planningModeStore';
+import { focusPane } from '../../hooks/usePaneShortcuts';
 
 /**
  * The tab's global keyboard shortcuts. Registered only while the tab is
@@ -8,6 +10,7 @@ import { requestQuickTask } from '../tasks/tasksPaneEvents';
  * handler reads but that shouldn't re-subscribe it are read through refs.
  */
 export function useTabShortcuts({
+  tabId,
   isActive,
   secondary,
   dialogs,
@@ -32,6 +35,15 @@ export function useTabShortcuts({
     if (!isActive) return;
 
     const handleKeyDown = (e) => {
+      if (matches('plan-mode', e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePlanningMode(tabId);
+        // The keys follow the mode: into the panel (pane 4 while planning), or back to the terminal. After it renders.
+        const pane = isPlanningMode(tabId) ? 4 : 2;
+        requestAnimationFrame(() => requestAnimationFrame(() => focusPane(pane)));
+        return;
+      }
       if (matches('secondary', e)) {
         e.preventDefault();
         e.stopPropagation();
@@ -98,6 +110,6 @@ export function useTabShortcuts({
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
+  }, [tabId, isActive, secondaryVisible, secondaryFocused, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     searchInputRef, onToggleCompaction, onOpenLazygit, onAutoCommit, onAutoMerge, onClearContext, setBudgetDialogOpen, setDashboardOpen]);
 }

@@ -12,7 +12,10 @@ import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
 import { usePlansActions } from '../plans/PlansContext';
 import { relToRepo, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
-import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage } from '../plans/planModel';
+import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage, planStatus } from '../plans/planModel';
+import { DRAFT_PARTS } from '../plans/planPrompts';
+import { draftFiles } from '../plans/usePlanFiles';
+import { startDraft } from '../planning/planningModeStore';
 import { buildPlanRevisePrompt } from '../plans/planPrompts';
 import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
 import { planGit } from '../plans/planGit';
@@ -237,7 +240,7 @@ export function useAgentControl() {
       return {
         index, id: plan.id, title: plan.title || '(untitled)', done, total,
         split: plan.split, autopilot: plan.autopilot?.status || 'off', file: plan.importedFrom?.path || null,
-        stage: planStage(plan), pr: plan.pr ?? null, merged: plan.merged ?? null,
+        stage: planStage(plan), status: planStatus(plan), pr: plan.pr ?? null, merged: plan.merged ?? null,
       };
     };
 
@@ -582,6 +585,21 @@ export function useAgentControl() {
         if (!notes) throw new Error('say what should change: lirah plans revise <plan> <notes>');
         const path = await live.current.plans.ensurePlanFile(repo, plan.id);
         return `${buildPlanRevisePrompt(plan, notes, path)}\n\nWhen the file is updated, run \`lirah plans rechunk ${plan.id}\`.`;
+      },
+      // Planning mode in the caller's tab, on a new (or same-named) draft folder the agent then writes into.
+      'plans.draft': async (args, words, { sessionId }) => {
+        const tab = callerTab(live.current.tabManager.tabs, sessionId);
+        if (!tab) throw new Error('lirah plans draft needs to run inside a Lirah tab');
+        const title = words.join(' ').trim() || String(args.title ?? '').trim();
+        if (!title) throw new Error('give the draft a title: lirah plans draft <title>');
+        // The workspace terminal plans for no one repo: its draft is approved from the tab it is for.
+        const folder = await startDraft(tab.id, title, tab.master ? null : await resolveRepoRoot(tab.projectPath));
+        const files = (await draftFiles(folder)).map((p) => basename(p));
+        return [
+          `planning mode is open in this tab on the draft ${folder}${files.length > 1 ? ` (already has ${files.join(', ')})` : ''}`,
+          `Write the plan there as we talk, one file per part: ${DRAFT_PARTS.map((p) => `${p.id}.md (${p.about})`).join('; ')}. plan.md holds the title and goal; add other .md files if the work needs them.`,
+          'Don\'t implement anything and don\'t commit. The user approves the draft in the planning panel, which joins the files into one plan and splits it into chunks.',
+        ].join('\n\n');
       },
       // As the pane's re-chunk: the plan's file as it is now, the chunks already done kept.
       'plans.rechunk': async (args, [ref = args.plan], { sessionId }) => {

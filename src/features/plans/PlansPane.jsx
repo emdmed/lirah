@@ -16,6 +16,7 @@ import { PlanPaneProvider } from './PlanPaneContext';
 import { usePlanPaneActions } from './usePlanPaneActions';
 import { PlanRow } from './PlanRow';
 import { getTabPrompt } from '../tabs/tabPrompts';
+import { setPlanningMode } from '../planning/planningModeStore';
 import { getTabSession } from '../tabs/terminalActivity';
 import { useCliRunning } from '../tabs/useTabsSummary';
 
@@ -124,6 +125,9 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
             </div>
           )}
           <NewRow label="plan" keys="N" onClick={() => setNewOpen(true)} />
+          <button type="button" onClick={() => setPlanningMode(activeTabId, true)} className="tui-btn mx-3 mb-2 self-start" title="Draft and chunk a plan next to this tab's terminal (Alt P)">
+            planning mode
+          </button>
         </>
       )}
 
@@ -149,7 +153,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
 
 // Done or shelved plans stay out of the list until asked for. An open PR still needs you.
 export function isTucked(plan) {
-  if (plan.shelved) return true;
+  if (plan.shelved || plan.cancelledAt) return true;
   const stage = planStage(plan);
   return stage === PLAN_STAGE.MERGED || stage === PLAN_STAGE.IMPLEMENTED;
 }

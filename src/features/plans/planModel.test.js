@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, canMoveChunk, planDir, planMonth, planTabId } from './planModel';
+import { describe, expect, it } from 'vitest';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, canMoveChunk, PLAN_STATUS, planDir, planMonth, planStatus, planTabId } from './planModel';
 
 it('files a plan under its creation month, zero-padded, in local time', () => {
   expect(planMonth(new Date(2026, 0, 31, 23, 59).getTime())).toBe('2026-01');
@@ -35,4 +35,27 @@ it('moves pending chunks among themselves but never past a committed one', () =>
   expect(canMoveChunk(chunks, 0, 1)).toBe(false);
   expect(canMoveChunk(chunks, 4, 1)).toBe(false);
   expect(canMoveChunk(chunks, -1, 1)).toBe(false);
+});
+
+describe('plan status', () => {
+  const chunks = (...statuses) => statuses.map((status) => ({ status }));
+  const plan = (over) => ({ chunks: chunks(CHUNK_STATUS.PENDING), ...over });
+
+  it('walks draft → pending → in-progress → in-review → completed', () => {
+    expect(planStatus(plan({ draft: true }))).toBe(PLAN_STATUS.DRAFT);
+    expect(planStatus(plan())).toBe(PLAN_STATUS.PENDING); // older plans have no draft flag
+    expect(planStatus(plan({ chunks: chunks(CHUNK_STATUS.IMPLEMENTED, CHUNK_STATUS.PENDING) }))).toBe(PLAN_STATUS.IN_PROGRESS);
+    expect(planStatus(plan({ chunks: chunks(CHUNK_STATUS.IMPLEMENTED) }))).toBe(PLAN_STATUS.IN_REVIEW);
+    expect(planStatus(plan({ pr: { state: 'OPEN', number: 3 } }))).toBe(PLAN_STATUS.IN_REVIEW);
+    expect(planStatus(plan({ merged: { at: 1 } }))).toBe(PLAN_STATUS.COMPLETED);
+  });
+
+  it('goes back to in-progress while review notes wait for their fix', () => {
+    expect(planStatus(plan({ chunks: [{ status: CHUNK_STATUS.IMPLEMENTED, awaitingFix: true }] }))).toBe(PLAN_STATUS.IN_PROGRESS);
+  });
+
+  it('is cancelled at any stage', () => {
+    expect(planStatus(plan({ cancelledAt: 1, merged: { at: 1 } }))).toBe(PLAN_STATUS.CANCELLED);
+    expect(planStatus(plan({ cancelledAt: 1, draft: true }))).toBe(PLAN_STATUS.CANCELLED);
+  });
 });

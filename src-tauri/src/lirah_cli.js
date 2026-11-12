@@ -79,6 +79,10 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah plans [list]             list this tab's repo plans and their progress
                                  (plans and their files: ~/.lirah/plans/<YYYY-MM>)
   lirah plans show <plan>        a plan's chunks and their state
+  lirah plans draft <title>      start planning: opens planning mode in this tab
+                                 on a new *_plan/ draft folder, and says where to
+                                 write the plan's parts (architecture, backend,
+                                 db, ui) as you and the user talk
   lirah plans import <file>      import a *_plan.md file, or a *_plan/ draft folder
                                  of .md files, as a plan (split into chunks)
   lirah plans revise <plan> <notes>
@@ -276,12 +280,13 @@ function printPlans(data) {
     String(p.index), p.id, `${p.done}/${p.total}`, stageText(p), p.split === "done" ? "" : `split ${p.split}`,
     p.autopilot === "off" ? "" : p.autopilot, p.title,
   ]);
-  return `${data.repo}\n\n${table(["#", "ID", "DONE", "STAGE", "SPLIT", "AUTOPILOT", "TITLE"], rows)}`;
+  return `${data.repo}\n\n${table(["#", "ID", "DONE", "STATUS", "SPLIT", "AUTOPILOT", "TITLE"], rows)}`;
 }
 
-// planned, building, implemented, PR #12 (open), merged
+// draft, pending, in-progress, in-review · PR #12, completed, cancelled
 function stageText(p) {
-  return p.stage === "pr-open" && p.pr ? `PR #${p.pr.number}` : p.stage;
+  const status = p.status ?? p.stage; // an app older than planning mode sends only the stage
+  return p.stage === "pr-open" && p.pr && status === "in-review" ? `${status} · PR #${p.pr.number}` : status;
 }
 
 function printPlan(p) {
@@ -454,13 +459,14 @@ function route(cmd, positional, args) {
         const [path, ...extra] = rest;
         return ["plans.import", [absolutePath(path ?? args.path, "lirah plans import <file>"), ...extra], show];
       }
+      case "draft": return ["plans.draft", rest, show];
       case "done": return ["plans.done", rest, show];
       case "revise": return ["plans.revise", rest, show];
       case "rechunk": return ["plans.rechunk", rest, show];
       case "debug": {
         return ["plans.debug", rest, printDebug];
       }
-      default: fail(`unknown plans command "${sub}" (list, show, import, revise, rechunk, done, debug)`);
+      default: fail(`unknown plans command "${sub}" (list, show, draft, import, revise, rechunk, done, debug)`);
     }
   }
   if (cmd === "jobs" || cmd === "job") {
@@ -604,11 +610,15 @@ function planSummary(plan, index) {
   const total = active.length;
   const stage = plan.merged ? "merged" : plan.pr?.state === "OPEN" ? "pr-open"
     : total > 0 && done === total ? "implemented" : started(plan) ? "building" : "planned";
+  // As the app's planStatus.
+  const status = plan.cancelledAt ? "cancelled" : plan.merged ? "completed" : plan.draft ? "draft"
+    : plan.chunks.some((c) => c.awaitingFix) ? "in-progress"
+      : stage === "implemented" || stage === "pr-open" ? "in-review" : stage === "building" ? "in-progress" : "pending";
   // A run can't survive the app closing: the app shows it paused on load.
   const autopilot = plan.autopilot?.status === "running" ? "paused" : plan.autopilot?.status || "off";
   return {
     index, id: plan.id, title: plan.title || "(untitled)", done, total, split: plan.split, autopilot,
-    file: plan.importedFrom?.path || null, stage, pr: plan.pr ?? null, merged: plan.merged ?? null,
+    file: plan.importedFrom?.path || null, stage, status, pr: plan.pr ?? null, merged: plan.merged ?? null,
   };
 }
 

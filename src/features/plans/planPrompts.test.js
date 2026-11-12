@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildTaskPlanPrompt, isDraftPath } from './planPrompts';
+import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildDraftPartPrompt, buildDraftAllPrompt, buildTaskPlanPrompt, hasMockupLink, isDraftPath } from './planPrompts';
 import { joinDraft } from './usePlanFiles';
 import { noGitConfig } from './planModel';
 
@@ -89,5 +89,43 @@ describe('draft plans', () => {
     const plan = { title: 'P', chunks: [] };
     expect(buildPlanRevisePrompt(plan, 'more QA', '/p/x_plan')).toContain('the .md files in the draft folder /p/x_plan');
     expect(buildPlanRevisePrompt(plan, 'more QA', '/p/x_plan.md')).toContain('Edit only /p/x_plan.md.');
+  });
+});
+
+describe('draft part prompt', () => {
+  const base = { title: 'Dark mode', folder: '/h/.lirah/plans/2026-11/dark_mode_plan', existing: ['plan.md', 'architecture.md', 'ui.md'] };
+
+  it('writes only its own file and reads the others as context', () => {
+    const text = buildDraftPartPrompt({ ...base, part: 'ui' });
+    expect(text).toContain(`Edit only ${base.folder}/ui.md.`);
+    expect(text).toContain('plan.md, architecture.md.');
+    expect(text).not.toContain('artifact');
+  });
+
+  it('asks for the mockup now, in the draft, and spots its link in ui.md', () => {
+    expect(buildDraftPartPrompt({ ...base, part: 'ui', mockup: true })).toContain('Make the mockup now, as part of this draft');
+    expect(hasMockupLink('# UI\n\nMockup: https://claude.ai/artifact/ab12-cd34')).toBe(true);
+    expect(hasMockupLink('# UI\n\nMockup: https://claude.ai/code/artifact/0f9e')).toBe(true);
+    expect(hasMockupLink('# UI\n\nA mockup will follow.')).toBe(false);
+    expect(hasMockupLink(null)).toBe(false);
+  });
+
+  it('asks for an artifact mockup only for the ui part', () => {
+    expect(buildDraftPartPrompt({ ...base, part: 'ui', mockup: true })).toContain('HTML artifact');
+    expect(buildDraftPartPrompt({ ...base, part: 'database', mockup: true })).not.toContain('artifact');
+  });
+
+  it('drafts every part in order in one prompt, mockup in ui.md', () => {
+    const text = buildDraftAllPrompt({ ...base, mockup: true });
+    const at = (f) => text.indexOf(`${base.folder}/${f}.md`);
+    expect([at('architecture'), at('ui'), at('backend'), at('database'), at('qa')].every((n, i, a) => n >= 0 && (i === 0 || n > a[i - 1]))).toBe(true);
+    expect(text).toContain('already has plan.md, architecture.md, ui.md');
+    expect(text).toContain('In ui.md, make the mockup now');
+    expect(buildDraftAllPrompt(base)).not.toContain('artifact');
+  });
+
+  it('drafts a part the user named, and rejects a nameless one', () => {
+    expect(buildDraftPartPrompt({ ...base, part: 'test_plan' })).toContain('the test plan side of the plan');
+    expect(() => buildDraftPartPrompt({ ...base, part: '' })).toThrow();
   });
 });

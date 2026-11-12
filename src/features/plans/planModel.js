@@ -56,6 +56,16 @@ export const PLAN_STAGE = Object.freeze({
   MERGED: 'merged',
 });
 
+/** The plan's status for people: draft → pending → in-progress → in-review → completed, or cancelled. Derived; only plan.cancelledAt and plan.draft are stored. */
+export const PLAN_STATUS = Object.freeze({
+  DRAFT: 'draft',
+  PENDING: 'pending',
+  IN_PROGRESS: 'in-progress',
+  IN_REVIEW: 'in-review',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+});
+
 /** A chunk's status with its flags folded in. Derived for display, never stored. */
 export const CHUNK_STATE = Object.freeze({
   ...CHUNK_STATUS,
@@ -158,6 +168,18 @@ export function planStage(plan) {
   const { done, total } = planProgress(plan);
   if (total > 0 && done === total) return PLAN_STAGE.IMPLEMENTED;
   return planStarted(plan) ? PLAN_STAGE.BUILDING : PLAN_STAGE.PLANNED;
+}
+
+/** Where the plan is in PLAN_STATUS terms. plan.draft is set while it is still being planned in planning mode. */
+export function planStatus(plan) {
+  if (plan.cancelledAt) return PLAN_STATUS.CANCELLED;
+  if (plan.merged) return PLAN_STATUS.COMPLETED;
+  if (plan.draft) return PLAN_STATUS.DRAFT;
+  // Review notes (PR comments) waiting for their fix put it back in progress.
+  if (plan.chunks.some((c) => c.awaitingFix)) return PLAN_STATUS.IN_PROGRESS;
+  const stage = planStage(plan);
+  if (stage === PLAN_STAGE.IMPLEMENTED || stage === PLAN_STAGE.PR_OPEN) return PLAN_STATUS.IN_REVIEW;
+  return stage === PLAN_STAGE.BUILDING ? PLAN_STATUS.IN_PROGRESS : PLAN_STATUS.PENDING;
 }
 
 /**
