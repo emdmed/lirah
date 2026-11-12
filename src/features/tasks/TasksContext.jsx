@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
 import { usePlansActions } from '../plans/PlansContext';
 import { buildTaskPlanPrompt } from '../plans/planPrompts';
+import { readPlanSource } from '../plans/usePlanFiles';
 import { getSettings } from '../settings/settingsStore';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { planContext } from './planContexts';
@@ -91,12 +92,13 @@ export function TasksProvider({ children }) {
   /**
    * Send the task to the agent in `tabId` to plan, with a plan context in
    * front. The plan is for `root`, saved as ~/.lirah/plans/<YYYY-MM>/<title>_plan.md; with
-   * `autoChunk` it is imported and split into chunks once written.
+   * `autoChunk` it is imported and split into chunks once written; with `draft`
+   * it is a `<title>_plan` folder of .md files.
    */
-  const planTask = useCallback(async (scope, id, { tabId, root, contextId, autoChunk = false }) => {
+  const planTask = useCallback(async (scope, id, { tabId, root, contextId, autoChunk = false, draft = false }) => {
     const task = find(scope, id);
     if (!task) throw new Error('Task not found');
-    const planPath = planFilePath(await invoke('get_home_dir'), task);
+    const planPath = planFilePath(await invoke('get_home_dir'), task, Date.now(), draft);
     const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, planPath, autoChunk });
     const send = getTabPrompt(tabId)?.send;
     if (!send) throw new Error('that tab has no prompt to send to');
@@ -112,7 +114,7 @@ export function TasksProvider({ children }) {
   const importTaskPlan = useCallback(async (scope, id, source) => {
     const task = find(scope, id);
     if (!task?.planPath) throw new Error('This task has no plan file');
-    const text = source ?? await invoke('read_file_content', { path: task.planPath });
+    const text = source ?? await readPlanSource(task.planPath);
     if (!text.trim()) throw new Error('The plan file is empty');
     const root = planRootOf(task);
     const planId = await createPlan(root, {

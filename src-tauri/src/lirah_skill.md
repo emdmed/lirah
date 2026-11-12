@@ -74,7 +74,8 @@ lirah tasks move <id>          move between this project's list and the global l
 lirah plans [list]             list this tab's repo plans, their progress and stage
                                (planned, building, implemented, PR #N, merged)
 lirah plans show <plan>        a plan's chunks and their state
-lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+lirah plans import <file>      import a *_plan.md file, or a *_plan/ draft folder
+                               of .md files, as a plan (split into chunks)
 lirah plans revise <plan> <notes>
                                the plan's file and a prompt to change it as asked
 lirah plans rechunk <plan>     split the plan again from its file; done chunks stay
@@ -168,8 +169,14 @@ tabs are your workers:
 - Paths are resolved against your current directory.
 - Write plans the user wants run in Lirah as `~/.lirah/plans/<YYYY-MM>/<topic>_plan.md`
   (this month), then import it with `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
+- When a plan spans several concerns (architecture, the feature itself, QA…), or the
+  user asks for a draft, write a draft folder `~/.lirah/plans/<YYYY-MM>/<topic>_plan/`
+  instead, one .md per concern (e.g. architecture.md, feature.md, qa.md; add or drop
+  files as the work needs), with `# Title` at the top of plan.md or the first file by
+  name. Lirah joins the files in name order, plan.md first; import the folder with
+  `lirah plans import <folder>`.
 - When the user wants a plan changed: `lirah plans revise <plan> "<what to change>"`,
-  edit only the file it names, then `lirah plans rechunk <plan>`. Don't implement
+  edit only the file or draft folder it names, then `lirah plans rechunk <plan>`. Don't implement
   anything while revising.
 - When you finish the plan chunk you were sent, commit, then run
   `lirah plans done <plan> <chunk>`. With nothing to commit, pass `--result`.

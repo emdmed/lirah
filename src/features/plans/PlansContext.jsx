@@ -12,6 +12,7 @@ import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { usePlanStore } from './usePlanStore';
+import { readPlanSource } from './usePlanFiles';
 import { useAutopilot } from './useAutopilot';
 import { sendSaved } from './sentPrompts';
 import { usePlanLifecycleSync } from './planLifecycle';
@@ -318,7 +319,7 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     if (!plan) throw new Error('Plan not found');
     const path = plan.importedFrom?.path;
-    const source = path ? await invoke('read_file_content', { path }).catch(() => null) : null;
+    const source = path ? await readPlanSource(path).catch(() => null) : null;
     replaceSource(repoRoot, planId, {
       source: source ?? plan.source,
       importedFrom: source != null ? { path, hash: hash8(source) } : plan.importedFrom ?? null,

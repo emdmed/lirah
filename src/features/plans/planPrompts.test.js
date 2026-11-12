@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt } from './planPrompts';
+import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildTaskPlanPrompt, isDraftPath } from './planPrompts';
+import { joinDraft } from './usePlanFiles';
 import { noGitConfig } from './planModel';
 
 const chunk = { id: 'c1', n: 1, title: 'Do it', body: 'Details.', status: 'pending' };
@@ -58,5 +59,35 @@ describe('plan fix prompt', () => {
   it('commits with the plan review trailer', () => {
     const p = buildPlanFixPrompt(gitPlan, [{ relPath: 'a.js', fromLine: 1, note: 'fix' }]);
     expect(p).toContain('git commit -m "plan(demo): review fixes" -m "Plan-Chunk: p1/review"');
+  });
+});
+
+describe('draft plans', () => {
+  it('tells a draft folder from a plan file', () => {
+    expect(isDraftPath('/h/.lirah/plans/2026-11/big_plan')).toBe(true);
+    expect(isDraftPath('/h/.lirah/plans/2026-11/big_plan/')).toBe(true);
+    expect(isDraftPath('/h/.lirah/plans/2026-11/big_plan.md')).toBe(false);
+  });
+
+  it('joins a draft plan.md first, then by name, skipping non-.md files', () => {
+    const files = [{ name: 'qa.md', text: '## QA\n' }, { name: 'shot.png', text: 'x' }, { name: 'Plan.md', text: '# Big' }, { name: 'arch.md', text: '## Arch' }];
+    expect(joinDraft('big_plan', files)).toBe('<!-- file: Plan.md -->\n# Big\n\n<!-- file: arch.md -->\n## Arch\n\n<!-- file: qa.md -->\n## QA');
+  });
+
+  it('titles a draft from its folder when the first file has no title', () => {
+    expect(joinDraft('dark_mode_plan', [{ name: 'feature.md', text: '## Feature' }])).toBe('# Dark mode\n\n<!-- file: feature.md -->\n## Feature');
+    expect(joinDraft('empty_plan', [])).toBe('');
+  });
+
+  it('asks for a folder when the task plan path is a draft', () => {
+    const task = { title: 'Dark mode', notes: '' };
+    expect(buildTaskPlanPrompt({ task, planPath: '/p/dark_mode_plan' })).toContain('draft folder at /p/dark_mode_plan');
+    expect(buildTaskPlanPrompt({ task, planPath: '/p/dark_mode_plan.md' })).toContain('Save the finished plan as markdown at /p/dark_mode_plan.md');
+  });
+
+  it('revises a draft folder, not one file', () => {
+    const plan = { title: 'P', chunks: [] };
+    expect(buildPlanRevisePrompt(plan, 'more QA', '/p/x_plan')).toContain('the .md files in the draft folder /p/x_plan');
+    expect(buildPlanRevisePrompt(plan, 'more QA', '/p/x_plan.md')).toContain('Edit only /p/x_plan.md.');
   });
 });

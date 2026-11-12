@@ -15,7 +15,7 @@
 // is true.
 import { connect } from "node:net";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { lirahDir, list, read, resolveWorkspace, revisionOf, write } from "./lirah_files.js";
@@ -79,7 +79,8 @@ const USAGE = `usage: lirah <command> [args...] [--json]
   lirah plans [list]             list this tab's repo plans and their progress
                                  (plans and their files: ~/.lirah/plans/<YYYY-MM>)
   lirah plans show <plan>        a plan's chunks and their state
-  lirah plans import <file>      import a *_plan.md file as a plan (split into chunks)
+  lirah plans import <file>      import a *_plan.md file, or a *_plan/ draft folder
+                                 of .md files, as a plan (split into chunks)
   lirah plans revise <plan> <notes>
                                  the plan's file and a prompt to change it as
                                  asked; edit the file, then re-chunk
@@ -634,6 +635,23 @@ function slugify(text) {
 }
 
 // As buildPlanRevisePrompt and its decisionsBlock in src/features/plans/planPrompts.js.
+// As joinDraft/readPlanSource in src/features/plans/usePlanFiles.js: a `<topic>_plan`
+// folder's .md files joined, plan.md / overview.md / README.md first, then by name.
+const DRAFT_DIR = /_plan$/;
+const DRAFT_FIRST = ["plan.md", "overview.md", "readme.md"];
+const isDraftPath = (path) => DRAFT_DIR.test(String(path).replace(/\/+$/, ""));
+function readPlanSource(path) {
+  if (!isDraftPath(path)) return readFileSync(path, "utf8");
+  const rank = (name) => { const i = DRAFT_FIRST.indexOf(name.toLowerCase()); return i < 0 ? DRAFT_FIRST.length : i; };
+  const names = readdirSync(path).filter((n) => /\.md$/i.test(n) && statSync(join(path, n)).isFile())
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const texts = names.map((n) => readFileSync(join(path, n), "utf8").trim());
+  const body = names.map((n, i) => `<!-- file: ${n} -->\n${texts[i]}`).join("\n\n");
+  if (!names.length || /^#\s/.test(texts[0])) return body;
+  const words = basename(path).replace(DRAFT_DIR, "").replace(/[_-]+/g, " ").trim();
+  return `# ${words.charAt(0).toUpperCase()}${words.slice(1)}\n\n${body}`;
+}
+
 function revisePrompt(plan, notes, path) {
   const done = plan.chunks.filter(isDone);
   const earlier = plan.chunks.filter((c) => c.status === "implemented" && (c.decisions?.length > 0 || c.result));
@@ -649,7 +667,9 @@ function revisePrompt(plan, notes, path) {
     done.length > 0 && `Already done (${done.length} of ${plan.chunks.length} chunks), keep it as done and build on it:\n${done.map((c) => `- ${c.n}. ${c.title} (${c.status})`).join("\n")}`,
     decisions,
     `Changes I want:\n${notes.trim()}`,
-    `Edit only ${path}. Don't implement anything and don't commit. I'll re-chunk the plan from the file once you're done.`,
+    isDraftPath(path)
+      ? `Edit only the .md files in the draft folder ${path} (add or remove files as needed). Don't implement anything and don't commit. I'll re-chunk the plan from the folder once you're done.`
+      : `Edit only ${path}. Don't implement anything and don't commit. I'll re-chunk the plan from the file once you're done.`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -875,7 +895,7 @@ const LOCAL = {
     const repo = repoRoot();
     let source;
     try {
-      source = readFileSync(path, "utf8");
+      source = readPlanSource(path);
     } catch (e) {
       throw new Error(`can't read ${path} (${e.code || e.message})`);
     }
@@ -919,14 +939,14 @@ const LOCAL = {
       writeFileSync(path, plan.source);
       savePlan({ ...plan, importedFrom: { path, hash: hash8(plan.source) } });
     }
-    return `${revisePrompt(plan, notes, path)}\n\nWhen the file is updated, run \`lirah plans rechunk ${plan.id}\`.`;
+    return `${revisePrompt(plan, notes, path)}\n\nWhen the ${isDraftPath(path) ? "folder" : "file"} is updated, run \`lirah plans rechunk ${plan.id}\`.`;
   },
   "plans.rechunk": (args, [ref = args.plan]) => {
     const plan = findPlan(repoPlans(repoRoot()), ref);
     const path = plan.importedFrom?.path;
     let source = null;
     try {
-      if (path) source = readFileSync(path, "utf8");
+      if (path) source = readPlanSource(path);
     } catch {
       // the file is gone: re-chunk from plan.source
     }

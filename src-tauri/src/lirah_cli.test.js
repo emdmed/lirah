@@ -63,6 +63,21 @@ it('imports a plan with its split queued, and re-chunks it', () => {
   expect(after.revisions).toHaveLength(1);
 });
 
+it('imports a draft folder as one plan, plan.md first', () => {
+  const dir = join(project, 'big_plan');
+  mkdirSync(dir);
+  writeFileSync(join(dir, 'qa.md'), '## QA\n\ncheck it');
+  writeFileSync(join(dir, 'architecture.md'), '## Arch');
+  writeFileSync(join(dir, 'plan.md'), '# Big thing');
+  writeFileSync(join(dir, 'shot.png'), 'x');
+  const id = /imported (p\w+);/.exec(lirah('plans', 'import', 'big_plan'))[1];
+  const plan = file(`plans/${thisMonth()}/${id}/plan.json`);
+  expect(plan.title).toBe('Big thing');
+  expect(plan.importedFrom.path).toBe(dir);
+  expect(plan.source).toBe('<!-- file: plan.md -->\n# Big thing\n\n<!-- file: architecture.md -->\n## Arch\n\n<!-- file: qa.md -->\n## QA\n\ncheck it');
+  expect(lirah('plans', 'revise', id, 'more QA')).toContain(`the draft folder ${dir}`);
+});
+
 it('asks the app to mark an in-progress chunk done', () => {
   put('plans/2026-11/p1/plan.json', {
     id: 'p1', title: 'P', repoRoot: project, split: 'done', createdAt: new Date(2026, 10, 5).getTime(),

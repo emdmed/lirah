@@ -12,10 +12,15 @@ const GLOBAL_DIALOGS = {
     Component: NewTabDialog,
     props: (ctx) => ({ currentPath: ctx.currentPath, onOpenProject: ctx.onOpenProject }),
   },
-  // Read-only preview of one file from outside a tab (the plans pane's saved prompts).
+  // Read-only preview from outside a tab: one file (a saved prompt), or `files`
+  // to step through (a draft plan's .md files).
   markdown: {
     Component: MarkdownViewerDialog,
-    props: (_ctx, entry) => ({ filePath: entry.filePath }),
+    props: (_ctx, entry, store) => ({
+      filePath: entry.filePath,
+      markdownFiles: entry.files,
+      onFileChange: (filePath) => store.open('markdown', { ...entry, filePath }, null),
+    }),
   },
 };
 
@@ -31,7 +36,7 @@ export function GlobalDialogOutlet(ctx) {
         <Component
           open
           onOpenChange={(next) => { if (!next) store.close(id, null); }}
-          {...def.props?.(ctx, entry)}
+          {...def.props?.(ctx, entry, store)}
         />
       </Suspense>
     );

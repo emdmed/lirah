@@ -32,6 +32,10 @@ export function slugify(text) {
 }
 
 /** First `# heading` of a markdown document, if any. */
+/** A draft plan: a `<topic>_plan/` folder of .md files beside the `<topic>_plan.md` files. */
+export const DRAFT_DIR = /_plan$/;
+export const isDraftPath = (path) => DRAFT_DIR.test(String(path).replace(/\/+$/, ''));
+
 export function markdownTitle(source) {
   const m = String(source || '').match(/^#\s+(.+)$/m);
   return m ? m[1].trim() : null;
@@ -266,7 +270,9 @@ export function buildPlanRevisePrompt(plan, notes, path) {
     done.length > 0 && `Already done (${done.length} of ${plan.chunks.length} chunks), keep it as done and build on it:\n${done.map((c) => `- ${c.n}. ${c.title} (${c.status})`).join('\n')}`,
     decisionsBlock(plan),
     `Changes I want:\n${notes.trim()}`,
-    `Edit only ${path}. Don't implement anything and don't commit. I'll re-chunk the plan from the file once you're done.`,
+    isDraftPath(path)
+      ? `Edit only the .md files in the draft folder ${path} (add or remove files as needed). Don't implement anything and don't commit. I'll re-chunk the plan from the folder once you're done.`
+      : `Edit only ${path}. Don't implement anything and don't commit. I'll re-chunk the plan from the file once you're done.`,
   ].filter(Boolean).join('\n\n');
 }
 
@@ -276,11 +282,14 @@ export function buildPlanRevisePrompt(plan, notes, path) {
  * `planPath`, where the plans pane finds it and offers to import it.
  */
 export function buildTaskPlanPrompt({ task, context, planPath, autoChunk = false }) {
+  const draft = isDraftPath(planPath);
   return [
     context?.trim(),
     `## Task\n\n${task.title.trim()}${task.notes?.trim() ? `\n\n${task.notes.trim()}` : ''}`,
-    `Save the finished plan as markdown at ${planPath}, starting with a \`# Title\` line.`,
-    autoChunk && 'Write that file only once the plan is final: it is picked up as soon as you end your turn and split into implementation chunks.',
+    draft
+      ? `Write the plan as a draft folder at ${planPath}: one markdown file per concern, e.g. architecture.md, feature.md, qa.md (add or drop files as the work needs). Start plan.md, or the first file by name, with a \`# Title\` line. The files are joined into one plan in name order, plan.md first.`
+      : `Save the finished plan as markdown at ${planPath}, starting with a \`# Title\` line.`,
+    autoChunk && `Write ${draft ? 'those files' : 'that file'} only once the plan is final: it is picked up as soon as you end your turn and split into implementation chunks.`,
   ]
     .filter(Boolean)
     .join('\n\n');

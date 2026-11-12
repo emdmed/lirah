@@ -47,6 +47,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
   const [showDone, setShowDone] = useState(false);
   const [contextsOpen, setContextsOpen] = useState(false);
   const [autoChunk, setAutoChunk] = useSetting('autoChunkTaskPlans');
+  const [draft, setDraft] = useSetting('draftTaskPlans');
 
   // Quick add: Enter saves; Shift+Enter starts a new line.
   const [text, setText] = useState('');
@@ -130,16 +131,16 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       if (!ok) return;
     }
     try {
-      const planPath = await planTask(scope, task.id, { tabId: activeTabId, root: projectScope, contextId, autoChunk });
+      const planPath = await planTask(scope, task.id, { tabId: activeTabId, root: projectScope, contextId, autoChunk, draft });
       toast.success(`Sent to ${tabName}: ${autoChunk ? 'the plan is split into chunks once written' : `the plan goes to ${basename(planPath)}`}`);
     } catch (e) {
       // Not sent: the prompt is still useful on the clipboard.
-      const planPath = planFilePath(await invoke('get_home_dir').catch(() => '~'), task);
+      const planPath = planFilePath(await invoke('get_home_dir').catch(() => '~'), task, Date.now(), draft);
       const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, planPath, autoChunk });
       const copied = await navigator.clipboard.writeText(text).then(() => true, () => false);
       toast.error(`Couldn't send the task: ${errorMessage(e)}.${copied ? ' The prompt is on the clipboard.' : ''}`);
     }
-  }, [tabs, activeTabId, projectScope, planTask, scope, toast, confirm, autoChunk]);
+  }, [tabs, activeTabId, projectScope, planTask, scope, toast, confirm, autoChunk, draft]);
 
   const handleEdit = useCallback((task, patch) => {
     updateTask(scope, task.id, patch);
@@ -222,6 +223,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
 
   // Stable so the memoized TaskRows skip re-rendering while the quick-add box is typed in.
   const handleChunkMode = useCallback((mode) => setAutoChunk(mode === 'chunks'), [setAutoChunk]);
+  const handlePlanShape = useCallback((shape) => setDraft(shape === 'draft'), [setDraft]);
   const openContexts = useCallback(() => setContextsOpen(true), []);
 
   const renderRow = (task, index, rowDrag) => (
@@ -243,6 +245,8 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       onOpenPlan={handleOpenPlan}
       chunkMode={autoChunk ? 'chunks' : 'file'}
       onChunkMode={handleChunkMode}
+      planShape={draft ? 'draft' : 'file'}
+      onPlanShape={handlePlanShape}
       onEditContexts={openContexts}
     />
   );

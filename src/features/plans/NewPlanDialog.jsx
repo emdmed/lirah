@@ -13,6 +13,7 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Scanner } from '../../components/instrument/Scanner';
 import { hash8 } from '../../lib/ids';
+import { readPlanSource } from './usePlanFiles';
 
 /**
  * Paste a plan (or load one from any path) and hand it to the splitter, or
@@ -39,7 +40,7 @@ export function NewPlanDialog({ open, onOpenChange, onCreate, onSendPrompt, send
     if (!p) return;
     try {
       const full = path.trim().startsWith('~/') ? `${await invoke('get_home_dir')}${p}` : p;
-      const text = await invoke('read_file_content', { path: full });
+      const text = await readPlanSource(full);
       setSource(text);
       setLoadedFrom({ path: full, hash: hash8(text) });
       setError('');

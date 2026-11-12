@@ -65,8 +65,14 @@ export function planFileName(task) {
   return `${slugify(task.title).replace(/-/g, '_') || 'task'}_plan.md`;
 }
 
-/** Where a task's plan file goes: `<home>/.lirah/plans/<YYYY-MM>/<title>_plan.md` (this month). */
-export const planFilePath = (home, task, now = Date.now()) => `${planFilesDir(home, now)}/${planFileName(task)}`;
+/**
+ * Where a task's plan goes: `<home>/.lirah/plans/<YYYY-MM>/<title>_plan.md` (this month),
+ * or with `draft` the `<title>_plan` folder of .md files.
+ */
+export function planFilePath(home, task, now = Date.now(), draft = false) {
+  const path = `${planFilesDir(home, now)}/${planFileName(task)}`;
+  return draft ? path.slice(0, -'.md'.length) : path;
+}
 
 /** The repo a task's plan is for; older tasks saved the file at the repo root. */
 export const planRootOf = (task) => task.planRoot || task.planPath.slice(0, lastSepIndex(task.planPath));

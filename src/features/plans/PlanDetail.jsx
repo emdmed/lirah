@@ -22,6 +22,9 @@ import { ChunkRow, DoneRun } from './ChunkRow';
 import { BUSY, useBusy, usePlanPane, useStarting } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { isNoGit, planGit } from './planGit';
+import { isDraftPath } from './planPrompts';
+import { openDraftFiles } from './usePlanFiles';
+import { useDialogStore } from '../dialogs/DialogProvider';
 import { planTerminalShown, useTabManager } from '../tabs/TabContext';
 import { useToast } from '../toast';
 import { FrameHints } from '../../components/instrument/FrameHints';
@@ -88,6 +91,7 @@ export function PlanDetail({ plan }) {
   const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan, shelvePlan } = usePlansActions();
   const { tabs, switchTab } = useTabManager();
   const toast = useToast();
+  const dialogs = useDialogStore();
   const reviewingAll = useBusy(BUSY.REVIEW_ALL);
   const settingUpGit = useBusy(BUSY.GIT_SETUP);
   const starting = useStarting(plan.id);
@@ -307,6 +311,16 @@ export function PlanDetail({ plan }) {
             >
               source
             </PanelButton>
+            {isDraftPath(plan.importedFrom?.path ?? '') && (
+              <PanelButton
+                onClick={() => openDraftFiles(dialogs, plan.importedFrom.path)
+                  .then((ok) => ok || toast.error('The draft folder has no .md files'))
+                  .catch((e) => toast.error(`Couldn't open the draft: ${e?.message || e}`))}
+                title="Read the draft's files as they are now (^[ / ^] to step through them)"
+              >
+                files
+              </PanelButton>
+            )}
             <PanelButton
               aria-pressed={showRevise}
               data-latched={showRevise || undefined}

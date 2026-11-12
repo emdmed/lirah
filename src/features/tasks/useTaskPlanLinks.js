@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
 import { usePlansActions, usePlansByRepo } from '../plans/PlansContext';
 import { requestPlanFocus } from '../plans/plansPaneEvents';
+import { readPlanSource } from '../plans/usePlanFiles';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
 import { useToast } from '../toast';
@@ -85,7 +86,7 @@ export function useTaskPlanLinks(tasksByScope, updateTask, importTaskPlan) {
     const autoImport = async (scope, task) => {
       if (importing.current.has(task.id) || agentBusy(task.planTabId)) return;
       if (findPlanRef.current(task) !== null) return; // already imported, or plans not loaded
-      const source = await invoke('read_file_content', { path: task.planPath }).catch(() => null);
+      const source = await readPlanSource(task.planPath).catch(() => null);
       if (cancelled || !source?.trim()) return;
       // Same text on two polls in a row: the agent is done writing it.
       const hash = hash8(source);
