@@ -4,6 +4,15 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-12
+
+### Added
+
+- **Draft plans** - A plan can be a draft folder `~/.lirah/plans/<YYYY-MM>/<topic>_plan/` of .md files (architecture.md, feature.md, qa.md...) instead of one file. Importing joins them, plan.md first and then by name, into one plan. Editing a file later marks the plan as updated, and re-chunk reads the folder again. The task plan menu can ask the agent for a draft folder ("Write as"), and `lirah plans import|revise|rechunk` and the Lirah skill handle folders too.
+- **Read a draft** - The found plans list shows a draft's files by name. Each one opens in the markdown viewer, and ^[ / ^] steps through the rest. An imported draft plan has a `files` button.
+- **Plan timeline** - `timeline` in the plans pane draws every plan of the repo on one calendar, from planned to merged (FIG.37). Picking one opens it.
+- **Merge a finished plan** - A finished plan in worktrees gets a `merge` button on its tab card, which opens the merge dialog on the plan's worktree with its base branch selected.
+
 ## [0.26.1] - 2026-11-12
 
 ### Fixed
