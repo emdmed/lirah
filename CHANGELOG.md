@@ -4,6 +4,22 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-12
+
+### Added
+
+- **Worktrees on tab rows** - A tab whose repo has other worktrees shows a branch mark with their count. Click it (or press `w` on the row) for the list: review a worktree's changes, merge it into the tab's branch, or delete it. Delete asks first, warns about uncommitted files and keeps the branch.
+- **Changed files beside the diff** - The diff viewer lists every changed file down the left, grouped by folder with its M/A/D/R letter; click one to jump to it. Worktree reviews and plan reviews use it. A worktree review covers everything since it split from the tab's branch, uncommitted and untracked work included.
+
+### Changed
+
+- **Thin diff map** - The diff's change map is a slim strip (spans, unchanged stretches, the view bracket), so the diff keeps its width. Review notes are listed under the diff.
+
+### Fixed
+
+- **Submenus** - Submenus in dropdown menus are no longer clipped by the menu they open from.
+- **Release build** - 0.28.0's installers failed a path check in CI and were never published; 0.29.0 ships planning mode with them.
+
 ## [0.28.0] - 2026-11-12
 
 ### Added
