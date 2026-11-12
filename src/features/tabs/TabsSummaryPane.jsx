@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { plural } from '../../lib/plural';
 import { useBookmarks } from '../bookmarks';
@@ -26,6 +26,12 @@ import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
 import { EmptyPlate } from '@/components/EmptyState';
+import { useConfirm } from '../dialogs/DialogProvider';
+import { dirtyCount, worktreeRemove } from '../../lib/git';
+import { lazyNamed } from '../../lib/lazyNamed';
+import { worktreeChanges } from '../git/worktreeChanges';
+
+const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
 
 const ROW = '[data-tab-row]';
 
@@ -60,7 +66,8 @@ export function rowActivity(own, workLabel, tabPlans) {
 export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHints, live = true }) {
   const { tabs, workspaceTabs, activeTabId, switchTab, requestCloseTab, reorderTab, renameTab, togglePlanTerminal: flipPlanTerminal } = useTabManager();
   const closable = tabs.length > 1;
-  const { repo, cli, now } = useTabsSummary(tabs, live);
+  const { repo, cli, now, refreshRepo } = useTabsSummary(tabs, live);
+  const confirm = useConfirm();
   const { bookmarks } = useBookmarks();
   const toast = useToast();
   const { linkedRepos } = useLinkedRepos(activeTabId);
@@ -70,6 +77,8 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
   const [openTrail, setOpenTrail] = useState(null); // tab id whose last turn is expanded
   const [renamingId, setRenamingId] = useState(null);
   const [roleMenuId, setRoleMenuId] = useState(null); // tab id whose role menu is open
+  const [worktreeMenuId, setWorktreeMenuId] = useState(null); // tab id whose worktree menu is open
+  const [worktreeDiff, setWorktreeDiff] = useState(null); // { repoPath, baseRef, files, filePath } under review
   const [focusedId, setFocusedId] = useState(null); // tab id whose row has focus
   // useDragReorder hands back a new object each render; rows are memoized, so
   // keep it the same until one of its parts changes.
@@ -83,6 +92,8 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
   // Read at click time, so the row actions stay stable while plans update (rows are memoized).
   const rootOf = useRef(plans.rootOf);
   rootOf.current = plans.rootOf;
+  const repoRef = useRef(repo);
+  repoRef.current = repo;
 
   const commitRename = useCallback((tab, value) => {
     const name = value.trim();
@@ -162,6 +173,51 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     getTabPrompt(tabId)?.merge?.(target.path, target.base);
   }, [activeTabId, switchTab]);
 
+  // Everything another worktree changed since it left the tab's branch, in the diff viewer.
+  const reviewWorktree = useCallback(async (tabId, worktree) => {
+    const base = repoRef.current[tabId]?.branch;
+    if (!base || base === 'HEAD') return toast.error('This tab is on a detached HEAD: nothing to compare the worktree with');
+    try {
+      const { baseRef, files } = await worktreeChanges(worktree.path, base);
+      if (!files.length) return toast.success(`${worktree.branch ?? worktree.path} has no changes since ${base}`);
+      setWorktreeDiff({ repoPath: worktree.path, baseRef, files, filePath: files[0].path });
+    } catch (e) {
+      toast.error(`Can't review the worktree: ${e?.message || e}`);
+    }
+  }, [toast]);
+
+  // Another worktree of the row's repo merges into the tab's branch, in the tab's merge dialog.
+  const mergeWorktree = useCallback((tabId, worktree) => {
+    if (tabId !== activeTabId) switchTab(tabId);
+    getTabPrompt(tabId)?.merge?.(worktree.path, repoRef.current[tabId]?.branch);
+  }, [activeTabId, switchTab]);
+
+  // Force-removes the worktree folder; its branch and commits stay.
+  const deleteWorktree = useCallback(async (tab, worktree) => {
+    const dirty = await dirtyCount(worktree.path).catch(() => null);
+    const ok = await confirm({
+      title: 'Delete this worktree?',
+      description: dirty
+        ? 'Its uncommitted changes are lost. The branch and its commits stay.'
+        : 'The folder goes. The branch and its commits stay.',
+      facts: [
+        { label: 'Branch', value: worktree.branch ?? 'detached' },
+        { label: 'Path', value: worktree.path },
+        ...(dirty ? [{ label: 'Uncommitted', value: plural(dirty, 'file'), tone: 'lamp' }] : []),
+      ],
+      confirmLabel: 'Delete worktree',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await worktreeRemove(tab.projectPath, worktree.path);
+      toast.success(`Deleted worktree ${worktree.branch ?? worktree.path}`);
+    } catch (e) {
+      toast.error(`Worktree not deleted: ${e?.message || e}`);
+    }
+    refreshRepo(tab.projectPath);
+  }, [confirm, toast, refreshRepo]);
+
   const actions = useMemo(() => ({
     switchTab,
     openPlan,
@@ -175,12 +231,16 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     attachEdits,
     toggleTrail,
     setRoleMenu: setRoleMenuId,
+    setWorktreeMenu: setWorktreeMenuId,
     resumePlan,
     stopPlan,
     shelvePlan: shelve,
     mergePlan,
     togglePlanTerminal,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal]);
+    reviewWorktree,
+    mergeWorktree,
+    deleteWorktree,
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal, reviewWorktree, mergeWorktree, deleteWorktree]);
 
   const kinds = [];
   const faulted = []; // tabs whose run stopped, for the closing line
@@ -217,9 +277,9 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
         // Only the tab you're on or the row you've selected unfolds, so rows never
         // jump as agents start and stop; the lamp and queue outline still show live state.
         const compact = !active && tab.id !== focusedId && !trailOpen
-          && renamingId !== tab.id && roleMenuId !== tab.id;
+          && renamingId !== tab.id && roleMenuId !== tab.id && worktreeMenuId !== tab.id;
         if (tab.id === focusedId) {
-          focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary });
+          focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary, worktrees: repo[tab.id]?.worktrees?.length });
         }
         return (
           <TabRow
@@ -249,6 +309,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
             compact={compact}
             renaming={renamingId === tab.id}
             roleMenuOpen={roleMenuId === tab.id}
+            worktreeMenuOpen={worktreeMenuId === tab.id}
             drag={drag}
             actions={actions}
           />
@@ -316,6 +377,20 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
           </span>
         )}
       </div>
+      <Suspense fallback={null}>
+        {worktreeDiff && (
+          <GitDiffDialog
+            open
+            onOpenChange={(o) => !o && setWorktreeDiff(null)}
+            repoPath={worktreeDiff.repoPath}
+            baseRef={worktreeDiff.baseRef}
+            filePath={worktreeDiff.filePath}
+            changedFiles={worktreeDiff.files}
+            onFileChange={(filePath) => setWorktreeDiff((d) => ({ ...d, filePath }))}
+            fileList
+          />
+        )}
+      </Suspense>
     </div>
   );
 });

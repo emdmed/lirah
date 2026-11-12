@@ -7,14 +7,8 @@ import { Scanner } from '../../components/instrument/Scanner';
 import { cn } from '../../lib/utils';
 import { Fig11Merge, planCommands } from './Fig11Merge';
 import { StepOrbit } from './StepOrbit';
+import { STATUS_COLOR } from './statusColor';
 
-// `git diff --name-status` letters, coloured like the auto-commit list.
-const STATUS_COLOR = {
-  M: 'var(--ins-warn)',
-  A: 'var(--ins-ok)',
-  D: 'var(--ins-fault)',
-  R: 'var(--color-status-info)',
-};
 
 const STEPS = [
   { id: 'check', label: 'Check', stages: ['checking', 'ready'] },

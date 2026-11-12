@@ -38,14 +38,17 @@ const DropdownMenuSubTrigger = React.forwardRef(({ className, inset, children, .
 DropdownMenuSubTrigger.displayName =
   DropdownMenuPrimitive.SubTrigger.displayName
 
+// Portalled: inside the parent menu its overflow would clip the submenu.
 const DropdownMenuSubContent = React.forwardRef(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubContent
-    ref={ref}
-    className={cn(
-      "z-50 min-w-[8rem] overflow-hidden rounded-none border-0 ins-veil bg-[var(--ins-raised)] p-1 text-popover-foreground font-mono",
-      className
-    )}
-    {...props} />
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.SubContent
+      ref={ref}
+      className={cn(
+        "z-50 min-w-[8rem] overflow-hidden rounded-none border-0 ins-veil bg-[var(--ins-raised)] p-1 text-popover-foreground font-mono",
+        className
+      )}
+      {...props} />
+  </DropdownMenuPrimitive.Portal>
 ))
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { DiffContent } from './DiffContent';
+import { ChangedFilesList } from './ChangedFilesList';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
 import { ChevronLeft, ChevronRight, NewChat, Pin, Send, Trash, Unpin } from '@/components/icons';
@@ -8,7 +9,6 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../com
 import { Scanner } from '../../components/instrument/Scanner';
 import { DiffBar } from '../../components/instrument/DiffBar';
 import { Position } from '../../components/instrument/Position';
-import { useFigureCompact } from '../../components/instrument/figure';
 import { basename } from '../../utils/pathUtils';
 import { usePinnedFiles } from '../pinned-files';
 
@@ -24,8 +24,9 @@ const NO_FILES = []; // stable default: a fresh [] would rebuild the nav callbac
  * @param {string} repoPath - Path to the git repository root
  * @param {string} baseRef - Optional ref for the old side (default HEAD)
  * @param {string} headRef - Optional ref for the new side (default: the working tree)
- * @param {Array} changedFiles - Optional list of all changed files for navigation
+ * @param {Array} changedFiles - Optional list of all changed files for navigation: paths or { path, status }
  * @param {function} onFileChange - Optional callback when navigating to a different file
+ * @param {boolean} fileList - Show changedFiles as a list down the side, to jump between them
  * @param {Array} annotations - Review notes already pinned to this diff (all files)
  * @param {function} onAddAnnotation - Enables the review-notes bar when provided
  * @param {function} onRemoveAnnotation - Drops one note by id
@@ -41,13 +42,13 @@ export function GitDiffDialog({
   headRef,
   changedFiles = NO_FILES,
   onFileChange,
+  fileList = false,
   annotations = [],
   onAddAnnotation,
   onRemoveAnnotation,
   onSendAnnotations,
   sendingAnnotations = false,
 }) {
-  const compactFigures = useFigureCompact();
   const [diffResult, setDiffResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -272,11 +273,15 @@ export function GitDiffDialog({
         )}
       </div>
 
+      <div className="flex flex-1 min-h-0">
+      {fileList && hasMultipleFiles && onFileChange && (
+        <ChangedFilesList files={changedFiles} current={filePath} repoPath={repoPath} onSelect={onFileChange} />
+      )}
       {/* Diff content */}
       <div
         ref={scrollContainerRef}
         tabIndex={-1}
-        className="flex-1 min-h-0 overflow-auto outline-none"
+        className="flex-1 min-w-0 min-h-0 overflow-auto outline-none"
       >
         {loading ? (
           <div className="flex items-center justify-center p-8">
@@ -300,13 +305,13 @@ export function GitDiffDialog({
           />
         ) : null}
       </div>
+      </div>
 
       {/* Review notes: pin feedback to lines, then send it all back to the
-          agent. In full figures the notes hang off their lines on the diff
-          map (FIG 25); compact keeps the list. */}
+          agent. The thin diff map marks each with a dot; the list reads them. */}
       {annotationsEnabled && (
         <div className="flex-shrink-0 edge-t-engraved">
-          {fileNotes.length > 0 && compactFigures && (
+          {fileNotes.length > 0 && (
             <div className="max-h-28 overflow-y-auto px-3 pt-2">
               {fileNotes.map((n) => (
                 <div key={n.id} className="flex items-start gap-2 py-0.5 text-xs">

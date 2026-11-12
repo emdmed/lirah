@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { usePageVisible } from '../../hooks/usePageVisible';
 import { createStore, useStore } from '../../lib/createStore';
 import { getTabSession } from './terminalActivity';
+import { worktreeList } from '../../lib/git';
 
 // get_git_stats is served from the backend cache, so the repo poll is cheap;
 // it only backs up the git-stats-changed / branch-changed events.
@@ -109,10 +110,18 @@ export function useTabsSummary(tabs, enabled = true) {
     if (!tabs.length) return;
     const entries = await Promise.all(tabs.map(async (t) => {
       try {
-        const [branch, stats] = await Promise.all([
+        const [branch, stats, trees] = await Promise.all([
           invoke('get_current_branch', { repoPath: t.projectPath }),
           invoke('get_git_stats', { path: t.projectPath }).catch(() => null),
+          worktreeList(t.projectPath).catch(() => []),
         ]);
+        // The repo's other checkouts: every worktree but the one this tab stands
+        // in, the deepest one holding its folder (worktrees can nest in the main one).
+        const here = normPath(t.projectPath);
+        const own = trees.map((w) => normPath(w.path))
+          .filter((p) => here === p || here.startsWith(`${p}/`))
+          .sort((a, b) => b.length - a.length)[0];
+        const worktrees = trees.filter((w) => normPath(w.path) !== own);
         let added = 0;
         let deleted = 0;
         let files = 0;
@@ -121,7 +130,7 @@ export function useTabsSummary(tabs, enabled = true) {
           deleted += s.deleted || 0;
           files += 1;
         }
-        return [t.id, { branch, added, deleted, files }];
+        return [t.id, { branch, added, deleted, files, worktrees }];
       } catch {
         return [t.id, null];
       }
@@ -206,5 +215,5 @@ export function useTabsSummary(tabs, enabled = true) {
     return () => clearInterval(t);
   }, [live]);
 
-  return { repo, cli, now };
+  return { repo, cli, now, refreshRepo: fetchRepos };
 }

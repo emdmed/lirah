@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { currentBranch, dirtyCount, git, gitLines, repoTop } from "../../lib/git";
+import { currentBranch, dirtyCount, git, gitLines, repoTop, worktreeList } from "../../lib/git";
 
 // Deterministic "finish this feature branch": switch to a base branch and merge
 // the feature into it. Fast-forward when possible, else a --no-ff merge commit.
@@ -34,15 +34,9 @@ export function parseShortstat(line = '') {
 const isDirty = async (repoPath) => (await dirtyCount(repoPath, { untracked: false })) > 0;
 const mergeInProgress = async (repoPath) => (await git(repoPath, ['rev-parse', '-q', '--verify', 'MERGE_HEAD'])).trim() !== '';
 
-// branch name -> worktree path, from `git worktree list --porcelain`.
+// branch name -> worktree path.
 async function worktreesByBranch(repoPath) {
-  const map = {};
-  let path = null;
-  for (const line of await gitLines(repoPath, ['worktree', 'list', '--porcelain'])) {
-    if (line.startsWith('worktree ')) path = line.slice(9);
-    else if (line.startsWith('branch refs/heads/') && path) map[line.slice(18)] = path;
-  }
-  return map;
+  return Object.fromEntries((await worktreeList(repoPath)).filter((w) => w.branch).map((w) => [w.branch, w.path]));
 }
 
 const readLastBase = (repoRoot) => {

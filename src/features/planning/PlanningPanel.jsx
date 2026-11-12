@@ -10,7 +10,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import { useRowCursor } from '../../hooks/useRowCursor';
 import { hash8 } from '../../lib/ids';
 import { cn } from '../../lib/utils';
-import { basename } from '../../utils/pathUtils';
+import { basename, parentDir } from '../../utils/pathUtils';
 import { useConfirm, useDialogStore } from '../dialogs/DialogProvider';
 import { StepOrbit } from '../git/StepOrbit';
 import { ChunkBody } from '../plans/ChunkRow';
@@ -63,7 +63,7 @@ function draftName(folder) {
 }
 
 /** …/plans/2026-11/x_plan → 2026-11 */
-const draftMonth = (folder) => basename(folder.slice(0, folder.lastIndexOf('/')));
+const draftMonth = (folder) => basename(parentDir(folder));
 
 /** Calls `load` now and every POLL_MS while `key` stays the same; the latest result. */
 function usePolled(load, key) {

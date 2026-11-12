@@ -12,6 +12,7 @@ import { Scanner } from '../../components/instrument/Scanner';
 import { Lamp } from '../../components/instrument/Lamp';
 import { RenameField } from './RenameField';
 import { RoleChip, RoleTagButton } from './RoleMenu';
+import { WorktreeMenu } from './WorktreeMenu';
 import { TurnTrail } from './TurnTrail';
 import { isSettledPlan, TabPlanTier } from '../plans/TabPlanTier';
 
@@ -86,6 +87,7 @@ export const ROW_KEYS = [
   { keys: ['o'], label: 'plan' },
   { keys: ['p'], label: 'resume' },
   { keys: ['e'], label: 'edits' },
+  { keys: ['w'], label: 'worktrees' },
   { keys: ['t'], label: 'role' },
   { keys: ['r'], label: 'rename' },
   { keys: ['x'], label: 'close' },
@@ -103,7 +105,7 @@ export const ROW_KEYS = [
  */
 export const TabRow = memo(function TabRow({
   tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, workLabel, active, linked, closable, queuePos,
-  turn, summaryText, summaryRunning, trailOpen, renaming, roleMenuOpen, plans, compact, drag, actions,
+  turn, summaryText, summaryRunning, trailOpen, renaming, roleMenuOpen, worktreeMenuOpen, plans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
   const summary = summaryText ? { text: summaryText, running: summaryRunning } : null;
@@ -121,6 +123,7 @@ export const TabRow = memo(function TabRow({
   const showTrail = summary && !permission;
   const queued = queuePos >= 0;
   const onRoleMenu = (open) => actions.setRoleMenu(open ? tab.id : null);
+  const onWorktreeMenu = (open) => actions.setWorktreeMenu(open ? tab.id : null);
   const edited = turn?.edited?.size ? [...turn.edited] : null;
 
   const onKeyDown = (e) => {
@@ -130,7 +133,7 @@ export const TabRow = memo(function TabRow({
       fn();
     };
     if (e.key === 'Enter' || e.key === ' ') return run(() => actions.switchTab(tab.id));
-    const hit = rowKeys({ active, closable, edited, plans, summary }).find((k) => k.on.includes(e.key));
+    const hit = rowKeys({ active, closable, edited, plans, summary, worktrees: info?.worktrees?.length }).find((k) => k.on.includes(e.key));
     if (!hit) return;
     run({
       attach: () => actions.attachEdits(edited),
@@ -141,6 +144,7 @@ export const TabRow = memo(function TabRow({
       rename: () => actions.startRename(tab.id),
       close: () => actions.closeTab(tab.id),
       role: () => onRoleMenu(true),
+      worktrees: () => onWorktreeMenu(true),
       folder: () => actions.openFolder(tab.projectPath),
     }[hit.label]);
   };
@@ -163,6 +167,7 @@ export const TabRow = memo(function TabRow({
     info?.branch && `branch ${info.branch}`,
     info?.branch && (info.files === 0 ? 'clean' : `${plural(info.files, 'file')} changed`),
     ...livePlans.map((p) => `plan ${p.title || 'untitled'}${p.autopilot?.status ? `, auto-pilot ${p.autopilot.status}` : ''}`),
+    info?.worktrees?.length > 0 && plural(info.worktrees.length, 'other worktree'),
     linked && 'linked to the prompt',
     workLabel,
   ].filter(Boolean).join(', ');
@@ -239,7 +244,7 @@ export const TabRow = memo(function TabRow({
         }
       }}
       title={tooltip}
-      aria-keyshortcuts="Enter r x l t a f o e"
+      aria-keyshortcuts="Enter r x l t w a f o e"
       data-marker="top"
       className={cn(
         'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
@@ -313,6 +318,7 @@ export const TabRow = memo(function TabRow({
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {compact && rowActions(false)}
+          <WorktreeMenu tab={tab} worktrees={info?.worktrees} open={worktreeMenuOpen} onOpenChange={onWorktreeMenu} onReview={actions.reviewWorktree} onMerge={actions.mergeWorktree} onDelete={actions.deleteWorktree} />
           <Readout
             info={info}
             contextFill={contextFill}

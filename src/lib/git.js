@@ -42,6 +42,16 @@ export function worktreeAdd(repoPath, { path, branch, create = false, base = 'HE
   return git(repoPath, ['worktree', 'add', path, branch]);
 }
 
+/** Every worktree of the repo as { path, branch }, the main one first; branch is null when detached. */
+export async function worktreeList(repoPath) {
+  const list = [];
+  for (const line of await gitLines(repoPath, ['worktree', 'list', '--porcelain'])) {
+    if (line.startsWith('worktree ')) list.push({ path: line.slice(9), branch: null });
+    else if (line.startsWith('branch refs/heads/') && list.length) list.at(-1).branch = line.slice(18);
+  }
+  return list;
+}
+
 /** Force-remove the worktree at `path`, then prune, which runs even if the remove failed. */
 export async function worktreeRemove(repoPath, path) {
   try {

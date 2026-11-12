@@ -2,11 +2,9 @@ import React, { useMemo, useState, useEffect, useRef, memo, useCallback } from '
 import { diffLines, diffWords } from 'diff';
 import { Check, ChevronDown, Copy } from '@/components/icons';
 import { Button } from '../../components/ui/button';
-import { useFigureCompact } from '../../components/instrument/figure';
-import { Fig25DiffMap, MAP_COMPACT_W, MAP_W } from './Fig25DiffMap';
+import { Fig25DiffMap, MAP_COMPACT_W } from './Fig25DiffMap';
 
 const LINE_HEIGHT = 24;
-const MAP_WIDE_HOST = 900; // narrower diffs get the map's marks only
 const CONTEXT_LINES = 3; // Lines of context to show around changes
 const VIRTUALIZATION_BUFFER = 10; // Extra lines to render above/below viewport
 
@@ -63,7 +61,6 @@ export function DiffContent({
   notes,
   onRemoveNote,
 }) {
-  const compact = useFigureCompact();
   const [collapsedRegions, setCollapsedRegions] = useState(new Set());
   const [selectedLines, setSelectedLines] = useState(new Set());
   const selectionAnchor = useRef(null);
@@ -540,17 +537,6 @@ export function DiffContent({
     container?.scrollTo({ top: k * LINE_HEIGHT, behavior: 'smooth' });
   }, [visibleLines, container]);
 
-  // The full map needs a wide host; a narrow one gets its marks only.
-  const rootRef = useRef(null);
-  const [wide, setWide] = useState(true);
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return undefined;
-    const ro = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= MAP_WIDE_HOST));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   if (!oldContent && !newContent) {
     return (
       <div className="p-4 text-center text-muted-foreground">
@@ -567,12 +553,13 @@ export function DiffContent({
   const offsetY = startIdx * LINE_HEIGHT;
 
   return (
-    <div ref={rootRef} className="flex font-mono text-sm relative">
-      {/* FIG 25: the diff map, a line ruler with every change on it. */}
+    <div className="flex font-mono text-sm relative">
+      {/* FIG 25 as a thin strip: spans, unchanged hatching and the view bracket.
+          Line labels and totals cost the diff its width; the header has the counts. */}
       {mapChunks.length > 0 && (
         <div
           className="flex-shrink-0 self-start border-r edge-engraved px-2 pb-2"
-          style={{ position: 'sticky', top: 28, width: (wide && !compact ? MAP_W : MAP_COMPACT_W) + 16 }}
+          style={{ position: 'sticky', top: 28, width: MAP_COMPACT_W + 16 }}
         >
           <Fig25DiffMap
             totalLines={maxLines}
@@ -582,9 +569,9 @@ export function DiffContent({
             notes={mapNotes}
             onJump={jumpToRow}
             onRemoveNote={onRemoveNote}
-            marksOnly={!wide}
-            // Pane minus the sticky offset and the map's own chrome (scale ends, total box, caption, padding).
-            height={paneHeight ? Math.max(160, paneHeight - 28 - (wide && !compact ? 120 : 20)) : undefined}
+            marksOnly
+            // Pane minus the sticky offset and the strip's padding.
+            height={paneHeight ? Math.max(160, paneHeight - 48) : undefined}
           />
         </div>
       )}
