@@ -4,6 +4,20 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-12
+
+### Added
+
+- **Planning mode** - Alt+P, `:plan-mode` or `planning mode` in the plans pane splits the tab: the agent's terminal on the left, the plan on the right. Pick or start a draft folder, have the agent write its parts (architecture, ui, backend, database, qa, or your own with `+ part`), split them into chunks, revise and re-chunk, then approve it into the plans pane as pending. A step orbit shows draft · split · review · pending.
+- **Draft all** - One button (or Shift+D) asks the agent for all five parts in order, asking you what it needs first. The ui part can come with an artifact mockup, which ui.md must link before the draft is approved.
+- **Your turn** - A part sent to the agent lights the gold lamp when the agent stops to ask you something.
+- **Stale chunks** - Revising or redrafting after the split marks the chunks "draft changed since the split", and the plan can't be approved until you re-chunk.
+- **`lirah plans draft <title>`** - Lets the agent start planning mode on a new draft folder itself.
+
+### Fixed
+
+- **`lirah` on PATH** - When the app's launcher comes first on PATH, `lirah plans ...` and the other agent commands now reach the CLI instead of opening a new window.
+
 ## [0.27.1] - 2026-11-12
 
 ### Fixed
