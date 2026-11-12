@@ -227,8 +227,46 @@ function DialogEmpty({ className, children }) {
   );
 }
 
+// A list row: name, a truncating preview, and ghost icon actions on the right.
+// It bleeds into the gutter, so wrap a list of rows in a -mx-3 container.
+function DialogRow({ name, preview, actions, selected, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`flex items-center justify-between gap-3 py-1.5 pl-3.5 pr-2 ${
+        selected ? 'ins-row-selected' : 'hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]'
+      }`}
+    >
+      <div className="flex min-w-0 flex-1 items-baseline gap-3">
+        <span className="shrink-0 truncate text-sm text-foreground">{name}</span>
+        <span className="min-w-0 truncate text-xs text-muted-foreground">{preview}</span>
+      </div>
+      {actions && (
+        <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+          {actions}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A form field: a legend label wired to its control, and an optional error.
+function DialogField({ label, htmlFor, error, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={htmlFor} className="ins-legend text-[11px]">
+        {label}
+      </label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 export {
   Dialog,
+  DialogRow,
+  DialogField,
   DialogTrigger,
   DialogClose,
   DialogContent,

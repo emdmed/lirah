@@ -8,6 +8,8 @@ import {
   DialogDescription,
   DialogGroup,
   DialogEmpty,
+  DialogRow,
+  DialogField,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -110,21 +112,13 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
             ) : (
               <div className="-mx-3 min-h-0 overflow-y-auto">
                 {templates.map((template) => (
-                  <div
+                  <DialogRow
                     key={template.id}
-                    className={`flex items-center justify-between gap-3 py-1.5 pl-3.5 pr-2 ${
-                      editingId === template.id ? 'ins-row-selected' : 'hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]'
-                    }`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-baseline gap-3">
-                      <span className="shrink-0 truncate text-sm text-foreground">{template.title}</span>
-                      <span className="min-w-0 truncate text-xs text-muted-foreground">
-                        {template.content.substring(0, 50)}
-                        {template.content.length > 50 ? '...' : ''}
-                      </span>
-                    </div>
-                    {!template.isDefault && (
-                      <div className="flex items-center gap-1 ml-2">
+                    name={template.title}
+                    preview={`${template.content.substring(0, 50)}${template.content.length > 50 ? '...' : ''}`}
+                    selected={editingId === template.id}
+                    actions={!template.isDefault && (
+                      <>
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -142,9 +136,9 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                         >
                           <Trash size={16} />
                         </Button>
-                      </div>
+                      </>
                     )}
-                  </div>
+                  />
                 ))}
               </div>
             )}
@@ -154,10 +148,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
           {(isAdding || editingId) && (
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <DialogGroup label={editingId ? 'Edit template' : 'New template'} />
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="template-title" className="ins-legend text-[11px]">
-                  Title
-                </label>
+              <DialogField label="Title" htmlFor="template-title">
                 <Input
                   id="template-title"
                   type="text"
@@ -166,12 +157,9 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                   placeholder="My Template"
                   autoFocus
                 />
-              </div>
+              </DialogField>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="template-content" className="ins-legend text-[11px]">
-                  Content
-                </label>
+              <DialogField label="Content" htmlFor="template-content">
                 <Textarea
                   id="template-content"
                   value={content}
@@ -180,7 +168,7 @@ export function ManageTemplatesDialog({ open, onOpenChange }) {
                   rows={4}
                   className="resize-none"
                 />
-              </div>
+              </DialogField>
 
               {error && (
                 <p className="text-xs text-destructive">{error}</p>
