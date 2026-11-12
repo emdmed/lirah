@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
+import { basename } from '../../utils/pathUtils';
 import { DRAFT_DIR, isDraftPath, markdownTitle } from './planPrompts';
 import { loadAllPlans, MONTH_DIR } from './usePlanStore';
 
@@ -42,8 +43,8 @@ export async function openDraftFiles(dialogs, folder) {
 export async function readPlanSource(path) {
   if (!isDraftPath(path)) return invoke('read_file_content', { path });
   const paths = await draftFiles(path);
-  const files = await Promise.all(paths.map(async (p) => ({ name: p.split('/').pop(), text: await invoke('read_file_content', { path: p }) })));
-  return joinDraft(path.replace(/\/+$/, '').split('/').pop(), files);
+  const files = await Promise.all(paths.map(async (p) => ({ name: basename(p), text: await invoke('read_file_content', { path: p }) })));
+  return joinDraft(basename(path), files);
 }
 
 /**
