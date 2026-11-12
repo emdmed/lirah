@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogField,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -63,10 +64,7 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="group-name" className="ins-legend">
-              Set name
-            </label>
+          <DialogField label="Set name" htmlFor="group-name" error={error}>
             <Input
               id="group-name"
               type="text"
@@ -75,10 +73,7 @@ export function SaveFileGroupDialog({ open, onOpenChange, projectPath, files }) 
               placeholder="e.g., persistence feature"
               autoFocus
             />
-            {error && (
-              <p className="text-xs text-[var(--ins-fault)]">{error}</p>
-            )}
-          </div>
+          </DialogField>
 
           <DialogFooter>
             <Button type="button" variant="outline" size="sm" onClick={handleCancel}>

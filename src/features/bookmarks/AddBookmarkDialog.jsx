@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogField,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -65,10 +66,7 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="name" className="ins-legend">
-              Name
-            </label>
+          <DialogField label="Name" htmlFor="name" error={error}>
             <Input
               id="name"
               type="text"
@@ -77,15 +75,9 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
               placeholder="My Project"
               autoFocus
             />
-            {error && (
-              <p className="text-xs text-[var(--ins-fault)]">{error}</p>
-            )}
-          </div>
+          </DialogField>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="path" className="ins-legend">
-              Path
-            </label>
+          <DialogField label="Path" htmlFor="path">
             <Input
               id="path"
               type="text"
@@ -93,7 +85,7 @@ export function AddBookmarkDialog({ open, onOpenChange, currentPath }) {
               readOnly
               className="text-muted-foreground cursor-default"
             />
-          </div>
+          </DialogField>
 
           <DialogFooter>
             <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
