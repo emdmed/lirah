@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogDescription, DialogGroup, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogGroup, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Keycap } from './instrument/Keycap'
 import { shortcutsByCategory } from '../lib/shortcuts'
 import { Fig15Keys } from './Fig15Keys'
@@ -73,8 +73,10 @@ export function KeyboardShortcutsDialog({ open, onOpenChange, section }) {
         status={`${COUNT} shortcuts`}
         hints={[{ keys: [':'], label: 'run any action by name' }]}
       >
-        <DialogTitle>Keyboard shortcuts</DialogTitle>
-        <DialogDescription className='sr-only'>Quick reference for all available shortcuts.</DialogDescription>
+        <DialogHeader>
+          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogDescription className='text-xs'>Every shortcut, grouped by where it works.</DialogDescription>
+        </DialogHeader>
 
         <div className='flex min-h-0 flex-col gap-5 overflow-y-auto pr-2'>
           <Fig15Keys />

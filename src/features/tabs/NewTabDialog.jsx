@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { open as openFolderPicker } from '@tauri-apps/plugin-dialog';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogGroup, DialogEmpty } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogGroup, DialogEmpty, DialogHeader } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { PickerRow, OpenTabTag, tildePath, useOpenTabsByPath } from '../../components/ui/picker';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
@@ -136,8 +136,10 @@ export function NewTabDialog({ open, onOpenChange, currentPath, onOpenProject })
           inputRef.current?.focus();
         }}
       >
-        <DialogTitle>New tab</DialogTitle>
-        <DialogDescription className="sr-only">Choose the project this tab opens in.</DialogDescription>
+        <DialogHeader>
+          <DialogTitle>New tab</DialogTitle>
+          <DialogDescription className="text-xs">Choose the project this tab opens in.</DialogDescription>
+        </DialogHeader>
 
         <Input
           ref={inputRef}
@@ -146,7 +148,7 @@ export function NewTabDialog({ open, onOpenChange, currentPath, onOpenProject })
             setQuery(e.target.value);
             setSelectedIndex(0);
           }}
-          placeholder="Choose the project this tab opens in…"
+          placeholder="Filter projects…"
           aria-label="Filter starred projects"
         />
 
