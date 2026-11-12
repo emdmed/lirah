@@ -85,7 +85,6 @@ export const focusDue = (lastCheckAt, now = Date.now()) => now - lastCheckAt >= 
  * checked when they change, when the window gets focus (a PR merged in the
  * browser, at most once a minute) and on every commit to main or master. A merged plan's worktrees
  * are removed, unless one has uncommitted changes.
- * shortcut: runs only while the plans pane shows the repo; move it to PlansProvider if merges go unnoticed.
  */
 export function usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees) {
   const waiting = useMemo(() => (plans || []).filter(awaitsLifecycle), [plans]);

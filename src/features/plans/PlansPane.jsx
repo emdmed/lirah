@@ -5,7 +5,6 @@ import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { usePlans } from './PlansContext';
 import { usePlanFiles } from './usePlanFiles';
-import { usePlanLifecycleSync } from './planLifecycle';
 import { FoundPlansSection } from './FoundPlansSection';
 import { EmptyLine, NewRow } from './parts';
 import { PLAN_STAGE, planStage, runRank, UNTITLED_PLAN } from './planModel';
@@ -26,8 +25,7 @@ const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog'
 /** The plans of the active tab's repo: a list, or one plan's chunks. */
 export const PlansPane = memo(function PlansPane({ projectPath }) {
   const { repoRoot } = useRepoRoot(projectPath);
-  const { plans, createPlan, replaceSource, updatePlan, removeWorktrees } = usePlans(repoRoot);
-  usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees);
+  const { plans, createPlan, replaceSource } = usePlans(repoRoot);
   const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
   const { activeTabId } = useTabManager();
   const toast = useToast();

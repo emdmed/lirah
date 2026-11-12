@@ -14,6 +14,7 @@ import { getTabPrompt } from '../tabs/tabPrompts';
 import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
 import { sendSaved } from './sentPrompts';
+import { usePlanLifecycleSync } from './planLifecycle';
 import {
   adoptedFacts, captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, fixCommits, isPendingFix, rollbackChunk as revertChunk, strayCommits, withFixCommits,
 } from './planGitOps';
@@ -544,9 +545,20 @@ export function PlansProvider({ children }) {
 
   return (
     <PlansActionsContext.Provider value={actions}>
-      <PlansStateContext.Provider value={plansByRepo}>{children}</PlansStateContext.Provider>
+      <PlansStateContext.Provider value={plansByRepo}>
+        {Object.entries(plansByRepo).map(([root, plans]) => (
+          <LifecycleSync key={root} repoRoot={root} plans={plans} updatePlan={updatePlan} removeWorktrees={removeWorktrees} />
+        ))}
+        {children}
+      </PlansStateContext.Provider>
     </PlansActionsContext.Provider>
   );
+}
+
+// Per loaded repo, so merges are noticed with the plans pane closed.
+function LifecycleSync({ repoRoot, plans, updatePlan, removeWorktrees }) {
+  usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees);
+  return null;
 }
 
 /** When an adopted chunk began: the latest finish before its own, else its finish. */
