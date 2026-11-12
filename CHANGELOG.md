@@ -4,6 +4,16 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-11-12
+
+### Fixed
+
+- **Windows paths** - Agent file marks, the git filter, git stats, file groups and prompt file detection work with Windows paths (`C:\...`). Thanks @facus26.
+- **Per-tab tokens on Windows** - Each tab shows its own session's token usage instead of the project's newest session.
+- **Launch on Windows** - The workspace terminal's prompt no longer gets cut in Windows PowerShell 5.1, and the launch button and Relaunch pass it too.
+- **Session start** - The "Started without the Lirah plugin" bar no longer shows on every new session until the first prompt, and the autopilot hears the session restart after `/clear`.
+- **Relaunch** - Stopping the CLI waits until it has really exited, clears leftover mouse input from the shell, and shows a toast instead of typing into a CLI it could not stop.
+
 ## [0.26.0] - 2026-11-11
 
 ### Added
