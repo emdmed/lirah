@@ -6,13 +6,13 @@ import {
   DialogDescription,
   DialogGroup,
   DialogEmpty,
+  DialogRow,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Scanner } from '@/components/instrument/Scanner';
 import { Done, Download, Failed, Warning } from '@/components/icons';
 import { useToast } from '@/features/toast';
-import { EmptyPlate } from '@/components/EmptyState';
 
 const STATUS_ICON = {
   installed: <Done size={14} style={{ color: 'var(--color-status-success)' }} />,
@@ -39,27 +39,33 @@ function StatusBadge({ status }) {
   );
 }
 
-// A group: legend and hairline, then bare rows (one frame per pane).
+// A group: legend and hairline, then DialogRows bleeding into the gutter.
 function Section({ title, children }) {
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-1">
       <DialogGroup label={title} />
-      <div className="space-y-1.5 text-xs">
+      <div className="-mx-3">
         {children}
       </div>
     </div>
   );
 }
 
-function StatusRow({ label, status, icon }) {
+function RowName({ icon, label }) {
   return (
-    <div className="flex items-center justify-between py-0.5">
-      <div className="flex items-center gap-2">
-        {icon || STATUS_ICON[status]}
-        <span className="opacity-80">{label}</span>
-      </div>
-      <StatusBadge status={status} />
-    </div>
+    <span className="inline-flex items-center gap-2">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function StatusRow({ label, status }) {
+  return (
+    <DialogRow
+      name={<RowName icon={STATUS_ICON[status]} label={label} />}
+      actions={<StatusBadge status={status} />}
+    />
   );
 }
 
@@ -84,13 +90,10 @@ function WorkflowRow({ workflow, projectPath, orchestrationCheck, onRefresh, toa
   };
 
   return (
-    <div className="flex items-center justify-between py-0.5">
-      <div className="flex items-center gap-2">
-        {workflow.localInstalled ? STATUS_ICON.installed : STATUS_ICON.missing}
-        <span className="opacity-80">{workflow.label}</span>
-        <span className="text-[11px] opacity-30 font-mono">{workflow.path}</span>
-      </div>
-      {workflow.cdnAvailable && !workflow.localInstalled ? (
+    <DialogRow
+      name={<RowName icon={workflow.localInstalled ? STATUS_ICON.installed : STATUS_ICON.missing} label={workflow.label} />}
+      preview={workflow.path}
+      actions={workflow.cdnAvailable && !workflow.localInstalled ? (
         <Button
           variant="ghost"
           size="panel"
@@ -101,9 +104,9 @@ function WorkflowRow({ workflow, projectPath, orchestrationCheck, onRefresh, toa
           Install
         </Button>
       ) : (
-        <StatusBadge status={workflow.localInstalled ? 'installed' : (workflow.cdnAvailable ? 'missing' : 'missing')} />
+        <StatusBadge status={workflow.localInstalled ? 'installed' : 'missing'} />
       )}
-    </div>
+    />
   );
 }
 
@@ -143,15 +146,21 @@ export function OrchestrationDashboard({
   }, [open, refreshStatus]);
 
   const isConfigured = orchStatus && orchStatus.protocol !== 'missing';
+  // protocol + scripts + workflows + the three hooks
+  const itemCount = isConfigured
+    ? 1 + Object.keys(orchStatus.scripts).length + (availableWorkflows?.length ?? 0) + (hooksStatus ? 3 : 0)
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="md"
         className="max-h-[80vh] overflow-y-auto"
+        status={loading ? 'refreshing' : isConfigured ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'}` : undefined}
+        escLabel="done"
       >
         <DialogTitle>Orchestration</DialogTitle>
-        <DialogDescription className="sr-only">Protocol, scripts, workflows and hooks for this project.</DialogDescription>
+        <DialogDescription>Protocol, scripts, workflows and hooks for this project.</DialogDescription>
 
         {loading ? (
           <div className="flex items-center justify-center py-8 gap-2">
@@ -175,7 +184,7 @@ export function OrchestrationDashboard({
                 <StatusRow key={name} label={name} status={status} />
               ))}
               {Object.keys(orchStatus.scripts).length === 0 && (
-                <EmptyPlate title="No scripts found" />
+                <DialogEmpty className="px-3">No scripts found</DialogEmpty>
               )}
             </Section>
 
@@ -194,10 +203,10 @@ export function OrchestrationDashboard({
                     />
                   ))
                 ) : (
-                  <EmptyPlate title="No workflows available" />
+                  <DialogEmpty className="px-3">No workflows available</DialogEmpty>
                 )
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3.5 text-xs">
                   <Scanner />
                   <span className="opacity-40">Loading workflows...</span>
                 </div>
@@ -209,7 +218,7 @@ export function OrchestrationDashboard({
               {hooksStatus ? (
                 <>
                   {!hooksStatus.installed && (
-                    <div className="flex items-center gap-1.5 text-[11px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
+                    <div className="flex items-center gap-1.5 px-3.5 text-[11px] pb-1" style={{ color: 'var(--color-status-warning)' }}>
                       <Warning size={12} />
                       Hooks not installed. Install globally via the orchestration setup guide.
                     </div>
@@ -228,7 +237,7 @@ export function OrchestrationDashboard({
                   />
                 </>
               ) : (
-                <span className="opacity-40">Checking...</span>
+                <span className="px-3.5 text-xs opacity-40">Checking...</span>
               )}
             </Section>
           </div>
