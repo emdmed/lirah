@@ -7,7 +7,7 @@ import { PanelButton } from '../../components/instrument/PanelButton';
 import { Span } from '../../components/instrument/Span';
 import { Field, Prose } from './parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
-import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, canMoveChunk, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
 import { BUSY, useBusy, usePlanPane, useStarting } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { isNoGit } from './planGit';
@@ -104,8 +104,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   const busy = useBusy(BUSY.chunk(chunk.id));
   const starting = useStarting(plan.id);
   const isNext = chunk.id === nextChunkId(plan);
-  const first = plan.chunks[0]?.id === chunk.id;
-  const last = plan.chunks.at(-1)?.id === chunk.id;
+  const index = plan.chunks.findIndex((c) => c.id === chunk.id);
   const piloted = isAutopilotLive(plan.autopilot);
   const pilotChunk = piloted && chunk.id === plan.autopilot.chunkId;
   // A paused run waits on you, so its chunk can be marked done by hand.
@@ -145,7 +144,6 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   };
   // Deleting renumbers the chunks after it, so it says so and can be undone.
   const remove = () => {
-    const index = plan.chunks.findIndex((c) => c.id === chunk.id);
     deleteChunk(repoRoot, plan.id, chunk.id);
     const after = plan.chunks.length - index - 1;
     toast.toast(`Deleted chunk ${chunk.n}${after > 0 ? `; ${after === 1 ? 'the one after it is' : `the ${after} after it are`} renumbered` : ''}`, {
@@ -267,8 +265,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
           <PanelButton onClick={startEdit} title="Edit the chunk's title and details">edit</PanelButton>
           <span className="ml-auto flex gap-0.5">
             {/* Reordering is rare: shown on hover or keyboard focus. */}
-            <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" className={REORDER} />
-            <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" className={REORDER} />
+            <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={!canMoveChunk(plan.chunks, index, -1)} title="Move up" aria-label="Move up" className={REORDER} />
+            <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={!canMoveChunk(plan.chunks, index, 1)} title="Move down" aria-label="Move down" className={REORDER} />
             <PanelButton icon={Trash} onClick={remove} title="Delete chunk (undo in the toast)" aria-label="Delete chunk" />
           </span>
         </>

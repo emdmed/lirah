@@ -108,6 +108,14 @@ export function effectiveChunkState(chunk) {
   return chunk.status;
 }
 
+/** Whether chunk i can swap with its neighbour at i + delta: neither may already be numbered in a commit message. */
+export function canMoveChunk(chunks, i, delta) {
+  const locked = (c) => c.awaitingFix || c.status === CHUNK_STATUS.IMPLEMENTED || c.status === CHUNK_STATUS.IN_PROGRESS;
+  const a = chunks[i];
+  const b = chunks[i + delta];
+  return !!a && !!b && !locked(a) && !locked(b);
+}
+
 // --- Selectors ---
 
 /** Chunks that count toward progress (skipped ones don't), and how many are in. */

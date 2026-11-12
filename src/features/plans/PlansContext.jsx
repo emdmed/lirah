@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, HALT_REASON, noGitConfig, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
+  AUTOPILOT_STATUS, CHUNK_STATUS, canMoveChunk, defaultGitConfig, HALT_REASON, noGitConfig, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
   planFilesDir, toRolledBack, UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
@@ -398,7 +398,7 @@ export function PlansProvider({ children }) {
     updatePlan(repoRoot, planId, (p) => {
       const i = p.chunks.findIndex((c) => c.id === chunkId);
       const j = i + delta;
-      if (i < 0 || j < 0 || j >= p.chunks.length) return {};
+      if (!canMoveChunk(p.chunks, i, delta)) return {};
       const chunks = [...p.chunks];
       [chunks[i], chunks[j]] = [chunks[j], chunks[i]];
       return { chunks: renumber(chunks) };
