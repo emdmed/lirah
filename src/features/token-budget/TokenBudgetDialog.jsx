@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogField } from '@/components/ui/dialog';
 import { Meter } from '@/components/instrument/Meter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,8 +63,7 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
   const cost = currentUsage.cost < 0.01 ? '<$0.01' : `$${currentUsage.cost.toFixed(2)}`;
 
   const limitField = (id, label, value, setValue, placeholder, kind) => (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="ins-legend">{label}</label>
+    <DialogField label={label} htmlFor={id}>
       <Input
         id={id}
         type="number"
@@ -84,7 +83,7 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
           fallback={<Meter value={currentUsage.total} max={parseInt(value)} size="lg" label={`${label} used`} />}
         />
       )}
-    </div>
+    </DialogField>
   );
 
   return (
@@ -98,9 +97,12 @@ export function TokenBudgetDialog({ open, onOpenChange, projectPath }) {
       >
         <DialogHeader>
           <DialogTitle>Token budget</DialogTitle>
-          <DialogDescription className="truncate font-mono text-xs" title={projectPath || undefined}>
-            {projectPath || 'No project'}
+          <DialogDescription className="text-xs">
+            Cap the tokens this project spends per day and week.
           </DialogDescription>
+          <p className="truncate font-mono text-xs text-muted-foreground" title={projectPath || undefined}>
+            {projectPath || 'No project'}
+          </p>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">

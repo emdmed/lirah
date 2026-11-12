@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -103,14 +104,16 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
         escLabel="cancel"
         status={<span className="tabular-nums">{rangeCount} session{rangeCount === 1 ? '' : 's'}</span>}
       >
-        <DialogTitle>Export usage report</DialogTitle>
-        <DialogDescription className="sr-only">
-          Pick a format, a date range and which columns to include, then export.
-        </DialogDescription>
+        <DialogHeader>
+          <DialogTitle>Export usage report</DialogTitle>
+          <DialogDescription className="text-xs">
+            Pick a format, a date range and which columns to include, then export.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <span className="ins-legend" id="export-format-label">Format</span>
+            <DialogGroup label={<span id="export-format-label">Format</span>} />
             <div className="flex gap-1" role="group" aria-labelledby="export-format-label">
               {['csv', 'json'].map(f => (
                 <Button
@@ -128,7 +131,7 @@ export function ExportReportDialog({ open, onOpenChange, sessions, projects }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="ins-legend">Dates</span>
+            <DialogGroup label="Dates" />
             <div className="flex items-center gap-2">
               <Input
                 type="date"
