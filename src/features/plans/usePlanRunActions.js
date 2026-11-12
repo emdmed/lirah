@@ -99,7 +99,10 @@ export function usePlanRunActions({
     } else {
       const active = tabs.find((t) => t.id === activeTabId);
       const host = active?.planHost || activeTabId;
-      if (!host) return null;
+      if (!host) {
+        toast.error("Open the plan's project tab first, then send again");
+        return null;
+      }
       const tab = addTab(cfg.workDir || repoRoot, { name: plan.title || UNTITLED_PLAN, planHost: host, background: true, focus: false });
       id = tab.id;
       updatePlan(repoRoot, plan.id, { tabId: id });
