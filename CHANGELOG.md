@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-11-12
+
+### Fixed
+
+- **Release build** - 0.27.0's installers failed a path check in CI and were never published; 0.27.1 ships its changes.
+
 ## [0.27.0] - 2026-11-12
 
 ### Added
