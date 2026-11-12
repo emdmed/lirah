@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup, DialogHeader, DialogField } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
@@ -33,10 +33,12 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm" escLabel="cancel">
-        <DialogTitle>Auto changelog</DialogTitle>
-        <DialogDescription className="sr-only">
-          Choose when an agent updates the changelog and which file it writes.
-        </DialogDescription>
+        <DialogHeader>
+          <DialogTitle>Auto changelog</DialogTitle>
+          <DialogDescription className="text-xs">
+            Choose when an agent updates the changelog and which file it writes.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="flex items-center justify-between gap-3">
           <label htmlFor="changelog-enabled" className="text-sm text-foreground cursor-pointer">
@@ -75,10 +77,7 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="changelog-target" className="ins-legend">
-            File
-          </label>
+        <DialogField label="File" htmlFor="changelog-target">
           <Input
             id="changelog-target"
             value={draftTarget}
@@ -86,7 +85,7 @@ export function AutoChangelogDialog({ open, onOpenChange, enabled, trigger, targ
             placeholder="CHANGELOG.md"
             className="text-sm font-mono"
           />
-        </div>
+        </DialogField>
 
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
