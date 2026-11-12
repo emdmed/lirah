@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../components/ui/tooltip';
 import { ChevronLeft, ChevronRight, Pin, Unpin } from '@/components/icons';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogEmpty } from '../../components/ui/dialog';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Position } from '../../components/instrument/Position';
 import { basename } from '../../utils/pathUtils';
@@ -141,6 +141,7 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
     <DialogContent
       size="full"
       status={hasMultipleFiles ? <Position index={currentFileIndex} count={markdownFiles.length} /> : null}
+      lamp={loading ? 'blink' : error ? 'fault' : 'on'}
       hints={hints}
       className="flex flex-col gap-0 px-0"
       onOpenAutoFocus={(e) => {
@@ -208,6 +209,8 @@ export const MarkdownViewerDialog = memo(function MarkdownViewerDialog({
             <p>Failed to load file</p>
             <p className="text-xs mt-1 text-muted-foreground">{error}</p>
           </div>
+        ) : !content ? (
+          <DialogEmpty className="justify-center p-8">This file is empty.</DialogEmpty>
         ) : isMarkdown ? (
           <div className="markdown-body">
             <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{shown}</ReactMarkdown>

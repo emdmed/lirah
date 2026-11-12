@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogEmpty } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { Keycap, KeyChord } from '../../components/instrument/Keycap';
@@ -222,9 +222,9 @@ export function SettingsDialog({
           <FilterContext.Provider value={filterValue}>
             <div className="min-h-0 overflow-y-auto pb-2 pr-2">
               {filtering && totalMatches === 0 && (
-                <p className="pt-1 text-xs text-muted-foreground">
+                <DialogEmpty>
                   No settings match “{query.trim()}”. <span className="text-foreground">esc</span> clears the filter.
-                </p>
+                </DialogEmpty>
               )}
               {/* Full screen, but rows keep a readable width. */}
               <div className="flex max-w-[720px] flex-col gap-8">

@@ -117,6 +117,7 @@ export function RaceCompareDialog({ jobs, onClose }) {
       size="full"
       fig="12"
       status={files.length > 1 ? <Position index={fileIndex} count={files.length} /> : null}
+      lamp={loading ? 'blink' : 'on'}
       hints={files.length > 1 ? [{ keys: ['^', '['], label: 'prev file' }, { keys: ['^', ']'], label: 'next file' }] : []}
       className="flex flex-col gap-0 px-0"
     >
