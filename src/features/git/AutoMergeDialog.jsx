@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { plural } from '../../lib/plural';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup, DialogRow, DialogEmpty } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -68,7 +68,7 @@ export function AutoMergeDialog({ autoMerge }) {
       <Scanner label={running} />
       {running}
     </>
-  ) : null;
+  ) : stage === 'ready' && plan ? `${plural(plan.commits.length, 'commit')} · ${plural(plan.files.length, 'file')}` : null;
   const settled = stage === 'done' || stage === 'error';
 
   return (
@@ -96,7 +96,7 @@ export function AutoMergeDialog({ autoMerge }) {
         }}
       >
         <DialogTitle>Merge branch</DialogTitle>
-        <DialogDescription className="sr-only">
+        <DialogDescription>
           Switch to a base branch and merge the current feature branch into it.
         </DialogDescription>
 
@@ -179,31 +179,39 @@ export function AutoMergeDialog({ autoMerge }) {
             </section>
 
             {!plan ? null : nothingToMerge ? (
-              <p className="text-xs text-muted-foreground">
+              <DialogEmpty>
                 {base} already contains every commit on {feature}. Nothing to merge.
-              </p>
+              </DialogEmpty>
             ) : (
               <>
                 <section className="flex min-h-0 flex-col gap-1">
-                  <DialogGroup label={`${plural(plan.commits.length, 'commit')} · ${plural(plan.files.length, 'file')}`} />
-                  <ul className="max-h-[16vh] overflow-y-auto">
+                  <DialogGroup label="Commits" />
+                  <div className="-mx-3 max-h-[16vh] overflow-y-auto">
                     {plan.commits.map((c) => (
-                      <li key={c} className="truncate py-[2px] text-xs">
-                        <span className="text-muted-foreground">{c.slice(0, c.indexOf(' '))}</span>
-                        <span className="text-foreground">{c.slice(c.indexOf(' '))}</span>
-                      </li>
+                      <DialogRow
+                        key={c}
+                        name={<span className="text-xs text-muted-foreground">{c.slice(0, c.indexOf(' '))}</span>}
+                        preview={<span className="text-foreground">{c.slice(c.indexOf(' ') + 1)}</span>}
+                      />
                     ))}
-                  </ul>
-                  <ul className="max-h-[14vh] overflow-y-auto pt-1">
+                  </div>
+                </section>
+
+                <section className="flex min-h-0 flex-col gap-1">
+                  <DialogGroup label="Files" />
+                  <div className="-mx-3 max-h-[14vh] overflow-y-auto">
                     {plan.files.map((f) => (
-                      <li key={f.path} className="flex items-baseline gap-3 py-[2px] text-xs">
-                        <span className="w-3 shrink-0 text-center" style={{ color: STATUS_COLOR[f.status] }}>
-                          {f.status}
-                        </span>
-                        <span className="min-w-0 truncate text-muted-foreground">{f.path}</span>
-                      </li>
+                      <DialogRow
+                        key={f.path}
+                        name={(
+                          <span className="inline-block w-3 text-center text-xs" style={{ color: STATUS_COLOR[f.status] }}>
+                            {f.status}
+                          </span>
+                        )}
+                        preview={f.path}
+                      />
                     ))}
-                  </ul>
+                  </div>
                 </section>
 
                 <Fig11Merge

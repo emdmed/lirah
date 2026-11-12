@@ -1,5 +1,5 @@
 import { plural } from '../../lib/plural';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogGroup, DialogRow, DialogEmpty } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
@@ -67,25 +67,19 @@ function StatusTally({ files }) {
 
 function FileList({ files, className }) {
   return (
-    <ul className={cn('overflow-y-auto py-1', className)}>
+    <div className={cn('overflow-y-auto', className)}>
       {files.map((f) => {
         const { code, color } = statusOf(f.status);
         const { dir, name: base } = splitDirName(f.path);
         return (
-          <li
+          <DialogRow
             key={f.path}
-            className="flex items-baseline gap-3 px-3 py-1 text-xs hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]"
-            title={`${f.status} — ${f.path}`}
-          >
-            <span className="w-3 shrink-0 text-center" style={{ color }}>{code}</span>
-            <span className="min-w-0 truncate">
-              <span className="text-muted-foreground">{dir}</span>
-              <span className="text-foreground">{base}</span>
-            </span>
-          </li>
+            name={<span className="inline-block w-3 text-center text-xs" style={{ color }} title={f.status}>{code}</span>}
+            preview={<>{dir}<span className="text-foreground">{base}</span></>}
+          />
         );
       })}
-    </ul>
+    </div>
   );
 }
 
@@ -147,7 +141,7 @@ export function AutoCommitDialog({ autoCommit }) {
     <span className={cn('tabular-nums', subjectLength > SUBJECT_MAX && 'text-[var(--ins-warn)]')}>
       subject {subjectLength}/{SUBJECT_MAX}
     </span>
-  ) : null;
+  ) : files.length > 0 ? plural(files.length, 'file') : null;
   const hints = stage === 'ready'
     ? [{ keys: ['↵'], label: retry ? 'retry' : 'commit' }, { keys: ['⇧', '↵'], label: 'new line' }]
     : canQueue
@@ -179,7 +173,7 @@ export function AutoCommitDialog({ autoCommit }) {
         }}
       >
         <DialogTitle>Auto commit</DialogTitle>
-        <DialogDescription className="sr-only">
+        <DialogDescription>
           Stage every change, generate a commit message, review it and commit.
         </DialogDescription>
 
@@ -209,10 +203,7 @@ export function AutoCommitDialog({ autoCommit }) {
 
         {/* Nothing changed is a quiet line, not a fault. */}
         {nothingToCommit && (
-          <p className="flex items-center gap-2.5 text-sm text-muted-foreground" role="status">
-            <Lamp state="off" />
-            Nothing to commit: the working tree is clean.
-          </p>
+          <DialogEmpty>Nothing to commit: the working tree is clean.</DialogEmpty>
         )}
 
         {stage === 'error' && !nothingToCommit && (
