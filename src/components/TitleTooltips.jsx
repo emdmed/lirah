@@ -23,6 +23,16 @@ export function TitleTooltips() {
   useEffect(() => {
     let el = null;
     let timer = null;
+    // A live title (a running clock, say) is set again while held: hold the new one too,
+    // or the OS tooltip shows beside ours.
+    const watch = new MutationObserver(() => {
+      const fresh = el?.getAttribute('title');
+      if (fresh == null) return;
+      el.setAttribute(HELD, fresh);
+      el.removeAttribute('title');
+      const text = fresh.trim();
+      setTip((t) => (t && text ? { ...t, text } : t));
+    });
 
     const hide = () => {
       clearTimeout(timer);
@@ -31,6 +41,7 @@ export function TitleTooltips() {
 
     const release = () => {
       hide();
+      watch.disconnect();
       if (!el) return;
       const held = el.getAttribute(HELD);
       el.removeAttribute(HELD);
@@ -49,6 +60,7 @@ export function TitleTooltips() {
       el = target;
       el.setAttribute(HELD, el.getAttribute('title'));
       el.removeAttribute('title');
+      watch.observe(el, { attributeFilter: ['title'] });
       timer = setTimeout(() => {
         if (el === target && target.isConnected) setTip({ text, rect: target.getBoundingClientRect() });
       }, SHOW_DELAY);
