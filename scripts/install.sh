@@ -65,6 +65,18 @@ fi
 EOF
 }
 
+# Print the block that hands `lirah <command>` to the CLI in ~/.lirah/bin. Both are called
+# lirah, and when the launcher wins on PATH an agent's `lirah plans ...` would open a new
+# window per call instead. A folder of that name still opens in the app.
+launcher_cli_block() {
+    cat << 'EOF'
+case "${1:-}" in
+    help|ping|settings|theme|startup|tabs|tab|tasks|task|plans|plan|jobs|job|qa)
+        if [ ! -e "$1" ] && [ -x "$HOME/.lirah/bin/lirah" ]; then exec "$HOME/.lirah/bin/lirah" "$@"; fi ;;
+esac
+EOF
+}
+
 # Write ~/.local/bin/lirah: handles `lirah update`, otherwise launches TARGET detached so the terminal can close
 write_user_launcher() {
     TARGET="$1"
@@ -75,6 +87,7 @@ write_user_launcher() {
     {
         echo '#!/bin/bash'
         launcher_update_block
+        launcher_cli_block
         echo "nohup \"$TARGET\" \"\$@\" >/dev/null 2>&1 &"
         echo 'disown'
     } > "$LAUNCHER"
@@ -90,6 +103,7 @@ write_system_launcher() {
         echo '#!/bin/bash'
         echo '# Installed by the Lirah install script to add `lirah update`'
         launcher_update_block
+        launcher_cli_block
         echo "exec \"$TARGET\" \"\$@\""
     } > "$TMP"
     # Copy then rename, so a running `lirah update` keeps reading its old copy

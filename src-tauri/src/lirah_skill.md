@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to start planning (planning mode), list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -72,8 +72,10 @@ lirah tasks remove <id>        delete a task (the user can undo from a toast)
 lirah tasks move <id>          move between this project's list and the global list
                                task commands take --global to act on the global list
 lirah plans [list]             list this tab's repo plans, their progress and stage
-                               (planned, building, implemented, PR #N, merged)
+                               (draft, pending, in-progress, in-review, completed, cancelled)
 lirah plans show <plan>        a plan's chunks and their state
+lirah plans draft <title>      start planning: opens planning mode in this tab on a
+                               new *_plan/ draft folder and says where to write it
 lirah plans import <file>      import a *_plan.md file, or a *_plan/ draft folder
                                of .md files, as a plan (split into chunks)
 lirah plans revise <plan> <notes>
@@ -144,7 +146,7 @@ tabs are your workers:
 - Work offline: `settings` (list, get, and set/reset except the guarded keys:
   sandbox, network isolation, the hooks and agent control), `theme`, `startup`,
   `tasks list|add|done` and `plans list|show|import|revise|rechunk|done`.
-- Need the app: `tabs`, `jobs`, `tasks reopen|edit|remove|move`, `plans debug`,
+- Need the app: `tabs`, `jobs`, `tasks reopen|edit|remove|move`, `plans draft|debug`,
   `ping`, and setting the guarded keys. Offline they fail with "LIRAH_CONTROL is
   unset" or "can't reach Lirah"; ask the user to run them from a Lirah tab.
 - Splitting an imported or re-chunked plan, and checking a chunk marked done,
@@ -156,6 +158,9 @@ tabs are your workers:
 
 ## Notes
 
+- If a `lirah` command prints nothing and exits 0, `lirah` on your PATH is the
+  desktop launcher, which opens a new Lirah window per call. Stop and run
+  `~/.lirah/bin/lirah` with the same arguments instead; never retry plain `lirah`.
 - Errors go to stderr and exit 1. Read the message and fix the call; don't retry
   blindly.
 - Some changes (sandbox, hooks, agent control itself) ask the user to confirm in
@@ -167,6 +172,13 @@ tabs are your workers:
 - For startup projects to open at launch, the mode must be `projects`:
   `lirah startup mode projects`.
 - Paths are resolved against your current directory.
+- When the user asks you to start a plan, plan a feature, or open planning mode:
+  run `lirah plans draft "<short title>"` first. It opens planning mode in this tab
+  and prints the draft folder. Then plan with the user, writing each part to its
+  file in that folder as it takes shape (architecture.md, ui.md, backend.md,
+  database.md, qa.md, only the parts the work has; the panel's "draft all" asks
+  for all five). Don't import it yourself: the user approves the
+  draft in the planning panel.
 - Write plans the user wants run in Lirah as `~/.lirah/plans/<YYYY-MM>/<topic>_plan.md`
   (this month), then import it with `lirah plans import`. Splitting takes a moment; check `lirah plans show`.
 - When a plan spans several concerns (architecture, the feature itself, QA…), or the

@@ -57,6 +57,8 @@ import { escapeShellPath, isAbsolute, basename } from '../../utils/pathUtils';
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
+import { PlanningPanel } from "../planning/PlanningPanel";
+import { usePlanningMode } from "../planning/planningModeStore";
 import { TextareaPanel } from "../../components/textarea-panel/textarea-panel";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DialogHost } from "../../components/DialogHost";
@@ -394,6 +396,8 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   });
 
   const secondary = useSecondaryTerminal(terminalRef);
+  // Planning mode takes the secondary terminal's half of the row (it keeps running, hidden).
+  const planning = usePlanningMode(tabId);
 
   const { changelogStatus, dismissChangelogStatus } = useAutoChangelog(
     currentPath,
@@ -932,6 +936,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   const handleCompactContext = useCallback(() => sendCliCommand('/compact'), [sendCliCommand]);
 
   useTabShortcuts({
+    tabId,
     isActive,
     secondary,
     dialogs,
@@ -1089,7 +1094,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     <TokenBudgetProvider workspaceId={workspaceId} tokenUsageStore={tokenUsageStore} projectStats={projectStats} projectPath={currentPath}>
     <SidebarProvider open={sidebar.sidebarOpen} onOpenChange={sidebar.setSidebarOpen} className={`min-h-0 flex-1 ${sidebar.isResizing ? 'select-none' : ''}`} style={{ height: '100%' }}>
       <Layout
-        rightGutter={zenMode && rightEdge}
+        rightGutter={(zenMode && rightEdge) || planning}
         sidebar={
           !zenMode && sidebar.sidebarOpen && (
             <LeftSidebar
@@ -1242,24 +1247,40 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
           </>
         }
         secondaryTerminal={
-          secondary.secondaryVisible && (
-            <SecondaryTerminal
-              key={secondary.secondaryKey}
-              ref={secondary.secondaryTerminalRef}
-              theme={theme.terminal}
-              visible={secondary.secondaryVisible}
-              onClose={secondary.closeSecondaryTerminal}
-              onFocusChange={secondary.setSecondaryFocused}
-              onSessionReady={secondary.setSecondarySessionId}
-              projectDir={secondary.projectDirOverride || resolvedProjectDir}
-              fullscreen={secondary.secondaryFullscreen}
-              onToggleFullscreen={toggleSecondaryFullscreen}
-              onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
-              onFocusModeChange={handleFocusModeChange}
-              initialCommand={secondary.pendingCommand}
-              isActive={visible}
-            />
-          )
+          <>
+            {planning && (
+              <PlanningPanel
+                tabId={tabId}
+                tabName={tabDisplayName({ customLabel, label, projectPath }, bookmarks)}
+                projectPath={projectPath}
+                selectedFiles={fileSelection.selectedFiles}
+                addFiles={fileSelection.addFiles}
+                removeFile={fileSelection.removeFileFromSelection}
+                master={master}
+              />
+            )}
+            {/* Hidden, not unmounted, while planning: unmounting closes its shell. */}
+            {secondary.secondaryVisible && (
+              <div style={{ display: planning ? 'none' : 'contents' }}>
+                <SecondaryTerminal
+                  key={secondary.secondaryKey}
+                  ref={secondary.secondaryTerminalRef}
+                  theme={theme.terminal}
+                  visible={secondary.secondaryVisible}
+                  onClose={secondary.closeSecondaryTerminal}
+                  onFocusChange={secondary.setSecondaryFocused}
+                  onSessionReady={secondary.setSecondarySessionId}
+                  projectDir={secondary.projectDirOverride || resolvedProjectDir}
+                  fullscreen={secondary.secondaryFullscreen}
+                  onToggleFullscreen={toggleSecondaryFullscreen}
+                  onPickerVisibilityChange={secondary.handlePickerVisibilityChange}
+                  onFocusModeChange={handleFocusModeChange}
+                  initialCommand={secondary.pendingCommand}
+                  isActive={visible && !planning}
+                />
+              </div>
+            )}
+          </>
         }
       >
         <Terminal

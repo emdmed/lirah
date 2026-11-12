@@ -253,7 +253,7 @@ export function PlansProvider({ children }) {
   }, [loadRepo, stateRef]);
 
   // Stored in `workspaceId`'s folder; the active workspace's by default.
-  const createPlan = useCallback(async (repoRoot, { source, importedFrom = null, workspaceId = activeWorkspaceRef.current }) => {
+  const createPlan = useCallback(async (repoRoot, { source, importedFrom = null, workspaceId = activeWorkspaceRef.current, draft = false }) => {
     await loadRepo(repoRoot);
     const title = markdownTitle(source);
     const slug = slugify(title);
@@ -272,6 +272,7 @@ export function PlansProvider({ children }) {
       chunks: [],
       tabId: null,
       clearBetweenChunks: true, // each chunk starts fresh; the decisions block carries what it needs
+      ...(draft && { draft: true }), // still being planned in planning mode (PLAN_STATUS.DRAFT)
       git: top ? defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')) : noGitConfig(repoRoot),
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -507,6 +508,12 @@ export function PlansProvider({ children }) {
     updatePlan(repoRoot, planId, { shelved });
   }, [findPlan, stopAutopilot, updatePlan]);
 
+  // Cancelled at any stage; a live run stops first. Uncancel by passing false.
+  const cancelPlan = useCallback((repoRoot, planId, cancelled = true) => {
+    if (cancelled && isAutopilotLive(findPlan(repoRoot, planId)?.autopilot)) stopAutopilot(repoRoot, planId);
+    updatePlan(repoRoot, planId, { cancelledAt: cancelled ? Date.now() : null });
+  }, [findPlan, stopAutopilot, updatePlan]);
+
   const actions = useMemo(() => ({
     loadRepo,
     getPlans,
@@ -534,6 +541,7 @@ export function PlansProvider({ children }) {
     stopAutopilot,
     dismissAutopilot,
     shelvePlan,
+    cancelPlan,
     revealRun,
     setGitConfig,
     addPlanRepo,
@@ -543,7 +551,7 @@ export function PlansProvider({ children }) {
     reopenGit,
   }), [loadRepo, getPlans, createPlan, replaceSource, rechunk, ensurePlanFile, sendPlanRevise, runSplit, deletePlan, updatePlan, updateChunk, moveChunk, deleteChunk, restoreChunk,
     implementChunk, checkChunk, markChunkDone, commitChunk, rollbackChunk, sendFix, startAutopilot, resumeAutopilot, stopAutopilot,
-    dismissAutopilot, shelvePlan, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
+    dismissAutopilot, shelvePlan, cancelPlan, revealRun, sendPlanFix, setGitConfig, addPlanRepo, removePlanRepo, ensureGit, removeWorktrees, reopenGit]);
 
   return (
     <PlansActionsContext.Provider value={actions}>

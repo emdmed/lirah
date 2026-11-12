@@ -12,6 +12,7 @@ import { getSettings, setSetting } from '../settings/settingsStore';
 import { useToast } from '../toast/ToastContext';
 import { IS_WINDOWS, isAbsolute } from '../../utils/pathUtils';
 import { buildFeatureMap } from '../feature-map/useFeatureMap';
+import { isPlanningMode, setPlanningMode } from '../planning/planningModeStore';
 import {
   addStartupProject, getStartup, removeStartupProject, setStartupMode,
 } from '../agent-control/actions';
@@ -128,6 +129,7 @@ export function useTabCommands({
       { id: 'merge', hint: 'merge this branch into a base branch', run: () => onAutoMerge() },
 
       // Files & panes
+      { id: 'plan-mode', hint: 'planning mode: terminal on the left, draft and plan on the right', options: ['on', 'off'], run: (arg) => setPlanningMode(tabId, onOff(arg, isPlanningMode(tabId))) },
       { id: 'zen', hint: 'zen mode: only the terminal', options: ['on', 'off'], run: (arg) => setSetting('zenMode', onOff(arg, getSettings().zenMode)) },
       // `:column 1|2|3|off [tab]`: the named tab (default this one) into that Zen column, or off screen.
       { id: 'column', aliases: ['col'], hint: 'zen columns: put a tab (default this one) in column 1-3, or off screen', options: ['1', '2', '3', 'off'], run: (line) => {

@@ -294,3 +294,54 @@ export function buildTaskPlanPrompt({ task, context, planPath, autoChunk = false
     .filter(Boolean)
     .join('\n\n');
 }
+
+/** The parts a draft is written in, one file each, in planning mode, in the order "draft all" writes them. */
+export const DRAFT_PARTS = Object.freeze([
+  { id: 'architecture', label: 'architecture', note: 'design and decisions', about: 'the overall design: components, data flow, boundaries and the main decisions with their trade-offs' },
+  { id: 'ui', label: 'ui', note: 'screens and states', about: 'screens, components, states (empty, loading, error) and interactions' },
+  { id: 'backend', label: 'backend', note: 'services and APIs', about: 'services, APIs, commands and background work: endpoints, contracts, errors' },
+  { id: 'database', label: 'database', note: 'schema and migrations', about: 'the data: schema, migrations, indexes, how existing data is kept or moved' },
+  { id: 'qa', label: 'qa', note: 'tests and acceptance', about: 'how the work is checked: acceptance criteria per part, the tests to add (unit, integration, end to end), edge cases and the manual checks before it ships' },
+]);
+
+// A published Claude artifact's link, as ui.md carries its mockup's.
+const ARTIFACT_LINK = /https:\/\/claude\.ai\/(?:code\/)?artifact\/[\w-]+/;
+
+/** Whether ui.md's text links its mockup artifact (the draft's gate when a mockup was asked for). */
+export const hasMockupLink = (text) => ARTIFACT_LINK.test(text || '');
+
+/**
+ * One part of a draft folder → a prompt asking the agent to write only that
+ * part's file. `existing` is the folder's other .md file names, read as context.
+ */
+export function buildDraftPartPrompt({ title, folder, part, existing = [], mockup = false }) {
+  if (!part) throw new Error('a draft part needs a name');
+  // A part beyond the four is one the user named: its file is all it says.
+  const spec = DRAFT_PARTS.find((p) => p.id === part) || { label: part, about: `the ${part.replace(/_/g, ' ')} side of the plan` };
+  const file = `${folder}/${part}.md`;
+  const others = existing.filter((n) => n !== `${part}.md`);
+  return [
+    `Draft the ${spec.label} part of the plan "${title}".`,
+    others.length > 0 && `Read the draft's other files in ${folder} first and stay consistent with them: ${others.join(', ')}.`,
+    `Write ${file} (create the folder if needed): ${spec.about}. Start it with a \`# \` heading. Explore the codebase as needed, ask me if something is unclear, and keep it to this part.`,
+    mockup && part === 'ui' && 'Make the mockup now, as part of this draft: an HTML artifact of the UI described, published, with its claude.ai link on the line under ui.md\'s heading. The draft can\'t be approved until ui.md links it, and the chunks won\'t build it later.',
+    `Edit only ${file}. Don't implement anything and don't commit.`,
+  ].filter(Boolean).join('\n\n');
+}
+
+/**
+ * The opinionated draft: every part in one prompt, in DRAFT_PARTS order, so
+ * each file builds on the ones before it. A part with nothing to say still
+ * gets its file, saying so, so the draft always has the same shape.
+ */
+export function buildDraftAllPrompt({ title, folder, existing = [], mockup = false }) {
+  const parts = DRAFT_PARTS.map((p, i) => `${i + 1}. ${folder}/${p.id}.md: ${p.about}.`);
+  return [
+    `Draft the whole plan "${title}" as ${DRAFT_PARTS.length} files in ${folder}, written in this order, each one consistent with the ones before it:`,
+    parts.join('\n'),
+    existing.length > 0 && `The folder already has ${existing.join(', ')}: read them first and build on them; rewrite a part only where it is wrong.`,
+    'First explore the codebase, then ask me the questions you need answered before writing (scope, constraints, trade-offs), one batch at a time. Start each file with a `# ` heading. If a part has nothing to do for this work, still write its file with one line saying why.',
+    mockup && 'In ui.md, make the mockup now: an HTML artifact of the UI described, published, with its claude.ai link on the line under ui.md\'s heading. The draft can\'t be approved until ui.md links it.',
+    `Edit only the .md files in ${folder}. Don't implement anything and don't commit.`,
+  ].filter(Boolean).join('\n\n');
+}

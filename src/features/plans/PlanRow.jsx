@@ -2,7 +2,7 @@ import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
 import { ProgressReadout } from './parts';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON, haltWord, PLAN_STAGE, pilotPosition, planProgress, planStage, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, HALT_REASON, haltWord, PLAN_STAGE, PLAN_STATUS, pilotPosition, planProgress, planStage, planStatus as lifecycleStatus, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
 /** The plan's lamp and auto-pilot tag, as its row and its tab show them. */
 // A run's tag takes its lamp's tone.
@@ -67,8 +67,8 @@ export function PlanRow({ plan, onOpen }) {
 
 const AUTOPILOT_LIVE = new Set([AUTOPILOT_STATUS.PAUSED, AUTOPILOT_STATUS.FAILED]);
 
-/** The plan's stage in a few words: "building", "PR #12", "merged". */
+/** The plan's status in a few words: "in-progress", "review · PR #12" (short for the row), "completed". */
 export function stageLabel(plan) {
-  const stage = planStage(plan);
-  return stage === PLAN_STAGE.PR_OPEN ? `PR #${plan.pr.number}` : stage;
+  const status = lifecycleStatus(plan);
+  return status === PLAN_STATUS.IN_REVIEW && planStage(plan) === PLAN_STAGE.PR_OPEN ? `review · PR #${plan.pr.number}` : status;
 }

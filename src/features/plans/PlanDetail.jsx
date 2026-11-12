@@ -88,7 +88,7 @@ function chunkSegments(chunks, open) {
 export function PlanDetail({ plan }) {
   const pane = usePlanPane();
   const { repoRoot } = pane;
-  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan, shelvePlan } = usePlansActions();
+  const { runSplit, setGitConfig, removePlanRepo, stopAutopilot, dismissAutopilot, updatePlan, shelvePlan, cancelPlan } = usePlansActions();
   const { tabs, switchTab } = useTabManager();
   const toast = useToast();
   const dialogs = useDialogStore();
@@ -344,9 +344,15 @@ export function PlanDetail({ plan }) {
             )}
             <PanelButton
               onClick={() => shelvePlan(repoRoot, plan.id, !plan.shelved)}
-              title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Take this plan out of the tabs pane; it stays here'}
+              title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Set it aside for now, to pick up later; it stays here (cancel is for a plan you won\'t do)'}
             >
               {plan.shelved ? 'unshelve' : 'shelve'}
+            </PanelButton>
+            <PanelButton
+              onClick={() => cancelPlan(repoRoot, plan.id, !plan.cancelledAt)}
+              title={plan.cancelledAt ? 'Take the plan back up where it was' : 'You won\'t do this plan: it stays here, tucked with the finished ones (shelve is for later)'}
+            >
+              {plan.cancelledAt ? 'uncancel' : 'cancel'}
             </PanelButton>
             {/* Destructive goes last, set apart, and prints its fault on hover. */}
             <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-[var(--ins-edge)]" />
