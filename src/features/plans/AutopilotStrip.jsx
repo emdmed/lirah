@@ -8,7 +8,7 @@ import { Fig09Loop } from './Fig09Loop';
 import { AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, haltWord, pilotPosition } from './planModel';
 
 /** Where the auto-pilot run stands, and what you can do about it. */
-export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop, onDismiss, onGoToTab, onReviewAll }) {
+export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop, onDismiss, onGoToTab, onReviewAll, onCancelStart }) {
   const ap = plan.autopilot;
   const running = ap.status === AUTOPILOT_STATUS.RUNNING;
   const now = useTick(running);
@@ -51,6 +51,9 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
           <span className="engraved-label shrink-0">auto-pilot</span>
           <span className={`min-w-0 truncate tabular-nums ${ap.status === AUTOPILOT_STATUS.DONE ? 'text-[var(--ins-ok)]' : 'text-muted-foreground'}`} role="status">{headline}</span>
           <span className="ml-auto flex items-center gap-1.5">
+            {onCancelStart && (
+              <PanelButton onClick={onCancelStart} title="Stop waiting for Claude to start; nothing is sent">cancel</PanelButton>
+            )}
             {ap.status === AUTOPILOT_STATUS.DONE && onReviewAll && (
               // A finished plan's one main action.
               <PanelButton variant="default" icon={View} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
@@ -98,6 +101,9 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
       )}
       {/* Tiered: resume is the one key that gets a stopped run going; stop sits apart. */}
       <div className="flex flex-wrap items-center gap-1.5">
+        {onCancelStart && (
+          <PanelButton onClick={onCancelStart} title="Stop waiting for Claude to start; nothing is sent">cancel</PanelButton>
+        )}
         {stopped && (
           <PanelButton variant="default" icon={Play} onClick={onResume} title={tabOpen ? 'Carry on in the same tab' : 'Carry on in this tab'}>
             resume

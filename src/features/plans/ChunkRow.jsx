@@ -8,7 +8,7 @@ import { Span } from '../../components/instrument/Span';
 import { Field, Prose } from './parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
-import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
+import { BUSY, useBusy, usePlanPane, useStarting } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { isNoGit } from './planGit';
 import { useToast } from '../toast';
@@ -102,6 +102,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   const toast = useToast();
   const dialogs = useDialogStore();
   const busy = useBusy(BUSY.chunk(chunk.id));
+  const starting = useStarting(plan.id);
   const isNext = chunk.id === nextChunkId(plan);
   const first = plan.chunks[0]?.id === chunk.id;
   const last = plan.chunks.at(-1)?.id === chunk.id;
@@ -330,6 +331,14 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
           )}
         </span>
       </button>
+
+      {/* Outside the row's button, which can't hold another. */}
+      {busy && starting && (
+        <div className="flex items-center gap-1.5 pl-[calc(0.75rem+14px+16px+12px)] pr-3 text-[11px] text-muted-foreground">
+          waiting for Claude to start
+          <PanelButton onClick={() => pane.cancelStart(plan.id)} title="Stop waiting; nothing is sent">cancel</PanelButton>
+        </div>
+      )}
 
       {open && (
         // Under the title, past the node and number columns.

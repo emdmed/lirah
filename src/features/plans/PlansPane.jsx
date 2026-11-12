@@ -46,7 +46,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
     if (id) setOpenPlanId(id);
   }, [plans, focusSeq]);
 
-  const { busy, paneActions, diffProps } = usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId });
+  const { busy, starting, paneActions, diffProps } = usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId });
 
   const handleCreate = useCallback(async ({ source, importedFrom }) => {
     try {
@@ -80,7 +80,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
   return (
     <>
       {openPlan ? (
-        <PlanPaneProvider busy={busy} actions={paneActions}>
+        <PlanPaneProvider busy={busy} starting={starting} actions={paneActions}>
           <PlanDetail plan={openPlan} />
         </PlanPaneProvider>
       ) : (

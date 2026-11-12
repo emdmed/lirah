@@ -32,10 +32,10 @@ export function PlanDrawer({ plan, repoRoot }) {
 // Mounted only while the drawer is open, so its handlers don't run beside the pane's.
 function PlanChunks({ plan, repoRoot }) {
   const { plans } = usePlans(repoRoot);
-  const { busy, paneActions, diffProps } = usePlanPaneActions({ repoRoot, plans, openPlan: plan, setOpenPlanId: noop });
+  const { busy, starting, paneActions, diffProps } = usePlanPaneActions({ repoRoot, plans, openPlan: plan, setOpenPlanId: noop });
   const [open, setOpen] = useState(null);
   return (
-    <PlanPaneProvider busy={busy} actions={paneActions}>
+    <PlanPaneProvider busy={busy} starting={starting} actions={paneActions}>
       <div className="flex flex-col py-1" onKeyDown={onListKey}>
         {plan.chunks.map((chunk) => (
           <ChunkRow
