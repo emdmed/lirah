@@ -2,7 +2,7 @@
  * Pure tree utility functions for building and updating file tree structures.
  */
 
-import { normalizePath } from './pathUtils';
+import { normalizePath, parentDir, basename } from './pathUtils';
 import { compareTreeEntries } from '../components/file-tree/utils/lsColors';
 
 export function buildTreeFromFlatList(flatList, rootPath) {
@@ -102,9 +102,8 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath, { lazy 
 
   created.forEach(({ path: filePath, is_dir: isDir }) => {
     const normalized = normalizePath(filePath);
-    const lastSep = normalized.lastIndexOf('/');
-    const parentPath = normalized.substring(0, lastSep);
-    const fileName = normalized.substring(lastSep + 1);
+    const parentPath = parentDir(normalized);
+    const fileName = basename(normalized);
 
     if (fileExistsInTree(newData, filePath)) {
       return; // Already in tree
@@ -120,7 +119,7 @@ export function incrementallyUpdateTree(prevTreeData, changes, rootPath, { lazy 
     };
 
     // Root-level file
-    if (parentPath === normalizedRoot) {
+    if (parentPath === normalizedRoot.replace(/\/$/, '')) {
       newNode.depth = 0;
       newData = [...newData, newNode];
       newData.sort(compareTreeEntries);

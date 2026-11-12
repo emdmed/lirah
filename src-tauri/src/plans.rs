@@ -75,13 +75,12 @@ pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result
 #[tauri::command]
 pub async fn delete_plan_file(path: String) -> Result<(), String> {
     crate::ipc::blocking("delete_plan_file", move || {
-        let file = Path::new(&path)
-            .canonicalize()
+        let file = crate::paths::canonical(Path::new(&path))
             .map_err(|e| format!("Plan file not found: {}", e))?;
         let plans = crate::util::lirah_dir()
             .ok_or("no home directory")?
-            .join("plans")
-            .canonicalize()
+            .join("plans");
+        let plans = crate::paths::canonical(&plans)
             .map_err(|e| format!("Plans folder not found: {}", e))?;
         if !is_plan_md(&plans, &file) || !file.is_file() {
             return Err("Only a .md file in ~/.lirah/plans/<YYYY-MM> can be removed".to_string());
@@ -110,11 +109,11 @@ pub async fn remove_plan_workdir(path: String) -> Result<(), String> {
         let base = crate::util::lirah_dir()
             .ok_or_else(|| "No home directory".to_string())?
             .join("plan-worktrees");
-        let dir = match Path::new(&path).canonicalize() {
+        let dir = match crate::paths::canonical(Path::new(&path)) {
             Ok(dir) => dir,
             Err(_) => return Ok(()), // Already gone.
         };
-        let base = base.canonicalize().map_err(|e| format!("No plan worktrees: {}", e))?;
+        let base = crate::paths::canonical(&base).map_err(|e| format!("No plan worktrees: {}", e))?;
         if dir.parent() != Some(base.as_path()) || !dir.is_dir() {
             return Err("Only a plan worktree folder can be removed".to_string());
         }

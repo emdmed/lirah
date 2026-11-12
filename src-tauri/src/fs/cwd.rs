@@ -63,7 +63,7 @@ fn process_cwd(
         // On Linux, read /proc/[pid]/cwd symlink
         let cwd_link = format!("/proc/{}/cwd", target_pid);
         fs::read_link(&cwd_link)
-            .map(|p| p.to_string_lossy().to_string())
+            .map(|p| crate::paths::to_app(&p))
             .map_err(|e| format!("Failed to read cwd from /proc: {}", e))
     }
 
@@ -84,7 +84,7 @@ fn process_cwd(
         // Query CWD directly — PowerShell's prompt function syncs OS-level CWD
         if let Some(process) = system.process(Pid::from_u32(pid)) {
             if let Some(cwd) = process.cwd() {
-                Ok(cwd.to_string_lossy().to_string())
+                Ok(crate::paths::to_app(cwd))
             } else {
                 Err("Could not get process CWD".to_string())
             }
@@ -108,7 +108,7 @@ fn process_cwd(
 
         if let Some(process) = system.process(Pid::from_u32(pid)) {
             if let Some(cwd) = process.cwd() {
-                Ok(cwd.to_string_lossy().to_string())
+                Ok(crate::paths::to_app(cwd))
             } else {
                 Err("Could not get process CWD".to_string())
             }
@@ -122,3 +122,7 @@ fn process_cwd(
         Err("Getting terminal cwd is not supported on this platform".to_string())
     }
 }
+
+#[cfg(test)]
+#[path = "cwd_tests.rs"]
+mod path_tests;

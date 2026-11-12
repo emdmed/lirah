@@ -179,7 +179,7 @@ fn tsc_binary(from: &Path) -> PathBuf {
 }
 
 fn normalize(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+    crate::paths::canonical(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// What one `tsc -p` run produced for a group of files.

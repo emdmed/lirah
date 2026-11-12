@@ -694,7 +694,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
         {projectPath && (tab === 'plans' || tab === 'tasks') && (
           <div className="ins-legend text-[11px] text-muted-foreground px-2 pt-1.5 truncate shrink-0" title={projectPath}>
-            {projectPath.split('/').filter(Boolean).pop()}
+            {basename(projectPath)}
           </div>
         )}
         {tab === 'agents' ? (

@@ -38,6 +38,9 @@ import { useTextareaShortcuts } from "../../hooks/useTextareaShortcuts";
 import { useHelpShortcut } from "../../hooks/useHelpShortcut";
 import { useBookmarksShortcut } from "../bookmarks";
 import { useClaudeLauncher } from "../cli-selection";
+import { launchOptions } from "./launchOptions";
+import { relaunchCli as relaunchInTab } from "./relaunch";
+import { killTabCli } from "./killTabCli";
 import { useFileSymbols } from "../file-analysis/useFileSymbols";
 import { useTokenUsage } from "../token-budget/useTokenUsage";
 import { useTokenUsageValue } from "../token-budget/tokenUsageStore";
@@ -50,7 +53,7 @@ import { buildPrompt } from "../../hooks/buildPrompt";
 import { usePromptContextSync } from "../../hooks/usePromptContextSync";
 import { ContextStatus } from "../../components/textarea-panel/ContextStatus";
 import { summarizeContext } from "../../components/textarea-panel/contextSummary";
-import { escapeShellPath } from "../../utils/pathUtils";
+import { escapeShellPath, isAbsolute, basename } from '../../utils/pathUtils';
 import { useOrchestrationCheck } from "../../hooks/useOrchestrationCheck";
 import { TokenBudgetProvider } from "../token-budget/TokenBudgetContext";
 import { SecondaryTerminal } from "../../components/SecondaryTerminal";
@@ -95,7 +98,7 @@ function todayTokens(stats) {
 }
 
 function isRealPath(p) {
-  return !!p && (p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p));
+  return !!p && isAbsolute(p);
 }
 
 // A callback whose identity never changes but always runs the latest `fn`.
@@ -127,7 +130,7 @@ const BOOT_PLACEHOLDER_MAX_MS = 20_000;
 // shell spawns, then the agent starts. Same vocabulary as the startup splash,
 // at pane scale.
 function TabBootPlaceholder({ projectPath, stage }) {
-  const name = projectPath?.split('/').filter(Boolean).pop() || 'project';
+  const name = basename(projectPath ?? '', 'project');
   return (
     <div
       role="status"
@@ -147,11 +150,6 @@ function TabBootPlaceholder({ projectPath, stage }) {
 
 // Memoized: App re-renders on every tab switch and tab-path update, which
 // must not re-render the tabs whose props didn't change.
-// Tells the workspace terminal's agent what it is for; the lirah skill has the how.
-const MASTER_PROMPT = 'You are the agent in this Lirah workspace\'s workspace terminal. The tabs listed by `lirah tabs` are your workers: '
-  + 'the user asks you for work and you hand it to them with `lirah tabs send` and collect it with `lirah tabs wait`, '
-  + 'without switching tabs. Follow the lirah skill\'s "Orchestrating from the workspace terminal" section.';
-
 // visible: on screen (layout, polls, fit, rendering). isActive: focused (keys,
 // palette, status slot, dialogs, terminal focus). column/columns: this visible
 // tab's slot among the side-by-side visible tabs.
@@ -425,20 +423,19 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   });
 
   // Terminate any running CLI process in the terminal before navigation
-  const terminateCliProcess = useCallback(async () => {
+  const terminateCliProcess = useCallback(async (launch) => {
     if (!terminalSessionId) return;
-    for (const cliName of TAB_CLI_PROCESSES) {
-      try {
-        const killed = await invoke('kill_pty_child_process', {
-          sessionId: terminalSessionId,
-          processName: cliName,
-        });
-        if (killed) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          return;
-        }
-      } catch { /* ignore errors */ }
-    }
+    // A killed CLI leaves its terminal modes on (mouse tracking...): relaunchInTab resets
+    // the display before and after the kill and Ctrl+C's the shell (see relaunch.js).
+    // The backend returns once the pid is gone, so only a short settle is left for the prompt.
+    // A CLI that cannot be stopped rejects: callers must not type into it.
+    await relaunchInTab({
+      kill: () => killTabCli({ invoke, sessionId: terminalSessionId, names: TAB_CLI_PROCESSES }),
+      writeDisplay: (data) => terminalRef.current?.writeDisplay?.(data),
+      writePty: (data) => invoke('write_to_terminal', { sessionId: terminalSessionId, data }),
+      launch,
+      delayMs: 150,
+    });
   }, [terminalSessionId]);
 
   const { tokenUsageStore, projectStats, refreshProjectStats } = useTokenUsage(currentPath, terminalSessionId, visible && !!currentPath && !secondary.secondaryFullscreen);
@@ -455,12 +452,17 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   });
 
   // Claude launcher
-  const { launchClaude, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+  const { launchClaude: launchCli, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
+  // Every launch carries the tab's system prompt; extra arguments (click events) are ignored.
+  const launchClaude = useCallback(() => launchCli(launchOptions({ master })), [launchCli, master]);
   // A claude started by hand: stop it and start it again with the plugin.
   const relaunchCli = useCallback(async () => {
-    await terminateCliProcess();
-    await launchClaude();
-  }, [terminateCliProcess, launchClaude]);
+    try {
+      await terminateCliProcess(launchClaude);
+    } catch (error) {
+      toast.error(`Couldn't stop the CLI, try again: ${error?.message || error}`);
+    }
+  }, [terminateCliProcess, launchClaude, toast.error]);
 
   // Remember the conversation this tab's agent is in, for launchFresh after a restart.
   useEffect(() => {
@@ -482,7 +484,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     const transcript = settings.selectedCli === 'claude-code' ? getTabTranscript(tabId) : null;
     const resume = transcript && await invoke('path_exists', { path: transcript }).catch(() => false);
     const resumeId = resume ? transcript.split(/[\\/]/).pop().replace(/\.jsonl$/, '') : null;
-    return launchClaude({ resumeId, systemPrompt: master ? MASTER_PROMPT : undefined });
+    return launchCli(launchOptions({ master, resumeId }));
   });
 
   useEffect(() => {

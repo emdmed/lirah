@@ -30,6 +30,7 @@ notify = "6.1"
 rustpython-parser = "0.4"
 dirs = "5.0"
 sysinfo = "0.33"
+dunce = "1"
 process-wrap = { version = "10", default-features = false, features = ["std", "process-group", "job-object", "creation-flags"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"

@@ -18,6 +18,7 @@ mod hook_server;
 mod feature_map;
 mod plans;
 mod util;
+mod paths;
 mod compaction;
 mod user_plugins;
 mod store;
@@ -100,7 +101,10 @@ pub fn run(initial_path: Option<String>) {
         .manage(std::sync::Arc::new(FsWatcherStore::new()))
         .manage(std::sync::Arc::new(SubagentWatcherStore::new()))
         .manage(agent_runner::create_agent_job_store())
-        .manage(InitialPath(initial_path))
+        .manage(InitialPath(initial_path.map(|p| {
+            let path = std::path::Path::new(&p);
+            paths::to_app(&paths::canonical(path).unwrap_or_else(|_| path.to_path_buf()))
+        })))
         .setup(move |app| {
             // The main window is built here rather than from the config so a
             // recording can give it its own profile folder.

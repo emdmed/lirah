@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogGroup, Dia
 import { Input } from '../../components/ui/input';
 import { PickerRow, OpenTabTag, tildePath, useOpenTabsByPath } from '../../components/ui/picker';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
+import { basename } from '../../utils/pathUtils';
 
 function folderName(path) {
-  return path.split('/').filter(Boolean).pop() || path;
+  return basename(path, path);
 }
 
 // Picks the project a new tab opens in: the current project, a starred

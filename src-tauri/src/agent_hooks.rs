@@ -408,7 +408,7 @@ fn merge_hooks(hooks: &mut serde_json::Map<String, serde_json::Value>, add: serd
 
 /// The agent-state events as `http` hooks to hook_server: token and session go
 /// as headers from the terminal's env (the `url` cannot take env vars).
-fn claude_http_hooks() -> serde_json::Value {
+pub(crate) fn claude_http_hooks() -> serde_json::Value {
     let hook = serde_json::json!([{ "hooks": [{
         "type": "http",
         "url": format!("http://127.0.0.1:{}/hook", crate::hook_server::HOOK_PORT),
@@ -416,7 +416,18 @@ fn claude_http_hooks() -> serde_json::Value {
         "headers": { "X-Lirah-Token": format!("${}", crate::hook_server::TOKEN_ENV), "X-Lirah-Session": format!("${SESSION_ENV}") },
         "allowedEnvVars": [crate::hook_server::TOKEN_ENV, SESSION_ENV],
     }] }]);
-    CLAUDE_EVENTS.iter().map(|e| (e.to_string(), hook.clone())).collect()
+    let mut hooks: serde_json::Map<String, serde_json::Value> =
+        CLAUDE_EVENTS.iter().map(|e| (e.to_string(), hook.clone())).collect();
+    // Claude Code 2.1.322 never runs http hooks for SessionStart, so that one is a
+    // command hook posting its stdin (the hook JSON) to the same listener. The
+    // shell expands the env vars; the quoting works in sh and Git Bash.
+    let curl = format!(
+        "curl -s -m 3 -X POST -H \"Content-Type: application/json\" -H \"X-Lirah-Token: ${}\" -H \"X-Lirah-Session: ${SESSION_ENV}\" --data-binary @- http://127.0.0.1:{}/hook",
+        crate::hook_server::TOKEN_ENV,
+        crate::hook_server::HOOK_PORT
+    );
+    hooks.insert("SessionStart".into(), serde_json::json!([{ "hooks": [{ "type": "command", "command": curl, "timeout": 5 }] }]));
+    serde_json::Value::Object(hooks)
 }
 
 /// Compose Lirah's one Claude Code plugin (~/.lirah/claude-plugin) and return
@@ -478,7 +489,7 @@ mod tests {
     fn claude_events_are_http_hooks_with_token_and_session_headers() {
         let hooks = claude_http_hooks();
         assert_eq!(hooks.as_object().unwrap().len(), CLAUDE_EVENTS.len());
-        for event in CLAUDE_EVENTS {
+        for event in CLAUDE_EVENTS.iter().filter(|e| **e != "SessionStart") {
             let hook = &hooks[*event][0]["hooks"][0];
             assert_eq!(hook["type"], "http");
             assert_eq!(hook["url"], format!("http://127.0.0.1:{}/hook", crate::hook_server::HOOK_PORT));
@@ -541,3 +552,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[cfg(test)]
+#[path = "agent_hooks_session_start_tests.rs"]
+mod session_start_tests;

@@ -1,6 +1,7 @@
 import { CalRecipe, Calibrated } from '@/components/instrument/calibrated';
 import { formatTokenCount } from './tokenCalculations';
 import { groupLabel, sharePct } from './contextGroups';
+import { basename } from '../../utils/pathUtils';
 
 // FIG.23: what the used context is made of, as Lirah's measuredToned recipe in the atlas hand (measuredAtlas)
 // (components/instrument/calibrated/recipes/measuredToned.js). The window's
@@ -34,7 +35,7 @@ const SHORT = {
 const INKS = ['fg', 'mu', 'fa', 'ed', 'e1'];
 
 const kfmt = (v) => (v >= 1000 ? `${+(v / 1000).toFixed(v >= 100_000 ? 0 : 1)}k` : String(Math.round(v)));
-const baseName = (s) => String(s || '').split('/').filter(Boolean).pop() || s;
+const baseName = (s) => basename(String(s || ''), s);
 
 // The smallest round magnification whose inset still holds `used`.
 function zoom(used, max) {

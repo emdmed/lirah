@@ -180,8 +180,7 @@ fn build_fs_watcher(
         return Err(format!("Path is not a directory: {}", path));
     }
     // get_git_stats caches under the canonical path, so invalidate with that.
-    let canonical_path = watch_path
-        .canonicalize()
+    let canonical_path = crate::paths::canonical(&watch_path)
         .unwrap_or_else(|_| watch_path.clone());
 
     let ignore_set: HashSet<&'static str> = IGNORE_DIRS.iter().copied().collect();
@@ -315,7 +314,7 @@ fn build_fs_watcher(
                 ..Default::default()
             };
             for p in touched {
-                let path_str = p.to_string_lossy().to_string();
+                let path_str = crate::paths::to_app(&p);
                 if p.symlink_metadata().is_ok() {
                     payload.created.push(FsChange { path: path_str, is_dir: p.is_dir() });
                 } else {
@@ -465,7 +464,7 @@ fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
             let rels: Vec<String> = changed
                 .iter()
                 .filter_map(|p| p.strip_prefix(&base).ok())
-                .map(|p| p.to_string_lossy().into_owned())
+                .map(|p| crate::paths::to_app(p))
                 .collect();
             let _ = app_handle.emit("lirah-files-changed", rels);
         }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { list, load, onExternalChange, remove, save } from '../../lib/fileStore';
 import { normalizeLoadedPlan, planDir } from './planModel';
+import { pathSegments } from '../../utils/pathUtils';
 
 // The plans state and its files: one ~/.lirah/plans/<YYYY-MM>/<plan-id>/plan.json
 // per plan, in the month it was created (one global folder: a plan may span repos).
@@ -70,7 +71,7 @@ export function usePlanStore({ onLoad } = {}) {
   useEffect(() => onExternalChange(
     (rel) => /^plans\/\d{4}-\d{2}\/[^/]+\/plan\.json$/.test(rel),
     (doc, rel) => {
-      const [, , id] = rel.split('/');
+      const [, , id] = pathSegments(rel);
       const { version, revision, ...raw } = doc ?? {};
       // Not normalizeLoadedPlan: that is for startup (it fails running splits, pauses autopilot).
       const plan = doc?.repoRoot ? raw : null;

@@ -10,6 +10,7 @@ import { getEffectiveSettings, getSettings } from "../settings/settingsStore";
 import { formatDuration } from "../../lib/formatDuration";
 import { tildePath } from "../../components/ui/picker";
 import { assertColumnRoom, placeColumn } from "../zen/zenColumns";
+import { commonFolder, basename } from '../../utils/pathUtils';
 
 // Actions are split from state so a tab can call updateTabPath without
 // re-rendering whenever any tab's path or the active tab changes.
@@ -72,14 +73,6 @@ export const planTerminalShown = (tabs, planTabId) => {
   return !!host && host.showing === planTabId;
 };
 
-// The deepest folder holding all of these paths ("/" at worst).
-function commonFolder(paths) {
-  const parts = paths.map((p) => p.split('/').filter(Boolean));
-  const shared = [];
-  for (let i = 0; parts.every((p) => i < p.length && p[i] === parts[0][i]); i++) shared.push(parts[0][i]);
-  return `/${shared.join('/')}`;
-}
-
 // `launch` asks the tab to start its agent once its shell is up, even with
 // auto-launch off; ProjectTab clears it as soon as it boots. `planHost` makes it
 // a plan's terminal: hidden, shown inside that project tab (its `showing`).
@@ -88,7 +81,7 @@ function createTab(projectPath, { launch = false, name, workspaceId, master = fa
     id: crypto.randomUUID(),
     projectPath,
     workspaceId,
-    label: projectPath.split('/').filter(Boolean).pop() || projectPath,
+    label: basename(projectPath, projectPath),
     ...(name?.trim() && { customLabel: name.trim() }),
     ...(launch && { launch: true }),
     ...(master && { master: true }),
@@ -432,7 +425,7 @@ export function TabProvider({ children }) {
   const updateTabPath = useCallback((tabId, newPath) => {
     setTabs(prev => prev.map(t =>
       t.id === tabId
-        ? { ...t, projectPath: newPath, label: newPath.split('/').filter(Boolean).pop() || newPath }
+        ? { ...t, projectPath: newPath, label: basename(newPath, newPath) }
         : t
     ));
   }, []);

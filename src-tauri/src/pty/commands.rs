@@ -638,22 +638,57 @@ pub async fn kill_pty_child_process(
     process_name: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<bool, String> {
-    use sysinfo::{Pid, ProcessesToUpdate, System};
-
     let shell_pid = session_pid(&state, &session_id)?;
     let target = process_name.to_lowercase();
     crate::ipc::blocking("kill_pty_child_process", move || {
-        let Some(pid) = find_descendant(shell_pid, &target).map(Pid::from_u32) else {
+        let Some(pid) = find_descendant(shell_pid, &target) else {
             return Ok(false);
         };
-        let mut sys = System::new();
-        sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
-        if let Some(process) = sys.process(pid) {
-            process.kill();
+        if kill_and_wait(pid, KILL_TIMEOUT) {
+            Ok(true)
+        } else {
+            Err(format!("could not stop {target}"))
         }
-        Ok(true)
     })
     .await
+}
+
+const KILL_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Kill `pid` and wait until it is really gone (Windows takes 150-200 ms to
+/// drop it). A process already gone counts as success; a zombie counts as gone.
+/// Checks at least once after the kill, even with a zero timeout.
+fn kill_and_wait(pid: u32, timeout: Duration) -> bool {
+    use sysinfo::{Pid, ProcessStatus, ProcessesToUpdate, System};
+
+    let pid = Pid::from_u32(pid);
+    let mut sys = System::new();
+    let alive = |sys: &mut System| {
+        sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+        sys.process(pid).is_some_and(|p| p.status() != ProcessStatus::Zombie)
+    };
+    if !alive(&mut sys) {
+        return true;
+    }
+    if let Some(process) = sys.process(pid) {
+        process.kill();
+    }
+    wait_until_gone(timeout, || alive(&mut sys))
+}
+
+/// Poll `is_alive` every 10 ms until it says false (true returned) or the
+/// timeout passes (false). Polls at least once, even with a zero timeout.
+fn wait_until_gone(timeout: Duration, mut is_alive: impl FnMut() -> bool) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if !is_alive() {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 #[cfg(test)]
@@ -674,3 +709,7 @@ mod tests {
         let _ = child.wait();
     }
 }
+
+#[cfg(test)]
+#[path = "commands_kill_tests.rs"]
+mod kill_tests;

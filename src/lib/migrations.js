@@ -6,6 +6,7 @@ import { list, load, save } from './fileStore';
 import { getSavedWorkspaces } from './workspaceStore';
 import { getDraft, saveDraft } from './promptDrafts';
 import { loadText } from './storage';
+import { splitDirName } from '../utils/pathUtils';
 
 const MARKER = 'migrations.json';
 
@@ -84,7 +85,7 @@ async function plansToGlobal({ workspaces, tabs }) {
     const { version, revision, ...plan } = doc;
     const md = plan.importedFrom?.path;
     if (md && /\.md$/i.test(md) && !md.startsWith(`${lirah}/plans/`) && await invoke('path_exists', { path: md }).catch(() => false)) {
-      const name = md.slice(md.lastIndexOf('/') + 1);
+      const { name } = splitDirName(md);
       let to = `${lirah}/plans/${month}/${name}`;
       if (await invoke('path_exists', { path: to }).catch(() => false)) to = `${lirah}/plans/${month}/${name.replace(/\.md$/i, '')}-${plan.id}.md`;
       await copy(md, to);

@@ -1,5 +1,6 @@
 import { CalRecipe } from '@/components/instrument/calibrated';
 import { CHUNK_STATUS } from './planModel';
+import { basename, pathSegments } from '../../utils/pathUtils';
 
 // FIG.22: which chunks touched which files, as the calibrated matrix recipe.
 // Chunks run down, files across (busiest first, up to MAX_COLS), a filled
@@ -13,9 +14,9 @@ const MIN_W = 423; // the kit never draws a recipe below 90% of its 470 width; n
 const LABEL_CHARS = 15; // rotated header labels clip past this
 const BUSY_AT = 3;
 
-const baseName = (p) => p.slice(p.lastIndexOf('/') + 1);
+const baseName = (p) => basename(p);
 const parentName = (p) => {
-  const parts = p.split('/');
+  const parts = pathSegments(p);
   return parts.length > 1 ? parts[parts.length - 2] : '';
 };
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);

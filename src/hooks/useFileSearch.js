@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react';
+import { normalizePath } from '../utils/pathUtils';
 
 /**
  * Lowercased search keys for one file entry. Paths are matched relative to
@@ -9,7 +10,7 @@ function buildSearchEntry(file, rootPrefix) {
   const relPath = rootPrefix && path.startsWith(rootPrefix) ? path.slice(rootPrefix.length) : path;
   return {
     lowerName: (file.name || '').toLowerCase(),
-    lowerPath: relPath.replace(/\\/g, '/').toLowerCase(),
+    lowerPath: normalizePath(relPath).toLowerCase(),
   };
 }
 

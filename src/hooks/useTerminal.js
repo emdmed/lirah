@@ -843,6 +843,11 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       // latest size to redraw cleanly.
       handleResize({ immediate: true });
     },
+    // Write straight to the xterm display (not the PTY): for resetting modes a killed program left on.
+    writeDisplay: (data) => new Promise((resolve) => {
+      if (!terminal) return resolve(false);
+      terminal.write(data, () => resolve(true));
+    }),
     // Whether the program in the terminal asked for bracketed paste (DECSET 2004).
     bracketedPaste: () => !!terminal?.modes?.bracketedPasteMode,
   }), [terminal, isReady, handleResize]);

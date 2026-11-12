@@ -13,7 +13,7 @@ import { usePlansActions } from './PlansContext';
 import { isNoGit } from './planGit';
 import { useToast } from '../toast';
 import { useDialogStore } from '../dialogs/DialogProvider';
-import { basename } from '../../utils/pathUtils';
+import { basename, splitDirName } from '../../utils/pathUtils';
 import { LirahMark } from '../../components/LirahMark';
 
 // The chunk's body on the spine: done filled, live (sent, fixing, waiting on
@@ -453,12 +453,12 @@ function FileTree({ files }) {
   return (
     <ul className="flex min-w-0 flex-col font-mono text-[11px] leading-[16.5px]">
       {files.map((f) => {
-        const cut = f.lastIndexOf('/') + 1;
+        const { dir, name } = splitDirName(f);
         return (
           <li key={f} className="flex min-w-0" title={f}>
             <span className="min-w-0 truncate">
-              <span className="text-muted-foreground">{f.slice(0, cut)}</span>
-              <span className="text-foreground">{f.slice(cut)}</span>
+              <span className="text-muted-foreground">{dir}</span>
+              <span className="text-foreground">{name}</span>
             </span>
           </li>
         );
@@ -476,13 +476,13 @@ function DirtyList({ files }) {
       {shown.map((f) => {
         const path = multi ? `${basename(f.root)}/${f.path}` : f.path;
         const mark = gitMark(f.code ?? ' M');
-        const cut = path.lastIndexOf('/') + 1;
+        const { dir, name } = splitDirName(path);
         return (
           <li key={`${f.root}:${f.path}`} className="flex min-w-0 gap-1.5" title={`${mark.label}: ${path}`}>
             <span aria-hidden="true" className={cn('w-2 shrink-0 text-center', mark.className.replace(' line-through', ''))}>{mark.letter}</span>
             <span className="min-w-0 truncate">
-              <span className="text-muted-foreground">{path.slice(0, cut)}</span>
-              <span className={mark.className}>{path.slice(cut)}</span>
+              <span className="text-muted-foreground">{dir}</span>
+              <span className={mark.className}>{name}</span>
             </span>
           </li>
         );

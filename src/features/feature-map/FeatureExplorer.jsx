@@ -8,6 +8,7 @@ import { useFeatureMap } from './useFeatureMap';
 import { markFeatureInTree, selectFeature, togglePinFeature, useTabFeatures } from './useTabFeatures';
 import { Fig34Features } from './Fig34Features';
 import { copyFeatureFiles, FeatureRow } from './FeaturesPane';
+import { parentDir, basename } from '../../utils/pathUtils';
 
 const HOOK_CAP = 40; // files the prompt hook sends per prompt
 
@@ -123,7 +124,7 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
   const usedBy = all.filter((f) => f.id !== feature.id && (f.uses || []).includes(feature.id)).map((f) => f.id);
   const folders = new Map();
   for (const p of files) {
-    const dir = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '.';
+    const dir = parentDir(p) || '.';
     folders.set(dir, [...(folders.get(dir) || []), p]);
   }
   const links = (ids) => (ids.length ? ids.map((id) => (
@@ -176,7 +177,7 @@ function FeatureSheet({ feature, all, pinned, onPin, onCopy, onSelect, onReveal,
               {paths.map((p) => (
                 <button key={p} onClick={() => onReveal(p)} title={`show ${p} in the file tree`} className="flex w-full gap-1.5 py-px text-left cursor-pointer hover:text-foreground">
                   <span className="w-2 shrink-0 text-foreground" aria-label={entries.has(p) ? 'entry point' : undefined}>{entries.has(p) ? '◆' : ''}</span>
-                  <span className="truncate">{p.slice(p.lastIndexOf('/') + 1)}</span>
+                  <span className="truncate">{basename(p)}</span>
                 </button>
               ))}
             </div>

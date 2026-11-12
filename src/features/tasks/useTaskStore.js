@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { load, onExternalChange, save } from '../../lib/fileStore';
 import { GLOBAL, normalizeTask } from './taskModel';
+import { pathSegments } from '../../utils/pathUtils';
 
 // The task lists and their files (under ~/.lirah), loaded on first use and
 // written back debounced through fileStore:
@@ -59,7 +60,7 @@ export function useTaskStore() {
   useEffect(() => onExternalChange(
     (rel) => rel === 'tasks/global.json' || /^workspaces\/[^/]+\/tasks\.json$/.test(rel),
     (doc, rel) => {
-      const scope = rel === 'tasks/global.json' ? GLOBAL : rel.split('/')[1];
+      const scope = rel === 'tasks/global.json' ? GLOBAL : pathSegments(rel)[1];
       if (!loadedRef.current.has(scope)) return;
       stateRef.current = { ...stateRef.current, [scope]: (Array.isArray(doc?.tasks) ? doc.tasks : []).map(normalizeTask) };
       setTasksByScope(stateRef.current);

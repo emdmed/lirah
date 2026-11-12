@@ -1,11 +1,17 @@
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { lastSepIndex, normalizePath, parentDir, basename } from '../utils/pathUtils';
+import { toGitStatsMap } from '../features/git/useGitStats';
 
 const IS_WINDOWS = navigator.platform.startsWith('Win');
 const SEP = IS_WINDOWS ? '\\' : '/';
 
-function lastSepIndex(p) {
-  return Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+// The deleted files git reports directly inside `dirPath`, in the canonical form.
+export function deletedFilesIn(rawStats, dirPath) {
+  const dir = normalizePath(dirPath).replace(/\/$/, '');
+  return [...toGitStatsMap(rawStats)]
+    .filter(([path, stats]) => stats.status === 'deleted' && parentDir(path) === dir)
+    .map(([path]) => ({ name: basename(path), path, is_dir: false, is_deleted: true }));
 }
 
 function isRoot(p) {
@@ -32,26 +38,7 @@ export function useFlatViewNavigation(terminalSessionId) {
   const mergeDeletedFiles = useCallback(async (directories, dirPath) => {
     try {
       const gitStats = await invoke('get_git_stats', { path: dirPath });
-      const deletedFiles = [];
-
-      for (const [filePath, stats] of Object.entries(gitStats)) {
-        if (stats.status === 'deleted') {
-          // Only include deleted files from the current directory
-          const sepIdx = lastSepIndex(filePath);
-          const parentDir = filePath.substring(0, sepIdx);
-          if (parentDir === dirPath) {
-            const fileName = filePath.substring(sepIdx + 1);
-            deletedFiles.push({
-              name: fileName,
-              path: filePath,
-              is_dir: false,
-              is_deleted: true
-            });
-          }
-        }
-      }
-
-      return [...directories, ...deletedFiles];
+      return [...directories, ...deletedFilesIn(gitStats, dirPath)];
     } catch (error) {
       console.warn('Failed to merge deleted files:', error);
       return directories;

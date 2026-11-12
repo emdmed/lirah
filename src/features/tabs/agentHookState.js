@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { createEmitter } from '../../lib/createStore';
 import { bashFileTargets } from './bashFileTargets';
 import { endEntry, startEntry } from '../worklog/worklogStore';
+import { isAbsolute, normalizePath, ancestorDirs } from '../../utils/pathUtils';
 
 // What each terminal's agent last said about itself through its hooks (see
 // src-tauri/src/agent_hooks.rs) or an OSC 7501 report (programStatus.js). Plain module state like terminalActivity.js:
@@ -50,9 +51,9 @@ function toolFiles(payload) {
   const input = payload.tool_input || {};
   if (tool === 'Bash') return bashFileTargets(input.command, payload.cwd);
   const kind = EDIT_TOOLS.has(tool) ? 'edit' : READ_TOOLS.has(tool) ? 'read' : null;
-  const path = input.file_path || input.notebook_path;
-  if (!kind || typeof path !== 'string' || !path.startsWith('/')) return [];
-  return [{ path, kind }];
+  const raw = input.file_path || input.notebook_path;
+  if (!kind || typeof raw !== 'string' || !isAbsolute(raw)) return [];
+  return [{ path: normalizePath(raw), kind }];
 }
 
 function recordFile(sessionId, payload, live) {
@@ -353,9 +354,7 @@ export function getFileActivity() {
   const folders = new Map();
   for (const [path, mark] of merged) {
     folders.set(path, strongerMark(folders.get(path), mark));
-    for (let dir = path.slice(0, path.lastIndexOf('/')); dir.length > 0; dir = dir.slice(0, dir.lastIndexOf('/'))) {
-      folders.set(dir, strongerMark(folders.get(dir), mark));
-    }
+    for (const dir of ancestorDirs(path)) folders.set(dir, strongerMark(folders.get(dir), mark));
   }
   mergedCache = { version: filesVersion, files: merged, folders };
   return mergedCache;

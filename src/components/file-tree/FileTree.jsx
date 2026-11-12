@@ -6,7 +6,7 @@ import { EmptyState } from "./EmptyState";
 import { useGitStats } from "../../features/git/useGitStats";
 import { filterTreeByGitChanges, filterTreeByMarkdown, countMarkdownFiles, countGitChanges } from "./utils/filterUtils";
 import { flattenVisibleTree } from "./utils/flattenTree";
-import { basename } from "../../utils/pathUtils";
+import { basename, ancestorDirs } from '../../utils/pathUtils';
 import { markKey, useAgentFileActivity } from "./useAgentFileActivity";
 import { useTabManager } from "../../features/tabs/TabContext";
 
@@ -127,10 +127,7 @@ export const FileTree = memo(function FileTree({
     const counts = new Map();
     if (!isTextareaPanelOpen || !selectedFiles) return counts;
     for (const file of selectedFiles) {
-      for (let i = file.lastIndexOf('/'); i > 0; i = file.lastIndexOf('/', i - 1)) {
-        const dir = file.slice(0, i);
-        counts.set(dir, (counts.get(dir) || 0) + 1);
-      }
+      for (const dir of ancestorDirs(file)) counts.set(dir, (counts.get(dir) || 0) + 1);
     }
     return counts;
   }, [isTextareaPanelOpen, selectedFiles]);

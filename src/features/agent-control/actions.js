@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { tabDisplayName } from '../tabs/TabContext';
 import { getTabSession } from '../tabs/terminalActivity';
 import { getAgentHookState } from '../tabs/agentHookState';
+import { isAbsolute, normalizePath } from '../../utils/pathUtils';
 
 // Changes the user confirms first: they loosen the sandbox, change what runs
 // inside every agent, or switch this control channel itself.
@@ -216,8 +217,8 @@ export async function resolveTabPath(raw) {
     const home = await invoke('get_home_dir');
     path = home + path.slice(1);
   }
-  if (!path.startsWith('/')) throw new Error(`path must be absolute, not "${raw}"`);
-  if (path.length > 1) path = path.replace(/\/+$/, '');
+  if (!isAbsolute(path)) throw new Error(`path must be absolute, not "${raw}"`);
+  if (path.length > 1) path = normalizePath(path);
   if (!(await invoke('path_exists', { path }))) throw new Error(`no such directory: ${path}`);
   return path;
 }
@@ -266,8 +267,8 @@ async function startupPath(raw, usage) {
     const home = await invoke('get_home_dir');
     path = home + path.slice(1);
   }
-  if (!path.startsWith('/')) throw new Error(`path must be absolute, not "${raw}"`);
-  return path.length > 1 ? path.replace(/\/+$/, '') : path;
+  if (!isAbsolute(path)) throw new Error(`path must be absolute, not "${raw}"`);
+  return path.length > 1 ? normalizePath(path) : path;
 }
 
 // Adds a directory, or updates the listed entry for it. `launch` and `name`

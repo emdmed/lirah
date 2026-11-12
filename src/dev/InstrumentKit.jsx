@@ -28,6 +28,7 @@ import { TreeGuide } from '../components/file-tree/TreeGuide';
 import { AgentMark } from '../components/file-tree/AgentMark';
 import { EmptyPlate } from '../components/EmptyState';
 import { ChunkBody } from '../features/plans/ChunkRow';
+import { basename } from '../utils/pathUtils';
 
 // Kit-only tab rows: live, waiting on you, resting (folded) and a plain shell.
 const NOOP = () => {};
@@ -289,7 +290,7 @@ export function InstrumentKit() {
               {KIT_FILES.map((f) => (
                 <SelectedFileItem
                   key={f}
-                  file={{ absolute: f, name: f.split('/').pop() }}
+                  file={{ absolute: f, name: basename(f) }}
                   currentState={KIT_STATES.get(f) || 'modify'}
                   onSetFileState={() => {}}
                   onRemoveFile={() => {}}

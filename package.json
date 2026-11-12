@@ -14,6 +14,7 @@
     "benchmark:tokens": "node scripts/benchmark-tokens.js",
     "check:contrast": "jiti scripts/check-contrast.mjs",
     "check:async-commands": "node scripts/check-async-commands.mjs",
+    "check:paths": "node scripts/check-paths.mjs",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "test": "vitest run",
     "qa": "node scripts/qa.mjs"
