@@ -131,21 +131,26 @@ const OLD_CHUNK_LINES = 3;
 
 /**
  * Decisions and results of the implemented chunks before `upTo` (all of them
- * when null), for a later prompt. Null when there are none.
+ * when null), for a later prompt. `listAll` also lists the chunks with
+ * nothing to pass on, so the block doubles as the "already implemented" list.
+ * Null when there is nothing to show.
  */
-function decisionsBlock(plan, upTo = null) {
+function decisionsBlock(plan, upTo = null, { listAll = false } = {}) {
+  // A chunk at or after `upTo` (one implemented before a re-run of an earlier
+  // chunk) is only listed: its decisions don't bind the chunks before it.
+  const passes = (c) => upTo == null || c.n < upTo;
   const earlier = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED
-    && (upTo == null || c.n < upTo)
-    && (c.decisions?.length > 0 || c.result));
+    && (listAll || (passes(c) && (c.decisions?.length > 0 || c.result))));
   if (earlier.length === 0) return null;
   const parts = earlier.map((c, i) => {
-    const lines = [...(c.decisions ?? [])];
-    if (c.result) lines.push(`(result) ${c.result}`);
+    const lines = passes(c) ? [...(c.decisions ?? [])] : [];
+    if (passes(c) && c.result) lines.push(`(result) ${c.result}`);
     const old = i < earlier.length - RECENT_CHUNKS && lines.length > OLD_CHUNK_LINES;
     const shown = old ? [...lines.slice(0, OLD_CHUNK_LINES), `… ${lines.length - OLD_CHUNK_LINES} more`] : lines;
-    return `  Chunk ${c.n} (${c.title}):\n${shown.map((l) => `  - ${l}`).join('\n')}`;
+    return [`  ${c.n}. ${c.title}`, ...shown.map((l) => `     - ${l}`)].join('\n');
   });
-  return `Decisions from earlier chunks (follow these unless this chunk says otherwise):\n${parts.join('\n')}`;
+  const head = listAll ? 'Already implemented, with their decisions' : 'Decisions from earlier chunks';
+  return `${head} (follow these unless this chunk says otherwise):\n${parts.join('\n')}`;
 }
 
 // `allowDone`: the chunk itself, which may need no file changes (a check, a
@@ -177,15 +182,13 @@ PLAN-STATUS: blocked — <reason>`;
 
 export function buildChunkPrompt(plan, chunk, { autopilot = false } = {}) {
   const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
-  const done = active.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED);
   const later = active.filter((c) => c.n > chunk.n && c.status !== CHUNK_STATUS.IMPLEMENTED);
   const list = (cs) => cs.map((c) => `  ${c.n}. ${c.title}`).join('\n');
   return [
     `Implement chunk ${chunk.n} of ${plan.chunks.length} of the plan "${plan.title}".`,
     plan.summary && `Plan summary: ${plan.summary}`,
-    done.length > 0 && `Already implemented:\n${list(done)}`,
+    decisionsBlock(plan, chunk.n, { listAll: true }),
     later.length > 0 && `Coming later (don't do these now):\n${list(later)}`,
-    decisionsBlock(plan, chunk.n),
     reposBlock(plan),
     `## Chunk ${chunk.n}: ${chunk.title}\n\n${chunkBody(chunk)}`,
     `Only do this chunk. ${commitInstruction(plan, chunk, { allowDone: true })}`,

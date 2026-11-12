@@ -55,7 +55,7 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, on
           {plan.split === SPLIT_STATUS.RUNNING ? (
             <Scanner />
           ) : (
-            <Lamp state={lampState} blink={running} label={tag || (running ? 'in progress' : 'idle')} />
+            <Lamp state={lampState} blink={running} label={tag || (lampState === 'ok' ? 'complete' : running ? 'in progress' : 'idle')} />
           )}
         </span>
         <span className="min-w-0 truncate text-foreground group-hover/well:text-[var(--ins-lamp)]">{title}</span>
@@ -77,8 +77,9 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, on
         label={`${done} of ${total} chunks implemented`}
         fallback={<ProgressReadout plan={plan} done={done} total={total} paper="var(--ins-well)" />}
       />
-      <span className="flex h-8 min-w-0 items-end gap-2 leading-4 text-muted-foreground">
-        <span className="line-clamp-2 min-w-0 flex-1 self-start break-words">{note ?? now}</span>
+      {/* Centred, so a one-line note sits level with the keys instead of above them. */}
+      <span className="flex h-8 min-w-0 items-center gap-2 leading-4 text-muted-foreground">
+        <span className="line-clamp-2 min-w-0 flex-1 break-words">{note ?? now}</span>
         <span className="flex shrink-0 items-center gap-1">
           {onTerminal && (
             <RowAction

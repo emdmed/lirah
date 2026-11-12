@@ -253,6 +253,7 @@ export function PlansProvider({ children }) {
       splitError: null,
       chunks: [],
       tabId: null,
+      clearBetweenChunks: true, // each chunk starts fresh; the decisions block carries what it needs
       git: top ? defaultGitConfig(repoRoot, slug, await currentBranch(repoRoot).catch(() => '')) : noGitConfig(repoRoot),
       createdAt: Date.now(),
       updatedAt: Date.now(),

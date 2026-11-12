@@ -22,3 +22,34 @@ describe('no-git prompts', () => {
     expect(buildNudgePrompt(gitPlan, chunk)).toContain("isn't committed yet");
   });
 });
+
+describe('chunk prompt handoff', () => {
+  it('lists each implemented chunk once, with its decisions under it', () => {
+    const plan = {
+      ...gitPlan,
+      chunks: [
+        { id: 'a', n: 1, title: 'One', status: 'implemented', decisions: ['Use foo.js'] },
+        { id: 'b', n: 2, title: 'Two', status: 'implemented', decisions: [] },
+        { id: 'c', n: 3, title: 'Three', status: 'pending' },
+      ],
+    };
+    const p = buildChunkPrompt(plan, plan.chunks[2]);
+    expect(p).toContain('Already implemented, with their decisions');
+    expect(p).toContain('  1. One\n     - Use foo.js\n  2. Two');
+    expect(p.match(/1\. One/g)).toHaveLength(1);
+    expect(p).not.toContain('Decisions from earlier chunks');
+  });
+
+  it('lists a later implemented chunk without passing on its decisions', () => {
+    const plan = {
+      ...gitPlan,
+      chunks: [
+        { id: 'a', n: 1, title: 'One', status: 'pending' },
+        { id: 'b', n: 2, title: 'Two', status: 'implemented', decisions: ['Later choice'] },
+      ],
+    };
+    const p = buildChunkPrompt(plan, plan.chunks[0]);
+    expect(p).toContain('  2. Two');
+    expect(p).not.toContain('Later choice');
+  });
+});
