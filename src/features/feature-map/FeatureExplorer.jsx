@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogGroup, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogEmpty, DialogGroup, DialogTitle } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { errorMessage } from '../../lib/errorMessage';
 import { useTabManager } from '../tabs/TabContext';
@@ -53,6 +53,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
       <DialogContent
         size="full"
         className="flex flex-col gap-0"
+        lamp={fm.status === 'building' ? 'blink' : fm.error ? 'fault' : 'on'}
         status={`${all.length} features${pinnedFeatures.length ? ` · ${pinnedFeatures.length} in context` : ''}`}
         hints={[{ keys: ['↑', '↓'], label: 'move' }, { keys: ['↵'], label: feature && pinned(feature) ? 'remove from context' : 'add to context' }]}
         onOpenAutoFocus={(e) => { e.preventDefault(); filterRef.current?.focus(); }}
@@ -88,7 +89,7 @@ export function FeatureExplorer({ open, onOpenChange, projectPath, onReveal }) {
                   onCopy={() => copyFeatureFiles(f, toast)}
                 />
               ))}
-              {!shown.length && <p className="px-2.5 py-1 text-[11px] text-muted-foreground">{all.length ? 'no feature matches' : 'no feature map yet'}</p>}
+              {!shown.length && <DialogEmpty>{all.length ? 'No feature matches.' : 'No feature map yet.'}</DialogEmpty>}
             </div>
           </nav>
 

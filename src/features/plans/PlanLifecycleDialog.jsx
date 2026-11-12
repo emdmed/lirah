@@ -34,7 +34,7 @@ export function PlanLifecycleDialog({ open, onOpenChange, plans, repoRoot, onOpe
           <SegmentBank value={show} options={SHOW} onChange={setShow} label="Plans shown" className="ml-auto" />
         </div>
         {shown.length === 0 ? (
-          <DialogEmpty>every plan here is shelved</DialogEmpty>
+          <DialogEmpty className="justify-center p-8">Every plan here is shelved.</DialogEmpty>
         ) : (
           <>
             <div className="min-h-0 flex-1 overflow-y-auto">
