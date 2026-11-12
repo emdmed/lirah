@@ -268,6 +268,7 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     if (!plan) throw new Error('Plan not found');
     if (isAutopilotLive(plan.autopilot)) throw new Error('Stop auto-pilot before re-chunking');
+    if (plan.split === SPLIT_STATUS.RUNNING) throw new Error('Wait for the split to finish before re-chunking');
     const busy = plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
     if (busy) throw new Error(`Chunk ${busy.n} is in progress; finish or roll it back before re-chunking`);
     updatePlan(repoRoot, planId, (p) => ({
