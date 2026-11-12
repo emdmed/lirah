@@ -45,13 +45,15 @@ afterEach(() => {
   rmSync(project, { recursive: true, force: true });
 });
 
+// Backslash is a separator only on Windows; elsewhere it is a legal filename character.
+const win = process.platform === 'win32';
 const expected = () => [join(project, 'src', 'b', 'index.js').replace(/\\/g, '/')];
 
-it('resolves a project-relative path written with backslashes', () => {
+it.runIf(win)('resolves a project-relative path written with backslashes', () => {
   expect(runHook('fix src\\b\\index.js please')).toEqual(expected());
 });
 
-it('resolves an absolute native path', () => {
+it.runIf(win)('resolves an absolute native path', () => {
   expect(runHook(`fix ${project}\\src\\b\\index.js please`)).toEqual(expected());
 });
 
