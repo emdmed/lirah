@@ -26,8 +26,8 @@ const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog'
 /** The plans of the active tab's repo: a list, or one plan's chunks. */
 export const PlansPane = memo(function PlansPane({ projectPath }) {
   const { repoRoot } = useRepoRoot(projectPath);
-  const { plans, createPlan, replaceSource, updatePlan } = usePlans(repoRoot);
-  usePlanLifecycleSync(repoRoot, plans, updatePlan);
+  const { plans, createPlan, replaceSource, updatePlan, removeWorktrees } = usePlans(repoRoot);
+  usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees);
   const { files, importFile, deleteFile } = usePlanFiles({ repoRoot, plans, createPlan, replaceSource });
   const { activeTabId } = useTabManager();
   const toast = useToast();

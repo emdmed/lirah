@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDuration } from '../../lib/formatDuration';
-import { Check, NavArrowDown, NavArrowRight, NavArrowUp, Play, Trash } from 'iconoir-react';
+import { Check, ChevronDown, ChevronRight, ChevronUp, Play, Trash } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -266,8 +266,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
           <PanelButton onClick={startEdit} title="Edit the chunk's title and details">edit</PanelButton>
           <span className="ml-auto flex gap-0.5">
             {/* Reordering is rare: shown on hover or keyboard focus. */}
-            <PanelButton icon={NavArrowUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" className={REORDER} />
-            <PanelButton icon={NavArrowDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" className={REORDER} />
+            <PanelButton icon={ChevronUp} onClick={() => onMove(-1)} disabled={first} title="Move up" aria-label="Move up" className={REORDER} />
+            <PanelButton icon={ChevronDown} onClick={() => onMove(1)} disabled={last} title="Move down" aria-label="Move down" className={REORDER} />
             <PanelButton icon={Trash} onClick={remove} title="Delete chunk (undo in the toast)" aria-label="Delete chunk" />
           </span>
         </>
@@ -554,7 +554,7 @@ export function DoneRun({ chunks, onToggle, unfolded = false }) {
           <span className="tabular-nums">{first}–{last}</span> implemented · {chunks.length} chunks
         </span>
         <span className="flex h-[18px] items-center gap-1.5 font-[family-name:var(--font-legend)] text-[11px] text-muted-foreground">
-          <NavArrowRight aria-hidden="true" className={cn('h-3 w-3 opacity-60 group-hover:opacity-100', unfolded && 'rotate-90')} />
+          <ChevronRight aria-hidden="true" className={cn('h-3 w-3 opacity-60 group-hover:opacity-100', unfolded && 'rotate-90')} />
         </span>
       </button>
     </div>

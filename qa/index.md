@@ -26,6 +26,6 @@ One recipe per feature. `npm run qa` runs every recipe linked below, and `npm ru
 | Compact | | | |
 | File analysis | | | |
 | Token budget | | | |
-| Agent CLI selection | | | |
+| Agent CLI selection | [cli-launch](recipes/cli-launch.md) | files pane open/parent, launch bar starts the CLI with the plugin, starred-project jump stops the running CLI first (fake `claude`, no agent login) | 2026-11-11 |
 | Markdown viewer | | | |
 | Splash | | | |

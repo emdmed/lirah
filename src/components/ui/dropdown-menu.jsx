@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { Check, NavArrowRight, Circle } from "iconoir-react"
+import { Check, ChevronRight, Empty } from "@/components/icons";
 
 import { cn } from "@/lib/utils"
 import { Keycap } from "@/components/instrument/Keycap"
@@ -32,7 +32,7 @@ const DropdownMenuSubTrigger = React.forwardRef(({ className, inset, children, .
     )}
     {...props}>
     {children}
-    <NavArrowRight className="ml-auto" />
+    <ChevronRight className="ml-auto" />
   </DropdownMenuPrimitive.SubTrigger>
 ))
 DropdownMenuSubTrigger.displayName =
@@ -89,7 +89,7 @@ const DropdownMenuCheckboxItem = React.forwardRef(({ className, children, checke
     {...props}>
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Check size={16} />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -108,7 +108,7 @@ const DropdownMenuRadioItem = React.forwardRef(({ className, children, ...props 
     {...props}>
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Circle className="h-2 w-2 fill-current" />
+        <Empty size={8} className="fill-current" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}

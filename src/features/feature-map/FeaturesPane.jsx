@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Copy } from 'iconoir-react';
+import { Copy } from '@/components/icons';
 import '@/components/instrument/calibrated';
 import { useCalSvg } from '@/components/instrument/useCalSvg';
 import { useFigureCompact } from '@/components/instrument/figure';

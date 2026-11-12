@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, git } from '../../lib/git';
 import { useFigureCompact } from '@/components/instrument/figure';
 import { Fig26Isolation } from './Fig26Isolation';
-import { NavArrowDown, Check, GitBranch, Git, Pin, TaskList, Import } from 'iconoir-react';
+import { Branch, Check, ChevronDown, Commit, Files, Import, Pin } from '@/components/icons';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ import { useAgentJobs } from './AgentJobsContext';
 const MAX_COPIES = 3;
 
 const SOURCE_META = {
-  selected: { label: 'tree', hint: 'select in the tree', icon: TaskList },
+  selected: { label: 'tree', hint: 'select in the tree', icon: Files },
   pinned: { label: 'pinned', hint: 'pin a file', icon: Pin },
   group: { label: 'group', hint: 'add a group', icon: Import },
 };
@@ -354,7 +354,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                   <DropdownMenuTrigger asChild>
                     <PanelButton icon={Import}>
                       Add group
-                      <NavArrowDown aria-hidden="true" className="opacity-60" />
+                      <ChevronDown aria-hidden="true" className="opacity-60" />
                     </PanelButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
@@ -486,9 +486,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-xs text-foreground">
                 {useWorktree ? (
-                  <GitBranch className="h-3 w-3 text-[var(--ins-lamp)]" aria-hidden="true" />
+                  <Branch size={12} className="text-[var(--ins-lamp)]" aria-hidden="true" />
                 ) : (
-                  <Git className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                  <Commit size={12} className="text-muted-foreground" aria-hidden="true" />
                 )}
                 {useWorktree ? 'Isolated worktree' : 'In place'}
               </div>
@@ -575,7 +575,7 @@ function Picker({ value, items, selectedId, onSelect, disabled = false }) {
       <DropdownMenuTrigger asChild disabled={disabled}>
         <Button variant="outline" size="sm" className="h-7 w-full min-w-0 justify-between px-2 text-xs">
           <span className="truncate">{value}</span>
-          <NavArrowDown className="h-3 w-3 opacity-60" />
+          <ChevronDown size={12} className="opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
@@ -586,7 +586,7 @@ function Picker({ value, items, selectedId, onSelect, disabled = false }) {
             className="flex items-center justify-between text-[11px] py-1.5"
           >
             <span className="truncate pr-2">{item.name}</span>
-            {selectedId === item.id && <Check className="h-3 w-3 text-[var(--ins-lamp)] flex-shrink-0" />}
+            {selectedId === item.id && <Check size={12} className="text-[var(--ins-lamp)] flex-shrink-0" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

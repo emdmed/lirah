@@ -1,15 +1,13 @@
 import { useMemo, memo } from 'react';
-import {
-  KeyCommand, Sparks, Terminal, StatsReport, Settings, GitCommit,
-  GitMerge, DocMagnifyingGlass, Compress, Erase
-} from 'iconoir-react';
+import { Agent, ChevronDown, Clear, Collapse, Command, Commit, FindInFile, Merge, Settings, Stats, Terminal } from '@/components/icons';
 import { Scanner } from './instrument/Scanner';
 import { Button } from './ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuShortcut,
-  DropdownMenuLabel, DropdownMenuGroup,
+  DropdownMenuLabel, DropdownMenuGroup, DropdownMenuRadioGroup, DropdownMenuRadioItem,
 } from './ui/dropdown-menu';
+import { CLI_OPTIONS } from '../features/cli-selection/CliSelectionModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useTokenBudget } from '../features/token-budget/TokenBudgetContext';
@@ -29,7 +27,7 @@ import { Fig10Sandbox } from '../features/settings/Fig10Sandbox';
 import { useFigureCompact } from './instrument/figure';
 
 const CLI_DISPLAY = {
-  'claude-code': { name: 'claude', icon: Sparks },
+  'claude-code': { name: 'claude', icon: Agent },
   'opencode': { name: 'opencode', icon: Terminal }
 };
 
@@ -210,19 +208,19 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
       <DropdownMenuContent side="bottom" align="center" className="w-64 text-xs">
         {crowded && onCompactContext && (
           <DropdownMenuItem onClick={onCompactContext} className="cursor-pointer py-1">
-            <Compress className="mr-2 w-3 h-3" />
+            <Collapse size={12} className="mr-2" />
             Compact (summarise and continue)
           </DropdownMenuItem>
         )}
         {onOpenContextDetails && (
           <DropdownMenuItem onClick={onOpenContextDetails} className="cursor-pointer py-1">
-            <DocMagnifyingGlass className="mr-2 w-3 h-3" />
+            <FindInFile size={12} className="mr-2" />
             Details…
           </DropdownMenuItem>
         )}
         {onOpenDashboard && (
           <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
-            <StatsReport className="mr-2 w-3 h-3" />
+            <Stats size={12} className="mr-2" />
             Token Metrics
             <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
           </DropdownMenuItem>
@@ -232,7 +230,7 @@ function ContextMeter({ currentPath, onOpenDashboard, onOpenContextDetails, onCl
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem destructive onClick={onClearContext} className="cursor-pointer py-1">
-              <Erase className="mr-2 w-3 h-3" />
+              <Clear size={12} className="mr-2" />
               Clear context
               <DropdownMenuShortcut keys={shortcutForCommand('clear')} />
             </DropdownMenuItem>
@@ -255,7 +253,7 @@ const AUTO_COMMIT_CHIP = {
 
 export const StatusBar = memo(({
   viewMode, currentPath, sessionId, onToggleHelp,
-  selectedCli, onOpenCliSettings, showTitleBar,
+  selectedCli, onCliChange, cliAvailability = {}, showTitleBar,
   sandboxEnabled, sandboxFailed, networkIsolation,
   onToggleNetworkIsolation, onToggleSandbox, secondaryTerminalFocused,
   onOpenDashboard, onOpenContextDetails, changelogStatus, onOpenSettings, onAutoCommit, onAutoMerge,
@@ -360,7 +358,7 @@ export const StatusBar = memo(({
       />
 
       {/* RIGHT: Runtime status + Settings */}
-      <div className="flex items-center justify-end gap-3 min-w-0" {...drag}>
+      <div className="flex items-center justify-end gap-4 min-w-0" {...drag}>
         {/* Transient status (changelog) — only visible when active */}
         {changelogStatus && (
           <ChangelogStatus status={changelogStatus} />
@@ -381,19 +379,36 @@ export const StatusBar = memo(({
 
         {/* Runtime zone: CLI, sandbox, network. Jobs live
             in their own rail, so they are not repeated here. */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {selectedCli && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="panel" onClick={onOpenCliSettings} className="lowercase">
-                  <Lamp state={sessionId ? 'on' : 'off'} />
-                  {cliName}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent title="Agent" hint="Ctrl+K">{cliName} · click to change the CLI</TooltipContent>
-            </Tooltip>
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="panel" className="lowercase gap-2">
+                      {cliName}
+                      <ChevronDown size={12} className="text-faint" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent title="Agent" hint="Ctrl+K">{cliName} · click to change the CLI</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-48 text-xs">
+                <DropdownMenuRadioGroup value={selectedCli} onValueChange={onCliChange}>
+                  {CLI_OPTIONS.map((o) => {
+                    const installed = cliAvailability[o.id] ?? true;
+                    return (
+                      <DropdownMenuRadioItem key={o.id} value={o.id} disabled={!installed} className="cursor-pointer py-1">
+                        {o.name}
+                        {!installed && <span className="ml-auto text-faint">not installed</span>}
+                      </DropdownMenuRadioItem>
+                    );
+                  })}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          {selectedCli && <span className="ins-sep-star" aria-hidden="true" />}
+          {selectedCli && <span className="h-3.5 w-px shrink-0 bg-[var(--ins-edge)]" aria-hidden="true" />}
           {onToggleCompaction && (
             <CompactionSwitch enabled={compactionEnabled} onToggle={onToggleCompaction} />
           )}
@@ -410,7 +425,7 @@ export const StatusBar = memo(({
         </div>
 
         {/* Settings, the final anchor */}
-        <span className="ins-sep-star" aria-hidden="true" />
+        <span className="h-3.5 w-px shrink-0 bg-[var(--ins-edge)]" aria-hidden="true" />
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -425,29 +440,29 @@ export const StatusBar = memo(({
           {/* Preferences live in the Settings dialog; this menu keeps actions. */}
           <DropdownMenuContent align="end" className="w-56 text-xs">
             <DropdownMenuItem onClick={onOpenSettings} className="cursor-pointer py-1">
-              <Settings className="mr-2 w-3 h-3" />
+              <Settings size={12} className="mr-2" />
               Settings…
             </DropdownMenuItem>
             <DropdownMenuSeparator star />
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={onOpenDashboard} className="cursor-pointer py-1">
-                <StatsReport className="mr-2 w-3 h-3" />
+                <Stats size={12} className="mr-2" />
                 Token Metrics
                 <DropdownMenuShortcut keys={shortcutForCommand('tokens')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoCommit} className="cursor-pointer py-1">
-                <GitCommit className="mr-2 w-3 h-3" />
+                <Commit size={12} className="mr-2" />
                 Auto Commit…
                 <DropdownMenuShortcut keys={shortcutForCommand('commit')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAutoMerge} className="cursor-pointer py-1">
-                <GitMerge className="mr-2 w-3 h-3" />
+                <Merge size={12} className="mr-2" />
                 Auto Merge…
                 <DropdownMenuShortcut keys={shortcutForCommand('merge')} />
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleHelp} className="cursor-pointer py-1">
-                <KeyCommand className="mr-2 w-3 h-3" />
+                <Command size={12} className="mr-2" />
                 Keyboard Shortcuts
                 <DropdownMenuShortcut keys={shortcutForCommand('help')} />
               </DropdownMenuItem>
@@ -456,7 +471,7 @@ export const StatusBar = memo(({
         </DropdownMenu>
         {!IS_MAC && showTitleBar && (
           <>
-            <span className="ins-sep-star mx-1" aria-hidden="true" />
+            <span className="mx-1 h-3.5 w-px shrink-0 bg-[var(--ins-edge)]" aria-hidden="true" />
             <WindowControls />
           </>
         )}

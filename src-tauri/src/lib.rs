@@ -181,6 +181,8 @@ pub fn run(initial_path: Option<String>) {
             fs_watcher::start_fs_watcher,
             fs_watcher::stop_fs_watcher,
             fs_watcher::start_lirah_watcher,
+            fs_watcher::omarchy_colors,
+            fs_watcher::start_omarchy_watcher,
             // Code
             typecheck::check_file_types,
             typecheck::check_project_types,

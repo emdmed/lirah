@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Square, GitCompare, Check, Trash, JournalPage, GitMerge, Undo, NavArrowRight, NavArrowDown, WarningTriangle, Copy, Archive, Upload, Trophy, Expand, Collapse, FastArrowRight } from 'iconoir-react';
+import { Agent, Archive, Check, ChevronDown, ChevronRight, Collapse, Compare, Copy, Expand, Jobs, Log, Merge, Plan, Stop, Tasks, Trash, Trophy, Undo, Upload, Warning } from '@/components/icons';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -645,7 +645,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
               aria-pressed={wide}
             />
             <PanelButton
-              icon={FastArrowRight}
+              icon={ChevronRight}
               onClick={() => setCollapsedOverride(true)}
               title="Collapse pane"
               aria-label="Collapse pane"
@@ -658,12 +658,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
       <div role="tablist" aria-label="Workspace sections" className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
-        <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
-        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
-        <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" />
-        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
+        <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" icon={Tasks} count={openTasks} />
+        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" icon={Plan} count={openPlans} />
+        <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" icon={Log} />
+        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" icon={Jobs} count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         {(totalActiveCount > 0 || tab === 'agents') && (
-          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
+          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" icon={Agent} count={totalActiveCount} />
         )}
       </div>
 
@@ -672,7 +672,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <div className="flex items-center gap-2">
             <PanelButton
               variant="default"
-              icon={GitMerge}
+              icon={Merge}
               onClick={handleReconcile}
               busy={reconciling}
               className="flex-1"
@@ -743,8 +743,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   onClick={() => setShowArchived((v) => !v)}
                   className="flex w-full items-center gap-1 px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
                 >
-                  {showArchived ? <NavArrowDown className="h-3 w-3" /> : <NavArrowRight className="h-3 w-3" />}
-                  <Archive className="h-3 w-3" />
+                  {showArchived ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  <Archive size={12} />
                   Archived
                   <span className="tabular-nums">{archivedJobs.length}</span>
                 </button>
@@ -833,7 +833,7 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
       </div>
       {running === 0 && comparable > 1 && (
         <div className="flex justify-end px-2 pt-2 text-[11px]">
-          <PanelButton icon={GitCompare} onClick={onCompare} title="Diff two candidates against each other">
+          <PanelButton icon={Compare} onClick={onCompare} title="Diff two candidates against each other">
             compare
           </PanelButton>
         </div>
@@ -962,7 +962,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
         </span>
         {job.kind === 'reconcile' && (
           <span className="inline-flex items-center gap-0.5 text-[var(--ins-lamp)]">
-            <GitMerge className="h-2.5 w-2.5" />
+            <Merge size={10} />
             merge
           </span>
         )}
@@ -976,7 +976,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             style={{ color: 'var(--color-status-warning)' }}
             title="No output or CPU work. The agent may be waiting on an approval it can't get in a headless run. It is stopped after 15 min idle."
           >
-            <WarningTriangle className="h-2.5 w-2.5" />
+            <Warning size={10} />
             idle {Math.floor(job.idleSecs / 60)}m
           </span>
         )}
@@ -992,13 +992,13 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             style={{ color: 'var(--color-destructive)' }}
             title={tc.failed.map((f) => `${basename(f.path)}: ${f.errorCount}`).join('\n')}
           >
-            <WarningTriangle className="h-2.5 w-2.5" />
+            <Warning size={10} />
             {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}
           </span>
         )}
         {tcClean && (
           <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-status-success)' }}>
-            <Check className="h-2.5 w-2.5" />
+            <Check size={10} />
             types ok
           </span>
         )}
@@ -1019,7 +1019,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
       {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
         <div className="mb-2 mx-2.5 border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
           <div className="flex items-center gap-1 text-[var(--color-status-warning)]">
-            <WarningTriangle className="h-2.5 w-2.5 shrink-0" />
+            <Warning size={10} className="shrink-0" />
             {job.overlaps?.length > 0
               ? `${job.overlaps.length} file${job.overlaps.length === 1 ? '' : 's'} edited by multiple jobs`
               : 'Merge conflicts on apply'}
@@ -1076,11 +1076,11 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
           {/* Actions: emphasized primary on the left, ghost icons on the right */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5 px-2.5 pb-2">
             {isRunning && (
-              <PrimaryAction icon={Square} label="Cancel" onClick={() => actions.cancel(job.id)} variant="danger" title="Stop this running job" />
+              <PrimaryAction icon={Stop} label="Cancel" onClick={() => actions.cancel(job.id)} variant="danger" title="Stop this running job" />
             )}
             {isDone && changedCount > 0 && (
               <PrimaryAction
-                icon={GitCompare}
+                icon={Compare}
                 label={`Review ${changedCount}`}
                 onClick={() => actions.review(job.id)}
                 variant="outline"
@@ -1089,7 +1089,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             )}
             {canApprove && (
               <PrimaryAction
-                icon={tcErrors ? WarningTriangle : isRace ? Trophy : Check}
+                icon={tcErrors ? Warning : isRace ? Trophy : Check}
                 label={
                   tcChecking
                     ? 'Checking…'
@@ -1115,7 +1115,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             )}
             {selectable && !showCheckbox && (
               <PrimaryAction
-                icon={GitMerge}
+                icon={Merge}
                 label="Select"
                 onClick={() => actions.toggleSelect(job.id)}
                 variant="outline"
@@ -1125,7 +1125,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
 
             <div className="ml-auto flex items-center gap-0.5">
               {isDone && <IconAction icon={Undo} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
-              {job.reportPath && <IconAction icon={JournalPage} title="View run report" onClick={() => actions.report(job.id)} />}
+              {job.reportPath && <IconAction icon={Plan} title="View run report" onClick={() => actions.report(job.id)} />}
               {isDone && (job.logPath || job.output.length > 0) && (
                 <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={() => actions.copyOutput(job.id)} />
               )}

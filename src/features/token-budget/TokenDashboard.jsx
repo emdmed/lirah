@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, Table, CodeBrackets, JournalPage, StatsReport } from 'iconoir-react';
+import { Code, Download, Plan, Stats, Table } from '@/components/icons';
 import { Scanner } from '@/components/instrument/Scanner';
 import { SegmentBank } from '@/components/instrument/SegmentBank';
 import { EmptyState } from '@/components/EmptyState';
@@ -234,22 +234,22 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm">
-                    <Download width={12} height={12} />
+                    <Download size={12} />
                     Export
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleExportCSV} className="gap-2 text-xs font-mono">
-                    <Table width={12} height={12} />
+                    <Table size={12} />
                     Export as CSV
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleExportJSON} className="gap-2 text-xs font-mono">
-                    <CodeBrackets width={12} height={12} />
+                    <Code size={12} />
                     Export as JSON
                   </DropdownMenuItem>
                   {allProjectsData && (
                     <DropdownMenuItem onClick={() => setExportDialogOpen(true)} className="gap-2 text-xs font-mono">
-                      <JournalPage width={12} height={12} />
+                      <Plan size={12} />
                       Advanced Export...
                     </DropdownMenuItem>
                   )}
@@ -354,7 +354,7 @@ export function TokenDashboard({ open, onOpenChange, tokenUsage, projectStats, r
                           ))}
                           {modelBreakdown.length === 0 && (
                             <EmptyState
-                              icon={StatsReport}
+                              icon={Stats}
                               title="No model data yet"
                               description="Start using Claude Code to see token usage analytics by model"
                               className="py-4"

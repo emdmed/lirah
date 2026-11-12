@@ -8,7 +8,7 @@ import { Scanner } from '../components/instrument/Scanner';
 import { ToggleSwitch } from '../components/instrument/ToggleSwitch';
 import { PanelButton } from '../components/instrument/PanelButton';
 import { Button } from '../components/ui/button';
-import { Send, JournalPage, Refresh } from 'iconoir-react';
+import { Plan, Refresh, Send } from '@/components/icons';
 import { PaneLegend } from '../components/instrument/PaneLegend';
 import { DiffBar } from '../components/instrument/DiffBar';
 import { LirahMark, LirahLockup } from '../components/LirahMark';
@@ -123,7 +123,7 @@ export function InstrumentKit() {
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-[var(--ins-edge)] py-2">
             <span className="ins-legend w-12">panel</span>
-            <PanelButton icon={JournalPage} latched={latch} onClick={() => setLatch((v) => !v)}>md</PanelButton>
+            <PanelButton icon={Plan} latched={latch} onClick={() => setLatch((v) => !v)}>md</PanelButton>
             <PanelButton icon={Refresh} aria-label="Sync" />
             <PanelButton variant="default" icon={Send}>send</PanelButton>
             <PanelButton busy>sync</PanelButton>

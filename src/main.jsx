@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { IconoirProvider } from "iconoir-react";
 import App from "./App";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { WatcherProvider } from "./features/watcher";
@@ -23,6 +22,7 @@ import { perfMark } from "./lib/perf";
 import { initSettings } from "./features/settings/settingsStore";
 import { initWorkspaces } from "./lib/workspaceStore";
 import { runMigrations } from "./lib/migrations";
+import { initOmarchyTheme } from "./themes/omarchy";
 
 // Imports are hoisted, so this marks the point where every module has been
 // evaluated — the JS parse/eval cost sits before it.
@@ -34,13 +34,12 @@ const showKit = import.meta.env.DEV && new URLSearchParams(window.location.searc
 const showFigs = import.meta.env.DEV && new URLSearchParams(window.location.search).has("figs");
 
 // Settings and workspaces come from ~/.lirah; every reader expects them loaded.
-await Promise.all([initSettings(), initWorkspaces()]);
+await Promise.all([initSettings(), initWorkspaces(), initOmarchyTheme()]);
 // Old per-repo task and plan files move into workspaces once, before the stores read them.
 await runMigrations();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <IconoirProvider iconProps={{ width: 24, height: 24, "aria-hidden": true }}>
     <ToastProvider>
       <ThemeProvider>
         <DialogProvider>
@@ -69,7 +68,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <TitleTooltips />
       </ThemeProvider>
     </ToastProvider>
-    </IconoirProvider>
   </React.StrictMode>,
 );
 

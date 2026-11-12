@@ -1,11 +1,11 @@
 import { formatTokenCount, formatCost } from '../tokenCalculations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DashboardSpeed, Gps, DataTransferBoth, Dollar } from 'iconoir-react';
+import { Price, Reveal, Stats, Transfer } from '@/components/icons';
 
 function StatRow({ icon: Icon, label, value, color }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
-      <Icon width={12} height={12} style={{ color }} />
+      <Icon size={12} style={{ color }} />
       <div className="flex-1 flex justify-between items-center text-xs font-mono">
         <span className="text-muted-foreground">{label}</span>
         <span>{value}</span>
@@ -50,10 +50,10 @@ export function SessionEfficiencyPanel({ metrics, colors = {} }) {
       </CardHeader>
       <CardContent className="pt-0 px-3 pb-3 flex-1 flex flex-col">
         <div className="space-y-0.5">
-          <StatRow icon={DashboardSpeed} label="Tok/Msg" value={formatTokenCount(averageTokensPerMessage)} color={c.input} />
-          <StatRow icon={Gps} label="Cache Hit" value={`${cacheHitRatePercent}%`} color={c.output} />
-          <StatRow icon={DataTransferBoth} label="Out/In Ratio" value={outputRatioDisplay} color={c.cacheRead} />
-          <StatRow icon={Dollar} label="$/Msg" value={formatCost(costPerMessage)} color={c.input} />
+          <StatRow icon={Stats} label="Tok/Msg" value={formatTokenCount(averageTokensPerMessage)} color={c.input} />
+          <StatRow icon={Reveal} label="Cache Hit" value={`${cacheHitRatePercent}%`} color={c.output} />
+          <StatRow icon={Transfer} label="Out/In Ratio" value={outputRatioDisplay} color={c.cacheRead} />
+          <StatRow icon={Price} label="$/Msg" value={formatCost(costPerMessage)} color={c.input} />
         </div>
 
         <div className="mt-auto pt-2 border-t edge-engraved">

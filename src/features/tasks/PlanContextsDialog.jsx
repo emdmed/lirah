@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash } from 'iconoir-react';
+import { Add, Trash } from '@/components/icons';
 import {
   Dialog,
   DialogContent,
@@ -52,7 +52,7 @@ export function PlanContextsDialog({ open, onOpenChange }) {
           ))}
         </div>
 
-        <PanelButton icon={Plus} onClick={handleAdd} className="mb-4 self-start text-xs">
+        <PanelButton icon={Add} onClick={handleAdd} className="mb-4 self-start text-xs">
           add context
         </PanelButton>
       </DialogContent>

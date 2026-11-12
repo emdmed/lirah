@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
-import { Filter, Xmark } from 'iconoir-react';
+import { Close, Filter } from '@/components/icons';
 
 export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
   const [expanded, setExpanded] = useState(false);
@@ -41,7 +41,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
           className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground"
           onClick={() => setExpanded(!expanded)}
         >
-          <Filter width={12} height={12} />
+          <Filter size={12} />
           Filters
           {hasActiveFilters && (
             <span className="text-[var(--ins-lamp)] shadow-[inset_0_0_0_1px_var(--ins-lamp)] rounded-xs px-1" style={{ fontSize: 'var(--font-xs)' }}>Active</span>
@@ -49,7 +49,7 @@ export function FilterPanel({ filters, onChange, projects = [], models = [] }) {
         </button>
         {hasActiveFilters && (
           <Button variant="ghost" size="panel" onClick={resetFilters}>
-            <Xmark width={10} height={10} />
+            <Close size={10} />
             Reset
           </Button>
         )}

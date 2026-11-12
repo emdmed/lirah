@@ -4,6 +4,19 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-11
+
+### Added
+
+- **Omarchy theme** - Follows the active Omarchy desktop palette and updates live when you switch desktop themes.
+
+### Changed
+
+- **Icons** - A new in-house icon set replaces the old one.
+- **CLI picker** - The CLI name in the status bar opens a dropdown to switch between Claude Code and opencode. The lamp before it is gone.
+- **Task rows** - A "Scope:" prefix in a task title is dimmed so related tasks group by eye, and a task's plan is labelled.
+- **No more blinking** - Dialogs, tooltips, menus and popups appear and close at once, without fades or a flash across their top edge.
+
 ## [0.25.2] - 2026-11-11
 
 ### Changed

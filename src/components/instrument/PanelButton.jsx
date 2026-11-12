@@ -22,7 +22,7 @@ export function PanelButton({ icon: Icon, children, latched, busy = false, disab
       {...props}
     >
       {isLatch && <Lamp state={latched ? 'on' : 'off'} />}
-      {busy ? <Scanner size="sm" /> : Icon && <Icon aria-hidden="true" />}
+      {busy ? <Scanner size="sm" /> : Icon && <Icon size={12} aria-hidden="true" />}
       {children}
     </button>
   );

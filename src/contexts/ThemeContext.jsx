@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getRecordingMode } from '../lib/recordingMode';
 import { themes, defaultTheme, loadTheme, saveTheme } from '../themes/theme-config';
 import { subscribeSettings } from '../features/settings/settingsStore';
+import { onOmarchyChange } from '../themes/omarchy';
 
 const ThemeContext = createContext(undefined);
 
@@ -30,6 +31,10 @@ export function ThemeProvider({ children }) {
   useEffect(() => subscribeSettings(() => {
     if (!forced.current) setCurrentTheme(loadTheme());
   }), []);
+
+  // The omarchy theme's palette changes in place when the desktop theme does.
+  const [palette, setPalette] = useState(0);
+  useEffect(() => onOmarchyChange(() => setPalette((n) => n + 1)), []);
 
   // Apply theme to CSS variables whenever theme changes
   useEffect(() => {
@@ -87,7 +92,7 @@ export function ThemeProvider({ children }) {
       clearTimeout(fadeTimer);
       root.classList.remove('theme-transition');
     };
-  }, [currentTheme]);
+  }, [currentTheme, palette]);
 
   const changeTheme = (themeName) => {
     if (themes[themeName]) {

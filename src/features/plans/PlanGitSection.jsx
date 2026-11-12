@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { basename } from '../../utils/pathUtils';
 import { cn } from '../../lib/utils';
-import { FolderMinus, Xmark } from 'iconoir-react';
+import { Close, RemoveFolder } from '@/components/icons';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
@@ -123,7 +123,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
                   }))} />
                 )}
                 {i > 0 && (
-                  <PanelButton icon={Xmark} onClick={() => onRemoveRepo(repo.root)} title="Remove from the plan" aria-label={`Remove ${basename(repo.root)}`} />
+                  <PanelButton icon={Close} onClick={() => onRemoveRepo(repo.root)} title="Remove from the plan" aria-label={`Remove ${basename(repo.root)}`} />
                 )}
               </>
             )}
@@ -198,7 +198,7 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
       )}
 
       {locked && !removed && cfg.worktrees && (
-        <PanelButton icon={FolderMinus} onClick={onRemoveWorktrees} disabled={busy} className="self-start" title="Remove the worktrees (the branches stay)">
+        <PanelButton icon={RemoveFolder} onClick={onRemoveWorktrees} disabled={busy} className="self-start" title="Remove the worktrees (the branches stay)">
           remove worktrees
         </PanelButton>
       )}

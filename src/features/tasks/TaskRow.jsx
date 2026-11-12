@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useRef, useState } from 'react';
-import { Check, DataTransferBoth, NavArrowDown, Trash, Undo } from 'iconoir-react';
+import { Check, ChevronDown, Transfer, Trash, Undo } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
@@ -66,7 +66,7 @@ export const TaskRow = memo(function TaskRow({
       onDrop={drag?.onDrop}
       onDragEnd={drag?.endDrag}
       className={cn(
-        'group relative flex flex-col gap-1.5 px-3 py-2 text-[11px] edge-b-engraved',
+        'group relative flex flex-col gap-1 px-3 pt-2.5 pb-3 text-[11px] edge-b-engraved',
         !open && 'hover:bg-foreground/5',
         drag?.dragIndex === index && 'opacity-50',
       )}
@@ -89,18 +89,18 @@ export const TaskRow = memo(function TaskRow({
           onClick={() => onToggleOpen(task.id)}
           aria-expanded={open}
           className={cn(
-            'min-w-0 flex-1 text-left text-[13px] leading-[18px] cursor-pointer outline-none',
-            done ? 'text-muted-foreground line-through' : 'text-foreground',
+            'min-w-0 flex-1 text-left text-[12px] leading-[18px] cursor-pointer outline-none',
+            done ? 'text-muted-foreground line-through' : 'font-medium text-foreground',
             !open && 'line-clamp-2',
           )}
         >
-          {task.title}
+          <TaskTitle title={task.title} />
         </button>
         {formatting && <span className="flex h-[18px] shrink-0 items-center"><Scanner size="sm" label="Formatting as a user story" /></span>}
         {/* Closed rows float the actions over the title's end so hidden buttons don't steal its width. */}
         <span className={cn(
           'flex shrink-0 items-center gap-0.5',
-          !open && 'absolute right-3 top-2 h-[18px] [--strip:color-mix(in_srgb,var(--color-foreground)_5%,var(--pane-bg,var(--ins-panel)))] bg-[var(--strip)] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-gradient-to-r before:from-transparent before:to-[var(--strip)] before:content-[""]',
+          !open && 'absolute right-3 top-2.5 h-[18px] [--strip:color-mix(in_srgb,var(--color-foreground)_5%,var(--pane-bg,var(--ins-panel)))] bg-[var(--strip)] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-gradient-to-r before:from-transparent before:to-[var(--strip)] before:content-[""]',
         )}>
           {!done && (
             <span className="flex items-center">
@@ -114,7 +114,7 @@ export const TaskRow = memo(function TaskRow({
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <PanelButton icon={NavArrowDown} title="Plan with another context" aria-label="Plan with another context" />
+                  <PanelButton icon={ChevronDown} title="Plan with another context" aria-label="Plan with another context" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[240px]">
                   <DropdownMenuLabel className="text-xs">Then</DropdownMenuLabel>
@@ -150,7 +150,7 @@ export const TaskRow = memo(function TaskRow({
             aria-label={done ? 'Back to the backlog' : 'Mark done'}
           />
           {moveLabel && (
-            <PanelButton icon={DataTransferBoth} onClick={() => onMove(task)} title={moveLabel} aria-label={moveLabel} />
+            <PanelButton icon={Transfer} onClick={() => onMove(task)} title={moveLabel} aria-label={moveLabel} />
           )}
           <PanelButton icon={Trash} onClick={() => onRemove(task)} title="Delete task" aria-label="Delete task" />
         </span>
@@ -158,7 +158,8 @@ export const TaskRow = memo(function TaskRow({
 
       {(task.status === TASK_STATUS.PLANNING || task.status === TASK_STATUS.PLANNED) && task.planPath && (
         <div className="flex min-w-0 items-center gap-2 pl-5 font-[family-name:var(--font-legend)] text-[11px] leading-4 text-muted-foreground">
-          <span className="truncate" title={task.planPath}>
+          <span className="engraved-label shrink-0">plan</span>
+          <span className="min-w-0 truncate text-foreground/80" title={task.planPath}>
             {task.status === TASK_STATUS.PLANNING ? 'waiting for ' : ''}{basename(task.planPath)}
             {task.status === TASK_STATUS.PLANNING && task.autoChunk ? ', then chunks' : ''}
           </span>
@@ -183,10 +184,18 @@ export const TaskRow = memo(function TaskRow({
   );
 });
 
+// "Plans: improve the sidebar" -> a dim "Plans:" scope, so related tasks group by eye.
+const SCOPE = /^([^:\s][^:]{0,23}):\s+(.+)$/s;
+function TaskTitle({ title }) {
+  const m = SCOPE.exec(title);
+  if (!m) return title;
+  return <><span className="font-normal text-muted-foreground">{m[1]}:</span> {m[2]}</>;
+}
+
 // Memoized: rows still re-render while dragging, and markdown parsing is the costly part.
 const TaskNotes = memo(function TaskNotes({ notes, className }) {
   return (
-    <div className={cn('markdown-body markdown-compact pl-5 text-muted-foreground', className)}>
+    <div className={cn('markdown-body markdown-compact mt-0.5 pl-5 text-muted-foreground/85', className)}>
       <Suspense fallback={<p className="whitespace-pre-wrap">{notes}</p>}>
         <Markdown>{notes}</Markdown>
       </Suspense>

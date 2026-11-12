@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TextSize, Asterisk } from 'iconoir-react';
+import { Required, TextSize } from '@/components/icons';
 import { FloatPane } from './ui/float-pane';
 import { Position } from './instrument/Position';
 import { shortcutKeys } from '../lib/shortcuts';
@@ -122,10 +122,10 @@ export function TerminalSearchBar({ searchAddon, decorations, onClose }) {
           className="ins-well h-6 min-w-0 flex-1 px-1.5 font-mono text-xs outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1"
         />
         <ToggleButton active={caseSensitive} onClick={() => setCaseSensitive((v) => !v)} title="Match case">
-          <TextSize className="h-3 w-3" />
+          <TextSize size={12} />
         </ToggleButton>
         <ToggleButton active={regex} onClick={() => setRegex((v) => !v)} title="Regular expression">
-          <Asterisk className="h-3 w-3" />
+          <Required size={12} />
         </ToggleButton>
         <button
           type="button"

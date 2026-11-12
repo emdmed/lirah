@@ -1,5 +1,5 @@
 import { formatDuration } from '../../lib/formatDuration';
-import { Eye, Play, Terminal } from 'iconoir-react';
+import { Play, Terminal, View } from '@/components/icons';
 import { Lamp } from '../../components/instrument/Lamp';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { autopilotLamp, Prose } from './parts';
@@ -53,7 +53,7 @@ export function AutopilotStrip({ plan, tabOpen, busy, options, onResume, onStop,
           <span className="ml-auto flex items-center gap-1.5">
             {ap.status === AUTOPILOT_STATUS.DONE && onReviewAll && (
               // A finished plan's one main action.
-              <PanelButton variant="default" icon={Eye} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
+              <PanelButton variant="default" icon={View} onClick={onReviewAll} disabled={busy} title="Review everything the plan committed, as one diff; notes go back to the agent">
                 review all
               </PanelButton>
             )}

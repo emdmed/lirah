@@ -2,7 +2,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority";
-import { SidebarCollapse } from "iconoir-react"
+import { HideSidebar } from "@/components/icons";
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -244,7 +244,7 @@ const SidebarTrigger = React.forwardRef(({ className, onClick, ...props }, ref) 
         toggleSidebar()
       }}
       {...props}>
-      <SidebarCollapse />
+      <HideSidebar />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

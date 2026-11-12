@@ -2,12 +2,12 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatTokenCount, formatCost } from '../tokenCalculations';
 import { calculateCost, DEFAULT_MODEL } from '../../../config/pricing';
-import { Clock, ChatBubble, Flash, Database, Coins, MultiplePages } from 'iconoir-react';
+import { Chat, Cost, Database, Files, Quick, Time } from '@/components/icons';
 
 function StatRow({ icon: Icon, label, value, color }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
-      <Icon width={12} height={12} style={{ color }} />
+      <Icon size={12} style={{ color }} />
       <div className="flex-1 flex justify-between items-center text-xs font-mono">
         <span className="text-muted-foreground">{label}</span>
         <span>{value}</span>
@@ -39,12 +39,12 @@ export function UsageSummaryPanel({ sessionData, tokenUsage, colors = {} }) {
       </CardHeader>
       <CardContent className="pt-0 px-3 pb-3 flex-1 flex flex-col">
         <div className="space-y-0.5">
-          <StatRow icon={Clock} label="Started" value={startTime} color={c.input} />
-          <StatRow icon={ChatBubble} label="Messages" value={totalMessages.toString()} color={c.output} />
+          <StatRow icon={Time} label="Started" value={startTime} color={c.input} />
+          <StatRow icon={Chat} label="Messages" value={totalMessages.toString()} color={c.output} />
           <StatRow icon={Database} label="Input" value={formatTokenCount(inputTokens)} color={c.cacheRead} />
-          <StatRow icon={Flash} label="Output" value={formatTokenCount(outputTokens)} color={c.input} />
-          <StatRow icon={MultiplePages} label="Cache" value={formatTokenCount(cacheReads)} color={c.output} />
-          <StatRow icon={Coins} label="Cost" value={formatCost(totalCost)} color={c.cacheRead} />
+          <StatRow icon={Quick} label="Output" value={formatTokenCount(outputTokens)} color={c.input} />
+          <StatRow icon={Files} label="Cache" value={formatTokenCount(cacheReads)} color={c.output} />
+          <StatRow icon={Cost} label="Cost" value={formatCost(totalCost)} color={c.cacheRead} />
         </div>
 
         <div className="mt-auto pt-2 border-t edge-engraved">

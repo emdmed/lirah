@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { INK, Node, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
-import { Plus } from 'iconoir-react';
+import { Add } from '@/components/icons';
 import { Keycap } from '@/components/instrument/Keycap';
 import { EmptyPlate } from '@/components/EmptyState';
 import { cn } from '../../lib/utils';
@@ -23,7 +23,7 @@ export function NewRow({ label, keys, onClick }) {
       onClick={onClick}
       className="flex items-center gap-1.5 px-2.5 py-2 text-[11px] text-muted-foreground hover:text-sidebar-foreground cursor-pointer transition-colors"
     >
-      <Plus className="h-3 w-3" />
+      <Add size={12} />
       new {label}
       <Keycap size="sm" className="ml-auto">{keys}</Keycap>
     </button>

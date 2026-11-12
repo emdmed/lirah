@@ -7,6 +7,7 @@ import { useToast } from "../toast/ToastContext";
 import { Layout } from "../../components/Layout";
 import { StatusBar } from "../../components/StatusBar";
 import { TabBarStatusSlot } from "./TabBar";
+import { TabShownContext } from "./tabShown";
 import { ZEN_LINE_MARK_SLOT_ID, ZEN_LINE_TOKENS_SLOT_ID } from "../zen/ZenLine";
 import { formatTokenCount } from "../token-budget/tokenCalculations";
 import { format } from "date-fns";
@@ -242,6 +243,8 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
   // deferred render, so keys reach the tab on screen and not the hidden one.
   // Not before that frame: focusing the terminal of a tab that was just made
   // visible costs ~60 ms in WebKitGTK and would hold the frame back.
+  const shown = useMemo(() => ({ visible, active: isActive }), [visible, isActive]);
+
   const paneRef = useRef(null);
   useLayoutEffect(() => {
     const pane = paneRef.current;
@@ -276,7 +279,7 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
       // A click in another column focuses it.
       onPointerDownCapture={visible && !isActive ? () => switchTab(tabId) : undefined}
     >
-      {content}
+      <TabShownContext.Provider value={shown}>{content}</TabShownContext.Provider>
       {!ready && <TabBootPlaceholder projectPath={projectPath} stage={bootStage} />}
     </div>
   );
@@ -1194,13 +1197,13 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
         }
         statusBar={
           <>
-          <TabBarStatusSlot active={isActive} slotId={ZEN_LINE_MARK_SLOT_ID}>
+          <TabBarStatusSlot slotId={ZEN_LINE_MARK_SLOT_ID}>
             <LirahMark size={16} lit={!!terminalSessionId} />
           </TabBarStatusSlot>
-          <TabBarStatusSlot active={isActive} slotId={ZEN_LINE_TOKENS_SLOT_ID}>
+          <TabBarStatusSlot slotId={ZEN_LINE_TOKENS_SLOT_ID}>
             <span title="Billable tokens today in this project">today {formatTokenCount(todayTokens(projectStats))}</span>
           </TabBarStatusSlot>
-          <TabBarStatusSlot active={isActive}>
+          <TabBarStatusSlot>
           <StatusBar
             viewMode={viewMode}
             currentPath={currentPath}
@@ -1208,7 +1211,8 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
             branchName={branchName}
             onToggleHelp={toggleHelp}
             selectedCli={settings.selectedCli}
-            onOpenCliSettings={openCliSettings}
+            onCliChange={settings.setSelectedCli}
+            cliAvailability={cliAvailability}
             showTitleBar={settings.showTitleBar}
             sandboxEnabled={settings.sandboxEnabled}
             sandboxFailed={settings.sandboxFailed}

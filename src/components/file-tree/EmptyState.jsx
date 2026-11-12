@@ -1,5 +1,5 @@
 import React from "react";
-import { Folder, GitBranch, JournalPage } from "iconoir-react";
+import { Branch, Folder, Plan } from "@/components/icons";
 import { EmptyState as EmptyStateBase } from "../EmptyState";
 
 /**
@@ -26,7 +26,7 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly, 
   if (showGitChangesOnly) {
     return (
       <EmptyStateBase
-        icon={GitBranch}
+        icon={Branch}
         title="No uncommitted changes"
         description="All files are clean in this directory"
         action={onToggleGitFilter ? { onClick: onToggleGitFilter, label: 'Show all files' } : undefined}
@@ -37,7 +37,7 @@ export function EmptyState({ searchQuery, showGitChangesOnly, showMarkdownOnly, 
   if (showMarkdownOnly) {
     return (
       <EmptyStateBase
-        icon={JournalPage}
+        icon={Plan}
         title="No markdown files"
         description="This directory has no .md files"
         action={onToggleMarkdownFilter ? { onClick: onToggleMarkdownFilter, label: 'Show all files' } : undefined}
