@@ -122,7 +122,8 @@ export function useAutoMerge() {
     });
   }, []);
 
-  const trigger = useCallback(async (currentPath) => {
+  // `preferredBase` (a plan's own base) wins over the remembered one when it exists.
+  const trigger = useCallback(async (currentPath, preferredBase) => {
     if (!currentPath) return;
     reset();
     setStage('checking');
@@ -148,7 +149,7 @@ export function useAutoMerge() {
         ...all.filter(b => !PREFERRED_BASES.includes(b)),
       ];
       const last = readLastBase(repoRoot);
-      const initial = last && ordered.includes(last) ? last : ordered[0];
+      const initial = [preferredBase, last].find((b) => b && ordered.includes(b)) ?? ordered[0];
 
       ctxRef.current = { repoPath, repoRoot, worktrees: await worktreesByBranch(repoPath) };
       setBases(ordered);

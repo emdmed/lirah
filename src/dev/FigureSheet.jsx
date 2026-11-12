@@ -16,6 +16,7 @@ import { Fig16Chunks } from '../features/plans/Fig16Chunks';
 import { Fig20Timeline } from '../features/plans/Fig20Timeline';
 import { Fig21PlanGit } from '../features/plans/Fig21PlanGit';
 import { Fig22FilesByChunk } from '../features/plans/Fig22FilesByChunk';
+import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
 import { Fig11Merge } from '../features/git/Fig11Merge';
 import { Fig12Race } from '../features/agent-jobs/Fig12Race';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
@@ -118,6 +119,22 @@ const PLAN_STUCK = {
   autopilot: { status: 'off', tabId: 't1', startedAt: PLAN.autopilot.startedAt },
   chunks: PLAN.chunks.map((c) => (c.status === 'in-progress' ? { ...c, needsCommit: true } : c)),
 };
+// FIG 37: a repo's plans over a week: merged, waiting on review, building, shelved, just planned.
+const DAY = 86_400_000;
+const lifePlan = (title, planned, chunks, extra = {}) => ({
+  id: title, title, createdAt: Date.now() - planned * DAY,
+  chunks: chunks.map(([s, d], i) => ({ n: i + 1, commits: d == null ? [] : ['c'], status: d == null ? 'in-progress' : 'implemented', startedAt: Date.now() - s * DAY, doneAt: d == null ? undefined : Date.now() - d * DAY })),
+  ...extra,
+});
+const LIFECYCLE_PLANS = [
+  lifePlan('Plans: review fixes', 7, [[6.5, 6], [6, 4.8]], { merged: { at: Date.now() - 4.5 * DAY } }),
+  lifePlan('Zen mode drawers', 5, [[4, 3], [3, 2.2]], { pr: { number: 41, state: 'OPEN', createdAt: new Date(Date.now() - 2 * DAY).toISOString() } }),
+  lifePlan('File tree marks', 3, [[2.5, 1.5], [1, null]]),
+  lifePlan('Elvish nuggets', 4, [[3.5, 3]], { shelved: true }),
+  lifePlan('Lyre logo', 0.4, []),
+  lifePlan('Plans: give every chunk a decision trail', 6, [[5.5, 5.2]], { merged: { at: Date.now() - 5 * DAY }, shelved: true }),
+];
+
 const LIVE = PLAN.chunks.find((c) => c.status === 'in-progress');
 
 const FILES = {
@@ -228,6 +245,7 @@ const FIGS = [
   { n: '20d', w: 560, el: () => <Fig20Timeline plan={PLAN_DONE} fallback={fb('timeline: complete')} /> },
   { n: 21, w: 480, el: () => <Fig21PlanGit plan={PLAN} fallback={fb('plan/… · 6 commits')} /> },
   { n: '21d', w: 480, el: () => <Fig21PlanGit plan={PLAN_DONE} fallback={fb('plan/… · ready')} /> },
+  { n: 37, w: 1100, paper: 'var(--ins-raised)', el: () => <div className="flex flex-col gap-3"><Fig37Lifecycle plans={LIFECYCLE_PLANS} /><LifecycleKey /></div> },
   { n: 22, w: 360, el: () => <Fig22FilesByChunk plan={PLAN} files={FILES} /> },
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
   { n: '19k', w: 240, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="skeleton" defaultLevel="skeleton" paper="var(--ins-panel)" /> },

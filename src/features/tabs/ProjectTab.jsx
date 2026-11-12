@@ -797,6 +797,10 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
       },
       addFiles: (paths) => addFilesRef.current(paths),
       send,
+      // Opens the merge dialog for another checkout of this repo, e.g. a plan's worktree.
+      merge: (path, base) => {
+        if (autoMergeStageRef.current === 'idle') autoMerge.trigger(path, base);
+      },
       // Starts the agent on a fresh context, without focusing the terminal.
       // Only Claude Code reports the new session (a SessionStart hook).
       clearContext: async () => {

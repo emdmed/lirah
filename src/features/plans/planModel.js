@@ -3,7 +3,7 @@
 // one status to the next. Pure, no React. The values are persisted, so they
 // never change; add new ones instead.
 import { shortId } from '../../lib/ids';
-import { defaultBranch } from './planGit';
+import { defaultBranch, planGit, workPath } from './planGit';
 
 /** chunk.status */
 export const CHUNK_STATUS = Object.freeze({
@@ -135,6 +135,16 @@ export function canMoveChunk(chunks, i, delta) {
 export function planProgress(plan) {
   const active = plan.chunks.filter((c) => c.status !== CHUNK_STATUS.SKIPPED);
   return { done: active.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED).length, total: active.length };
+}
+
+// A finished, unmerged plan's worktree in its primary repo, and the base to merge into.
+// shortcut: multi-repo plans merge the primary repo only; merge the others with alt M in their worktrees.
+export function planMergeTarget(plan) {
+  const cfg = planGit(plan);
+  const repo = cfg.repos[0];
+  if (plan.merged || !cfg.worktrees || cfg.removedAt || !repo || workPath(repo) === repo.root) return null;
+  const { done, total } = planProgress(plan);
+  return total > 0 && done === total ? { path: workPath(repo), base: repo.base } : null;
 }
 
 export function planStarted(plan) {

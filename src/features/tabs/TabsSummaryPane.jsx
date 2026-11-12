@@ -10,7 +10,7 @@ import { getTabContextFill } from './tabContextFill';
 import { getTabAutoCommit } from './tabAutoCommit';
 import { getLastTurn } from './agentHookState';
 import { useAttentionQueue } from './useAgentAttention';
-import { AUTOPILOT_STATUS, haltWord } from '../plans/planModel';
+import { AUTOPILOT_STATUS, haltWord, planMergeTarget } from '../plans/planModel';
 import { autopilotLamp } from '../plans/parts';
 import { LIVE, OWN_BUSY, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
 import { getTabPrompt } from './tabPrompts';
@@ -154,6 +154,13 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
   }, [flipPlanTerminal, openPlan]);
   const stopPlan = useCallback((plan) => stopAutopilot(rootOf.current.get(plan.id), plan.id), [stopAutopilot]);
   const shelve = useCallback((plan) => shelvePlan(rootOf.current.get(plan.id), plan.id, true), [shelvePlan]);
+  // The merge dialog belongs to the row's tab, so that tab comes forward first.
+  const mergePlan = useCallback((tabId, plan) => {
+    const target = planMergeTarget(plan);
+    if (!target) return;
+    if (tabId !== activeTabId) switchTab(tabId);
+    getTabPrompt(tabId)?.merge?.(target.path, target.base);
+  }, [activeTabId, switchTab]);
 
   const actions = useMemo(() => ({
     switchTab,
@@ -171,8 +178,9 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     resumePlan,
     stopPlan,
     shelvePlan: shelve,
+    mergePlan,
     togglePlanTerminal,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, togglePlanTerminal]);
+  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal]);
 
   const kinds = [];
   const faulted = []; // tabs whose run stopped, for the closing line

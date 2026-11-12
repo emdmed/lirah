@@ -1,4 +1,4 @@
-import { Archive, Play, Stop, Terminal } from '@/components/icons';
+import { Archive, Merge, Play, Stop, Terminal } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Lamp } from '../../components/instrument/Lamp';
@@ -7,7 +7,7 @@ import { RowAction } from '../tabs/RowAction';
 import { Fig16Chunks } from './Fig16Chunks';
 import { ProgressReadout } from './parts';
 import { planStatus, TAG_TONE } from './PlanRow';
-import { AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
+import { AUTOPILOT_STATUS, CHUNK_STATUS, pilotPosition, planMergeTarget, SPLIT_STATUS, UNTITLED_PLAN } from './planModel';
 
 // What the plan is on right now: why its run stopped, or the chunk in flight.
 function nowLine(plan) {
@@ -33,10 +33,11 @@ export function isSettledPlan(plan) {
  * one fixed height. With nothing live it shows the latest finished plan and
  * `note` in place of the chunk in flight. A stopped run gets resume (the primary
  * key, also `p` on the row) and stop, in the card's last row. Shelve takes the
- * card off the tab without deleting the plan. Terminal flips the tab between its
+ * card off the tab without deleting the plan. Merge (a finished plan in worktrees)
+ * opens the merge dialog on its worktree. Terminal flips the tab between its
  * own terminal and the plan's (null: the plan has none yet).
  */
-export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, onTerminal, terminalShown }) {
+export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, onMerge, onTerminal, terminalShown }) {
   const { done, total, running, tag, lampState } = planStatus(plan);
   const title = plan.title || UNTITLED_PLAN;
   const ap = plan.autopilot;
@@ -92,6 +93,11 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, on
             </RowAction>
           )}
           {ap?.status !== AUTOPILOT_STATUS.RUNNING && (<>
+            {onMerge && planMergeTarget(plan) && (
+              <RowAction onClick={onMerge} title="Merge the plan's branch into its base (the merge dialog shows what it will do)" className={buttonVariants({ variant: 'ghost', size: 'panel' })}>
+                <Merge aria-hidden="true" />merge
+              </RowAction>
+            )}
             <RowAction onClick={onShelve} title="Take this plan off the tab; it stays under all plans" className={buttonVariants({ variant: 'ghost', size: 'panel' })}>
               <Archive aria-hidden="true" />shelve
             </RowAction>

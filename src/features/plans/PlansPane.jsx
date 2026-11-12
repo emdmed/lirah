@@ -21,6 +21,7 @@ import { useCliRunning } from '../tabs/useTabsSummary';
 
 const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
 const NewPlanDialog = lazyNamed(() => import('./NewPlanDialog'), 'NewPlanDialog');
+const PlanLifecycleDialog = lazyNamed(() => import('./PlanLifecycleDialog'), 'PlanLifecycleDialog');
 
 /** The plans of the active tab's repo: a list, or one plan's chunks. */
 export const PlansPane = memo(function PlansPane({ projectPath }) {
@@ -33,6 +34,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
   const [openPlanId, setOpenPlanId] = useState(null);
   const [newOpen, setNewOpen] = useState(false);
   const [showTucked, setShowTucked] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   const openPlan = plans?.find((p) => p.id === openPlanId) || null;
   useEffect(() => setOpenPlanId(null), [repoRoot]);
@@ -96,12 +98,20 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
                 <span className="engraved-label">plans</span>
                 <span className="font-mono tabular-nums">{plans.length}</span>
                 <span className="truncate">· {basename(repoRoot)}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowTimeline(true)}
+                  className="tui-btn ml-auto shrink-0"
+                  title="Every plan from planned to merged, on one calendar"
+                >
+                  timeline
+                </button>
                 {tucked > 0 && (
                   <button
                     type="button"
                     onClick={() => setShowTucked((v) => !v)}
                     aria-pressed={showTucked}
-                    className="tui-btn ml-auto shrink-0"
+                    className="tui-btn shrink-0"
                     title={showTucked ? 'Hide finished and shelved plans' : 'Show finished and shelved plans'}
                   >
                     {showTucked ? 'hide' : 'show'} {tucked} done/shelved
@@ -118,6 +128,16 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
       )}
 
       <Suspense fallback={null}>
+        {/* All plans, done and shelved too: the timeline is their history. */}
+        {showTimeline && (
+          <PlanLifecycleDialog
+            open
+            onOpenChange={setShowTimeline}
+            plans={plans}
+            repoRoot={repoRoot}
+            onOpenPlan={(id) => { setShowTimeline(false); setOpenPlanId(id); }}
+          />
+        )}
         {newOpen && <NewPlanDialog open onOpenChange={setNewOpen} onCreate={handleCreate} onSendPrompt={handleSendPrompt} sendBlocked={sendBlocked} />}
         {diffProps && (
           <GitDiffDialog {...diffProps} />
