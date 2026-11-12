@@ -13,6 +13,8 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogField,
+  DialogGroup,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -325,7 +327,7 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Name" htmlFor="job-name">
+            <DialogField label="Name" htmlFor="job-name">
               <input
                 id="job-name"
                 value={name}
@@ -333,19 +335,19 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                 placeholder={template?.title || 'Optional'}
                 className={WELL_INPUT}
               />
-            </Field>
-            <Field label="Template">
+            </DialogField>
+            <DialogField label="Template">
               <Picker
                 value={template?.title || 'None'}
                 items={[{ id: null, name: 'None' }, ...templates.map((t) => ({ id: t.id, name: t.title }))]}
                 selectedId={templateId}
                 onSelect={setTemplateId}
               />
-            </Field>
+            </DialogField>
           </div>
 
           {/* Context files: tree selection + pinned, with groups as an add-in */}
-          <Field
+          <Section
             label="Context files"
             count={checkedFiles.length}
             action={
@@ -411,9 +413,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                 })
               )}
             </div>
-          </Field>
+          </Section>
 
-          <Field label={template ? 'Instructions · optional' : 'Instructions'} htmlFor="job-instructions">
+          <DialogField label={template ? 'Instructions · optional' : 'Instructions'} htmlFor="job-instructions">
             <textarea
               id="job-instructions"
               value={instructions}
@@ -422,10 +424,10 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
               placeholder="e.g. Write unit tests for these files following existing conventions."
               className={cn(WELL_INPUT, 'h-auto resize-none py-2 leading-relaxed')}
             />
-          </Field>
+          </DialogField>
 
           {/* Agents: pick one, or several to race them against each other. */}
-          <Field
+          <Section
             label={canRace ? 'Agents · pick several to race' : 'Agent'}
             action={
               canRace && (
@@ -473,8 +475,9 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
                 );
               })}
             </div>
-          </Field>
+          </Section>
 
+          <DialogGroup label="Isolation" />
           <div className="flex items-center gap-3">
             <ToggleSwitch
               checked={useWorktree}
@@ -552,16 +555,21 @@ const WELL_INPUT =
   'ins-well h-7 w-full min-w-0 px-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1';
 
 
-// A labelled form block: printed legend (with an optional count and a
-// right-aligned action) above its control.
-function Field({ label, count, action, htmlFor, children }) {
+// A multi-control block: group legend and hairline (with an optional count
+// and a right-aligned action) above its controls.
+function Section({ label, count, action, children }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex min-h-5 items-center justify-between gap-2">
-        <label htmlFor={htmlFor} className="ins-legend">
-          {label}
-          {count !== undefined && <span className="tube-idle ml-1.5">{count}</span>}
-        </label>
+      <div className="flex min-h-5 items-center gap-2">
+        <DialogGroup
+          className="flex-1"
+          label={
+            <>
+              {label}
+              {count !== undefined && <span className="tube-idle ml-1.5">{count}</span>}
+            </>
+          }
+        />
         {action}
       </div>
       {children}
