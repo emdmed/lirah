@@ -5,7 +5,7 @@ export const TERMINAL_MODE_RESET =
   '\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1005l\x1b[?1006l\x1b[?1015l' + // mouse tracking and encodings
   '\x1b[?2004l' + // bracketed paste
   '\x1b[?1004l' + // focus reporting
-  '\x1b[?1049l' + // alternate screen
+  '\x1b[?1047l' + // leave the alternate screen; not 1049, which also restores a saved cursor and garbles a shell never in it
   '\x1b[<u' + // pop the kitty keyboard mode
   '\x1b[?25h'; // show the cursor
 

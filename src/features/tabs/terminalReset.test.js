@@ -2,10 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { TERMINAL_MODE_RESET, killCliAndResetTerminal } from './terminalReset';
 
 describe('TERMINAL_MODE_RESET', () => {
-  it.each([1000, 1002, 1003, 1005, 1006, 1015, 2004, 1004, 1049])('turns off private mode %i (DECRST)', (m) => {
+  it.each([1000, 1002, 1003, 1005, 1006, 1015, 2004, 1004, 1047])('turns off private mode %i (DECRST)', (m) => {
     // the mode may sit alone or inside a combined list: ESC [ ? 1000 ; 1002 l
     const resets = [...TERMINAL_MODE_RESET.matchAll(/\x1b\[\?([\d;]+)l/g)].flatMap((x) => x[1].split(';').map(Number));
     expect(resets).toContain(m);
+  });
+
+  it('never sends 1049: its reset restores a saved cursor even in the normal screen', () => {
+    expect(TERMINAL_MODE_RESET).not.toMatch(/\x1b\[\?(?:[\d;]*;)?1049(?:;[\d;]*)?[hl]/);
   });
 
   it('shows the cursor', () => {
@@ -17,7 +21,7 @@ describe('TERMINAL_MODE_RESET', () => {
   });
 
   it('contains no set (h) of a mouse or paste mode', () => {
-    for (const m of [1000, 1002, 1003, 1005, 1006, 1015, 2004, 1004, 1049]) {
+    for (const m of [1000, 1002, 1003, 1005, 1006, 1015, 2004, 1004, 1047]) {
       expect(TERMINAL_MODE_RESET).not.toMatch(new RegExp(`\\x1b\\[\\?(?:[\\d;]*;)?${m}(?:;[\\d;]*)?h`));
     }
   });
