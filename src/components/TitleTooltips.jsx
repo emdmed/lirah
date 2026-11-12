@@ -8,11 +8,27 @@ const EDGE = 8;
 // Holds the title while the pointer is on its element.
 const HELD = 'data-lirah-title';
 
+// A Radix tooltip trigger: its tooltip is the one hint there.
+const RADIX_TRIGGER = '[data-slot="tooltip-trigger"]';
+
+// The element a hover's hint belongs to: the nearest one with a title (live or
+// held), or an svg element with a <title> child.
+function hintOwner(el) {
+  for (let n = el; n; n = n.parentElement) {
+    if (n.hasAttribute('title') || n.hasAttribute(HELD)) return n;
+    if (n instanceof SVGElement && n.querySelector(':scope > title')) return n;
+  }
+  return null;
+}
+
 /**
- * Draws every native `title` hint as an instrument tooltip, so the app has no
- * OS-styled popups. While the pointer is on an element its title is held in
- * HELD, which keeps the OS tooltip from showing; it goes back on leave so the
- * attribute still names the control for screen readers.
+ * Draws every native hint (a `title` attribute or an SVG `<title>`) as an
+ * instrument tooltip, so the app has no OS-styled popups and a hover shows one
+ * hint. While the pointer is on an element every native hint from it up to the
+ * root is held (titles in HELD, `<title>` text emptied), which keeps the OS
+ * from drawing any of them; the innermost is the one shown. Inside a Radix
+ * tooltip trigger nothing is drawn: the Radix tooltip is the hint. Everything
+ * goes back on leave so the hints still name their controls for screen readers.
  * Mounted once at the app root.
  */
 export function TitleTooltips() {
@@ -21,17 +37,48 @@ export function TitleTooltips() {
   const tipRef = useRef(null);
 
   useEffect(() => {
-    let el = null;
+    let owner = null;
+    let radix = false;
     let timer = null;
-    // A live title (a running clock, say) is set again while held: hold the new one too,
+    const held = new Map(); // element -> its title, or <title> text node -> its text
+
+    // Hold every native hint from `from` up; returns the innermost one's text.
+    // Safe to run again: only hints that came back live are held anew.
+    const hold = (from) => {
+      let text = null;
+      for (let n = from; n; n = n.parentElement) {
+        const live = n.getAttribute('title');
+        if (live != null) {
+          held.set(n, live);
+          n.setAttribute(HELD, live);
+          n.removeAttribute('title');
+        }
+        let hint = held.has(n) ? held.get(n) : null;
+        const t = n instanceof SVGElement ? n.querySelector(':scope > title') : null;
+        if (t) {
+          // Empty the text nodes rather than the <title>, so React keeps the nodes it updates.
+          for (const c of t.childNodes) {
+            if (c.nodeType === Node.TEXT_NODE && c.nodeValue) {
+              held.set(c, c.nodeValue);
+              c.nodeValue = '';
+            }
+          }
+          hint ??= [...t.childNodes].map((c) => held.get(c) ?? '').join('');
+        }
+        if (hint == null) continue;
+        // A cal element repaints its <title> on every frame of a glide.
+        watch.observe(n, t ? { attributeFilter: ['title'], childList: true, characterData: true, subtree: true } : { attributeFilter: ['title'] });
+        text ??= hint;
+      }
+      return text?.trim();
+    };
+
+    // A live hint (a running clock, say) is set again while held: hold the new one too,
     // or the OS tooltip shows beside ours.
     const watch = new MutationObserver(() => {
-      const fresh = el?.getAttribute('title');
-      if (fresh == null) return;
-      el.setAttribute(HELD, fresh);
-      el.removeAttribute('title');
-      const text = fresh.trim();
-      setTip((t) => (t && text ? { ...t, text } : t));
+      if (!owner) return;
+      const text = hold(owner);
+      setTip((t) => (t && text && t.text !== text ? { ...t, text } : t));
     });
 
     const hide = () => {
@@ -42,27 +89,33 @@ export function TitleTooltips() {
     const release = () => {
       hide();
       watch.disconnect();
-      if (!el) return;
-      const held = el.getAttribute(HELD);
-      el.removeAttribute(HELD);
-      // React may have set a new title meanwhile; that one wins.
-      if (held != null && !el.hasAttribute('title')) el.setAttribute('title', held);
-      el = null;
+      for (const [n, v] of held) {
+        if (n.nodeType === Node.TEXT_NODE) {
+          if (!n.nodeValue) n.nodeValue = v;
+        } else {
+          n.removeAttribute(HELD);
+          // React may have set a new title meanwhile; that one wins.
+          if (!n.hasAttribute('title')) n.setAttribute('title', v);
+        }
+      }
+      held.clear();
+      owner = null;
+      radix = false;
     };
 
     const onOver = (e) => {
-      const target = e.target instanceof Element ? e.target.closest(`[title], [${HELD}]`) : null;
-      if (target === el) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const next = target && hintOwner(target);
+      const inRadix = !!target?.closest(RADIX_TRIGGER);
+      if (next === owner && inRadix === radix) return;
       release();
-      if (!target) return;
-      const text = target.getAttribute('title')?.trim();
-      if (!text) return;
-      el = target;
-      el.setAttribute(HELD, el.getAttribute('title'));
-      el.removeAttribute('title');
-      watch.observe(el, { attributeFilter: ['title'] });
+      if (!next) return;
+      owner = next;
+      radix = inRadix;
+      if (!hold(next) || radix) return;
       timer = setTimeout(() => {
-        if (el === target && target.isConnected) setTip({ text, rect: target.getBoundingClientRect() });
+        const text = owner === next && next.isConnected && hold(next);
+        if (text) setTip({ text, rect: next.getBoundingClientRect() });
       }, SHOW_DELAY);
     };
 
