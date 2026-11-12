@@ -6,7 +6,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { dirtyCount, git } from '../../lib/git';
 import { chunkCommitsByRepo, planGit, workPath } from './planGit';
-import { chunkTrailer } from './planPrompts';
+import { planFixCommits } from './planGitOps';
+import { chunkTrailer, planFixTrailer } from './planPrompts';
 import { CHUNK_STATUS, PLAN_STAGE, planStage } from './planModel';
 
 const firstLine = async (root, args) => (await git(root, args)).split('\n')[0].trim();
@@ -21,8 +22,8 @@ async function baseRef(repo, branch) {
 }
 
 /**
- * { at, sha } once every committed chunk's trailer is on its repo's base
- * branch, else null. Trailers survive merges, rebases and squash merges alike.
+ * { at, sha } once every committed chunk's trailer (and the fix trailer, when
+ * the plan has fix commits there) is on its repo's base branch, else null. Trailers survive merges, rebases and squash merges alike.
  */
 export async function detectMerge(plan, now = Date.now()) {
   const cfg = planGit(plan);
@@ -38,6 +39,8 @@ export async function detectMerge(plan, now = Date.now()) {
       const hit = await firstLine(repo.root, ['log', base, '-1', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`, '--format=%H']);
       if (!hit) return null;
     }
+    if (planFixCommits(plan, repo.root).length > 0
+      && !(await firstLine(repo.root, ['log', base, '-1', '--fixed-strings', `--grep=${planFixTrailer(plan)}`, '--format=%H']))) return null;
     if (!merge && cfg.branch) {
       // A --no-ff merge dates the merge; a fast-forward or squash leaves only "now".
       const line = await firstLine(repo.root, ['log', base, '-1', '--merges', '--fixed-strings', `--grep=Merge branch '${cfg.branch}'`, '--format=%H %ct']);
