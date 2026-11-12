@@ -58,14 +58,16 @@ function ConfirmDialog({ request, settle }) {
           size="sm"
           tone={fault ? 'fault' : undefined}
           escLabel="cancel"
+          // No description: opt out of Radix's describedby instead of a hidden copy of the title.
+          {...(!request.description && { 'aria-describedby': undefined })}
           hints={[{ keys: ['↵'], label: typeof label === 'string' ? label.toLowerCase() : 'confirm' }]}
         >
-          <DialogTitle>{request.title}</DialogTitle>
-          {request.description ? (
-            <DialogDescription className="leading-relaxed">{request.description}</DialogDescription>
-          ) : (
-            <DialogDescription className="sr-only">{request.title}</DialogDescription>
-          )}
+          <DialogHeader>
+            <DialogTitle>{request.title}</DialogTitle>
+            {request.description && (
+              <DialogDescription className="leading-relaxed">{request.description}</DialogDescription>
+            )}
+          </DialogHeader>
           {request.facts?.length > 0 && <ConfirmFacts facts={request.facts} />}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => settle(false)}>Cancel</Button>
