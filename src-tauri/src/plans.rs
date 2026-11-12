@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::path::Path;
-use std::process::Stdio;
+use std::process::{Child, Output, Stdio};
+use std::time::{Duration, Instant};
 
 /// Ask Claude to split a plan into implementation chunks. The prompt (built by
 /// the frontend, see src/features/plans/planPrompts.js) goes in on stdin since
@@ -10,7 +11,12 @@ use std::process::Stdio;
 #[tauri::command]
 pub async fn split_plan(project_dir: String, prompt: String) -> Result<String, String> {
     crate::ipc::blocking("split_plan", move || {
-        claude_print("claude --print --model sonnet --allowedTools Read Grep Glob", &project_dir, &prompt)
+        claude_print_within(
+            "claude --print --model sonnet --allowedTools Read Grep Glob",
+            &project_dir,
+            &prompt,
+            Some(Duration::from_secs(5 * 60)),
+        )
     })
     .await
 }
@@ -41,6 +47,11 @@ pub async fn summarize_worklog(project_dir: String, prompt: String, model: Strin
 
 /// Run a headless claude command with `prompt` on stdin; stdout on success.
 pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result<String, String> {
+    claude_print_within(cmd, project_dir, prompt, None)
+}
+
+/// `claude_print` that kills claude and fails once `timeout` passes.
+fn claude_print_within(cmd: &str, project_dir: &str, prompt: &str, timeout: Option<Duration>) -> Result<String, String> {
     let mut child = crate::util::login_shell_command(cmd)
         .current_dir(project_dir)
         .env("TERM", "xterm-256color")
@@ -56,9 +67,10 @@ pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result
             .map_err(|e| format!("Failed to send the prompt to claude: {}", e))?;
     }
 
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("claude failed: {}", e))?;
+    let output = match timeout {
+        Some(t) => wait_with_deadline(child, t)?,
+        None => child.wait_with_output().map_err(|e| format!("claude failed: {}", e))?,
+    };
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     if output.status.success() {
         return Ok(stdout);
@@ -68,6 +80,36 @@ pub(crate) fn claude_print(cmd: &str, project_dir: &str, prompt: &str) -> Result
         "claude failed: {}",
         if stderr.trim().is_empty() { stdout } else { stderr }
     ))
+}
+
+/// `wait_with_output` with a deadline: the pipes drain on threads (so a chatty
+/// child can't block on a full pipe) while this polls for exit.
+fn wait_with_deadline(mut child: Child, timeout: Duration) -> Result<Output, String> {
+    fn drain(pipe: Option<impl std::io::Read + Send + 'static>) -> std::thread::JoinHandle<Vec<u8>> {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(mut p) = pipe {
+                let _ = p.read_to_end(&mut buf);
+            }
+            buf
+        })
+    }
+    let (stdout, stderr) = (drain(child.stdout.take()), drain(child.stderr.take()));
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait().map_err(|e| format!("claude failed: {}", e))? {
+            let stdout = stdout.join().unwrap_or_default();
+            let stderr = stderr.join().unwrap_or_default();
+            return Ok(Output { status, stdout, stderr });
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            // The drain threads are left behind: a grandchild may still hold the pipes.
+            return Err(format!("claude timed out after {} minutes", timeout.as_secs() / 60));
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 /// Delete a plan .md file. Only a `.md` file directly inside a month folder
@@ -169,8 +211,30 @@ pub async fn gh_pr_for_branch(repo_path: String, branch: String) -> Result<Strin
 
 #[cfg(test)]
 mod tests {
-    use super::is_plan_md;
+    use super::{is_plan_md, wait_with_deadline};
     use std::path::Path;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_with_deadline_kills_a_hung_child() {
+        // `cat` on an open stdin never exits; not `sleep`, which pty's descendant test looks for.
+        let child = Command::new("cat").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
+        let start = Instant::now();
+        assert!(wait_with_deadline(child, Duration::from_millis(300)).unwrap_err().contains("timed out"));
+        assert!(start.elapsed() < Duration::from_secs(5));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_with_deadline_captures_output() {
+        let child = Command::new("sh").args(["-c", "echo out; echo err >&2"]).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
+        let out = wait_with_deadline(child, Duration::from_secs(10)).unwrap();
+        assert!(out.status.success());
+        assert_eq!(out.stdout, b"out\n");
+        assert_eq!(out.stderr, b"err\n");
+    }
 
     #[test]
     fn only_md_files_in_a_month_folder() {
