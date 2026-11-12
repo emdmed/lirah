@@ -7,6 +7,7 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogField,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -107,37 +108,40 @@ export function NewPlanDialog({ open, onOpenChange, onCreate, onSendPrompt, send
         </DialogHeader>
 
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="flex flex-col gap-3">
-          <label htmlFor="new-plan-source" className="ins-legend">Plan</label>
-          <Textarea
-            id="new-plan-source"
-            value={source}
-            onChange={(e) => {
-              setSource(e.target.value);
-              setError('');
-            }}
-            placeholder="# My plan&#10;&#10;Paste the plan markdown here…"
-            className="h-72 resize-none font-mono text-xs"
-            autoFocus
-          />
-          <div className="flex items-center gap-2">
-            <Input
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleLoad();
-                }
+          <DialogField label="Plan" htmlFor="new-plan-source">
+            <Textarea
+              id="new-plan-source"
+              value={source}
+              onChange={(e) => {
+                setSource(e.target.value);
+                setError('');
               }}
-              placeholder="or load a file: /path/to/plan.md"
-              aria-label="Load a plan from a file path"
-              className="h-8 text-xs"
+              placeholder="# My plan&#10;&#10;Paste the plan markdown here…"
+              className="h-72 resize-none font-mono text-xs"
+              autoFocus
             />
-            <Button type="button" variant="outline" size="sm" onClick={handleLoad} disabled={!path.trim()}>
-              Load
-            </Button>
-          </div>
-          {error && <p className="text-xs text-[var(--ins-fault)]" role="alert">{error}</p>}
+          </DialogField>
+          <DialogField label="Load from file" htmlFor="new-plan-path">
+            <div className="flex items-center gap-2">
+              <Input
+                id="new-plan-path"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleLoad();
+                  }
+                }}
+                placeholder="/path/to/plan.md"
+                className="h-8 text-xs"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={handleLoad} disabled={!path.trim()}>
+                Load
+              </Button>
+            </div>
+          </DialogField>
+          {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
           {!error && onSendPrompt && sendBlocked && source.trim() && (
             <p className="text-xs text-muted-foreground">Send as prompt is off: {sendBlocked}.</p>
           )}
