@@ -9,6 +9,11 @@ export function chunkTrailer(plan, chunk) {
   return `Plan-Chunk: ${plan.id}/${chunk.id}`;
 }
 
+// Plan-level review fixes belong to no chunk, so they get a pseudo-chunk id.
+export function planFixTrailer(plan) {
+  return `Plan-Chunk: ${plan.id}/review`;
+}
+
 export function chunkCommitMessage(plan, chunk) {
   return `plan(${plan.slug}): ${chunk.n} — ${chunk.title}`;
 }
@@ -246,7 +251,7 @@ export function buildPlanFixPrompt(plan, notes) {
     decisionsBlock(plan),
     reposBlock(plan),
     `Review notes (${notes.length}):\n${noteLines(notes)}`,
-    `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}"`,
+    `Address every note. Don't revert unrelated work. When it's done and working, commit only the files you changed, with exactly this message:\ngit commit -m "${message.replace(/"/g, "'")}" -m "${planFixTrailer(plan)}"`,
   ].filter(Boolean).join('\n\n');
 }
 
