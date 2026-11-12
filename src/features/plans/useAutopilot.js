@@ -10,6 +10,7 @@ import {
   planProgress, stopDrivesRun, UNTITLED_PLAN,
 } from './planModel';
 import { buildNudgePrompt, parseDecisions, parseStatusMarker, STATUS_DONE } from './planPrompts';
+import { isPendingFix } from './planGitOps';
 import { requestPlanFocus } from './plansPaneEvents';
 import { useHookWatchdog } from './useHookWatchdog';
 
@@ -82,7 +83,7 @@ const inFlight = (chunk) => chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.a
  * provider's checkChunk, implementChunk and sendChunkPrompt.
  */
 export function useAutopilot({
-  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
+  stateRef, findPlan, updatePlan, checkChunk, checkFixes, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
 }) {
   // Plans whose agent is being cleared: the session ending and starting again
   // is expected then, not something to steer the run by.
@@ -338,6 +339,7 @@ export function useAutopilot({
       const turnEnded = next?.state === 'done' && prev?.state !== 'done';
       for (const [repoRoot, plans] of Object.entries(stateRef.current)) {
         for (const plan of plans) {
+          if (turnEnded && plan.fixes?.some((f) => isPendingFix(f) && getTabSession(f.tabId) === sessionId)) checkFixes(repoRoot, plan.id);
           if (!pilotedBy(plan, sessionId)) {
             if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, inFlight, (c) => settle(repoRoot, plan.id, c, sessionId));
             continue;
@@ -352,7 +354,7 @@ export function useAutopilot({
         }
       }
     });
-  }, [stateRef, checkChunk, markChunkDone, halt, setAutopilot, onAutopilotStop]);
+  }, [stateRef, checkChunk, checkFixes, markChunkDone, halt, setAutopilot, onAutopilotStop]);
 
   // A run whose tab was closed would wait forever for a Stop.
   useEffect(() => {

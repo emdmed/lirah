@@ -59,6 +59,26 @@ export function planFixCommits(plan, root) {
   return (plan.fixes ?? []).flatMap((f) => f.commits?.[root] ?? []);
 }
 
+/** A sent plan fix whose commits weren't found yet. */
+export const isPendingFix = (fix) => Object.keys(fix.commits ?? {}).length === 0;
+
+/**
+ * plan.fixes with the fix commits (`commitsByRepo`, from fixCommits) not yet
+ * recorded given to the latest pending fix, or null when there's nothing new.
+ */
+export function withFixCommits(plan, commitsByRepo) {
+  const i = (plan.fixes ?? []).findLastIndex(isPendingFix);
+  if (i < 0) return null;
+  const fresh = {};
+  for (const [root, shas] of Object.entries(commitsByRepo)) {
+    const seen = new Set(planFixCommits(plan, root));
+    const mine = shas.filter((sha) => !seen.has(sha));
+    if (mine.length > 0) fresh[root] = mine;
+  }
+  if (Object.keys(fresh).length === 0) return null;
+  return plan.fixes.map((f, j) => (j === i ? { ...f, commits: fresh } : f));
+}
+
 /**
  * What a chunk found already committed without being sent lacks: each repo's
  * base (the parent of its first commit, so reviews and rollback have a range)

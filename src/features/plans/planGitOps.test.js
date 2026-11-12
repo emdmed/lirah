@@ -12,7 +12,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   }),
 }));
 
-const { adoptedFacts, captureBaseShas, chunkCommits, planReviewRanges } = await import('./planGitOps');
+const { adoptedFacts, captureBaseShas, chunkCommits, planReviewRanges, withFixCommits } = await import('./planGitOps');
 const { noGitConfig } = await import('./planModel');
 
 const plan = { id: 'p1', repoRoot: '/r', chunks: [] };
@@ -56,5 +56,17 @@ describe('plan review ranges', () => {
     expect(planReviewRanges({ ...plan, chunks: [chunk], fixes })[0]).toMatchObject({
       baseRef: 'base0', headRef: 'f3', commits: ['a1', 'a2', 'f1', 'f2', 'f3'],
     });
+  });
+});
+
+describe('withFixCommits', () => {
+  it('gives the latest pending fix only the commits not recorded yet', () => {
+    const fixes = [{ commits: { '/r': ['f1'] } }, { notes: 2, commits: {} }];
+    expect(withFixCommits({ fixes }, { '/r': ['f1', 'f2'] })).toEqual([fixes[0], { notes: 2, commits: { '/r': ['f2'] } }]);
+  });
+
+  it('is null with no pending fix or nothing new', () => {
+    expect(withFixCommits({}, { '/r': ['f1'] })).toBeNull();
+    expect(withFixCommits({ fixes: [{ commits: { '/r': ['f1'] } }, { commits: {} }] }, { '/r': ['f1'] })).toBeNull();
   });
 });

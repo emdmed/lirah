@@ -15,7 +15,7 @@ import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
 import { sendSaved } from './sentPrompts';
 import {
-  adoptedFacts, captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, rollbackChunk as revertChunk, strayCommits,
+  adoptedFacts, captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, fixCommits, isPendingFix, rollbackChunk as revertChunk, strayCommits, withFixCommits,
 } from './planGitOps';
 import {
   chunkBases, cleanupGit, defaultBranch, planGit, prepareGit, withRepos,
@@ -68,6 +68,7 @@ export function PlansProvider({ children }) {
           } else if (chunk.awaitingFix || (chunk.status === CHUNK_STATUS.IN_PROGRESS && !restarted)) checkChunk(repoRoot, plan.id, chunk.id);
         }
         if (restarted) catchUp(repoRoot, plan.id);
+        if (plan.fixes?.some(isPendingFix)) checkFixes(repoRoot, plan.id);
       }
     },
   });
@@ -153,6 +154,21 @@ export function PlansProvider({ children }) {
       checkingRef.current.delete(chunkId);
     }
   }, [findChunk, updatePlan, tabRepoRoots]);
+
+  // Give a sent plan fix the fix commits the agent made for it.
+  const checkFixes = useCallback(async (repoRoot, planId) => {
+    const plan = findPlan(repoRoot, planId);
+    if (!plan?.fixes?.some(isPendingFix)) return;
+    try {
+      const commitsByRepo = await fixCommits(plan);
+      updatePlan(repoRoot, planId, (p) => {
+        const fixes = withFixCommits(p, commitsByRepo);
+        return fixes ? { fixes } : {};
+      });
+    } catch (e) {
+      console.error('Plan fix check failed:', e);
+    }
+  }, [findPlan, updatePlan]);
 
   // The app closed mid-run while the agent kept going: adopt every chunk
   // committed since, in plan order, so the paused run shows what's really done.
@@ -453,7 +469,11 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     if (!plan || notes.length === 0) return;
     await sendToTab(tabId, buildPlanFixPrompt(plan, notes));
-  }, [findPlan, sendToTab]);
+    // Its commits are filled in by checkFixes when the agent's turn ends.
+    updatePlan(repoRoot, planId, (p) => ({
+      fixes: [...(p.fixes ?? []), { at: Date.now(), notes: notes.length, tabId, commits: {} }],
+    }));
+  }, [findPlan, sendToTab, updatePlan]);
 
   // Fallback when the agent didn't commit: commit everything as this chunk.
   const commitChunk = useCallback(async (repoRoot, planId, chunkId) => {
@@ -475,7 +495,7 @@ export function PlansProvider({ children }) {
   const {
     startAutopilot, resumeAutopilot, stopAutopilot, dismissAutopilot, revealRun,
   } = useAutopilot({
-    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
+    stateRef, findPlan, updatePlan, checkChunk, checkFixes, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
   });
 
   // Out of the tabs pane, not deleted. A live run is turned off first, so nothing runs out of sight.
