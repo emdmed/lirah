@@ -92,6 +92,19 @@ export function stopDrivesRun(ap) {
   return ap?.status === AUTOPILOT_STATUS.RUNNING || AUTO_RESUME_REASONS.has(ap?.reason);
 }
 
+/**
+ * What auto-pilot does when its agent stops on an in-progress chunk: `found` is
+ * the chunk's commit, `marker` the reply's PLAN-STATUS, `running`/`nudged` the run.
+ * Action is advance, done (mark it done, then advance), nudge or halt (paused, with reason).
+ */
+export function stopOutcome({ found, marker, running, nudged }) {
+  if (found) return { action: 'advance', reason: null };
+  if (marker?.kind === 'done') return { action: 'done', reason: null }; // planPrompts' STATUS_DONE; importing it would cycle.
+  if (marker?.kind === HALT_REASON.BLOCKED || marker?.kind === HALT_REASON.NEEDS_INPUT) return { action: 'halt', reason: marker.kind };
+  if (running && !nudged) return { action: 'nudge', reason: null };
+  return { action: 'halt', reason: HALT_REASON.NO_COMMIT };
+}
+
 /** A run that is going or waiting on you, as opposed to finished, failed or off. */
 export function isAutopilotLive(ap) {
   return ap?.status === AUTOPILOT_STATUS.RUNNING || ap?.status === AUTOPILOT_STATUS.PAUSED;
@@ -106,6 +119,14 @@ export function effectiveChunkState(chunk) {
   if (chunk.needsCommit) return CHUNK_STATE.NO_COMMIT;
   if (chunk.awaitingFix) return CHUNK_STATE.FIXING;
   return chunk.status;
+}
+
+/** Whether chunk i can swap with its neighbour at i + delta: neither may already be numbered in a commit message. */
+export function canMoveChunk(chunks, i, delta) {
+  const locked = (c) => c.awaitingFix || c.status === CHUNK_STATUS.IMPLEMENTED || c.status === CHUNK_STATUS.IN_PROGRESS;
+  const a = chunks[i];
+  const b = chunks[i + delta];
+  return !!a && !!b && !locked(a) && !locked(b);
 }
 
 // --- Selectors ---

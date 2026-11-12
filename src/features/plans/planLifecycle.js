@@ -6,7 +6,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { dirtyCount, git } from '../../lib/git';
 import { chunkCommitsByRepo, planGit, workPath } from './planGit';
-import { chunkTrailer } from './planPrompts';
+import { planFixCommits } from './planGitOps';
+import { chunkTrailer, planFixTrailer } from './planPrompts';
 import { CHUNK_STATUS, PLAN_STAGE, planStage } from './planModel';
 
 const firstLine = async (root, args) => (await git(root, args)).split('\n')[0].trim();
@@ -21,8 +22,8 @@ async function baseRef(repo, branch) {
 }
 
 /**
- * { at, sha } once every committed chunk's trailer is on its repo's base
- * branch, else null. Trailers survive merges, rebases and squash merges alike.
+ * { at, sha } once every committed chunk's trailer (and the fix trailer, when
+ * the plan has fix commits there) is on its repo's base branch, else null. Trailers survive merges, rebases and squash merges alike.
  */
 export async function detectMerge(plan, now = Date.now()) {
   const cfg = planGit(plan);
@@ -38,6 +39,8 @@ export async function detectMerge(plan, now = Date.now()) {
       const hit = await firstLine(repo.root, ['log', base, '-1', '--fixed-strings', `--grep=${chunkTrailer(plan, chunk)}`, '--format=%H']);
       if (!hit) return null;
     }
+    if (planFixCommits(plan, repo.root).length > 0
+      && !(await firstLine(repo.root, ['log', base, '-1', '--fixed-strings', `--grep=${planFixTrailer(plan)}`, '--format=%H']))) return null;
     if (!merge && cfg.branch) {
       // A --no-ff merge dates the merge; a fast-forward or squash leaves only "now".
       const line = await firstLine(repo.root, ['log', base, '-1', '--merges', '--fixed-strings', `--grep=Merge branch '${cfg.branch}'`, '--format=%H %ct']);
@@ -67,20 +70,24 @@ async function canRemoveWorktrees(plan) {
 }
 
 const MAIN_BRANCHES = new Set(['main', 'master']);
+const FOCUS_THROTTLE_MS = 60_000;
 let ghWarned = false;
+
+/** Whether the plan's PR or merge is still worth polling for. Shelved plans are left alone. */
+export const awaitsLifecycle = (plan) => !plan.shelved
+  && [PLAN_STAGE.IMPLEMENTED, PLAN_STAGE.PR_OPEN].includes(planStage(plan));
+
+/** Whether a focus event should check again, given when the last check started. */
+export const focusDue = (lastCheckAt, now = Date.now()) => now - lastCheckAt >= FOCUS_THROTTLE_MS;
 
 /**
  * Keeps plan.pr and plan.merged current for the repo's implemented plans:
  * checked when they change, when the window gets focus (a PR merged in the
- * browser) and on every commit to main or master. A merged plan's worktrees
+ * browser, at most once a minute) and on every commit to main or master. A merged plan's worktrees
  * are removed, unless one has uncommitted changes.
- * shortcut: runs only while the plans pane shows the repo; move it to PlansProvider if merges go unnoticed.
  */
 export function usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees) {
-  const waiting = useMemo(() => (plans || []).filter((p) => {
-    const stage = planStage(p);
-    return stage === PLAN_STAGE.IMPLEMENTED || stage === PLAN_STAGE.PR_OPEN;
-  }), [plans]);
+  const waiting = useMemo(() => (plans || []).filter(awaitsLifecycle), [plans]);
   const waitingRef = useRef(waiting);
   waitingRef.current = waiting;
   const key = waiting.map((p) => p.id).join(',');
@@ -89,10 +96,12 @@ export function usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktree
     if (!repoRoot || !key) return;
     let cancelled = false;
     let running = false;
+    let lastCheckAt = -Infinity;
 
     const check = async () => {
       if (running) return;
       running = true;
+      lastCheckAt = Date.now();
       try {
         for (const plan of waitingRef.current) {
           let pr = plan.pr ?? null;
@@ -118,8 +127,9 @@ export function usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktree
       }
     };
 
+    const onFocus = () => focusDue(lastCheckAt) && check();
     check();
-    window.addEventListener('focus', check);
+    window.addEventListener('focus', onFocus);
     // Commit watchers are ref-counted per repo; the stop is chained onto the start.
     const started = invoke('start_commit_watcher', { repoPath: repoRoot }).then(() => true, () => false);
     const unlisten = listen('commit-detected', ({ payload }) => {
@@ -127,7 +137,7 @@ export function usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktree
     });
     return () => {
       cancelled = true;
-      window.removeEventListener('focus', check);
+      window.removeEventListener('focus', onFocus);
       unlisten.then((fn) => fn());
       started.then((ok) => ok && invoke('stop_commit_watcher', { repoPath: repoRoot }).catch(() => {}));
     };

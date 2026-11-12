@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { currentBranch, repoTop } from '../../lib/git';
 import { hash8, shortId } from '../../lib/ids';
 import {
-  AUTOPILOT_STATUS, CHUNK_STATUS, defaultGitConfig, HALT_REASON, noGitConfig, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
+  AUTOPILOT_STATUS, CHUNK_STATUS, canMoveChunk, defaultGitConfig, HALT_REASON, noGitConfig, isAutopilotLive, newChunks, nextChunkId, planProgress, planStarted, renumber, runRank, SPLIT_STATUS, toImplemented, toInProgress,
   planFilesDir, toRolledBack, UNTITLED_PLAN,
 } from './planModel';
 import { useToast } from '../toast';
@@ -14,8 +14,9 @@ import { getTabPrompt } from '../tabs/tabPrompts';
 import { usePlanStore } from './usePlanStore';
 import { useAutopilot } from './useAutopilot';
 import { sendSaved } from './sentPrompts';
+import { usePlanLifecycleSync } from './planLifecycle';
 import {
-  adoptedFacts, captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, rollbackChunk as revertChunk, strayCommits,
+  adoptedFacts, captureBaseShas, chunkCommits, commitChunk as commitChunkChanges, commitDecisions, fixCommits, isPendingFix, rollbackChunk as revertChunk, strayCommits, withFixCommits,
 } from './planGitOps';
 import {
   chunkBases, cleanupGit, defaultBranch, planGit, prepareGit, withRepos,
@@ -68,6 +69,7 @@ export function PlansProvider({ children }) {
           } else if (chunk.awaitingFix || (chunk.status === CHUNK_STATUS.IN_PROGRESS && !restarted)) checkChunk(repoRoot, plan.id, chunk.id);
         }
         if (restarted) catchUp(repoRoot, plan.id);
+        if (plan.fixes?.some(isPendingFix)) checkFixes(repoRoot, plan.id);
       }
     },
   });
@@ -153,6 +155,21 @@ export function PlansProvider({ children }) {
       checkingRef.current.delete(chunkId);
     }
   }, [findChunk, updatePlan, tabRepoRoots]);
+
+  // Give a sent plan fix the fix commits the agent made for it.
+  const checkFixes = useCallback(async (repoRoot, planId) => {
+    const plan = findPlan(repoRoot, planId);
+    if (!plan?.fixes?.some(isPendingFix)) return;
+    try {
+      const commitsByRepo = await fixCommits(plan);
+      updatePlan(repoRoot, planId, (p) => {
+        const fixes = withFixCommits(p, commitsByRepo);
+        return fixes ? { fixes } : {};
+      });
+    } catch (e) {
+      console.error('Plan fix check failed:', e);
+    }
+  }, [findPlan, updatePlan]);
 
   // The app closed mid-run while the agent kept going: adopt every chunk
   // committed since, in plan order, so the paused run shows what's really done.
@@ -269,6 +286,7 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     if (!plan) throw new Error('Plan not found');
     if (isAutopilotLive(plan.autopilot)) throw new Error('Stop auto-pilot before re-chunking');
+    if (plan.split === SPLIT_STATUS.RUNNING) throw new Error('Wait for the split to finish before re-chunking');
     const busy = plan.chunks.find((c) => c.status === CHUNK_STATUS.IN_PROGRESS || c.awaitingFix);
     if (busy) throw new Error(`Chunk ${busy.n} is in progress; finish or roll it back before re-chunking`);
     updatePlan(repoRoot, planId, (p) => ({
@@ -381,7 +399,7 @@ export function PlansProvider({ children }) {
     updatePlan(repoRoot, planId, (p) => {
       const i = p.chunks.findIndex((c) => c.id === chunkId);
       const j = i + delta;
-      if (i < 0 || j < 0 || j >= p.chunks.length) return {};
+      if (!canMoveChunk(p.chunks, i, delta)) return {};
       const chunks = [...p.chunks];
       [chunks[i], chunks[j]] = [chunks[j], chunks[i]];
       return { chunks: renumber(chunks) };
@@ -453,7 +471,11 @@ export function PlansProvider({ children }) {
     const plan = findPlan(repoRoot, planId);
     if (!plan || notes.length === 0) return;
     await sendToTab(tabId, buildPlanFixPrompt(plan, notes));
-  }, [findPlan, sendToTab]);
+    // Its commits are filled in by checkFixes when the agent's turn ends.
+    updatePlan(repoRoot, planId, (p) => ({
+      fixes: [...(p.fixes ?? []), { at: Date.now(), notes: notes.length, tabId, commits: {} }],
+    }));
+  }, [findPlan, sendToTab, updatePlan]);
 
   // Fallback when the agent didn't commit: commit everything as this chunk.
   const commitChunk = useCallback(async (repoRoot, planId, chunkId) => {
@@ -475,7 +497,7 @@ export function PlansProvider({ children }) {
   const {
     startAutopilot, resumeAutopilot, stopAutopilot, dismissAutopilot, revealRun,
   } = useAutopilot({
-    stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
+    stateRef, findPlan, updatePlan, checkChunk, checkFixes, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
   });
 
   // Out of the tabs pane, not deleted. A live run is turned off first, so nothing runs out of sight.
@@ -524,9 +546,20 @@ export function PlansProvider({ children }) {
 
   return (
     <PlansActionsContext.Provider value={actions}>
-      <PlansStateContext.Provider value={plansByRepo}>{children}</PlansStateContext.Provider>
+      <PlansStateContext.Provider value={plansByRepo}>
+        {Object.entries(plansByRepo).map(([root, plans]) => (
+          <LifecycleSync key={root} repoRoot={root} plans={plans} updatePlan={updatePlan} removeWorktrees={removeWorktrees} />
+        ))}
+        {children}
+      </PlansStateContext.Provider>
     </PlansActionsContext.Provider>
   );
+}
+
+// Per loaded repo, so merges are noticed with the plans pane closed.
+function LifecycleSync({ repoRoot, plans, updatePlan, removeWorktrees }) {
+  usePlanLifecycleSync(repoRoot, plans, updatePlan, removeWorktrees);
+  return null;
 }
 
 /** When an adopted chunk began: the latest finish before its own, else its finish. */

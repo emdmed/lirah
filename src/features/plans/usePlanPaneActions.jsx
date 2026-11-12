@@ -13,7 +13,8 @@ import { usePlanReview } from './usePlanReview';
 
 /**
  * The plans pane's handlers for PlanPaneProvider (confirm, set up git or toast
- * before calling the store), the action in flight, and the review's diff
+ * before calling the store), the action in flight, the plans waiting for
+ * their terminal's Claude to start, and the review's diff
  * dialog props. Shared by the plans pane and Zen's plan drawer.
  */
 export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId }) {
@@ -37,7 +38,7 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     }
   }, [toast]);
 
-  const { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume } = usePlanRunActions({
+  const { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume, starting, cancelStart } = usePlanRunActions({
     repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, activeTabId, addTab, wakeTab, switchTab, confirm, toast,
     ensureGit, updatePlan, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
   });
@@ -190,8 +191,9 @@ export function usePlanPaneActions({ repoRoot, plans, openPlan, setOpenPlanId })
     revise: handleRevise,
     rechunk: handleRechunk,
     openPlanTab: handleOpenPlanTab,
+    cancelStart,
   }), [repoRoot, closePlan, handleImplement, handleCheck, handleMarkDone, handleCommit, handleReview, handleRollback, handleAutopilot,
-    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit, handleRevise, handleRechunk, handleOpenPlanTab]);
+    handleResume, handleReviewAll, handleDeletePlan, handleAddRepo, handleRemoveWorktrees, handleReopenGit, handleRevise, handleRechunk, handleOpenPlanTab, cancelStart]);
 
-  return { busy, paneActions, diffProps };
+  return { busy, starting, paneActions, diffProps };
 }

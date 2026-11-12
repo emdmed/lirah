@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt } from './planPrompts';
+import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt } from './planPrompts';
 import { noGitConfig } from './planModel';
 
 const chunk = { id: 'c1', n: 1, title: 'Do it', body: 'Details.', status: 'pending' };
@@ -51,5 +51,12 @@ describe('chunk prompt handoff', () => {
     const p = buildChunkPrompt(plan, plan.chunks[0]);
     expect(p).toContain('  2. Two');
     expect(p).not.toContain('Later choice');
+  });
+});
+
+describe('plan fix prompt', () => {
+  it('commits with the plan review trailer', () => {
+    const p = buildPlanFixPrompt(gitPlan, [{ relPath: 'a.js', fromLine: 1, note: 'fix' }]);
+    expect(p).toContain('git commit -m "plan(demo): review fixes" -m "Plan-Chunk: p1/review"');
   });
 });

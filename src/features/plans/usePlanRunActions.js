@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { dirtyCount } from '../../lib/git';
 import { getSettings, setSetting } from '../settings/settingsStore';
 import { getTabSession } from '../tabs/terminalActivity';
@@ -18,8 +18,8 @@ const AGENT_SETTLE_MS = 500;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Resolves true once the agent in `tabId` is up and idle, or false after `ms`. */
-function agentStarted(tabId, ms) {
+/** Resolves true once the agent in `tabId` is up and idle, or false after `ms` or when `signal` aborts. */
+function agentStarted(tabId, ms, signal) {
   const ready = () => getAgentHookState(getTabSession(tabId))?.state === 'waiting';
   if (ready()) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -27,9 +27,12 @@ function agentStarted(tabId, ms) {
     const finish = (ok) => {
       clearTimeout(timer);
       unsubscribe();
+      signal.removeEventListener('abort', cancel);
       resolve(ok);
     };
-    const timer = setTimeout(() => finish(false), ms);
+    const cancel = () => finish(false);
+    const timer = setTimeout(cancel, ms);
+    signal.addEventListener('abort', cancel);
     unsubscribe = subscribeAgentHooks(() => ready() && finish(true));
   });
 }
@@ -43,6 +46,11 @@ export function usePlanRunActions({
   repoRoot, plans, openPlan, setOpenPlanId, withBusy, tabs, activeTabId, addTab, wakeTab, switchTab, confirm, toast,
   ensureGit, updatePlan, implementChunk, startAutopilot, resumeAutopilot, stopAutopilot,
 }) {
+  // Plans waiting for their terminal's Claude to start, and how to stop each wait.
+  const [starting, setStarting] = useState(() => new Set());
+  const startWaits = useRef(new Map());
+  const cancelStart = useCallback((planId) => startWaits.current.get(planId)?.abort(), []);
+
   // Before typing into the plan's terminal: is there an agent, and is it free?
   // `chunk` is the one about to be sent; auto-pilot adopts a chunk in flight.
   const confirmSend = useCallback(async (plan, chunk, tabId) => {
@@ -99,13 +107,30 @@ export function usePlanRunActions({
     } else {
       const active = tabs.find((t) => t.id === activeTabId);
       const host = active?.planHost || activeTabId;
-      if (!host) return null;
+      if (!host) {
+        toast.error("Open the plan's project tab first, then send again");
+        return null;
+      }
       const tab = addTab(cfg.workDir || repoRoot, { name: plan.title || UNTITLED_PLAN, planHost: host, background: true, focus: false });
       id = tab.id;
       updatePlan(repoRoot, plan.id, { tabId: id });
     }
     switchTab(id); // shown while it starts, in case Claude asks to trust the folder
-    if (!(await agentStarted(id, AGENT_START_TIMEOUT_MS))) {
+    const wait = new AbortController();
+    startWaits.current.get(plan.id)?.abort();
+    startWaits.current.set(plan.id, wait);
+    setStarting((s) => new Set(s).add(plan.id));
+    const ok = await agentStarted(id, AGENT_START_TIMEOUT_MS, wait.signal);
+    if (startWaits.current.get(plan.id) === wait) {
+      startWaits.current.delete(plan.id);
+      setStarting((s) => {
+        const next = new Set(s);
+        next.delete(plan.id);
+        return next;
+      });
+    }
+    if (wait.signal.aborted) return null; // cancelled: a silent stop
+    if (!ok) {
       toast.error(`Claude didn't start in the plan's terminal "${plan.title || UNTITLED_PLAN}". Show it (terminal), launch Claude (Ctrl+K), then send again.`);
       return null;
     }
@@ -197,5 +222,5 @@ export function usePlanRunActions({
     }
   }, [plans, toggleSeq, openPlan, setOpenPlanId, repoRoot, stopAutopilot, handleResume, handleAutopilot, toast]);
 
-  return { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume };
+  return { prepareFor, confirmSend, handleImplement, handleAutopilot, handleResume, starting, cancelStart };
 }

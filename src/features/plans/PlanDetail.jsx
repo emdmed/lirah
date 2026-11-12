@@ -19,7 +19,7 @@ import { Fig22FilesByChunk } from './Fig22FilesByChunk';
 import { usePlanCommitFiles } from './usePlanCommitFiles';
 import { useUncommitted } from './useUncommitted';
 import { ChunkRow, DoneRun } from './ChunkRow';
-import { BUSY, useBusy, usePlanPane } from './PlanPaneContext';
+import { BUSY, useBusy, usePlanPane, useStarting } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
 import { isNoGit, planGit } from './planGit';
 import { planTerminalShown, useTabManager } from '../tabs/TabContext';
@@ -90,6 +90,8 @@ export function PlanDetail({ plan }) {
   const toast = useToast();
   const reviewingAll = useBusy(BUSY.REVIEW_ALL);
   const settingUpGit = useBusy(BUSY.GIT_SETUP);
+  const starting = useStarting(plan.id);
+  const cancelStart = starting ? () => pane.cancelStart(plan.id) : null;
   const showingTerminal = planTerminalShown(tabs, plan.tabId);
   const terminalTitle = showingTerminal ? 'Back to this tab\'s terminal' : 'Show the plan\'s terminal in this tab (opens one if closed)';
   const resplit = () => runSplit(repoRoot, plan.id);
@@ -196,6 +198,7 @@ export function PlanDetail({ plan }) {
       onGoToTab={() => switchTab(plan.autopilot.tabId)}
       onReviewAll={noGit ? null : () => pane.reviewAll(plan)}
       options={piloted ? freshContext : null}
+      onCancelStart={cancelStart}
     />
   );
   // Running, paused or failed: what the run needs from you comes before the plan's identity.
@@ -443,6 +446,10 @@ export function PlanDetail({ plan }) {
                 {handSent ? `run on auto-pilot from ${handSent.n}` : 'run on auto-pilot'}
               </PanelButton>
               {freshContext}
+              {/* With no strip yet, the first start's wait is cancelled here. */}
+              {cancelStart && !plan.autopilot && (
+                <PanelButton onClick={cancelStart} title="Stop waiting for Claude to start; nothing is sent">cancel</PanelButton>
+              )}
             </div>
           )}
         </Section>

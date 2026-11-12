@@ -12,7 +12,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   }),
 }));
 
-const { adoptedFacts, captureBaseShas, chunkCommits } = await import('./planGitOps');
+const { adoptedFacts, captureBaseShas, chunkCommits, planReviewRanges, withFixCommits } = await import('./planGitOps');
 const { noGitConfig } = await import('./planModel');
 
 const plan = { id: 'p1', repoRoot: '/r', chunks: [] };
@@ -41,5 +41,32 @@ describe('no-git plans', () => {
     calls.length = 0;
     expect(await captureBaseShas(noGitConfig('/x'))).toEqual({});
     expect(calls).toEqual([]);
+  });
+});
+
+describe('plan review ranges', () => {
+  const chunk = { id: 'c1', status: 'implemented', commits: ['a1', 'a2'], baseShas: { '/r': 'base0' }, startedAt: 1, doneAt: 2 };
+
+  it('end at the last chunk commit without fixes', () => {
+    expect(planReviewRanges({ ...plan, chunks: [chunk] })[0].headRef).toBe('a2');
+  });
+
+  it('end at the newest fix commit when the plan has one', () => {
+    const fixes = [{ commits: { '/r': ['f1'] } }, { commits: { '/r': ['f2', 'f3'] } }];
+    expect(planReviewRanges({ ...plan, chunks: [chunk], fixes })[0]).toMatchObject({
+      baseRef: 'base0', headRef: 'f3', commits: ['a1', 'a2', 'f1', 'f2', 'f3'],
+    });
+  });
+});
+
+describe('withFixCommits', () => {
+  it('gives the latest pending fix only the commits not recorded yet', () => {
+    const fixes = [{ commits: { '/r': ['f1'] } }, { notes: 2, commits: {} }];
+    expect(withFixCommits({ fixes }, { '/r': ['f1', 'f2'] })).toEqual([fixes[0], { notes: 2, commits: { '/r': ['f2'] } }]);
+  });
+
+  it('is null with no pending fix or nothing new', () => {
+    expect(withFixCommits({}, { '/r': ['f1'] })).toBeNull();
+    expect(withFixCommits({ fixes: [{ commits: { '/r': ['f1'] } }, { commits: {} }] }, { '/r': ['f1'] })).toBeNull();
   });
 });

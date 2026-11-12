@@ -7,7 +7,7 @@ import { git, gitLines } from '../../lib/git';
 import { basename } from '../../utils/pathUtils';
 import { chunkBases, chunkCommitsByRepo, planGit, workPath } from './planGit';
 import { CHUNK_STATUS } from './planModel';
-import { chunkCommitMessage, chunkTrailer, parseDecisions } from './planPrompts';
+import { chunkCommitMessage, chunkTrailer, parseDecisions, planFixTrailer } from './planPrompts';
 
 // Commits a little older than the chunk's start still count: clocks and
 // commit dates are not exact.
@@ -37,6 +37,46 @@ export async function chunkCommits(plan, chunk) {
     if (shas.length > 0) commitsByRepo[repo.root] = shas;
   }
   return commitsByRepo;
+}
+
+/**
+ * The plan's review-fix commits, by repo root (oldest first), found by the fix
+ * trailer in each repo's whole history: the trailer names the plan.
+ */
+export async function fixCommits(plan) {
+  const commitsByRepo = {};
+  for (const repo of planGit(plan).repos) {
+    const shas = (await gitLines(workPath(repo), [
+      'log', '--format=%H', '--fixed-strings', `--grep=${planFixTrailer(plan)}`,
+    ])).reverse();
+    if (shas.length > 0) commitsByRepo[repo.root] = shas;
+  }
+  return commitsByRepo;
+}
+
+/** The fix commits in `root` recorded on `plan.fixes` (each { commits: root -> shas }), in fix order. */
+export function planFixCommits(plan, root) {
+  return (plan.fixes ?? []).flatMap((f) => f.commits?.[root] ?? []);
+}
+
+/** A sent plan fix whose commits weren't found yet. */
+export const isPendingFix = (fix) => Object.keys(fix.commits ?? {}).length === 0;
+
+/**
+ * plan.fixes with the fix commits (`commitsByRepo`, from fixCommits) not yet
+ * recorded given to the latest pending fix, or null when there's nothing new.
+ */
+export function withFixCommits(plan, commitsByRepo) {
+  const i = (plan.fixes ?? []).findLastIndex(isPendingFix);
+  if (i < 0) return null;
+  const fresh = {};
+  for (const [root, shas] of Object.entries(commitsByRepo)) {
+    const seen = new Set(planFixCommits(plan, root));
+    const mine = shas.filter((sha) => !seen.has(sha));
+    if (mine.length > 0) fresh[root] = mine;
+  }
+  if (Object.keys(fresh).length === 0) return null;
+  return plan.fixes.map((f, j) => (j === i ? { ...f, commits: fresh } : f));
 }
 
 /**
@@ -173,7 +213,8 @@ export function chunkReviewRanges(plan, chunk) {
 
 /**
  * The whole plan as one review, per repo: from before the first implemented
- * chunk that committed there to the last chunk's last commit there.
+ * chunk that committed there to the last chunk's last commit there, or the
+ * newest plan fix commit there when there is one.
  */
 export function planReviewRanges(plan) {
   const chunks = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED && c.commits?.length > 0);
@@ -183,11 +224,12 @@ export function planReviewRanges(plan) {
     if (mine.length === 0) continue;
     const first = mine.reduce((a, c) => ((c.startedAt ?? 0) < (a.startedAt ?? 0) ? c : a));
     const last = mine.reduce((a, c) => ((c.doneAt ?? 0) > (a.doneAt ?? 0) ? c : a));
+    const fixes = planFixCommits(plan, repo.root);
     ranges.push({
       path: workPath(repo),
-      commits: mine.flatMap((c) => chunkCommitsByRepo(plan, c)[repo.root]),
+      commits: [...mine.flatMap((c) => chunkCommitsByRepo(plan, c)[repo.root]), ...fixes],
       baseRef: chunkBases(plan, first)[repo.root],
-      headRef: chunkCommitsByRepo(plan, last)[repo.root].at(-1),
+      headRef: fixes.at(-1) ?? chunkCommitsByRepo(plan, last)[repo.root].at(-1),
     });
   }
   return ranges;

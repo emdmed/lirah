@@ -7,9 +7,10 @@ import { getAgentHookState, getAgentTranscript, subscribeAgentHooks } from '../t
 import { getTabSession } from '../tabs/terminalActivity';
 import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, nextChunkId,
-  planProgress, stopDrivesRun, UNTITLED_PLAN,
+  planProgress, stopDrivesRun, stopOutcome, UNTITLED_PLAN,
 } from './planModel';
 import { buildNudgePrompt, parseDecisions, parseStatusMarker, STATUS_DONE } from './planPrompts';
+import { isPendingFix } from './planGitOps';
 import { requestPlanFocus } from './plansPaneEvents';
 import { useHookWatchdog } from './useHookWatchdog';
 
@@ -82,7 +83,7 @@ const inFlight = (chunk) => chunk.status === CHUNK_STATUS.IN_PROGRESS || chunk.a
  * provider's checkChunk, implementChunk and sendChunkPrompt.
  */
 export function useAutopilot({
-  stateRef, findPlan, updatePlan, checkChunk, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
+  stateRef, findPlan, updatePlan, checkChunk, checkFixes, markChunkDone, implementChunk, sendChunkPrompt, clearTabContext, tabs, switchTab, toast,
 }) {
   // Plans whose agent is being cleared: the session ending and starting again
   // is expected then, not something to steer the run by.
@@ -270,27 +271,22 @@ export function useAutopilot({
     if (current?.status !== CHUNK_STATUS.IN_PROGRESS) return ap.status === AUTOPILOT_STATUS.RUNNING ? advance(repoRoot, planId) : undefined;
     const res = await checkChunk(repoRoot, planId, current.id);
     if (res.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, res.error);
-    if (res.found) {
-      setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.RUNNING, nudged: false, reason: null, message: null });
-      return advance(repoRoot, planId);
-    }
-    const text = await lastReply(sessionId);
+    const text = res.found ? null : await lastReply(sessionId);
     const marker = parseStatusMarker(text);
-    if (marker?.kind === STATUS_DONE) {
+    const { action, reason } = stopOutcome({ found: res.found, marker, running: ap.status === AUTOPILOT_STATUS.RUNNING, nudged: ap.nudged });
+    if (action === 'nudge') return nudge(repoRoot, plan, current);
+    if (action === 'done') {
       // Nothing to commit for this chunk (a check, a test run): on to the next.
       const done = await markChunkDone(repoRoot, planId, current.id, marker.message || null, parseDecisions(text));
       if (done.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, done.error);
+    }
+    if (action !== 'halt') {
       setAutopilot(repoRoot, planId, { status: AUTOPILOT_STATUS.RUNNING, nudged: false, reason: null, message: null });
       return advance(repoRoot, planId);
     }
-    if (marker?.kind === HALT_REASON.BLOCKED) {
-      // The agent says it can't go on: that needs you, the run itself didn't break.
-      return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.BLOCKED, marker.message || `Chunk ${current.n}: the agent is blocked.`);
-    }
-    if (marker?.kind === HALT_REASON.NEEDS_INPUT) {
-      return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.NEEDS_INPUT, marker.message || `Chunk ${current.n}: the agent has a question.`);
-    }
-    if (ap.status === AUTOPILOT_STATUS.RUNNING && !ap.nudged) return nudge(repoRoot, plan, current);
+    // Blocked or a question needs you, the run itself didn't break.
+    if (reason === HALT_REASON.BLOCKED) return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, reason, marker.message || `Chunk ${current.n}: the agent is blocked.`);
+    if (reason === HALT_REASON.NEEDS_INPUT) return halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, reason, marker.message || `Chunk ${current.n}: the agent has a question.`);
     const said = excerpt(text);
     halt(repoRoot, planId, AUTOPILOT_STATUS.PAUSED, HALT_REASON.NO_COMMIT,
       `Chunk ${current.n} stopped without committing.${said ? ` Last said: "${said}"` : ''}`);
@@ -338,6 +334,7 @@ export function useAutopilot({
       const turnEnded = next?.state === 'done' && prev?.state !== 'done';
       for (const [repoRoot, plans] of Object.entries(stateRef.current)) {
         for (const plan of plans) {
+          if (turnEnded && plan.fixes?.some((f) => isPendingFix(f) && getTabSession(f.tabId) === sessionId)) checkFixes(repoRoot, plan.id);
           if (!pilotedBy(plan, sessionId)) {
             if (turnEnded) checkSessionChunks(repoRoot, plan, sessionId, inFlight, (c) => settle(repoRoot, plan.id, c, sessionId));
             continue;
@@ -352,7 +349,7 @@ export function useAutopilot({
         }
       }
     });
-  }, [stateRef, checkChunk, markChunkDone, halt, setAutopilot, onAutopilotStop]);
+  }, [stateRef, checkChunk, checkFixes, markChunkDone, halt, setAutopilot, onAutopilotStop]);
 
   // A run whose tab was closed would wait forever for a Stop.
   useEffect(() => {

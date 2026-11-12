@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
 // What the plans pane hands down to the open plan and its chunks: which action
 // is in flight (state, changes often) and the pane's own handlers (actions).
@@ -15,24 +15,30 @@ export const BUSY = Object.freeze({
 const PlanPaneStateContext = createContext(null);
 const PlanPaneActionsContext = createContext(null);
 
-export function PlanPaneProvider({ busy, actions, children }) {
+export function PlanPaneProvider({ busy, starting, actions, children }) {
+  const state = useMemo(() => ({ busy, starting }), [busy, starting]);
   return (
     <PlanPaneActionsContext.Provider value={actions}>
-      <PlanPaneStateContext.Provider value={busy}>{children}</PlanPaneStateContext.Provider>
+      <PlanPaneStateContext.Provider value={state}>{children}</PlanPaneStateContext.Provider>
     </PlanPaneActionsContext.Provider>
   );
 }
 
 /** Whether `key` (a BUSY key) is the action in flight. */
 export function useBusy(key) {
-  return useContext(PlanPaneStateContext) === key;
+  return useContext(PlanPaneStateContext)?.busy === key;
+}
+
+/** Whether the plan is waiting for its terminal's Claude to start (cancelStart stops the wait). */
+export function useStarting(planId) {
+  return !!useContext(PlanPaneStateContext)?.starting?.has(planId);
 }
 
 /**
  * The pane's handlers: repoRoot, closePlan, and the actions that confirm, set
  * up git or toast before calling the store (implement, check, commit, review,
  * rollback, autopilot, resume, reviewAll, deletePlan, addRepo, removeWorktrees, reopenGit,
- * revise, rechunk).
+ * revise, rechunk, cancelStart).
  */
 export function usePlanPane() {
   const ctx = useContext(PlanPaneActionsContext);
