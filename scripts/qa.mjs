@@ -11,7 +11,7 @@
 //
 // Env: QA_MODEL (default haiku). See qa/README.md.
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, openSync, closeSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, cpSync, openSync, closeSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -125,25 +125,81 @@ export async function getInstance() {
   } finally { rmSync(lockFile, { force: true }); }
 }
 
-async function boot() {
-  const home = mkdtempSync(join(tmpdir(), 'lirah-qa-'));
-  const port = await freePort();
-  const token = randomBytes(16).toString('hex');
-  const realHome = homedir();
-  // Seed the profile: tabs open a plain shell (no agent), plus a small git project to work on.
+// The fresh profile: tabs open a plain shell (no agent), plus a small git project to work on.
+// Rewritten on every reset, so a recipe can't leave settings or project changes behind.
+function seed(home) {
   const project = join(home, 'project');
-  mkdirSync(join(home, '.lirah'));
+  mkdirSync(join(home, '.lirah'), { recursive: true });
   const now = Date.now();
   writeFileSync(join(home, '.lirah/settings.json'), JSON.stringify({
     autoLaunchCli: false,
     bookmarks: [{ id: 'qa-project', name: 'project', path: project, createdAt: now, lastAccessedAt: now }],
   }));
+  const git = (...a) => execFileSync('git', ['-c', 'user.name=QA', '-c', 'user.email=qa@example.com', ...a], { cwd: project, stdio: 'ignore' });
+  if (existsSync(join(project, '.git'))) {
+    // shortcut: keeps commits a recipe made on main; reset to the root commit if a recipe ever commits.
+    git('checkout', '-qf', 'main'); git('reset', '-q', '--hard'); git('clean', '-qfdx');
+    return;
+  }
   mkdirSync(join(project, 'src'), { recursive: true });
   writeFileSync(join(project, 'README.md'), '# QA fixture\n\nA small project for QA flows.\n');
   writeFileSync(join(project, 'src/index.js'), 'export const greet = (name) => `Hello, ${name}!`;\n');
   writeFileSync(join(project, 'src/util.js'), 'export const add = (a, b) => a + b;\n');
-  const git = (...a) => execFileSync('git', ['-c', 'user.name=QA', '-c', 'user.email=qa@example.com', ...a], { cwd: project, stdio: 'ignore' });
   git('init', '-q', '-b', 'main'); git('add', '.'); git('commit', '-qm', 'initial commit');
+}
+
+// Per-run state under ~/.lirah. workspaces/ is qa.reset's own (wiping it here would race the
+// reloaded page); control/, bin/, claude-plugin/, hook-token, migrations.json belong to the running Rust side.
+const RUN_STATE = ['tasks', 'plans', 'agent-events', 'prompt-context', 'compaction', 'jobs', 'jobs-logs', 'jobs-state.json'];
+
+/** Back to the fresh baseline: 0 tabs, one workspace, no dialog, no shell left. Throws why not. */
+async function reset(inst) {
+  const control = inst.env.LIRAH_CONTROL;
+  const r = await ask(control, 'qa.reset');
+  if (!r.ok) throw new Error(`qa.reset: ${r.error}`);
+  seed(inst.home);
+  for (const f of RUN_STATE) rmSync(join(inst.home, '.lirah', f), { recursive: true, force: true });
+  await sleep(1000); // the old page answers until it unloads
+  const { pid } = (await ask(control, 'qa.whoami')).data;
+  let why = 'frontend never answered after the reload';
+  for (const deadline = Date.now() + 30_000; Date.now() < deadline; await sleep(500)) {
+    const snap = await ask(control, 'qa', { _: ['snapshot'] }).catch(() => null);
+    if (!snap?.ok) continue;
+    const tabs = (await ask(control, 'tabs.list')).data;
+    let ws = null;
+    try { ws = JSON.parse(readFileSync(join(inst.home, '.lirah/workspaces/index.json'), 'utf8')).workspaces; } catch { /* not saved yet */ }
+    let shells = '';
+    try { shells = execFileSync('ps', ['--ppid', String(pid), '-o', 'comm='], { encoding: 'utf8' }).split('\n').filter((c) => /^(ba|z|fi|da)?sh$/.test(c)).join(' '); } catch { /* no children */ }
+    why = tabs.length ? `${tabs.length} tabs open` : String(snap.data).startsWith('(a modal dialog') ? 'a dialog is open'
+      : ws?.length !== 1 ? `${ws?.length ?? 'no'} workspaces` : shells ? `shell still running (${shells})` : null;
+    if (!why) return;
+  }
+  throw new Error(why);
+}
+
+/** reset(), or one fresh instance when it fails; resolves to the instance to use. */
+export async function resetInstance(inst) {
+  try { await reset(inst); return inst; } catch (e) { console.log(`\nqa: reset failed (${e.message}), starting a fresh instance`); }
+  await down();
+  rmSync(inst.home, { recursive: true, force: true });
+  return getInstance();
+}
+
+/** Copy app.log's tail and ~/.lirah (minus sockets) to runs/<recipe>-<time>/ before the next reset wipes them. */
+function keepEvidence(file, inst) {
+  const dir = join(registry, 'runs', `${file.replace(/\.md$/, '')}-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+  mkdirSync(dir, { recursive: true });
+  try { writeFileSync(join(dir, 'app.log'), readFileSync(inst.log, 'utf8').slice(-200_000)); } catch { /* no log */ }
+  cpSync(join(inst.home, '.lirah'), join(dir, 'lirah'), { recursive: true, filter: (src) => !src.includes('/.lirah/control') });
+  return dir;
+}
+
+async function boot() {
+  const home = mkdtempSync(join(tmpdir(), 'lirah-qa-'));
+  const port = await freePort();
+  const token = randomBytes(16).toString('hex');
+  const realHome = homedir();
+  seed(home);
   const appEnv = {
     ...baseEnv,
     HOME: home, // the app keeps everything under $HOME/.lirah: a fresh, throwaway profile
@@ -244,20 +300,22 @@ const flows = [...readFileSync(join(repo, 'qa/index.md'), 'utf8').matchAll(/\]\(
 if (!flows.length) { console.log('qa: no recipes in qa/index.md match'); process.exit(1); }
 
 let failed = 0, cost = 0;
+let inst;
+try { inst = await getInstance(); } catch (e) { console.log(`qa: could not start the app: ${e.message}`); process.exit(1); }
 for (const file of flows) {
   process.stdout.write(`qa: ${file} ... `);
-  let inst;
-  try { inst = await getInstance(); } catch (e) { console.log(`could not start the app: ${e.message}`); process.exit(1); }
+  try { inst = await resetInstance(inst); } catch (e) { console.log(`could not start the app: ${e.message}`); process.exit(1); }
   const r = await runFlow(file, inst);
-  inst.stop();
   cost += r.cost;
-  if (r.error || !r.result?.pass) failed++;
-  if (r.error) { console.log(`ERROR (${r.error})`); continue; }
-  console.log(`${r.result.pass ? 'PASS' : 'FAIL'} — ${r.result.summary}`);
-  for (const s of r.result.steps.filter((x) => !x.ok)) console.log(`    ✗ ${s.step}\n      ${s.evidence}`);
-  if (r.result.pass) rmSync(inst.home, { recursive: true, force: true });
-  else console.log(`    app log and profile kept in ${inst.home}`);
+  if (r.error || !r.result?.pass) { failed++; r.kept = keepEvidence(file, inst); }
+  if (r.error) console.log(`ERROR (${r.error})`);
+  else {
+    console.log(`${r.result.pass ? 'PASS' : 'FAIL'} — ${r.result.summary}`);
+    for (const s of r.result.steps.filter((x) => !x.ok)) console.log(`    ✗ ${s.step}\n      ${s.evidence}`);
+  }
+  if (r.kept) console.log(`    app log and profile kept in ${r.kept}`);
 }
 console.log(`qa: ${flows.length - failed}/${flows.length} recipes passed, cost $${cost.toFixed(4)}`);
+console.log('qa: instance left running; `npm run qa -- --down` stops it');
 process.exit(failed ? 1 : 0);
 }
