@@ -8,7 +8,8 @@
 //
 // Env: QA_MODEL (default haiku). See qa/README.md.
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, openSync, closeSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import net from 'node:net';
@@ -24,11 +25,33 @@ const freePort = () => new Promise((ok) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Run from inside a Lirah tab, LIRAH_* point at the user's real app: drop them.
 const baseEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('LIRAH_')));
+// Registry of the running instance, shared by every runner on this machine.
+const registry = join(tmpdir(), 'lirah-qa');
+const instanceFile = join(registry, 'instance.json');
+const lockFile = join(registry, 'instance.lock');
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+/** One runner starts an instance at a time: wait for another runner's startup, clearing a dead one's lock. */
+async function takeLock() {
+  mkdirSync(registry, { recursive: true });
+  for (;;) {
+    try { const fd = openSync(lockFile, 'wx'); writeFileSync(fd, String(process.pid)); closeSync(fd); return; } catch (e) { if (e.code !== 'EEXIST') throw e; }
+    const holder = Number(readFileSync(lockFile, 'utf8').trim() || 0);
+    if (holder && !alive(holder)) { rmSync(lockFile, { force: true }); continue; }
+    await sleep(1000);
+  }
+}
 
 /** Start an isolated instance; resolves to { home, env, stop }. */
 async function startInstance() {
+  await takeLock();
+  try { return await boot(); } finally { rmSync(lockFile, { force: true }); }
+}
+
+async function boot() {
   const home = mkdtempSync(join(tmpdir(), 'lirah-qa-'));
   const port = await freePort();
+  const token = randomBytes(16).toString('hex');
   const realHome = homedir();
   // Seed the profile: tabs open a plain shell (no agent), plus a small git project to work on.
   const project = join(home, 'project');
@@ -50,43 +73,45 @@ async function startInstance() {
     CARGO_HOME: process.env.CARGO_HOME || join(realHome, '.cargo'),
     RUSTUP_HOME: process.env.RUSTUP_HOME || join(realHome, '.rustup'),
     LIRAH_QA: '1',
+    LIRAH_QA_TOKEN: token, // qa.whoami echoes it, so a runner can tell its instance from any other Lirah
     LIRAH_DEV_PORT: String(port),
   };
   const config = JSON.stringify({ build: { devUrl: `http://localhost:${port}` } });
   const log = join(home, 'app.log');
+  // Output goes straight to the file, not through this process, so the instance can outlive the runner.
+  const logFd = openSync(log, 'a');
   const app = spawn(join(repo, 'node_modules/.bin/tauri'), ['dev', '--config', config], {
-    cwd: repo, env: appEnv, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: repo, env: appEnv, detached: true, stdio: ['ignore', logFd, logFd],
   });
-  let out = '';
-  const keep = (d) => { out += d; if (out.length > 200_000) out = out.slice(-100_000); };
-  app.stdout.on('data', keep);
-  app.stderr.on('data', keep);
+  closeSync(logFd);
   let exited = false;
   app.on('exit', () => { exited = true; });
+  const tail = () => readFileSync(log, 'utf8').slice(-3000);
   const stop = () => {
     try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already gone */ }
-    writeFileSync(log, out);
+    try { if (JSON.parse(readFileSync(instanceFile, 'utf8')).pid === app.pid) rmSync(instanceFile); } catch { /* not ours or gone */ }
   };
 
-  // A `lirah` that talks to this instance only.
   const bin = join(home, 'qa-bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'lirah'), `#!/bin/sh\nHOME='${home}' exec node '${join(repo, 'src-tauri/src/lirah_cli.js')}' "$@"\n`, { mode: 0o755 });
   const controlDir = join(home, '.lirah/control');
   const env = { ...baseEnv, PATH: `${bin}:${process.env.PATH}`, LIRAH_CONTROL: '' };
 
   // First run compiles the Rust side, so allow a while.
   const deadline = Date.now() + 15 * 60_000;
   for (;;) {
-    if (exited) { stop(); throw new Error(`app exited during startup; log: ${log}\n${out.slice(-3000)}`); }
+    if (exited) { stop(); throw new Error(`app exited during startup; log: ${log}\n${tail()}`); }
     if (Date.now() > deadline) { stop(); throw new Error(`app did not come up in 15 min; log: ${log}`); }
     const sock = existsSync(controlDir) && readdirSync(controlDir).find((f) => f.endsWith('.sock'));
     if (sock) {
       env.LIRAH_CONTROL = join(controlDir, sock);
+      // A `lirah` pinned to this instance: real LIRAH_* exported in the caller's shell can't redirect it.
+      writeFileSync(join(bin, 'lirah'), `#!/bin/sh\nunset LIRAH_PTY_SESSION LIRAH_WORKSPACE\nHOME='${home}' LIRAH_CONTROL='${env.LIRAH_CONTROL}' exec node '${join(repo, 'src-tauri/src/lirah_cli.js')}' "$@"\n`, { mode: 0o755 });
       try { // the frontend answers once React has mounted
         execFileSync(join(bin, 'lirah'), ['qa', 'snapshot'], { env, stdio: 'pipe', timeout: 5000 });
         await sleep(1500); // let startup tabs settle
-        return { home, env, stop, log };
+        writeFileSync(instanceFile, JSON.stringify({ pid: app.pid, pgid: app.pid, home, control: env.LIRAH_CONTROL, port, token, startedAt: Date.now() }));
+        return { home, env, stop, log, token };
       } catch { /* not ready yet */ }
     }
     await sleep(1000);
@@ -128,7 +153,7 @@ function runFlow(file, inst) {
 if (up) {
   console.log('qa: starting an instance (first run compiles Rust, can take minutes)...');
   const inst = await startInstance();
-  console.log(`qa: up. In another shell:\n  export PATH="${inst.env.PATH.split(':')[0]}:$PATH" LIRAH_CONTROL="${inst.env.LIRAH_CONTROL}"\n  lirah qa snapshot\nCtrl+C stops it.`);
+  console.log(`qa: up. In another shell:\n  export PATH="${inst.env.PATH.split(':')[0]}:$PATH"\n  lirah qa snapshot\nCtrl+C stops it.`);
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { inst.stop(); process.exit(0); });
   await new Promise(() => {});
 }
