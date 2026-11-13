@@ -1,9 +1,12 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from '@/components/icons';
+import { cn } from '../../lib/utils';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { errorMessage } from '../../lib/errorMessage';
+import { FrameHints } from '../../components/instrument/FrameHints';
+import { PanelButton } from '../../components/instrument/PanelButton';
 import { Scanner } from '../../components/instrument/Scanner';
-import { SegmentBank } from '../../components/instrument/SegmentBank';
+import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
@@ -215,7 +218,6 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       focusQuickAdd();
       return;
     }
-    if (e.target.closest('[role="radiogroup"]')) return; // the scope bank owns its arrow keys
     onCursorKey(e);
   };
 
@@ -249,58 +251,66 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
 
   return (
     <div ref={containerRef} tabIndex={-1} onKeyDown={onPaneKey} onBlur={onBlur} className="flex flex-col outline-none">
-      <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
-        <SegmentBank
-          label="Task scope"
-          value={view}
-          onChange={setView}
-          className="min-w-0"
-          options={[
-            { value: 'project', label: <ScopeLabel label={workspaceName} count={projectCount} /> },
-            { value: 'global', label: <ScopeLabel label="global" count={globalCount} /> },
-          ]}
-        />
-        <button
-          type="button"
-          onClick={() => setContextsOpen(true)}
-          className="tui-btn ml-auto"
-          title="Edit the plan contexts sent with a task"
-        >
-          contexts
-        </button>
-      </div>
+      {/* The composer: where a task goes and what it says, on the bar tone so the list reads apart from it. */}
+      <div className="flex flex-col bg-[var(--tui-bar)] shadow-[inset_0_-1px_0_0_var(--tui-line-strong)]">
+        <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
+          {/* Either name selects its list; the switch between them flips it. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <ScopeLabel label={workspaceName} count={projectCount} on={view === 'project'} onClick={() => setView('project')} />
+            <ToggleSwitch
+              checked={view === 'global'}
+              onChange={(on) => setView(on ? 'global' : 'project')}
+              label="Show global tasks"
+              tone="ink"
+            />
+            <ScopeLabel label="global" count={globalCount} on={view === 'global'} onClick={() => setView('global')} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setContextsOpen(true)}
+            className="tui-btn ml-auto"
+            title="Edit the plan contexts sent with a task"
+          >
+            contexts
+          </button>
+        </div>
 
-      <form
-        className="flex flex-col gap-1.5 px-3 pb-2 edge-b-engraved"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <Textarea
-          ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            } else if (e.key === 'Escape') {
-              e.currentTarget.blur();
-            }
+        <form
+          className="flex flex-col gap-1.5 px-3 pb-2.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
           }}
-          disabled={!scope}
-          rows={2}
-          placeholder={view === 'global' ? 'Add a global task…' : `Add a task to ${workspaceName}…`}
-          aria-label="New task"
-          className="min-h-12 resize-none py-1.5 text-xs leading-[18px]"
-        />
-        {text.trim() && (
-          <span className="text-[11px] text-muted-foreground">
-            ↵ save · ⇧↵ new line · formatted as a user story
-          </span>
-        )}
-      </form>
+        >
+          <Textarea
+            ref={inputRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              } else if (e.key === 'Escape') {
+                e.currentTarget.blur();
+              }
+            }}
+            disabled={!scope}
+            rows={2}
+            placeholder={`${view === 'global' ? 'Add a global task…' : `Add a task to ${workspaceName}…`}\nFirst line is the title; it's rewritten as a user story.`}
+            aria-label="New task"
+            className="min-h-12 resize-none py-1.5 text-xs leading-[18px]"
+          />
+          {/* Always drawn, so focusing the box never pushes the list down. */}
+          <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="tui-frame-hints min-w-0">
+              <FrameHints hints={[{ keys: ['↵'], label: 'add' }, { keys: ['⇧↵'], label: 'new line' }, { keys: ['esc'], label: 'leave' }]} />
+            </span>
+            <PanelButton type="submit" variant="default" disabled={!text.trim() || !scope} className="ml-auto shrink-0">
+              add
+            </PanelButton>
+          </div>
+        </form>
+      </div>
 
       {!tasks ? (
         scope ? (
@@ -322,7 +332,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
                 type="button"
                 onClick={() => setShowDone((v) => !v)}
                 aria-expanded={showDone}
-                className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer edge-b-engraved"
+                className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer edge-b-engraved"
               >
                 {showDone ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 <span className="engraved-label">done</span>
@@ -341,11 +351,19 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
   );
 });
 
-function ScopeLabel({ label, count }) {
+function ScopeLabel({ label, count, on, onClick }) {
   return (
-    <span className="flex max-w-40 items-center gap-1.5 px-1.5 text-[11px]">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        'flex max-w-40 cursor-pointer items-center gap-1.5 text-[11px]',
+        on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
       <span className="truncate">{label}</span>
-      {count > 0 && <span className="tabular-nums text-foreground">{count}</span>}
-    </span>
+      {count > 0 && <span className="tabular-nums">{count}</span>}
+    </button>
   );
 }

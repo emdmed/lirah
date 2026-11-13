@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Play, Refresh, Terminal } from '@/components/icons';
+import { ChevronDown, ChevronLeft, Done, Failed, Play, Refresh, Terminal } from '@/components/icons';
 import { Lamp } from '../../components/instrument/Lamp';
 import { SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { Scanner } from '../../components/instrument/Scanner';
 import { PanelButton } from '../../components/instrument/PanelButton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import { PlanGitSection } from './PlanGitSection';
 import { ProgressReadout, Prose, Section } from './parts';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -331,33 +332,39 @@ export function PlanDetail({ plan }) {
             >
               revise
             </PanelButton>
-            <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-[var(--ins-edge)]" />
-            {plan.split !== SPLIT_STATUS.RUNNING && (
-              <PanelButton
-                onClick={() => pane.rechunk(plan)}
-                disabled={revising || chunkInFlight || piloted}
-                title={chunkInFlight || piloted ? 'Not while a chunk or auto-pilot is running'
-                  : started ? 'Split what isn\'t done yet again, from the plan file as it is now; finished chunks stay'
-                    : 'Split the plan again, from its file as it is now'}
-              >
-                {started ? 're-chunk' : 're-split'}
-              </PanelButton>
-            )}
-            <PanelButton
-              onClick={() => shelvePlan(repoRoot, plan.id, !plan.shelved)}
-              title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Set it aside for now, to pick up later; it stays here (cancel is for a plan you won\'t do)'}
-            >
-              {plan.shelved ? 'unshelve' : 'shelve'}
-            </PanelButton>
-            <PanelButton
-              onClick={() => cancelPlan(repoRoot, plan.id, !plan.cancelledAt)}
-              title={plan.cancelledAt ? 'Take the plan back up where it was' : 'You won\'t do this plan: it stays here, tucked with the finished ones (shelve is for later)'}
-            >
-              {plan.cancelledAt ? 'uncancel' : 'cancel'}
-            </PanelButton>
-            {/* Destructive goes last, set apart, and prints its fault on hover. */}
-            <span aria-hidden="true" className="mx-0.5 h-3.5 w-px bg-[var(--ins-edge)]" />
-            <PanelButton onClick={() => pane.deletePlan(plan)} className="hover:text-[var(--ins-fault)]" title="Delete this plan (asks first)">delete</PanelButton>
+            {/* What happens to the plan, out of the way of the views; destructive last (DESIGN rule 14). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <PanelButton icon={ChevronDown} title="Re-split, shelve, cancel or delete this plan" className="flex-row-reverse">options</PanelButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="text-xs">
+                {plan.split !== SPLIT_STATUS.RUNNING && (
+                  <DropdownMenuItem className="cursor-pointer py-1"
+                    onClick={() => pane.rechunk(plan)}
+                    disabled={revising || chunkInFlight || piloted}
+                    title={chunkInFlight || piloted ? 'Not while a chunk or auto-pilot is running'
+                      : started ? 'Split what isn\'t done yet again, from the plan file as it is now; finished chunks stay'
+                        : 'Split the plan again, from its file as it is now'}
+                  >
+                    {started ? 're-chunk' : 're-split'}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem className="cursor-pointer py-1"
+                  onClick={() => shelvePlan(repoRoot, plan.id, !plan.shelved)}
+                  title={plan.shelved ? 'Show this plan on its tab and in the tabs pane again' : 'Set it aside for now, to pick up later; it stays here (cancel is for a plan you won\'t do)'}
+                >
+                  {plan.shelved ? 'unshelve' : 'shelve'}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-1"
+                  onClick={() => cancelPlan(repoRoot, plan.id, !plan.cancelledAt)}
+                  title={plan.cancelledAt ? 'Take the plan back up where it was' : 'You won\'t do this plan: it stays here, tucked with the finished ones (shelve is for later)'}
+                >
+                  {plan.cancelledAt ? 'uncancel' : 'cancel'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="cursor-pointer py-1" destructive onClick={() => pane.deletePlan(plan)} title="Delete this plan (asks first)">delete…</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </span>
         </div>
         {showSource && (
@@ -395,12 +402,13 @@ export function PlanDetail({ plan }) {
           </form>
         )}
 
-        {runUp && <div className="mt-3">{strip}</div>}
-
-        {/* Identity next: the title, and what the plan is for. */}
+        {/* Identity first: the title, and what the plan is for. */}
         {/* The plan's name is a proper name: Spectral italic, the pane's largest type. */}
         <h3 className="ins-name mt-3.5 text-[17px] leading-tight text-foreground wrap-anywhere">{plan.title || UNTITLED_PLAN}</h3>
         {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground" />}
+
+        {/* A live run sits right under what it's running. */}
+        {runUp && <div className="mt-3">{strip}</div>}
 
         <LifecycleLine plan={plan} />
         {(finished || plan.cancelledAt) && <CompleteStamp plan={plan} />}
@@ -430,15 +438,7 @@ export function PlanDetail({ plan }) {
       {finished && chunksBlock}
 
       {/* Sections: each hangs from a ruled head (calibrated's section line), so
-          progress, run, git and chunks read as separate concerns. */}
-      {total > 0 && (
-        <Section title="progress">
-          {/* The timeline once a chunk has a time; until then the bar. A live
-              run's strip already says where it is: no second count. */}
-          <Fig20Timeline plan={plan} showCount={!runUp} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
-        </Section>
-      )}
-
+          run, progress, git and chunks read as separate concerns. */}
       {/* How the plan gets done: auto-pilot, and the plan's own terminal. */}
       {((plan.autopilot && !runUp) || canPilot || terminalKey) && (
         <Section
@@ -449,7 +449,7 @@ export function PlanDetail({ plan }) {
             </PanelButton>
           )}
         >
-          {/* A settled run (done or off) is a line here; a live one sits at the top. */}
+          {/* A settled run (done or off) is a line here; a live one sits under the title. */}
           {plan.autopilot && !runUp && strip}
           {/* The run bank: the primary key, with its one option beside it.
               During a run the option moves into the strip, beside stop. While
@@ -474,6 +474,14 @@ export function PlanDetail({ plan }) {
               )}
             </div>
           )}
+        </Section>
+      )}
+
+      {total > 0 && (
+        <Section title="progress">
+          {/* The timeline once a chunk has a time; until then the bar. A live
+              run's strip already says where it is: no second count. */}
+          <Fig20Timeline plan={plan} showCount={!runUp} fallback={<ProgressReadout plan={plan} done={done} total={total} />} />
         </Section>
       )}
 
@@ -513,7 +521,7 @@ export function PlanDetail({ plan }) {
   );
 }
 
-/** A finished or cancelled plan's markup stamp, then what it took: chunks, summed working time, first start to last finish. */
+/** A finished or cancelled plan's mark (orrery Done/Failed glyph and legend), then what it took: chunks, summed working time, first start to last finish. */
 function CompleteStamp({ plan }) {
   const r = chunkRuler(plan);
   // Cancelled wins: a plan you dropped isn't complete, even with every chunk done.
@@ -524,7 +532,10 @@ function CompleteStamp({ plan }) {
     : null;
   return (
     <div role="status" className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] tabular-nums text-muted-foreground">
-      <span className="ins-stamp shrink-0" data-cancelled={cancelled || undefined}>{cancelled ? 'cancelled' : 'complete'}</span>
+      <span className="ins-stamp shrink-0" data-cancelled={cancelled || undefined}>
+        {cancelled ? <Failed size={14} /> : <Done size={14} />}
+        {cancelled ? 'cancelled' : 'complete'}
+      </span>
       <span className="min-w-0">
         <span className="text-foreground">{r.done}/{r.total}</span> chunks{cancelled && ' done'}
         {r.spent != null && <> · <span className="text-foreground">{formatDuration(r.spent)}</span> of work</>}

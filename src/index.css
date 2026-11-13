@@ -450,26 +450,22 @@ body {
   letter-spacing: 0.08em;
 }
 
-/* A finished plan's markup stamp (calibrated's .cal-stamp, in the ok ink, fault ink once cancelled):
-   a ruled box inside a ruled box, set down a little askew, pressed once on arrival. */
+/* A finished plan's mark: the orrery Done glyph and a legend word in the ok ink
+   (Failed and fault ink once cancelled), faded in once on arrival. */
 .ins-stamp {
   --stamp-c: var(--ins-ok);
-  display: inline-block;
-  font: 500 11px/1 var(--font-legend);
-  letter-spacing: .16em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--legend-weight) 11px/1 var(--font-legend);
+  letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
   color: var(--stamp-c);
-  border: 1px solid var(--stamp-c);
-  outline: 1px solid color-mix(in oklab, var(--stamp-c) 45%, transparent);
-  outline-offset: 2px;
-  padding: 5px 8px 4px;
-  margin: 3px;
-  transform: rotate(-2deg);
-  animation: ins-stamp-down 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ins-stamp-in 400ms var(--ins-ease-out) both;
 }
 .ins-stamp[data-cancelled] { --stamp-c: var(--ins-fault); }
-@keyframes ins-stamp-down {
-  from { transform: rotate(-6deg) scale(1.35); opacity: 0; filter: blur(1px); }
+@keyframes ins-stamp-in {
+  from { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ins-stamp { animation: none; }
@@ -546,6 +542,22 @@ body {
     align-items: center;
     gap: 6px;
     color: var(--color-foreground);
+  }
+
+  /* No-agent plate (LaunchAgentPrompt): the agent's seat on its orbit is empty;
+     it warms to gold while the launch key is under the pointer or focused. */
+  .ins-agent-seat {
+    stroke: var(--color-muted-foreground);
+    transition: stroke var(--ins-cool) var(--ins-ease-out);
+  }
+  .ins-agent-seat-halo { stroke: var(--ins-lamp); opacity: 0; transition: opacity var(--ins-cool) var(--ins-ease-out); }
+  .ins-agent-plate:has(.ins-agent-launch :is(:hover, :focus-visible)) .ins-agent-seat {
+    stroke: var(--ins-lamp);
+    transition-duration: var(--ins-warm);
+  }
+  .ins-agent-plate:has(.ins-agent-launch :is(:hover, :focus-visible)) .ins-agent-seat-halo {
+    opacity: 1;
+    transition-duration: var(--ins-warm);
   }
 
   /* Startup orrery (FirstTabChooser): bodies travel out from the mark, and fade when typing filters them out. */

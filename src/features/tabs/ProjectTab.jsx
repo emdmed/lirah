@@ -13,7 +13,7 @@ import { formatTokenCount } from "../token-budget/tokenCalculations";
 import { format } from "date-fns";
 import { ZenStrip } from "../zen/ZenStrip";
 import { LirahMark } from "../../components/LirahMark";
-import { LeftSidebar } from "../../components/LeftSidebar";
+import { LeftSidebar, LeftSidebarRail } from "../../components/LeftSidebar";
 import { usePromptTemplates } from "../templates";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useWatcher } from "../watcher";
@@ -217,6 +217,14 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
   // stays mounted, as before.
   // A background tab (woken by the master agent) boots without being shown.
   const [booted, setBooted] = useState(visible || background);
+  // Booted later, by switching to it (not opened, restored on screen, or woken).
+  const [bootedOnSwitch] = useState(!booted);
+  const [autoLaunchCli] = useSetting('autoLaunchCli', workspaceId);
+  const [launchOnTabSwitch] = useSetting('launchOnTabSwitch');
+  // Auto-launch for this tab's fresh shells; a tab first shown by switching to it can opt out.
+  const autoLaunch = autoLaunchCli && (launchOnTabSwitch || !bootedOnSwitch);
+  // No agent on its way: the launch plate covers the pane from the start, no splash first.
+  const noAgentComing = !launchOnStart && !background && !autoLaunch;
   if ((innerVisible || background) && !booted) setBooted(true);
 
   // Latched once the tab is first ready (shell up, agent started and drawn);
@@ -236,10 +244,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider initialFiles={draft?.files}>
-        <ProjectTabInner draft={draft} projectPath={projectPath} customLabel={customLabel} label={label} zenKey={columns > 1 ? column + 1 : null} rightEdge={column === columns - 1} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner draft={draft} projectPath={projectPath} customLabel={customLabel} label={label} zenKey={columns > 1 ? column + 1 : null} rightEdge={column === columns - 1} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} autoLaunch={autoLaunch} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, customLabel, label, column, columns, compactionHook, launchOnStart, background, master, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, customLabel, label, column, columns, compactionHook, launchOnStart, background, autoLaunch, master, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -282,12 +290,12 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
       onPointerDownCapture={visible && !isActive ? () => switchTab(tabId) : undefined}
     >
       <TabShownContext.Provider value={shown}>{content}</TabShownContext.Provider>
-      {!ready && <TabBootPlaceholder projectPath={projectPath} stage={bootStage} />}
+      {!ready && !noAgentComing && <TabBootPlaceholder projectPath={projectPath} stage={bootStage} />}
     </div>
   );
 });
 
-function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, rightEdge, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, master, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, rightEdge, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, autoLaunch, master, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
@@ -398,6 +406,11 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   const secondary = useSecondaryTerminal(terminalRef);
   // Planning mode takes the secondary terminal's half of the row (it keeps running, hidden).
   const planning = usePlanningMode(tabId);
+  // Planning's own fold of the files pane, apart from sidebarOpen so normal mode keeps its pane.
+  const [planFold, setPlanFold] = useState(planning);
+  const foldPane = useCallback(() => setPlanFold(true), []);
+  // Entering planning folds the pane; leaving resets it. Layout effect so the full pane never paints first.
+  useLayoutEffect(() => setPlanFold(planning), [planning]);
 
   const { changelogStatus, dismissChangelogStatus } = useAutoChangelog(
     currentPath,
@@ -479,7 +492,8 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   }, [terminalSessionId, tabId]);
 
   // Every fresh shell starts the tab's agent, so a tab opens straight into it
-  // (with auto-launch off, only a tab opened with a launch request does).
+  // (with auto-launch off, or launch on tab switch off for a tab first shown
+  // by switching to it, only a tab opened with a launch request does).
   // Waits until the tab is first shown, so restoring many tabs at startup
   // doesn't start every agent at once. Typing into the shell first cancels it.
   const launchFresh = useStableHandler(async () => {
@@ -493,7 +507,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
 
   useEffect(() => {
     const id = terminalSessionId;
-    if (!(settings.autoLaunchCli || launchRequested) || !(visible || background) || !terminalReady || !id || freshShellRef.current !== id) return;
+    if (!(autoLaunch || launchRequested) || !(visible || background) || !terminalReady || !id || freshShellRef.current !== id) return;
     const cancel = (e) => {
       // Keys typed in another tab (the master) must not cancel a background launch.
       if (!isActive) return;
@@ -515,7 +529,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
       clearTimeout(timer);
       window.removeEventListener('keydown', cancel, true);
     };
-  }, [settings.autoLaunchCli, launchRequested, isActive, visible, background, terminalReady, terminalSessionId, launchFresh, onReady]);
+  }, [autoLaunch, launchRequested, isActive, visible, background, terminalReady, terminalSessionId, launchFresh, onReady]);
 
   // When the boot placeholder can lift. Without an agent on its way (auto-launch
   // off, or a shell reclaimed after a reload), as soon as the shell is up.
@@ -525,7 +539,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   useEffect(() => {
     const id = terminalSessionId;
     if (!terminalReady || !id) return;
-    const agentComing = (settings.autoLaunchCli || launchRequested) && freshShellRef.current === id;
+    const agentComing = (autoLaunch || launchRequested) && freshShellRef.current === id;
     if (!agentComing) {
       onReady?.();
       return;
@@ -542,7 +556,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     };
     check();
     return () => clearTimeout(timer);
-  }, [terminalReady, terminalSessionId, settings.autoLaunchCli, launchRequested, onReady, onBootStage]);
+  }, [terminalReady, terminalSessionId, autoLaunch, launchRequested, onReady, onBootStage]);
 
   const orchestrationCheck = useOrchestrationCheck();
 
@@ -740,7 +754,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     sidebarOpen: sidebar.sidebarOpen, setSidebarOpen: sidebar.setSidebarOpen,
     viewMode, setViewMode,
     onLoadFlatView: loadFolders, onLoadTreeView: treeView.loadTreeData,
-    onLaunchClaude: launchClaude, terminalSessionId,
+    onLaunchClaude: launchClaude, agentRunning: cliRunning !== null, terminalSessionId,
     secondaryTerminalFocused: secondary.secondaryFocused,
     onToggleMarkdownFilter: treeView.handleToggleMarkdownFilter,
     isActive,
@@ -1096,7 +1110,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
       <Layout
         rightGutter={(zenMode && rightEdge) || planning}
         sidebar={
-          !zenMode && sidebar.sidebarOpen && (
+          !zenMode && sidebar.sidebarOpen && (planning && planFold ? <LeftSidebarRail onUnfold={() => setPlanFold(false)} /> : (
             <LeftSidebar
               sidebar={sidebar}
               projectPath={projectPath}
@@ -1127,7 +1141,8 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
               keepFilesAfterSend={settings.keepFilesAfterSend}
               onToggleKeepFiles={settings.setKeepFilesAfterSend}
               isActive={visible}
-            />
+              onFold={planning ? foldPane : undefined}
+            />)
           )
         }
         textarea={
@@ -1146,7 +1161,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
               onManageTemplates={openManageTemplates}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
-              projectPath={currentPath}
+              projectPath={projectPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
               onSaveGroup={openSaveFileGroup}
               compactionEnabled={compaction.compactionEnabled}
@@ -1189,7 +1204,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
               onManageTemplates={openManageTemplates}
               templateDropdownOpen={templateDropdownOpen}
               onTemplateDropdownOpenChange={setTemplateDropdownOpen}
-              projectPath={currentPath}
+              projectPath={projectPath}
               onLoadGroup={fileSelection.handleLoadFileGroup}
               onSaveGroup={openSaveFileGroup}
               promptBase={promptBase}
@@ -1304,10 +1319,11 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
           name={zenMode ? tabDisplayName({ customLabel, label, projectPath }, bookmarks) : undefined}
         />
         {zenMode && <ZenStrip tabId={tabId} zenKey={zenKey} isActive={isActive} visible={visible} cliName={cliRunning} branchName={branchName} />}
-        {!settings.autoLaunchCli && <LaunchAgentPrompt
+        {!autoLaunch && <LaunchAgentPrompt
           tabId={tabId}
           sessionId={terminalSessionId}
           isActive={visible}
+          projectPath={projectPath}
           selectedCli={settings.selectedCli}
           onLaunch={launchClaude}
           onChangeCli={openCliSettings}

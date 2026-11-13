@@ -16,6 +16,7 @@ import { getContextFill, HEAVY_CONTEXT_TOKENS } from '../config/models';
 import { Lamp } from './instrument/Lamp';
 import { LirahMark } from './LirahMark';
 import { WindowControls } from './WindowControls';
+import { WorkspaceMenu } from '../features/tabs/WorkspaceMenu';
 import { IS_MAC, IS_WINDOWS, basename } from '../utils/pathUtils';
 import { Meter } from './instrument/Meter';
 import { ToggleSwitch } from './instrument/ToggleSwitch';
@@ -316,6 +317,7 @@ export const StatusBar = memo(({
             {branchName && <span className="text-muted-foreground truncate">{branchName}</span>}
           </span>
         )}
+        <WorkspaceMenu />
 
         <div className="ml-auto" />
 
@@ -431,6 +433,7 @@ export const StatusBar = memo(({
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="panel" aria-label="Settings and actions">
+                  <Settings size={12} className="text-muted-foreground" aria-hidden="true" />
                   <span className="text-muted-foreground">settings</span>
                 </Button>
               </DropdownMenuTrigger>

@@ -239,6 +239,12 @@
   font-size: 11px;
   line-height: 1.5;
 }
+.markdown-body.markdown-compact code {
+  /* In a two-line preview a code span is part of the sentence, not a highlight. */
+  font-size: inherit;
+  color: var(--color-foreground);
+  padding: 0 0.3em;
+}
 .markdown-body.markdown-compact :is(h1, h2, h3, h4, p, ul, ol) {
   margin: 0.4em 0;
   font-size: 11px;

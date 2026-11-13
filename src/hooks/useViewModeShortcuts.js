@@ -30,6 +30,7 @@ export function useViewModeShortcuts({
   onLoadFlatView,
   onLoadTreeView,
   onLaunchClaude,
+  agentRunning,
   terminalSessionId,
   secondaryTerminalFocused,
   onToggleMarkdownFilter,
@@ -97,15 +98,10 @@ export function useViewModeShortcuts({
         e.preventDefault();
         e.stopPropagation();
 
-        // Do nothing if already in tree mode
-        if (sidebarOpen && viewMode === 'tree') {
+        // Already in tree mode with an agent up: launching would type into it.
+        if (sidebarOpen && viewMode === 'tree' && agentRunning) {
           return;
         }
-
-        // Always launch CLI for now - the process check isn't reliable since
-        // the login shell is always running. We could implement a more sophisticated
-        // check in the future using terminal output analysis or command prompt detection.
-        const shouldLaunchCli = true;
 
         // Open tree view (closes flat if open)
         setViewMode('tree');
@@ -113,8 +109,7 @@ export function useViewModeShortcuts({
         setSidebarOpen(true);
         onLoadTreeView();
 
-        // Launch Claude Code only if terminal is idle
-        if (shouldLaunchCli && onLaunchClaude) {
+        if (onLaunchClaude) {
           onLaunchClaude();
         }
       }
@@ -123,5 +118,5 @@ export function useViewModeShortcuts({
     // Use capture phase to intercept before terminal
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude, terminalSessionId, secondaryTerminalFocused, onToggleMarkdownFilter, isActive, confirm]);
+  }, [sidebarOpen, viewMode, setSidebarOpen, setViewMode, onLoadFlatView, onLoadTreeView, onLaunchClaude, agentRunning, terminalSessionId, secondaryTerminalFocused, onToggleMarkdownFilter, isActive, confirm]);
 }

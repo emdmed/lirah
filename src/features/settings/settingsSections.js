@@ -22,6 +22,12 @@ export const SETTINGS_ROWS = [
     words: 'auto-launch launch starred projects start cli terminal open',
   },
   {
+    id: 'launch-on-switch', section: 'agent', kind: 'toggle', key: 'launchOnTabSwitch',
+    label: 'Launch on tab switch',
+    hint: 'A restored tab starts its agent the first time you switch to it. Off: it waits with a launch plate. Needs auto-launch.',
+    words: 'launch on tab switch restored tabs start agent cli switching background',
+  },
+  {
     id: 'agent-state-hook', section: 'agent', kind: 'toggle', key: 'agentStateHook',
     label: 'Agent state hook',
     hint: 'The agent tells its tab when it is working, needs permission or is done. Off: Lirah guesses from terminal output. Applies to agents launched after the change.',

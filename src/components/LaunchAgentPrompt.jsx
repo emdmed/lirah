@@ -5,21 +5,28 @@ import { usePageVisible } from '../hooks/usePageVisible';
 import { tabCliLabel } from '../lib/agentClis';
 import { subscribeAgentHooks, getAgentHookState } from '../features/tabs/agentHookState';
 import { useCliRunning } from '../features/tabs/useTabsSummary';
-import { buttonVariants } from '@/components/ui/button';
+import { Lamp } from './instrument/Lamp.jsx';
+import { LirahMark } from './LirahMark';
+import { SKY } from './Layout';
+import { LAND_SVG } from '../features/tabs/FirstTabChooser';
+import { basename } from '../utils/pathUtils';
 
 // Tabs whose launch bar was dismissed. Module state so a terminal restart or a
 // remount doesn't bring it back; it resets with the app.
 const dismissedTabs = new Set();
 
+// The startup orrery's orbits (FirstTabChooser), with no bodies on them.
+const ORBITS = [110, 165, 220, 280];
+
 /**
- * Slim bar at the top-right of the terminal pane while the tab's shell has no
- * agent: a split key that launches the selected CLI (same as Ctrl+K), or opens
- * the CLI picker from its chevron.
+ * Plate over the terminal pane while the tab's shell has no agent: a split key
+ * that launches the selected CLI (same as Ctrl+K), or opens the CLI picker
+ * from its chevron.
  * Goes away once an agent runs, the user types into the shell, or it is
  * dismissed for the tab.
  */
 export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
-  tabId, sessionId, isActive, selectedCli, onLaunch, onChangeCli,
+  tabId, sessionId, isActive, projectPath, selectedCli, onLaunch, onChangeCli,
 }) {
   const pageVisible = usePageVisible();
   const [dismissed, setDismissed] = useState(() => dismissedTabs.has(tabId));
@@ -68,34 +75,72 @@ export const LaunchAgentPrompt = memo(function LaunchAgentPrompt({
     onLaunch?.();
   }, [sessionId, onLaunch]);
 
-  if (!sessionId || dismissed || done) return null;
+  // Drawn before the shell is up too, so a tab with no agent coming opens straight onto it.
+  if (dismissed || done) return null;
 
   const cliLabel = tabCliLabel(selectedCli);
+  const name = basename(projectPath ?? '', 'project');
 
+  // The startup orrery, settled: the unlit mark with the agent's seat on its
+  // orbit empty. Hovering the launch key warms the empty seat.
   return (
     <div
-      className="absolute top-3 right-5 z-10 flex items-center gap-2 h-7 pl-1 pr-1.5 text-xs ins-veil"
+      className="ins-agent-plate absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 overflow-hidden p-6"
+      style={{ backgroundColor: 'var(--ins-gutter)' }}
       role="region"
-      aria-label="Launch agent"
+      aria-label={`No agent running in ${name}`}
     >
-      <SplitKey
-        onClick={handleLaunch}
-        onChoose={onChangeCli}
-        chooseLabel="Choose agent"
-      >
-        ▶ Launch {cliLabel}
-      </SplitKey>
-      <KeyChord keys={['^', 'K']} size="sm" />
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className={buttonVariants({ variant: 'ghost', size: 'icon-panel' })}
-        data-icon-only
-        aria-label="Dismiss launch bar for this tab"
-        title="Hide for this tab"
-      >
-        ×
-      </button>
+      {SKY}
+      {LAND_SVG}
+      <div className="relative flex w-full flex-col items-center gap-3">
+        <span className="relative w-full max-w-[760px]" style={{ aspectRatio: '760 / 290' }}>
+          <svg viewBox="0 0 760 290" aria-hidden="true" className="absolute inset-0 h-full w-full overflow-visible">
+            <g fill="none" stroke="var(--color-foreground)" strokeWidth="1" vectorEffect="non-scaling-stroke" transform="rotate(-11 380 145)">
+              {ORBITS.map((rx, i) => (
+                <ellipse
+                  key={rx}
+                  cx="380"
+                  cy="145"
+                  rx={rx}
+                  ry={rx * 0.47}
+                  opacity={i === ORBITS.length - 1 ? 0.4 : 0.3}
+                  strokeDasharray={i === ORBITS.length - 1 ? '5 4' : undefined}
+                />
+              ))}
+              <circle cx="380" cy="145" r="44" strokeWidth="0.6" strokeDasharray="1 3" opacity="0.4" />
+              {/* The agent's seat on the first orbit (60deg along it), empty. */}
+              <g className="ins-agent-seat" transform="translate(435 189.8)">
+                <circle className="ins-agent-seat-halo" r="10" strokeDasharray="1 2.5" />
+                <circle r="4.5" fill="var(--ins-gutter)" />
+              </g>
+            </g>
+          </svg>
+          <LirahMark size={40} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+        </span>
+        <span className="ins-name text-[16px] text-foreground">{name}</span>
+        <span className="h-px w-56 bg-[var(--ins-edge)]" aria-hidden="true" />
+        <span className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+          <Lamp state="off" />
+          no agent running
+        </span>
+        <span className="ins-agent-launch mt-2 flex items-center gap-2 text-xs">
+          <SplitKey onClick={handleLaunch} onChoose={onChangeCli} chooseLabel="Choose agent" disabled={!sessionId}>
+            ▶ Launch {cliLabel}
+          </SplitKey>
+          <KeyChord keys={['^', 'K']} size="sm" />
+        </span>
+        <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground">
+          or type to use the shell ·
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="underline-offset-2 hover:text-foreground hover:underline"
+            title="Hide for this tab"
+          >
+            hide
+          </button>
+        </span>
+      </div>
     </div>
   );
 });

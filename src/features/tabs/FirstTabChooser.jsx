@@ -33,7 +33,7 @@ const LAND = Array.from({ length: 18 }, (_, i) => {
   }
   return d;
 });
-const LAND_SVG = (
+export const LAND_SVG = (
   <svg
     aria-hidden="true"
     className="pointer-events-none absolute inset-x-0 bottom-0 h-[220px] w-full"

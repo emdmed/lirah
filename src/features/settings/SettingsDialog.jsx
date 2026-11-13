@@ -81,6 +81,7 @@ export function SettingsDialog({
   const [compactionHook, setCompactionHook] = useSetting('compactionHook');
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
   const [agentControl, setAgentControl] = useSetting('agentControl');
+  const [launchOnTabSwitch, setLaunchOnTabSwitch] = useSetting('launchOnTabSwitch');
   const [taskFormatPrompt, setTaskFormatPrompt] = useSetting('taskFormatPrompt');
 
   const {
@@ -219,16 +220,16 @@ export function SettingsDialog({
 
           {/* Settings pane. Fixed height so switching sections doesn't jump. */}
           <FilterContext.Provider value={filterValue}>
-            <div className="min-h-0 overflow-y-auto pb-2 pr-2">
+            <div className="@container min-h-0 overflow-y-auto pb-2 pr-2">
               {filtering && totalMatches === 0 && (
                 <DialogEmpty>
                   No settings match “{query.trim()}”. <span className="text-foreground">esc</span> clears the filter.
                 </DialogEmpty>
               )}
-              {/* Full screen, but rows keep a readable width. */}
-              <div className="flex max-w-[720px] flex-col gap-8">
+              {/* Full screen: controls keep one column, hints take the margin beside it. */}
+              <div className="flex max-w-[1180px] flex-col gap-8">
                 <Section section={section('agent')} active={activeId === 'agent'}>
-                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'auto-launch', 'startup']}>
+                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'auto-launch', 'launch-on-switch', 'startup']}>
                     <ChoiceRow
                       row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli}
                       scope={<ScopeLine workspaceId={workspaceId} settingKey="selectedCli" label={ROW['default-cli'].label} format={cliLabel} />}
@@ -238,6 +239,7 @@ export function SettingsDialog({
                       row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli}
                       scope={<ScopeLine workspaceId={workspaceId} settingKey="autoLaunchCli" label={ROW['auto-launch'].label} />}
                     />
+                    <ToggleRow row={ROW['launch-on-switch']} value={launchOnTabSwitch} onChange={setLaunchOnTabSwitch} disabled={!autoLaunchCli} />
                     <StartupRow projectPath={projectPath} workspaceId={workspaceId} />
                   </Group>
                   <Group label="Prompt" sectionId="agent" rows={['keep-context', 'prompt-box']}>

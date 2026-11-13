@@ -21,8 +21,8 @@ export function Section({ section, active, children }) {
       aria-labelledby={filtering ? undefined : `settings-tab-${section.id}`}
       className="flex flex-col"
     >
-      <header className="mb-5 flex flex-col gap-1">
-        <h3 className="ins-legend text-[11px] text-foreground">{section.title}</h3>
+      <header className="mb-6 flex flex-col gap-1">
+        <h3 className="ins-name text-[15px] text-foreground">{section.title}</h3>
         {!filtering && <p className="text-[11px] text-muted-foreground">{section.blurb}</p>}
       </header>
       <div className="flex flex-col gap-4">{children}</div>
@@ -47,8 +47,10 @@ export function Group({ label, sectionId, rows, children }) {
 }
 
 // One setting. Label and inline control share a line joined by a dotted
-// leader, like a spec sheet; the hint sits under the label; wide controls
-// (choices, fields, lists) take the full width below.
+// leader, like a spec sheet; wide controls (choices, fields, lists) take the
+// column below. The hint sits under the label, or, once the pane is wide,
+// in a remarks column beside the row so the controls scan as one column.
+// The last track takes the hint's extra height, so the scope line stays put.
 export function Row({ id, sectionId, label, hint, control, scope, children, htmlFor }) {
   const { query, filtering } = useContext(FilterContext);
   if (filtering) {
@@ -56,8 +58,8 @@ export function Row({ id, sectionId, label, hint, control, scope, children, html
     if (!rowMatches(words, query)) return null;
   }
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
+    <div className="grid grid-cols-1 gap-y-1.5 @[960px]:grid-cols-[minmax(0,600px)_minmax(0,1fr)] @[960px]:grid-rows-[auto_auto_1fr] @[960px]:gap-x-12 @[960px]:gap-y-1">
+      <div className="flex min-h-6 items-center gap-2 @[960px]:col-start-1">
         <label htmlFor={htmlFor} className="shrink-0 text-xs text-foreground">{label}</label>
         {control && (
           <>
@@ -66,9 +68,13 @@ export function Row({ id, sectionId, label, hint, control, scope, children, html
           </>
         )}
       </div>
-      {hint && <div className="text-[11px] leading-snug text-muted-foreground">{hint}</div>}
-      {scope}
-      {children && <div className="pt-1">{children}</div>}
+      {hint && (
+        <div className="max-w-[64ch] text-[11px] leading-snug text-muted-foreground @[960px]:col-start-2 @[960px]:row-span-3 @[960px]:row-start-1 @[960px]:pt-1">
+          {hint}
+        </div>
+      )}
+      {scope && <div className="@[960px]:col-start-1">{scope}</div>}
+      {children && <div className="pt-1 @[960px]:col-start-1">{children}</div>}
     </div>
   );
 }
@@ -174,9 +180,10 @@ export function SubRows({ className, children }) {
 const onOff = (v) => (v === true ? 'on' : v === false ? 'off' : String(v));
 
 /**
- * Under an overridable row: a 'this workspace' switch (writes or removes the
- * key in workspace.json `overrides`), the value in effect and where it comes
- * from, and a reset while an override is set. `format` labels a value.
+ * Under an overridable row: one quiet line. Off, it says the value holds for
+ * all workspaces and offers to set it for this one (writes the key in
+ * workspace.json `overrides`); on, it names both values and offers a reset.
+ * `format` labels a value.
  */
 export function ScopeLine({ workspaceId, settingKey, label, format = onOff }) {
   const override = useSyncExternalStore(subscribeSettings, () => (workspaceId ? getOverride(workspaceId, settingKey) : undefined));
@@ -185,20 +192,27 @@ export function ScopeLine({ workspaceId, settingKey, label, format = onOff }) {
   const on = override !== undefined;
   const reset = () => setOverride(workspaceId, settingKey, undefined);
   return (
-    <div className="flex h-6 items-center gap-2 text-[11px] text-muted-foreground">
-      <ToggleSwitch
-        checked={on}
-        onChange={(next) => (next ? setOverride(workspaceId, settingKey, global) : reset())}
-        tone="lamp"
-        label={`${label}: this workspace only`}
-      />
-      <span className="shrink-0">this workspace</span>
-      <span aria-hidden="true" className="h-px flex-1 translate-y-[3px] border-b border-dotted border-[var(--ins-edge)]" />
-      <span className="min-w-0 truncate">
-        in effect <span className="text-foreground">{format(on ? override : global)}</span>
-        {on ? <> · all workspaces {format(global)}</> : ' · all workspaces'}
-      </span>
-      {on && <PanelButton className="text-xs" onClick={reset} aria-label={`Reset ${label} to all workspaces`}>reset</PanelButton>}
+    <div className="flex h-5 items-center gap-2 text-[11px] text-muted-foreground">
+      {on ? (
+        <>
+          <span className="min-w-0 truncate">
+            <span className="text-foreground">this workspace</span> · all workspaces use {format(global)}
+          </span>
+          <button type="button" className="tui-btn shrink-0" onClick={reset} aria-label={`Reset ${label} to all workspaces`}>reset</button>
+        </>
+      ) : (
+        <>
+          <span className="shrink-0">all workspaces</span>
+          <button
+            type="button"
+            className="tui-btn shrink-0"
+            onClick={() => setOverride(workspaceId, settingKey, global)}
+            aria-label={`${label}: set for this workspace only`}
+          >
+            this workspace only
+          </button>
+        </>
+      )}
     </div>
   );
 }

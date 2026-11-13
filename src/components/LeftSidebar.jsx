@@ -12,7 +12,9 @@ import { useRowCursor } from "../hooks/useRowCursor";
 import { SegmentBank } from "./instrument/SegmentBank";
 import { useSetting } from "../features/settings/settingsStore";
 import { TabButton } from "./instrument/TabButton";
-import { Files, Terminal } from "@/components/icons";
+import { ChevronLeft, ChevronRight, Files, Terminal } from "@/components/icons";
+import { PanelButton } from "./instrument/PanelButton";
+import { Keycap } from "./instrument/Keycap";
 import { MasterStrip } from "../features/tabs/MasterStrip";
 import { TabsSummaryPane } from "../features/tabs/TabsSummaryPane";
 import { useTabManager } from "../features/tabs/TabContext";
@@ -67,6 +69,17 @@ function FeaturesSection({ projectPath }) {
   );
 }
 
+/** The folded files pane: its expand key sits on the frame line, where the collapse key was. */
+export function LeftSidebarRail({ onUnfold }) {
+  return (
+    <div data-pane="1" className="relative flex flex-col items-center pt-5 my-1.5 mr-3 shrink-0 w-7 bg-[var(--ins-panel)]">
+      {/* -9px: centres the 20px key on the legend line, 1px into the face (legend: 14px tall from the pane top, face inset 6px). */}
+      <PanelButton icon={ChevronRight} onClick={onUnfold} title="Expand pane" aria-label="Expand pane" className="absolute -top-[9px] left-1/2 -translate-x-1/2" />
+      <Keycap size="sm">1</Keycap>
+    </div>
+  );
+}
+
 export const LeftSidebar = memo(function LeftSidebar({
   sidebar,
   projectPath,
@@ -93,6 +106,7 @@ export const LeftSidebar = memo(function LeftSidebar({
   keepFilesAfterSend,
   onToggleKeepFiles,
   isActive = true,
+  onFold,
 }) {
   const {
     selectedFiles, toggleFileSelection, filesWithRelativePaths,
@@ -142,6 +156,7 @@ export const LeftSidebar = memo(function LeftSidebar({
             : filtering && filterCounts?.total != null ? <span className="tabular-nums">{rowCount} <span className="text-faint">of {filterCounts.total}</span></span>
             : rowCount
           }
+          trailing={onFold && <PanelButton icon={ChevronLeft} onClick={onFold} title="Collapse pane" aria-label="Collapse pane" />}
         />
         <SidebarContent id="files-section" role="tabpanel" aria-label={section} className="flex flex-col flex-1 min-h-0">
           <SectionSwitch section={section} onSection={setSection} filesPanel={filesPanel} onFilesPanel={setFilesPanel} />

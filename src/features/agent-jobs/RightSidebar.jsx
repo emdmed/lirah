@@ -23,7 +23,6 @@ import { useAgentJobs } from './AgentJobsContext';
 import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { useTabManager } from '../tabs/TabContext';
-import { WorkspaceRow } from '../tabs/WorkspaceRow';
 import { PlansPane } from '../plans/PlansPane';
 import { EmptyLine, NewRow } from '../plans/parts';
 import { usePlans } from '../plans/PlansContext';
@@ -635,8 +634,6 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         lamp={runningJobs + totalActiveCount > 0 ? 'on' : undefined}
         trailing={
           <>
-            <WorkspaceRow />
-            <span className="ins-sep-star" aria-hidden="true" />
             <PanelButton
               icon={wide ? Collapse : Expand}
               onClick={toggleWide}

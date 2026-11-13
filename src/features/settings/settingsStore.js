@@ -31,6 +31,8 @@ export const SETTINGS_DEFAULTS = {
   // Launch the CLI automatically when a starred (bookmarked) repo is opened.
   // Never applies to tabs restored at startup: that isn't a deliberate act.
   autoLaunchCli: true,
+  // With auto-launch on: a restored tab also starts its agent the first time it is switched to.
+  launchOnTabSwitch: true,
   selectedCli: 'claude-code',
   // Command that starts Claude Code in a tab; empty = `claude`, or npx when it isn't on PATH.
   claudeCommand: '',

@@ -65,7 +65,7 @@ export const TaskRow = memo(function TaskRow({
       onDrop={drag?.onDrop}
       onDragEnd={drag?.endDrag}
       className={cn(
-        'group relative flex flex-col gap-1 px-3 pt-2.5 pb-3 text-[11px] edge-b-engraved',
+        'group relative flex flex-col gap-1 px-3 py-2 text-[11px] edge-b-engraved',
         !open && 'hover:bg-foreground/5',
         drag?.dragIndex === index && 'opacity-50',
       )}
@@ -99,7 +99,7 @@ export const TaskRow = memo(function TaskRow({
         {/* Closed rows float the actions over the title's end so hidden buttons don't steal its width. */}
         <span className={cn(
           'flex shrink-0 items-center gap-0.5',
-          !open && 'absolute right-3 top-2.5 h-[18px] [--strip:color-mix(in_srgb,var(--color-foreground)_5%,var(--pane-bg,var(--ins-panel)))] bg-[var(--strip)] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-gradient-to-r before:from-transparent before:to-[var(--strip)] before:content-[""]',
+          !open && 'absolute right-3 top-2 h-[18px] [--strip:color-mix(in_srgb,var(--color-foreground)_5%,var(--pane-bg,var(--ins-panel)))] bg-[var(--strip)] pl-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-gradient-to-r before:from-transparent before:to-[var(--strip)] before:content-[""]',
         )}>
           {!done && (
             <span className="flex items-center">
@@ -145,10 +145,16 @@ export const TaskRow = memo(function TaskRow({
         </span>
       </div>
 
+      {open ? (
+        <TaskEditor task={task} onEdit={onEdit} />
+      ) : (
+        task.notes && <TaskNotes notes={task.notes} className="line-clamp-2 [&>:first-child]:mt-0" />
+      )}
+
       {(task.status === TASK_STATUS.PLANNING || task.status === TASK_STATUS.PLANNED) && task.planPath && (
         <div className="flex min-w-0 items-center gap-2 pl-5 font-[family-name:var(--font-legend)] text-[11px] leading-4 text-muted-foreground">
           <span className="engraved-label shrink-0">plan</span>
-          <span className="min-w-0 truncate text-foreground/80" title={task.planPath}>
+          <span className="min-w-0 truncate" title={task.planPath}>
             {task.status === TASK_STATUS.PLANNING ? 'waiting for ' : ''}{basename(task.planPath)}
             {task.status === TASK_STATUS.PLANNING && task.autoChunk ? ', then chunks' : ''}
           </span>
@@ -162,12 +168,6 @@ export const TaskRow = memo(function TaskRow({
             </button>
           )}
         </div>
-      )}
-
-      {open ? (
-        <TaskEditor task={task} onEdit={onEdit} />
-      ) : (
-        task.notes && <TaskNotes notes={task.notes} className="line-clamp-2 [&>:first-child]:mt-0" />
       )}
     </div>
   );
@@ -184,7 +184,7 @@ function TaskTitle({ title }) {
 // Memoized: rows still re-render while dragging, and markdown parsing is the costly part.
 const TaskNotes = memo(function TaskNotes({ notes, className }) {
   return (
-    <div className={cn('markdown-body markdown-compact mt-0.5 pl-5 text-muted-foreground/85', className)}>
+    <div className={cn('markdown-body markdown-compact mt-0.5 pl-5 text-muted-foreground', className)}>
       <Suspense fallback={<p className="whitespace-pre-wrap">{notes}</p>}>
         <Markdown>{notes}</Markdown>
       </Suspense>
