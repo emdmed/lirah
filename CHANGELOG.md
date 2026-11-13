@@ -4,6 +4,22 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-13
+
+### Added
+
+- **Plan stamps** - A finished plan's detail shows a COMPLETE stamp with its chunk count, working time and end-to-end time. A cancelled plan shows a red CANCELLED stamp with how far it got and when it was cancelled.
+
+### Changed
+
+- **Cancelled plans in red** - In the plans list (under "show done/shelved"), a cancelled plan's status reads red and its title is dimmed.
+- **Dialogs share one shape** - Forms, pickers, git dialogs, the run job and new plan dialogs, and the viewers now use the same rows, fields, group headings, status lamp and empty states.
+- **QA runs on one verified instance** - `npm run qa` attaches to a single registered QA instance (identity-checked with `lirah qa whoami`) or starts one, resets it between recipes instead of restarting, and keeps it up until `--down`. New `--up`, `--status`, `--down` and `--fresh` flags.
+
+### Fixed
+
+- **Tooltips** - One hint per hover, no doubled native SVG titles, and a tooltip no longer changes under you while it's shown.
+
 ## [0.29.0] - 2026-11-12
 
 ### Added
