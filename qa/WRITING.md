@@ -1,6 +1,6 @@
 # Writing QA recipes
 
-For the model that writes recipes (Opus, run with `/qa-recipes`). Recipes are run later by a cheap model (Haiku) that knows nothing about the code. It only gets `qa/AGENT.md` and the recipe, and drives a fresh app through `lirah qa ...`. A recipe is good when Haiku passes it on a good build and fails it when the feature breaks.
+For the model that writes recipes (Opus, run with `/qa-recipes`). Recipes are run later by a cheap model (Haiku) that knows nothing about the code. It only gets `qa/AGENT.md` and the recipe, and drives a freshly reset app through `lirah qa ...`. A recipe is good when Haiku passes it on a good build and fails it when the feature breaks.
 
 ## Which features
 
@@ -14,15 +14,15 @@ Do the features one at a time, and update the index after each one, so stopping 
 ## Per feature
 
 1. **Learn what the feature promises.** Read its spec in `docs/specs/` if there is one (Behavior, Acceptance Criteria) and skim its code in `src/features/`. List the 2–4 things a user would be most upset to see break. Those are what the recipe checks. Skip anything you can't check from the screen or a terminal.
-2. **Walk it in the real app.** Start an instance: `npm run qa -- --up` in the background, with the sandbox disabled because it opens a window. Then export the two variables it prints and `unset LIRAH_PTY_SESSION LIRAH_WORKSPACE`. Do the journey yourself with `lirah qa snapshot / click / type / key / wait / terminal`. Note the exact labels and what each step shows afterwards. This is the only way to get labels right. Don't write them from the code.
+2. **Walk it in the real app.** Run `npm run qa -- --up` once, with the sandbox disabled because it opens a window. It attaches to the shared instance or starts it, prints the path of its `lirah` wrapper and exits. Call that path directly, with no exports or unsets, and check `<wrapper> qa whoami` shows `qa: true` before driving. Never start a second instance. Do the journey yourself with `<wrapper> qa snapshot / click / type / key / wait / terminal`, and `<wrapper> qa reset` to start over. Note the exact labels and what each step shows afterwards. This is the only way to get labels right. Don't write them from the code.
    - The profile is fresh: `~/project` (a small git repo, starred), tabs open a plain shell, and no agent is logged in. If the feature needs more state, put it in the recipe's Setup with `lirah` commands (`lirah tasks add`, `lirah settings set`, and so on) or terminal commands (create files, make a commit).
-   - Frontend edits need an instance restart to take effect. You shouldn't need any edits here.
+   - Frontend edits reach the instance on the next reset (every recipe run resets it). You shouldn't need any edits here.
 3. **Write `qa/recipes/<feature>.md`** in the format below.
 4. **Prove it passes:** `npm run qa -- <feature>` twice. Both runs must pass. If Haiku fails on a good build, the recipe is unclear: fix the wording (labels, waits, an Expect that can be checked another way) and run it again.
 5. **Prove it catches a break.** Pick the core handler behind one step, for example a button's `onClick` or the function the action calls, and stub it out (`() => {}`). First check the file has no uncommitted changes (`git diff --quiet -- <file>`); if it has some, pick another file or skip this step. Run the recipe and confirm it FAILS at that step. Then put the file back with `git checkout -- <file>` and check `git diff -- <file>` is empty. If the recipe passed with the feature broken, its Expect is too weak: tighten it and repeat.
 6. **Update `qa/index.md`:** link the recipe in the Recipe column (`[name](recipes/name.md)`, which is what the runner looks for), write a few words in Covers, and put today's date in Verified. Add a row if the feature wasn't listed.
 
-Stop the instance when you're done. In your report, list for each feature its recipe, the two passing runs, the break you tried and the step that caught it, plus any app bug you found along the way. A real bug is worth reporting. Don't make a recipe work around it.
+Leave the instance running when you're done unless the user asks you to stop it (`npm run qa -- --down`). In your report, list for each feature its recipe, the two passing runs, the break you tried and the step that caught it, plus any app bug you found along the way. A real bug is worth reporting. Don't make a recipe work around it.
 
 ## Recipe format
 

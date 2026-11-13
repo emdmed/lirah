@@ -290,7 +290,7 @@ if (flag('--down') || flag('--fresh')) await down();
 if (flag('--down')) process.exit(0);
 if (flag('--up') || flag('--fresh')) {
   const inst = await getInstance();
-  console.log(`qa: up. In your shell:\n  export PATH="${inst.env.PATH.split(':')[0]}:$PATH"\n  lirah qa snapshot\nIt keeps running; \`npm run qa -- --down\` stops it.`);
+  console.log(`qa: up. Drive it with this wrapper (it pins HOME and LIRAH_CONTROL, no exports needed):\n  ${join(inst.home, 'qa-bin/lirah')} qa whoami\nIt keeps running; \`npm run qa -- --down\` stops it.`);
   process.exit(0);
 }
 
