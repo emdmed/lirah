@@ -4,6 +4,26 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-14
+
+### Added
+
+- **Launch on tab switch** - New setting under Settings → Agent → Launch. With auto-launch on, a restored tab starts its agent the first time you switch to it. Turn it off and the tab waits with a launch plate instead.
+- **Settings icon** - The `settings` key in the status bar now shows a gear icon.
+
+### Changed
+
+- **Settings panel layout** - In a wide window, the controls form one column and each setting's explanation sits beside it instead of under it. The "this workspace" line under a setting is now one quiet line: `all workspaces [this workspace only]`, or both values with a `[reset]` once it's set for this workspace. Section titles are set in the italic name face.
+- **Workspaces in the status bar** - Workspaces moved from the Workspace pane's legend to a dropdown next to the project name. It switches workspaces, and n / r / x add, rename and remove them. Double-click or F2 renames the active one.
+- **Launch plate** - With no agent running, the terminal pane shows a plate with the project and the orbits from the startup screen, instead of a slim bar.
+- **Planning mode folds the files pane** - Entering planning mode folds the files pane to a narrow rail. Its key unfolds it, and leaving planning resets it.
+- **Plan detail** - Re-split, shelve, cancel and delete moved into an `options` menu, with delete last. A live run sits right under the plan title. The COMPLETE and CANCELLED stamps carry the done and failed glyphs.
+- **Tasks pane** - The scope picker is now a switch between the workspace name and `global`, on its own band above the list. A task's notes show above its plan line. Code in a note preview reads as part of the sentence.
+
+### Fixed
+
+- **Ctrl+S in tree view** - With the file tree already open and no agent running, the shortcut now launches the agent instead of doing nothing.
+
 ## [0.31.0] - 2026-11-13
 
 ### Changed
