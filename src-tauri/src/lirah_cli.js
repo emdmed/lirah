@@ -501,6 +501,9 @@ function route(cmd, positional, args) {
       default: fail(`unknown tasks command "${sub}" (list, add, done, reopen, edit, remove, move)`);
     }
   }
+  if (cmd === "qa" && sub === "whoami") {
+    return ["qa.whoami", rest, (d) => `pid ${d.pid}\nhome ${d.home}\ntoken ${d.token ?? "-"}`];
+  }
   return [cmd, positional, show];
 }
 

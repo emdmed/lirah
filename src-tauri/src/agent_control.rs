@@ -286,6 +286,15 @@ fn relay(emit: &dyn Fn(Value) -> tauri::Result<()>, req: Request) -> Value {
     if (req.cmd == "qa" || req.cmd.starts_with("qa.")) && std::env::var_os("LIRAH_QA").is_none() {
         return json!({ "ok": false, "error": "qa commands need an instance started with LIRAH_QA=1 (npm run qa)" });
     }
+    // Answered here so the QA runner can check which instance it reached before the frontend mounts.
+    if req.cmd == "qa.whoami" {
+        return json!({ "ok": true, "data": {
+            "pid": std::process::id(),
+            "home": std::env::var("HOME").ok(),
+            "qa": true,
+            "token": std::env::var("LIRAH_QA_TOKEN").ok(),
+        } });
+    }
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
     pending().lock().unwrap_or_else(|e| e.into_inner()).insert(id, tx);
@@ -333,6 +342,24 @@ pub fn agent_control_reply(
     };
     let _ = tx.send(reply);
     Ok(())
+}
+
+#[cfg(test)]
+mod relay_tests {
+    use super::*;
+
+    #[test]
+    fn qa_whoami_answers_with_the_token() {
+        let whoami = || relay(&|_| Ok(()), serde_json::from_str(r#"{"cmd":"qa.whoami"}"#).unwrap());
+        std::env::remove_var("LIRAH_QA");
+        assert_eq!(whoami()["ok"], false);
+        std::env::set_var("LIRAH_QA", "1");
+        std::env::set_var("LIRAH_QA_TOKEN", "t0k3n");
+        let reply = whoami();
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert_eq!(reply["data"]["token"], "t0k3n");
+        assert_eq!(reply["data"]["pid"], std::process::id());
+    }
 }
 
 #[cfg(all(test, windows))]
