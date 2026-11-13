@@ -42,10 +42,68 @@ async function takeLock() {
   }
 }
 
-/** Start an isolated instance; resolves to { home, env, stop }. */
-async function startInstance() {
+/** One JSON request straight to a control socket; resolves to the reply, rejects on no answer. */
+export function ask(control, cmd, args = {}, timeout = 5000) {
+  return new Promise((ok, fail) => {
+    let buf = '';
+    const s = net.connect(control);
+    s.setEncoding('utf8');
+    s.setTimeout(timeout, () => { s.destroy(); fail(new Error(`${cmd}: no answer`)); });
+    s.on('connect', () => s.write(JSON.stringify({ session: null, cmd, args }) + '\n'));
+    s.on('error', (e) => fail(new Error(`${cmd}: ${e.code || e.message}`)));
+    s.on('data', (d) => (buf += d));
+    s.on('end', () => { try { ok(JSON.parse(buf)); } catch { fail(new Error(`${cmd}: bad reply`)); } });
+  });
+}
+
+// A `lirah` pinned to this instance: real LIRAH_* exported in the caller's shell can't redirect it.
+function pin(home, control) {
+  const bin = join(home, 'qa-bin');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, 'lirah'), `#!/bin/sh\nunset LIRAH_PTY_SESSION LIRAH_WORKSPACE\nHOME='${home}' LIRAH_CONTROL='${control}' exec node '${join(repo, 'src-tauri/src/lirah_cli.js')}' "$@"\n`, { mode: 0o755 });
+  return { ...baseEnv, PATH: `${bin}:${process.env.PATH}`, LIRAH_CONTROL: control };
+}
+
+const stopper = (pid) => () => {
+  try { process.kill(-pid, 'SIGTERM'); } catch { /* already gone */ }
+  try { if (JSON.parse(readFileSync(instanceFile, 'utf8')).pid === pid) rmSync(instanceFile); } catch { /* not ours or gone */ }
+};
+
+/** The registered instance if it is alive, ours (token + home) and answering; otherwise null, dropping a stale registry. */
+export async function findInstance() {
+  let reg;
+  try { reg = JSON.parse(readFileSync(instanceFile, 'utf8')); } catch { return null; }
+  try {
+    if (!alive(-reg.pgid)) throw new Error(`process group ${reg.pgid} is gone`);
+    // The socket is named after the Rust pid, which changes when tauri dev rebuilds and restarts it.
+    const dir = join(reg.home, '.lirah/control');
+    const sock = existsSync(dir) && readdirSync(dir).find((f) => f.endsWith('.sock') && alive(Number(f.slice(0, -5))));
+    if (!sock) throw new Error(`no live control socket in ${dir}`);
+    const control = join(dir, sock);
+    const who = await ask(control, 'qa.whoami');
+    if (!who.ok || who.data?.qa !== true) throw new Error(`whoami refused: ${who.error || 'not a QA instance'}`);
+    if (who.data.token !== reg.token) throw new Error('token mismatch: the socket belongs to another instance');
+    if (who.data.home !== reg.home) throw new Error(`home mismatch: ${who.data.home}`);
+    const snap = await ask(control, 'qa', { _: ['snapshot'] });
+    if (!snap.ok) throw new Error(`frontend not answering: ${snap.error}`);
+    if (control !== reg.control) writeFileSync(instanceFile, JSON.stringify({ ...reg, control }));
+    return { pid: reg.pid, home: reg.home, env: pin(reg.home, control), stop: stopper(reg.pid), log: join(reg.home, 'app.log'), token: reg.token };
+  } catch (e) {
+    console.log(`qa: not reusing instance pid ${reg.pid} (${e.message})`);
+    rmSync(instanceFile, { force: true });
+    return null;
+  }
+}
+
+/** Attach to the registered instance or start one; resolves to { home, env, stop, log, token }. */
+export async function getInstance() {
   await takeLock();
-  try { return await boot(); } finally { rmSync(lockFile, { force: true }); }
+  try {
+    const found = await findInstance();
+    if (found) { console.log(`qa: using instance pid ${found.pid}, home ${found.home}`); return found; }
+    console.log('qa: starting an instance (first run compiles Rust, can take minutes)');
+    return await boot();
+  } finally { rmSync(lockFile, { force: true }); }
 }
 
 async function boot() {
@@ -87,15 +145,8 @@ async function boot() {
   let exited = false;
   app.on('exit', () => { exited = true; });
   const tail = () => readFileSync(log, 'utf8').slice(-3000);
-  const stop = () => {
-    try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already gone */ }
-    try { if (JSON.parse(readFileSync(instanceFile, 'utf8')).pid === app.pid) rmSync(instanceFile); } catch { /* not ours or gone */ }
-  };
-
-  const bin = join(home, 'qa-bin');
-  mkdirSync(bin);
+  const stop = stopper(app.pid);
   const controlDir = join(home, '.lirah/control');
-  const env = { ...baseEnv, PATH: `${bin}:${process.env.PATH}`, LIRAH_CONTROL: '' };
 
   // First run compiles the Rust side, so allow a while.
   const deadline = Date.now() + 15 * 60_000;
@@ -104,11 +155,9 @@ async function boot() {
     if (Date.now() > deadline) { stop(); throw new Error(`app did not come up in 15 min; log: ${log}`); }
     const sock = existsSync(controlDir) && readdirSync(controlDir).find((f) => f.endsWith('.sock'));
     if (sock) {
-      env.LIRAH_CONTROL = join(controlDir, sock);
-      // A `lirah` pinned to this instance: real LIRAH_* exported in the caller's shell can't redirect it.
-      writeFileSync(join(bin, 'lirah'), `#!/bin/sh\nunset LIRAH_PTY_SESSION LIRAH_WORKSPACE\nHOME='${home}' LIRAH_CONTROL='${env.LIRAH_CONTROL}' exec node '${join(repo, 'src-tauri/src/lirah_cli.js')}' "$@"\n`, { mode: 0o755 });
+      const env = pin(home, join(controlDir, sock));
       try { // the frontend answers once React has mounted
-        execFileSync(join(bin, 'lirah'), ['qa', 'snapshot'], { env, stdio: 'pipe', timeout: 5000 });
+        execFileSync(join(home, 'qa-bin/lirah'), ['qa', 'snapshot'], { env, stdio: 'pipe', timeout: 5000 });
         await sleep(1500); // let startup tabs settle
         writeFileSync(instanceFile, JSON.stringify({ pid: app.pid, pgid: app.pid, home, control: env.LIRAH_CONTROL, port, token, startedAt: Date.now() }));
         return { home, env, stop, log, token };
@@ -150,9 +199,10 @@ function runFlow(file, inst) {
   });
 }
 
+// Imported by qa.test.mjs: only run when executed.
+if (import.meta.filename === resolve(process.argv[1] ?? '')) {
 if (up) {
-  console.log('qa: starting an instance (first run compiles Rust, can take minutes)...');
-  const inst = await startInstance();
+  const inst = await getInstance();
   console.log(`qa: up. In another shell:\n  export PATH="${inst.env.PATH.split(':')[0]}:$PATH"\n  lirah qa snapshot\nCtrl+C stops it.`);
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { inst.stop(); process.exit(0); });
   await new Promise(() => {});
@@ -167,7 +217,7 @@ let failed = 0, cost = 0;
 for (const file of flows) {
   process.stdout.write(`qa: ${file} ... `);
   let inst;
-  try { inst = await startInstance(); } catch (e) { console.log(`could not start the app: ${e.message}`); process.exit(1); }
+  try { inst = await getInstance(); } catch (e) { console.log(`could not start the app: ${e.message}`); process.exit(1); }
   const r = await runFlow(file, inst);
   inst.stop();
   cost += r.cost;
@@ -180,3 +230,4 @@ for (const file of flows) {
 }
 console.log(`qa: ${flows.length - failed}/${flows.length} recipes passed, cost $${cost.toFixed(4)}`);
 process.exit(failed ? 1 : 0);
+}

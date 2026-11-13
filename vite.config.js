@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs";
@@ -58,6 +59,7 @@ export default defineConfig(async () => {
 
     test: {
       setupFiles: ['./vitest.setup.js'],
+      exclude: [...configDefaults.exclude, 'scripts/qa.test.mjs'], // node:test, run with node --test
     },
 
     build: {
