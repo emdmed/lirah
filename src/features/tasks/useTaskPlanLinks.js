@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
 import { usePlansActions, usePlansByRepo } from '../plans/PlansContext';
 import { requestPlanFocus } from '../plans/plansPaneEvents';
+import { isDraftPath } from '../plans/planPrompts';
 import { readPlanSource } from '../plans/usePlanFiles';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
@@ -21,7 +22,7 @@ function agentBusy(tabId) {
 /**
  * Follows each sent task to its plan, across every loaded task list:
  * `planning` until the agent writes the plan file, then `planned`, and linked
- * to the plan once it is imported. A task sent with auto-chunk is imported by
+ * to the plan once it is imported (a draft task: once the planning panel approves it). An older task sent with auto-chunk is imported by
  * itself (which starts the chunk split) once its file is there, the agent's
  * turn is over and the file has stopped changing. Polls only while some task
  * is waiting on its file.
@@ -114,6 +115,8 @@ export function useTaskPlanLinks(tasksByScope, updateTask, importTaskPlan) {
         const exists = await invoke('path_exists', { path: task.planPath }).catch(() => false);
         if (cancelled) return;
         if (!exists) continue;
+        // A draft folder exists from the start: its task waits for the plan the panel approves.
+        if (isDraftPath(task.planPath)) continue;
         if (task.status === TASK_STATUS.PLANNING && !task.autoChunk) {
           updateTask(scope, task.id, { status: TASK_STATUS.PLANNED });
         } else if (task.autoChunk) {

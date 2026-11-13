@@ -276,20 +276,21 @@ export function buildPlanRevisePrompt(plan, notes, path) {
   ].filter(Boolean).join('\n\n');
 }
 
-/**
- * A backlog task → a prompt asking the agent to plan it. `context` is the
- * user's plan context (which skill or approach to use); the plan is saved at
- * `planPath`, where the plans pane finds it and offers to import it.
- */
-export function buildTaskPlanPrompt({ task, context, planPath, autoChunk = false }) {
-  const draft = isDraftPath(planPath);
+/** What `lirah plans draft` tells the agent once planning mode is open on `folder`; `files` are the names already in it. */
+export function buildDraftOpenPrompt(folder, files = []) {
+  return [
+    `planning mode is open in this tab on the draft ${folder}${files.length > 1 ? ` (already has ${files.join(', ')})` : ''}`,
+    `Write the plan there as we talk, one file per part: ${DRAFT_PARTS.map((p) => `${p.id}.md (${p.about})`).join('; ')}. plan.md holds the title and goal; add other .md files if the work needs them.`,
+    'Don\'t implement anything and don\'t commit. The user approves the draft in the planning panel, which joins the files into one plan and splits it into chunks.',
+  ].join('\n\n');
+}
+
+/** A task to plan in planning mode, on its draft `folder`, with a plan context in front. */
+export function buildTaskPlanPrompt({ task, context, folder, files }) {
   return [
     context?.trim(),
     `## Task\n\n${task.title.trim()}${task.notes?.trim() ? `\n\n${task.notes.trim()}` : ''}`,
-    draft
-      ? `Write the plan as a draft folder at ${planPath}: one markdown file per concern, e.g. architecture.md, feature.md, qa.md (add or drop files as the work needs). Start plan.md, or the first file by name, with a \`# Title\` line. The files are joined into one plan in name order, plan.md first.`
-      : `Save the finished plan as markdown at ${planPath}, starting with a \`# Title\` line.`,
-    autoChunk && `Write ${draft ? 'those files' : 'that file'} only once the plan is final: it is picked up as soon as you end your turn and split into implementation chunks.`,
+    buildDraftOpenPrompt(folder, files),
   ]
     .filter(Boolean)
     .join('\n\n');

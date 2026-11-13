@@ -4,7 +4,6 @@ import { lazyNamed } from '../../lib/lazyNamed';
 import { errorMessage } from '../../lib/errorMessage';
 import { Scanner } from '../../components/instrument/Scanner';
 import { SegmentBank } from '../../components/instrument/SegmentBank';
-import { useSetting } from '../settings/settingsStore';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { getAgentHookState } from '../tabs/agentHookState';
 import { getTabSession } from '../tabs/terminalActivity';
@@ -17,7 +16,8 @@ import { useToast } from '../toast';
 import { useTabManager } from '../tabs/TabContext';
 import { useDragReorder } from '../tabs/useDragReorder';
 import { EmptyLine } from '../plans/parts';
-import { buildTaskPlanPrompt } from '../plans/planPrompts';
+import { buildTaskPlanPrompt, isDraftPath } from '../plans/planPrompts';
+import { openDraft } from '../planning/planningModeStore';
 import { requestPlanFocus } from '../plans/plansPaneEvents';
 import { planContext } from './planContexts';
 import { useTasks } from './TasksContext';
@@ -46,8 +46,6 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
   const [openId, setOpenId] = useState(null);
   const [showDone, setShowDone] = useState(false);
   const [contextsOpen, setContextsOpen] = useState(false);
-  const [autoChunk, setAutoChunk] = useSetting('autoChunkTaskPlans');
-  const [draft, setDraft] = useSetting('draftTaskPlans');
 
   // Quick add: Enter saves; Shift+Enter starts a new line.
   const [text, setText] = useState('');
@@ -131,16 +129,16 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       if (!ok) return;
     }
     try {
-      const planPath = await planTask(scope, task.id, { tabId: activeTabId, root: projectScope, contextId, autoChunk, draft });
-      toast.success(`Sent to ${tabName}: ${autoChunk ? 'the plan is split into chunks once written' : `the plan goes to ${basename(planPath)}`}`);
+      const folder = await planTask(scope, task.id, { tabId: activeTabId, root: projectScope, contextId });
+      toast.success(`Planning in ${tabName}: the draft goes to ${basename(folder)}`);
     } catch (e) {
       // Not sent: the prompt is still useful on the clipboard.
-      const planPath = planFilePath(await invoke('get_home_dir').catch(() => '~'), task, Date.now(), draft);
-      const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, planPath, autoChunk });
+      const folder = planFilePath(await invoke('get_home_dir').catch(() => '~'), task, Date.now(), true);
+      const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, folder });
       const copied = await navigator.clipboard.writeText(text).then(() => true, () => false);
       toast.error(`Couldn't send the task: ${errorMessage(e)}.${copied ? ' The prompt is on the clipboard.' : ''}`);
     }
-  }, [tabs, activeTabId, projectScope, planTask, scope, toast, confirm, autoChunk, draft]);
+  }, [tabs, activeTabId, projectScope, planTask, scope, toast, confirm]);
 
   const handleEdit = useCallback((task, patch) => {
     updateTask(scope, task.id, patch);
@@ -176,6 +174,10 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       requestPlanFocus(task.planId);
       return;
     }
+    if (isDraftPath(task.planPath)) {
+      openDraft(activeTabId, task.planPath); // approved and split from the planning panel
+      return;
+    }
     try {
       const planId = await importTaskPlan(scope, task.id);
       toast.success(`Imported "${task.title}", splitting into chunks`, {
@@ -184,7 +186,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
     } catch (e) {
       toast.error(`Couldn't import the plan: ${errorMessage(e)}`);
     }
-  }, [importTaskPlan, scope, toast]);
+  }, [importTaskPlan, scope, toast, activeTabId]);
 
   const toggleOpen = useCallback((id) => setOpenId((cur) => (cur === id ? null : id)), []);
 
@@ -222,8 +224,6 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
   const globalCount = view === 'global' ? count(tasks) : count(otherTasks);
 
   // Stable so the memoized TaskRows skip re-rendering while the quick-add box is typed in.
-  const handleChunkMode = useCallback((mode) => setAutoChunk(mode === 'chunks'), [setAutoChunk]);
-  const handlePlanShape = useCallback((shape) => setDraft(shape === 'draft'), [setDraft]);
   const openContexts = useCallback(() => setContextsOpen(true), []);
 
   const renderRow = (task, index, rowDrag) => (
@@ -243,10 +243,6 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
       onMove={handleMove}
       onRemove={handleRemove}
       onOpenPlan={handleOpenPlan}
-      chunkMode={autoChunk ? 'chunks' : 'file'}
-      onChunkMode={handleChunkMode}
-      planShape={draft ? 'draft' : 'file'}
-      onPlanShape={handlePlanShape}
       onEditContexts={openContexts}
     />
   );

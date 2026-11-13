@@ -3,12 +3,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { hash8 } from '../../lib/ids';
 import { usePlansActions } from '../plans/PlansContext';
 import { buildTaskPlanPrompt } from '../plans/planPrompts';
-import { readPlanSource } from '../plans/usePlanFiles';
+import { draftFiles, readPlanSource } from '../plans/usePlanFiles';
+import { startDraft } from '../planning/planningModeStore';
+import { basename } from '../../utils/pathUtils';
 import { getSettings } from '../settings/settingsStore';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { planContext } from './planContexts';
 import {
-  buildFormatPrompt, GLOBAL, isOpen, newTask, parseFormatted, planFilePath, planRootOf, reorderSubset, TASK_STATUS, taskText,
+  buildFormatPrompt, GLOBAL, isOpen, newTask, parseFormatted, planRootOf, reorderSubset, TASK_STATUS, taskText,
 } from './taskModel';
 import { useTaskStore } from './useTaskStore';
 import { useTaskPlanLinks } from './useTaskPlanLinks';
@@ -90,21 +92,21 @@ export function TasksProvider({ children }) {
   }, [find, updateTask]);
 
   /**
-   * Send the task to the agent in `tabId` to plan, with a plan context in
-   * front. The plan is for `root`, saved as ~/.lirah/plans/<YYYY-MM>/<title>_plan.md; with
-   * `autoChunk` it is imported and split into chunks once written; with `draft`
-   * it is a `<title>_plan` folder of .md files.
+   * Plan the task as `lirah plans draft` does: planning mode opens in `tabId`
+   * on a ~/.lirah/plans/<YYYY-MM>/<title>_plan draft folder for `root`, and the
+   * task goes to that tab's agent with a plan context in front. The draft is
+   * approved and split from the planning panel.
    */
-  const planTask = useCallback(async (scope, id, { tabId, root, contextId, autoChunk = false, draft = false }) => {
+  const planTask = useCallback(async (scope, id, { tabId, root, contextId }) => {
     const task = find(scope, id);
     if (!task) throw new Error('Task not found');
-    const planPath = planFilePath(await invoke('get_home_dir'), task, Date.now(), draft);
-    const text = buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, planPath, autoChunk });
     const send = getTabPrompt(tabId)?.send;
     if (!send) throw new Error('that tab has no prompt to send to');
-    await send(text);
-    updateTask(scope, id, { status: TASK_STATUS.PLANNING, planPath, planRoot: root, planId: null, planTabId: tabId, autoChunk });
-    return planPath;
+    const folder = await startDraft(tabId, task.title, root);
+    const files = (await draftFiles(folder)).map((p) => basename(p));
+    await send(buildTaskPlanPrompt({ task, context: planContext(contextId)?.text, folder, files }));
+    updateTask(scope, id, { status: TASK_STATUS.PLANNING, planPath: folder, planRoot: root, planId: null, planTabId: tabId, autoChunk: false });
+    return folder;
   }, [find, updateTask]);
 
   /**

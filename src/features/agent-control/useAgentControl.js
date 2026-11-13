@@ -13,7 +13,7 @@ import { resolveRepoRoot } from '../plans/planRepoRoot';
 import { usePlansActions } from '../plans/PlansContext';
 import { relToRepo, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
 import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage, planStatus } from '../plans/planModel';
-import { DRAFT_PARTS } from '../plans/planPrompts';
+import { buildDraftOpenPrompt } from '../plans/planPrompts';
 import { draftFiles } from '../plans/usePlanFiles';
 import { startDraft } from '../planning/planningModeStore';
 import { buildPlanRevisePrompt } from '../plans/planPrompts';
@@ -600,11 +600,7 @@ export function useAgentControl() {
         // The workspace terminal plans for no one repo: its draft is approved from the tab it is for.
         const folder = await startDraft(tab.id, title, tab.master ? null : await resolveRepoRoot(tab.projectPath));
         const files = (await draftFiles(folder)).map((p) => basename(p));
-        return [
-          `planning mode is open in this tab on the draft ${folder}${files.length > 1 ? ` (already has ${files.join(', ')})` : ''}`,
-          `Write the plan there as we talk, one file per part: ${DRAFT_PARTS.map((p) => `${p.id}.md (${p.about})`).join('; ')}. plan.md holds the title and goal; add other .md files if the work needs them.`,
-          'Don\'t implement anything and don\'t commit. The user approves the draft in the planning panel, which joins the files into one plan and splits it into chunks.',
-        ].join('\n\n');
+        return buildDraftOpenPrompt(folder, files);
       },
       // As the pane's re-chunk: the plan's file as it is now, the chunks already done kept.
       'plans.rechunk': async (args, [ref = args.plan], { sessionId }) => {

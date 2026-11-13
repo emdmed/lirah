@@ -81,7 +81,6 @@ export function SettingsDialog({
   const [compactionHook, setCompactionHook] = useSetting('compactionHook');
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
   const [agentControl, setAgentControl] = useSetting('agentControl');
-  const [autoChunkTaskPlans, setAutoChunkTaskPlans] = useSetting('autoChunkTaskPlans');
   const [taskFormatPrompt, setTaskFormatPrompt] = useSetting('taskFormatPrompt');
 
   const {
@@ -245,9 +244,8 @@ export function SettingsDialog({
                     <ToggleRow row={ROW['keep-context']} value={keepFilesAfterSend} onChange={setKeepFilesAfterSend} />
                     <ToggleRow row={ROW['prompt-box']} value={promptBoxOnStart} onChange={setPromptBoxOnStart} />
                   </Group>
-                  <Group label="Tasks" sectionId="agent" rows={['plan-contexts', 'auto-chunk', 'task-format']}>
+                  <Group label="Tasks" sectionId="agent" rows={['plan-contexts', 'task-format']}>
                     <PlanContextsRow />
-                    <ToggleRow row={ROW['auto-chunk']} value={autoChunkTaskPlans} onChange={setAutoChunkTaskPlans} />
                     <Row id="task-format" sectionId="agent" label={ROW['task-format'].label} htmlFor="settings-task-format" hint="Haiku rewrites each task you save with these instructions. Leave empty for a user story. The first line always becomes the title.">
                       <DraftField
                         id="settings-task-format"

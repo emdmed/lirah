@@ -69,9 +69,14 @@ export async function startDraft(tabId, title, repo = null) {
     await invoke('write_file_content', { path: `${path}/plan.md`, content: `# ${name}\n` });
     await invoke('write_file_content', { path: `${path}/${DRAFT_META}`, content: `${JSON.stringify({ repo })}\n` });
   }
+  openDraft(tabId, path);
+  return path;
+}
+
+/** Shows the draft folder `path` in the tab's planning mode. */
+export function openDraft(tabId, path) {
   setPlanningFolder(tabId, path);
   setPlanningMode(tabId, true);
-  return path;
 }
 
 // Parts sent to the agent and not written yet, per draft folder, so the row

@@ -697,7 +697,6 @@ const SETTINGS = Object.fromEntries([
   ["agentControl", "agent", "Agent control", true, { guarded: true }],
   ["keepFilesAfterSend", "agent", "Keep context after send", false],
   ["promptBoxOnStart", "agent", "Prompt box on new tabs", false],
-  ["autoChunkTaskPlans", "agent", "Split task plans into chunks", true],
   ["showTitleBar", "appearance", "Window controls", true],
   ["zenMode", "appearance", "Zen mode", false],
   ["figures", "appearance", "Figures", "full", { values: ["full", "compact"] }],

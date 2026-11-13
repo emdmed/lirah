@@ -10,12 +10,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { basename } from '../../utils/pathUtils';
+import { isDraftPath } from '../plans/planPrompts';
 import { usePlanContexts } from './planContexts';
 import { splitTaskText, TASK_STATUS, taskText } from './taskModel';
 import '../markdown/markdown.css';
@@ -36,19 +35,18 @@ const LAMP = {
 
 /**
  * One task. Click (or Enter on the cursor) opens it: the story in full, a
- * click away from editing. `formatting` is on while a model rewrites it; the plan button sends it to the active tab's agent with the default
- * plan context, its arrow picks another and what follows the plan:
- * `planShape` 'file' (one .md) or 'draft' (a folder of them), and `chunkMode`
- * 'chunks' (import and split it) or 'file' (leave the file). `drag` is
+ * click away from editing. `formatting` is on while a model rewrites it; the plan button opens planning mode on a draft for it and sends it
+ * to the active tab's agent with the default plan context, its arrow picks another. `drag` is
  * useDragReorder's result, null for rows that don't reorder (done tasks).
  */
 export const TaskRow = memo(function TaskRow({
   task, index, open, cursor, drag, formatting, moveLabel, onToggleOpen, onEdit, onPlan, onDone, onMove, onRemove, onOpenPlan,
-  onEditContexts, chunkMode, onChunkMode, planShape, onPlanShape,
+  onEditContexts,
 }) {
   const { contexts, defaultId } = usePlanContexts();
   const lamp = LAMP[task.status] || LAMP.backlog;
   const done = task.status === TASK_STATUS.DONE;
+  const draft = !task.planId && !!task.planPath && isDraftPath(task.planPath); // opens in planning mode until approved
   const dropLine = drag?.dropLineAt(index);
   const rowRef = useRef(null);
 
@@ -109,7 +107,7 @@ export const TaskRow = memo(function TaskRow({
                 type="button"
                 onClick={() => onPlan(task, defaultId)}
                 className="tui-btn px-1"
-                title={`Send to the active tab's agent to plan, with the default plan context${chunkMode === 'chunks' ? ', then split it into chunks' : ''}`}
+                title="Plan it in planning mode, with the default plan context"
               >
                 plan
               </button>
@@ -118,26 +116,6 @@ export const TaskRow = memo(function TaskRow({
                   <PanelButton icon={ChevronDown} title="Plan with another context" aria-label="Plan with another context" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[240px]">
-                  <DropdownMenuLabel className="text-xs">Write as</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup value={planShape} onValueChange={onPlanShape}>
-                    <DropdownMenuRadioItem value="file" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
-                      One plan file
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="draft" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
-                      Draft folder (architecture, feature, qa…)
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs">Then</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup value={chunkMode} onValueChange={onChunkMode}>
-                    <DropdownMenuRadioItem value="chunks" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
-                      Split into chunks
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="file" onSelect={(e) => e.preventDefault()} className="cursor-pointer text-xs">
-                      Keep the plan file
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                  <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-xs">Plan with</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {contexts.map((c) => (
@@ -174,13 +152,13 @@ export const TaskRow = memo(function TaskRow({
             {task.status === TASK_STATUS.PLANNING ? 'waiting for ' : ''}{basename(task.planPath)}
             {task.status === TASK_STATUS.PLANNING && task.autoChunk ? ', then chunks' : ''}
           </span>
-          {task.status === TASK_STATUS.PLANNED && (
+          {(task.status === TASK_STATUS.PLANNED || draft) && (
             <button
               type="button"
               onClick={() => onOpenPlan(task)}
               className="tui-btn ml-auto shrink-0"
             >
-              {task.planId ? 'open plan' : 'import & chunk'}
+              {task.planId ? 'open plan' : draft ? 'open draft' : 'import & chunk'}
             </button>
           )}
         </div>

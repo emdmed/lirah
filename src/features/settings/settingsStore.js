@@ -71,11 +71,6 @@ export const SETTINGS_DEFAULTS = {
   // Folders of tools and skills given to Claude Code, each with a prompt.
   // Items are { id, name, folder, prompt, enabled } (see PluginsRow).
   plugins: [],
-  // The plan menu's choice: a task's plan is imported and split into chunks
-  // once the agent has written it (git repos only), or left as a file.
-  autoChunkTaskPlans: true,
-  // The plan menu's other choice: the plan is one .md file, or a draft folder of them.
-  draftTaskPlans: false,
   // How a model rewrites a saved task; empty = a user story (see tasks/taskModel.js).
   taskFormatPrompt: '',
   // The model the work log pane summarizes with: 'haiku', 'sonnet' or 'opus'.

@@ -79,10 +79,13 @@ describe('draft plans', () => {
     expect(joinDraft('empty_plan', [])).toBe('');
   });
 
-  it('asks for a folder when the task plan path is a draft', () => {
-    const task = { title: 'Dark mode', notes: '' };
-    expect(buildTaskPlanPrompt({ task, planPath: '/p/dark_mode_plan' })).toContain('draft folder at /p/dark_mode_plan');
-    expect(buildTaskPlanPrompt({ task, planPath: '/p/dark_mode_plan.md' })).toContain('Save the finished plan as markdown at /p/dark_mode_plan.md');
+  it('plans a task in its draft folder, as lirah plans draft does', () => {
+    const task = { title: 'Dark mode', notes: 'Follow the OS' };
+    const text = buildTaskPlanPrompt({ task, context: 'CTX', folder: '/p/dark_mode_plan', files: ['plan.md'] });
+    expect(text.startsWith('CTX\n\n## Task\n\nDark mode\n\nFollow the OS')).toBe(true);
+    expect(text).toContain('planning mode is open in this tab on the draft /p/dark_mode_plan');
+    expect(text).not.toContain('already has'); // only plan.md, the title, is there
+    expect(text).toContain('Don\'t implement anything');
   });
 
   it('revises a draft folder, not one file', () => {

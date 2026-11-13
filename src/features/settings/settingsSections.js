@@ -63,12 +63,6 @@ export const SETTINGS_ROWS = [
     words: 'plan contexts tasks backlog skill grill instructions prompt planning',
   },
   {
-    id: 'auto-chunk', section: 'agent', kind: 'toggle', key: 'autoChunkTaskPlans',
-    label: 'Split task plans into chunks',
-    hint: 'When an agent finishes writing the plan for a task, import it in the plans pane and split it into chunks. Off: the plan stays a file in the repo. Also picked in the plan button\'s menu. Git repos only.',
-    words: 'auto chunk split import task plans automatic',
-  },
-  {
     id: 'task-format', section: 'agent', kind: 'custom', label: 'Task formatting prompt',
     words: 'task format formatting prompt user story haiku model rewrite tasks',
   },
