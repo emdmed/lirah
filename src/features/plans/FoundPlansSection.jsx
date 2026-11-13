@@ -61,19 +61,19 @@ export function FoundPlansSection({ files, importFile, deleteFile }) {
   };
 
   return (
-    <div className="flex flex-col edge-b-engraved pb-1">
-      <div className="flex items-center gap-2 px-3 pt-2.5 text-[11px] text-muted-foreground">
-        <span className="engraved-label">found here</span>
+    <div className="flex flex-col pb-1 mb-3">
+      <div className="pane-head flex items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground">
+        <span className="engraved-label">not imported</span>
         <span className="font-mono tabular-nums">{files.length}</span>
       </div>
-      <div className="px-3 pb-1 text-[11px] text-muted-foreground"># plan files in ~/.lirah/plans</div>
+      <div className="px-3 pt-1.5 pb-1 text-[11px] text-muted-foreground"># plan files in ~/.lirah/plans</div>
       {files.map((file) => {
         const changed = file.state === 'changed';
         const title = titleBeyondName(file.title, file.name);
         return (
           <div key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-foreground" title={file.title || file.name}>{title || file.name}</span>
+              <span className="truncate font-medium text-foreground" title={file.title || file.name}>{title || file.name}</span>
               {file.draft ? (
                 // A draft lists its files; each opens the viewer there, ^[ / ^] steps to the others.
                 <span className="flex flex-wrap gap-x-1 text-[11px] text-muted-foreground" title={file.path}>

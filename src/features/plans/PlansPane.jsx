@@ -95,7 +95,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
             </EmptyLine>
           ) : (
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 text-[11px] text-muted-foreground edge-b-engraved">
+              <div className="pane-head flex items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground">
                 <span className="engraved-label">plans</span>
                 <span className="font-mono tabular-nums">{plans.length}</span>
                 <span className="truncate">· {basename(repoRoot)}</span>

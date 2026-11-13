@@ -439,6 +439,17 @@ body {
   color: var(--ins-legend);
 }
 
+/* A pane's section head (plans, found here): a tinted band between strong rules, so sections read apart. */
+.pane-head {
+  background: var(--tui-bar);
+  box-shadow: inset 0 1px 0 0 var(--tui-line-strong), inset 0 -1px 0 0 var(--tui-line-strong);
+}
+.pane-head .engraved-label {
+  color: var(--color-foreground);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
 /* A finished plan's markup stamp (calibrated's .cal-stamp, in the ok ink, fault ink once cancelled):
    a ruled box inside a ruled box, set down a little askew, pressed once on arrival. */
 .ins-stamp {

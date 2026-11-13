@@ -40,7 +40,7 @@ export function PlanRow({ plan, onOpen }) {
             />
           )}
         </span>
-        <span className={cn('line-clamp-2 text-xs leading-4', plan.cancelledAt ? 'text-muted-foreground' : 'text-foreground')}>{plan.title || UNTITLED_PLAN}</span>
+        <span className={cn('line-clamp-2 text-xs font-medium leading-4', plan.cancelledAt ? 'text-muted-foreground' : 'text-foreground')}>{plan.title || UNTITLED_PLAN}</span>
         {plan.split === SPLIT_STATUS.DONE && tag && (
           <span
             className={cn(
