@@ -4,6 +4,16 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-13
+
+### Changed
+
+- **Tasks plan in planning mode** - A task's plan button now opens planning mode in the active tab on a draft folder and sends the task there, like `lirah plans draft`. You approve and split the draft from the planning panel. A task that is still a draft shows "open draft", which reopens it.
+
+### Removed
+
+- **Plan menu options** - The "Write as" and "Then" choices in the plan button's menu, and the "Split task plans into chunks" setting, are gone. Every task plan is now a draft.
+
 ## [0.30.1] - 2026-11-13
 
 ### Changed
