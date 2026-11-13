@@ -11,7 +11,8 @@ import {
   AUTOPILOT_STATUS, CHUNK_STATUS, isAutopilotLive, nextChunkId, PLAN_STAGE, planLifecycle, shortDate, planProgress, planStarted, SPLIT_STATUS,
   UNTITLED_PLAN,
 } from './planModel';
-import { formatAgo } from '../../lib/formatDuration';
+import { formatAgo, formatDuration } from '../../lib/formatDuration';
+import { chunkRuler } from './Fig16Chunks';
 import { useTaskForPlan } from '../tasks/TasksContext';
 import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
@@ -402,6 +403,7 @@ export function PlanDetail({ plan }) {
         {plan.summary && <Prose text={plan.summary} clamp={3} className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground" />}
 
         <LifecycleLine plan={plan} />
+        {(finished || plan.cancelledAt) && <CompleteStamp plan={plan} />}
 
         {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
         {stuck && (
@@ -507,6 +509,28 @@ export function PlanDetail({ plan }) {
       )}
 
       {!finished && chunksBlock}
+    </div>
+  );
+}
+
+/** A finished or cancelled plan's markup stamp, then what it took: chunks, summed working time, first start to last finish. */
+function CompleteStamp({ plan }) {
+  const r = chunkRuler(plan);
+  // Cancelled wins: a plan you dropped isn't complete, even with every chunk done.
+  const cancelled = !!plan.cancelledAt;
+  const timed = plan.chunks.filter((c) => c.status === CHUNK_STATUS.IMPLEMENTED && c.startedAt && c.doneAt);
+  const span = timed.length
+    ? Math.max(...timed.map((c) => c.doneAt)) - Math.min(...timed.map((c) => c.startedAt))
+    : null;
+  return (
+    <div role="status" className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] tabular-nums text-muted-foreground">
+      <span className="ins-stamp shrink-0" data-cancelled={cancelled || undefined}>{cancelled ? 'cancelled' : 'complete'}</span>
+      <span className="min-w-0">
+        <span className="text-foreground">{r.done}/{r.total}</span> chunks{cancelled && ' done'}
+        {r.spent != null && <> · <span className="text-foreground">{formatDuration(r.spent)}</span> of work</>}
+        {span != null && span > (r.spent ?? 0) && <> · {formatDuration(span)} end to end</>}
+        {cancelled && <> · {shortDate(plan.cancelledAt)}</>}
+      </span>
     </div>
   );
 }

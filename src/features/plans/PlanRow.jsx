@@ -40,7 +40,7 @@ export function PlanRow({ plan, onOpen }) {
             />
           )}
         </span>
-        <span className="line-clamp-2 text-xs leading-4 text-foreground">{plan.title || UNTITLED_PLAN}</span>
+        <span className={cn('line-clamp-2 text-xs leading-4', plan.cancelledAt ? 'text-muted-foreground' : 'text-foreground')}>{plan.title || UNTITLED_PLAN}</span>
         {plan.split === SPLIT_STATUS.DONE && tag && (
           <span
             className={cn(
@@ -52,7 +52,7 @@ export function PlanRow({ plan, onOpen }) {
           </span>
         )}
         {plan.split === SPLIT_STATUS.DONE && !tag && (
-          <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">{plan.shelved ? 'shelved' : stageLabel(plan)}</span>
+          <span className={cn('ml-auto shrink-0 text-[11px] leading-4', plan.cancelledAt ? 'text-[var(--ins-fault)]' : 'text-muted-foreground')}>{plan.shelved && !plan.cancelledAt ? 'shelved' : stageLabel(plan)}</span>
         )}
         {plan.split !== SPLIT_STATUS.DONE && (
           <span className="ml-auto shrink-0 text-[11px] leading-4 text-muted-foreground">

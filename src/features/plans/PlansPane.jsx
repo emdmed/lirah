@@ -113,7 +113,7 @@ export const PlansPane = memo(function PlansPane({ projectPath }) {
                     onClick={() => setShowTucked((v) => !v)}
                     aria-pressed={showTucked}
                     className="tui-btn shrink-0"
-                    title={showTucked ? 'Hide finished and shelved plans' : 'Show finished and shelved plans'}
+                    title={showTucked ? 'Hide finished, shelved and cancelled plans' : 'Show finished, shelved and cancelled plans'}
                   >
                     {showTucked ? 'hide' : 'show'} {tucked} done/shelved
                   </button>
