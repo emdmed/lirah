@@ -4,6 +4,13 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-11-13
+
+### Changed
+
+- **Bolder plans sidebar** - The plans list and its file list now have header bands with strong rules, a gap between them, and heavier plan titles. The project name above them has room to breathe.
+- **"Not imported"** - The list of plan files waiting in `~/.lirah/plans` is now headed "not imported" instead of "found here".
+
 ## [0.30.0] - 2026-11-13
 
 ### Added
