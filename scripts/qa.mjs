@@ -4,7 +4,10 @@
 //
 //   npm run qa                    run every recipe in qa/index.md
 //   npm run qa -- tasks theme     run recipes whose file name contains a word
-//   npm run qa -- --up            start an instance and keep it up for a hand-driven session
+//   npm run qa -- --up            attach to or start the instance, print its wrapper path and exit
+//   npm run qa -- --status        show the registered instance and what it answers to qa.whoami
+//   npm run qa -- --down          stop the instance and drop its registry entry
+//   npm run qa -- --fresh         --down, then start a new instance
 //
 // Env: QA_MODEL (default haiku). See qa/README.md.
 import { spawn, execFileSync } from 'node:child_process';
@@ -16,7 +19,7 @@ import net from 'node:net';
 
 const repo = resolve(import.meta.dirname, '..');
 const argv = process.argv.slice(2);
-const up = argv.includes('--up');
+const flag = (f) => argv.includes(f);
 const filters = argv.filter((a) => !a.startsWith('--'));
 
 const freePort = () => new Promise((ok) => {
@@ -69,17 +72,33 @@ const stopper = (pid) => () => {
   try { if (JSON.parse(readFileSync(instanceFile, 'utf8')).pid === pid) rmSync(instanceFile); } catch { /* not ours or gone */ }
 };
 
+// The socket is named after the Rust pid, which changes when tauri dev rebuilds and restarts it.
+const liveSocket = (home) => {
+  const dir = join(home, '.lirah/control');
+  const sock = existsSync(dir) && readdirSync(dir).find((f) => f.endsWith('.sock') && alive(Number(f.slice(0, -5))));
+  return sock ? join(dir, sock) : null;
+};
+const readRegistry = () => { try { return JSON.parse(readFileSync(instanceFile, 'utf8')); } catch { return null; } };
+
+/** Kill the registered instance's process group (SIGKILL after 10s) and remove instance.json. */
+export async function down() {
+  const reg = readRegistry();
+  if (!reg) { console.log('qa: no instance registered'); return; }
+  try { process.kill(-reg.pgid, 'SIGTERM'); } catch { /* already gone */ }
+  for (let i = 0; i < 20 && alive(-reg.pgid); i++) await sleep(500);
+  try { process.kill(-reg.pgid, 'SIGKILL'); } catch { /* gone */ }
+  rmSync(instanceFile, { force: true });
+  console.log(`qa: stopped instance pid ${reg.pid} (profile left in ${reg.home})`);
+}
+
 /** The registered instance if it is alive, ours (token + home) and answering; otherwise null, dropping a stale registry. */
 export async function findInstance() {
-  let reg;
-  try { reg = JSON.parse(readFileSync(instanceFile, 'utf8')); } catch { return null; }
+  const reg = readRegistry();
+  if (!reg) return null;
   try {
     if (!alive(-reg.pgid)) throw new Error(`process group ${reg.pgid} is gone`);
-    // The socket is named after the Rust pid, which changes when tauri dev rebuilds and restarts it.
-    const dir = join(reg.home, '.lirah/control');
-    const sock = existsSync(dir) && readdirSync(dir).find((f) => f.endsWith('.sock') && alive(Number(f.slice(0, -5))));
-    if (!sock) throw new Error(`no live control socket in ${dir}`);
-    const control = join(dir, sock);
+    const control = liveSocket(reg.home);
+    if (!control) throw new Error(`no live control socket in ${reg.home}/.lirah/control`);
     const who = await ask(control, 'qa.whoami');
     if (!who.ok || who.data?.qa !== true) throw new Error(`whoami refused: ${who.error || 'not a QA instance'}`);
     if (who.data.token !== reg.token) throw new Error('token mismatch: the socket belongs to another instance');
@@ -201,11 +220,22 @@ function runFlow(file, inst) {
 
 // Imported by qa.test.mjs: only run when executed.
 if (import.meta.filename === resolve(process.argv[1] ?? '')) {
-if (up) {
+if (flag('--status')) {
+  const reg = readRegistry();
+  if (!reg) { console.log('qa: no instance registered'); process.exit(1); }
+  console.log(JSON.stringify(reg, null, 2));
+  const control = alive(-reg.pgid) && liveSocket(reg.home);
+  const who = control ? await ask(control, 'qa.whoami').catch((e) => ({ ok: false, error: e.message })) : { ok: false, error: 'no live process group or control socket' };
+  const ours = who.ok && who.data?.token === reg.token && who.data?.home === reg.home;
+  console.log(`whoami: ${JSON.stringify(who)}\nqa: ${ours ? 'instance is up and verified' : 'instance is not usable'}`);
+  process.exit(ours ? 0 : 1);
+}
+if (flag('--down') || flag('--fresh')) await down();
+if (flag('--down')) process.exit(0);
+if (flag('--up') || flag('--fresh')) {
   const inst = await getInstance();
-  console.log(`qa: up. In another shell:\n  export PATH="${inst.env.PATH.split(':')[0]}:$PATH"\n  lirah qa snapshot\nCtrl+C stops it.`);
-  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { inst.stop(); process.exit(0); });
-  await new Promise(() => {});
+  console.log(`qa: up. In your shell:\n  export PATH="${inst.env.PATH.split(':')[0]}:$PATH"\n  lirah qa snapshot\nIt keeps running; \`npm run qa -- --down\` stops it.`);
+  process.exit(0);
 }
 
 // qa/index.md is the list of record: a recipe runs only once it is linked there.
