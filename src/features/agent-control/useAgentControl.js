@@ -338,6 +338,11 @@ export function useAgentControl() {
       'qa.text': async (args, [what = args.target]) => (await qaDriver()).text(what),
       'qa.wait': async (args, words) => (await qaDriver()).wait(args.text ?? words.join(' '), { timeout: Math.min(Number(args.timeout) || 10, 50), gone: !!args.gone }),
       'qa.terminal': async (args, [n = args.n ?? 1]) => (await qaDriver()).terminal(n, args.rows ?? 40),
+      'qa.reset': async (args, positional, { later }) => {
+        const reply = await (await qaDriver()).reset(live.current.tabManager);
+        later(() => location.reload());
+        return reply;
+      },
       'qa.terminal-type': async (args, [n = 1, ...words]) => (await qaDriver()).terminalType(n, (args.text ?? words.join(' ')) + (args.enter ? '\r' : '')),
       'settings.list': () => listSettings(),
       'settings.get': (args, [key = args.key]) => getSetting(key),

@@ -2,6 +2,8 @@
 // Only reachable when the app runs with LIRAH_QA=1 (the Rust control server
 // refuses `qa` otherwise). Reads the DOM as text, so it works without painting.
 
+import { remove } from '../../lib/fileStore';
+
 const INTERACTIVE = 'button, a[href], input, textarea, select, summary, [role=button], [role=tab], [role=menuitem], '
   + '[role=menuitemcheckbox], [role=menuitemradio], [role=option], [role=checkbox], [role=switch], [role=radio], '
   + '[role=treeitem], [role=link], [role=combobox], [contenteditable=true], [tabindex]:not([tabindex="-1"])';
@@ -174,4 +176,21 @@ export async function terminalType(n, data) {
   pickTerminal(n).input(data, true);
   await settle();
   return `sent ${JSON.stringify(data)} to terminal #${n}`;
+}
+
+/**
+ * Back to a fresh instance's state: close dialogs (Escape) and tabs (their PTYs die), delete
+ * ~/.lirah/workspaces/ and reload. Returns the reply; the caller reloads after sending it.
+ */
+export async function reset({ tabs, removeTab }) {
+  for (let open; (open = [...document.querySelectorAll('[role=dialog], [role=alertdialog]')].pop());) {
+    open.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true, composed: true }));
+    await settle();
+    if (open.isConnected) break; // won't close; the reload drops it anyway
+  }
+  // removeTab keeps the last tab; the reloaded page reaps its PTY, as it isn't in any workspace.json.
+  for (const t of tabs) removeTab(t.id);
+  await settle(); // let the save effect queue the emptied tabs, so remove() drops that write too
+  await remove('workspaces');
+  return `closed ${tabs.length} tab${tabs.length === 1 ? '' : 's'}; reloading`;
 }
