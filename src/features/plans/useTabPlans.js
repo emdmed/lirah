@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { usePlansActions, usePlansByRepo } from './PlansContext';
 import { useRepoRoots } from './planRepoRoot';
-import { planProgress, planTabId, runRank, SPLIT_STATUS } from './planModel';
+import { isOpenPlan, planProgress, planTabId, runRank, SPLIT_STATUS } from './planModel';
 
 /**
  * Plans for the tabs pane: the ones working in each open tab (tab id ->
@@ -33,6 +33,8 @@ export function useTabPlans(tabs, activeTabId) {
     }
     for (const list of Object.values(byTab)) list.sort((a, b) => runRank(a) - runRank(b));
 
+    // Same rule as the workspace pane's plans count, so "all N" there and here agree.
+    const open = (plansByRepo?.[activeRoot] || []).filter(isOpenPlan).length;
     const loose = (plansByRepo?.[activeRoot] || [])
       .filter((plan) => {
         if (plan.shelved || hostOf.has(planTabId(plan))) return false;
@@ -42,6 +44,6 @@ export function useTabPlans(tabs, activeTabId) {
       })
       .sort((a, b) => runRank(a) - runRank(b));
 
-    return { byTab, loose, rootOf };
+    return { byTab, loose, open, rootOf };
   }, [tabs, plansByRepo, activeRoot]);
 }

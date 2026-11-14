@@ -373,7 +373,7 @@ export const TabRow = memo(function TabRow({
               <span className="min-w-0 truncate">{workLabel}</span>
             </div>
           ) : (
-            <div className="h-4 pl-6 text-[11px] leading-4 text-muted-foreground">no turn yet</div>
+            <div className="h-4 pl-6 text-[11px] leading-4 text-muted-foreground">waiting for a first prompt</div>
           )}
 
           {/* Tier 4: the plan its agent is working through, or the last one it finished. */}

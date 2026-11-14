@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Branch, Compare, Merge, Trash } from '@/components/icons';
+import { Compare, Merge, Trash, Worktree } from '@/components/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ export function WorktreeMenu({ tab, worktrees, open, onOpenChange, onReview, onM
             title={`${plural(worktrees.length, 'other worktree')} of this repo (w)`}
             className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[11px] tabular-nums text-muted-foreground hover:text-[var(--ins-lamp)] data-[state=open]:text-[var(--ins-lamp)]"
           >
-            <Branch size={12} />{worktrees.length}
+            <Worktree size={12} />{worktrees.length}
           </RowAction>
         </DropdownMenuTrigger>
         <DropdownMenuContent

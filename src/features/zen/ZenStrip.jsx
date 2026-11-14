@@ -158,7 +158,7 @@ export function ZenStrip({ tabId, zenKey, isActive, visible = isActive, cliName,
             // Files open in the files drawer, so the trail never unfolds here.
             <TurnTrail turn={turn} summary={summary} root={root} open={false} onToggle={noop} onAttach={noop} />
           ) : (
-            <span>no turn yet</span>
+            <span>waiting for a first prompt</span>
           )}
         </span>
         {ruler && ruler.total > 0 && (

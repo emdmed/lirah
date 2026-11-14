@@ -14,7 +14,7 @@ import { useAttentionQueue } from './useAgentAttention';
 import { RenameField } from './RenameField';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Button } from '@/components/ui/button';
-import { Add, ChevronDown } from '@/components/icons';
+import { Add, ChevronDown, Workspace } from '@/components/icons';
 
 // The lamp on a background workspace whose agent waits on you.
 function Waiting({ blocked }) {
@@ -84,7 +84,8 @@ export function WorkspaceMenu() {
           title="Workspace (Alt+W cycles; double-click or F2 to rename)"
           aria-label={`Workspace ${active?.name ?? ''}${waitingText}`}
         >
-          <span className="truncate max-w-32">{active?.name}</span>
+          <Workspace size={12} className="shrink-0 text-muted-foreground" />
+          <span className="ins-name truncate max-w-32 text-[16px] leading-none text-foreground">{active?.name}</span>
           {waitingNames.length > 0 && <Lamp state={othersBlocked ? 'fault' : 'wait'} />}
           <ChevronDown size={12} className="text-faint" />
         </Button>

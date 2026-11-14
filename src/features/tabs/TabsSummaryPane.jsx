@@ -26,6 +26,9 @@ import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
 import { EmptyPlate } from '@/components/EmptyState';
+import { Worktree } from '@/components/icons';
+import { ContextMoon } from '../../components/instrument/ContextMoon';
+import { Lamp } from '../../components/instrument/Lamp';
 import { useConfirm } from '../dialogs/DialogProvider';
 import { dirtyCount, worktreeRemove } from '../../lib/git';
 import { lazyNamed } from '../../lib/lazyNamed';
@@ -79,6 +82,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
   const [roleMenuId, setRoleMenuId] = useState(null); // tab id whose role menu is open
   const [worktreeMenuId, setWorktreeMenuId] = useState(null); // tab id whose worktree menu is open
   const [worktreeDiff, setWorktreeDiff] = useState(null); // { repoPath, baseRef, files, filePath } under review
+  const [showKey, setShowKey] = useState(false); // the row-glyph key above the tally
   const [focusedId, setFocusedId] = useState(null); // tab id whose row has focus
   // useDragReorder hands back a new object each render; rows are memoized, so
   // keep it the same until one of its parts changes.
@@ -323,14 +327,15 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
         <>
           <div className="flex items-center gap-2 px-3 pt-3.5 pb-1.5 edge-b-engraved">
             <span className="engraved-label">plans</span>
+            <span className="text-[11px] text-muted-foreground">not on a tab</span>
             <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{plans.loose.length}</span>
             <button
               type="button"
               onClick={() => requestPlansPane('open')}
               className="tui-btn ml-auto"
-              title="Show every plan of this repo"
+              title="Show every plan of this repo, including the ones tabs are working on"
             >
-              all plans
+              all {plans.open}
             </button>
           </div>
           {plans.loose.map((plan) => (
@@ -340,6 +345,17 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
       )}
       {/* Closing line, pinned to the pane's foot: the tally, then the focused row's keys. */}
       <div className="sticky bottom-0 mt-auto flex flex-wrap items-center gap-x-1 gap-y-1 bg-[var(--ins-panel)] px-3 pt-2 pb-1 text-[11px] tabular-nums edge-t-engraved">
+        {/* What the row readout's marks mean, drawn with the marks themselves. */}
+        {showKey && (
+          <span className="flex basis-full flex-wrap items-center gap-x-4 gap-y-1.5 pb-1.5 text-muted-foreground">
+            {/* Lamps draw a halo past their box, so they get the wider gap. */}
+            <span className="flex items-center gap-1.5"><ContextMoon ratio={0.5} />context used</span>
+            <span className="flex items-center gap-2.5 pl-1"><Lamp state="wait" settled />needs you</span>
+            <span className="flex items-center gap-2.5 pl-1"><Lamp state="fault" settled />run stopped</span>
+            <span className="flex items-center gap-1.5 font-mono"><span className="text-[var(--ins-ok)]">+4</span>uncommitted lines</span>
+            <span className="flex items-center gap-1.5"><Worktree size={12} />other worktrees</span>
+          </span>
+        )}
         <span className="flex items-center gap-1">
           {tally(kinds).map((t, i) => (
             <span key={t.label} className="flex items-center gap-1">
@@ -364,6 +380,15 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
             </span>
           ))}
         </span>
+        <button
+          type="button"
+          className="tui-btn ml-auto"
+          aria-pressed={showKey}
+          title="What the marks on each tab row mean"
+          onClick={() => setShowKey((v) => !v)}
+        >
+          key
+        </button>
         {focusKeys && (
           <span className="flex basis-full flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground">
             <FrameHints

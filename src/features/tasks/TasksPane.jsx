@@ -1,5 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight } from '@/components/icons';
+import { ChevronDown, ChevronRight, Workspace } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { errorMessage } from '../../lib/errorMessage';
@@ -256,7 +256,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
         <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
           {/* Either name selects its list; the switch between them flips it. */}
           <div className="flex min-w-0 items-center gap-2">
-            <ScopeLabel label={workspaceName} count={projectCount} on={view === 'project'} onClick={() => setView('project')} />
+            <ScopeLabel icon={Workspace} label={workspaceName} count={projectCount} on={view === 'project'} onClick={() => setView('project')} />
             <ToggleSwitch
               checked={view === 'global'}
               onChange={(on) => setView(on ? 'global' : 'project')}
@@ -351,7 +351,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
   );
 });
 
-function ScopeLabel({ label, count, on, onClick }) {
+function ScopeLabel({ icon: Icon, label, count, on, onClick }) {
   return (
     <button
       type="button"
@@ -362,6 +362,7 @@ function ScopeLabel({ label, count, on, onClick }) {
         on ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
+      {Icon && <Icon size={12} className="shrink-0" />}
       <span className="truncate">{label}</span>
       {count > 0 && <span className="tabular-nums">{count}</span>}
     </button>

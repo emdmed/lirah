@@ -28,7 +28,7 @@ export const STROKE = { hair: 1, ink: 1.3, emphasis: 1.6, heavy: 2 };
 // Dash patterns, finest first: projection, pending, planned, out of reach.
 export const DASH = { fine: '2 3', medium: '4 3', long: '5 4', sparse: '2 4' };
 
-// Geist Mono at 11px advances 6.6px per character, ~7px with the legend
+// Chivo Mono at 11px advances 6.6px per character, ~7px with the legend
 // tracking (6.6 left one-line boxes a character short). Layout uses this
 // estimate rather than measuring, so figures lay out in one pass.
 export const CH = 7;

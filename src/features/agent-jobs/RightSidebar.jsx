@@ -27,7 +27,7 @@ import { PlansPane } from '../plans/PlansPane';
 import { EmptyLine, NewRow } from '../plans/parts';
 import { usePlans } from '../plans/PlansContext';
 import { useRepoRoot } from '../plans/planRepoRoot';
-import { CHUNK_STATUS } from '../plans/planModel';
+import { isOpenPlan } from '../plans/planModel';
 import { TasksPane } from '../tasks/TasksPane';
 import { WorklogPane } from '../worklog/WorklogPane';
 import { useOpenTaskCount } from '../tasks/TasksContext';
@@ -850,12 +850,10 @@ function RaceGroup({ jobs, renderCard, onCompare }) {
 
 
 // Plans in the active tab's repo that still have a chunk to do or underway.
-// A rolled-back chunk is back to to-do, so it counts as pending.
-const OPEN_CHUNK = new Set([CHUNK_STATUS.PENDING, CHUNK_STATUS.IN_PROGRESS, CHUNK_STATUS.ROLLED_BACK]);
 function useOpenPlanCount(projectPath) {
   const { repoRoot } = useRepoRoot(projectPath);
   const { plans } = usePlans(repoRoot);
-  return useMemo(() => (plans || []).filter((p) => p.chunks?.some((c) => OPEN_CHUNK.has(c.status))).length, [plans]);
+  return useMemo(() => (plans || []).filter(isOpenPlan).length, [plans]);
 }
 
 // A job's duration line (P6): lit while running, fault when it failed, muted

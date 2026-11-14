@@ -365,3 +365,7 @@ export const planDir = (plan) => `plans/${planMonth(plan.createdAt)}/${plan.id}`
 
 /** Where plan .md files go: `<home>/.lirah/plans/<YYYY-MM>` (the month of `ts`). */
 export const planFilesDir = (home, ts) => `${home}/.lirah/plans/${planMonth(ts)}`;
+
+// A plan with a chunk still to do or underway. A rolled-back chunk is back to to-do, so it counts.
+const OPEN_CHUNK = new Set([CHUNK_STATUS.PENDING, CHUNK_STATUS.IN_PROGRESS, CHUNK_STATUS.ROLLED_BACK]);
+export const isOpenPlan = (plan) => !!plan.chunks?.some((c) => OPEN_CHUNK.has(c.status));

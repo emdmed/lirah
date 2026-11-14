@@ -1,5 +1,5 @@
 import { useMemo, memo } from 'react';
-import { Agent, ChevronDown, Clear, Collapse, Command, Commit, FindInFile, Merge, Settings, Stats, Terminal } from '@/components/icons';
+import { Agent, Branch, ChevronDown, Clear, Collapse, Command, Commit, FindInFile, Merge, Settings, Stats, Terminal } from '@/components/icons';
 import { Scanner } from './instrument/Scanner';
 import { Button } from './ui/button';
 import {
@@ -307,17 +307,18 @@ export const StatusBar = memo(({
       className="ins-rail grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-2 pr-2 h-full text-xs font-mono text-foreground"
       {...drag}
     >
-      {/* LEFT: maker's mark, project name and branch, then waiting / update. On macOS the window controls come first, at the left. */}
+      {/* LEFT: maker's mark, then workspace / tab / branch, broadest first, then waiting / update. On macOS the window controls come first, at the left. */}
       <div className="flex items-center gap-3 overflow-hidden min-w-0" {...drag}>
         {IS_MAC && showTitleBar && <WindowControls />}
         <LirahMark size={18} lit={!!sessionId} className="shrink-0 ml-1" />
+        <WorkspaceMenu />
         {currentPath && (
           <span className="flex items-baseline gap-2 min-w-0" title={currentPath}>
-            <span className="ins-name text-[16px] leading-none shrink-0">{basename(currentPath)}</span>
-            {branchName && <span className="text-muted-foreground truncate">{branchName}</span>}
+            <span className="text-faint" aria-hidden="true">/</span>
+            <span className="ins-name text-[14px] leading-none shrink-0 text-muted-foreground">{basename(currentPath)}</span>
+            {branchName && <span className="flex min-w-0 items-baseline gap-1 text-muted-foreground"><Branch size={12} className="shrink-0 self-center" /><span className="truncate">{branchName}</span></span>}
           </span>
         )}
-        <WorkspaceMenu />
 
         <div className="ml-auto" />
 

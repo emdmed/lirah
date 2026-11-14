@@ -10,30 +10,62 @@
   font-display: swap;
 }
 
-/* Terminal, chrome and legend face (OFL, bundled: the app runs offline).
-   Latin subset; xterm draws box-drawing glyphs itself. */
+/* Base face: content, chrome and the terminal (OFL, bundled: the app runs
+   offline). Latin subset; xterm draws box-drawing glyphs itself. */
 @font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-400.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMono-Medium.woff2') format('woff2');
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Legend face (OFL, latin subset). */
+@font-face {
+  font-family: 'Chivo Mono';
+  src: url('/fonts/ChivoMono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chivo Mono';
+  src: url('/fonts/ChivoMono-500.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 
-/* Base face for content and the terminal (bundled: the app runs offline). */
+/* Glyph face: JetBrains Mono cut down to arrows, box drawing and geometric
+   shapes (OFL), so tree chevrons render the same on every machine. */
 @font-face {
-  font-family: 'Typestar OCR';
-  src: url('/fonts/Typestar-OCR.woff2') format('woff2');
-  font-weight: normal;
+  font-family: 'JetBrains Mono Glyphs';
+  src: url('/fonts/JetBrainsMono-Glyphs.woff2') format('woff2');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+2190-21FF, U+2500-257F, U+25A0-25FF;
 }
 
 /* Name face, for proper names set in italic (.ins-name). OFL, latin subset. */
@@ -70,7 +102,7 @@
 
 @theme {
   /* Font family */
-  --font-mono: "Typestar OCR", "Geist Mono", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
   
   /* Two sizes, like a terminal: 11px for chrome (labels, titles, status
      line), 12px for content (files, prompt, lists). xl/2xl stay for the rare
@@ -177,7 +209,7 @@
   /* Eärendil's star, the mark's four-point star: the meter needle and the
      status-bar separator. */
   --ins-star:        polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
-  --font-legend: "Geist Mono", var(--font-mono);
+  --font-legend: "Chivo Mono", var(--font-mono);
   --font-name: "Spectral", Georgia, serif;
   --legend-weight: 400;
   --legend-tracking: 0.04em;
@@ -203,9 +235,8 @@
   /* Status lines (tab bar, status bar) sit between gutter and panel. */
   --tui-bar: color-mix(in srgb, var(--ins-gutter) 60%, var(--ins-panel));
   --glow: var(--ins-lamp);
-  /* Tree guides need box-drawing coverage the OCR face lacks; these are the
-     common mono fonts that have it. */
-  --font-glyph: "JetBrainsMono Nerd Font", "JetBrains Mono", "DejaVu Sans Mono", "Adwaita Mono", "Noto Sans Mono", Menlo, Consolas, monospace;
+  /* Tree chevrons and guides: the bundled glyph cut, then common mono fonts. */
+  --font-glyph: "JetBrains Mono Glyphs", "JetBrains Mono", "DejaVu Sans Mono", monospace;
 }
 
 /* Native controls follow the theme: dark lists and scrollbars in dark

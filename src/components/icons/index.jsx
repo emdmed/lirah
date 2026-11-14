@@ -16,6 +16,8 @@ const GLYPHS = {
   Pin: <><circle cx="11.5" cy="8" r="5" /><circle className="b" cx="11.5" cy="8" r="2.2" /><path d="M11 13v8" /></>,
   Commit: <><path d="M3 11h4.5M16.5 11H21" /><circle className="b" cx="12" cy="11" r="3.6" /></>,
   Branch: <><path d="M7 3v18M7 16C7 11.5 17 12.5 17 8.8" /><circle className="b" cx="17" cy="6.4" r="2.2" /></>,
+  Worktree: <><path d="M7 3v18M7 16C7 13.3 17 14.8 17 12M12.5 3h3l1 1.5h5v7.5h-9z" /><circle className="b" cx="17" cy="8.4" r="1.6" /></>,
+  Workspace: <><path d="M3 20V4.5h6V9h12v11zM9 6.5h6V9M15 6.5h6V9" /><circle className="b" cx="12" cy="14.5" r="2.2" /></>,
   Merge: <><path d="M7 3v18M17 15.2C17 10.5 7 12.5 7 8" /><circle className="b" cx="17" cy="17.6" r="2.2" /></>,
   Plan: <><path d="M10 5h11M10 11h11M10 17h11M3 5h3" /><circle className="b" cx="4.5" cy="11" r="2.2" /></>,
   Filter: <><path d="M3 5h18M5.5 5l5.5 6.5M18.5 5L13 11.5" /><circle className="b" cx="12" cy="16" r="2.2" /></>,
@@ -110,5 +112,5 @@ const make = (name) => {
 
 export const ICON_NAMES = Object.keys(GLYPHS);
 export const {
-  Refresh, Repeat, Send, Download, Upload, Import, View, Reveal, Pin, Commit, Branch, Merge, Plan, Filter, Stats, Agent, Undo, Transfer, Play, Stop, Check, Close, Add, Done, Failed, Warning, Compare, Database, Cost, Sort, Link, Table, Search, FindInFile, Settings, Time, Star, Required, Best, Trophy, Quick, Unpin, Expand, Collapse, CollapseAll, HideSidebar, ShowSidebar, Empty, ChevronDown, ChevronRight, ChevronLeft, ChevronUp, ArrowUp, ArrowDown, ParentFolder, Terminal, Copy, Trash, Edit, Clear, Folder, RemoveFolder, File, RemoveFile, FileBelow, Files, Archive, Save, Chat, NewChat, Code, TextSize, Command, Attach, Tasks, Log, Jobs, Price
+  Refresh, Repeat, Send, Download, Upload, Import, View, Reveal, Pin, Commit, Branch, Worktree, Workspace, Merge, Plan, Filter, Stats, Agent, Undo, Transfer, Play, Stop, Check, Close, Add, Done, Failed, Warning, Compare, Database, Cost, Sort, Link, Table, Search, FindInFile, Settings, Time, Star, Required, Best, Trophy, Quick, Unpin, Expand, Collapse, CollapseAll, HideSidebar, ShowSidebar, Empty, ChevronDown, ChevronRight, ChevronLeft, ChevronUp, ArrowUp, ArrowDown, ParentFolder, Terminal, Copy, Trash, Edit, Clear, Folder, RemoveFolder, File, RemoveFile, FileBelow, Files, Archive, Save, Chat, NewChat, Code, TextSize, Command, Attach, Tasks, Log, Jobs, Price
 } = Object.fromEntries(ICON_NAMES.map((n) => [n, make(n)]));

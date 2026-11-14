@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/lirah.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- The terminal and chrome face; preloaded so xterm measures it, not a fallback. -->
-    <link rel="preload" href="/fonts/Typestar-OCR.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/IBMPlexMono-400.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/GrenzeGotisch-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
     <title>Lirah</title>
     <!--
@@ -17,7 +17,7 @@
     <style>
       /* index.css is not loaded yet, so the splash declares its own faces. */
       @font-face { font-family: 'Grenze Gotisch'; src: url('/fonts/GrenzeGotisch-SemiBold.woff2') format('woff2'); font-weight: 600; font-display: block; }
-      @font-face { font-family: 'Geist Mono'; src: url('/fonts/GeistMono-Regular.woff2') format('woff2'); font-weight: 400; font-display: block; }
+      @font-face { font-family: 'Chivo Mono'; src: url('/fonts/ChivoMono-400.woff2') format('woff2'); font-weight: 400; font-display: block; }
       html, body { margin: 0; background: var(--splash-bg, #1e1e26); }
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
@@ -46,7 +46,7 @@
       #splash.is-ready ellipse:nth-child(3) { animation-delay: 80ms; }
       #splash.is-ready ellipse:nth-child(4) { animation-delay: 120ms; }
       #splash .word { font: 600 30px/1 'Grenze Gotisch', serif; }
-      #splash .note { font: 10px/1 'Geist Mono', monospace; letter-spacing: 1px; text-transform: uppercase; opacity: .55; min-height: 10px; }
+      #splash .note { font: 10px/1 'Chivo Mono', monospace; letter-spacing: 1px; text-transform: uppercase; opacity: .55; min-height: 10px; }
       #splash.is-done { opacity: 0; pointer-events: none; }
       #splash[hidden] { display: none; }
       /* Zen shifts reuse the splash as a bare veil on the terminal's colour: no
