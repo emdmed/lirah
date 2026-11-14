@@ -46,6 +46,21 @@ it('adds, lists and finishes a task in the workspace file', () => {
   expect(file('tasks/global.json').tasks[0].title).toBe('Inbox item');
 });
 
+it('stores an artifact under the repo folder and lists it, with the app closed', () => {
+  writeFileSync(join(project, 'My Report.html'), '<h1>hi</h1>');
+  const dir = join(home, '.lirah', 'artifacts', project.replace(/[\\/:]/g, '-'));
+  expect(lirah('artifacts', 'add', 'My Report.html')).toContain(join(dir, 'My-Report.html'));
+  expect(readFileSync(join(dir, 'My-Report.html'), 'utf8')).toBe('<h1>hi</h1>');
+  lirah('artifacts', 'add', 'My Report.html', '--name', 'summary');
+  expect(lirah('artifacts')).toBe(`${dir}\n\nMy-Report.html\nsummary.html\n`);
+  expect(() => lirah('artifacts', 'add', 'missing.html')).toThrow(/no such file/);
+  expect(lirah('artifacts', 'rename', 'summary', 'Final Notes')).toBe('renamed to Final-Notes.html\n');
+  expect(() => lirah('artifacts', 'rename', 'My-Report', 'Final-Notes')).toThrow(/already exists/);
+  expect(lirah('artifacts', 'rm', 'My-Report.html')).toBe('deleted My-Report.html\n');
+  expect(lirah('artifacts')).toBe(`${dir}\n\nFinal-Notes.html\n`);
+  expect(() => lirah('artifacts', 'remove', 'nope')).toThrow(/no artifact "nope"/);
+});
+
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 it('imports a plan with its split queued, and re-chunks it', () => {

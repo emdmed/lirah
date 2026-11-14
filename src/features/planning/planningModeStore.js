@@ -73,6 +73,24 @@ export async function startDraft(tabId, title, repo = null) {
   return path;
 }
 
+// Files to attach as context once the tab's planning panel is up (it owns the
+// tab's file selection): a plan started from an artifact brings the artifact.
+const pendingContext = new Map();
+
+/** Queue `paths` for the tab's context; the planning panel takes them with takePendingContext. */
+export function attachOnPlanning(tabId, paths) {
+  pendingContext.set(tabId, [...(pendingContext.get(tabId) || []), ...paths]);
+  emit();
+}
+
+export function takePendingContext(tabId) {
+  const paths = pendingContext.get(tabId) || [];
+  pendingContext.delete(tabId);
+  return paths;
+}
+
+export const usePendingContextCount = (tabId) => useSyncExternalStore(subscribe, () => pendingContext.get(tabId)?.length ?? 0);
+
 /** Shows the draft folder `path` in the tab's planning mode. */
 export function openDraft(tabId, path) {
   setPlanningFolder(tabId, path);

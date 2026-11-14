@@ -15,7 +15,7 @@
 // is true.
 import { connect } from "node:net";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { lirahDir, list, read, resolveWorkspace, revisionOf, write } from "./lirah_files.js";
@@ -76,6 +76,15 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  global list
                                  Task commands take --global to work on the
                                  global list instead of this tab's project.
+  lirah artifacts [list]         list this tab's repo HTML artifacts
+                                 (files: ~/.lirah/artifacts/<repo path, / as ->)
+  lirah artifacts add <file.html> [--name N]
+                                 store a self-contained HTML page for this repo
+                                 and show it in Lirah (same name: replaced)
+  lirah artifacts open <name>    show a stored artifact in Lirah
+  lirah artifacts rename <name> <new-name>
+                                 rename an artifact (won't overwrite another)
+  lirah artifacts remove <name>  delete an artifact
   lirah plans [list]             list this tab's repo plans and their progress
                                  (plans and their files: ~/.lirah/plans/<YYYY-MM>)
   lirah plans show <plan>        a plan's chunks and their state
@@ -274,6 +283,10 @@ function printTasks(data) {
   return `${where}\n\n${table(["ID", "STATUS", "TITLE"], rows)}`;
 }
 
+function printArtifacts(data) {
+  return data.artifacts.length ? `${data.dir}\n\n${data.artifacts.join("\n")}` : `no artifacts in ${data.dir}`;
+}
+
 function printPlans(data) {
   if (!data.plans.length) return `no plans in ${data.repo}`;
   const rows = data.plans.map((p) => [
@@ -373,6 +386,14 @@ function absolutePath(raw, usage) {
 
 // A bare --flag right before a positional swallows it as its value: put the
 // positional back and make the flag true.
+// The absolute path of an existing .html file, for `artifacts add`.
+function htmlPath(raw) {
+  const path = absolutePath(raw, "lirah artifacts add <file.html> [--name N]");
+  if (!/\.html?$/i.test(path)) fail(`not an .html file: ${path}`);
+  if (!existsSync(path) || !statSync(path).isFile()) fail(`no such file: ${path}`);
+  return path;
+}
+
 // The absolute directory for `tabs open` / `startup add`, which must exist.
 function tabPath(raw, usage = "lirah tabs open <path> [--launch]") {
   const path = absolutePath(raw, usage);
@@ -449,6 +470,21 @@ function route(cmd, positional, args) {
       }
       case "clear": return ["startup.clear", rest, show];
       default: fail(`unknown startup command "${sub}" (mode, add, remove, clear)`);
+    }
+  }
+  if (cmd === "artifacts" || cmd === "artifact") {
+    switch (sub ?? "list") {
+      case "list": return ["artifacts.list", rest, printArtifacts];
+      case "add": {
+        const [path, ...extra] = rest;
+        return ["artifacts.add", [htmlPath(path ?? args.path), ...extra], show];
+      }
+      case "open": return ["artifacts.open", rest, show];
+      case "rename":
+      case "mv": return ["artifacts.rename", rest, show];
+      case "remove":
+      case "rm": return ["artifacts.remove", rest, show];
+      default: fail(`unknown artifacts command "${sub}" (list, add, open, rename, remove)`);
     }
   }
   if (cmd === "plans" || cmd === "plan") {
@@ -636,6 +672,15 @@ function replaceSource(plan, source, importedFrom) {
     split: "queued", splitError: null,
   });
 }
+
+// As artifactsRel/artifactName in src/lib/lirahPaths.js.
+const artifactsRel = (repo) => `artifacts/${repo.replace(/[\\/:]/g, "-")}`;
+function existingArtifact(dir, ref) {
+  const name = artifactName(ref ?? "");
+  if (!list(dir).includes(name)) throw new Error(`no artifact "${ref}" (see \`lirah artifacts\`)`);
+  return name;
+}
+const artifactName = (raw) => `${String(raw).replace(/\.html?$/i, "").replace(/[^\w.-]+/g, "-") || "artifact"}.html`;
 
 const QUEUED = "Lirah splits it into chunks when it loads this repo's plans (at once if they're open)";
 
@@ -902,6 +947,33 @@ const LOCAL = {
       summary: plan.summary || "",
       chunks: plan.chunks.map((c) => ({ n: c.n, id: c.id, state: state(c), title: c.title || "" })),
     };
+  },
+  "artifacts.list": () => {
+    const dir = artifactsRel(repoRoot());
+    return { dir: join(lirahDir(), dir), artifacts: list(dir).filter((n) => n.endsWith(".html")) };
+  },
+  "artifacts.add": (args, [path = args.path]) => {
+    const file = join(lirahDir(), artifactsRel(repoRoot()), artifactName(args.name || basename(path)));
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, readFileSync(path, "utf8"));
+    return `stored ${file} (Lirah isn't running; open it from the sidebar's artifacts section later)`;
+  },
+  "artifacts.rename": (args, [from = args.name, to = args.to]) => {
+    if (!to) throw new Error("missing new name: lirah artifacts rename <name> <new-name>");
+    const dir = artifactsRel(repoRoot());
+    const old = existingArtifact(dir, from);
+    const next = artifactName(to);
+    if (next !== old) {
+      if (list(dir).includes(next)) throw new Error(`an artifact named "${next}" already exists`);
+      renameSync(join(lirahDir(), dir, old), join(lirahDir(), dir, next));
+    }
+    return `renamed to ${next}`;
+  },
+  "artifacts.remove": (args, [ref = args.name]) => {
+    const dir = artifactsRel(repoRoot());
+    const name = existingArtifact(dir, ref);
+    unlinkSync(join(lirahDir(), dir, name));
+    return `deleted ${name}`;
   },
   "plans.import": (args, [path = args.path]) => {
     const repo = repoRoot();

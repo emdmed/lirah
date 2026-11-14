@@ -13,3 +13,10 @@ export const planWorktreesDir = (home, plan) => `${planWorktreesRoot(home)}/${pl
 
 /** A workspace's job folder: job records, logs, run reports and patches. */
 export const jobsDir = (home, workspaceId) => `${lirahDir(home)}/workspaces/${workspaceId}/jobs`;
+
+/** A repo's HTML artifacts, relative to ~/.lirah: its path with every separator as "-". */
+export const artifactsRel = (repo) => `artifacts/${repo.replace(/[\\/:]/g, '-')}`;
+
+/** The stored file name for an artifact: safe characters only, always .html. */
+export const artifactName = (raw) => `${String(raw).replace(/\.html?$/i, '').replace(/[^\w.-]+/g, '-') || 'artifact'}.html`;
+

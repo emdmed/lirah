@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '../toast';
-import { useConfirm } from '../dialogs/DialogProvider';
+import { useConfirm, useDialogStore } from '../dialogs/DialogProvider';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getSettings, setSetting } from '../settings/settingsStore';
 import { isProjectTab, masterTabOf, tabDisplayName, useTabManager } from '../tabs/TabContext';
@@ -26,6 +26,8 @@ import { getSessionTerminal, getTabSession } from '../tabs/terminalActivity';
 import { keyBytes } from './keyNames';
 import { outputSince, subscribeOutput, watchOutput } from '../tabs/outputTail';
 import { hash8 } from '../../lib/ids';
+import { artifactName, artifactsRel } from '../../lib/lirahPaths';
+import { deleteArtifact, listArtifacts, renameArtifact, saveArtifact } from '../artifacts/artifactFiles';
 import { JOB_CLIS } from '../../lib/agentClis';
 import {
   addStartupProject, callerTab, clearStartupProjects, getSetting, getStartup, removeStartupProject, setStartupMode, isGuarded, listSettings, listTabs, listThemes, prepareReset, prepareSetting,
@@ -86,9 +88,10 @@ export function useAgentControl() {
   const tasksActions = useTasksActions();
   const plansActions = usePlansActions();
   const jobsActions = useAgentJobsActions();
+  const dialogs = useDialogStore();
   // The listener is set up once; it reads the latest of these through the ref.
   const live = useRef({});
-  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions, jobs: jobsActions };
+  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions, jobs: jobsActions, dialogs };
 
   useEffect(() => {
     // Ask before a guarded change. Resolves true when allowed.
@@ -548,6 +551,34 @@ export function useAgentControl() {
       },
 
       // Tasks: the caller tab's project list (as the tasks pane scopes it), or --global.
+      'artifacts.list': async (args, positional, { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const home = await invoke('get_home_dir');
+        return { dir: `${home}/.lirah/${artifactsRel(repo)}`, artifacts: await listArtifacts(repo) };
+      },
+      'artifacts.add': async (args, [path = args.path], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const html = await invoke('read_file_content', { path });
+        const { name, path: file } = await saveArtifact(repo, args.name || basename(path), html);
+        live.current.dialogs.open('artifact', { repo, name }, null);
+        return `stored ${file} and opened it in Lirah`;
+      },
+      'artifacts.open': async (args, [ref = args.name], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        const name = artifactName(ref ?? '');
+        if (!(await listArtifacts(repo)).includes(name)) throw new Error(`no artifact "${ref}" (see \`lirah artifacts\`)`);
+        live.current.dialogs.open('artifact', { repo, name }, null);
+        return `opened ${name}`;
+      },
+      'artifacts.rename': async (args, [from = args.name, to = args.to], { sessionId }) => {
+        if (!to) throw new Error('missing new name: lirah artifacts rename <name> <new-name>');
+        const repo = await projectScope(sessionId);
+        return `renamed to ${await renameArtifact(repo, from, to)}`;
+      },
+      'artifacts.remove': async (args, [ref = args.name], { sessionId }) => {
+        const repo = await projectScope(sessionId);
+        return `deleted ${await deleteArtifact(repo, ref)}`;
+      },
       'plans.list': async (args, positional, { sessionId }) => {
         const repo = await projectScope(sessionId);
         const plans = await live.current.plans.getPlans(repo);

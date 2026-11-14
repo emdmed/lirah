@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Agent, Archive, Check, ChevronDown, ChevronRight, Collapse, Compare, Copy, Expand, Jobs, Log, Merge, Plan, Stop, Tasks, Trash, Trophy, Undo, Upload, Warning } from '@/components/icons';
+import { Agent, Archive, Check, ChevronDown, ChevronRight, Collapse, Compare, Copy, Expand, Jobs, Log, Merge, Plan, Stop, Tasks, Trash, Trophy, Undo, Upload, View, Warning } from '@/components/icons';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -24,6 +24,7 @@ import { Fig12Race } from './Fig12Race';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { useTabManager } from '../tabs/TabContext';
 import { PlansPane } from '../plans/PlansPane';
+import { ArtifactsPane, useArtifacts } from '../artifacts/ArtifactsPane';
 import { EmptyLine, NewRow } from '../plans/parts';
 import { usePlans } from '../plans/PlansContext';
 import { useRepoRoot } from '../plans/planRepoRoot';
@@ -125,6 +126,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   } = useAgentJobs();
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
+  const artifacts = useArtifacts(projectPath);
   const { workspaceTabs, activeWorkspaceId, activeTabId } = useTabManager();
   const dialog = useDialog();
   const openTasks = useOpenTaskCount(activeWorkspaceId);
@@ -135,6 +137,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   // user folds it away (» or Alt+4); the rail keeps a new-tab key.
   const [collapsedOverride, setCollapsedOverride] = useState(null);
   const [tab, setTab] = useState('tasks');
+  // Like agents, only while there are some (or it's the open section): a fifth tab pushes log and jobs off the row.
+  const showArtifacts = artifacts.names?.length > 0 || tab === 'artifacts';
   const [dialogOpen, setDialogOpen] = useState(false);
   const [review, setReview] = useState(null); // { jobId, filePath }
   // Review notes pinned to lines of the job being reviewed, sent back to the
@@ -603,7 +607,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
         if (e.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return;
         // [ ] cycle sections. Alt is allowed and AltGraph excused: ISO layouts type [ ] with AltGr.
         if ((e.key === '[' || e.key === ']') && (e.getModifierState('AltGraph') || !(e.ctrlKey || e.metaKey))) {
-          const sections = ['tasks', 'plans', 'log', 'jobs', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
+          const sections = ['tasks', 'plans', ...(showArtifacts ? ['artifacts'] : []), 'log', 'jobs', ...(totalActiveCount > 0 || tab === 'agents' ? ['agents'] : [])];
           const step = e.key === ']' ? 1 : -1;
           e.preventDefault();
           setTab(sections[(sections.indexOf(tab) + step + sections.length) % sections.length]);
@@ -657,6 +661,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       <div role="tablist" aria-label="Workspace sections" className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
         <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" icon={Tasks} count={openTasks} />
         <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" icon={Plan} count={openPlans} />
+        {showArtifacts && (
+          <TabButton active={tab === 'artifacts'} onClick={() => setTab('artifacts')} label="artifacts" icon={View} count={artifacts.names?.length} />
+        )}
         <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" icon={Log} />
         <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" icon={Jobs} count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
         {(totalActiveCount > 0 || tab === 'agents') && (
@@ -689,7 +696,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
         {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
-        {projectPath && (tab === 'plans' || tab === 'tasks') && (
+        {projectPath && (tab === 'plans' || tab === 'tasks' || tab === 'artifacts') && (
           <div className="ins-legend text-[11px] text-muted-foreground px-3 pt-2 pb-2.5 truncate shrink-0" title={projectPath}>
             {basename(projectPath)}
           </div>
@@ -698,6 +705,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <SubagentList />
         ) : tab === 'plans' ? (
           <PlansPane projectPath={projectPath} />
+        ) : tab === 'artifacts' ? (
+          <ArtifactsPane projectPath={projectPath} repoRoot={artifacts.repoRoot} names={artifacts.names} />
         ) : tab === 'tasks' ? (
           <TasksPane projectPath={projectPath} />
         ) : tab === 'log' ? (

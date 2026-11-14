@@ -1,4 +1,4 @@
-use notify::event::ModifyKind;
+use notify::event::{CreateKind, ModifyKind};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -430,14 +430,18 @@ pub fn start_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
 fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
     let base = crate::util::lirah_dir().ok_or("no home directory")?;
     let (tx, rx) = mpsc::channel::<PathBuf>();
+    let artifacts = base.join("artifacts");
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
         let Ok(event) = res else { return };
         if matches!(event.kind, EventKind::Access(_)) {
             return;
         }
+        let new_dir = matches!(event.kind, EventKind::Create(CreateKind::Folder));
         // Temp files (".x.json.tmp-<pid>") have another extension, so only renames onto the target count.
         for p in event.paths {
-            if p.extension().is_some_and(|e| e == "json") {
+            // A repo's first artifact is often written before its new folder is watched: report the folder.
+            let artifacts_dir = new_dir && p.parent() == Some(artifacts.as_path());
+            if artifacts_dir || p.extension().is_some_and(|e| e == "json" || e == "html") {
                 let _ = tx.send(p);
             }
         }
@@ -447,7 +451,7 @@ fn build_lirah_watcher(app_handle: AppHandle) -> Result<(), String> {
     watcher
         .watch(&base, RecursiveMode::NonRecursive)
         .map_err(|e| format!("Failed to watch {}: {e}", base.display()))?;
-    for dir in ["workspaces", "tasks", "plans"] {
+    for dir in ["workspaces", "tasks", "plans", "artifacts"] {
         let dir = base.join(dir);
         let _ = std::fs::create_dir_all(&dir);
         watcher

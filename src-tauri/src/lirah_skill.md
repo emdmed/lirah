@@ -71,6 +71,13 @@ lirah tasks edit <id> [--title T] [--notes N]
 lirah tasks remove <id>        delete a task (the user can undo from a toast)
 lirah tasks move <id>          move between this project's list and the global list
                                task commands take --global to act on the global list
+lirah artifacts [list]         list this tab's repo HTML artifacts
+lirah artifacts add <file.html> [--name N]
+                               store an HTML page for this repo and show it in Lirah
+lirah artifacts open <name>    show a stored artifact in Lirah
+lirah artifacts rename <name> <new-name>
+                               rename an artifact (won't overwrite another)
+lirah artifacts remove <name>  delete an artifact
 lirah plans [list]             list this tab's repo plans, their progress and stage
                                (draft, pending, in-progress, in-review, completed, cancelled)
 lirah plans show <plan>        a plan's chunks and their state
@@ -172,6 +179,11 @@ tabs are your workers:
 - For startup projects to open at launch, the mode must be `projects`:
   `lirah startup mode projects`.
 - Paths are resolved against your current directory.
+- When a page would show something better than terminal text (a report, an
+  explainer, a mock), write one self-contained .html file (CSS and JS inline,
+  images as data: URIs) and run `lirah artifacts add <file.html>`; it opens in
+  Lirah. Pages render in a sandbox: relative files, network fetches to file paths
+  and the app's API don't work. Adding the same name again replaces it.
 - When the user asks you to start a plan, plan a feature, or open planning mode:
   run `lirah plans draft "<short title>"` first. It opens planning mode in this tab
   and prints the draft folder. Then plan with the user, writing each part to its

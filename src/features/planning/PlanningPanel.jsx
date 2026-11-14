@@ -27,8 +27,11 @@ import { getTabSession } from '../tabs/terminalActivity';
 import { useToast } from '../toast';
 import {
   DRAFT_META, draftRepo, markPartSent, setDraftMockup, setPlanningFolder, setPlanningMode, settleSentParts, startDraft,
-  useDraftMockup, usePlanningFolder, useSentParts,
+  takePendingContext, useDraftMockup, usePendingContextCount, usePlanningFolder, useSentParts,
 } from './planningModeStore';
+import { useRepoArtifacts } from '../artifacts/ArtifactsPane';
+import { artifactsRel } from '../../lib/lirahPaths';
+import { View } from '@/components/icons';
 
 // The whole road: write the parts, split them into chunks, review (revise, re-chunk, approve), then pending in the plans pane.
 const STEPS = [{ id: 'draft', label: 'draft' }, { id: 'split', label: 'split' }, { id: 'review', label: 'review' }, { id: 'pending', label: 'pending' }];
@@ -147,6 +150,10 @@ export function PlanningPanel({ tabId, tabName, projectPath, selectedFiles, addF
   // A draft without ui.md has no UI to mock up.
   const mockupMissing = mockup && !!uiPath && !hasMockupLink(uiText);
   const showPicker = !folder || picking;
+
+  // Files queued for this tab's context (a plan started from an artifact): the panel owns the selection.
+  const pendingContext = usePendingContextCount(tabId);
+  useEffect(() => { if (pendingContext) addFiles(takePendingContext(tabId)); }, [pendingContext, tabId, addFiles]);
 
   useEffect(() => { if (folder) settleSentParts(folder, DRAFT_PARTS.map((p) => p.id).filter((id) => names.includes(`${id}.md`))); });
 
@@ -414,6 +421,16 @@ export function PlanningPanel({ tabId, tabName, projectPath, selectedFiles, addF
             />
           )}
 
+          {folder && !showPicker && repoRoot && (
+            <ArtifactsGroup
+              repoRoot={repoRoot}
+              selectedFiles={selectedFiles}
+              addFiles={addFiles}
+              removeFile={removeFile}
+              onOpen={(name) => dialogs.open('artifact', { repo: repoRoot, name }, null)}
+            />
+          )}
+
           {plan && !showPicker && (
             <Group label="chunks" end={splitting ? null : stale ? 'draft changed since the split · r' : plan.chunks.length}>
               <div role="status" className="contents">
@@ -485,6 +502,44 @@ export function PlanningPanel({ tabId, tabName, projectPath, selectedFiles, addF
         <FrameHints hints={hints} />
       </span>
     </div>
+  );
+}
+
+/**
+ * The repo's HTML artifacts (`lirah artifacts`), each with a context box like
+ * the parts', so a report or mockup can go with the planning prompts.
+ */
+function ArtifactsGroup({ repoRoot, selectedFiles, addFiles, removeFile, onOpen }) {
+  const names = useRepoArtifacts(repoRoot);
+  const [home, setHome] = useState(null);
+  useEffect(() => { invoke('get_home_dir').then(setHome, () => {}); }, []);
+  if (!names?.length || !home) return null;
+  const dir = `${home}/.lirah/${artifactsRel(repoRoot)}`;
+  const inContext = names.filter((n) => selectedFiles.has(`${dir}/${n}`)).length;
+  return (
+    <Group label="artifacts" end={inContext > 0 ? `${names.length} · ${inContext} in context` : names.length}>
+      <div className="flex flex-col">
+        {names.map((name) => {
+          const path = `${dir}/${name}`;
+          return (
+            <div key={name} className={PART_ROW}>
+              <span className="flex h-5 w-3.5 items-center justify-center text-muted-foreground"><View size={12} /></span>
+              <button type="button" className="min-w-0 truncate text-left text-foreground outline-none focus-visible:text-[var(--ins-legend)]" onClick={() => onOpen(name)} title={`Open ${name}`}>
+                {name.replace(/\.html$/, '')}
+              </button>
+              <span className="flex h-5 items-center justify-center">
+                <Checkbox
+                  checked={selectedFiles.has(path)}
+                  onCheckedChange={(on) => (on ? addFiles([path]) : removeFile(path))}
+                  aria-label={`Add ${name} to the context`}
+                  title="Attach to your next prompt"
+                />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Group>
   );
 }
 
