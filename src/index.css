@@ -13,29 +13,29 @@
 /* Base face: content, chrome and the terminal (OFL, bundled: the app runs
    offline). Latin subset; xterm draws box-drawing glyphs itself. */
 @font-face {
-  font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-400.woff2') format('woff2');
+  font-family: 'Martian Mono';
+  src: url('/fonts/MartianMono-400.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-500.woff2') format('woff2');
+  font-family: 'Martian Mono';
+  src: url('/fonts/MartianMono-500.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-600.woff2') format('woff2');
+  font-family: 'Martian Mono';
+  src: url('/fonts/MartianMono-600.woff2') format('woff2');
   font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-700.woff2') format('woff2');
+  font-family: 'Martian Mono';
+  src: url('/fonts/MartianMono-700.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -102,7 +102,7 @@
 
 @theme {
   /* Font family */
-  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
+  --font-mono: "Martian Mono", "JetBrains Mono", "Source Code Pro", Menlo, Monaco, "Courier New", monospace;
   
   /* Two sizes, like a terminal: 11px for chrome (labels, titles, status
      line), 12px for content (files, prompt, lists). xl/2xl stay for the rare

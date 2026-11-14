@@ -22,5 +22,6 @@ export function rowKeys({ active, closable, edited, plans, summary, worktrees })
     worktrees > 0 && { keys: ['w'], on: ['w'], label: 'worktrees' },
     { keys: ['t'], on: ['t'], label: 'role' },
     { keys: ['f'], on: ['f'], label: 'folder' },
+    { keys: ['→'], on: ['ArrowRight', 'ArrowLeft'], label: 'unfold' },
   ].filter(Boolean);
 }

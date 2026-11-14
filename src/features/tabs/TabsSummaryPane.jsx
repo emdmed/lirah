@@ -21,7 +21,6 @@ import { ROW_KEYS, TabRow } from './TabRow';
 import { rowKeys } from './rowKeys';
 import { useTabPlans } from '../plans/useTabPlans';
 import { usePlansActions } from '../plans/PlansContext';
-import { PlanRow } from '../plans/PlanRow';
 import { NewRow } from '../plans/parts';
 import { FrameHints } from '../../components/instrument/FrameHints';
 import { requestPlanFocus, requestPlansPane } from '../plans/plansPaneEvents';
@@ -91,7 +90,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     () => ({ dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt }),
     [dragIndex, onDragStart, onDragOver, onDrop, endDrag, dropLineAt],
   );
-  const plans = useTabPlans(tabs, activeTabId);
+  const plans = useTabPlans(tabs);
   const { resumeAutopilot, stopAutopilot, shelvePlan } = usePlansActions();
   // Read at click time, so the row actions stay stable while plans update (rows are memoized).
   const rootOf = useRef(plans.rootOf);
@@ -152,6 +151,19 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     if (tabId !== activeTabId) switchTab(tabId);
     requestPlanFocus(planId);
   }, [activeTabId, switchTab]);
+
+  // The pending count opens the plans view on the row's repo.
+  const openPlans = useCallback((tabId) => {
+    if (tabId !== activeTabId) switchTab(tabId);
+    requestPlansPane('open');
+  }, [activeTabId, switchTab]);
+
+  const [expanded, setExpanded] = useState(() => new Set()); // tab ids unfolded by hand
+  const toggleExpanded = useCallback((id) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  }), []);
 
   const toggleTrail = useCallback((id) => setOpenTrail((open) => (open === id ? null : id)), []);
 
@@ -225,6 +237,8 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
   const actions = useMemo(() => ({
     switchTab,
     openPlan,
+    openPlans,
+    toggleExpanded,
     closeTab: requestCloseTab,
     startRename: setRenamingId,
     commitRename,
@@ -244,7 +258,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     reviewWorktree,
     mergeWorktree,
     deleteWorktree,
-  }), [switchTab, openPlan, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal, reviewWorktree, mergeWorktree, deleteWorktree]);
+  }), [switchTab, openPlan, openPlans, toggleExpanded, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal, reviewWorktree, mergeWorktree, deleteWorktree]);
 
   const kinds = [];
   const faulted = []; // tabs whose run stopped, for the closing line
@@ -278,9 +292,9 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
         if (activity.kind === 'failed') faulted.push({ id: tab.id, name: tabName(tab) });
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
         const trailOpen = !!summary && openTrail === tab.id;
-        // Only the tab you're on or the row you've selected unfolds, so rows never
-        // jump as agents start and stop; the lamp and queue outline still show live state.
-        const compact = !active && tab.id !== focusedId && !trailOpen
+        // Rows unfold only by hand (chevron or →), so the list never jumps as you
+        // move or agents start and stop; the lamp and queue outline still show live state.
+        const compact = !expanded.has(tab.id) && !trailOpen
           && renamingId !== tab.id && roleMenuId !== tab.id && worktreeMenuId !== tab.id;
         if (tab.id === focusedId) {
           focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary, worktrees: repo[tab.id]?.worktrees?.length });
@@ -310,6 +324,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
             summaryRunning={!!summary?.running}
             trailOpen={trailOpen}
             plans={tabPlans}
+            pendingPlans={plans.pending[tab.id] ?? 0}
             compact={compact}
             renaming={renamingId === tab.id}
             roleMenuOpen={roleMenuId === tab.id}
@@ -322,27 +337,6 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
       </div>
       {onNewTab && <NewRow label="tab" keys="Ctrl+T" onClick={onNewTab} />}
 
-      {/* The active repo's plans with work left that no tab is working on. */}
-      {plans.loose.length > 0 && (
-        <>
-          <div className="flex items-center gap-2 px-3 pt-3.5 pb-1.5 edge-b-engraved">
-            <span className="engraved-label">plans</span>
-            <span className="text-[11px] text-muted-foreground">not on a tab</span>
-            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{plans.loose.length}</span>
-            <button
-              type="button"
-              onClick={() => requestPlansPane('open')}
-              className="tui-btn ml-auto"
-              title="Show every plan of this repo, including the ones tabs are working on"
-            >
-              all {plans.open}
-            </button>
-          </div>
-          {plans.loose.map((plan) => (
-            <PlanRow key={plan.id} plan={plan} onOpen={() => requestPlanFocus(plan.id)} />
-          ))}
-        </>
-      )}
       {/* Closing line, pinned to the pane's foot: the tally, then the focused row's keys. */}
       <div className="sticky bottom-0 mt-auto flex flex-wrap items-center gap-x-1 gap-y-1 bg-[var(--ins-panel)] px-3 pt-2 pb-1 text-[11px] tabular-nums edge-t-engraved">
         {/* What the row readout's marks mean, drawn with the marks themselves. */}

@@ -96,6 +96,7 @@ export const SHORTCUTS = [
   { id: 'ws-rename', keys: ['r'], description: 'Rename Tab', category: 'Workspace pane', note: 'or F2' },
   { id: 'ws-close', keys: ['x'], description: 'Close Tab', category: 'Workspace pane', note: 'tabs row' },
   { id: 'ws-role', keys: ['t'], description: 'Set Role', category: 'Workspace pane', note: 'tabs row' },
+  { id: 'ws-unfold', keys: ['→'], description: 'Unfold / Fold Tab Row', category: 'Workspace pane', note: 'or ←' },
   { id: 'ws-folder', keys: ['f'], description: 'Open Folder', category: 'Workspace pane', note: 'tabs row' },
   { id: 'ws-new', keys: ['N'], description: 'New Job / Plan / Task', category: 'Workspace pane', note: 'jobs, plans or tasks section' },
   { id: 'ws-help', keys: ['?'], description: 'Open This Section', category: 'Workspace pane' },

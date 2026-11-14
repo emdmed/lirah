@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Agent, Branch, Folder, Link } from '@/components/icons';
+import { Agent, Branch, ChevronDown, ChevronRight, Folder, Link, Plan } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
@@ -89,6 +89,7 @@ export const ROW_KEYS = [
   { keys: ['e'], label: 'edits' },
   { keys: ['w'], label: 'worktrees' },
   { keys: ['t'], label: 'role' },
+  { keys: ['→'], label: 'unfold' },
   { keys: ['r'], label: 'rename' },
   { keys: ['x'], label: 'close' },
 ];
@@ -105,7 +106,7 @@ export const ROW_KEYS = [
  */
 export const TabRow = memo(function TabRow({
   tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, workLabel, active, linked, closable, queuePos,
-  turn, summaryText, summaryRunning, trailOpen, renaming, roleMenuOpen, worktreeMenuOpen, plans, compact, drag, actions,
+  turn, summaryText, summaryRunning, trailOpen, renaming, roleMenuOpen, worktreeMenuOpen, plans, pendingPlans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
   const summary = summaryText ? { text: summaryText, running: summaryRunning } : null;
@@ -146,6 +147,7 @@ export const TabRow = memo(function TabRow({
       role: () => onRoleMenu(true),
       worktrees: () => onWorktreeMenu(true),
       folder: () => actions.openFolder(tab.projectPath),
+      unfold: () => actions.toggleExpanded(tab.id),
     }[hit.label]);
   };
 
@@ -244,7 +246,7 @@ export const TabRow = memo(function TabRow({
         }
       }}
       title={tooltip}
-      aria-keyshortcuts="Enter r x l t w a f o e"
+      aria-keyshortcuts="Enter r x l t w a f o e ArrowRight"
       data-marker="top"
       className={cn(
         'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
@@ -318,6 +320,19 @@ export const TabRow = memo(function TabRow({
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {compact && rowActions(false)}
+          {pendingPlans > 0 && (
+            <RowAction
+              tabIndex={-1}
+              title={`${plural(pendingPlans, 'pending plan')} in this repo, not on a tab`}
+              onClick={(e) => {
+                e.stopPropagation();
+                actions.openPlans(tab.id);
+              }}
+              className="inline-flex shrink-0 items-center gap-0.5 font-mono text-[11px] tabular-nums text-muted-foreground hover:text-[var(--ins-lamp)]"
+            >
+              <Plan size={12} />{pendingPlans}
+            </RowAction>
+          )}
           <WorktreeMenu tab={tab} worktrees={info?.worktrees} open={worktreeMenuOpen} onOpenChange={onWorktreeMenu} onReview={actions.reviewWorktree} onMerge={actions.mergeWorktree} onDelete={actions.deleteWorktree} />
           <Readout
             info={info}
@@ -328,6 +343,19 @@ export const TabRow = memo(function TabRow({
             // A folded row's actions take the readout's place on hover, so the name keeps its width.
             className={compact && (roleMenuOpen ? 'hidden' : 'group-hover:hidden group-focus-within:hidden')}
           />
+          {/* Rows unfold only on request, so the list never jumps. */}
+          <RowAction
+            tabIndex={-1}
+            aria-label={compact ? `Unfold ${name}` : `Fold ${name}`}
+            title={compact ? 'Unfold (→)' : 'Fold (→)'}
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.toggleExpanded(tab.id);
+            }}
+            className="-mr-1 inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+          >
+            {compact ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+          </RowAction>
         </span>
       </div>
 
