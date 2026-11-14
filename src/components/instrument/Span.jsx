@@ -21,7 +21,7 @@ const GAP = 6;
 const VALUE_W = 49; // "12m 40s" in the 7px legend face
 export const SPAN_WIDTH = TRACK + GAP + VALUE_W;
 
-// Ruler steps in seconds, shared with FIG.12's lanes.
+// Ruler steps in seconds.
 const STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600];
 
 /** The first step that leaves `minGap` px between ticks over `width` px. */

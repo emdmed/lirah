@@ -1158,6 +1158,27 @@ body {
   background: var(--ins-edge);
 }
 
+/* Dialog type scale, three steps apart so they read as tiers: 17px italic
+   title in the frame > 13px content and inputs in ink, description in muted
+   > 11px caps legends and notes. Unlayered, so it wins over the text-xs a
+   dialog passes to its description or wells. */
+.tui-dialog [data-slot="dialog-title"]:not(.sr-only):not(:has(div, p)) {
+  font-size: 17px;
+  gap: 8px;
+}
+.tui-dialog [data-slot="dialog-description"] {
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+.tui-dialog .ins-well {
+  font-size: 13px;
+}
+.tui-dialog .ins-well::placeholder {
+  color: var(--color-muted-foreground);
+}
+
 /* An empty list: a faint star and one line. */
 /* Actions are italic verbs and the solid ink primary (no brackets); a
    destructive one draws a fault hairline. */

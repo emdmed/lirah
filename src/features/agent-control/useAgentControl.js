@@ -11,7 +11,7 @@ import { useTasksActions } from '../tasks/TasksContext';
 import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
 import { usePlansActions } from '../plans/PlansContext';
-import { relToRepo, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
+import { jobSteps, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
 import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage, planStatus } from '../plans/planModel';
 import { buildDraftOpenPrompt } from '../plans/planPrompts';
 import { draftFiles } from '../plans/usePlanFiles';
@@ -266,25 +266,14 @@ export function useAgentControl() {
     const jobSummary = (j, index) => ({
       index, id: j.id, status: j.status, cli: j.cli, label: j.label,
       repo: j.repoPath, startedAt: j.startedAt, endedAt: j.endedAt,
-      files: j.changedFiles?.length ?? 0, report: j.reportPath || null,
-      log: j.logPath || null, race: !!j.raceId,
+      step: `${(j.stepIndex ?? 0) + 1}/${jobSteps(j).length}`, report: j.reportPath || null,
+      log: j.logPath || null,
     });
-    // Other jobs touching this job's files, as "jobs 3, 5" indexes (or ids when out of scope).
-    const jobOverlaps = (job, jobs) => {
-      const rel = (job.changedFiles || []).map((f) => relToRepo(job, f.path));
-      return live.current.jobs.findOverlappingJobs(job.repoPath, rel)
-        .filter((o) => o.id !== job.id)
-        .map((o) => {
-          const i = jobs.findIndex((j) => j.id === o.id);
-          return { ...o, index: i === -1 ? null : i + 1 };
-        });
+    // The caller tab's repo's recipes.
+    const recipeScope = async (sessionId) => {
+      const repo = await projectScope(sessionId);
+      return { repo, recipes: live.current.jobs.getRecipes().filter((r) => r.repoPath === repo) };
     };
-    const overlapNote = (overlaps) => {
-      if (!overlaps.length) return '';
-      const refs = overlaps.map((o) => o.index ?? o.id);
-      return `job${refs.length === 1 ? '' : 's'} ${refs.join(', ')} also touch${refs.length === 1 ? 'es' : ''} these files; applying ${refs.length === 1 ? 'it' : 'them'} later may conflict`;
-    };
-    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
     // What diagnosePlan needs from the app for `plan`.
     const debugEnv = async (plan) => {
@@ -687,90 +676,69 @@ export function useAgentControl() {
       },
 
       // Jobs: background agent jobs, as the jobs pane shows them. Rerunning,
-      // revising, archiving and races stay in the pane.
+      // archiving and editing recipes stay in the pane.
       'jobs.list': async (args, positional, { sessionId }) => {
         const { repo, jobs } = await jobScope(args, sessionId);
         return { repo, jobs: jobs.map((j, i) => jobSummary(j, i + 1)) };
       },
-      // As the Run job dialog with one agent, always in an isolated worktree; asks the user first.
+      'jobs.recipes': async (args, positional, { sessionId }) => {
+        const { repo, recipes } = await recipeScope(sessionId);
+        return { repo, recipes: recipes.map((r, i) => ({ index: i + 1, id: r.id, name: r.name, steps: r.steps })) };
+      },
+      // A one-step job from a prompt, or a saved recipe with --recipe; runs in place, asks the user first.
       'jobs.run': async (args, words, { sessionId }) => {
-        const prompt = (words.length ? words.join(' ') : String(args.prompt ?? '')).trim();
-        if (!prompt) throw new Error('missing prompt: lirah jobs run <prompt> [--cli C] [--label L]');
-        const cli = args.cli === undefined ? 'claude' : String(args.cli);
-        const known = JOB_CLIS.find((o) => o.value === cli);
-        if (!known) throw new Error(`unknown cli "${cli}" (${JOB_CLIS.map((o) => o.value).join(', ')})`);
-        if (!(await invoke('check_command_exists', { command: known.bin }).catch(() => true))) {
-          throw new Error(`${known.bin} is not installed`);
-        }
         const repo = await projectScope(sessionId);
-        const oneLine = prompt.replace(/\s+/g, ' ');
-        const label = args.label === undefined ? (oneLine.length > 60 ? `${oneLine.slice(0, 57)}...` : oneLine) : String(args.label);
+        const workspaceId = callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId;
+        let steps;
+        let label;
+        let recipeId = null;
+        if (args.recipe !== undefined) {
+          const { recipes } = await recipeScope(sessionId);
+          const ref = String(args.recipe).trim();
+          const recipe = /^\d+$/.test(ref) ? recipes[Number(ref) - 1] : recipes.find((r) => r.id === ref || r.name === ref);
+          if (!recipe) throw new Error(`no recipe "${ref}" (see \`lirah jobs recipes\`)`);
+          ({ steps, name: label, id: recipeId } = recipe);
+        } else {
+          const prompt = (words.length ? words.join(' ') : String(args.prompt ?? '')).trim();
+          if (!prompt) throw new Error('missing prompt: lirah jobs run <prompt> [--cli C] [--label L], or --recipe <name>');
+          const oneLine = prompt.replace(/\s+/g, ' ');
+          steps = [{ cli: args.cli === undefined ? 'claude' : String(args.cli), prompt }];
+          label = args.label === undefined ? (oneLine.length > 60 ? `${oneLine.slice(0, 57)}...` : oneLine) : String(args.label);
+        }
+        for (const { cli } of steps) {
+          const known = JOB_CLIS.find((o) => o.value === cli);
+          if (!known) throw new Error(`unknown cli "${cli}" (${JOB_CLIS.map((o) => o.value).join(', ')})`);
+          if (!(await invoke('check_command_exists', { command: known.bin }).catch(() => true))) {
+            throw new Error(`${known.bin} is not installed`);
+          }
+        }
+        const what = steps.map((s, i) => `${steps.length > 1 ? `${i + 1}. ` : ''}${s.cli}: "${s.prompt.replace(/\s+/g, ' ').slice(0, 200)}"`).join(' ');
         const ok = await live.current.confirm({
-          title: `Let Claude start a background ${known.label} job?`,
-          description: `"${oneLine.length > 300 ? `${oneLine.slice(0, 297)}...` : oneLine}" in ${repo}. It runs unattended with auto-approve, in an isolated worktree, so nothing lands in your tree until it's applied (outside a git repo, or if the worktree can't be made, it runs in place).`,
+          title: `Let Claude start the background job "${label}"?`,
+          description: `${what} in ${repo}. It runs unattended with auto-approve, in place: the agent${steps.length > 1 ? 's edit' : ' edits'} your working tree directly and can run any command.`,
           confirmLabel: 'Start job',
         });
         if (!ok) throw new Error('denied by user');
-        const id = await live.current.jobs.launchJob({
-          cli, prompt, label, repoPath: repo, useWorktree: true,
-          workspaceId: callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId,
-        });
+        const id = await live.current.jobs.launchJob({ steps, label, repoPath: repo, recipeId, workspaceId });
         live.current.toast.info(`Claude started job "${label}"`);
-        return `started job ${id} (${cli}) in ${repo}; follow it with \`lirah jobs show ${id}\``;
+        return `started job ${id} (${steps.length} step${steps.length === 1 ? '' : 's'}) in ${repo}; follow it with \`lirah jobs show ${id}\``;
       },
       'jobs.show': async (args, [ref = args.job], { sessionId }) => {
         const { jobs } = await jobScope(args, sessionId);
         const [index, job] = findJob(args, jobs, ref);
         return {
           ...jobSummary(job, index),
-          prompt: job.prompt, cwd: job.cwd, worktree: job.worktreePath || null, exitCode: job.exitCode ?? null,
-          error: job.error || null, diffStat: job.diffStat || null, typecheck: job.typecheck || null,
-          idleSecs: job.idleSecs ?? null, kind: job.kind || null,
-          changedFiles: (job.changedFiles || []).map((f) => relToRepo(job, f.path)),
-          overlaps: jobOverlaps(job, jobs),
+          steps: jobSteps(job), cwd: job.cwd, exitCode: job.exitCode ?? null,
+          error: job.error || null, idleSecs: job.idleSecs ?? null,
         };
       },
       'jobs.cancel': async (args, [ref = args.job], { sessionId }) => {
         const { jobs } = await jobScope(args, sessionId);
         const [index, job] = findJob(args, jobs, ref);
         if (job.status !== 'running') throw new Error(`job ${index} is ${job.status}, not running`);
-        if (job.raceId) throw new Error(`job ${index} is a race candidate; cancel it in the jobs pane`);
         await live.current.jobs.cancelJob(job.id);
         live.current.toast.info(`Claude cancelled "${job.label}"`);
-        const kept = job.worktreePath
-          ? 'worktree kept (discard it in the jobs pane)'
-          : 'it ran in place, so its partial edits are already in the repo';
-        return `cancelled ${index}; ${kept}${job.logPath ? `; output so far: ${job.logPath}` : ''}`;
-      },
-      // As the pane's Apply button (approveJob: typecheck gate, dirty-tree prompt), after asking the user.
-      'jobs.apply': async (args, [ref = args.job], { sessionId }) => {
-        const { jobs } = await jobScope(args, sessionId);
-        const [index, job] = findJob(args, jobs, ref);
-        const n = job.changedFiles?.length ?? 0;
-        if (job.status === 'running') throw new Error(`job ${index} is running; wait for it to finish`);
-        if (job.status === 'applied') throw new Error(`job ${index} is already applied`);
-        if (!['done', 'failed', 'conflict', 'interrupted'].includes(job.status)) throw new Error(`job ${index} is ${job.status}; nothing to apply`);
-        if (!job.worktreePath) throw new Error(`job ${index} ran in place, its changes are already in the repo`);
-        if (!n) throw new Error(`job ${index} has no changes to apply`);
-        if (job.raceId) throw new Error(`job ${index} is a race candidate; pick the winner in the jobs pane`);
-        const force = args.force === true;
-        const note = overlapNote(jobOverlaps(job, jobs));
-        const ok = await live.current.confirm({
-          title: `Let Claude apply "${job.label}"?`,
-          description: [
-            `The agent in a tab asked to apply ${plural(n, 'changed file')} into ${job.repoPath} as uncommitted changes.`,
-            force && 'Typecheck skipped (--force).',
-            note && `${note[0].toUpperCase()}${note.slice(1)}.`,
-          ].filter(Boolean).join(' '),
-          confirmLabel: 'Apply',
-        });
-        if (!ok) throw new Error('denied by user');
-        const res = await live.current.jobs.approveJob(job.id, { force });
-        if (res.blocked) throw new Error(`not applied: ${plural(res.typecheck?.errorCount ?? 0, 'type error')} in the changes; fix them, or apply --force`);
-        if (res.cancelled) throw new Error('denied by user');
-        if (!res.ok) throw new Error(`apply failed: ${res.error} (a patch that doesn't apply cleanly writes nothing; the job and its worktree are kept)`);
-        live.current.toast.info(`Claude applied "${job.label}" (${plural(n, 'file')})`);
-        return `applied ${plural(n, 'file')} into ${job.repoPath} (uncommitted)${note ? `; ${note}` : ''}`;
+        return `cancelled ${index}; it ran in place, so its partial edits are already in the repo${job.logPath ? `; output so far: ${job.logPath}` : ''}`;
       },
 
       'tasks.list': async (args, positional, { sessionId }) => {

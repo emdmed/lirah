@@ -2,25 +2,21 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Agent, Archive, Check, ChevronDown, ChevronRight, Collapse, Compare, Copy, Expand, Jobs, Log, Merge, Plan, Stop, Tasks, Trash, Trophy, Undo, Upload, View, Warning } from '@/components/icons';
+import { Agent, Archive, ChevronDown, ChevronRight, Collapse, Copy, Edit, Expand, Jobs, Log, Plan, Play, Stop, Tasks, Trash, Undo, Upload, View, Warning } from '@/components/icons';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
-import { Checkbox } from '../../components/ui/checkbox';
 import { SubagentList } from '../../components/AgentSidebar';
 import { useSubagentContext } from '../../contexts/SubagentContext';
 import { useToast } from '../toast';
 import { useConfirm, useDialog } from '../dialogs/DialogProvider';
 import { Lamp, jobLamp } from '../../components/instrument/Lamp';
-import { Scanner } from '../../components/instrument/Scanner';
 import { PaneLegend } from '../../components/instrument/PaneLegend';
 import { TabButton } from '../../components/instrument/TabButton';
 import { Keycap } from '../../components/instrument/Keycap';
-import { DiffBar } from '../../components/instrument/DiffBar';
 import { Span, SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { jobsPaneRequest, requestTabsPane } from './jobsPane';
-import { useAgentJobs } from './AgentJobsContext';
-import { Fig12Race } from './Fig12Race';
+import { jobSteps, useAgentJobs } from './AgentJobsContext';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { useTabManager } from '../tabs/TabContext';
 import { PlansPane } from '../plans/PlansPane';
@@ -39,10 +35,8 @@ import { setPaneDrag } from '../../lib/paneDrag';
 const RAIL_KEY = cn(buttonVariants({ variant: 'ghost', size: null }), 'flex-col gap-0.5 w-6 px-0.5 py-1');
 
 // Loaded on first open, mounted only while open.
-const GitDiffDialog = lazyNamed(() => import('../git/GitDiffDialog'), 'GitDiffDialog');
 const MarkdownViewerDialog = lazyNamed(() => import('../markdown/MarkdownViewerDialog'), 'MarkdownViewerDialog');
 const RunJobDialog = lazyNamed(() => import('./RunJobDialog'), 'RunJobDialog');
-const RaceCompareDialog = lazyNamed(() => import('./RaceCompareDialog'), 'RaceCompareDialog');
 
 const MIN_WIDTH = 224;
 const MAX_WIDTH = 560;
@@ -68,46 +62,8 @@ const STATUS_META = {
   interrupted: { color: 'var(--color-status-warning)', label: 'interrupted' },
 };
 
-// A job can be reconciled into the current branch once it has finished with
-// isolated changes still sitting in its worktree.
-function isReconcilable(job) {
-  return (
-    (job.status === 'done' ||
-      job.status === 'failed' ||
-      job.status === 'conflict' ||
-      job.status === 'interrupted') &&
-    !!job.worktreePath &&
-    job.changedFiles.length > 0
-  );
-}
-
-// Finished with changes left to look at: the card offers "Review N".
-function needsReview(job) {
-  return (
-    (job.status === 'done' || job.status === 'failed' || job.status === 'conflict' || job.status === 'interrupted') &&
-    job.changedFiles.length > 0
-  );
-}
-
-// The repo a job works on (its cwd is a throwaway worktree when isolated).
+// The repo a job works on (older jobs ran in a throwaway worktree).
 const jobRepo = (job) => job.repoPath || job.cwd;
-
-// Fold race candidates into a single entry so they render as one comparison
-// group, in the position of the race's first (newest) candidate.
-function groupJobs(list) {
-  const out = [];
-  const seen = new Set();
-  for (const job of list) {
-    if (!job.raceId) {
-      out.push({ type: 'job', key: job.id, job });
-      continue;
-    }
-    if (seen.has(job.raceId)) continue;
-    seen.add(job.raceId);
-    out.push({ type: 'race', key: job.raceId, jobs: list.filter((j) => j.raceId === job.raceId) });
-  }
-  return out;
-}
 
 const spanItem = (j) => ({ startedAt: j.startedAt, endedAt: j.endedAt, running: j.status === 'running' });
 
@@ -115,15 +71,17 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const {
     jobs,
     cancelJob,
-    approveJob,
     rerunJob,
-    reconcileJobs,
     discardJob,
     archiveJob,
     unarchiveJob,
-    pickRaceWinner,
-    reviseJob,
+    recipes,
+    runRecipe,
+    deleteRecipe,
   } = useAgentJobs();
+  const { repoRoot } = useRepoRoot(projectPath);
+  const jobsRepo = repoRoot || projectPath;
+  const repoRecipes = recipes.filter((r) => r.repoPath === jobsRepo);
   const { totalActiveCount } = useSubagentContext();
   const openPlans = useOpenPlanCount(projectPath);
   const artifacts = useArtifacts(projectPath);
@@ -140,23 +98,15 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   // Like agents, only while there are some (or it's the open section): a fifth tab pushes log and jobs off the row.
   const showArtifacts = artifacts.names?.length > 0 || tab === 'artifacts';
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [review, setReview] = useState(null); // { jobId, filePath }
-  // Review notes pinned to lines of the job being reviewed, sent back to the
-  // agent as a revision instead of being retyped as a fresh prompt.
-  const [notes, setNotes] = useState([]);
-  const [sendingNotes, setSendingNotes] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState(null); // recipe open in the dialog
   const [reportPath, setReportPath] = useState(null); // markdown report being viewed
-  const [compareRaceId, setCompareRaceId] = useState(null); // race being compared A-vs-B
-  const [selected, setSelected] = useState(() => new Set()); // job ids picked for reconcile
-  const [reconciling, setReconciling] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
   const visibleJobs = jobs.filter((j) => !j.archived);
   const archivedJobs = jobs.filter((j) => j.archived);
-  // P6: the durations drawn in a list share one scale. Race candidates draw
-  // theirs in FIG.12's lanes, so they stay off it.
-  const spanJobs = visibleJobs.filter((j) => !j.raceId).map(spanItem);
+  // P6: the durations drawn in a list share one scale.
+  const spanJobs = visibleJobs.map(spanItem);
   const collapsed = collapsedOverride ?? false;
   const newTabTitle = 'New tab (Ctrl+T)';
 
@@ -244,92 +194,15 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   };
 
   const runningJobs = jobs.filter((j) => j.status === 'running').length;
-  const reviewJobs = jobs.filter((j) => !j.archived && needsReview(j)).length;
 
-  // Keep the selection in sync with the jobs that are still reconcilable
-  // (finished/discarded jobs drop out on their own).
-  useEffect(() => {
-    setSelected((prev) => {
-      if (prev.size === 0) return prev;
-      const valid = new Set(jobs.filter((j) => isReconcilable(j) && !j.archived).map((j) => j.id));
-      const next = new Set([...prev].filter((id) => valid.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [jobs]);
-
-  const toggleSelect = (id) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
-  const handleReconcile = async () => {
-    if (selected.size === 0 || reconciling) return;
-    setReconciling(true);
-    const count = selected.size;
-    try {
-      const res = await reconcileJobs([...selected]);
-      if (res?.started) {
-        const collisions = (res.overlapCount || 0) + (res.seededConflicts || 0);
-        if (collisions > 0) {
-          const bits = [];
-          if (res.overlapCount) bits.push(`${res.overlapCount} file${res.overlapCount === 1 ? '' : 's'} edited by 2+ jobs`);
-          if (res.seededConflicts) bits.push(`${res.seededConflicts} job${res.seededConflicts === 1 ? '' : 's'} conflicted on apply`);
-          toast.warning(
-            `Reconciling ${count} jobs — ${bits.join(', ')}. An agent is resolving them; review carefully before applying.`
-          );
-        } else {
-          toast.info(
-            `Reconciling ${count} job${count === 1 ? '' : 's'} — no file overlaps; an agent is verifying the combined result`
-          );
-        }
-      } else if (res?.error) {
-        toast.error(`Reconcile failed: ${res.error}`);
-      }
-    } finally {
-      setReconciling(false);
-      setSelected(new Set());
-    }
-  };
-
-  const handleApprove = async (id, force = false) => {
-    const job = jobs.find((j) => j.id === id);
-    const count = job?.changedFiles.length ?? 0;
-    const result = await approveJob(id, { force });
-    if (result?.blocked) {
-      const n = result.typecheck?.errorCount ?? 0;
-      toast.error(
-        `Not applied — ${n} type error${n === 1 ? '' : 's'} in the changes. Fix them in the worktree, or use "Apply anyway".`
-      );
-    } else if (result?.ok) {
-      const files = `${count} file${count === 1 ? '' : 's'}`;
-      const suffix = result.forced ? ' (typecheck skipped)' : '';
-      // Looked up on demand: the toast is the only consumer, so a poll for
-      // it would cost 2 Hz of git calls for one string.
-      // The job's own repo, not the active tab's: it may be another project.
-      const branchName = job && jobRepo(job)
-        ? await invoke('get_current_branch', { repoPath: jobRepo(job) }).catch(() => null)
-        : null;
-      toast.success(
-        `Applied ${files} into your ${branchName ? `${branchName} ` : ''}working tree — uncommitted${suffix}`
-      );
-    } else if (result?.error) {
-      toast.error(`Apply failed: ${result.error}`);
-    }
-  };
-
-  // Discarding deletes the job's worktree, so its changes are gone for good.
+  // Only a job from before steps existed has a worktree; discarding deletes it.
   const handleDiscard = async (id) => {
     const job = jobs.find((j) => j.id === id);
     if (!job) return;
-    const count = job.changedFiles?.length ?? 0;
-    if (job.worktreePath || count > 0) {
+    if (job.worktreePath) {
       const ok = await confirm({
         title: `Discard ${job.label || 'this job'}?`,
-        description: job.worktreePath
-          ? `Its worktree is deleted${count ? ` along with ${count} changed file${count === 1 ? '' : 's'}` : ''}. This can't be undone.`
-          : 'The job is removed from the list.',
+        description: `Its worktree ${job.worktreePath} is deleted with any changes left in it. This can't be undone.`,
         confirmLabel: 'Discard',
         destructive: true,
       });
@@ -339,77 +212,33 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     await discardJob(id);
   };
 
-  // Settle a race: apply this candidate, throw the others away.
-  const handlePickWinner = async (id, force = false) => {
-    const job = jobs.find((j) => j.id === id);
-    const count = job?.changedFiles.length ?? 0;
-    const others = job?.raceId ? jobs.filter((j) => j.raceId === job.raceId && j.id !== id) : [];
-    if (others.length > 0) {
-      const running = others.filter((j) => j.status === 'running').length;
-      const ok = await confirm({
-        title: `Keep ${job?.cli || 'this candidate'}?`,
-        description: `Its changes are applied to your working tree. The other ${others.length} candidate${
-          others.length === 1 ? '' : 's'
-        } ${others.length === 1 ? 'is' : 'are'} discarded and ${others.length === 1 ? 'its worktree' : 'their worktrees'} deleted${
-          running ? ` (${running} still running will be stopped)` : ''
-        }. This can't be undone.`,
-        confirmLabel: 'Keep this',
-        destructive: true,
-      });
-      if (!ok) return;
-    }
-    const result = await pickRaceWinner(id, { force });
-    if (result?.blocked) {
-      const n = result.typecheck?.errorCount ?? 0;
-      toast.error(
-        `Not applied — ${n} type error${n === 1 ? '' : 's'} in this candidate. Pick another, or use "Keep anyway".`
-      );
-    } else if (result?.ok) {
-      const others = result.discarded || 0;
-      toast.success(
-        `Kept ${job?.cli || 'candidate'} — ${count} file${count === 1 ? '' : 's'} applied, ${others} other candidate${
-          others === 1 ? '' : 's'
-        } discarded`
-      );
-    } else if (result?.error) {
-      toast.error(`Apply failed: ${result.error}`);
-    }
-  };
-
-  const openReview = (id) => {
-    const job = jobs.find((j) => j.id === id);
-    if (!job) return;
-    setNotes([]);
-    setReview({ jobId: job.id, filePath: job.changedFiles[0]?.path || null });
-  };
-
-  const addNote = (note) =>
-    setNotes((prev) => [...prev, { ...note, id: `${Date.now()}-${prev.length}` }]);
-
-  const removeNote = (id) => setNotes((prev) => prev.filter((n) => n.id !== id));
-
-  // Ship the notes back to the agent that wrote the diff — it re-runs in the
-  // same worktree with the original task plus the feedback.
-  const handleSendNotes = async () => {
-    if (!review || notes.length === 0 || sendingNotes) return;
-    setSendingNotes(true);
-    try {
-      const result = await reviseJob(review.jobId, notes);
-      if (result?.ok) {
-        toast.info(`Sent ${notes.length} note${notes.length === 1 ? '' : 's'} back to the agent`);
-        setNotes([]);
-        setReview(null);
-      } else {
-        toast.error(`Could not send notes: ${result?.error || 'unknown error'}`);
-      }
-    } finally {
-      setSendingNotes(false);
-    }
-  };
-
   const handleRerun = async (id) => {
     await rerunJob(id);
     toast.info('Re-running job');
+  };
+
+  const handleRunRecipe = async (recipe) => {
+    try {
+      await runRecipe(recipe.id);
+      toast.info(`Running ${recipe.name}`);
+    } catch (err) {
+      toast.error(`Could not run ${recipe.name}: ${err.message || err}`);
+    }
+  };
+
+  const handleDeleteRecipe = async (recipe) => {
+    const ok = await confirm({
+      title: `Delete recipe ${recipe.name}?`,
+      description: 'Its runs stay in the list.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (ok) deleteRecipe(recipe.id);
+  };
+
+  const openDialog = (recipe = null) => {
+    setEditingRecipe(recipe);
+    setDialogOpen(true);
   };
 
   // Copy just the LLM output — no prompt, no metadata — so it can be pasted as a
@@ -451,8 +280,6 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
     prevCount.current = jobs.length;
   }, [jobs.length]);
 
-  const reviewJob = review ? jobs.find((j) => j.id === review.jobId) : null;
-  const compareJobs = compareRaceId ? jobs.filter((j) => j.raceId === compareRaceId) : [];
 
   // Card actions take a job id and keep their identity across renders, so
   // memo(JobCard) re-renders only the card whose job changed. They forward to
@@ -460,15 +287,11 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const handlersRef = useRef(null);
   useLayoutEffect(() => {
     handlersRef.current = {
-      toggleSelect,
       cancel: cancelJob,
-      approve: handleApprove,
-      pickWinner: handlePickWinner,
       rerun: handleRerun,
       discard: handleDiscard,
       archive: archiveJob,
       unarchive: unarchiveJob,
-      review: openReview,
       report: (id) => setReportPath(jobs.find((j) => j.id === id)?.reportPath ?? null),
       copyOutput: handleCopyOutput,
     };
@@ -476,24 +299,15 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const cardActions = useMemo(() => {
     const forward = (name) => (...args) => handlersRef.current[name](...args);
     return Object.fromEntries(
-      ['toggleSelect', 'cancel', 'approve', 'pickWinner', 'rerun', 'discard', 'archive', 'unarchive', 'review', 'report', 'copyOutput']
+      ['cancel', 'rerun', 'discard', 'archive', 'unarchive', 'report', 'copyOutput']
         .map((name) => [name, forward(name)])
     );
   }, []);
 
-  // One place that knows how a job card is wired, shared by the active list, the
-  // race groups and the archived section.
-  const renderCard = (job, { archived = false, hideTime = false } = {}) => (
-    <JobCard
-      key={job.id}
-      job={job}
-      archived={archived}
-      hideTime={hideTime}
-      selectable={!archived && isReconcilable(job)}
-      selected={selected.has(job.id)}
-      selectionActive={selected.size > 0}
-      actions={cardActions}
-    />
+  // One place that knows how a job card is wired, shared by the active list and
+  // the archived section.
+  const renderCard = (job, { archived = false } = {}) => (
+    <JobCard key={job.id} job={job} archived={archived} actions={cardActions} />
   );
 
   if (collapsed) {
@@ -569,7 +383,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
             onClick={() => {
               setCollapsedOverride(false);
               setTab('jobs');
-              setDialogOpen(true);
+              openDialog();
             }}
             type="button"
             className={RAIL_KEY}
@@ -665,34 +479,11 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <TabButton active={tab === 'artifacts'} onClick={() => setTab('artifacts')} label="artifacts" icon={View} count={artifacts.names?.length} />
         )}
         <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" icon={Log} />
-        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" icon={Jobs} count={runningJobs + reviewJobs} lamp={runningJobs > 0} />
+        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" icon={Jobs} count={runningJobs} lamp={runningJobs > 0} />
         {(totalActiveCount > 0 || tab === 'agents') && (
           <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" icon={Agent} count={totalActiveCount} />
         )}
       </div>
-
-      {tab === 'jobs' && selected.size > 0 && (
-        <div className="flex flex-col gap-1.5 px-3 py-2 shrink-0 border-b border-b-sidebar-border bg-sidebar-accent/40">
-          <div className="flex items-center gap-2">
-            <PanelButton
-              variant="default"
-              icon={Merge}
-              onClick={handleReconcile}
-              busy={reconciling}
-              className="flex-1"
-              title="Merge the selected jobs with an agent that resolves conflicts and verifies the combined result"
-            >
-              Reconcile {selected.size}
-            </PanelButton>
-            <PanelButton onClick={() => setSelected(new Set())} disabled={reconciling}>
-              Clear
-            </PanelButton>
-          </div>
-          <span className="text-[11px] leading-snug text-muted-foreground">
-            An agent merges them in an isolated worktree and verifies the build. Review before applying.
-          </span>
-        </div>
-      )}
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
         {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
@@ -713,6 +504,22 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
           <WorklogPane projectPath={projectPath} />
         ) : (
           <>
+            {repoRecipes.length > 0 && (
+              <div className="flex flex-col edge-b-engraved pb-1">
+                <div className="ins-legend px-2.5 pt-2 pb-1 text-[11px] text-muted-foreground truncate" title={jobsRepo}>
+                  recipes · {basename(jobsRepo)}
+                </div>
+                {repoRecipes.map((r) => (
+                  <RecipeRow
+                    key={r.id}
+                    recipe={r}
+                    onRun={() => handleRunRecipe(r)}
+                    onEdit={() => openDialog(r)}
+                    onDelete={() => handleDeleteRecipe(r)}
+                  />
+                ))}
+              </div>
+            )}
             {visibleJobs.length === 0 ? (
               <EmptyLine hint="N dispatches a headless agent run">
                 {archivedJobs.length > 0 ? 'no active jobs' : 'no jobs'}
@@ -724,23 +531,12 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   <span>· all repos</span>
                   <SpanRuler />
                 </div>
-                {groupJobs(visibleJobs).map((entry) =>
-                  entry.type === 'race' ? (
-                    <RaceGroup
-                      key={entry.key}
-                      jobs={entry.jobs}
-                      renderCard={renderCard}
-                      onCompare={() => setCompareRaceId(entry.key)}
-                    />
-                  ) : (
-                    renderCard(entry.job)
-                  )
-                )}
+                {visibleJobs.map((job) => renderCard(job))}
               </div>
               </SpanScale>
             )}
 
-            <NewRow label="job" keys="N" onClick={() => setDialogOpen(true)} />
+            <NewRow label="job" keys="N" onClick={() => openDialog()} />
 
             {/* Archived jobs: stored but out of immediate sight, browsable on demand. */}
             {archivedJobs.length > 0 && (
@@ -768,26 +564,8 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       </div>
 
       <Suspense fallback={null}>
-      {dialogOpen && <RunJobDialog open={dialogOpen} onOpenChange={setDialogOpen} projectPath={projectPath} />}
-
-      {reviewJob && review.filePath && (
-          <GitDiffDialog
-            open
-            onOpenChange={(o) => !o && setReview(null)}
-            filePath={review.filePath}
-            repoPath={reviewJob.cwd}
-            changedFiles={reviewJob.changedFiles}
-            onFileChange={(filePath) => setReview((r) => ({ ...r, filePath }))}
-            annotations={notes}
-            onAddAnnotation={reviewJob.status === 'running' ? undefined : addNote}
-            onRemoveAnnotation={removeNote}
-            onSendAnnotations={handleSendNotes}
-            sendingAnnotations={sendingNotes}
-          />
-      )}
-
-      {compareJobs.length > 1 && (
-          <RaceCompareDialog jobs={compareJobs} onClose={() => setCompareRaceId(null)} />
+      {dialogOpen && (
+        <RunJobDialog open={dialogOpen} onOpenChange={setDialogOpen} repoPath={jobsRepo} recipe={editingRecipe} />
       )}
 
       {reportPath && (
@@ -804,59 +582,25 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   );
 }
 
-// Candidates of one race, boxed together so they read as alternatives to choose
-// between rather than as unrelated jobs that all want applying.
 // App re-renders for reasons of its own (tabs, attention, updates); its props
 // here are a path and a stable callback.
 export const RightSidebar = memo(RightSidebarPanel);
 
-function RaceGroup({ jobs, renderCard, onCompare }) {
-  // FIG.12 draws the candidates as lanes with their durations (in its
-  // tooltip, in compact figures), so the cards drop their own time.
-  const running = jobs.filter((j) => j.status === 'running').length;
-  const settled = jobs.some((j) => j.status === 'applied');
-  // Comparing needs two candidates that actually produced changes.
-  const comparable = jobs.filter((j) => j.status !== 'running' && j.changedFiles.length > 0).length;
+// A saved recipe: its name and step count, run / edit / delete.
+function RecipeRow({ recipe, onRun, onEdit, onDelete }) {
+  const n = recipe.steps.length;
   return (
-    // A bracket frame with its legend inset into the top line, like a group
-    // of controls on a panel.
-    <div className="relative mt-1.5 shadow-[inset_0_0_0_1px_var(--ins-edge-strong)]">
-      <div className="absolute -top-[6px] left-2 right-2 flex items-center justify-between text-[11px] leading-none">
-        <span className="flex items-center gap-1.5 bg-[var(--ins-panel)] px-1.5 min-w-0">
-          <span className="ins-legend shrink-0">Race</span>
-          <span className="truncate text-muted-foreground" title={jobs[0]?.label}>{jobs[0]?.label}</span>
-        </span>
-        <span className="flex items-center gap-1.5 bg-[var(--ins-panel)] px-1.5 shrink-0 tabular-nums text-muted-foreground">
-          {running > 0 ? (
-            <>
-              <Lamp state="on" blink />
-              {running}/{jobs.length}
-            </>
-          ) : (
-            <span>{jobs.length} candidate{jobs.length === 1 ? '' : 's'}</span>
-          )}
-        </span>
-      </div>
-      {running === 0 && comparable > 1 && (
-        <div className="flex justify-end px-2 pt-2 text-[11px]">
-          <PanelButton icon={Compare} onClick={onCompare} title="Diff two candidates against each other">
-            compare
-          </PanelButton>
-        </div>
-      )}
-      {!settled && (
-        <div className="px-2 pt-2.5 pb-1 text-[11px] leading-snug text-muted-foreground">
-          Same prompt, separate worktrees. Keeping one applies it and discards the rest.
-        </div>
-      )}
-      <div className="px-2.5 pt-2.5 pb-1">
-        <Fig12Race jobs={jobs} short />
-      </div>
-      <div className="flex flex-col p-1.5 pt-0.5">{jobs.map((job) => renderCard(job, { hideTime: true }))}</div>
+    <div className="group flex items-center gap-2 px-2.5 py-1 text-xs hover:bg-[color-mix(in_srgb,var(--ins-lamp)_4%,transparent)]">
+      <span className="min-w-0 flex-1 truncate" title={recipe.steps.map((st, i) => `${i + 1}. ${st.cli}: ${st.prompt}`).join('\n')}>
+        {recipe.name}
+      </span>
+      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{n} step{n === 1 ? '' : 's'}</span>
+      <IconAction icon={Edit} title={`Edit ${recipe.name}`} onClick={onEdit} />
+      <IconAction icon={Trash} title={`Delete ${recipe.name}`} onClick={onDelete} danger />
+      <IconAction icon={Play} title={`Run ${recipe.name}`} onClick={onRun} />
     </div>
   );
 }
-
 
 // Plans in the active tab's repo that still have a chunk to do or underway.
 function useOpenPlanCount(projectPath) {
@@ -888,12 +632,11 @@ function outputRuns(output) {
   return runs;
 }
 
-const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, selected, selectionActive, actions }) {
+const JobCard = memo(function JobCard({ job, archived, actions }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
   const lamp = jobLamp(job.status);
-  const changedCount = job.changedFiles.length;
   const isRunning = job.status === 'running';
   const isDone =
     job.status === 'done' ||
@@ -901,19 +644,9 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
     job.status === 'conflict' ||
     job.status === 'interrupted';
   const duration = isRunning ? null : jobDuration(job.startedAt, job.endedAt);
-  // A race candidate is applied by winning, which also clears the others.
-  const isRace = !!job.raceId;
-  const stat = job.diffStat;
-  const hasStat = stat && (stat.added > 0 || stat.removed > 0);
+  const stepCount = jobSteps(job).length;
   // A status word for anything that isn't a clean running/done state.
   const showStatusChip = !isRunning && job.status !== 'done';
-  const canApprove = isDone && !!job.worktreePath && changedCount > 0;
-  // Checkboxes replace lamps only while a reconcile selection is being built.
-  const showCheckbox = selectable && (selected || selectionActive);
-  const tc = job.typecheck;
-  const tcChecking = tc?.status === 'checking';
-  const tcErrors = tc?.status === 'done' && tc.errorCount > 0;
-  const tcClean = tc?.status === 'done' && tc.errorCount === 0;
 
   // Keep the expanded log pinned to the newest output while a job streams. Keyed
   // on the array, not its length: once the buffer caps the length stops changing.
@@ -923,24 +656,15 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
 
   return (
     // One row per job, split by hairlines: lamp, title and time on the first
-    // line, agent and diff on the second. Output and actions open on demand.
+    // line, agent and step on the second. Output and actions open on demand.
     <div
       className={cn(
         'edge-b-engraved transition-colors',
-        selected || expanded ? 'bg-[color-mix(in_srgb,var(--ins-lamp)_6%,transparent)]' : 'hover:bg-[color-mix(in_srgb,var(--ins-lamp)_4%,transparent)]'
+        expanded ? 'bg-[color-mix(in_srgb,var(--ins-lamp)_6%,transparent)]' : 'hover:bg-[color-mix(in_srgb,var(--ins-lamp)_4%,transparent)]'
       )}
     >
       <div className="flex items-center gap-2 px-2.5 pt-2">
-        {showCheckbox ? (
-          <Checkbox
-            checked={selected}
-            onCheckedChange={() => actions.toggleSelect(job.id)}
-            aria-label={`Select ${job.label} for reconcile`}
-            className="h-3 w-3 shrink-0"
-          />
-        ) : (
-          <Lamp {...lamp} label={meta.label} />
-        )}
+        <Lamp {...lamp} label={meta.label} />
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
@@ -949,7 +673,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
         >
           {job.label}
         </button>
-        {!hideTime && job.startedAt && (
+        {job.startedAt && (
           <Span
             startedAt={job.startedAt}
             endedAt={job.endedAt}
@@ -964,14 +688,10 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
           {jobRepo(job) && <span className="text-foreground">{basename(jobRepo(job))} · </span>}
           {job.cli}
         </span>
-        {job.kind === 'reconcile' && (
-          <span className="inline-flex items-center gap-0.5 text-[var(--ins-lamp)]">
-            <Merge size={10} />
-            merge
+        {stepCount > 1 && (
+          <span className="tabular-nums text-muted-foreground" title="Step">
+            {isRunning || job.status === 'failed' ? `step ${(job.stepIndex ?? 0) + 1}/${stepCount}` : `${stepCount} steps`}
           </span>
-        )}
-        {hasStat && (
-          <DiffBar added={stat.added} removed={stat.removed} side={48} />
         )}
         {showStatusChip && <span style={{ color: meta.color }}>{meta.label}</span>}
         {isRunning && job.idleSecs > 0 && (
@@ -984,69 +704,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             idle {Math.floor(job.idleSecs / 60)}m
           </span>
         )}
-        {tcChecking && (
-          <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-            <Scanner />
-            typecheck
-          </span>
-        )}
-        {tcErrors && (
-          <span
-            className="inline-flex items-center gap-0.5"
-            style={{ color: 'var(--color-destructive)' }}
-            title={tc.failed.map((f) => `${basename(f.path)}: ${f.errorCount}`).join('\n')}
-          >
-            <Warning size={10} />
-            {tc.errorCount} type error{tc.errorCount === 1 ? '' : 's'}
-          </span>
-        )}
-        {tcClean && (
-          <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--color-status-success)' }}>
-            <Check size={10} />
-            types ok
-          </span>
-        )}
-        {!expanded && isDone && changedCount > 0 && (
-          // Same handler as the expanded "Review N" button: review comes before apply.
-          <button
-            onClick={() => actions.review(job.id)}
-            title="Review the isolated diff before applying"
-            className="tui-btn ml-auto shrink-0"
-            data-lit
-          >
-            review {changedCount}
-          </button>
-        )}
       </div>
-
-      {/* Loud conflict record for a reconcile job: which files 2+ jobs edited. */}
-      {job.kind === 'reconcile' && (job.overlaps?.length > 0 || job.conflictLabels?.length > 0) && (
-        <div className="mb-2 mx-2.5 border border-[var(--color-status-warning)]/30 bg-[var(--color-status-warning)]/[0.07] px-2 py-1.5 text-[11px] leading-snug">
-          <div className="flex items-center gap-1 text-[var(--color-status-warning)]">
-            <Warning size={10} className="shrink-0" />
-            {job.overlaps?.length > 0
-              ? `${job.overlaps.length} file${job.overlaps.length === 1 ? '' : 's'} edited by multiple jobs`
-              : 'Merge conflicts on apply'}
-          </div>
-          {job.overlaps?.length > 0 && (
-            <div className="mt-1 flex flex-col gap-0.5 font-mono text-muted-foreground">
-              {job.overlaps.slice(0, 6).map((o) => (
-                <div key={o.path} className="truncate" title={`${o.path} — ${o.labels.join(', ')}`}>
-                  {o.path}
-                </div>
-              ))}
-              {job.overlaps.length > 6 && (
-                <div className="text-muted-foreground">+{job.overlaps.length - 6} more</div>
-              )}
-            </div>
-          )}
-          {job.conflictLabels?.length > 0 && (
-            <div className="mt-1 text-muted-foreground">
-              Textual conflict from: {job.conflictLabels.join(', ')}
-            </div>
-          )}
-        </div>
-      )}
 
       {job.error && (
         <div className="mb-2 mx-2.5 bg-destructive/5 px-2 py-1 text-[11px] leading-snug text-destructive/90 break-words">
@@ -1082,50 +740,6 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
             {isRunning && (
               <PrimaryAction icon={Stop} label="Cancel" onClick={() => actions.cancel(job.id)} variant="danger" title="Stop this running job" />
             )}
-            {isDone && changedCount > 0 && (
-              <PrimaryAction
-                icon={Compare}
-                label={`Review ${changedCount}`}
-                onClick={() => actions.review(job.id)}
-                variant="outline"
-                title="Review the isolated diff before applying"
-              />
-            )}
-            {canApprove && (
-              <PrimaryAction
-                icon={tcErrors ? Warning : isRace ? Trophy : Check}
-                label={
-                  tcChecking
-                    ? 'Checking…'
-                    : tcErrors
-                    ? isRace
-                      ? 'Keep anyway'
-                      : 'Apply anyway'
-                    : isRace
-                    ? 'Keep this'
-                    : 'Apply'
-                }
-                onClick={() => (isRace ? actions.pickWinner(job.id, tcErrors) : actions.approve(job.id, tcErrors))}
-                disabled={tcChecking}
-                variant={tcErrors ? 'danger' : 'primary'}
-                title={
-                  tcErrors
-                    ? 'These changes have type errors — applying anyway skips the check. Review before committing.'
-                    : isRace
-                    ? 'Keep this candidate: applies it to your working tree and discards the other candidates'
-                    : 'Apply these changes into your working tree — uncommitted, so you review and commit them yourself'
-                }
-              />
-            )}
-            {selectable && !showCheckbox && (
-              <PrimaryAction
-                icon={Merge}
-                label="Select"
-                onClick={() => actions.toggleSelect(job.id)}
-                variant="outline"
-                title="Select for reconcile: merge several finished jobs with an agent"
-              />
-            )}
 
             <div className="ml-auto flex items-center gap-0.5">
               {isDone && <IconAction icon={Undo} title="Re-run job" onClick={() => actions.rerun(job.id)} />}
@@ -1142,7 +756,7 @@ const JobCard = memo(function JobCard({ job, archived, hideTime, selectable, sel
               {!isRunning && (
                 <IconAction
                   icon={Trash}
-                  title={job.worktreePath ? 'Discard changes' : 'Dismiss'}
+                  title={job.worktreePath ? 'Discard worktree' : 'Dismiss'}
                   onClick={() => actions.discard(job.id)}
                   danger
                 />

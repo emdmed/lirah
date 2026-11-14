@@ -107,19 +107,21 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  applies the safe repairs and checks again
   lirah jobs [list] [--all]      this tab's repo's background jobs (--all: every repo)
   lirah jobs run <prompt> [--cli C] [--label L]
-                                 start a background job in this tab's repo, in
-                                 an isolated worktree (asks the user first;
-                                 --cli: claude, codex, gemini, ...)
+                                 start a background agent in this tab's repo; it
+                                 edits the working tree in place (asks the user
+                                 first; --cli: claude, codex, gemini, ...)
+  lirah jobs run --recipe <recipe>
+                                 run a saved recipe: its steps one after another,
+                                 stopping at the first that fails (asks first)
+  lirah jobs recipes             this tab's repo's saved recipes
   lirah jobs show <job> [--all]  one job's details
   lirah jobs cancel <job> [--all]
                                  stop a running job
-  lirah jobs apply <job> [--force] [--all]
-                                 apply a finished job's changes to its repo
-                                 (asks the user first)
   lirah ping                     check that Lirah is reachable
 
   <plan> is an index from \`lirah plans\`, an id or a title; <chunk> its number or id.
-  <job> is an index from \`lirah jobs\` or a job id.
+  <job> is an index from \`lirah jobs\` or a job id; <recipe> an index from
+  \`lirah jobs recipes\`, an id or a name.
   <tab> is "." (this tab), an index from \`lirah tabs\`, a tab id or a name.
 
   --json   print the reply as JSON
@@ -339,31 +341,28 @@ function printJobs(data) {
   const where = data.repo || "all repos";
   if (!data.jobs.length) return `no jobs in ${where}`;
   const all = !data.repo;
-  const header = ["#", "ID", "STATUS", "CLI", "AGE", "FILES", ...(all ? ["REPO"] : []), "TASK", "REPORT"];
+  const header = ["#", "ID", "STATUS", "CLI", "STEP", "AGE", ...(all ? ["REPO"] : []), "TASK", "REPORT"];
   const rows = data.jobs.map((j) => [
-    String(j.index), j.id, j.status + (j.race ? " (race)" : ""), j.cli || "", age(j), String(j.files),
+    String(j.index), j.id, j.status, j.cli || "", j.step, age(j),
     ...(all ? [basename(j.repo)] : []), j.label || "", jobReport(j),
   ]);
   return `${where}\n\n${table(header, rows)}`;
 }
 
 function printJob(j) {
-  const lines = [`${j.label || "(no label)"} (${j.id}): ${j.status}, ${j.cli}, ${age(j)}${j.race ? ", race candidate" : ""}`, ""];
-  const stat = j.diffStat ? ` (+${j.diffStat.added ?? 0} -${j.diffStat.removed ?? 0})` : "";
-  const tc = j.typecheck;
-  const typecheck = !tc ? null : tc.status === "checking" ? "checking" : `${tc.errorCount ?? 0} error(s)`;
-  const overlaps = j.overlaps?.length
-    ? j.overlaps.map((o) => `${o.index ?? o.id} "${o.label}" (${o.files.length} file${o.files.length === 1 ? "" : "s"})`).join(", ")
-    : null;
+  const lines = [`${j.label || "(no label)"} (${j.id}): ${j.status}, ${j.cli}, step ${j.step}, ${age(j)}`, ""];
   const fields = [
-    ["repo", j.repo], ["worktree", j.worktree || "none (ran in place, or already applied)"],
-    ["files", `${j.files}${stat}`], ["typecheck", typecheck], ["exit code", j.exitCode], ["error", j.error],
-    ["report", j.report], ["log", j.log], ["overlaps", overlaps],
+    ["repo", j.repo], ["exit code", j.exitCode], ["error", j.error], ["report", j.report], ["log", j.log],
   ];
   for (const [k, v] of fields) if (v !== null && v !== undefined && v !== "") lines.push(`${k}: ${v}`);
-  if (j.changedFiles?.length) lines.push("", ...j.changedFiles.map((f) => `  ${f}`));
-  lines.push("", "prompt:", j.prompt || "");
+  for (const [i, s] of (j.steps || []).entries()) lines.push("", `step ${i + 1} (${s.cli}):`, s.prompt);
   return lines.join("\n");
+}
+
+function printRecipes(data) {
+  if (!data.recipes.length) return `no recipes in ${data.repo}; save one from the Run job dialog`;
+  const rows = data.recipes.map((r) => [String(r.index), r.id, r.name, r.steps.map((s) => s.cli).join(" → ")]);
+  return `${data.repo}\n\n${table(["#", "ID", "NAME", "STEPS"], rows)}`;
 }
 
 function printStartup(data) {
@@ -512,8 +511,8 @@ function route(cmd, positional, args) {
       case "start": return ["jobs.run", rest, show];
       case "show": return ["jobs.show", rest, printJob];
       case "cancel": return ["jobs.cancel", rest, show];
-      case "apply": return ["jobs.apply", rest, show];
-      default: fail(`unknown jobs command "${sub}" (list, run, show, cancel, apply)`);
+      case "recipes": return ["jobs.recipes", [], printRecipes];
+      default: fail(`unknown jobs command "${sub}" (list, run, recipes, show, cancel)`);
     }
   }
   if (cmd === "tasks" || cmd === "task") {

@@ -18,14 +18,12 @@ import { Fig21PlanGit } from '../features/plans/Fig21PlanGit';
 import { Fig22FilesByChunk } from '../features/plans/Fig22FilesByChunk';
 import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
 import { Fig11Merge } from '../features/git/Fig11Merge';
-import { Fig12Race } from '../features/agent-jobs/Fig12Race';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
 import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
 import { Fig19Detail } from '../features/file-analysis/Fig19Detail';
 import { boundKeysFor } from '../lib/shortcuts';
 import { ProgressReadout } from '../features/plans/parts';
 import { Span, SpanRuler, SpanScale } from '../components/instrument/Span';
-import { Fig26Isolation } from '../features/agent-jobs/Fig26Isolation';
 import { Meter } from '../components/instrument/Meter';
 import { Fig23Sources } from '../features/token-budget/Fig23Sources';
 import { Fig24PromptCost } from '../features/token-budget/Fig24PromptCost';
@@ -145,7 +143,7 @@ const FILES = {
     c3: { [ROOT]: ['src/features/plans/Fig09Loop.jsx', 'src/index.css'] },
     c4: { [ROOT]: ['src/features/settings/Fig10Sandbox.jsx', 'src/components/instrument/figure/kit.jsx', 'src/index.css'] },
     c5: { [ROOT]: ['src/features/git/Fig11Merge.jsx', 'src/features/git/MergeDialog.jsx'] },
-    c6: { [ROOT]: ['src/features/agent-jobs/Fig12Race.jsx', 'src/components/instrument/figure/registry.js', 'src/components/instrument/figure/index.js', 'src/lib/formatDuration.js', 'src/hooks/useTick.js', 'CHANGELOG.md', 'DESIGN.md'] },
+    c6: { [ROOT]: ['src/components/instrument/figure/registry.js', 'src/components/instrument/figure/index.js', 'src/lib/formatDuration.js', 'src/hooks/useTick.js', 'CHANGELOG.md', 'DESIGN.md'] },
   },
 };
 
@@ -178,13 +176,6 @@ const MERGE = {
   featureWorktree: WT,
 };
 const MERGE_FF = { ff: true, behind: 0, commits: ['a', 'b', 'c', 'd'], diffStat: { files: 3, added: 41, removed: 7 }, switchNeeded: false, mergeDir: ROOT };
-
-const JOBS = [
-  { id: 'j1', label: 'Fix flaky figure test · claude', cli: 'claude', status: 'done', startedAt: NOW - 9 * MIN, endedAt: NOW - 3 * MIN, typecheck: { status: 'done', errorCount: 0 }, diffStat: { added: 42, removed: 7 } },
-  { id: 'j2', label: 'Fix flaky figure test · codex', cli: 'codex', status: 'running', startedAt: NOW - 9 * MIN, typecheck: null, diffStat: null },
-  { id: 'j3', label: 'Fix flaky figure test · gemini', cli: 'gemini', status: 'done', startedAt: NOW - 9 * MIN, endedAt: NOW - 5 * MIN, typecheck: { status: 'done', errorCount: 3 }, diffStat: { added: 118, removed: 40 } },
-  { id: 'j4', label: 'Fix flaky figure test · opencode', cli: 'opencode', status: 'failed', startedAt: NOW - 8 * MIN, endedAt: NOW - 6 * MIN, typecheck: null, diffStat: null },
-];
 
 const iso = (t) => new Date(t).toISOString();
 const AGENTS = [
@@ -222,8 +213,6 @@ const FIGS = [
   { n: 10, w: 460, el: () => <Fig10Drawing spec={SPEC} tabName="nevo-terminal" paper="var(--ins-panel)" fallback={fb('sandbox: / ro, ~ rw')} /> },
   { n: 11, w: 640, el: () => <Fig11Merge feature="plan/calibrated-figures-plan-a-draw" base="main" plan={MERGE} fallback={fb('merge commit, 11 commits')} /> },
   { n: '11b', w: 640, el: () => <Fig11Merge feature="fix/glow" base="main" plan={MERGE_FF} fallback={fb('fast-forward, 4 commits')} /> },
-  { n: 12, w: 560, el: () => <Fig12Race jobs={JOBS} fallback={fb('race: 4 agents')} /> },
-  { n: '12s', w: 260, el: () => <Fig12Race jobs={JOBS} short fallback={fb('race: 4 agents')} /> },
   { n: 13, w: 300, paper: 'var(--color-sidebar, var(--ins-panel))', el: () => <Fig13Agents agents={AGENTS} now={NOW} onDismiss={() => {}} onOpenList={() => {}} renderCard={() => null} fallback={fb('2 subagents running')} /> },
   { n: 14, w: 380, el: () => <Fig14Budget kind="daily" limit={2_000_000} used={1_120_000} rows={BUDGET_ROWS} now={today} fallback={fb('daily 56%')} /> },
   { n: '14w', w: 380, el: () => <Fig14Budget kind="weekly" limit={10_000_000} used={9_700_000} rows={[]} fallback={fb('weekly 97%')} /> },
@@ -335,12 +324,6 @@ const LANE_C = [
   { n: 'P6 job list', w: 256, el: () => <SpanList rows={SPAN_JOBS} /> },
   { n: 'P6 chunk rows', w: 300, el: () => <SpanList rows={SPAN_CHUNKS} /> },
   { n: 'P6 one job', w: 256, el: () => <SpanList rows={SPAN_JOBS.slice(0, 1)} /> },
-  { n: '26 race', w: 500, el: () => <Fig26Isolation isolated clis={['claude', 'codex']} copies={2} branch="main" repo="acme-api" name="add pagination" fallback={fb('race · 4 candidates')} /> },
-  { n: '26 one', w: 500, el: () => <Fig26Isolation isolated clis={['claude']} branch="main" repo="acme-api" fallback={fb('isolated worktree')} /> },
-  { n: '26 in place', w: 500, el: () => <Fig26Isolation isolated={false} clis={['claude']} branch="feat/very-long-branch-name-here" repo="acme-api" name="add pagination" fallback={fb('in place')} /> },
-  { n: '26 many', w: 500, el: () => <Fig26Isolation isolated clis={['claude', 'codex', 'gemini', 'opencode']} copies={3} branch="main" repo="nevo-terminal" fallback={fb('race · 12')} /> },
-  { n: '26 no repo', w: 500, el: () => <Fig26Isolation isolated={false} canIsolate={false} clis={['claude']} repo="scratch" fallback={fb('in place')} /> },
-  { n: '26 narrow', w: 280, el: () => <Fig26Isolation isolated clis={['claude']} branch="main" repo="acme-api" fallback={fb('isolated worktree')} /> },
 ];
 
 const SPAN_JOBS = [

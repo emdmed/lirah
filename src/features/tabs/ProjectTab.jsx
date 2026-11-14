@@ -81,7 +81,6 @@ import { useSeededSetting, useSetting, getSettings } from "../settings/settingsS
 import { CommandPalette, useCommandPalette } from "../command-palette/command-palette";
 import { useTabShortcuts } from "./useTabShortcuts";
 import { useTabCommands } from "./useTabCommands";
-import { useAgentJobsActions } from "../agent-jobs/AgentJobsContext";
 import { perfTabSwitchStep } from "../../lib/perf";
 import { Lamp } from "../../components/instrument/Lamp.jsx";
 
@@ -380,14 +379,6 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   const { extractFileSymbols, clearFileSymbols, clearAllSymbols, isAnalyzable, formatFileAnalysis, getLineCount, getViewModeLabel } = fileSymbolsHook;
 
   const fileSelection = useFileSelection();
-
-  // Bridge this tab's file-tree selection up to the global agent-jobs context
-  // (only while active) so the Run Job dialog can use it as context.
-  const { registerContextFiles } = useAgentJobsActions();
-  useEffect(() => {
-    if (!isActive) return;
-    registerContextFiles(fileSelection.filesForGroup);
-  }, [isActive, fileSelection.filesForGroup, registerContextFiles]);
 
   // Register symbol callbacks and currentPath with file selection context
   useEffect(() => {

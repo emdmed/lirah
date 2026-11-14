@@ -1,11 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { JOB_CLIS } from '../../lib/agentClis';
 import { plural } from '../../lib/plural';
 import { invoke } from '@tauri-apps/api/core';
-import { currentBranch, git } from '../../lib/git';
-import { useFigureCompact } from '@/components/instrument/figure';
-import { Fig26Isolation } from './Fig26Isolation';
-import { Branch, Check, ChevronDown, Commit, Files, Import, Pin } from '@/components/icons';
+import { Add, ArrowDown, ArrowUp, Check, ChevronDown, Close } from '@/components/icons';
 import {
   Dialog,
   DialogContent,
@@ -13,13 +10,9 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogField,
-  DialogGroup,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
-import { Checkbox } from '../../components/ui/checkbox';
 import { PanelButton } from '../../components/instrument/PanelButton';
-import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
 import { Lamp } from '../../components/instrument/Lamp';
 import {
   DropdownMenu,
@@ -28,98 +21,31 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { cn } from '../../lib/utils';
-import { basename, getRelativePath, splitDirName } from '../../utils/pathUtils';
-import { useFileGroups } from '../file-groups';
-import { usePromptTemplates } from '../templates';
-import { usePinnedFiles } from '../pinned-files';
+import { basename } from '../../utils/pathUtils';
+import { useToast } from '../toast';
 import { useAgentJobs } from './AgentJobsContext';
+import { ChunkBody } from '../plans/ChunkRow';
 
-const MAX_COPIES = 3;
+const blankStep = (cli = 'claude') => ({ cli, prompt: '' });
 
-const SOURCE_META = {
-  selected: { label: 'tree', hint: 'select in the tree', icon: Files },
-  pinned: { label: 'pinned', hint: 'pin a file', icon: Pin },
-  group: { label: 'group', hint: 'add a group', icon: Import },
-};
-
-// Turn a template + chosen files + free-text into a single headless prompt.
-function assemblePrompt({ template, files, instructions }) {
-  const parts = [];
-  if (template?.content) parts.push(template.content.trim());
-  if (instructions?.trim()) parts.push(instructions.trim());
-  if (files.length) {
-    const lines = files.map((f) => {
-      const note =
-        f.state === 'do-not-modify'
-          ? ' (reference only — do not modify)'
-          : f.state === 'use-as-example'
-          ? ' (use as an example)'
-          : '';
-      return `@${f.relativePath}${note}`;
-    });
-    parts.push(`Relevant files:\n${lines.join('\n')}`);
-  }
-  return parts.join('\n\n');
-}
-
-export function RunJobDialog({ open, onOpenChange, projectPath }) {
-  const { getGroupsForProject } = useFileGroups();
-  const { templates } = usePromptTemplates();
-  const { getPinnedPaths } = usePinnedFiles();
-  const { jobs, launchRace, selectedContextFiles, findOverlappingJobs } = useAgentJobs();
-
-  const groups = useMemo(
-    () => (projectPath ? getGroupsForProject(projectPath) : []),
-    [projectPath, getGroupsForProject]
-  );
-
-  const pinnedFiles = useMemo(() => {
-    if (!projectPath) return [];
-    return getPinnedPaths().map((abs) => ({
-      relativePath: getRelativePath(abs, projectPath),
-      state: 'modify',
-      source: 'pinned',
-    }));
-  }, [projectPath, getPinnedPaths]);
-
+// Compose or edit a job: an ordered list of agent prompts run one after another
+// in the repo. Run it once, or save it as a recipe to run again from the pane.
+export function RunJobDialog({ open, onOpenChange, repoPath, recipe = null }) {
+  const { launchJob, saveRecipe } = useAgentJobs();
+  const toast = useToast();
   const [name, setName] = useState('');
-  const [templateId, setTemplateId] = useState(null);
-  // Agents to run this prompt through. More than one candidate makes it a race:
-  // each gets its own worktree and you keep exactly one result.
-  const [clis, setClis] = useState(() => new Set(['claude']));
-  const [copies, setCopies] = useState(1);
+  const [steps, setSteps] = useState(() => [blankStep()]);
   const [availableClis, setAvailableClis] = useState(null); // null = not probed yet
-  const [useWorktree, setUseWorktree] = useState(true);
-  const [isGitRepo, setIsGitRepo] = useState(true);
-  const [branch, setBranch] = useState(null); // for FIG.26's "your tree"
-  const compactFigures = useFigureCompact();
-  const [instructions, setInstructions] = useState('');
 
-  // Detect whether the project is inside a git repo — worktree isolation and
-  // diff review only work when it is.
+  // On open: start blank, or from the recipe being edited.
   useEffect(() => {
-    if (!open || !projectPath) return;
-    let cancelled = false;
-    git(projectPath, ['rev-parse', '--is-inside-work-tree'])
-      .then(() => {
-        if (!cancelled) setIsGitRepo(true);
-        return currentBranch(projectPath).then((b) => {
-          if (!cancelled) setBranch(b && b !== 'HEAD' ? b : null);
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setIsGitRepo(false);
-          setUseWorktree(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, projectPath]);
-  // Probe which agent CLIs are actually installed, so a race can't be aimed at a
-  // binary that isn't there. A failed probe leaves the option enabled rather
-  // than hiding a working agent.
+    if (!open) return;
+    setName(recipe?.name ?? '');
+    setSteps(recipe?.steps?.length ? recipe.steps.map((s) => ({ ...s })) : [blankStep()]);
+  }, [open, recipe]);
+
+  // Probe which agent CLIs are installed. A failed probe leaves the option
+  // enabled rather than hiding a working agent.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -140,410 +66,190 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
     };
   }, [open]);
 
-  const [groupFiles, setGroupFiles] = useState([]); // files pulled in from a group
-  const [checked, setChecked] = useState(() => new Set());
+  const filled = steps.filter((s) => s.prompt.trim());
+  const canRun = !!repoPath && filled.length > 0;
+  const canSave = canRun && name.trim().length > 0;
 
-  // Merge the three sources, de-duplicated by relativePath (tree > group > pinned).
-  const candidates = useMemo(() => {
-    const byPath = new Map();
-    const add = (list, source) => {
-      for (const f of list) {
-        if (!f.relativePath) continue;
-        if (!byPath.has(f.relativePath)) {
-          byPath.set(f.relativePath, { ...f, source });
-        }
-      }
-    };
-    add(selectedContextFiles, 'selected');
-    add(groupFiles, 'group');
-    add(pinnedFiles, 'pinned');
-    return Array.from(byPath.values());
-  }, [selectedContextFiles, groupFiles, pinnedFiles]);
-
-  // On open: pre-check the tree selection, reset transient state.
-  useEffect(() => {
-    if (open) {
-      setName('');
-      setInstructions('');
-      setGroupFiles([]);
-      setChecked(new Set(selectedContextFiles.map((f) => f.relativePath)));
-    }
-  }, [open, selectedContextFiles]);
-
-  const template = templates.find((t) => t.id === templateId) || null;
-  const checkedFiles = candidates.filter((c) => checked.has(c.relativePath));
-  const canRun =
-    !!projectPath && (!!template || checkedFiles.length > 0 || instructions.trim().length > 0);
-
-  // Files this job is allowed to change (reference/example files excluded).
-  const modifiablePaths = useMemo(
-    () =>
-      checkedFiles
-        .filter((f) => f.state !== 'do-not-modify' && f.state !== 'use-as-example')
-        .map((f) => f.relativePath),
-    [checkedFiles]
-  );
-
-  // Warn when another pending/running job in this repo already owns some of the
-  // same files — the collision the reconciler would otherwise have to untangle.
-  const overlaps = useMemo(
-    () => (open ? findOverlappingJobs(projectPath, modifiablePaths) : []),
-    // findOverlappingJobs is stable and reads the latest jobs; `jobs` is a
-    // dep so the warning tracks jobs finishing, applying or being discarded.
-    [open, findOverlappingJobs, projectPath, modifiablePaths, jobs]
-  );
-
-  const toggleFile = (relativePath) => {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(relativePath)) next.delete(relativePath);
-      else next.add(relativePath);
+  const patchStep = (i, patch) => setSteps((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const removeStep = (i) => setSteps((prev) => prev.filter((_, j) => j !== i));
+  const moveStep = (i, by) =>
+    setSteps((prev) => {
+      const next = [...prev];
+      [next[i], next[i + by]] = [next[i + by], next[i]];
       return next;
     });
+  // A new step keeps the previous step's agent.
+  const addStep = () => setSteps((prev) => [...prev, blankStep(prev[prev.length - 1]?.cli)]);
+
+  const fallbackLabel = () => {
+    const line = filled[0]?.prompt.trim().replace(/\s+/g, ' ') ?? 'Agent job';
+    return line.length > 60 ? `${line.slice(0, 57)}...` : line;
   };
-
-  const addGroup = (group) => {
-    setGroupFiles((prev) => {
-      const existing = new Set(prev.map((f) => f.relativePath));
-      const merged = [...prev];
-      for (const f of group.files) {
-        if (!existing.has(f.relativePath)) merged.push({ ...f, source: 'group' });
-      }
-      return merged;
-    });
-    setChecked((prev) => new Set([...prev, ...group.files.map((f) => f.relativePath)]));
-  };
-
-  // Racing only makes sense when every candidate gets its own worktree —
-  // in-place runs would all edit the same files at once.
-  const canRace = isGitRepo && useWorktree;
-  const candidateCount = canRace ? clis.size * copies : 1;
-
-  const toggleCli = (value) => {
-    if (!canRace) {
-      setClis(new Set([value])); // no isolation: picking swaps the single agent
-      return;
-    }
-    setClis((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) {
-        if (next.size === 1) return prev; // always leave one agent selected
-        next.delete(value);
-      } else {
-        next.add(value);
-      }
-      return next;
-    });
-  };
-
-  // Dropping isolation collapses a pending race back to a single candidate.
-  useEffect(() => {
-    if (canRace) return;
-    setCopies(1);
-    setClis((prev) => (prev.size > 1 ? new Set([[...prev][0]]) : prev));
-  }, [canRace]);
 
   const handleRun = async () => {
-    const prompt = assemblePrompt({ template, files: checkedFiles, instructions });
-    if (!prompt.trim()) return;
-    const label =
-      name.trim() ||
-      template?.title ||
-      `Agent job (${checkedFiles.length} file${checkedFiles.length === 1 ? '' : 's'})`;
-    await launchRace({
-      clis: [...clis],
-      copies: canRace ? copies : 1,
-      prompt,
-      label,
-      repoPath: projectPath,
-      useWorktree,
-      intendedFiles: modifiablePaths,
-    });
-    onOpenChange(false);
+    if (!canRun) return;
+    try {
+      await launchJob({ steps: filled, label: name.trim() || fallbackLabel(), repoPath });
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(`Could not start job: ${err.message || err}`);
+    }
   };
 
-  // Jobs are spawned with each CLI's auto-approve flag (agent_runner
-  // commands.rs), so nothing stops a tool call. Said before Run.
-  const isolationText = (
-    <>
-      <div
-        className="flex items-start gap-2.5 text-[11px] leading-snug"
-        role={useWorktree ? 'note' : 'alert'}
-      >
-        {!useWorktree && <Lamp state="warn" className="mt-[3px]" />}
-        <span className={useWorktree ? 'text-muted-foreground' : 'text-foreground'}>
-          Jobs run unattended with auto-approve: no permission prompts, and they are not
-          sandboxed.{' '}
-          {useWorktree ? (
-            'The isolated worktree keeps edits out of your working tree until you apply them.'
-          ) : (
-            <span className="text-[var(--ins-warn)]">
-              In place, the agent edits your working tree directly and can run any command.
-              Isolated worktree recommended.
-            </span>
-          )}
-        </span>
-      </div>
+  const handleSave = async ({ run = false } = {}) => {
+    if (!canSave) return;
+    const id = saveRecipe({ id: recipe?.id, name, repoPath, steps: filled });
+    onOpenChange(false);
+    if (!run) {
+      toast.success(`Saved recipe ${name.trim()}`);
+      return;
+    }
+    // The recipe lands in state on the next render; run from the same steps.
+    try {
+      await launchJob({ steps: filled, label: name.trim(), repoPath, recipeId: id });
+    } catch (err) {
+      toast.error(`Could not start job: ${err.message || err}`);
+    }
+  };
 
-      {candidateCount > 1 && (
-        <div className="text-[11px] leading-snug text-muted-foreground">
-          <span>
-            <span className="text-foreground">Race · {candidateCount} candidates</span> on the same
-            prompt, one worktree each. Compare the diffs and keep one; the rest are discarded.
-          </span>
-        </div>
-      )}
-    </>
-  );
-
-  const isolationHint = !isGitRepo
-    ? 'Not a git repository — runs in place, no diff review.'
-    : useWorktree
-    ? 'Changes stay in a separate worktree until you apply them.'
-    : 'Edits your working tree directly.';
+  // The one main action: with a name the job is kept, without it it runs once.
+  const primary = recipe || name.trim() ? 'save-run' : 'run';
+  const runPrimary = () => (primary === 'run' ? handleRun() : handleSave({ run: true }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="md"
-        className="max-w-[95vw] max-h-[85vh] flex flex-col gap-4"
-        status={checkedFiles.length > 0 ? plural(checkedFiles.length, 'file') : undefined}
-        hints={[{ keys: ['^', '↵'], label: candidateCount > 1 ? 'race' : 'run' }]}
+        size="lg"
+        className="max-h-[85vh] flex flex-col gap-4"
+        status={plural(filled.length, 'step')}
+        hints={[{ keys: ['^', '↵'], label: primary === 'run' ? 'run once' : 'save & run' }]}
         escLabel="cancel"
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canRun) {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            handleRun();
+            runPrimary();
           }
         }}
       >
         <DialogHeader className="shrink-0 gap-0">
-          <DialogTitle>Run background agent</DialogTitle>
-          <DialogDescription className="text-xs leading-relaxed">
-            Runs a headless agent and streams its output to the Jobs panel. You review the changes
-            before they reach your working tree.
+          <DialogTitle>{recipe ? `Edit ${recipe.name}` : 'Run background agents'}</DialogTitle>
+          <DialogDescription>
+            Each step&apos;s agent runs headless in {repoPath ? basename(repoPath) : 'the repo'}, top to bottom.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-            <DialogField label="Name" htmlFor="job-name">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden">
+          <label htmlFor="job-name" className="flex items-center gap-3">
+            <span className="engraved-label w-12 shrink-0">Name</span>
+            <span className="relative min-w-0 flex-1">
               <input
                 id="job-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={template?.title || 'Optional'}
-                className={WELL_INPUT}
+                placeholder="e.g. Release checks"
+                className={cn(WELL_INPUT, 'pr-28')}
               />
-            </DialogField>
-            <DialogField label="Template">
-              <Picker
-                value={template?.title || 'None'}
-                items={[{ id: null, name: 'None' }, ...templates.map((t) => ({ id: t.id, name: t.title }))]}
-                selectedId={templateId}
-                onSelect={setTemplateId}
-              />
-            </DialogField>
-          </div>
-
-          {/* Context files: tree selection + pinned, with groups as an add-in */}
-          <Section
-            label="Context files"
-            count={checkedFiles.length}
-            action={
-              groups.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <PanelButton icon={Import}>
-                      Add group
-                      <ChevronDown aria-hidden="true" className="opacity-60" />
-                    </PanelButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
-                    {groups.map((g) => (
-                      <DropdownMenuItem
-                        key={g.id}
-                        onClick={() => addGroup(g)}
-                        className="flex justify-between gap-4 text-[11px] py-1.5"
-                      >
-                        <span className="truncate">{g.name}</span>
-                        <span className="tube-idle">{g.files.length}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )
-            }
-          >
-            <div className="ins-well max-h-40 overflow-auto py-1">
-              {candidates.length === 0 ? (
-                <div className="flex flex-col items-center gap-1.5 px-3 py-4 text-center text-[11px] text-muted-foreground">
-                  <span className="text-foreground/80">No files in context</span>
-                  <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-                    {Object.values(SOURCE_META).map(({ hint, icon: Icon }) => (
-                      <span key={hint} className="inline-flex items-center gap-1">
-                        <Icon className="h-3 w-3" aria-hidden="true" />
-                        {hint}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              ) : (
-                candidates.map((f) => {
-                  const meta = SOURCE_META[f.source] || SOURCE_META.selected;
-                  const Icon = meta.icon;
-                  const isOn = checked.has(f.relativePath);
-                  const { dir, name } = splitDirName(f.relativePath);
-                  return (
-                    <label
-                      key={f.relativePath}
-                      className="flex cursor-pointer items-center gap-2 px-2 py-[3px] hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)]"
-                    >
-                      <Checkbox checked={isOn} onCheckedChange={() => toggleFile(f.relativePath)} />
-                      <span className={cn('min-w-0 flex-1 truncate text-[11px]', !isOn && 'opacity-50')}>
-                        <span className="text-muted-foreground">{dir}</span>
-                        <span className="text-foreground">{name}</span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={`From ${meta.label}`}>
-                        <Icon className="h-2.5 w-2.5" aria-hidden="true" />
-                        {meta.label}
-                      </span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </Section>
-
-          <DialogField label={template ? 'Instructions · optional' : 'Instructions'} htmlFor="job-instructions">
-            <textarea
-              id="job-instructions"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              rows={3}
-              placeholder="e.g. Write unit tests for these files following existing conventions."
-              className={cn(WELL_INPUT, 'h-auto resize-none py-2 leading-relaxed')}
-            />
-          </DialogField>
-
-          {/* Agents: pick one, or several to race them against each other. */}
-          <Section
-            label={canRace ? 'Agents · pick several to race' : 'Agent'}
-            action={
-              canRace && (
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <span className="mr-1">runs each</span>
-                  {Array.from({ length: MAX_COPIES }, (_, i) => i + 1).map((n) => (
-                    <PanelButton
-                      key={n}
-                      aria-pressed={copies === n}
-                      onClick={() => setCopies(n)}
-                      className={cn('w-6 tabular-nums', copies === n && 'text-[var(--ins-lamp)]')}
-                      aria-label={`${n} run${n === 1 ? '' : 's'} per agent`}
-                    >
-                      {n}×
-                    </PanelButton>
-                  ))}
+              {!recipe && !name.trim() && (
+                <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-muted-foreground">
+                  to save as recipe
                 </span>
-              )
-            }
-          >
-            <div className="flex flex-wrap gap-1.5">
-              {JOB_CLIS.map((o) => {
-                const missing = availableClis && !availableClis.has(o.value);
-                const on = clis.has(o.value);
-                return (
-                  <PanelButton
-                    key={o.value}
-                    latched={on}
-                    disabled={missing && !on}
-                    onClick={() => toggleCli(o.value)}
-                    title={
-                      missing
-                        ? `${o.bin} not found on PATH`
-                        : canRace
-                        ? 'Toggle — two or more agents race in separate worktrees'
-                        : 'Racing needs isolated worktrees; picking swaps the agent'
-                    }
-                    className={cn(
-                      on && 'text-foreground',
-                      missing && !on && 'cursor-not-allowed opacity-40 line-through'
-                    )}
-                  >
-                    {o.label}
-                  </PanelButton>
-                );
-              })}
-            </div>
-          </Section>
+              )}
+            </span>
+          </label>
 
-          <DialogGroup label="Isolation" />
-          <div className="flex items-center gap-3">
-            <ToggleSwitch
-              checked={useWorktree}
-              onChange={(v) => isGitRepo && setUseWorktree(v)}
-              disabled={!isGitRepo}
-              tone="lamp"
-              label="Isolated worktree"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-xs text-foreground">
-                {useWorktree ? (
-                  <Branch size={12} className="text-[var(--ins-lamp)]" aria-hidden="true" />
-                ) : (
-                  <Commit size={12} className="text-muted-foreground" aria-hidden="true" />
-                )}
-                {useWorktree ? 'Isolated worktree' : 'In place'}
-              </div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{isolationHint}</div>
-            </div>
-          </div>
-
-          {/* FIG.26 draws where the job writes and the race as a sum; the
-              old sentences are its fallback. Compact keeps the warning as
-              text: it is a safety note, not a value for a tooltip. */}
-          <Fig26Isolation
-            isolated={canRace}
-            canIsolate={isGitRepo}
-            clis={[...clis]}
-            copies={copies}
-            branch={branch}
-            repo={projectPath ? basename(projectPath) : null}
-            name={name.trim() || template?.title}
-            fallback={compactFigures ? null : isolationText}
-          />
-          {compactFigures && isolationText}
-
-          {overlaps.length > 0 && (
-            <div className="flex items-start gap-2.5 text-[11px] leading-snug" role="alert">
-              <Lamp state="warn" className="mt-[3px]" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[var(--ins-warn)]">
-                  Overlaps {plural(overlaps.length, 'pending job')}
-                </div>
-                <ul className="mt-1 flex flex-col gap-0.5 text-muted-foreground">
-                  {overlaps.map((o) => (
-                    <li key={o.id} className="truncate">
-                      <span className="text-foreground/80">{o.label}</span>{' '}
-                      <span className="opacity-70">({o.status})</span> — {o.files.join(', ')}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-1 text-muted-foreground">
-                  Both jobs will edit these files and you'll have to reconcile them. Consider splitting
-                  the work by file.
+          {/* The run order, drawn as the plans' chunk spine: a step with a
+              prompt is a solid ring, an empty one a dashed ring and is skipped. */}
+          <ol className="-mx-3 flex flex-col">
+            {steps.map((step, i) => {
+              const ready = !!step.prompt.trim();
+              return (
+                <li key={i} className="ins-spine group/step relative">
+                  <div className={STEP_ROW}>
+                    <span className="flex h-6 w-3.5 items-center justify-center">
+                      <ChunkBody body={ready ? 'next' : 'queued'} label={ready ? `Step ${i + 1} ready` : `Step ${i + 1} empty, skipped`} />
+                    </span>
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <div className="flex h-6 items-center gap-2">
+                        <span className="w-4 font-[family-name:var(--font-legend)] text-[11px] tabular-nums text-[var(--ins-legend)]">{i + 1}</span>
+                        <Picker
+                          value={JOB_CLIS.find((o) => o.value === step.cli)?.label ?? step.cli}
+                          items={JOB_CLIS.map((o) => ({
+                            id: o.value,
+                            name: availableClis && !availableClis.has(o.value) ? `${o.label} (not found)` : o.label,
+                          }))}
+                          selectedId={step.cli}
+                          onSelect={(cli) => patchStep(i, { cli })}
+                          label={`Step ${i + 1} agent`}
+                        />
+                        <span className="ml-auto flex items-center gap-0.5 opacity-60 transition-opacity group-hover/step:opacity-100 group-focus-within/step:opacity-100">
+                          <PanelButton icon={ArrowUp} disabled={i === 0} onClick={() => moveStep(i, -1)} aria-label={`Move step ${i + 1} up`} />
+                          <PanelButton
+                            icon={ArrowDown}
+                            disabled={i === steps.length - 1}
+                            onClick={() => moveStep(i, 1)}
+                            aria-label={`Move step ${i + 1} down`}
+                          />
+                          <PanelButton icon={Close} disabled={steps.length === 1} onClick={() => removeStep(i)} aria-label={`Remove step ${i + 1}`} />
+                        </span>
+                      </div>
+                      <textarea
+                        value={step.prompt}
+                        onChange={(e) => patchStep(i, { prompt: e.target.value })}
+                        rows={3}
+                        aria-label={`Step ${i + 1} prompt`}
+                        placeholder={i === 0 ? 'e.g. Update the dependencies and fix what breaks.' : 'e.g. Run the tests and fix any failures.'}
+                        className={cn(WELL_INPUT, 'h-auto resize-y py-2 leading-relaxed')}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+            {/* The spine ends on the add key; a failure anywhere above ends the run early. */}
+            <li className="ins-spine relative">
+              <div className={STEP_ROW}>
+                <span className="flex h-6 w-3.5 items-center justify-center text-muted-foreground">
+                  <Add size={11} aria-hidden="true" />
+                </span>
+                <div className="flex h-6 items-center gap-3">
+                  <PanelButton onClick={addStep}>Add step</PanelButton>
+                  <span className="text-[11px] text-muted-foreground">a failing step stops the run</span>
                 </div>
               </div>
-            </div>
-          )}
+            </li>
+          </ol>
+        </div>
+
+        {/* Jobs are spawned with each CLI's auto-approve flag (agent_runner
+            commands.rs), so nothing stops a tool call. Said before Run. */}
+        <div className="flex shrink-0 items-start gap-2.5 border-t border-[var(--ins-edge)] pt-3 text-[12px] leading-relaxed" role="alert">
+          <Lamp state="warn" className="mt-[3px]" />
+          <span className="text-foreground">
+            Unattended, auto-approved and not sandboxed:{' '}
+            <span className="text-[var(--ins-warn)]">each agent edits your working tree directly and can run any command.</span>
+          </span>
         </div>
 
         <DialogFooter className="shrink-0">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleRun} disabled={!canRun}>
-            {candidateCount > 1 ? `Race ${candidateCount}` : 'Run'}
+          {!recipe && (
+            <Button variant={primary === 'run' ? 'default' : 'outline'} size="sm" onClick={handleRun} disabled={!canRun}>
+              Run once
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => handleSave()} disabled={!canSave}>
+            Save
+          </Button>
+          <Button
+            variant={primary === 'save-run' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSave({ run: true })}
+            disabled={!canSave}
+           
+          >
+            Save &amp; run
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -551,42 +257,22 @@ export function RunJobDialog({ open, onOpenChange, projectPath }) {
   );
 }
 
+// Body column, then the step; px-3 puts the body on the .ins-spine line.
+const STEP_ROW = 'grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-start gap-x-2.5 px-3 pb-3';
+
 const WELL_INPUT =
   'ins-well h-7 w-full min-w-0 px-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus-visible:outline-1 focus-visible:outline-solid focus-visible:outline-[var(--ins-lamp)] focus-visible:-outline-offset-1';
 
-
-// A multi-control block: group legend and hairline (with an optional count
-// and a right-aligned action) above its controls.
-function Section({ label, count, action, children }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex min-h-5 items-center gap-2">
-        <DialogGroup
-          className="flex-1"
-          label={
-            <>
-              {label}
-              {count !== undefined && <span className="tube-idle ml-1.5">{count}</span>}
-            </>
-          }
-        />
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Picker({ value, items, selectedId, onSelect, disabled = false }) {
+function Picker({ value, items, selectedId, onSelect, label, disabled = false }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild disabled={disabled}>
-        <Button variant="outline" size="sm" className="h-7 w-full min-w-0 justify-between px-2 text-xs">
-          <span className="truncate">{value}</span>
+        <Button variant="ghost" size="sm" aria-label={label} className="h-6 min-w-0 gap-1.5 px-1.5">
+          <span className="ins-name truncate text-[14px] text-foreground">{value}</span>
           <ChevronDown size={12} className="opacity-60" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-64 overflow-auto text-xs">
+      <DropdownMenuContent align="start" className="max-h-64 overflow-auto text-xs">
         {items.map((item) => (
           <DropdownMenuItem
             key={String(item.id)}

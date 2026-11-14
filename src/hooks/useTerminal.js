@@ -200,11 +200,15 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
   useEffect(() => {
     if (!terminalRef.current) return;
 
+    const fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace';
     // Create xterm instance
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 14,
-      fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace',
+      // Martian Mono runs wide with a tall x-height: 13px reads like 14px of a
+      // narrower mono, and 1.2 keeps wrapped agent replies off each other.
+      fontSize: 13,
+      lineHeight: 1.2,
+      fontFamily,
       theme: theme,
       allowProposedApi: true,
       // User-configurable; xterm's 1000-line default loses most of an agent turn.
@@ -258,6 +262,25 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
       // Container may not have dimensions yet, spawn effect will re-fit
     }
 
+    // xterm measures its cell once, at open. Opened before the bundled font
+    // loaded (font-display: swap), the grid keeps the fallback's narrower
+    // cells; re-measure once it arrives. Setting the same family is a no-op
+    // in xterm, hence the round trip.
+    let disposed = false;
+    if (!document.fonts.check(`13px ${fontFamily}`)) {
+      document.fonts.load(`13px ${fontFamily}`).then(() => {
+        if (disposed) return;
+        term.options.fontFamily = 'monospace';
+        term.options.fontFamily = fontFamily;
+        try {
+          const proposed = fit.proposeDimensions();
+          if (proposed && proposed.cols >= MIN_USABLE_COLS && proposed.rows >= MIN_USABLE_ROWS) fit.fit();
+        } catch {
+          // No layout box yet; the ResizeObserver fits later.
+        }
+      }, () => {});
+    }
+
     terminalInstRef.current = term;
     terminalRef.current.__xterm = term; // read by the QA driver (agent-control/qaDriver.js)
     setTerminal(term);
@@ -265,6 +288,7 @@ export function useTerminal(terminalRef, theme, imperativeRef, onSearchFocus, on
     setSearchAddon(search);
 
     return () => {
+      disposed = true;
       const webgl = webglRef.current;
       webglRef.current = null;
       if (webgl) disposeWebgl(webgl);

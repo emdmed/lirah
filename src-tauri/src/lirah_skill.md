@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to start planning (planning mode), list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect, cancel or apply Lirah's background agent jobs.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to start planning (planning mode), list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect or cancel Lirah's background agent jobs and run their saved recipes.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -96,14 +96,15 @@ lirah plans debug <plan> [--fix]
                                the safe repairs and checks again
 lirah jobs [list] [--all]      this tab's repo's background jobs (--all: every repo)
 lirah jobs run <prompt> [--cli C] [--label L]
-                               start a background job in this tab's repo, in an
-                               isolated worktree (asks the user first)
+                               start a background agent in this tab's repo; it
+                               edits the working tree in place (asks the user first)
+lirah jobs run --recipe <recipe>
+                               run a saved recipe: its steps one after another,
+                               stopping at the first that fails (asks first)
+lirah jobs recipes             this tab's repo's saved recipes
 lirah jobs show <job> [--all]  one job's details
 lirah jobs cancel <job> [--all]
                                stop a running job
-lirah jobs apply <job> [--force] [--all]
-                               apply a finished job's changes to its repo
-                               (asks the user first)
 lirah ping                     check that Lirah is reachable
 ```
 
@@ -222,17 +223,15 @@ tabs are your workers:
 - A task title is one line; put details in `--notes` (markdown is fine). Quote
   both so the shell keeps them whole.
 - `lirah jobs` gives each job's run report path. Read the report with your file
-  tools; it has the prompt, changed files and full output. A running or cancelled
+  tools; it has every step's prompt and the full output. A running or cancelled
   job has no report yet, so read its log path instead.
-- `lirah jobs apply` asks the user to confirm. It lands the changes uncommitted in
-  the repo. On `denied by user`, stop. When the typecheck blocks it, tell the user.
-  Only pass `--force` when they say so.
-- Only cancel a job when the user asks. Its worktree is kept.
+- Only cancel a job when the user asks. Edits it already made stay in the repo.
 - `lirah jobs run "<prompt>"` starts a job when the user asks for work in the
   background (or in parallel). The job's agent starts with no context, so write a
   complete, self-contained prompt: the goal, the files, the constraints, and how to
-  verify. Quote it. Split independent work into separate jobs that touch different
-  files. The user confirms each launch; on `denied by user`, stop. Then check on it
-  with `lirah jobs show <id>`, and apply it only when the user says so.
-- You can't rerun, revise or archive jobs, or start or settle races, from the CLI.
-  Point the user to the jobs pane.
+  verify. Quote it. Jobs edit the working tree in place, so don't run two that
+  touch the same files at once. The user confirms each launch; on `denied by user`,
+  stop. Then check on it with `lirah jobs show <id>`.
+- `lirah jobs run --recipe <name>` runs a sequence the user saved. Recipes are
+  made and edited in the jobs pane; you can't rerun or archive jobs from the CLI
+  either.

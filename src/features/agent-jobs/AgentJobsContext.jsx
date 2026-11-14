@@ -1,19 +1,16 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { basename } from '../../utils/pathUtils';
 import { invoke } from '@tauri-apps/api/core';
-import { git, repoTop, worktreeAdd, worktreeRemove } from '../../lib/git';
+import { git, repoTop, worktreeRemove } from '../../lib/git';
 import { jobWorktreesDir, jobsDir, lirahDir } from '../../lib/lirahPaths';
 import { getCurrentWorkspaces, workspaceListStore } from '../../lib/workspaceStore';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../../lib/notify';
-import { useConfirm } from '../dialogs/DialogProvider';
 
 // Split so consumers subscribe only to what they read: streamed job output
-// changes `jobs` many times a second, and ProjectTab — which only registers its
-// file selection — must not re-render for it.
+// changes `jobs` many times a second, and ProjectTab must not re-render for it.
 const AgentJobsActionsContext = createContext(undefined);
 const AgentJobsStateContext = createContext(undefined);
-const AgentJobsContextFilesContext = createContext(undefined);
+const AgentJobsRecipesContext = createContext(undefined);
 
 const MAX_OUTPUT_LINES = 500;
 
@@ -22,62 +19,43 @@ const MAX_OUTPUT_LINES = 500;
 const PERSIST_DEBOUNCE = 400;
 const PERSIST_MAX_STALENESS = 3000;
 
-// Job records, one list per workspace, beside the jobs' logs, reports and patches.
+// Job records, one list per workspace, beside the jobs' logs and reports.
 const jobStore = workspaceListStore('jobs/jobs.json', 'jobs');
+// Saved step sequences, run again on demand.
+const recipeStore = workspaceListStore('jobs/recipes.json', 'recipes');
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Parse `git status --porcelain` into absolute paths of changed files.
-// Uncommitted changes in the tree a job is about to be applied onto, and which
-// of them the job also touches (relative paths). Untracked files only count
-// when the job writes the same path. Null when the status can't be read.
-async function workingTreeConflicts(job, dest) {
-  try {
-    const out = await git(dest, ['status', '--porcelain']);
-    const entries = out.split('\n').filter((l) => l.trim()).map((line) => {
-      const rest = line.slice(3);
-      const path = (rest.includes(' -> ') ? rest.split(' -> ')[1] : rest).replace(/^"|"$/g, '');
-      return { path, untracked: line.startsWith('??') };
-    });
-    const prefix = `${job.cwd}/`;
-    const jobPaths = new Set((job.changedFiles || []).map((f) =>
-      f.path.startsWith(prefix) ? f.path.slice(prefix.length) : f.path));
-    const overlap = entries.filter((e) => jobPaths.has(e.path)).map((e) => e.path);
-    const dirty = entries.filter((e) => !e.untracked).length;
-    return { dirty, overlap };
-  } catch {
-    return null;
-  }
+/** A job's ordered steps. Jobs from before steps existed ran one prompt. */
+export function jobSteps(job) {
+  return job.steps?.length ? job.steps : [{ cli: job.cli, prompt: job.prompt }];
 }
 
-function parsePorcelain(output, cwd) {
-  return output
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter(Boolean)
-    .map((line) => {
-      // Format: "XY <path>" or "XY <old> -> <new>" for renames.
-      const rest = line.slice(3);
-      const path = rest.includes(' -> ') ? rest.split(' -> ')[1] : rest;
-      return { path: `${cwd}/${path.replace(/^"|"$/g, '')}` };
-    });
+/** Index of the step to start after the current one ends, or null when the run is over. */
+export function nextStepIndex(job, success) {
+  const i = job?.stepIndex ?? 0;
+  if (!success || job?.status !== 'running' || i >= jobSteps(job).length - 1) return null;
+  return i + 1;
 }
 
-// Write a persistent markdown run log for a finished job. Lives in the job's
-// workspace jobs folder so it survives worktree removal and app restarts.
-async function writeJobReport(job, { changedFiles, success, exitCode, endedAt }) {
+// Path of a job's change relative to the repo root, given its cwd.
+export function relToRepo(job, p) {
+  return job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p;
+}
+
+// Write a persistent markdown run log for a finished job, in its workspace
+// jobs folder so it survives app restarts.
+async function writeJobReport(job, { success, exitCode, endedAt }) {
   try {
     const home = await invoke('get_home_dir');
     const stamp = new Date(endedAt).toISOString().replace(/[:.]/g, '-');
     const safeLabel = (job.label || 'job').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 40);
     const path = `${jobsDir(home, job.workspaceId)}/${stamp}-${safeLabel}.md`;
+    const steps = jobSteps(job);
+    const at = (job.stepIndex ?? 0) + 1;
 
-    const rel = (p) => (job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p);
-    const filesList = changedFiles.length
-      ? changedFiles.map((f) => `  - ${rel(f.path)}`).join('\n')
-      : '  - (none)';
     // Prefer the full on-disk log — the in-memory buffer is capped at
     // MAX_OUTPUT_LINES, so long jobs would otherwise lose their earliest output.
     let outputText = job.output.map((o) => o.chunk).join('\n');
@@ -93,19 +71,14 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
     const md = [
       `# ${job.label}`,
       '',
-      `- **CLI:** ${job.cli}`,
-      `- **Status:** ${success ? 'done' : 'failed'} (exit ${exitCode})`,
-      `- **Isolated worktree:** ${job.useWorktree ? 'yes' : 'no'}`,
+      `- **Status:** ${success ? 'done' : `failed at step ${at}/${steps.length}`} (exit ${exitCode})`,
       `- **Working dir:** ${job.cwd}`,
       `- **Started:** ${new Date(job.startedAt).toISOString()}`,
       `- **Finished:** ${new Date(endedAt).toISOString()}`,
-      `- **Changed files (${changedFiles.length}):**`,
-      filesList,
       '',
-      '## Prompt',
+      '## Steps',
       '',
-      job.prompt,
-      '',
+      ...steps.flatMap((s, i) => [`### ${i + 1} · ${s.cli}`, '', s.prompt, '']),
       '## Output',
       '',
       '```text',
@@ -121,144 +94,10 @@ async function writeJobReport(job, { changedFiles, success, exitCode, endedAt })
   }
 }
 
-// Sum added/removed lines across a worktree's changes. `git add -N` records
-// intent-to-add for untracked files so they show up in `git diff --numstat` as
-// additions (without staging their content), giving a full +/- count in one go.
-// Only safe to call on an isolated worktree — never the user's real working tree.
-async function computeDiffStat(cwd) {
-  try {
-    await git(cwd, ['add', '-N', '.']);
-    const out = await git(cwd, ['diff', '--numstat']);
-    let added = 0;
-    let removed = 0;
-    for (const line of out.split('\n')) {
-      const [a, d] = line.trim().split(/\s+/);
-      if (a === '-' || d === '-') continue; // binary file — no line counts
-      const na = parseInt(a, 10);
-      const nd = parseInt(d, 10);
-      if (!Number.isNaN(na)) added += na;
-      if (!Number.isNaN(nd)) removed += nd;
-    }
-    return { added, removed };
-  } catch {
-    return null;
-  }
-}
-
-// Files worth type-checking as a post-merge gate. tsc follows imports, so
-// checking a changed file also catches references to symbols another job
-// renamed or removed elsewhere.
-const TYPECHECK_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/i;
-
-// Path of a job's change relative to the repo root, given its cwd (worktree).
-export function relToRepo(job, p) {
-  return job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p;
-}
-
-// Type-check a job's changed files and aggregate. `changedFiles` is an array
-// of { path } with ABSOLUTE paths inside `projectPath` (the tree to check).
-// One tsc run per tsconfig covers every file, with the project's real
-// compiler options; diagnostics are filtered to the changed files. Missing
-// files (deletions), non-JS/TS files, and a missing tsc are skipped rather than
-// treated as failures — this gate only fails on real type errors.
-async function typecheckChangedFiles(projectPath, changedFiles) {
-  const candidates = (changedFiles || [])
-    .map((f) => f.path)
-    .filter((p) => TYPECHECK_EXT.test(p));
-  let errorCount = 0;
-  const failed = [];
-  let checked = 0;
-  if (candidates.length > 0) {
-    try {
-      const results = await invoke('check_project_types', { projectPath, files: candidates });
-      for (const [path, res] of Object.entries(results || {})) {
-        checked++;
-        if (res && res.error_count > 0) {
-          errorCount += res.error_count;
-          failed.push({ path, errorCount: res.error_count });
-        }
-      }
-    } catch {
-      // tsc not installed or not runnable — skip, don't fail.
-    }
-  }
-  return {
-    status: 'done',
-    checked,
-    skipped: candidates.length - checked,
-    errorCount,
-    failed,
-  };
-}
-
-// Build the instruction prompt for the semantic-reconcile agent. It receives
-// each source job's intent + touched files so it can integrate them coherently,
-// not just resolve textual conflicts.
-function buildReconcilePrompt(jobs, conflictJobs) {
-  const rel = (job, p) => (job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p);
-  const goals = jobs
-    .map((j, i) => {
-      const files = j.changedFiles.map((f) => rel(j, f.path)).join(', ') || '(no files)';
-      return `${i + 1}. ${j.label}\n   Files touched: ${files}\n   Goal: ${(j.prompt || '').trim()}`;
-    })
-    .join('\n\n');
-
-  const conflictNote = conflictJobs.length
-    ? `Some changes overlapped: the working tree contains git conflict markers (<<<<<<<, =======, >>>>>>>) from these jobs — ${conflictJobs
-        .map((j) => j.label)
-        .join(', ')}. Resolve every one of them.`
-    : 'The changes applied without textual conflicts, but they may still interact in ways that break the code.';
-
-  return [
-    `The current working tree already contains the combined changes of ${jobs.length} background agent job(s), merged together for integration.`,
-    conflictNote,
-    '',
-    'What each job was trying to accomplish:',
-    '',
-    goals,
-    '',
-    'Your task: reconcile everything into one coherent, correct result.',
-    '- Resolve all git conflict markers if any are present.',
-    '- Ensure the combined changes are logically consistent: no references to renamed or removed symbols, no duplicated or contradictory logic, no half-applied refactors across the merged edits.',
-    "- Run the project's typecheck/build (and fast tests if available) and fix anything the merge broke.",
-    '- Preserve every job\'s intent — integrate them all, do not drop or revert one to satisfy another.',
-    'End with a short summary of how you combined them and anything you had to change to make them fit.',
-  ].join('\n');
-}
-
-// Build the follow-up prompt for a revision: the agent's own worktree is already
-// in the reviewed state, so it only needs the notes plus enough of the original
-// goal to keep the intent. Notes carry file:line so it can go straight there.
-function buildRevisionPrompt(job, notes) {
-  const lines = notes.map((n) => {
-    const where = n.fromLine === n.toLine ? `${n.relPath}:${n.fromLine}` : `${n.relPath}:${n.fromLine}-${n.toLine}`;
-    const snippet = n.snippet ? `\n   > ${n.snippet.split('\n').join('\n   > ')}` : '';
-    return `- ${where} — ${n.note}${snippet}`;
-  });
-  return [
-    'You already made changes in this working directory. They have been reviewed and need revision.',
-    '',
-    'Original task:',
-    '',
-    (job.prompt || '').trim(),
-    '',
-    `Review notes (${notes.length}):`,
-    '',
-    lines.join('\n'),
-    '',
-    'Address every note in place, here in this working directory. Keep the rest of the work intact — do not revert or redo changes the notes did not ask about. End with a short summary of what you changed for each note.',
-  ].join('\n');
-}
-
-// Remove worktrees under ~/.lirah/worktrees/ that no job in `liveJobs` claims —
-// jobs whose app was killed mid-run, or whose entry was dropped without a clean
-// discard, otherwise leak a full checkout each. Only ever touches paths inside
-// that directory. Best-effort; failures are silent by design.
-//
-// Runs once at startup against the just-hydrated job list, which is shared
-// across instances via the workspaces' jobs.json — so a second window's worktrees are
-// claimed too, apart from one it launched in the last few hundred ms (the
-// debounce window on that file).
+// Remove worktrees under ~/.lirah/worktrees/ that no job in `liveJobs` claims.
+// Jobs no longer make worktrees; this clears what the old isolated jobs left,
+// keeping those whose job record (and its unapplied changes) is still listed.
+// Only ever touches paths inside that directory. Best-effort.
 async function gcOrphanWorktrees(home, liveJobs) {
   if (!home) return 0;
   const root = jobWorktreesDir(home);
@@ -266,7 +105,7 @@ async function gcOrphanWorktrees(home, liveJobs) {
   try {
     entries = await invoke('read_directory', { path: root });
   } catch {
-    return 0; // No worktrees directory yet.
+    return 0; // No worktrees directory.
   }
   const claimed = new Set(liveJobs.map((j) => j.worktreePath).filter(Boolean));
   let removed = 0;
@@ -299,19 +138,11 @@ async function gcOrphanWorktrees(home, liveJobs) {
 
 export function AgentJobsProvider({ children }) {
   const [jobs, setJobs] = useState([]);
-  // Files selected in the active tab's file tree, bridged up from ProjectTab
-  // (which owns the tab-scoped FileSelectionProvider). Shape: [{relativePath, state}].
-  const [selectedContextFiles, setSelectedContextFiles] = useState([]);
+  const [recipes, setRecipes] = useState([]);
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
-  const confirm = useConfirm();
-  // Ids already run through finalizeJob this session. Closes the gap between a
-  // job finishing and its status landing in state.
-  const finalizedRef = useRef(new Set());
-
-  const registerContextFiles = useCallback((files) => {
-    setSelectedContextFiles(Array.isArray(files) ? files : []);
-  }, []);
+  const recipesRef = useRef(recipes);
+  recipesRef.current = recipes;
 
   const patchJob = useCallback((id, updater) => {
     setJobs((prev) =>
@@ -338,6 +169,7 @@ export function AgentJobsProvider({ children }) {
             return []; // First run or unreadable state — start empty.
           }
         });
+        const savedRecipes = await recipeStore.load(async () => []);
         // Jobs whose backend threads are still alive (webview reload, not a full
         // restart) — those keep streaming, so leave them 'running' and let the
         // listeners below finalize them.
@@ -349,40 +181,23 @@ export function AgentJobsProvider({ children }) {
         }
         const liveSet = new Set(liveIds);
 
-        const recovered = await Promise.all(
-          saved.map(async (entry) => {
-            // Snapshots carry no output (it lives in the job's log file).
-            const job = { ...entry, output: entry.output || [] };
-            if (job.status !== 'running' || liveSet.has(job.id)) return job;
-            // Process is gone (app was restarted, or it finished while detached).
-            // Recover any changes from the worktree so review/discard still work.
-            let changedFiles = [];
-            try {
-              const status = await git(job.cwd, ['status', '--porcelain']);
-              changedFiles = parsePorcelain(status, job.cwd);
-            } catch {
-              // Non-git cwd or the worktree is gone.
-            }
-            const worktreeGone = job.worktreePath
-              ? !(await invoke('path_exists', { path: job.worktreePath }).catch(() => false))
-              : true;
-            const hasChanges = changedFiles.length > 0;
-            const diffStat = !worktreeGone && hasChanges ? await computeDiffStat(job.cwd) : null;
-            return {
-              ...job,
-              status: hasChanges ? 'done' : 'interrupted',
-              changedFiles,
-              diffStat,
-              endedAt: job.endedAt || Date.now(),
-              worktreePath: worktreeGone ? null : job.worktreePath,
-              error: hasChanges ? job.error : 'Interrupted — recovered after the app was closed.',
-            };
-          })
-        );
+        // Snapshots carry no output (it lives in the job's log file). A running
+        // job whose process is gone was cut off by an app restart.
+        const recovered = saved.map((entry) => {
+          const job = { ...entry, output: entry.output || [] };
+          if (job.status !== 'running' || liveSet.has(job.id)) return job;
+          return {
+            ...job,
+            status: 'interrupted',
+            endedAt: job.endedAt || Date.now(),
+            error: 'Interrupted — the app was closed while it ran.',
+          };
+        });
 
-        if (!cancelled) setJobs(recovered);
-        // Sweep worktrees no surviving job claims. Runs after recovery so a job
-        // that was merely interrupted keeps its changes.
+        if (!cancelled) {
+          setJobs(recovered);
+          setRecipes(savedRecipes);
+        }
         if (!cancelled) await gcOrphanWorktrees(home, recovered);
       } catch {
         // Persistence unavailable — run in-memory only.
@@ -420,6 +235,31 @@ export function AgentJobsProvider({ children }) {
     return () => clearTimeout(timer);
   }, [jobs]);
 
+  useEffect(() => {
+    if (hydratedRef.current) recipeStore.save(recipes);
+  }, [recipes]);
+
+  // Start step `index` of a job. Every step runs under the job's id, so its
+  // output lands on the same card and in the same log file.
+  const runStep = useCallback(async (job, index) => {
+    const steps = jobSteps(job);
+    const { cli, prompt } = steps[index];
+    if (index > 0) {
+      patchJob(job.id, (j) => ({
+        stepIndex: index,
+        cli,
+        idleSecs: 0,
+        output: [...j.output, { stream: 'stdout', chunk: `── step ${index + 1}/${steps.length} · ${cli} ──` }]
+          .slice(-MAX_OUTPUT_LINES),
+      }));
+    }
+    try {
+      await invoke('run_agent_job', { jobId: job.id, cli, prompt, cwd: job.cwd, logPath: job.logPath, streamJson: false });
+    } catch (e) {
+      patchJob(job.id, { status: 'failed', error: String(e), endedAt: Date.now() });
+    }
+  }, [patchJob]);
+
   // Stream output + completion events from the backend.
   useEffect(() => {
     let unlistenOutput = null;
@@ -431,31 +271,21 @@ export function AgentJobsProvider({ children }) {
       // A cancelled (or otherwise no-longer-running) job can still emit a backend
       // 'done' event when its process finally exits. Don't let that resurrect it
       // to 'done' or fire a spurious report + notification.
-      const snapshot = jobsRef.current.find((j) => j.id === job.id);
-      if (snapshot && snapshot.status !== 'running') return;
-      finalizedRef.current.add(job.id);
-      let changedFiles = [];
-      try {
-        const status = await git(job.cwd, ['status', '--porcelain']);
-        changedFiles = parsePorcelain(status, job.cwd);
-      } catch {
-        // Non-git cwd or command failed — leave changedFiles empty.
+      if (job.status !== 'running') return;
+      const next = nextStepIndex(job, success);
+      if (next !== null) {
+        runStep(job, next);
+        return;
       }
       const endedAt = Date.now();
-      // Line-level diff stat, but only for isolated worktrees (never touch the
-      // user's real index/working tree).
-      const diffStat = job.worktreePath && changedFiles.length ? await computeDiffStat(job.cwd) : null;
+      const stillRunning = () => jobsRef.current.find((j) => j.id === job.id)?.status === 'running';
       // Use the freshest job snapshot so the report captures the full output.
       const fresh = jobsRef.current.find((j) => j.id === job.id) || job;
-      const cancelled = () => jobsRef.current.find((j) => j.id === job.id)?.status !== 'running';
-      if (cancelled()) return;
-      const reportPath = await writeJobReport(fresh, { changedFiles, success, exitCode, endedAt });
-      if (cancelled()) return;
+      const reportPath = await writeJobReport(fresh, { success, exitCode, endedAt });
+      if (!stillRunning()) return;
       patchJob(job.id, {
         status: success ? 'done' : 'failed',
         exitCode,
-        changedFiles,
-        diffStat,
         endedAt,
         reportPath,
         idleSecs: 0,
@@ -463,30 +293,11 @@ export function AgentJobsProvider({ children }) {
           error: 'Stopped after 15 min with no output or CPU work. The agent was probably waiting on an approval it can\'t get in a headless run.',
         }),
       });
-      // A race would otherwise pop one notification per candidate and none for
-      // the thing you actually wait on — all candidates being ready to compare.
-      if (job.raceId) {
-        const others = jobsRef.current.filter((j) => j.raceId === job.raceId && j.id !== job.id);
-        // jobsRef can lag a sibling that finished moments ago, so consult the
-        // finalized set too — otherwise two near-simultaneous finishes each see
-        // the other as running and nobody announces the race.
-        const pending = others.some(
-          (j) => j.status === 'running' && !finalizedRef.current.has(j.id)
-        );
-        if (!pending) {
-          const all = [...others.map((j) => j.changedFiles.length), changedFiles.length];
-          const withChanges = all.filter((n) => n > 0).length;
-          notify(
-            'Race ready',
-            `${all.length} candidates finished — ${withChanges} with changes. Compare and keep one.`
-          );
-        }
-      } else {
-        notify(
-          success ? 'Agent job finished' : 'Agent job failed',
-          `${job.label} — ${changedFiles.length} file(s) changed`
-        );
-      }
+      const n = jobSteps(job).length;
+      notify(
+        success ? 'Agent job finished' : 'Agent job failed',
+        success ? `${job.label} — ${n} step${n === 1 ? '' : 's'}` : `${job.label} — step ${(job.stepIndex ?? 0) + 1}/${n} failed`
+      );
     };
 
     (async () => {
@@ -528,121 +339,49 @@ export function AgentJobsProvider({ children }) {
       if (unlistenDone) unlistenDone();
       if (unlistenIdle) unlistenIdle();
     };
-  }, [patchJob]);
+  }, [patchJob, runStep]);
 
-  // Launch a background job. If useWorktree, run it in an isolated git worktree
-  // so file changes stay quarantined until approved.
+  // Launch a background job: its steps run one after another, in place in the
+  // repo, and the first failing step ends the run.
   const launchJob = useCallback(async ({
-    cli,
-    prompt,
+    steps,
     label,
     repoPath,
-    useWorktree = true,
-    intendedFiles = [],
-    // Set when this job is one candidate of a race — several agents solving the
-    // same prompt in parallel, of which the user keeps one.
-    raceId = null,
-    raceSize = 0,
+    recipeId = null,
     workspaceId = getCurrentWorkspaces().activeWorkspaceId,
   }) => {
+    const list = (steps || []).filter((s) => s?.cli && s.prompt?.trim());
+    if (!list.length) throw new Error('a job needs at least one step with a prompt');
     const id = makeId();
     const home = await invoke('get_home_dir').catch(() => null);
     // Full output is mirrored here so it survives the in-memory cap and reloads.
     const logPath = home ? `${jobsDir(home, workspaceId)}/${id}.log` : null;
-
-    // Resolve the git repo root (works even when repoPath is a subdirectory).
-    // Null means repoPath is not inside a git repo.
-    let repoRoot = null;
-    try {
-      repoRoot = await repoTop(repoPath);
-    } catch {
-      repoRoot = null;
-    }
-
-    const targetRepo = repoRoot || repoPath;
-    let cwd = targetRepo;
-    let worktreePath = null;
-    let error = null;
-
-    if (useWorktree && !repoRoot) {
-      // Worktree isolation requires a git repo — degrade to in-place with a note.
-      error = 'Not a git repository — running in-place (no isolation or diff review).';
-    } else if (useWorktree) {
-      try {
-        if (!home) throw new Error('home directory unavailable');
-        worktreePath = `${jobWorktreesDir(home)}/${basename(repoRoot, 'repo')}-${id}`;
-        await worktreeAdd(repoRoot, { path: worktreePath, detach: true });
-        cwd = worktreePath;
-      } catch (e) {
-        // Fall back to running in-place if worktree creation fails.
-        error = `Worktree unavailable, running in-place: ${e}`;
-        worktreePath = null;
-        cwd = targetRepo;
-      }
-    }
+    // The repo root (works from a subdirectory); outside git, the folder itself.
+    const cwd = await repoTop(repoPath).catch(() => repoPath);
 
     const job = {
       id,
-      cli,
       label,
-      prompt,
+      steps: list,
+      stepIndex: 0,
+      cli: list[0].cli,
+      prompt: list[0].prompt,
+      recipeId,
       status: 'running',
-      repoPath: targetRepo,
+      repoPath: cwd,
       cwd,
-      worktreePath,
-      useWorktree: !!worktreePath,
-      // Files the user flagged as modifiable — used to warn when a later job's
-      // scope overlaps this one's before it's even launched.
-      intendedFiles: Array.isArray(intendedFiles) ? intendedFiles : [],
-      raceId,
-      raceSize,
       workspaceId,
       output: [],
-      changedFiles: [],
       exitCode: null,
-      error,
+      error: null,
       logPath,
       startedAt: Date.now(),
       endedAt: null,
     };
     setJobs((prev) => [job, ...prev]);
-
-    try {
-      // streamJson stays off: this UI shows the raw output and folds it into the
-      // run report, so it wants plain text, not NDJSON events.
-      await invoke('run_agent_job', { jobId: id, cli, prompt, cwd, logPath, streamJson: false });
-    } catch (e) {
-      patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
-    }
+    await runStep(job, 0);
     return id;
-  }, [patchJob]);
-
-  // Fan one prompt out across several agents at once. Every candidate gets its
-  // own isolated worktree, so they can be compared side by side and exactly one
-  // kept — the rest are torn down with their changes. `clis` is the list of CLIs
-  // to run; `copies` runs each CLI that many times (same agent, different luck).
-  const launchRace = useCallback(async ({ clis, copies = 1, label, ...rest }) => {
-    const list = (clis || []).filter(Boolean);
-    if (list.length === 0) return { raceId: null, ids: [] };
-    const n = list.length * Math.max(1, copies);
-    // A single candidate isn't a race — launch it as an ordinary job so it isn't
-    // wrapped in compare UI it doesn't need.
-    if (n === 1) {
-      const id = await launchJob({ ...rest, cli: list[0], label });
-      return { raceId: null, ids: [id] };
-    }
-    const raceId = makeId();
-    const ids = [];
-    for (const cli of list) {
-      for (let i = 0; i < Math.max(1, copies); i += 1) {
-        const suffix = copies > 1 ? `${cli} #${i + 1}` : cli;
-        ids.push(
-          await launchJob({ ...rest, cli, label: `${label} · ${suffix}`, raceId, raceSize: n })
-        );
-      }
-    }
-    return { raceId, ids };
-  }, [launchJob]);
+  }, [runStep]);
 
   const cancelJob = useCallback(async (id) => {
     patchJob(id, { status: 'cancelled', endedAt: Date.now() });
@@ -653,219 +392,20 @@ export function AgentJobsProvider({ children }) {
     }
   }, [patchJob]);
 
-  // Apply a job's isolated worktree changes onto the current branch's working
-  // tree. With `threeWay`, overlapping edits are merged and left with conflict
-  // markers instead of hard-failing — the reconcile path relies on this so that
-  // several jobs touching the same files can be combined. Throws on failure so
-  // the caller can decide whether to keep the worktree around for inspection.
-  const applyJobPatch = useCallback(async (job, { threeWay = false, targetRepo } = {}) => {
-    const dest = targetRepo || job.repoPath;
-    // Stage everything (incl. new files) and produce a full binary patch.
-    await git(job.cwd, ['add', '-A']);
-    const patch = await git(job.cwd, ['diff', '--cached', '--binary']);
-    if (!patch.trim()) return;
-    const home = await invoke('get_home_dir');
-    const patchFile = `${jobsDir(home, job.workspaceId)}/${job.id}.patch`;
-    await invoke('write_file_content', { path: patchFile, content: patch });
-    const applyArgs = ['apply', '--whitespace=nowarn'];
-    if (threeWay) applyArgs.push('--3way');
-    applyArgs.push(patchFile);
-    await git(dest, applyArgs);
-  }, []);
-
-  // Apply a single job's worktree changes back onto the main repo working tree.
-  // Gated on a typecheck of the isolated result: a job (or a reconcile result)
-  // that doesn't type-check is blocked before it can touch the working tree,
-  // unless the caller forces it through. This is the "don't trust per-worktree
-  // green — verify the merged result" gate; for a reconcile job the worktree IS
-  // the merged tree, so this checks exactly what will land.
-  const approveJob = useCallback(async (id, { force = false, allowDirty = false } = {}) => {
-    const job = jobsRef.current.find((j) => j.id === id);
-    if (!job || !job.worktreePath) return { ok: false, error: 'No isolated changes to apply.' };
-    let typecheck = null;
-    try {
-      if (!force) {
-        patchJob(id, { typecheck: { status: 'checking' } });
-        typecheck = await typecheckChangedFiles(job.worktreePath, job.changedFiles);
-        patchJob(id, { typecheck });
-        if (typecheck.errorCount > 0) {
-          return { ok: false, blocked: true, typecheck, label: job.label };
-        }
-      }
-      // `git apply` lands on top of whatever is uncommitted in the working tree,
-      // so ask first when that tree isn't clean.
-      if (!allowDirty) {
-        const conflicts = await workingTreeConflicts(job, job.repoPath);
-        if (conflicts && (conflicts.dirty > 0 || conflicts.overlap.length > 0)) {
-          const n = Math.max(conflicts.dirty, conflicts.overlap.length);
-          const shown = conflicts.overlap.slice(0, 5);
-          const more = conflicts.overlap.length - shown.length;
-          const overlapText = shown.length
-            ? ` The job also changes ${conflicts.overlap.length === 1 ? 'this file' : 'these files'}: ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}.`
-            : '';
-          const ok = await confirm({
-            title: 'Apply onto uncommitted changes?',
-            description: `Your working tree has uncommitted changes in ${n} file${n === 1 ? '' : 's'}.${overlapText} Apply anyway? Commit or stash first if you want to undo the apply cleanly.`,
-            confirmLabel: 'Apply anyway',
-            destructive: true,
-          });
-          if (!ok) return { ok: false, cancelled: true, label: job.label };
-        }
-      }
-      await applyJobPatch(job);
-      await git(job.repoPath, ['worktree', 'remove', '--force', job.worktreePath]);
-      patchJob(id, { status: 'applied', worktreePath: null });
-      // A reconcile job supersedes its sources — tear their worktrees down and
-      // drop them so their (now-integrated) changes can't be applied a second time.
-      if (job.sourceJobIds?.length) {
-        for (const srcId of job.sourceJobIds) {
-          const src = jobsRef.current.find((j) => j.id === srcId);
-          if (src?.worktreePath) {
-            try {
-              await git(src.repoPath, ['worktree', 'remove', '--force', src.worktreePath]);
-            } catch {
-              // Worktree already gone.
-            }
-          }
-        }
-        setJobs((prev) => prev.filter((j) => !job.sourceJobIds.includes(j.id)));
-      }
-      return { ok: true, label: job.label, typecheck, forced: force };
-    } catch (e) {
-      patchJob(id, { error: `Approve failed: ${e}` });
-      return { ok: false, error: String(e), label: job.label };
-    }
-  }, [applyJobPatch, patchJob, confirm]);
-
-  // Launch a fresh copy of a finished/failed job with the exact same prompt,
-  // CLI and isolation — the common "tweak nothing, just run it again" path.
+  // Run a finished job again with the same steps.
   const rerunJob = useCallback(async (id) => {
     const job = jobsRef.current.find((j) => j.id === id);
     if (!job) return null;
     return launchJob({
-      cli: job.cli,
-      prompt: job.prompt,
+      steps: jobSteps(job),
       label: job.label,
       repoPath: job.repoPath,
-      useWorktree: job.useWorktree,
-      intendedFiles: job.intendedFiles,
+      recipeId: job.recipeId ?? null,
+      workspaceId: job.workspaceId,
     });
   }, [launchJob]);
 
-  // Semantically reconcile several finished jobs. Rather than blindly 3-way
-  // merging into the working tree (which resolves text but not logic), we:
-  //   1. spin up a dedicated integration worktree off the current branch,
-  //   2. seed it by 3-way applying every selected job's patch (overlaps become
-  //      conflict markers),
-  //   3. launch a headless agent in that worktree to resolve conflicts, make the
-  //      combined change coherent, and get the project building.
-  // The result surfaces as an ordinary reviewable job the user can Review/Apply.
-  // Returns { started, jobId } on success or { started:false, error }.
-  const reconcileJobs = useCallback(async (ids) => {
-    const idSet = new Set(ids);
-    const targets = jobsRef.current.filter(
-      (j) => idSet.has(j.id) && j.worktreePath && j.changedFiles.length > 0
-    );
-    if (targets.length === 0) return { started: false, error: 'No reconcilable jobs selected.' };
-
-    // All jobs must share a repo to be integrated together.
-    const repoRoot = targets[0].repoPath;
-    if (targets.some((j) => j.repoPath !== repoRoot)) {
-      return { started: false, error: 'Selected jobs belong to different repositories.' };
-    }
-
-    const home = await invoke('get_home_dir').catch(() => null);
-    if (!home) return { started: false, error: 'Home directory unavailable.' };
-
-    const id = makeId();
-    const intPath = `${jobWorktreesDir(home)}/reconcile-${basename(repoRoot, 'repo')}-${id}`;
-    try {
-      await worktreeAdd(repoRoot, { path: intPath, detach: true });
-    } catch (e) {
-      return { started: false, error: `Could not create integration worktree: ${e}` };
-    }
-
-    // Detect files two or more jobs both touched BEFORE merging — a 3-way apply
-    // can silently auto-merge overlapping hunks, so textual-conflict detection
-    // alone under-reports collisions. This is the ground truth for "which jobs
-    // stepped on each other", surfaced loudly rather than smoothed over.
-    const touchedBy = new Map(); // repo-relative path -> [job labels]
-    for (const job of targets) {
-      for (const f of job.changedFiles) {
-        const rel = relToRepo(job, f.path);
-        if (!touchedBy.has(rel)) touchedBy.set(rel, []);
-        touchedBy.get(rel).push(job.label);
-      }
-    }
-    const overlaps = [...touchedBy.entries()]
-      .filter(([, labels]) => labels.length > 1)
-      .map(([path, labels]) => ({ path, labels }));
-
-    // Seed the integration worktree with every job's changes. 3-way so overlaps
-    // land as conflict markers for the agent to resolve instead of hard-failing.
-    const conflicts = [];
-    for (const job of targets) {
-      try {
-        await applyJobPatch(job, { threeWay: true, targetRepo: intPath });
-      } catch {
-        conflicts.push(job);
-      }
-    }
-
-    // Mark the source jobs that couldn't apply cleanly so the user can see which
-    // upstream jobs collided (the 'conflict' status is otherwise never set).
-    if (conflicts.length) {
-      const conflictIds = new Set(conflicts.map((j) => j.id));
-      setJobs((prev) => prev.map((j) => (conflictIds.has(j.id) ? { ...j, status: 'conflict' } : j)));
-    }
-
-    const workspaceId = targets[0].workspaceId;
-    const logPath = `${jobsDir(home, workspaceId)}/${id}.log`;
-    const prompt = buildReconcilePrompt(targets, conflicts);
-    const job = {
-      id,
-      kind: 'reconcile',
-      cli: 'claude',
-      label: `Reconcile ${targets.length} job${targets.length === 1 ? '' : 's'}`,
-      prompt,
-      status: 'running',
-      repoPath: repoRoot,
-      cwd: intPath,
-      worktreePath: intPath,
-      useWorktree: true,
-      output: [],
-      changedFiles: [],
-      exitCode: null,
-      error: null,
-      logPath,
-      workspaceId,
-      sourceJobIds: targets.map((t) => t.id),
-      // Loud conflict record: files two+ jobs both edited, and jobs whose patch
-      // wouldn't apply cleanly. Rendered on the card so nothing is smoothed over.
-      overlaps,
-      conflictLabels: conflicts.map((j) => j.label),
-      startedAt: Date.now(),
-      endedAt: null,
-    };
-    setJobs((prev) => [job, ...prev]);
-
-    try {
-      await invoke('run_agent_job', { jobId: id, cli: 'claude', prompt, cwd: intPath, logPath, streamJson: false });
-    } catch (e) {
-      patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
-      return { started: false, error: String(e) };
-    }
-    return {
-      started: true,
-      jobId: id,
-      seededConflicts: conflicts.length,
-      overlapCount: overlaps.length,
-    };
-  }, [applyJobPatch, patchJob]);
-
-  // Archive: tuck a finished job out of the main list without losing anything —
-  // worktree, report and log are untouched, so an archived job can still be
-  // reviewed, applied or re-run later from the archived section.
+  // Archive: tuck a finished job out of the main list; report and log are untouched.
   const archiveJob = useCallback((id) => {
     const job = jobsRef.current.find((j) => j.id === id);
     if (!job || job.status === 'running') return;
@@ -878,6 +418,7 @@ export function AgentJobsProvider({ children }) {
 
   const discardJob = useCallback(async (id) => {
     const job = jobsRef.current.find((j) => j.id === id);
+    // Only jobs from before steps existed ran in a worktree.
     if (job?.worktreePath) {
       try {
         await git(job.repoPath, ['worktree', 'remove', '--force', job.worktreePath]);
@@ -888,119 +429,61 @@ export function AgentJobsProvider({ children }) {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, []);
 
-  // Settle a race: apply one candidate and tear the rest down. Losing candidates
-  // are cancelled if still running, then discarded with their worktrees — the
-  // winner is the only thing that reaches the working tree. The apply goes
-  // through approveJob, so the typecheck gate still applies.
-  const pickRaceWinner = useCallback(async (id, { force = false } = {}) => {
-    const winner = jobsRef.current.find((j) => j.id === id);
-    if (!winner) return { ok: false, error: 'Job not found.' };
-    const result = await approveJob(id, { force });
-    if (!result.ok) return result;
-    const losers = winner.raceId
-      ? jobsRef.current.filter((j) => j.raceId === winner.raceId && j.id !== id)
-      : [];
-    for (const loser of losers) {
-      if (loser.status === 'running') await cancelJob(loser.id);
-      await discardJob(loser.id);
-    }
-    return { ...result, discarded: losers.length };
-  }, [approveJob, cancelJob, discardJob]);
-
-  // Re-run a finished job in its own worktree with review notes attached, so
-  // feedback on a diff goes straight back to the agent that wrote it instead of
-  // becoming a fresh job with none of the context. The job keeps its identity —
-  // same id, same worktree, same card — and simply goes back to running.
-  const reviseJob = useCallback(async (id, notes) => {
-    const job = jobsRef.current.find((j) => j.id === id);
-    if (!job) return { ok: false, error: 'Job not found.' };
-    if (job.status === 'running') return { ok: false, error: 'Job is still running.' };
-    if (!notes?.length) return { ok: false, error: 'No review notes to send.' };
-
-    const revision = (job.revisions || 0) + 1;
-    const prompt = buildRevisionPrompt(job, notes);
-    const notesBlock = notes
-      .map((n) => `- ${n.relPath}:${n.fromLine}${n.toLine !== n.fromLine ? `-${n.toLine}` : ''} — ${n.note}`)
-      .join('\n');
-
-    patchJob(id, (j) => ({
-      status: 'running',
-      exitCode: null,
-      error: null,
-      endedAt: null,
-      startedAt: Date.now(),
-      typecheck: null,
-      revisions: revision,
-      // Fold the notes into the stored prompt so the run report records what the
-      // agent was actually asked for across revisions.
-      prompt: `${j.prompt}\n\n## Review notes (revision ${revision})\n${notesBlock}`,
-      output: [...j.output, { stream: 'stdout', chunk: `— revision ${revision}: ${notes.length} review note(s) —` }],
-    }));
-
-    try {
-      await invoke('run_agent_job', {
-        jobId: id,
-        cli: job.cli,
-        prompt,
-        cwd: job.cwd,
-        logPath: job.logPath,
-        streamJson: false,
-      });
-    } catch (e) {
-      patchJob(id, { status: 'failed', error: String(e), endedAt: Date.now() });
-      return { ok: false, error: String(e) };
-    }
-    return { ok: true, revision };
-  }, [patchJob]);
-
-  // Find existing jobs in the same repo whose scope (files they intend to touch,
-  // or already changed) overlaps a prospective set of repo-relative paths. Used
-  // to warn before launching a job that would collide with a pending one, so
-  // overlap is partitioned away up front instead of reconciled after the fact.
-  const findOverlappingJobs = useCallback((repoPath, relativePaths) => {
-    if (!repoPath || !relativePaths?.length) return [];
-    const want = new Set(relativePaths);
-    const active = new Set(['running', 'done', 'interrupted', 'conflict']);
-    const out = [];
-    for (const job of jobsRef.current) {
-      if (job.repoPath !== repoPath || !active.has(job.status)) continue;
-      const scope = new Set([
-        ...(job.intendedFiles || []),
-        ...(job.changedFiles || []).map((f) => relToRepo(job, f.path)),
-      ]);
-      const files = [...want].filter((p) => scope.has(p));
-      if (files.length) out.push({ id: job.id, label: job.label, status: job.status, files });
-    }
-    return out;
+  // Create or update a recipe; returns its id.
+  const saveRecipe = useCallback(({ id, name, repoPath, steps, workspaceId }) => {
+    const existing = id && recipesRef.current.find((r) => r.id === id);
+    const recipe = {
+      id: existing ? id : makeId(),
+      name: name.trim(),
+      repoPath,
+      steps: steps.filter((s) => s?.cli && s.prompt?.trim()),
+      workspaceId: existing?.workspaceId ?? workspaceId ?? getCurrentWorkspaces().activeWorkspaceId,
+    };
+    setRecipes((prev) => (existing ? prev.map((r) => (r.id === id ? recipe : r)) : [...prev, recipe]));
+    return recipe.id;
   }, []);
+
+  const deleteRecipe = useCallback((id) => {
+    setRecipes((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const runRecipe = useCallback(async (id) => {
+    const recipe = recipesRef.current.find((r) => r.id === id);
+    if (!recipe) throw new Error('recipe not found');
+    return launchJob({
+      steps: recipe.steps,
+      label: recipe.name,
+      repoPath: recipe.repoPath,
+      recipeId: recipe.id,
+      workspaceId: recipe.workspaceId,
+    });
+  }, [launchJob]);
 
   /** The current job list (newest first), for agent control. */
   const getJobs = useCallback(() => jobsRef.current, []);
+  const getRecipes = useCallback(() => recipesRef.current, []);
 
   const actions = useMemo(() => ({
     getJobs,
+    getRecipes,
     launchJob,
-    launchRace,
-    pickRaceWinner,
-    reviseJob,
-    findOverlappingJobs,
     cancelJob,
-    approveJob,
     rerunJob,
-    reconcileJobs,
     discardJob,
     archiveJob,
     unarchiveJob,
-    registerContextFiles,
-  }), [getJobs, launchJob, launchRace, pickRaceWinner, reviseJob, findOverlappingJobs, cancelJob, approveJob,
-    rerunJob, reconcileJobs, discardJob, archiveJob, unarchiveJob, registerContextFiles]);
+    saveRecipe,
+    deleteRecipe,
+    runRecipe,
+  }), [getJobs, getRecipes, launchJob, cancelJob, rerunJob, discardJob, archiveJob, unarchiveJob,
+    saveRecipe, deleteRecipe, runRecipe]);
 
   return (
     <AgentJobsActionsContext.Provider value={actions}>
       <AgentJobsStateContext.Provider value={jobs}>
-        <AgentJobsContextFilesContext.Provider value={selectedContextFiles}>
+        <AgentJobsRecipesContext.Provider value={recipes}>
           {children}
-        </AgentJobsContextFilesContext.Provider>
+        </AgentJobsRecipesContext.Provider>
       </AgentJobsStateContext.Provider>
     </AgentJobsActionsContext.Provider>
   );
@@ -1015,10 +498,10 @@ export function useAgentJobsActions() {
   return actions;
 }
 
-// Everything, including the live job list. For the jobs pane and its dialogs.
+// Everything, including the live job list and recipes. For the jobs pane and its dialog.
 export function useAgentJobs() {
   const actions = useAgentJobsActions();
   const jobs = useContext(AgentJobsStateContext);
-  const selectedContextFiles = useContext(AgentJobsContextFilesContext);
-  return useMemo(() => ({ ...actions, jobs, selectedContextFiles }), [actions, jobs, selectedContextFiles]);
+  const recipes = useContext(AgentJobsRecipesContext);
+  return useMemo(() => ({ ...actions, jobs, recipes }), [actions, jobs, recipes]);
 }
