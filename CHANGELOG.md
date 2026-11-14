@@ -4,6 +4,25 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-14
+
+### Added
+
+- **Artifacts** - Each repo keeps its own HTML artifacts in `~/.lirah/artifacts`. A Workspace pane lists them and a viewer opens them inside Lirah. Agents manage them with `lirah artifacts list|add|open|rename|remove`.
+- **Job recipes** - A job is now an ordered list of steps, each with its own agent and prompt, run one after another in the repo. A failing step stops the run. Run a job once, or save it as a recipe and run it again from the Jobs pane or with `lirah jobs run --recipe <name>`. `lirah jobs recipes` lists them.
+
+### Changed
+
+- **Fonts** - Content and the terminal use Martian Mono; legends use Chivo Mono.
+- **Terminal text** - The terminal is set at 13px with 1.2 line height, so wrapped agent replies no longer sit on each other. A terminal that opens before its font has loaded now re-measures its grid once the font arrives.
+- **Dialog type** - Every dialog shares one type scale: a larger italic title in the frame, 13px content, inputs and descriptions, and 11px legends.
+- **New job dialog** - Steps hang on the same spine as plan chunks, with the agent picker in each step's header. The main button is Run once until you name the job, then Save & run.
+- **Tab rows** - Rows unfold only when you ask (the chevron or →/←). Each row shows its repo's pending plan count, replacing the "plans not on a tab" list.
+
+### Removed
+
+- **Isolated and raced jobs** - Worktree isolation, races, the compare dialog, reconcile, revise from the diff review and apply are gone, as is `lirah jobs apply`. Jobs edit the working tree directly.
+
 ## [0.32.0] - 2026-11-14
 
 ### Added
