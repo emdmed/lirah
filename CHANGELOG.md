@@ -4,6 +4,20 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-15
+
+### Added
+
+- **Plan terminal label** - A tab showing its plan's terminal names the plan in the pane title, keeps a dashed frame, and has a `tab terminal` button to go back. The buttons in the plan card and the run panel now read `plan terminal` and `tab terminal`.
+
+### Changed
+
+- **Empty context pane** - With nothing attached, the Context pane folds to one line of links that jump to whatever fills it.
+- **Quieter workspace panes** - The task, plan and job lists use calmer type and spacing.
+- **Plan chunk rows** - A closed chunk shows its title on one line; the full title is in the tooltip.
+- **Plan card** - The card's note has its own line, so it no longer clips beside the buttons.
+- **Tab row diffs** - The diff figures share one zero tick down the list, so their sizes compare at a glance.
+
 ## [0.33.0] - 2026-11-14
 
 ### Added
