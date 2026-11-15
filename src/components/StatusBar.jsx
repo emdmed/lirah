@@ -61,7 +61,7 @@ function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolatio
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center gap-1.5 px-1">
+        <label className="flex items-center gap-1.5 px-1 cursor-pointer">
           {/* The site's sandbox orbit: a dashed ring, faint while off. */}
           <svg width="14" height="14" viewBox="-8 -8 16 16" aria-hidden="true" className={cn('shrink-0', !enabled && 'text-faint')}>
             <circle r="6.2" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1.6" />
@@ -69,7 +69,7 @@ function SandboxSwitch({ enabled, failed, onToggle, projectPath, networkIsolatio
           <span>sandbox</span>
           <ToggleSwitch checked={enabled} onChange={onToggle} disabled={IS_WINDOWS} label="Sandbox" tone="ink" />
           {enabled && failed && <Lamp state="fault" label="Sandbox failed" />}
-        </span>
+        </label>
       </TooltipTrigger>
       {drawn ? (
         <TooltipContent side="top" className={cn('px-0 py-0 text-left text-wrap', compact ? 'w-[332px] max-w-[332px]' : 'w-[492px] max-w-[492px]')}>
@@ -92,10 +92,14 @@ function CompactionSwitch({ enabled, onToggle }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center gap-1.5 px-1">
+        <label className="flex items-center gap-1.5 px-1 cursor-pointer">
+          {/* The index as a ledger of ruled lines, sandbox's partner; faint while off. */}
+          <svg width="14" height="14" viewBox="-8 -8 16 16" aria-hidden="true" className={cn('shrink-0', !enabled && 'text-faint')}>
+            <path d="M-5.5 -4H5.5M-5.5 0H3M-5.5 4H0.5" fill="none" stroke="currentColor" strokeWidth="1" />
+          </svg>
           <span>index</span>
           <ToggleSwitch checked={enabled} onChange={onToggle} label="Compaction hook" tone="ink" />
-        </span>
+        </label>
       </TooltipTrigger>
       <TooltipContent title="Index" hint="Ctrl+Shift+P">
         {enabled ? 'on' : 'off'} · this tab's agent gets a fresh project index to grep on each prompt
@@ -110,10 +114,10 @@ function NetworkSwitch({ isolated, enabled, onToggle }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center gap-1.5 px-1">
+        <label className="flex items-center gap-1.5 px-1 cursor-pointer">
           <span>net</span>
           <ToggleSwitch checked={isolated} onChange={onToggle} disabled={IS_WINDOWS || !enabled} label="Network isolation" tone="warn" />
-        </span>
+        </label>
       </TooltipTrigger>
       <TooltipContent title="Network" hint="click to change">{tooltip}</TooltipContent>
     </Tooltip>
@@ -315,7 +319,7 @@ export const StatusBar = memo(({
         {currentPath && (
           <span className="flex items-baseline gap-2 min-w-0" title={currentPath}>
             <span className="text-faint" aria-hidden="true">/</span>
-            <span className="ins-name text-[14px] leading-none shrink-0 text-muted-foreground">{basename(currentPath)}</span>
+            <span className="ins-name text-[14px] leading-none shrink-0 text-foreground">{basename(currentPath)}</span>
             {branchName && <span className="flex min-w-0 items-baseline gap-1 text-muted-foreground"><Branch size={12} className="shrink-0 self-center" /><span className="truncate">{branchName}</span></span>}
           </span>
         )}
@@ -382,7 +386,7 @@ export const StatusBar = memo(({
 
         {/* Runtime zone: CLI, sandbox, network. Jobs live
             in their own rail, so they are not repeated here. */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {selectedCli && (
             <DropdownMenu>
               <Tooltip>

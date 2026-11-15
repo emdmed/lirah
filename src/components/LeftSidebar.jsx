@@ -41,8 +41,8 @@ function SectionSwitch({ section, onSection, filesPanel, onFilesPanel }) {
   const waiting = useAttentionQueue(workspaceTabs).length;
   return (
     <div role="tablist" aria-label="Files pane sections" className="flex items-end gap-2 px-1.5 h-9 shrink-0 edge-b-engraved">
-      <TabButton active={section === 'tabs'} onClick={() => onSection('tabs')} label="tabs" icon={Terminal} count={waiting} countTone="text-[var(--ins-warn)]" controls="files-section" hint="The workspace's tabs (:tabs)" />
-      <TabButton active={section === 'files'} onClick={() => onSection('files')} label="files" icon={Files} controls="files-section" hint="The project's files" />
+      <TabButton active={section === 'tabs'} onClick={() => onSection('tabs')} label="tabs" count={waiting} countTone="text-[var(--ins-warn)]" controls="files-section" hint="The workspace's tabs (:tabs)" />
+      <TabButton active={section === 'files'} onClick={() => onSection('files')} label="files" controls="files-section" hint="The project's files" />
       {section === 'files' && (
         <SegmentBank className="ml-auto self-center" label="Files view" value={filesPanel} onChange={onFilesPanel} options={FILES_PANELS} />
       )}

@@ -87,10 +87,11 @@ export const TaskRow = memo(function TaskRow({
           type="button"
           onClick={() => onToggleOpen(task.id)}
           aria-expanded={open}
+          title={open ? undefined : task.title}
           className={cn(
             'min-w-0 flex-1 text-left text-[12px] leading-[18px] cursor-pointer outline-none',
-            done ? 'text-muted-foreground line-through' : 'font-medium text-foreground',
-            !open && 'line-clamp-2',
+            done ? 'text-muted-foreground line-through' : 'text-foreground',
+            !open && 'truncate',
           )}
         >
           <TaskTitle title={task.title} />
@@ -148,7 +149,8 @@ export const TaskRow = memo(function TaskRow({
       {open ? (
         <TaskEditor task={task} onEdit={onEdit} />
       ) : (
-        task.notes && <TaskNotes notes={task.notes} className="line-clamp-2 [&>:first-child]:mt-0" />
+        // Only the cursor row unfolds its story, like the tabs ledger, so the list stays one line a task.
+        cursor && task.notes && <TaskNotes notes={task.notes} className="line-clamp-2 [&>:first-child]:mt-0" />
       )}
 
       {(task.status === TASK_STATUS.PLANNING || task.status === TASK_STATUS.PLANNED) && task.planPath && (

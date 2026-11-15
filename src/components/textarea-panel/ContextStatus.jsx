@@ -33,19 +33,15 @@ const NO_PROMPT = '';
 // while the files pane (which lists them all) is open.
 const FILE_NAME_LIMIT = 8;
 const TYPING = 'input, textarea, select, [contenteditable="true"]';
-// Empty manifest: the filled manifest's rows, each holding a ghost chip
-// (dashed, chip-sized) where its real chips will land. Two rows fill the
-// section's 48px floor, so the pane keeps its height when context arrives.
-// A ghost jumps to the pane that fills its row.
+// Empty manifest: the pane folds to one line of quiet links, each jumping to
+// the pane that fills its kind of context, in pane order.
 const GHOSTS = [
-  { row: 'files', label: 'pick files', keys: ['alt', '1'], shortcut: 'Alt+1', pane: 1, title: 'Pick files in the files pane' },
-  { row: 'features', label: 'add feature', keys: ['alt', '5'], shortcut: 'Alt+5', title: 'Pin a feature from the feature map' },
-  { row: 'repos', label: "link a tab's repo", keys: ['alt', '4'], shortcut: 'Alt+4', pane: 4, title: "Link another tab's repo from the workspace pane" },
+  { row: 'files', label: 'files', keys: ['alt', '1'], shortcut: 'Alt+1', pane: 1, title: 'Pick files in the files pane' },
+  { row: 'repos', label: 'repos', keys: ['alt', '4'], shortcut: 'Alt+4', pane: 4, title: "Link another tab's repo from the workspace pane" },
+  { row: 'features', label: 'feature', keys: ['alt', '5'], shortcut: 'Alt+5', title: 'Pin a feature from the feature map' },
 ];
-// Dashed in every state, so a ghost never passes for a real chip; hover and
-// focus brighten it, and focus adds the ring real chips use.
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 pl-1.5 pr-1 border border-dashed border-[var(--ins-faint)] font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground hover:border-[var(--ins-legend)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:text-foreground focus-visible:border-[var(--ins-legend)]";
+const GHOST = "inline-flex items-center gap-1.5 h-5 shrink-0 font-mono text-[11px] leading-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:text-foreground";
 
 /**
  * The prompt pane without the prompt: a manifest of what Lirah appends to the
@@ -311,6 +307,7 @@ export const ContextStatus = memo(function ContextStatus({
     );
   }
 
+  const empty = !attachedSummary && rows.length === 0 && !hasContext;
   let manifest;
   if (attachedSummary) {
     manifest = (
@@ -330,26 +327,84 @@ export const ContextStatus = memo(function ContextStatus({
     );
   } else {
     manifest = (
-      <dl className="flex flex-col gap-y-1">
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {GHOSTS.filter((g) => g.row !== 'features' || hasMap).map((g) => (
-          <ManifestRow key={g.row} label={g.row}>
-            <button
-              type="button"
-              onClick={() => (g.pane ? focusPane(g.pane) : setPickerOpen(true))}
-              title={g.title}
-              aria-label={g.title}
-              aria-keyshortcuts={g.shortcut}
-              className={`group/ghost ${GHOST}`}
-            >
-              <span className="text-faint group-hover/ghost:text-foreground group-focus-visible/ghost:text-foreground" aria-hidden>+</span>
-              <span>{g.label}</span>
-              <KeyChord keys={g.keys} size="sm" />
-            </button>
-          </ManifestRow>
+          <button
+            key={g.row}
+            type="button"
+            onClick={() => (g.pane ? focusPane(g.pane) : setPickerOpen(true))}
+            title={g.title}
+            aria-label={g.title}
+            aria-keyshortcuts={g.shortcut}
+            className={`group/ghost ${GHOST}`}
+          >
+            <span className="text-faint group-hover/ghost:text-foreground group-focus-visible/ghost:text-foreground" aria-hidden>+</span>
+            <span>{g.label}</span>
+            <KeyChord keys={g.keys} size="sm" />
+          </button>
         ))}
-      </dl>
+      </p>
     );
   }
+
+  // What shapes the context, a star, then what happens to it.
+  const bank = (
+    <>
+      <PromptToolbar
+        selectedTemplateId={selectedTemplateId}
+        onSelectTemplate={onSelectTemplate}
+        onManageTemplates={onManageTemplates}
+        templateDropdownOpen={templateDropdownOpen}
+        onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
+        showSelectedBadge={false}
+      />
+      <ProjectToolbar
+        projectPath={projectPath}
+        onLoadGroup={onLoadGroup}
+        onSaveGroup={onSaveGroup}
+        fileCount={fileCount}
+        label="saved sets"
+      />
+      {(showKeep || hasContext || showInsert) && <span className="ins-sep-star mx-1" aria-hidden="true" />}
+      {showKeep && (
+        <ModeSegment
+          size="md"
+          lit={keepFilesAfterSend}
+          lamp={keepFilesAfterSend ? 'ok' : 'off'}
+          pressed={keepFilesAfterSend}
+          onClick={toggleKeep}
+          label={keepFilesAfterSend ? 'Keep context after send is on. Turn off' : 'Keep context after send is off. Turn on'}
+          title="Keep this context for the prompt after the next one  ·  k"
+        >
+          keep
+        </ModeSegment>
+      )}
+      {hasContext && (
+        <ModeSegment
+          size="md"
+          onClick={togglePeek}
+          aria-expanded={peeking}
+          aria-controls={peekId}
+          label={peeking ? 'Hide the text that will be appended' : 'Read the text that will be appended'}
+          title="Read the exact text appended to your prompt  ·  p"
+        >
+          {peeking ? 'hide text' : 'peek'}
+        </ModeSegment>
+      )}
+      {showInsert && (
+        <ModeSegment
+          size="md"
+          lit
+          onClick={onInsert}
+          label="Insert the context into the terminal"
+          title="This CLI has no Lirah hook: type the context into the terminal, then add your prompt  ·  i  ·  :insert"
+          className="px-2 shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
+        >
+          insert
+        </ModeSegment>
+      )}
+    </>
+  );
 
   return (
     <div ref={rootRef} data-pane="3" data-title="[3] context" data-legend className="group/ctx tui-pane flex flex-col px-4 pt-[22px] pb-[18px] gap-2" onKeyDown={onPaneKeyDown}>
@@ -365,20 +420,27 @@ export const ContextStatus = memo(function ContextStatus({
         {hasContext || attachedSummary ? `Context ${status}` : 'No context attached. Prompts go as typed.'}
       </span>
 
-      {/* What gets appended. A floor of two rows and a ceiling of four keep
-          the pane's height (and so the terminal's rows) steady. */}
-      <section
-        aria-label="Context appended to your next prompt"
-        // Alt+3 lands here (data-pane-focus), so the pane keys work at once
-        // and the list scrolls with the arrow keys. The lit pane frame and
-        // its key hints show the focus.
-        ref={manifestRef}
-        tabIndex={0}
-        data-pane-focus
-        className="min-h-[48px] max-h-[112px] overflow-y-auto pr-1 -mx-1.5 px-1.5 focus:outline-none"
-      >
-        {manifest}
-      </section>
+      {/* What gets appended. Empty, the pane folds to one line beside the bank
+          (the terminal gains the rows back); filled, a floor of two rows and a
+          ceiling of four keep its height steady while context comes and goes. */}
+      <div className={cn(empty ? 'flex flex-wrap items-center gap-x-3 gap-y-2 -mx-1.5' : 'contents')}>
+        <section
+          aria-label="Context appended to your next prompt"
+          // Alt+3 lands here (data-pane-focus), so the pane keys work at once
+          // and the list scrolls with the arrow keys. The lit pane frame and
+          // its key hints show the focus.
+          ref={manifestRef}
+          tabIndex={0}
+          data-pane-focus
+          className={cn(
+            'focus:outline-none',
+            empty ? 'min-w-0 flex-1 px-1.5' : 'min-h-[48px] max-h-[112px] overflow-y-auto pr-1 -mx-1.5 px-1.5',
+          )}
+        >
+          {manifest}
+        </section>
+        {empty && <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{bank}</div>}
+      </div>
 
       {pickerOpen && hasMap && (
         <FeaturePicker
@@ -389,63 +451,11 @@ export const ContextStatus = memo(function ContextStatus({
         />
       )}
 
-      {/* One bank, left-aligned: what shapes the context, a star, then what
-          happens to it. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--ins-edge)] pt-2.5 -mx-1.5">
-        <PromptToolbar
-          selectedTemplateId={selectedTemplateId}
-          onSelectTemplate={onSelectTemplate}
-          onManageTemplates={onManageTemplates}
-          templateDropdownOpen={templateDropdownOpen}
-          onTemplateDropdownOpenChange={onTemplateDropdownOpenChange}
-          showSelectedBadge={false}
-        />
-        <ProjectToolbar
-          projectPath={projectPath}
-          onLoadGroup={onLoadGroup}
-          onSaveGroup={onSaveGroup}
-          fileCount={fileCount}
-          label="saved sets"
-        />
-        {(showKeep || hasContext || showInsert) && <span className="ins-sep-star mx-1" aria-hidden="true" />}
-        {showKeep && (
-          <ModeSegment
-            size="md"
-            lit={keepFilesAfterSend}
-            lamp={keepFilesAfterSend ? 'ok' : 'off'}
-            pressed={keepFilesAfterSend}
-            onClick={toggleKeep}
-            label={keepFilesAfterSend ? 'Keep context after send is on. Turn off' : 'Keep context after send is off. Turn on'}
-            title="Keep this context for the prompt after the next one  ·  k"
-          >
-            keep
-          </ModeSegment>
-        )}
-        {hasContext && (
-          <ModeSegment
-            size="md"
-            onClick={togglePeek}
-            aria-expanded={peeking}
-            aria-controls={peekId}
-            label={peeking ? 'Hide the text that will be appended' : 'Read the text that will be appended'}
-            title="Read the exact text appended to your prompt  ·  p"
-          >
-            {peeking ? 'hide text' : 'peek'}
-          </ModeSegment>
-        )}
-        {showInsert && (
-          <ModeSegment
-            size="md"
-            lit
-            onClick={onInsert}
-            label="Insert the context into the terminal"
-            title="This CLI has no Lirah hook: type the context into the terminal, then add your prompt  ·  i  ·  :insert"
-            className="px-2 shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
-          >
-            insert
-          </ModeSegment>
-        )}
-      </div>
+      {!empty && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--ins-edge)] pt-2.5 -mx-1.5">
+          {bank}
+        </div>
+      )}
 
       {peeking && (
         <pre

@@ -381,7 +381,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
           title="What the marks on each tab row mean"
           onClick={() => setShowKey((v) => !v)}
         >
-          key
+          legend
         </button>
         {focusKeys && (
           <span className="flex basis-full flex-wrap items-center gap-x-1 gap-y-1 text-muted-foreground">

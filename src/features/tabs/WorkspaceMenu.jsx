@@ -85,7 +85,7 @@ export function WorkspaceMenu() {
           aria-label={`Workspace ${active?.name ?? ''}${waitingText}`}
         >
           <Workspace size={12} className="shrink-0 text-muted-foreground" />
-          <span className="ins-name truncate max-w-32 text-[16px] leading-none text-foreground">{active?.name}</span>
+          <span className="truncate max-w-32 text-[var(--ins-legend)]">{active?.name}</span>
           {waitingNames.length > 0 && <Lamp state={othersBlocked ? 'fault' : 'wait'} />}
           <ChevronDown size={12} className="text-faint" />
         </Button>

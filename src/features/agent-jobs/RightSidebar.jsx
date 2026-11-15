@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, Fragment, 
 import { basename } from '../../utils/pathUtils';
 import { formatTimer } from '../../lib/formatDuration';
 import { getSettings, setSetting, useSeededSetting } from '../settings/settingsStore';
-import { Agent, Archive, ChevronDown, ChevronRight, Collapse, Copy, Edit, Expand, Jobs, Log, Plan, Play, Stop, Tasks, Trash, Undo, Upload, View, Warning } from '@/components/icons';
+import { Archive, ChevronDown, ChevronRight, Collapse, Copy, Edit, Expand, Jobs, Log, Plan, Play, Stop, Trash, Undo, Upload, View, Warning } from '@/components/icons';
 import { PanelButton } from '../../components/instrument/PanelButton';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
@@ -473,21 +473,22 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
       {/* Same height as the files pane's control bank, so both header rules
           sit on one line across the window. */}
       <div role="tablist" aria-label="Workspace sections" className="flex items-end gap-2 px-2 h-9 shrink-0 edge-b-engraved">
-        <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" icon={Tasks} count={openTasks} />
-        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" icon={Plan} count={openPlans} />
+        <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} label="tasks" count={openTasks} />
+        <TabButton active={tab === 'plans'} onClick={() => setTab('plans')} label="plans" count={openPlans} />
         {showArtifacts && (
-          <TabButton active={tab === 'artifacts'} onClick={() => setTab('artifacts')} label="artifacts" icon={View} count={artifacts.names?.length} />
+          <TabButton active={tab === 'artifacts'} onClick={() => setTab('artifacts')} label="artifacts" count={artifacts.names?.length} />
         )}
-        <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" icon={Log} />
-        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" icon={Jobs} count={runningJobs} lamp={runningJobs > 0} />
+        <TabButton active={tab === 'log'} onClick={() => setTab('log')} label="log" />
+        <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} label="jobs" count={runningJobs} lamp={runningJobs > 0} />
         {(totalActiveCount > 0 || tab === 'agents') && (
-          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" icon={Agent} count={totalActiveCount} />
+          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')} label="agents" count={totalActiveCount} />
         )}
       </div>
 
       <div id="workspace-section" role="tabpanel" aria-label={tab} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 pb-1.5 flex flex-col">
-        {/* These sections follow the active tab's project, unlike tabs/jobs; name it. */}
-        {projectPath && (tab === 'plans' || tab === 'tasks' || tab === 'artifacts') && (
+        {/* Plans and artifacts follow the active tab's project, unlike jobs; name it.
+            Tasks name their own list (workspace or global) in the composer. */}
+        {projectPath && (tab === 'plans' || tab === 'artifacts') && (
           <div className="ins-legend text-[11px] text-muted-foreground px-3 pt-2 pb-2.5 truncate shrink-0" title={projectPath}>
             {basename(projectPath)}
           </div>

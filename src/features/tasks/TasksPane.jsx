@@ -253,7 +253,7 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
     <div ref={containerRef} tabIndex={-1} onKeyDown={onPaneKey} onBlur={onBlur} className="flex flex-col outline-none">
       {/* The composer: where a task goes and what it says, on the bar tone so the list reads apart from it. */}
       <div className="flex flex-col bg-[var(--tui-bar)] shadow-[inset_0_-1px_0_0_var(--tui-line-strong)]">
-        <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 text-[11px]">
+        <div className="flex items-center gap-1 px-3 pt-3 pb-2.5 text-[11px]">
           {/* Either name selects its list; the switch between them flips it. */}
           <div className="flex min-w-0 items-center gap-2">
             <ScopeLabel icon={Workspace} label={workspaceName} count={projectCount} on={view === 'project'} onClick={() => setView('project')} />
@@ -271,12 +271,12 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
             className="tui-btn ml-auto"
             title="Edit the plan contexts sent with a task"
           >
-            contexts
+            plan contexts
           </button>
         </div>
 
         <form
-          className="flex flex-col gap-1.5 px-3 pb-2.5"
+          className="flex flex-col gap-2.5 px-3 pb-3.5"
           onSubmit={(e) => {
             e.preventDefault();
             submit();
@@ -298,14 +298,14 @@ export const TasksPane = memo(function TasksPane({ projectPath }) {
             rows={2}
             placeholder={`${view === 'global' ? 'Add a global task…' : `Add a task to ${workspaceName}…`}\nFirst line is the title; it's rewritten as a user story.`}
             aria-label="New task"
-            className="min-h-12 resize-none py-1.5 text-xs leading-[18px]"
+            className="min-h-14 resize-none px-2.5 py-2 text-xs leading-[18px]"
           />
           {/* Always drawn, so focusing the box never pushes the list down. */}
           <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
             <span className="tui-frame-hints min-w-0">
               <FrameHints hints={[{ keys: ['↵'], label: 'add' }, { keys: ['⇧↵'], label: 'new line' }, { keys: ['esc'], label: 'leave' }]} />
             </span>
-            <PanelButton type="submit" variant="default" disabled={!text.trim() || !scope} className="ml-auto shrink-0">
+            <PanelButton type="submit" disabled={!text.trim() || !scope} className="ml-auto shrink-0">
               add
             </PanelButton>
           </div>

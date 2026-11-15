@@ -320,6 +320,8 @@ export const TabRow = memo(function TabRow({
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {compact && rowActions(false)}
+          {/* Fixed slots, empty or not, so the counts line up down the pane like the readout. */}
+          <span className="inline-flex w-8 shrink-0 justify-end">
           {pendingPlans > 0 && (
             <RowAction
               tabIndex={-1}
@@ -333,7 +335,10 @@ export const TabRow = memo(function TabRow({
               <Plan size={12} />{pendingPlans}
             </RowAction>
           )}
-          <WorktreeMenu tab={tab} worktrees={info?.worktrees} open={worktreeMenuOpen} onOpenChange={onWorktreeMenu} onReview={actions.reviewWorktree} onMerge={actions.mergeWorktree} onDelete={actions.deleteWorktree} />
+          </span>
+          <span className="inline-flex w-8 shrink-0 justify-end">
+            <WorktreeMenu tab={tab} worktrees={info?.worktrees} open={worktreeMenuOpen} onOpenChange={onWorktreeMenu} onReview={actions.reviewWorktree} onMerge={actions.mergeWorktree} onDelete={actions.deleteWorktree} />
+          </span>
           <Readout
             info={info}
             contextFill={contextFill}
@@ -352,7 +357,11 @@ export const TabRow = memo(function TabRow({
               e.stopPropagation();
               actions.toggleExpanded(tab.id);
             }}
-            className="-mr-1 inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+            className={cn(
+              '-mr-1 inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground',
+              // A folded row shows its fold key only under the pointer or the cursor; the slot stays.
+              compact && !active && 'invisible group-hover:visible group-focus-within:visible',
+            )}
           >
             {compact ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           </RowAction>

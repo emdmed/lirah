@@ -137,10 +137,9 @@ export function MasterStrip() {
       live ? 'text-[var(--ins-lamp)] duration-[var(--ins-warm)]' : 'text-foreground duration-[var(--ins-cool)]',
      )} />
       </span>
-      {/* The pane's legend already says workspace. */}
+      {/* Named after :master, so it never reads as pane 2's terminal. */}
       <span className="engraved-label shrink-0 text-foreground">
-        <span className="hidden @[300px]:inline">terminal</span>
-        <span className="@[300px]:hidden">term</span>
+        master
       </span>
       <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
         <WorkerFan workers={workers} />
