@@ -755,6 +755,16 @@ body {
     color: var(--ins-lamp);
   }
 
+  /* A plan's terminal keeps a dashed frame even at rest (a dashed orbit is
+     work in progress), so it never passes for the tab's own. */
+  .tui-pane[data-plan]::after {
+    border-style: dashed;
+  }
+
+  .tui-pane[data-plan]:not(:focus-within, .terminal-live)::after {
+    border-color: var(--ins-edge);
+  }
+
   /* A terminal pane: the screen fills the frame, so the hairline is the
      screen's bezel rather than a second box around it. */
   .tui-pane.tui-pane-screen {

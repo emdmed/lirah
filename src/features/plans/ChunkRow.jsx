@@ -284,7 +284,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         aria-keyshortcuts={rowKeys.length ? rowKeys.join(' ') : undefined}
         className="group grid min-w-0 grid-cols-[14px_16px_minmax(0,1fr)_auto] items-start gap-x-1.5 px-3 py-[3px] text-left text-[11px] cursor-pointer hover:bg-foreground/5 outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]"
         aria-expanded={open}
-        title={isNext ? 'Next chunk' : undefined}
+        // Closed rows truncate to one line, so the tooltip carries the full title.
+        title={[isNext && 'Next chunk', !open && chunk.title].filter(Boolean).join('\n') || undefined}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
           <ChunkBody body={body} skipped={skipped} label={status} />
@@ -300,7 +301,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         <span
           className={cn(
             'min-w-0 leading-[18px]',
-            open ? 'wrap-anywhere' : 'line-clamp-2 wrap-anywhere',
+            open ? 'wrap-anywhere' : 'truncate',
             skipped ? 'text-muted-foreground line-through' : implemented && !open ? 'text-muted-foreground' : 'text-foreground',
             body === 'live' && 'ins-name text-[16px]',
           )}

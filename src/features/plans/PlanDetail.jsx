@@ -99,7 +99,7 @@ export function PlanDetail({ plan }) {
   const starting = useStarting(plan.id);
   const cancelStart = starting ? () => pane.cancelStart(plan.id) : null;
   const showingTerminal = planTerminalShown(tabs, plan.tabId);
-  const terminalTitle = showingTerminal ? 'Back to this tab\'s terminal' : 'Show the plan\'s terminal in this tab (opens one if closed)';
+  const terminalTitle = showingTerminal ? 'Back to this tab\'s terminal' : 'Swap this tab\'s terminal for the plan\'s own (opens one if closed; both keep running)';
   const resplit = () => runSplit(repoRoot, plan.id);
   const { done, total } = planProgress(plan);
   const nextId = nextChunkId(plan);
@@ -445,7 +445,7 @@ export function PlanDetail({ plan }) {
           title="run"
           aside={terminalKey && (
             <PanelButton icon={Terminal} onClick={() => pane.openPlanTab(plan)} aria-pressed={showingTerminal} title={terminalTitle}>
-              {showingTerminal ? 'back' : 'terminal'}
+              {showingTerminal ? 'tab terminal' : 'plan terminal'}
             </PanelButton>
           )}
         >

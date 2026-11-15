@@ -360,7 +360,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
               {t.label === 'run stopped' && faulted.length > 0 && (
                 <button
                   type="button"
-                  className="ins-name cursor-pointer text-xs text-foreground hover:text-[var(--ins-fault)] focus-ring"
+                  className="ins-name cursor-pointer text-foreground hover:text-[var(--ins-fault)] focus-ring"
                   title="Show the stopped run"
                   onClick={(e) => {
                     const row = e.currentTarget.closest('.group\\/list')?.querySelector(`[data-tab-row="${faulted[0].id}"]`);

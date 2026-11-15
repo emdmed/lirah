@@ -39,11 +39,12 @@ const glide = (a, b) => (a.added !== b.added || a.removed !== b.removed ? { ...b
  * `side` is the length of one span at 200k lines; keep it the same down a
  * list so the rows compare. `fmt` formats the printed values (compactCount
  * in tight rows). `values={false}` draws the spans only, as compact does.
- * Zero on a side draws nothing there.
+ * Zero on a side draws nothing there. `left` reserves px left of the centre
+ * tick, so left-aligned bars down a list share one zero.
  */
-export function DiffBar({ added = 0, removed = 0, side = 40, fmt = String, values = true, className }) {
+export function DiffBar({ added = 0, removed = 0, side = 40, fmt = String, values = true, left, className }) {
   const compact = useFigureCompact();
-  const data = { added, removed, side, fmt, values: values && !compact, label: `${added} added, ${removed} removed` };
+  const data = { added, removed, side, fmt, values: values && !compact, left, label: `${added} added, ${removed} removed` };
   const ref = useCalSvg('diffRow', data, glide);
   if (added + removed === 0) return null;
   return (

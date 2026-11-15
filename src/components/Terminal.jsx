@@ -2,11 +2,13 @@ import { useRef, useEffect, useCallback, forwardRef, memo } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { PaneLegend } from './instrument/PaneLegend';
+import { PanelButton } from './instrument/PanelButton';
+import { ChevronLeft } from '@/components/icons';
 import { ClaudeMark } from './ClaudeMark';
 import { tabCliLabel } from '../lib/agentClis';
 import { paneDragAware } from '../lib/paneDrag';
 
-export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, cli = 'claude-code', cliRunning = false, master = false, paneIndex = 2, name }, ref) => {
+export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onReady, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, onSandboxFailed, isActive = true, reattachKey = null, cli = 'claude-code', cliRunning = false, master = false, paneIndex = 2, name, plan, onPlanBack }, ref) => {
   const terminalRef = useRef(null);
   const { handleResize, sessionId, reattached, isReady, isFocused, sandboxFailed, searchAddon, searchOpen, searchDecorations, closeSearch } =
     useTerminal(terminalRef, theme, ref, onSearchFocus, onToggleGitFilter, onFocusChange, sandboxEnabled, networkIsolation, projectDir, null, false, isActive, reattachKey);
@@ -67,6 +69,7 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
       data-pane="2"
       data-title="[2] terminal"
       data-legend
+      data-plan={plan ? '' : undefined}
       className={`tui-pane tui-pane-screen terminal-wrapper ${isFocused
         ? 'terminal-live'
         : ''
@@ -82,12 +85,20 @@ export const Terminal = memo(forwardRef(({ theme, onResize, onSessionReady, onRe
     >
       <PaneLegend
         index={paneIndex}
-        title={master ? 'Workspace terminal' : (name ?? 'Terminal')}
+        title={master ? 'Workspace terminal'
+          // The plan's name is the identity here, so it takes the name slot; the kind drops to the note.
+          : plan ? <span className="inline-block max-w-[48ch] truncate pr-0.5 align-bottom" title={plan}>{plan}</span>
+          : (name ?? 'Terminal')}
         status={cli === 'claude-code'
           ? <ClaudeMark idle={!cliRunning} />
           : <span className={cliRunning ? 'text-foreground' : undefined}>{tabCliLabel(cli)}</span>}
-        note={[cli === 'claude-code' ? 'claude' : null, !name && projectDir?.split(/[\\/]/).filter(Boolean).pop()].filter(Boolean).join(' · ') || undefined}
+        note={([plan ? 'plan terminal' : null, cli === 'claude-code' ? 'claude' : null, !name && !plan && projectDir?.split(/[\\/]/).filter(Boolean).pop()].filter(Boolean).join(' · ') || undefined)}
         lit={isFocused}
+        trailing={onPlanBack && (
+          <PanelButton icon={ChevronLeft} onClick={onPlanBack} title="Back to this tab's own terminal; the plan's keeps running">
+            tab terminal
+          </PanelButton>
+        )}
       />
       {/* The screen carries the inset; the ref div stays unpadded so FitAddon
           measures exactly the cell area. */}

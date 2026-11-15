@@ -5,7 +5,9 @@
 // to 200k; the 200-line knee is a dotted mark on both sides (skipped where a
 // value is printed across it). Values sit at the span ends in legend type.
 //
-// Data: { added, removed, side, fmt, values, prev: [added, removed] }.
+// Data: { added, removed, side, fmt, values, prev: [added, removed], left }.
+// `left` reserves that many px left of the centre tick, so a list whose bars
+// start at one x shares one zero.
 // Motion (see Calibrated.play): t is ms. The spans grow out from the centre
 // (or glide from `prev`) and the values count with them. The width is laid
 // out from the final values, so nothing reflows mid-glide.
@@ -43,7 +45,7 @@ function diffRow(o) {
   const aF = diffReach(added, side), rF = diffReach(removed, side);
   const aW = values && added > 0 ? GAP + Math.max(C.textWidth(addText(added)), C.textWidth(addText(pa))) : 0;
   const rW = values && removed > 0 ? GAP + Math.max(C.textWidth(remText(removed)), C.textWidth(remText(pr))) : 0;
-  const left = Math.max(knee, rF + rW, diffReach(pr, side) + rW);
+  const left = Math.max(o.left ?? 0, knee, rF + rW, diffReach(pr, side) + rW);
   const right = Math.max(knee, aF + aW, diffReach(pa, side) + aW);
   const cx = left + 1, w = cx + right + 1;
 

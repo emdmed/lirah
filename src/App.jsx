@@ -219,6 +219,7 @@ function App() {
                   launchOnStart={!!tab.launch}
                   background={!!tab.background}
                   master={!!tab.master}
+                  planHost={tab.planHost}
                   availableUpdate={availableUpdate}
                 />
               </DevProfiler>

@@ -47,6 +47,9 @@ function AutoCommitMark({ stage }) {
   );
 }
 
+// Room left of the diff's zero tick: a −99 printed at its span end (7 + 5 + 20px).
+const DIFF_LEFT = 32;
+
 /** The row's right-hand readout: uncommitted lines, the context moon, the lamp. */
 function Readout({ info, contextFill, autoCommit, lamp, label, className }) {
   let diff = null;
@@ -57,7 +60,7 @@ function Readout({ info, contextFill, autoCommit, lamp, label, className }) {
     diff = info.files === 0 ? null : (
       <span className="inline-flex" title={`${plural(info.files, 'file')} changed · +${info.added} −${info.deleted}`}>
         {info.added || info.deleted
-          ? <DiffBar added={info.added} removed={info.deleted} side={24} fmt={compactCount} />
+          ? <DiffBar added={info.added} removed={info.deleted} side={24} fmt={compactCount} left={DIFF_LEFT} />
           : plural(info.files, 'file')}
       </span>
     );
@@ -65,7 +68,9 @@ function Readout({ info, contextFill, autoCommit, lamp, label, className }) {
   // Fixed slots, so the moons line up down the pane whatever the counts are.
   return (
     <span className={cn('flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground', className)}>
-      <span className="inline-flex min-w-[9ch] items-center justify-end">{diff}</span>
+      {/* Bars start at the slot's left edge with a fixed reserve, so every row's
+          zero tick sits at one x; the slot fits up to −99 / +999 before it grows. */}
+      <span className="inline-flex min-w-[84px] items-center justify-start">{diff}</span>
       <span className="inline-flex w-3 justify-center">
         {contextFill != null && <ContextMoon ratio={contextFill} />}
       </span>

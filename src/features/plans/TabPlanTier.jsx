@@ -78,18 +78,18 @@ export function TabPlanTier({ plan, note, onOpen, onResume, onStop, onShelve, on
         label={`${done} of ${total} chunks implemented`}
         fallback={<ProgressReadout plan={plan} done={done} total={total} paper="var(--ins-well)" />}
       />
-      {/* Centred, so a one-line note sits level with the keys instead of above them. */}
-      <span className="flex h-8 min-w-0 items-center gap-2 leading-4 text-muted-foreground">
-        <span className="line-clamp-2 min-w-0 flex-1 break-words">{note ?? now}</span>
+      {/* The note gets its own line (kept while empty, so the height holds); beside the keys it clipped to a word. */}
+      <span className="h-4 min-w-0 truncate leading-4 text-muted-foreground" title={note ?? now ?? undefined}>{note ?? now}</span>
+      <span className="flex min-w-0 items-center justify-end">
         <span className="flex shrink-0 items-center gap-1">
           {onTerminal && (
             <RowAction
               onClick={onTerminal}
               aria-pressed={terminalShown}
-              title={terminalShown ? 'Back to this tab\'s terminal' : 'Show the plan\'s terminal in this tab'}
+              title={terminalShown ? 'Back to this tab\'s terminal' : 'Swap this tab\'s terminal for the plan\'s own (both keep running)'}
               className={buttonVariants({ variant: 'ghost', size: 'panel' })}
             >
-              <Terminal aria-hidden="true" />{terminalShown ? 'back' : 'terminal'}
+              <Terminal aria-hidden="true" />{terminalShown ? 'tab terminal' : 'plan terminal'}
             </RowAction>
           )}
           {ap?.status !== AUTOPILOT_STATUS.RUNNING && (<>

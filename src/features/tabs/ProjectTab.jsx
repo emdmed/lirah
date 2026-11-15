@@ -154,7 +154,7 @@ function TabBootPlaceholder({ projectPath, stage }) {
 // visible: on screen (layout, polls, fit, rendering). isActive: focused (keys,
 // palette, status slot, dialogs, terminal focus). column/columns: this visible
 // tab's slot among the side-by-side visible tabs.
-export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, label, isActive, visible = isActive, column = 0, columns = 1, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, availableUpdate }) {
+export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, label, isActive, visible = isActive, column = 0, columns = 1, tabId, workspaceId, compactionHook = false, launchOnStart = false, background = false, master = false, planHost, availableUpdate }) {
   // Inactive tabs stay mounted so terminals don't lose state, but we can't
   // use display:none — xterm's renderer pauses against a zero-size box and
   // pixels go stale, so when the tab returns the canvas blits the old frame
@@ -243,10 +243,10 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
   const content = useMemo(() => booted && (
     <DialogScope scope={tabId} active={innerActive}>
       <FileSelectionProvider initialFiles={draft?.files}>
-        <ProjectTabInner draft={draft} projectPath={projectPath} customLabel={customLabel} label={label} zenKey={columns > 1 ? column + 1 : null} rightEdge={column === columns - 1} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} autoLaunch={autoLaunch} master={master} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
+        <ProjectTabInner draft={draft} projectPath={projectPath} customLabel={customLabel} label={label} zenKey={columns > 1 ? column + 1 : null} rightEdge={column === columns - 1} isActive={innerActive} visible={innerVisible} tabId={tabId} workspaceId={workspaceId} compactionHook={compactionHook} launchOnStart={launchOnStart} background={background} autoLaunch={autoLaunch} master={master} planHost={planHost} availableUpdate={availableUpdate} onReady={markReady} onBootStage={setBootStage} />
       </FileSelectionProvider>
     </DialogScope>
-  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, customLabel, label, column, columns, compactionHook, launchOnStart, background, autoLaunch, master, availableUpdate, markReady]);
+  ), [booted, draft, tabId, workspaceId, innerActive, innerVisible, projectPath, customLabel, label, column, columns, compactionHook, launchOnStart, background, autoLaunch, master, planHost, availableUpdate, markReady]);
 
   // Move keyboard focus right after the frame showing the new tab, ahead of the
   // deferred render, so keys reach the tab on screen and not the hidden one.
@@ -294,12 +294,13 @@ export const ProjectTab = memo(function ProjectTab({ projectPath, customLabel, l
   );
 });
 
-function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, rightEdge, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, autoLaunch, master, availableUpdate, onReady, onBootStage }) {
+function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, rightEdge, isActive, visible, tabId, workspaceId, compactionHook, launchOnStart, background, autoLaunch, master, planHost, availableUpdate, onReady, onBootStage }) {
   const { theme, themes, changeTheme } = useTheme();
   const { fileWatchingEnabled } = useWatcher();
   const { getTemplateById } = usePromptTemplates();
   const { bookmarks, updateBookmark } = useBookmarks();
-  const { updateTabPath, clearTabLaunch } = useTabActions();
+  const { updateTabPath, clearTabLaunch, togglePlanTerminal } = useTabActions();
+  const planBack = useCallback(() => togglePlanTerminal(tabId), [togglePlanTerminal, tabId]);
   // A tab opened with `lirah tabs open --launch` starts its agent on its first
   // fresh shell even with auto-launch off. Read once at mount and cleared from
   // the tab right away, so a reload never launches it a second time.
@@ -1306,6 +1307,8 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
           cli={settings.selectedCli}
           cliRunning={cliRunning === tabCliProcess(settings.selectedCli)}
           master={master}
+          plan={planHost ? tabDisplayName({ customLabel, label, projectPath }, bookmarks) : undefined}
+          onPlanBack={planHost ? planBack : undefined}
           paneIndex={zenMode ? zenKey : 2}
           name={zenMode ? tabDisplayName({ customLabel, label, projectPath }, bookmarks) : undefined}
         />
