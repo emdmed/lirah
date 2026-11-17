@@ -85,6 +85,8 @@ export function ThemeProvider({ children }) {
     root.toggleAttribute('data-desk', !!ui.gutter);
     if (ui.material) root.dataset.material = ui.material;
     else delete root.dataset.material;
+    if (ui.trim) root.dataset.trim = ui.trim;
+    else delete root.dataset.trim;
 
     // Save theme preference, and its gutter, ink and lamp colours for the boot splash
     // (index.html reads it before any module loads).

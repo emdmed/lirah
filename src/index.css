@@ -288,7 +288,7 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
    room light to desk and pile alike. */
 :root[data-material="velvet"] .tui-pane::after {
   /* The nap: pile brushed one way catches light high and falls away low. */
-  background: linear-gradient(170deg, rgb(255 250 230 / 0.13), transparent 32% 70%, rgb(0 8 4 / 0.18));
+  background: linear-gradient(170deg, rgb(255 250 230 / 0.06), transparent 32% 70%, rgb(0 8 4 / 0.18));
   box-shadow:
     /* the board's top lip shades the lining; its bottom lip catches light */
     0 -1px 0 rgb(110 80 30 / 0.28),
@@ -299,24 +299,25 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
 }
 /* The desk is Crema Marfil: cloudy ivory with sparse tan veins. Every surface
    that paints the desk shares one viewport-fixed sheet, so the veins run on
-   unbroken behind the panels, legends and gutters. Veins are thresholded noise
-   (a single spike in a transfer table), rotated so they run on the diagonal. */
+   unbroken behind the panels, legends and gutters. Pre-rendered once (it was an
+   feTurbulence SVG, re-rasterised at window size on every paint, which was slow). */
 :root[data-material="velvet"] {
-  --desk-marble: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Cfilter id='c' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.004' numOctaves='4' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.80  0 0 0 0 0.70  0 0 0 0 0.50  1.4 0 0 0 -0.62'/%3E%3C/filter%3E%3Cfilter id='v' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0012 0.0045' numOctaves='4' seed='21'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='table' tableValues='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/%3E%3C/feComponentTransfer%3E%3CfeColorMatrix values='0 0 0 0 0.52  0 0 0 0 0.42  0 0 0 0 0.28  0.75 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23c%29'/%3E%3Cg transform='rotate%28-28%29'%3E%3Crect x='-50%25' y='-20%25' width='250%25' height='250%25' filter='url%28%23v%29'/%3E%3C/g%3E%3C/svg%3E");
+  /* Baked onto Shire's gutter colour (theme-config.js); re-render if that changes. */
+  --desk-marble: url("/shire-marble.webp?v=2");
 }
 :root[data-material="velvet"] :is(body, [class*="bg-[var(--ins-gutter)]"], [style*="--ins-gutter)"]),
 :root[data-material="velvet"] .tui-pane:not(.tui-float, .tui-dialog)::before,
 :root[data-material="velvet"] .tui-pane:not(.tui-float, .tui-dialog) :is(.tui-pane-info, .ins-pane-legend > *) {
   background-image: var(--desk-marble);
   background-attachment: fixed;
-  background-size: 100vw 100vh;
+  background-size: cover;
 }
 /* A pane's top and bottom strips are desk too; the Context pane overlays the
    terminal, so left bare they show green pile beside its legend. */
 :root[data-material="velvet"] .tui-pane:not(.tui-float, .tui-dialog) {
   background:
     linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat,
-    var(--desk-marble) 0 0 / 100vw 100vh fixed,
+    var(--desk-marble) 0 0 / cover fixed,
     var(--ins-gutter);
 }
 :root[data-material="velvet"] #root::after {
@@ -325,15 +326,38 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
   inset: 0;
   z-index: 9999;
   pointer-events: none;
-  /* No viewBox: the noise renders at window pixels, so the grain never stretches. */
+  /* No blend mode or noise: a full-window soft-light layer re-blends on every
+     terminal frame. Plain alpha keeps it a cheap static layer. */
   background:
     /* room light: a lamp above the board, the corners falling into shade */
-    radial-gradient(130% 80% at 50% -15%, rgb(255 255 255 / 0.9), transparent 60%),
-    radial-gradient(140% 120% at 50% 45%, transparent 60%, rgb(60 40 10 / 1)),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85 0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
-  /* Low: the velvet should read smooth up close; the marble carries the desk. */
-  opacity: 0.3;
+    radial-gradient(130% 80% at 50% -15%, rgb(255 255 255 / 0.12), transparent 60%),
+    radial-gradient(140% 120% at 50% 45%, transparent 60%, rgb(60 40 10 / 0.12));
+}
+/* Gilt fittings (a theme's ui.trim, any material): a hairline inlay just
+   inside each panel's edge, keycaps in gilt line with no fill, and what is
+   chosen marked by a gilt rule, not a tint. Gilt is the theme's own lamp. */
+:root[data-trim="gilt"] {
+  --gilt: color-mix(in srgb, var(--ins-lamp) 40%, transparent);
+}
+:root[data-trim="gilt"] .tui-pane:not(.tui-float, .tui-dialog)::after {
+  outline: 1px solid color-mix(in srgb, var(--ins-lamp) 22%, transparent);
+  outline-offset: -4px;
+}
+:root[data-trim="gilt"] .ins-cap:not([data-lit]) {
+  background: transparent;
+  border: 1px solid var(--gilt);
+  color: var(--color-muted-foreground);
+}
+:root[data-trim="gilt"] :is(.ins-seg, .ins-seg > .ins-key + .ins-key) { border-color: var(--gilt); }
+:root[data-trim="gilt"] :is(.ins-key:is([data-latched], [aria-pressed="true"], [aria-checked="true"], [data-state="on"]), .ins-seg-key[aria-selected="true"]) {
+  background: transparent;
+  box-shadow: inset 0 -2px 0 var(--ins-lamp);
+}
+/* With no tint, the unchosen radio steps back so the pair still reads. */
+:root[data-trim="gilt"] .ins-key[role="radio"]:not([aria-checked="true"]) { color: var(--color-muted-foreground); }
+:root[data-trim="gilt"] .ins-row-selected {
+  background: transparent;
+  box-shadow: inset 2px 0 0 var(--ins-lamp);
 }
 :root[data-desk] .tui-pane:is(:focus-within, .terminal-live)::before { color: color-mix(in srgb, var(--color-lamp) 60%, #000); }
 
@@ -1127,6 +1151,12 @@ body {
   z-index: 6;
 }
 
+.tui-dialog [data-slot="dialog-title"]:not(.sr-only):not(:has(div, p)) > .tui-dialog-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The keycap and lamp in a title keep their own type. */
 .tui-dialog [data-slot="dialog-title"] .ins-cap {
   font-style: normal;
@@ -1248,6 +1278,8 @@ body {
   line-height: 1.55;
   max-width: 68ch;
   text-wrap: pretty;
+  /* Paths and ids have no break points of their own. */
+  overflow-wrap: anywhere;
 }
 .tui-dialog .ins-well {
   font-size: 13px;
