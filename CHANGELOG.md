@@ -4,6 +4,16 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.37.1] - 2026-11-17
+
+### Changed
+
+- **The current tab is set in crop ticks** - Corner brackets, like the dialogs' plate corners, mark the tab on screen instead of a gold `›`, so gold on a tab row only means it waits on you. Its number is drawn in full ink.
+
+### Fixed
+
+- **Gilt trim no longer looks frayed at panel edges** - Row hairlines stop at the gilt inlay instead of crossing it.
+
 ## [0.37.0] - 2026-11-17
 
 ### Added
