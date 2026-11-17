@@ -4,6 +4,13 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-17
+
+### Added
+
+- **Session usage in the context peek** - The context meter's hover card and the zen context drawer show the session's tokens split into cache read, cache write, output and uncached, with each share.
+- **Omarchy bar widget** - An Omarchy plugin shows every tab's agent state and plan in the bar, and Lirah's notifications with a way back to the tab. Lirah keeps its own notifications quiet while the widget is polling.
+
 ## [0.34.0] - 2026-11-15
 
 ### Added
