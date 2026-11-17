@@ -70,8 +70,8 @@ function Readout({ info, contextFill, autoCommit, lamp, label, className }) {
     <span className={cn('flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground', className)}>
       {/* Bars start at the slot's left edge with a fixed reserve, so every row's
           zero tick sits at one x; the slot fits up to −99 / +999 before it grows. */}
-      <span className="inline-flex min-w-[84px] items-center justify-start">{diff}</span>
-      <span className="inline-flex w-3 justify-center">
+      <span className="inline-flex min-w-[84px] items-center justify-start @max-[300px]:hidden">{diff}</span>
+      <span className="inline-flex w-3 justify-center @max-[220px]:hidden">
         {contextFill != null && <ContextMoon ratio={contextFill} />}
       </span>
       {/* 15px slot: the lamp's reticle reaches 4px past its 7px box. */}
@@ -254,7 +254,8 @@ export const TabRow = memo(function TabRow({
       aria-keyshortcuts="Enter r x l t w a f o e ArrowRight"
       data-marker="top"
       className={cn(
-        'group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
+        // A container, so a narrow pane drops the readout's slots before the name or the actions shrink.
+        '@container group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
         compact ? 'py-1.5' : 'py-2.5',
         active ? 'ins-row-selected before:!top-3' : 'hover:bg-foreground/5',
         // Waiting on you: the row is framed in the lamp gold.
@@ -326,7 +327,7 @@ export const TabRow = memo(function TabRow({
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {compact && rowActions(false)}
           {/* Fixed slots, empty or not, so the counts line up down the pane like the readout. */}
-          <span className="inline-flex w-8 shrink-0 justify-end">
+          <span className="inline-flex w-8 shrink-0 justify-end @max-[380px]:hidden">
           {pendingPlans > 0 && (
             <RowAction
               tabIndex={-1}
@@ -341,7 +342,7 @@ export const TabRow = memo(function TabRow({
             </RowAction>
           )}
           </span>
-          <span className="inline-flex w-8 shrink-0 justify-end">
+          <span className="inline-flex w-8 shrink-0 justify-end @max-[380px]:hidden">
             <WorktreeMenu tab={tab} worktrees={info?.worktrees} open={worktreeMenuOpen} onOpenChange={onWorktreeMenu} onReview={actions.reviewWorktree} onMerge={actions.mergeWorktree} onDelete={actions.deleteWorktree} />
           </span>
           <Readout
