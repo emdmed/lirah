@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.emdmed.lirah",
+  "name": "Lirah",
+  "version": "1.0.0",
+  "author": "emdmed",
+  "license": "MIT",
+  "description": "What Lirah's agents are doing, and its notifications with a way back to the tab.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Lirah",
+    "description": "The Lirah lyre lights while agents work and shows a count when they wait on you. The panel lists every tab by what it needs, with its plan; notifications open the tab.",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "notifications": true,
+      "controlDir": "~/.lirah/control"
+    },
+    "schema": [
+      {
+        "key": "notifications",
+        "type": "boolean",
+        "label": "Show Lirah's notifications (Lirah stays quiet while this is on)",
+        "defaultValue": true
+      },
+      {
+        "key": "controlDir",
+        "type": "string",
+        "label": "Lirah control socket folder",
+        "defaultValue": "~/.lirah/control"
+      }
+    ]
+  }
+}

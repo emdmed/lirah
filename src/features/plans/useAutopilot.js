@@ -116,7 +116,7 @@ export function useAutopilot({
       [AUTOPILOT_STATUS.FAILED]: `${name} · auto-pilot error`,
     }[kind];
     const reveal = () => revealRun(repoRoot, plan.id);
-    notify(title, body, { onClick: reveal });
+    notify(title, body, { onClick: reveal, tabId: plan.autopilot?.tabId ?? null });
     const t = toastRef.current;
     const show = kind === AUTOPILOT_STATUS.DONE ? t.success : kind === AUTOPILOT_STATUS.PAUSED ? t.warning : t.error;
     show(`${title}${body ? ` — ${body}` : ''}`, {

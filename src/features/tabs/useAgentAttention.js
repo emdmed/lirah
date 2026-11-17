@@ -106,25 +106,22 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
   useEffect(() => {
     let pending = [];
     let timer = null;
-    const tabName = (sessionId) => {
-      const tab = tabsRef.current.find((t) => getTabSession(t.id) === sessionId);
-      if (!tab) return null;
-      return tabDisplayName(tab, bookmarksRef.current);
-    };
+    const tabOf = (sessionId) => tabsRef.current.find((t) => getTabSession(t.id) === sessionId) || null;
     const flush = () => {
       timer = null;
       const alerts = pending;
       pending = [];
       if (alerts.length === 1) {
-        notify(alerts[0].title, alerts[0].body);
+        notify(alerts[0].title, alerts[0].body, { tabId: alerts[0].tabId });
       } else if (alerts.length > 1) {
-        notify(`${alerts.length} agents need you`, alerts.map((a) => a.title).join('\n'));
+        notify(`${alerts.length} agents need you`, alerts.map((a) => a.title).join('\n'), { tabId: alerts[0].tabId });
       }
     };
     const onChange = ({ sessionId, prev, next, turnMs }) => {
       if (!next || isFocused(sessionId)) return;
-      const name = tabName(sessionId);
-      if (!name) return;
+      const tab = tabOf(sessionId);
+      if (!tab) return;
+      const name = tabDisplayName(tab, bookmarksRef.current);
       const cli = cliLabel(next.source);
       let alert = null;
       if (next.state === 'permission' && prev?.state !== 'permission') {
@@ -137,7 +134,7 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
       }
       if (!alert) return;
       pending = pending.filter((a) => a.sessionId !== sessionId);
-      pending.push({ ...alert, sessionId });
+      pending.push({ ...alert, sessionId, tabId: tab.id });
       if (!timer) timer = setTimeout(flush, NOTIFY_BATCH_MS);
     };
     const unsubscribe = subscribeAgentHooks(onChange);

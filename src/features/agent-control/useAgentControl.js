@@ -10,16 +10,18 @@ import { useBookmarks } from '../bookmarks';
 import { useTasksActions } from '../tasks/TasksContext';
 import { GLOBAL, splitTaskText, TASK_STATUS } from '../tasks/taskModel';
 import { resolveRepoRoot } from '../plans/planRepoRoot';
-import { usePlansActions } from '../plans/PlansContext';
+import { usePlansActions, usePlansByRepo } from '../plans/PlansContext';
 import { jobSteps, useAgentJobsActions } from '../agent-jobs/AgentJobsContext';
-import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage, planStatus } from '../plans/planModel';
+import { CHUNK_STATUS, effectiveChunkState, planProgress, planStage, planStatus, planTabId, runRank } from '../plans/planModel';
 import { buildDraftOpenPrompt } from '../plans/planPrompts';
 import { draftFiles } from '../plans/usePlanFiles';
 import { startDraft } from '../planning/planningModeStore';
 import { buildPlanRevisePrompt } from '../plans/planPrompts';
 import { DEBUG_FIX, diagnosePlan, PENDING_PATCH } from '../plans/planDebug';
 import { planGit } from '../plans/planGit';
-import { getAgentHookState, getAgentTranscript, settleIfInterrupted, subscribeAgentHooks } from '../tabs/agentHookState';
+import { getAgentHookState, getAgentTranscript, needsAttention, settleIfInterrupted, subscribeAgentHooks } from '../tabs/agentHookState';
+import { markNotifier, recentAlerts } from '../../lib/notify';
+import { focusPane } from '../../hooks/usePaneShortcuts';
 import { getTabPrompt } from '../tabs/tabPrompts';
 import { getTabTranscript } from '../../lib/terminalSessions';
 import { getSessionTerminal, getTabSession } from '../tabs/terminalActivity';
@@ -87,11 +89,12 @@ export function useAgentControl() {
   const { bookmarks } = useBookmarks();
   const tasksActions = useTasksActions();
   const plansActions = usePlansActions();
+  const plansByRepo = usePlansByRepo();
   const jobsActions = useAgentJobsActions();
   const dialogs = useDialogStore();
   // The listener is set up once; it reads the latest of these through the ref.
   const live = useRef({});
-  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions, jobs: jobsActions, dialogs };
+  live.current = { toast, confirm, theme, tabManager, bookmarks, tasks: tasksActions, plans: plansActions, plansByRepo, jobs: jobsActions, dialogs };
 
   useEffect(() => {
     // Ask before a guarded change. Resolves true when allowed.
@@ -502,6 +505,45 @@ export function useAgentControl() {
         const { tabs, switchTab } = live.current.tabManager;
         const tab = target(scope(sessionId).tabs, ref, sessionId);
         switchTab(tab.id);
+        return `focused ${name(tab)}`;
+      },
+
+      // Status: every workspace's tabs and the recent notifications, for a
+      // desktop widget outside any tab. `--notifier` says the caller shows the
+      // notifications, so the webview stays quiet (see notify.js).
+      'status.get': (args) => {
+        if (flag(args.notifier)) markNotifier();
+        const { tabs, workspaces, activeTabId } = live.current.tabManager;
+        const workspaceName = new Map(workspaces.map((w) => [w.id, w.name]));
+        // A plan's terminal counts as its project tab, as in the tabs pane.
+        const hostOf = new Map(tabs.map((t) => [t.id, t.planHost || t.id]));
+        const plansOf = new Map();
+        for (const plan of Object.values(live.current.plansByRepo || {}).flat()) {
+          const tabId = hostOf.get(planTabId(plan));
+          if (!plan.shelved && tabId) plansOf.set(tabId, [...(plansOf.get(tabId) || []), plan]);
+        }
+        return {
+          focused: document.hasFocus(),
+          tabs: tabs.filter(isProjectTab).map((tab) => {
+            const session = getTabSession(tab.id);
+            const hook = getAgentHookState(session);
+            const plan = (plansOf.get(tab.id) || []).sort((a, b) => runRank(a) - runRank(b))[0];
+            return {
+              id: tab.id, name: name(tab), path: tab.projectPath, workspace: workspaceName.get(tab.workspaceId) || null,
+              active: tab.id === activeTabId, agent: hook?.state || null, since: hook?.at ?? null,
+              message: hook?.message || null, attention: needsAttention(session),
+              plan: plan ? { title: plan.title || '(untitled)', ...planProgress(plan), autopilot: plan.autopilot?.status || 'off' } : null,
+            };
+          }),
+          alerts: recentAlerts(),
+        };
+      },
+      // Any workspace's tab by id, with focus in its terminal.
+      'status.focus': (args, [id = args.tab]) => {
+        const tab = live.current.tabManager.tabs.find((t) => t.id === id);
+        if (!tab) throw new Error(`no tab ${id}`);
+        live.current.tabManager.switchTab(tab.id);
+        requestAnimationFrame(() => requestAnimationFrame(() => focusPane(2)));
         return `focused ${name(tab)}`;
       },
 
