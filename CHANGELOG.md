@@ -4,6 +4,23 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-17
+
+### Added
+
+- **Shire theme** - Bottle-green velvet panels on an ivory marble desk, with gilt fittings.
+- **Rivendell Silver and Lothlórien Birch themes** - Rivendell and Lothlórien on pale stone desks; pick the plain theme for the dark desk, so either look is one switch away.
+- **Gilt trim** - Shire, Rivendell, Lothlórien and Orrery draw a gilt hairline inside each panel, outline keycaps, and mark what is chosen with a gilt rule instead of a tint.
+
+### Changed
+
+- **Orrery sits on a parchment desk, and Lothlórien's palette is quieter** - Gold is kept for what is lit, and the borders are warm hairlines.
+- **Tab rows hide their readouts in narrow panes** instead of crowding the tab name.
+
+### Fixed
+
+- **Dialogs with long titles or paths no longer overflow.**
+
 ## [0.36.1] - 2026-11-17
 
 ### Fixed
