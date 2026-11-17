@@ -76,6 +76,18 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--color-warn', ui.warn ?? terminal.brightYellow);
     root.style.setProperty('--color-fault', ui.fault ?? terminal.brightRed);
 
+    // A theme may set its desk apart from its panels (Shire: ivory desk, green
+    // panels); then the desk gets its own ink, and status bars take the panel.
+    const desk = ui.gutter
+      ? { '--ins-gutter': ui.gutter, '--ins-desk-ink': ui.gutterForeground, '--tui-bar': 'color-mix(in srgb, var(--ins-panel) 88%, #000)' }
+      : { '--ins-gutter': null, '--ins-desk-ink': null, '--tui-bar': null };
+    Object.entries(desk).forEach(([k, v]) => (v ? root.style.setProperty(k, v) : root.style.removeProperty(k)));
+    root.toggleAttribute('data-desk', !!ui.gutter);
+    if (ui.material) root.dataset.material = ui.material;
+    else delete root.dataset.material;
+    if (ui.trim) root.dataset.trim = ui.trim;
+    else delete root.dataset.trim;
+
     // Save theme preference, and its gutter, ink and lamp colours for the boot splash
     // (index.html reads it before any module loads).
     if (forced.current !== currentTheme) {

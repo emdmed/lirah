@@ -193,10 +193,10 @@ function App() {
 
   return (
     <SubagentProvider tabs={tabs}>
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--ins-gutter)' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--ins-gutter)' }}>
         {!zenMode && <TabBar />}
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', background: 'var(--ins-gutter)' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', backgroundColor: 'var(--ins-gutter)' }}>
           <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
             {tabs.map(tab => {
               // A plan's terminal takes its project tab's place while that tab shows it.

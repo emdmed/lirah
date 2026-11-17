@@ -1242,6 +1242,8 @@ export const themes = {
     },
     // UI colors
     ui: {
+      // Gilt fittings on every panel (index.css, data-trim).
+      trim: 'gilt',
       background: 'hsl(200 20% 12%)',
       foreground: 'hsl(45 34% 86%)',
       card: 'hsl(197 19% 14%)',
@@ -1259,7 +1261,7 @@ export const themes = {
       accentForeground: 'hsl(200 20% 12%)',
       destructive: 'hsl(8 70% 62%)',
       destructiveForeground: 'hsl(200 20% 12%)',
-      border: 'hsl(197 16% 26%)',
+      border: 'hsl(40 16% 28%)',
       input: 'hsl(199 20% 18%)',
       inputBackground: 'hsl(200 21% 8%)',
       ring: 'hsl(41 64% 62%)',
@@ -1269,7 +1271,7 @@ export const themes = {
       sidebarPrimaryForeground: 'hsl(200 20% 12%)',
       sidebarAccent: 'hsl(199 20% 16%)',
       sidebarAccentForeground: 'hsl(45 34% 86%)',
-      sidebarBorder: 'hsl(197 16% 26%)',
+      sidebarBorder: 'hsl(40 16% 28%)',
       sidebarRing: 'hsl(41 64% 62%)',
       // Instrument lamps: gold leaf lit, sage ok, copper warn, rose fault.
       // Lightness steps down ok > lamp > warn > fault so each reads apart.
@@ -1318,33 +1320,35 @@ export const themes = {
     },
     // UI colors
     ui: {
+      // Gilt fittings on every panel (index.css, data-trim).
+      trim: 'gilt',
       background: 'hsl(75 18% 9%)',
-      foreground: 'hsl(46 56% 85%)',
+      foreground: 'hsl(46 40% 85%)',
       card: 'hsl(75 16% 11%)',
-      cardForeground: 'hsl(46 56% 85%)',
+      cardForeground: 'hsl(46 40% 85%)',
       popover: 'hsl(75 16% 11%)',
-      popoverForeground: 'hsl(46 56% 85%)',
-      primary: 'hsl(45 71% 62%)',
+      popoverForeground: 'hsl(46 40% 85%)',
+      primary: 'hsl(46 40% 85%)',
       primaryForeground: 'hsl(75 18% 9%)',
       secondary: 'hsl(75 15% 14%)',
-      secondaryForeground: 'hsl(46 56% 85%)',
+      secondaryForeground: 'hsl(46 40% 85%)',
       muted: 'hsl(75 15% 14%)',
       mutedForeground: 'hsl(70 9% 62%)',
       accent: 'hsl(105 11% 74%)',
       accentForeground: 'hsl(75 18% 9%)',
       destructive: 'hsl(17 60% 63%)',
       destructiveForeground: 'hsl(75 18% 9%)',
-      border: 'hsl(80 12% 20%)',
+      border: 'hsl(45 18% 26%)',
       input: 'hsl(75 15% 14%)',
       inputBackground: 'hsl(75 22% 6%)',
       ring: 'hsl(45 71% 62%)',
       sidebar: 'hsl(75 18% 9%)',
-      sidebarForeground: 'hsl(46 56% 85%)',
-      sidebarPrimary: 'hsl(45 71% 62%)',
+      sidebarForeground: 'hsl(46 40% 85%)',
+      sidebarPrimary: 'hsl(46 40% 85%)',
       sidebarPrimaryForeground: 'hsl(75 18% 9%)',
       sidebarAccent: 'hsl(75 15% 14%)',
-      sidebarAccentForeground: 'hsl(46 56% 85%)',
-      sidebarBorder: 'hsl(80 12% 20%)',
+      sidebarAccentForeground: 'hsl(46 40% 85%)',
+      sidebarBorder: 'hsl(45 18% 26%)',
       sidebarRing: 'hsl(45 71% 62%)',
       // Instrument lamps: mallorn gold lit, leaf ok, amber warn, autumn fault.
       lamp: '#e3c05a',
@@ -1352,10 +1356,10 @@ export const themes = {
       warn: '#e8a960',
       fault: '#d06a50',
       // Semantic colors
-      folder: '45 71% 62%',              // Mallorn gold for folder icons
+      folder: '45 40% 62%',              // Aged mallorn gold for folder icons
       gitAdded: '76 43% 63%',            // Mallorn leaf for +lines
       gitDeleted: '17 60% 63%',          // Autumn leaf for -lines
-      treeGuide: '46 56% 85% / 0.1',    // Silver-gold with opacity for tree guide lines
+      treeGuide: '46 40% 85% / 0.1',    // Silver-gold with opacity for tree guide lines
     },
   },
   orrery: {
@@ -1392,6 +1396,11 @@ export const themes = {
     },
     // UI colors: one slate hue (198) for every surface, parchment (45) for ink.
     ui: {
+      // Slate panels on a parchment desk, in its own ink (see ThemeContext).
+      gutter: 'hsl(42 26% 87%)',
+      gutterForeground: 'hsl(198 20% 10%)',
+      // Gilt fittings on every panel (index.css, data-trim).
+      trim: 'gilt',
       background: 'hsl(198 20% 10%)',
       foreground: 'hsl(45 37% 86%)',
       card: 'hsl(198 18% 12%)',
@@ -1409,7 +1418,7 @@ export const themes = {
       accentForeground: 'hsl(198 20% 10%)',
       destructive: 'hsl(8 70% 62%)',
       destructiveForeground: 'hsl(198 20% 10%)',
-      border: 'hsl(198 13% 23%)',
+      border: 'hsl(40 16% 26%)',
       input: 'hsl(198 16% 16%)',
       inputBackground: 'hsl(198 22% 6%)',
       ring: 'hsl(41 64% 62%)',
@@ -1419,7 +1428,7 @@ export const themes = {
       sidebarPrimaryForeground: 'hsl(198 20% 10%)',
       sidebarAccent: 'hsl(198 16% 14%)',
       sidebarAccentForeground: 'hsl(45 37% 86%)',
-      sidebarBorder: 'hsl(198 13% 23%)',
+      sidebarBorder: 'hsl(40 16% 26%)',
       sidebarRing: 'hsl(41 64% 62%)',
       // Instrument lamps: gold leaf lit, sage ok, copper warn, rose fault.
       // Lightness steps down ok > lamp > warn > fault so each reads apart.
@@ -1434,6 +1443,103 @@ export const themes = {
       treeGuide: '45 37% 86% / 0.1',    // Parchment hairlines for the tree
     },
   },
+  shire: {
+    name: 'Shire',
+    type: 'dark',
+    // Terminal colors - Shire: bottle-green velvet panels on a pale stone desk, gilt fittings
+    terminal: {
+      foreground: '#ebe3cf',      // Ivory
+      background: '#11271e',      // Bottle green velvet
+      cursor: '#c9a55a',          // Antique gilt
+      cursorAccent: '#11271e',    // Bottle green
+      selectionBackground: '#25443a', // Lifted green
+      selectionForeground: '#ebe3cf', // Ivory
+
+      // Normal colors
+      black: '#1d3a2e',           // Green shadow
+      red: '#e08a78',             // Rose clay
+      green: '#a9d6a0',           // Pale hedge (light enough to read on green)
+      yellow: '#e0bf68',          // Brass
+      blue: '#8fb8d8',            // Sky
+      magenta: '#d5a3c0',         // Heather
+      cyan: '#94cfc2',            // Celadon
+      white: '#d8cfb6',           // Cream
+
+      // Bright colors
+      brightBlack: '#7e9289',     // Faded green (readable for comments)
+      brightRed: '#f0a493',       // Bright rose
+      brightGreen: '#c0e6b6',     // Bright hedge
+      brightYellow: '#f0d488',    // Polished brass
+      brightBlue: '#aacbe6',      // Bright sky
+      brightMagenta: '#e4bdd3',   // Bright heather
+      brightCyan: '#b4e2d8',      // Bright celadon
+      brightWhite: '#fbf6e8',     // Fresh ivory
+    },
+    // UI colors: bottle-green (155) panels on a pale stone (40) desk, ivory ink, gilt hairlines, gilt for lit state.
+    ui: {
+      // Gilt fittings on every panel (index.css, data-trim).
+      trim: 'gilt',
+      // The desk between panels, and the ink printed on it (see ThemeContext).
+      gutter: 'hsl(40 22% 92%)',
+      gutterForeground: 'hsl(155 38% 11%)',
+      // Velvet pile on the panels and grain on the desk (index.css, data-material).
+      material: 'velvet',
+      background: 'hsl(155 38% 11%)',
+      foreground: 'hsl(42 38% 86%)',
+      card: 'hsl(155 32% 14%)',
+      cardForeground: 'hsl(42 38% 86%)',
+      popover: 'hsl(155 32% 14%)',
+      popoverForeground: 'hsl(42 38% 86%)',
+      primary: 'hsl(42 38% 86%)',
+      primaryForeground: 'hsl(155 38% 11%)',
+      secondary: 'hsl(155 26% 17%)',
+      secondaryForeground: 'hsl(42 38% 86%)',
+      muted: 'hsl(155 26% 17%)',
+      mutedForeground: 'hsl(42 14% 64%)',
+      // Aged ivory: brass is kept for lit state only.
+      accent: 'hsl(42 30% 74%)',
+      accentForeground: 'hsl(155 38% 11%)',
+      destructive: 'hsl(8 68% 64%)',
+      destructiveForeground: 'hsl(155 38% 11%)',
+      border: 'hsl(42 24% 34%)',
+      input: 'hsl(155 26% 17%)',
+      inputBackground: 'hsl(155 40% 8%)',
+      ring: 'hsl(41 45% 58%)',
+      sidebar: 'hsl(155 38% 11%)',
+      sidebarForeground: 'hsl(42 38% 86%)',
+      sidebarPrimary: 'hsl(42 38% 86%)',
+      sidebarPrimaryForeground: 'hsl(155 38% 11%)',
+      sidebarAccent: 'hsl(155 30% 15%)',
+      sidebarAccentForeground: 'hsl(42 38% 86%)',
+      sidebarBorder: 'hsl(42 24% 34%)',
+      sidebarRing: 'hsl(41 45% 58%)',
+      // Instrument lamps: brass lit, hedge ok, copper warn, rose fault.
+      lamp: '#c9a55a',
+      ok: '#b6dea6',
+      warn: '#e5925f',
+      fault: '#e06e5c',
+      // Semantic colors
+      folder: '42 40% 66%',              // Aged brass for folder icons
+      gitAdded: '105 45% 72%',           // Pale hedge for +lines
+      gitDeleted: '10 67% 68%',          // Rose clay for -lines
+      treeGuide: '42 38% 86% / 0.1',   // Ivory hairlines for the tree
+    },
+  },
+};
+
+// Rivendell on a pale silver-stone desk, in its own ink (see ThemeContext); the
+// panels are Rivendell's, so swapping the two themes swaps only the desk.
+themes['rivendell-silver'] = {
+  ...themes.rivendell,
+  name: 'Rivendell Silver',
+  ui: { ...themes.rivendell.ui, gutter: 'hsl(195 12% 86%)', gutterForeground: 'hsl(200 20% 12%)' },
+};
+
+// Lothlórien on a pale birch desk, likewise.
+themes['lothlorien-birch'] = {
+  ...themes.lothlorien,
+  name: 'Lothlórien Birch',
+  ui: { ...themes.lothlorien.ui, gutter: 'hsl(55 14% 86%)', gutterForeground: 'hsl(75 18% 9%)' },
 };
 
 export const defaultTheme = 'tokyo-night';

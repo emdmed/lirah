@@ -114,7 +114,9 @@ function DialogContent({
           data-instant={instant || undefined}
           data-tone={tone || undefined}
           className={cn(
-            "tui-pane tui-dialog grid w-full max-w-lg gap-4 px-5 font-mono",
+            // minmax(0,1fr): an unbreakable path in the body would otherwise widen the
+            // track past the frame and push the footer buttons out of it.
+            "tui-pane tui-dialog grid w-full max-w-lg grid-cols-[minmax(0,1fr)] gap-4 px-5 font-mono",
             size && SIZES[size],
             className
           )}
@@ -191,7 +193,8 @@ function DialogTitle({
       {shell?.keys?.length > 0 && (
         <Keycap size="sm" lit>{joinKeys(shell.keys)}</Keycap>
       )}
-      {children}
+      {/* A text box of its own: ellipsis does nothing on the flex title itself. */}
+      <span className="tui-dialog-title-text">{children}</span>
       {shell && legendLamp(shell.lamp)}
     </DialogPrimitive.Title>
   );

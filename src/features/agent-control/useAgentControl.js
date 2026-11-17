@@ -778,7 +778,7 @@ export function useAgentControl() {
         }
         const what = steps.map((s, i) => `${steps.length > 1 ? `${i + 1}. ` : ''}${s.cli}: "${s.prompt.replace(/\s+/g, ' ').slice(0, 200)}"`).join(' ');
         const ok = await live.current.confirm({
-          title: `Let Claude start the background job "${label}"?`,
+          title: `Start job "${label}"?`,
           description: `${what} in ${repo}. It runs unattended with auto-approve, in place: the agent${steps.length > 1 ? 's edit' : ' edits'} your working tree directly and can run any command.`,
           confirmLabel: 'Start job',
         });
