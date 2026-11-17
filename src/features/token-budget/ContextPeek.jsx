@@ -109,6 +109,8 @@ export function ContextPeek({ tokenUsage, projectPath, heavy }) {
         )}
       />
 
+      <SessionUsage tokenUsage={tokenUsage} />
+
       {heavy && shown[0] && (
         <p className="flex items-center gap-2 pt-2 edge-t-engraved text-[var(--ins-warn)]" role="status">
           <Lamp state="warn" />
@@ -117,6 +119,41 @@ export function ContextPeek({ tokenUsage, projectPath, heavy }) {
           </span>
         </p>
       )}
+    </div>
+  );
+}
+
+// Every token the session has spent, by kind: why it is cheap (cache reads)
+// or expensive (writes, output, uncached). Cache read in lamp, as in FIG.06.
+const SESSION_KINDS = [
+  { group: 'cache read', key: 'cache_read_input_tokens', ink: 'var(--ins-lamp)' },
+  { group: 'cache write', key: 'cache_creation_input_tokens', ink: 'var(--ins-legend)' },
+  { group: 'output', key: 'output_tokens', ink: 'var(--ins-edge-key)' },
+  { group: 'uncached', key: 'input_tokens', ink: 'var(--ins-faint)' },
+];
+
+function SessionUsage({ tokenUsage }) {
+  const kinds = SESSION_KINDS.map((k) => ({ ...k, tokens: tokenUsage[k.key] || 0 }));
+  const total = kinds.reduce((n, k) => n + k.tokens, 0);
+  if (!total) return null;
+  const color = (group) => kinds.find((k) => k.group === group).ink;
+  return (
+    <div className="flex flex-col gap-1 pt-2 edge-t-engraved">
+      <div className="flex items-baseline justify-between">
+        <span className="ins-legend">Session</span>
+        <span className="text-faint">{formatTokenCount(total)} tokens</span>
+      </div>
+      <SourceBar groups={kinds.filter((k) => k.tokens)} total={total} color={color} />
+      <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-0.5">
+        {kinds.map((k) => (
+          <div key={k.group} className="contents">
+            <Swatch color={k.ink} />
+            <span className="truncate">{k.group}</span>
+            <span className="text-muted-foreground text-right">{sharePct(k.tokens, total)}</span>
+            <span className="w-[6ch] text-right">{formatTokenCount(k.tokens)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
