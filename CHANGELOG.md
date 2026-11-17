@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-11-17
+
+### Fixed
+
+- **Jobs found no `claude` when Lirah started from the app launcher** - The check before a job starts now searches your terminal's PATH, so a CLI in `~/.local/bin` (the usual place on Ubuntu) is found instead of failing with "claude is not installed".
+
 ## [0.36.0] - 2026-11-17
 
 ### Added
