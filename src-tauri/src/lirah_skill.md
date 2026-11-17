@@ -1,6 +1,6 @@
 ---
 name: lirah
-description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to start planning (planning mode), list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect or cancel Lirah's background agent jobs and run their saved recipes.
+description: Use when the user asks to change Lirah settings, startup projects, theme, open/close/rename tabs, to orchestrate the workspace's tabs from its workspace terminal (send them work, wait for their replies), to list, add, finish, edit, delete or move tasks in Lirah's task list, to start planning (planning mode), list, import, revise, re-chunk or check off Lirah plans and their chunks, or to start, list, inspect or cancel Lirah's background agent jobs and save or run their recipes.
 ---
 
 # Configuring Lirah with the `lirah` command
@@ -102,6 +102,10 @@ lirah jobs run --recipe <recipe>
                                run a saved recipe: its steps one after another,
                                stopping at the first that fails (asks first)
 lirah jobs recipes             this tab's repo's saved recipes
+lirah jobs save <name> <prompt> [--cli C]
+lirah jobs save <name> --steps '[{"cli":"claude","prompt":"..."}, ...]'
+                               save a recipe in this tab's repo (one step, or
+                               several in order); an existing name is replaced
 lirah jobs show <job> [--all]  one job's details
 lirah jobs cancel <job> [--all]
                                stop a running job
@@ -232,6 +236,7 @@ tabs are your workers:
   verify. Quote it. Jobs edit the working tree in place, so don't run two that
   touch the same files at once. The user confirms each launch; on `denied by user`,
   stop. Then check on it with `lirah jobs show <id>`.
-- `lirah jobs run --recipe <name>` runs a sequence the user saved. Recipes are
-  made and edited in the jobs pane; you can't rerun or archive jobs from the CLI
-  either.
+- `lirah jobs run --recipe <name>` runs a saved sequence. `lirah jobs save`
+  makes one (or replaces one with the same name) when the user asks for a
+  reusable job; each step's prompt must be self-contained, like a job's. Deleting
+  recipes, rerunning and archiving jobs stay in the jobs pane.

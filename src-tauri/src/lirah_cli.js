@@ -114,6 +114,10 @@ const USAGE = `usage: lirah <command> [args...] [--json]
                                  run a saved recipe: its steps one after another,
                                  stopping at the first that fails (asks first)
   lirah jobs recipes             this tab's repo's saved recipes
+  lirah jobs save <name> <prompt> [--cli C]
+  lirah jobs save <name> --steps '[{"cli":"claude","prompt":"..."}, ...]'
+                                 save a recipe in this tab's repo (one step, or
+                                 several in order); an existing name is replaced
   lirah jobs show <job> [--all]  one job's details
   lirah jobs cancel <job> [--all]
                                  stop a running job
@@ -360,7 +364,7 @@ function printJob(j) {
 }
 
 function printRecipes(data) {
-  if (!data.recipes.length) return `no recipes in ${data.repo}; save one from the Run job dialog`;
+  if (!data.recipes.length) return `no recipes in ${data.repo}; save one with \`lirah jobs save\` or the Run job dialog`;
   const rows = data.recipes.map((r) => [String(r.index), r.id, r.name, r.steps.map((s) => s.cli).join(" → ")]);
   return `${data.repo}\n\n${table(["#", "ID", "NAME", "STEPS"], rows)}`;
 }
@@ -512,7 +516,8 @@ function route(cmd, positional, args) {
       case "show": return ["jobs.show", rest, printJob];
       case "cancel": return ["jobs.cancel", rest, show];
       case "recipes": return ["jobs.recipes", [], printRecipes];
-      default: fail(`unknown jobs command "${sub}" (list, run, recipes, show, cancel)`);
+      case "save": return ["jobs.save", rest, show];
+      default: fail(`unknown jobs command "${sub}" (list, run, recipes, save, show, cancel)`);
     }
   }
   if (cmd === "tasks" || cmd === "task") {

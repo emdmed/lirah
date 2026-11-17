@@ -718,7 +718,7 @@ export function useAgentControl() {
       },
 
       // Jobs: background agent jobs, as the jobs pane shows them. Rerunning,
-      // archiving and editing recipes stay in the pane.
+      // archiving and deleting recipes stay in the pane.
       'jobs.list': async (args, positional, { sessionId }) => {
         const { repo, jobs } = await jobScope(args, sessionId);
         return { repo, jobs: jobs.map((j, i) => jobSummary(j, i + 1)) };
@@ -726,6 +726,28 @@ export function useAgentControl() {
       'jobs.recipes': async (args, positional, { sessionId }) => {
         const { repo, recipes } = await recipeScope(sessionId);
         return { repo, recipes: recipes.map((r, i) => ({ index: i + 1, id: r.id, name: r.name, steps: r.steps })) };
+      },
+      // Save a recipe in the caller tab's repo: one step from a prompt, or --steps as JSON.
+      // Saving under an existing name replaces that recipe's steps. Runs nothing, so no confirm.
+      'jobs.save': async (args, [name = args.name, ...words], { sessionId }) => {
+        const title = String(name ?? '').trim();
+        if (!title) throw new Error('missing name: lirah jobs save <name> <prompt> [--cli C], or --steps <json>');
+        let steps;
+        if (args.steps !== undefined) {
+          if (!Array.isArray(args.steps)) throw new Error('--steps must be a JSON array of {"cli", "prompt"}');
+          steps = args.steps.map((s) => ({ cli: String(s?.cli ?? 'claude'), prompt: String(s?.prompt ?? '').trim() }));
+        } else {
+          steps = [{ cli: args.cli === undefined ? 'claude' : String(args.cli), prompt: words.join(' ').trim() }];
+        }
+        if (!steps.length || steps.some((s) => !s.prompt)) throw new Error('every step needs a prompt');
+        for (const { cli } of steps) {
+          if (!JOB_CLIS.some((o) => o.value === cli)) throw new Error(`unknown cli "${cli}" (${JOB_CLIS.map((o) => o.value).join(', ')})`);
+        }
+        const { repo, recipes } = await recipeScope(sessionId);
+        const existing = recipes.find((r) => r.name === title);
+        const workspaceId = callerTab(live.current.tabManager.tabs, sessionId)?.workspaceId;
+        const id = live.current.jobs.saveRecipe({ id: existing?.id, name: title, repoPath: repo, steps, workspaceId });
+        return `${existing ? 'updated' : 'saved'} recipe "${title}" (${id}, ${steps.length} step${steps.length === 1 ? '' : 's'}) in ${repo}; run it with \`lirah jobs run --recipe "${title}"\``;
       },
       // A one-step job from a prompt, or a saved recipe with --recipe; runs in place, asks the user first.
       'jobs.run': async (args, words, { sessionId }) => {
