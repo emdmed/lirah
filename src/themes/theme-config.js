@@ -1434,6 +1434,86 @@ export const themes = {
       treeGuide: '45 37% 86% / 0.1',    // Parchment hairlines for the tree
     },
   },
+  shire: {
+    name: 'Shire',
+    type: 'dark',
+    // Terminal colors - Shire: royal green velvet panels on an ivory desk, brass fittings
+    terminal: {
+      foreground: '#efe6cc',      // Ivory
+      background: '#0d3a25',      // Royal green velvet
+      cursor: '#d9b45a',          // Brass
+      cursorAccent: '#0d3a25',    // Racing green
+      selectionBackground: '#2a5a44', // Lifted green
+      selectionForeground: '#efe6cc', // Ivory
+
+      // Normal colors
+      black: '#1b4734',           // Green shadow
+      red: '#e08a78',             // Rose clay
+      green: '#a9d6a0',           // Pale hedge (light enough to read on green)
+      yellow: '#e0bf68',          // Brass
+      blue: '#8fb8d8',            // Sky
+      magenta: '#d5a3c0',         // Heather
+      cyan: '#94cfc2',            // Celadon
+      white: '#d8cfb6',           // Cream
+
+      // Bright colors
+      brightBlack: '#7f9a88',     // Faded green (readable for comments)
+      brightRed: '#f0a493',       // Bright rose
+      brightGreen: '#c0e6b6',     // Bright hedge
+      brightYellow: '#f0d488',    // Polished brass
+      brightBlue: '#aacbe6',      // Bright sky
+      brightMagenta: '#e4bdd3',   // Bright heather
+      brightCyan: '#b4e2d8',      // Bright celadon
+      brightWhite: '#fbf6e8',     // Fresh ivory
+    },
+    // UI colors: racing-green (154) panels on an ivory (43) desk, ivory ink, brass for lit state.
+    ui: {
+      // The desk between panels, and the ink printed on it (see ThemeContext).
+      gutter: 'hsl(43 50% 91%)',
+      gutterForeground: 'hsl(152 64% 14%)',
+      // Velvet pile on the panels and grain on the desk (index.css, data-material).
+      material: 'velvet',
+      background: 'hsl(152 64% 14%)',
+      foreground: 'hsl(44 52% 87%)',
+      card: 'hsl(152 56% 17%)',
+      cardForeground: 'hsl(44 52% 87%)',
+      popover: 'hsl(152 56% 17%)',
+      popoverForeground: 'hsl(44 52% 87%)',
+      primary: 'hsl(44 52% 87%)',
+      primaryForeground: 'hsl(152 64% 14%)',
+      secondary: 'hsl(152 46% 20%)',
+      secondaryForeground: 'hsl(44 52% 87%)',
+      muted: 'hsl(152 46% 20%)',
+      mutedForeground: 'hsl(45 18% 66%)',
+      // Aged ivory: brass is kept for lit state only.
+      accent: 'hsl(42 30% 74%)',
+      accentForeground: 'hsl(152 64% 14%)',
+      destructive: 'hsl(8 68% 64%)',
+      destructiveForeground: 'hsl(152 64% 14%)',
+      border: 'hsl(152 28% 29%)',
+      input: 'hsl(152 46% 20%)',
+      inputBackground: 'hsl(152 66% 9%)',
+      ring: 'hsl(41 62% 62%)',
+      sidebar: 'hsl(152 64% 14%)',
+      sidebarForeground: 'hsl(44 52% 87%)',
+      sidebarPrimary: 'hsl(44 52% 87%)',
+      sidebarPrimaryForeground: 'hsl(152 64% 14%)',
+      sidebarAccent: 'hsl(152 50% 18%)',
+      sidebarAccentForeground: 'hsl(44 52% 87%)',
+      sidebarBorder: 'hsl(152 28% 29%)',
+      sidebarRing: 'hsl(41 62% 62%)',
+      // Instrument lamps: brass lit, hedge ok, copper warn, rose fault.
+      lamp: '#d9b45a',
+      ok: '#b6dea6',
+      warn: '#e5925f',
+      fault: '#e06e5c',
+      // Semantic colors
+      folder: '42 40% 66%',              // Aged brass for folder icons
+      gitAdded: '105 45% 72%',           // Pale hedge for +lines
+      gitDeleted: '10 67% 68%',          // Rose clay for -lines
+      treeGuide: '44 52% 87% / 0.12',   // Ivory hairlines for the tree
+    },
+  },
 };
 
 export const defaultTheme = 'tokyo-night';

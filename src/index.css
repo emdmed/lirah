@@ -270,6 +270,73 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
   --ins-glow:   4px;
 }
 
+/* A desk set apart from the panels (a theme's ui.gutter, e.g. Shire): what is
+   printed on the desk rather than a panel face takes the desk's own ink. */
+:root[data-desk] :is(.ins-pane-legend, .tui-pane-info, .chassis-rail) {
+  --color-foreground: var(--ins-desk-ink);
+  --color-muted-foreground: color-mix(in srgb, var(--ins-desk-ink) 72%, var(--ins-gutter));
+  --ins-legend: var(--ins-desk-ink);
+  --ins-faint: color-mix(in srgb, var(--ins-desk-ink) 50%, var(--ins-gutter));
+  --ins-lamp: color-mix(in srgb, var(--color-lamp) 60%, #000);
+}
+:root[data-desk] .tui-pane::before { color: var(--ins-desk-ink); }
+
+/* Velvet (a theme's ui.material, e.g. Shire): each panel is a green pile
+   lining sunk into an ivory board, lit from above like a jewellery case. The
+   pane's ::after already overlays the face (terminal canvas included), so the
+   nap sheen and the recess ride on it; one fixed layer adds grain and the
+   room light to desk and pile alike. */
+:root[data-material="velvet"] .tui-pane::after {
+  /* The nap: pile brushed one way catches light high and falls away low. */
+  background: linear-gradient(170deg, rgb(255 250 230 / 0.13), transparent 32% 70%, rgb(0 8 4 / 0.18));
+  box-shadow:
+    /* the board's top lip shades the lining; its bottom lip catches light */
+    0 -1px 0 rgb(110 80 30 / 0.28),
+    0 1px 0 rgb(255 255 250 / 0.75),
+    inset 0 7px 10px -5px rgb(0 8 4 / 0.55),
+    inset 0 -1px 0 rgb(255 250 230 / 0.09),
+    inset 0 0 28px rgb(0 10 5 / 0.22);
+}
+/* The desk is Crema Marfil: cloudy ivory with sparse tan veins. Every surface
+   that paints the desk shares one viewport-fixed sheet, so the veins run on
+   unbroken behind the panels, legends and gutters. Veins are thresholded noise
+   (a single spike in a transfer table), rotated so they run on the diagonal. */
+:root[data-material="velvet"] {
+  --desk-marble: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Cfilter id='c' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.004' numOctaves='4' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.80  0 0 0 0 0.70  0 0 0 0 0.50  1.4 0 0 0 -0.62'/%3E%3C/filter%3E%3Cfilter id='v' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0012 0.0045' numOctaves='4' seed='21'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='table' tableValues='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0'/%3E%3C/feComponentTransfer%3E%3CfeColorMatrix values='0 0 0 0 0.52  0 0 0 0 0.42  0 0 0 0 0.28  0.75 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23c%29'/%3E%3Cg transform='rotate%28-28%29'%3E%3Crect x='-50%25' y='-20%25' width='250%25' height='250%25' filter='url%28%23v%29'/%3E%3C/g%3E%3C/svg%3E");
+}
+:root[data-material="velvet"] :is(body, [class*="bg-[var(--ins-gutter)]"], [style*="--ins-gutter)"]),
+:root[data-material="velvet"] .tui-pane:not(.tui-float, .tui-dialog)::before,
+:root[data-material="velvet"] .tui-pane:not(.tui-float, .tui-dialog) :is(.tui-pane-info, .ins-pane-legend > *) {
+  background-image: var(--desk-marble);
+  background-attachment: fixed;
+  background-size: 100vw 100vh;
+}
+/* A pane's top and bottom strips are desk too; the Context pane overlays the
+   terminal, so left bare they show green pile beside its legend. */
+:root[data-material="velvet"] .tui-pane:not(.tui-float, .tui-dialog) {
+  background:
+    linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat,
+    var(--desk-marble) 0 0 / 100vw 100vh fixed,
+    var(--ins-gutter);
+}
+:root[data-material="velvet"] #root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  /* No viewBox: the noise renders at window pixels, so the grain never stretches. */
+  background:
+    /* room light: a lamp above the board, the corners falling into shade */
+    radial-gradient(130% 80% at 50% -15%, rgb(255 255 255 / 0.9), transparent 60%),
+    radial-gradient(140% 120% at 50% 45%, transparent 60%, rgb(60 40 10 / 1)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85 0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+  /* Low: the velvet should read smooth up close; the marble carries the desk. */
+  opacity: 0.3;
+}
+:root[data-desk] .tui-pane:is(:focus-within, .terminal-live)::before { color: color-mix(in srgb, var(--color-lamp) 60%, #000); }
+
 html,
 body,
 #root {
