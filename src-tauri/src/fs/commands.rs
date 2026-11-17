@@ -7,7 +7,12 @@ pub async fn check_command_exists(command: String) -> Result<bool, String> {
         #[cfg(target_family = "windows")]
         let checker = "where";
 
-        let output = crate::util::hidden_command(checker)
+        // Search the terminal's PATH, not the app's: a launcher-started app on Ubuntu lacks ~/.local/bin.
+        let mut cmd = crate::util::hidden_command(checker);
+        if let Some(path) = crate::util::terminal_path() {
+            cmd.env("PATH", path);
+        }
+        let output = cmd
             .arg(&command)
             .output()
             .map_err(|e| format!("Failed to check command: {}", e))?;
