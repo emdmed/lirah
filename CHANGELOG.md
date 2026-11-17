@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-17
+
+### Added
+
+- **Save job recipes from the CLI** - `lirah jobs save <name> <prompt> [--cli C]` saves a one-step recipe in the tab's repo, and `--steps '<json>'` saves several steps in order. Saving under an existing name replaces that recipe, so agents can now make the recipes they run with `lirah jobs run --recipe`.
+
 ## [0.35.0] - 2026-11-17
 
 ### Added
