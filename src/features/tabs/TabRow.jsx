@@ -252,12 +252,11 @@ export const TabRow = memo(function TabRow({
       }}
       title={tooltip}
       aria-keyshortcuts="Enter r x l t w a f o e ArrowRight"
-      data-marker="top"
       className={cn(
         // A container, so a narrow pane drops the readout's slots before the name or the actions shrink.
         '@container group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
         compact ? 'py-1.5' : 'py-2.5',
-        active ? 'ins-row-selected before:!top-3' : 'hover:bg-foreground/5',
+        active ? 'ins-tab-current' : 'hover:bg-foreground/5',
         // Waiting on you: the row is framed in the lamp gold.
         queued ? 'outline-solid outline-1 -outline-offset-1 outline-[var(--ins-lamp)]' : 'outline-none',
         drag.dragIndex === index && 'opacity-50',
@@ -282,7 +281,7 @@ export const TabRow = memo(function TabRow({
           title={queued ? `Waiting on you · ${queuePos === 0 ? 'next' : `#${queuePos + 1}`} for Alt+A` : index < 9 ? `Ctrl+${index + 1}` : undefined}
           className={cn(
             'inline-flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[11px] tabular-nums',
-            queued ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]' : 'border-transparent text-muted-foreground',
+            queued ? 'border-[var(--ins-lamp)] text-[var(--ins-lamp)]' : cn('border-transparent', active ? 'text-foreground' : 'text-muted-foreground'),
           )}
         >
           {index + 1}

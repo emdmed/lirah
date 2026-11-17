@@ -343,6 +343,23 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
   outline: 1px solid color-mix(in srgb, var(--ins-lamp) 22%, transparent);
   outline-offset: -4px;
 }
+/* Rows run to the pane's edge; the band outside the inlay is painted over in
+   the face so their hairlines stop at the inlay instead of crossing it. The
+   frame's resting line joins the band; focus still inks it. */
+:root[data-trim="gilt"] .tui-pane:not(.tui-float, .tui-dialog) { --inlay-mask: inset 0 0 0 4px var(--ins-panel); }
+:root[data-trim="gilt"] .tui-pane.tui-pane-screen { --inlay-mask: inset 0 0 0 4px var(--ins-glass); }
+:root[data-trim="gilt"] .tui-pane:not(.tui-float, .tui-dialog)::after { box-shadow: var(--inlay-mask); }
+:root[data-trim="gilt"] .tui-pane:not(.tui-float, .tui-dialog, :focus-within, .terminal-live)::after { border-color: var(--ins-panel); }
+:root[data-trim="gilt"] .tui-pane.tui-pane-screen:not(:focus-within, .terminal-live)::after { border-color: var(--ins-glass); }
+:root[data-material="velvet"][data-trim="gilt"] .tui-pane:not(.tui-float, .tui-dialog)::after {
+  box-shadow:
+    var(--inlay-mask),
+    0 -1px 0 rgb(110 80 30 / 0.28),
+    0 1px 0 rgb(255 255 250 / 0.75),
+    inset 0 7px 10px -5px rgb(0 8 4 / 0.55),
+    inset 0 -1px 0 rgb(255 250 230 / 0.09),
+    inset 0 0 28px rgb(0 10 5 / 0.22);
+}
 :root[data-trim="gilt"] .ins-cap:not([data-lit]) {
   background: transparent;
   border: 1px solid var(--gilt);
@@ -358,6 +375,10 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
 :root[data-trim="gilt"] .ins-row-selected {
   background: transparent;
   box-shadow: inset 2px 0 0 var(--ins-lamp);
+}
+:root[data-trim="gilt"] .ins-tab-current {
+  --tick: var(--ins-lamp);
+  background-color: transparent;
 }
 :root[data-desk] .tui-pane:is(:focus-within, .terminal-live)::before { color: color-mix(in srgb, var(--color-lamp) 60%, #000); }
 
@@ -1031,11 +1052,19 @@ body {
   pointer-events: none;
 }
 
-/* Multi-line rows (tab cards) pin the marker to their first line. */
-.ins-row-selected[data-marker="top"]::before {
-  top: 0.5rem;
-  transform: none;
-  line-height: 1rem;
+/* The current tab is the page on screen, not a cursor: it is set in crop
+   ticks, the dialogs' plate corners, over a tint. Ink, not gold (gold on a
+   tab row means it waits on you). Backgrounds, so the row's engraved
+   box-shadow hairline stays. */
+.ins-tab-current {
+  --tick: var(--color-foreground);
+  --tick-h: linear-gradient(var(--tick), var(--tick)) no-repeat;
+  background:
+    var(--tick-h) left 3px top 3px / 7px 1px, var(--tick-h) left 3px top 3px / 1px 7px,
+    var(--tick-h) right 3px top 3px / 7px 1px, var(--tick-h) right 3px top 3px / 1px 7px,
+    var(--tick-h) left 3px bottom 4px / 7px 1px, var(--tick-h) left 3px bottom 4px / 1px 7px,
+    var(--tick-h) right 3px bottom 4px / 7px 1px, var(--tick-h) right 3px bottom 4px / 1px 7px,
+    color-mix(in srgb, var(--color-foreground) 8%, transparent);
 }
 
 /*
