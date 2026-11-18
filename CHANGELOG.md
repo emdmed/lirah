@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-18
+
+### Added
+
+- **Agent voice** - A new setting (Settings → Agent → Launch) makes Claude Code answer briefly, in simple words, and flag problems up front with ⚠. On by default ("Plain"); set it to "Off" for the CLI's own style. Applies to new launches.
+
 ## [0.37.1] - 2026-11-17
 
 ### Changed
