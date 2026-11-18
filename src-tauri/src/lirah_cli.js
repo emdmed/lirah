@@ -740,6 +740,7 @@ function revisePrompt(plan, notes, path) {
 const CLI_IDS = ["claude-code", "opencode"];
 const SETTINGS = Object.fromEntries([
   ["selectedCli", "agent", "Default CLI", "claude-code", { values: CLI_IDS, appliesTo: "new tabs" }],
+  ["agentVoice", "agent", "Agent voice", "plain", { values: ["plain", "off"] }],
   ["autoLaunchCli", "agent", "Auto-launch agent", true],
   ["agentStateHook", "agent", "Agent state hook", true, { guarded: true }],
   ["compactionHook", "agent", "Compaction hook", true, { guarded: true }],

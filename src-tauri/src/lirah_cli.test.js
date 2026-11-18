@@ -118,6 +118,8 @@ it('sets the theme and settings in settings.json, keeping other keys', () => {
   expect(file('settings.json')).toMatchObject({ revision: 6, bookmarks: [{ id: 'b' }], theme: 'rose-pine', scrollback: 50000, autoLaunchCli: false });
   expect(lirah('settings', 'get', 'figures').trim()).toBe('full');
   expect(() => lirah('settings', 'set', 'figures', 'tiny')).toThrow(/must be one of full, compact/);
+  expect(lirah('settings', 'get', 'agentVoice').trim()).toBe('plain');
+  expect(() => lirah('settings', 'set', 'agentVoice', 'loud')).toThrow(/must be one of plain, off/);
 });
 
 it('refuses sensitive settings without the app', () => {

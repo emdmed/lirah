@@ -28,6 +28,7 @@ const CHOICES = {
   autoCommitCli: TAB_CLIS.map((c) => c.id),
   scrollback: SCROLLBACK_OPTIONS.map((o) => o.value),
   figures: ['full', 'compact'],
+  agentVoice: ['plain', 'off'],
 };
 
 // Settings the CLI may touch: those with a row in the Settings dialog.

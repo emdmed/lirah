@@ -80,6 +80,9 @@ export const SETTINGS_DEFAULTS = {
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',
+  // How the tab's agent talks: 'plain' (short, simple words, problems flagged
+  // up front; see tabs/launchOptions.js) or 'off' (the CLI's own style).
+  agentVoice: 'plain',
   // Starred repos: { id, name, path, createdAt, lastAccessedAt }.
   bookmarks: [],
   // Saved prompts: { id, title, content, createdAt, updatedAt }.
@@ -205,6 +208,7 @@ const VALIDATORS = {
     : undefined),
   plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
+  agentVoice: (v) => (v === 'plain' || v === 'off' ? v : undefined),
   sidebarSection: (v) => (v === 'tabs' || v === 'files' ? v : undefined),
   filesPanel: (v) => (v === 'tree' || v === 'features' ? v : undefined),
   bookmarks: cleanBookmarks,

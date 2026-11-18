@@ -463,7 +463,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
   // Claude launcher
   const { launchClaude: launchCli, cliAvailability } = useClaudeLauncher(terminalSessionId, terminalRef, settings.selectedCli);
   // Every launch carries the tab's system prompt; extra arguments (click events) are ignored.
-  const launchClaude = useCallback(() => launchCli(launchOptions({ master })), [launchCli, master]);
+  const launchClaude = useCallback(() => launchCli(launchOptions({ master, voice: getSettings().agentVoice })), [launchCli, master]);
   // A claude started by hand: stop it and start it again with the plugin.
   const relaunchCli = useCallback(async () => {
     try {
@@ -494,7 +494,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     const transcript = settings.selectedCli === 'claude-code' ? getTabTranscript(tabId) : null;
     const resume = transcript && await invoke('path_exists', { path: transcript }).catch(() => false);
     const resumeId = resume ? transcript.split(/[\\/]/).pop().replace(/\.jsonl$/, '') : null;
-    return launchCli(launchOptions({ master, resumeId }));
+    return launchCli(launchOptions({ master, resumeId, voice: getSettings().agentVoice }));
   });
 
   useEffect(() => {

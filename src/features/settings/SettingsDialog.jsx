@@ -32,6 +32,7 @@ import { CLI_COMMANDS } from '../cli-selection/useClaudeLauncher';
 const PlanContextsDialog = lazyNamed(() => import('../tasks/PlanContextsDialog'), 'PlanContextsDialog');
 
 const CLI_OPTIONS = TAB_CLIS.map((c) => ({ value: c.id, label: c.title, short: c.process }));
+const VOICE_OPTIONS = [{ value: 'plain', label: 'Plain' }, { value: 'off', label: 'Off' }];
 const cliLabel = (v) => CLI_OPTIONS.find((o) => o.value === v)?.label ?? v;
 
 // The auto commit shortcut, as the hint bar shows it.
@@ -81,6 +82,7 @@ export function SettingsDialog({
   const [compactionHook, setCompactionHook] = useSetting('compactionHook');
   const [promptBoxOnStart, setPromptBoxOnStart] = useSetting('promptBoxOnStart');
   const [agentControl, setAgentControl] = useSetting('agentControl');
+  const [agentVoice, setAgentVoice] = useSetting('agentVoice');
   const [launchOnTabSwitch, setLaunchOnTabSwitch] = useSetting('launchOnTabSwitch');
   const [taskFormatPrompt, setTaskFormatPrompt] = useSetting('taskFormatPrompt');
 
@@ -229,12 +231,13 @@ export function SettingsDialog({
               {/* Full screen: controls keep one column, hints take the margin beside it. */}
               <div className="flex max-w-[1180px] flex-col gap-8">
                 <Section section={section('agent')} active={activeId === 'agent'}>
-                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'auto-launch', 'launch-on-switch', 'startup']}>
+                  <Group label="Launch" sectionId="agent" rows={['default-cli', 'claude-command', 'agent-voice', 'auto-launch', 'launch-on-switch', 'startup']}>
                     <ChoiceRow
                       row={ROW['default-cli']} value={defaultCli} options={CLI_OPTIONS} onChange={setDefaultCli}
                       scope={<ScopeLine workspaceId={workspaceId} settingKey="selectedCli" label={ROW['default-cli'].label} format={cliLabel} />}
                     />
                     <ClaudeCommandRow />
+                    <ChoiceRow row={ROW['agent-voice']} value={agentVoice} options={VOICE_OPTIONS} onChange={setAgentVoice} />
                     <ToggleRow
                       row={ROW['auto-launch']} value={autoLaunchCli} onChange={setAutoLaunchCli}
                       scope={<ScopeLine workspaceId={workspaceId} settingKey="autoLaunchCli" label={ROW['auto-launch'].label} />}

@@ -16,6 +16,12 @@ export const SETTINGS_ROWS = [
     words: 'claude start command launch npx path binary executable custom',
   },
   {
+    id: 'agent-voice', section: 'agent', kind: 'choice', key: 'agentVoice',
+    label: 'Agent voice',
+    hint: 'Plain: brief, simple words, problems flagged with ⚠. Claude Code only; applies to new launches.',
+    words: 'agent voice style tone concise plain simple language talk speak verbose cognitive load',
+  },
+  {
     id: 'auto-launch', section: 'agent', kind: 'toggle', key: 'autoLaunchCli',
     label: 'Auto-launch agent',
     hint: 'Start the CLI when a terminal opens or you open a starred project. Off shows a launch key instead.',
