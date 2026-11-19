@@ -16,7 +16,7 @@ import { TabButton } from '../../components/instrument/TabButton';
 import { Keycap } from '../../components/instrument/Keycap';
 import { Span, SpanRuler, SpanScale } from '../../components/instrument/Span';
 import { jobsPaneRequest, requestTabsPane } from './jobsPane';
-import { jobSteps, useAgentJobs } from './AgentJobsContext';
+import { groupRuns, jobSteps, runKey, useAgentJobs } from './AgentJobsContext';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { useTabManager } from '../tabs/TabContext';
 import { PlansPane } from '../plans/PlansPane';
@@ -103,10 +103,10 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
   const [showArchived, setShowArchived] = useState(false);
 
   // Archived jobs are stored alongside the rest but kept out of immediate sight.
-  const visibleJobs = jobs.filter((j) => !j.archived);
-  const archivedJobs = jobs.filter((j) => j.archived);
+  const visibleJobs = useMemo(() => groupRuns(jobs.filter((j) => !j.archived)), [jobs]);
+  const archivedJobs = useMemo(() => groupRuns(jobs.filter((j) => j.archived)), [jobs]);
   // P6: the durations drawn in a list share one scale.
-  const spanJobs = visibleJobs.map(spanItem);
+  const spanJobs = visibleJobs.map((runs) => spanItem(runs[0]));
   const collapsed = collapsedOverride ?? false;
   const newTabTitle = 'New tab (Ctrl+T)';
 
@@ -306,14 +306,14 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
 
   // One place that knows how a job card is wired, shared by the active list and
   // the archived section.
-  const renderCard = (job, { archived = false } = {}) => (
-    <JobCard key={job.id} job={job} archived={archived} actions={cardActions} />
+  const renderCard = ([job, ...pastRuns], { archived = false } = {}) => (
+    <JobCard key={runKey(job)} job={job} pastRuns={pastRuns} archived={archived} actions={cardActions} />
   );
 
   if (collapsed) {
     // One lamp per job reads the whole queue at a glance; the pane index sits
     // on a keycap instead of a rotated label.
-    const railJobs = visibleJobs.slice(0, 8);
+    const railJobs = visibleJobs.slice(0, 8).map((runs) => runs[0]);
     return (
       <div data-pane="4" className="flex flex-col items-center gap-2 py-2 my-3 mx-3 shrink-0 w-7 edge-engraved bg-[var(--ins-panel)]">
         <button
@@ -532,7 +532,7 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   <span>· all repos</span>
                   <SpanRuler />
                 </div>
-                {visibleJobs.map((job) => renderCard(job))}
+                {visibleJobs.map((runs) => renderCard(runs))}
               </div>
               </SpanScale>
             )}
@@ -552,9 +552,9 @@ function RightSidebarPanel({ projectPath, onNewTab }) {
                   <span className="tabular-nums">{archivedJobs.length}</span>
                 </button>
                 {showArchived && (
-                  <SpanScale items={archivedJobs.map(spanItem)}>
+                  <SpanScale items={archivedJobs.map((runs) => spanItem(runs[0]))}>
                     <div className="flex flex-col gap-1.5 px-2 pt-0.5 opacity-80">
-                      {archivedJobs.map((job) => renderCard(job, { archived: true }))}
+                      {archivedJobs.map((runs) => renderCard(runs, { archived: true }))}
                     </div>
                   </SpanScale>
                 )}
@@ -633,7 +633,7 @@ function outputRuns(output) {
   return runs;
 }
 
-const JobCard = memo(function JobCard({ job, archived, actions }) {
+const JobCard = memo(function JobCard({ job, pastRuns, archived, actions }) {
   const [expanded, setExpanded] = useState(false);
   const logRef = useRef(null);
   const meta = STATUS_META[job.status] || STATUS_META.done;
@@ -648,6 +648,7 @@ const JobCard = memo(function JobCard({ job, archived, actions }) {
   const stepCount = jobSteps(job).length;
   // A status word for anything that isn't a clean running/done state.
   const showStatusChip = !isRunning && job.status !== 'done';
+  const allRuns = [job, ...pastRuns];
 
   // Keep the expanded log pinned to the newest output while a job streams. Keyed
   // on the array, not its length: once the buffer caps the length stops changing.
@@ -695,6 +696,9 @@ const JobCard = memo(function JobCard({ job, archived, actions }) {
           </span>
         )}
         {showStatusChip && <span style={{ color: meta.color }}>{meta.label}</span>}
+        {pastRuns.length > 0 && (
+          <span className="tabular-nums text-muted-foreground" title="Times this job ran">×{allRuns.length}</span>
+        )}
         {isRunning && job.idleSecs > 0 && (
           <span
             className="inline-flex items-center gap-0.5"
@@ -736,6 +740,25 @@ const JobCard = memo(function JobCard({ job, archived, actions }) {
             )}
           </div>
 
+          {/* Every time this job ran, latest first. */}
+          {pastRuns.length > 0 && (
+            <div className="mx-2.5 mt-2 flex flex-col text-[11px]">
+              <span className="ins-legend text-muted-foreground">ran {allRuns.length} times</span>
+              {allRuns.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 py-0.5">
+                  <Lamp {...jobLamp(r.status)} label={r.status} />
+                  <span className="min-w-0 flex-1 truncate tabular-nums">
+                    {r.startedAt ? new Date(r.startedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {r.status === 'running' ? 'running' : jobDuration(r.startedAt, r.endedAt)}
+                  </span>
+                  {r.reportPath && <IconAction icon={Plan} title="View this run's report" onClick={() => actions.report(r.id)} />}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Actions: emphasized primary on the left, ghost icons on the right */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5 px-2.5 pb-2">
             {isRunning && (
@@ -749,16 +772,16 @@ const JobCard = memo(function JobCard({ job, archived, actions }) {
                 <IconAction icon={Copy} title="Copy output (use as a prompt elsewhere)" onClick={() => actions.copyOutput(job.id)} />
               )}
               {!isRunning && !archived && (
-                <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={() => actions.archive(job.id)} />
+                <IconAction icon={Archive} title="Archive — hide from the list, keep everything" onClick={() => allRuns.forEach((r) => actions.archive(r.id))} />
               )}
               {archived && (
-                <IconAction icon={Upload} title="Restore to the jobs list" onClick={() => actions.unarchive(job.id)} />
+                <IconAction icon={Upload} title="Restore to the jobs list" onClick={() => allRuns.forEach((r) => actions.unarchive(r.id))} />
               )}
               {!isRunning && (
                 <IconAction
                   icon={Trash}
                   title={job.worktreePath ? 'Discard worktree' : 'Dismiss'}
-                  onClick={() => actions.discard(job.id)}
+                  onClick={async () => { for (const r of allRuns) await actions.discard(r.id); }}
                   danger
                 />
               )}
@@ -768,7 +791,8 @@ const JobCard = memo(function JobCard({ job, archived, actions }) {
       )}
     </div>
   );
-});
+}, (a, b) => a.job === b.job && a.archived === b.archived && a.actions === b.actions
+  && a.pastRuns.length === b.pastRuns.length && a.pastRuns.every((r, i) => r === b.pastRuns[i]));
 
 function PrimaryAction({ icon: Icon, label, onClick, variant = 'outline', title, disabled = false }) {
   return (

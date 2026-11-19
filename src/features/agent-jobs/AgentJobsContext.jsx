@@ -40,6 +40,20 @@ export function nextStepIndex(job, success) {
   return i + 1;
 }
 
+// Re-runs of the same job share one card: same recipe, or same label, repo and steps.
+export const runKey = (j) => j.recipeId || JSON.stringify([j.label, j.repoPath || j.cwd, jobSteps(j)]);
+
+/** Runs grouped per job, latest run first; groups ordered by their latest start. */
+export function groupRuns(jobs) {
+  const groups = new Map();
+  for (const j of [...jobs].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))) {
+    const k = runKey(j);
+    if (groups.has(k)) groups.get(k).push(j);
+    else groups.set(k, [j]);
+  }
+  return [...groups.values()];
+}
+
 // Path of a job's change relative to the repo root, given its cwd.
 export function relToRepo(job, p) {
   return job.cwd && p.startsWith(job.cwd + '/') ? p.slice(job.cwd.length + 1) : p;
@@ -396,6 +410,9 @@ export function AgentJobsProvider({ children }) {
   const rerunJob = useCallback(async (id) => {
     const job = jobsRef.current.find((j) => j.id === id);
     if (!job) return null;
+    // Bring the card's archived runs back with the new run.
+    const key = runKey(job);
+    setJobs((prev) => prev.map((j) => (j.archived && runKey(j) === key ? { ...j, archived: false, archivedAt: null } : j)));
     return launchJob({
       steps: jobSteps(job),
       label: job.label,
