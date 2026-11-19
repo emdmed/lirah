@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-19
+
+### Changed
+
+- **One card per job** - Re-running a job no longer adds a new card. Each job keeps a single card showing its latest run and how many times it ran; opening it lists every run with its time, duration and report. Jobs are sorted by their latest run, and re-running an archived job brings its card back to the list.
+
 ## [0.39.1] - 2026-11-19
 
 ### Changed
