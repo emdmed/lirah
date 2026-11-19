@@ -18,7 +18,7 @@ export const SETTINGS_ROWS = [
   {
     id: 'agent-voice', section: 'agent', kind: 'choice', key: 'agentVoice',
     label: 'Agent voice',
-    hint: 'Plain: brief, simple words, problems flagged with ⚠. Claude Code only; applies to new launches.',
+    hint: 'Plain: brief, simple words, problems flagged with ⚠ (the tab gets a ⚠ until you look). Claude Code only; applies to new launches.',
     words: 'agent voice style tone concise plain simple language talk speak verbose cognitive load',
   },
   {

@@ -37,22 +37,22 @@ function buildQueue(tabs) {
   for (const tab of tabs) {
     const sessionId = getTabSession(tab.id);
     if (!needsAttention(sessionId)) continue;
-    const { state, at } = getAgentHookState(sessionId);
-    queue.push({ tabId: tab.id, sessionId, state, at });
+    const { state, at, flag } = getAgentHookState(sessionId);
+    queue.push({ tabId: tab.id, sessionId, state, at, flag });
   }
-  return queue.sort((a, b) => (a.state === 'permission') !== (b.state === 'permission')
-    ? (a.state === 'permission' ? -1 : 1)
-    : a.at - b.at);
+  // Blocked on permission first, then replies that flagged a problem, then oldest.
+  const rank = (q) => (q.state === 'permission' ? 0 : q.flag ? 1 : 2);
+  return queue.sort((a, b) => rank(a) - rank(b) || a.at - b.at);
 }
 
-const queueKey = (queue) => queue.map((q) => `${q.tabId}:${q.sessionId}:${q.state}:${q.at}`).join('|');
+const queueKey = (queue) => queue.map((q) => `${q.tabId}:${q.sessionId}:${q.state}:${q.at}:${!!q.flag}`).join('|');
 
 /**
  * Tabs whose agent is waiting on you and that you haven't looked at since:
- * blocked on permission first, then oldest first.
+ * blocked on permission first, then flagged replies, then oldest first.
  * The same array comes back until the queue itself changes, so the hook events
  * of a busy agent (every tool call) don't re-render the caller.
- * @returns {Array<{ tabId: string, sessionId: string, state: string, at: number }>}
+ * @returns {Array<{ tabId: string, sessionId: string, state: string, at: number, flag?: string }>}
  */
 export function useAttentionQueue(tabs) {
   const cacheRef = useRef({ key: null, queue: [] });
@@ -129,8 +129,8 @@ export function useAgentAttention({ tabs, activeTabId, switchTab }) {
           title: `${name} · ${cli} needs permission`,
           body: next.message || 'Approve or deny to let it continue.',
         };
-      } else if (next.state === 'done' && turnMs >= NOTIFY_MIN_TURN_MS) {
-        alert = { title: `${name} · ${cli} done`, body: `Finished after ${formatDuration(turnMs)}.` };
+      } else if (next.state === 'done' && (next.flag || turnMs >= NOTIFY_MIN_TURN_MS)) {
+        alert = { title: `${name} · ${cli} done`, body: next.flag || `Finished after ${formatDuration(turnMs)}.` };
       }
       if (!alert) return;
       pending = pending.filter((a) => a.sessionId !== sessionId);

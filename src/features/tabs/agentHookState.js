@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { createEmitter } from '../../lib/createStore';
 import { bashFileTargets } from './bashFileTargets';
 import { endEntry, startEntry } from '../worklog/worklogStore';
+import { parseDecisions } from '../plans/planPrompts';
 import { isAbsolute, normalizePath, ancestorDirs } from '../../utils/pathUtils';
 
 // What each terminal's agent last said about itself through its hooks (see
@@ -14,7 +15,7 @@ import { isAbsolute, normalizePath, ancestorDirs } from '../../utils/pathUtils';
 //   working     — a prompt is being worked on (prompt submitted, tool running)
 //   permission  — blocked on a permission prompt
 //   waiting     — idle at its prompt (session started, or idle-prompt notice)
-//   done        — finished its turn; your move
+//   done        — finished its turn; your move (flag: its first ⚠ line)
 
 const states = new Map(); // sessionId -> { state, message, notice, error, source, at, seq }
 
@@ -163,6 +164,13 @@ function recordTool(sessionId, payload, at) {
   }
 }
 
+// The first line of a reply that starts with ⚠: the agent voice prompt
+// (launchOptions.js) has the agent flag what needs the user that way.
+export function flagLine(text) {
+  if (typeof text !== 'string') return null;
+  return text.split('\n').map((l) => l.trim()).find((l) => l.startsWith('⚠'))?.slice(0, 200) || null;
+}
+
 function nextState(payload) {
   switch (payload?.hook_event_name) {
     case 'UserPromptSubmit':
@@ -176,8 +184,10 @@ function nextState(payload) {
         /permission/i.test(payload.message || '')
         ? { state: 'permission', message: payload.message }
         : { state: 'waiting', message: payload.message, notice: true };
-    case 'Stop':
-      return payload.error ? { state: 'done', error: true } : { state: 'done' };
+    case 'Stop': {
+      const flag = flagLine(payload.last_assistant_message);
+      return { state: 'done', ...(payload.error && { error: true }), ...(flag && { flag }) };
+    }
     case 'SessionStart':
       return { state: 'waiting' };
     case 'SessionEnd':
@@ -256,7 +266,7 @@ export function startAgentHookListener() {
         turn.endedAt = now;
         turnMs = now - turn.startedAt;
       }
-      endEntry(sessionId, turn?.edited);
+      endEntry(sessionId, turn?.edited, parseDecisions(payload.last_assistant_message));
     } else if (hookEvent === 'SessionEnd') {
       endEntry(sessionId, getLastTurn(sessionId)?.edited);
     }

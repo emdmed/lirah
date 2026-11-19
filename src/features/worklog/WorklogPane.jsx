@@ -39,6 +39,7 @@ const Dot = () => <span aria-hidden="true">·</span>;
 
 /**
  * The work log: Claude Code prompts from every repo, newest first, by day.
+ * Opens on the decisions agents recorded; "all logs" shows every prompt.
  * Shows the active tab's repo by default; "all repos" shows everything.
  * "summary" has a model write what got done instead of the raw list.
  */
@@ -47,7 +48,7 @@ export function WorklogPane({ projectPath }) {
   const branch = useBranchName(projectPath);
   const [allRepos, setAllRepos] = useState(false);
   const [onlyBranch, setOnlyBranch] = useState(false);
-  const [view, setView] = useState('raw');
+  const [view, setView] = useState('decisions');
 
   if (!entries) return null;
   const everywhere = allRepos || !repo;
@@ -65,11 +66,11 @@ export function WorklogPane({ projectPath }) {
           </>
         )}
         <span className="ml-auto flex items-center gap-2">
-          <Toggle options={[['raw', 'raw'], ['summary', 'summary']]} value={view} onChange={setView} />
+          <Toggle options={[['decisions', 'decisions'], ['all logs', 'raw'], ['summary', 'summary']]} value={view} onChange={setView} />
         </span>
       </div>
-      {view === 'summary'
-        ? <WorklogSummary entries={filtered} scope={scope} cwd={repo || projectPath} />
+      {view === 'summary' ? <WorklogSummary entries={filtered} scope={scope} cwd={repo || projectPath} />
+        : view === 'decisions' ? <WorklogDecisions entries={filtered} showRepo={everywhere} />
         : <WorklogList entries={filtered} showRepo={everywhere} />}
       {older && (
         <button
@@ -129,6 +130,33 @@ function WorklogList({ entries, showRepo }) {
       </Fragment>
     );
   });
+}
+
+// The `Decision:` lines agents wrote, newest first, by day; the prompt that led
+// to each is in its tooltip.
+function WorklogDecisions({ entries, showRepo }) {
+  const shown = entries.filter((e) => e.decisions?.length).reverse();
+  if (shown.length === 0) {
+    return (
+      <EmptyLine hint="when you answer an agent's question, its Decision: line is kept here">
+        no decisions yet
+      </EmptyLine>
+    );
+  }
+  return shown.map((e, i) => (
+    <Fragment key={e.id}>
+      {(i === 0 || day(shown[i - 1].at) !== day(e.at)) && (
+        <div className="ins-legend px-2.5 pt-2 pb-0.5 text-[11px] text-muted-foreground">{day(e.at)}</div>
+      )}
+      <div className="flex items-baseline gap-2 px-3 py-1.5 text-[11px] edge-b-engraved" title={e.prompt}>
+        <span className="shrink-0 tabular-nums text-muted-foreground">{time(e.at)}</span>
+        <ul className="flex min-w-0 flex-1 flex-col gap-0.5 text-[13px] text-foreground">
+          {e.decisions.map((d) => <li key={d} className="break-words">{d}</li>)}
+          {showRepo && e.repo && <li className="truncate text-[11px] text-muted-foreground">{basename(e.repo)}</li>}
+        </ul>
+      </div>
+    </Fragment>
+  ));
 }
 
 // Summaries by input, so switching views or sections doesn't pay for one twice.

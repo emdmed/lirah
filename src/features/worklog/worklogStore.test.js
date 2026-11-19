@@ -88,6 +88,13 @@ describe('worklog', () => {
     expect(entries().map((e) => [e.prompt, e.repo, e.branch])).toEqual([['in repo', repo, 'main'], ['in other', other, 'dev']]);
   });
 
+  it("keeps the turn's decisions, and none when there are none", async () => {
+    await startEntry('d', { prompt: 'pick one', cwd: join(repo) });
+    await endEntry('d', [], ['keep plain as the default']);
+    expect(entries().at(-1).decisions).toEqual(['keep plain as the default']);
+    expect((await turn('no choice', () => {})).decisions).toBeUndefined();
+  });
+
   it('appends a start and an end line to the month file', async () => {
     await turn('one', () => {});
     const lines = disk.get(monthFile(Date.now())).trim().split('\n').map((l) => JSON.parse(l));

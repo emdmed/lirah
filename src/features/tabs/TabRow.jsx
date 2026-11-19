@@ -110,7 +110,7 @@ export const ROW_KEYS = [
  * (a running "since" or duration included) changes.
  */
 export const TabRow = memo(function TabRow({
-  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, workLabel, active, linked, closable, queuePos,
+  tab, index, name, info, contextFill, autoCommit, activityKind, activityLabel, activitySince, activityQuestion, workLabel, active, linked, closable, queuePos, flag,
   turn, summaryText, summaryRunning, trailOpen, renaming, roleMenuOpen, worktreeMenuOpen, plans, pendingPlans, compact, drag, actions,
 }) {
   const activity = { kind: activityKind, label: activityLabel, since: activitySince };
@@ -159,6 +159,7 @@ export const TabRow = memo(function TabRow({
   const tooltip = [
     tab.note,
     tab.projectPath,
+    flag,
     `${activity.label}${activity.since ? ` · ${activity.since}` : ''}`,
     compact && info?.branch && `branch ${info.branch}`,
     summary && (compact || !showTrail) && `last turn: ${summary.text}`,
@@ -171,6 +172,7 @@ export const TabRow = memo(function TabRow({
     name,
     activity.label,
     queuePos >= 0 && `waiting on you, ${queuePos === 0 ? 'next' : `number ${queuePos + 1}`}`,
+    flag,
     info?.branch && `branch ${info.branch}`,
     info?.branch && (info.files === 0 ? 'clean' : `${plural(info.files, 'file')} changed`),
     ...livePlans.map((p) => `plan ${p.title || 'untitled'}${p.autopilot?.status ? `, auto-pilot ${p.autopilot.status}` : ''}`),
@@ -286,6 +288,8 @@ export const TabRow = memo(function TabRow({
         >
           {index + 1}
         </span>
+        {/* The agent's last reply flagged a problem; gone once you look. */}
+        {flag && <span aria-hidden="true" className="shrink-0 text-[11px] text-[var(--ins-lamp)]">⚠</span>}
         {renaming ? (
           <RenameField
             initial={name}

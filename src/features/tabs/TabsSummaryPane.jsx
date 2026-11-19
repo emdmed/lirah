@@ -291,6 +291,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
         kinds.push(activity.kind);
         if (activity.kind === 'failed') faulted.push({ id: tab.id, name: tabName(tab) });
         const queuePos = active ? -1 : queue.findIndex((q) => q.tabId === tab.id);
+        const flag = queue[queuePos]?.flag;
         const trailOpen = !!summary && openTrail === tab.id;
         // Rows unfold only by hand (chevron or →), so the list never jumps as you
         // move or agents start and stop; the lamp and queue outline still show live state.
@@ -319,6 +320,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
             linked={!active && linkedRepos.some((r) => r.path === tab.projectPath)}
             closable={closable}
             queuePos={queuePos}
+            flag={flag}
             turn={turn}
             summaryText={summary?.text}
             summaryRunning={!!summary?.running}

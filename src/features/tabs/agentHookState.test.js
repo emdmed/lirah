@@ -10,7 +10,7 @@ vi.mock('@tauri-apps/api/event', () => ({
 }));
 vi.mock('../worklog/worklogStore', () => ({ startEntry: vi.fn(), endEntry: vi.fn() }));
 
-const { startAgentHookListener, getFileActivity } = await import('./agentHookState');
+const { startAgentHookListener, getFileActivity, getAgentHookState } = await import('./agentHookState');
 
 beforeAll(() => startAgentHookListener());
 
@@ -49,5 +49,22 @@ describe('file marks from agent tools (canonical paths)', () => {
 
   it('ignores a relative path', () => {
     expect(marks('Read', { file_path: 'src\\a.js' })).toEqual({});
+  });
+});
+
+describe('flagged replies', () => {
+  const stop = (sessionId, last_assistant_message) =>
+    handler({ payload: { sessionId, payload: { hook_event_name: 'Stop', last_assistant_message } } });
+
+  it('keeps the first ⚠ line of the last reply', () => {
+    stop('f1', 'Done.\n  ⚠ Tests fail on Windows: path sep.\n⚠ second');
+    expect(getAgentHookState('f1')).toMatchObject({ state: 'done', flag: '⚠ Tests fail on Windows: path sep.' });
+  });
+
+  it('no ⚠ line, or no message: no flag', () => {
+    stop('f2', 'All good, see ⚠ in the docs.');
+    stop('f3');
+    expect(getAgentHookState('f2').flag).toBeUndefined();
+    expect(getAgentHookState('f3').flag).toBeUndefined();
   });
 });
