@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.39.1] - 2026-11-19
+
+### Changed
+
+- **Clearer work log header** - The decisions / all logs / summary switch is now a framed key bank on its own row, with decision and prompt counts. The repo and branch filters sit on a quieter line below, written as `repo / all repos · all branches / branch`, and no longer wrap into the view switch.
+
 ## [0.39.0] - 2026-11-19
 
 ### Added
