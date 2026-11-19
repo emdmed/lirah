@@ -4,6 +4,14 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-19
+
+### Added
+
+- **Royal themes** - Four new themes, each after a royal craft: Fabergé (blue enamel over engraved waves, beaded gold), Bindery (red leather with a double gilt border, on laid paper), Sèvres (a light theme in white porcelain with a gold and cobalt rim, on sky blue) and Maki-e (black lacquer with gold dust, on red).
+- **Regalia** - Small royal details you can switch on in any theme from Settings → Appearance: a wax seal for "needs you", an illuminated initial on the focused pane, a coronet on the current tab, tooled corners, heraldic shields for workspaces, a beaded focus border, an engraved panel ground and an ermine desk.
+- **Lamp style** - Lamps can be drawn as the reticle, a domed gem or a twelve-petal crest that turns while a tab waits on you.
+
 ## [0.40.0] - 2026-11-19
 
 ### Changed
