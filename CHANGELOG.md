@@ -4,6 +4,17 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-19
+
+### Added
+
+- **Flagged replies mark their tab** - When an agent's last reply has a line starting with ⚠, its tab shows a ⚠ beside the number until you look, moves up the waiting-on-you queue (after permission prompts), and the desktop notification quotes the flagged line.
+- **Decisions log** - The work log opens on a new "decisions" view: the `Decision:` lines agents write when you answer a question or pick an option, by day, with the prompt in the tooltip. "all logs" shows every prompt as before.
+
+### Changed
+
+- **Agent voice asks less of you** - Plain now keeps ⚠ for what you must act on (assumptions go on an "Assumed:" line), asks one question at a time with a recommended answer, records your answers as `Decision:` lines, and merges closing notes into one block.
+
 ## [0.38.0] - 2026-11-18
 
 ### Added
