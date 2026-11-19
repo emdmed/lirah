@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../lib/utils';
 import { basename } from '../../utils/pathUtils';
 import { Scanner } from '../../components/instrument/Scanner';
+import { SegmentBank } from '../../components/instrument/SegmentBank';
 import { EmptyLine } from '../plans/parts';
 import { useBranchName } from '../git/useBranchName';
 import { useSetting } from '../settings/settingsStore';
@@ -21,21 +22,25 @@ const day = (at) => new Date(at).toLocaleDateString(undefined, { weekday: 'short
 const time = (at) => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+// Either/or choices, `/` between them so a pair reads as one switch.
 function Toggle({ options, value, onChange }) {
-  return options.map(([label, v]) => (
-    <button
-      key={label}
-      type="button"
-      aria-pressed={value === v}
-      onClick={() => onChange(v)}
-      className={cn('cursor-pointer truncate hover:text-sidebar-foreground', value === v && 'text-foreground')}
-    >
-      {label}
-    </button>
+  return options.map(([label, v], i) => (
+    <Fragment key={label}>
+      {i > 0 && <span aria-hidden="true" className="text-faint">/</span>}
+      <button
+        type="button"
+        aria-pressed={value === v}
+        onClick={() => onChange(v)}
+        className={cn('min-w-0 cursor-pointer truncate hover:text-sidebar-foreground', value === v && 'text-foreground')}
+      >
+        {label}
+      </button>
+    </Fragment>
   ));
 }
 
-const Dot = () => <span aria-hidden="true">·</span>;
+const Dot = () => <span aria-hidden="true" className="text-faint">·</span>;
+const Count = ({ n }) => <span className="ml-1.5 tabular-nums text-muted-foreground/80">{n}</span>;
 
 /**
  * The work log: Claude Code prompts from every repo, newest first, by day.
@@ -53,21 +58,33 @@ export function WorklogPane({ projectPath }) {
   if (!entries) return null;
   const everywhere = allRepos || !repo;
   const filtered = entries.filter((e) => everywhere || (e.repo === repo && (!onlyBranch || !branch || e.branch === branch)));
+  const decided = filtered.reduce((n, e) => n + (e.decisions?.length || 0), 0);
   const scope = everywhere ? 'all repos' : `${basename(repo)}${onlyBranch && branch ? `, branch ${branch}` : ''}`;
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2.5 pt-1 pb-1 text-[11px] text-muted-foreground">
-        {repo && <Toggle options={[[basename(repo), false], ['all repos', true]]} value={allRepos} onChange={setAllRepos} />}
-        {!everywhere && branch && (
-          <>
-            <Dot />
-            <Toggle options={[['all branches', false], [branch, true]]} value={onlyBranch} onChange={setOnlyBranch} />
-          </>
+      <div className="flex flex-col gap-1.5 px-2.5 pt-2 pb-1.5 text-[11px] text-muted-foreground edge-b-engraved">
+        <SegmentBank
+          label="Log view"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'decisions', label: <>decisions{decided > 0 && <Count n={decided} />}</> },
+            { value: 'raw', label: <>all logs{filtered.length > 0 && <Count n={filtered.length} />}</> },
+            { value: 'summary', label: 'summary' },
+          ]}
+        />
+        {repo && (
+          <div className="flex min-w-0 items-center gap-x-1.5">
+            <Toggle options={[[basename(repo), false], ['all repos', true]]} value={allRepos} onChange={setAllRepos} />
+            {!everywhere && branch && (
+              <>
+                <span aria-hidden="true" className="px-1 text-faint">·</span>
+                <Toggle options={[['all branches', false], [branch, true]]} value={onlyBranch} onChange={setOnlyBranch} />
+              </>
+            )}
+          </div>
         )}
-        <span className="ml-auto flex items-center gap-2">
-          <Toggle options={[['decisions', 'decisions'], ['all logs', 'raw'], ['summary', 'summary']]} value={view} onChange={setView} />
-        </span>
       </div>
       {view === 'summary' ? <WorklogSummary entries={filtered} scope={scope} cwd={repo || projectPath} />
         : view === 'decisions' ? <WorklogDecisions entries={filtered} showRepo={everywhere} />
