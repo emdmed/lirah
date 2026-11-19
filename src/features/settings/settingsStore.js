@@ -80,6 +80,10 @@ export const SETTINGS_DEFAULTS = {
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',
+  // Royal nuggets switched on (see ROYAL_NUGGETS; index.css [data-royal~=…]), and
+  // the lamp shape: 'reticle' (the default), 'gem' (a cabochon) or 'mon' (a crest).
+  royal: [],
+  lampStyle: 'reticle',
   // How the tab's agent talks: 'plain' (short, simple words, problems flagged
   // up front; see tabs/launchOptions.js) or 'off' (the CLI's own style).
   agentVoice: 'plain',
@@ -199,6 +203,9 @@ function cleanPlugin(item) {
   };
 }
 
+export const ROYAL_NUGGETS = ['seal', 'initial', 'coronet', 'corners', 'tinctures', 'beads', 'guilloche', 'ermine'];
+export const LAMP_STYLES = ['reticle', 'gem', 'mon'];
+
 // Keys whose value needs more than a type check. Each returns the cleaned
 // value, or undefined to keep the default.
 const VALIDATORS = {
@@ -208,6 +215,8 @@ const VALIDATORS = {
     : undefined),
   plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
+  royal: (v) => (Array.isArray(v) ? ROYAL_NUGGETS.filter((n) => v.includes(n)) : undefined),
+  lampStyle: (v) => (LAMP_STYLES.includes(v) ? v : undefined),
   agentVoice: (v) => (v === 'plain' || v === 'off' ? v : undefined),
   sidebarSection: (v) => (v === 'tabs' || v === 'files' ? v : undefined),
   filesPanel: (v) => (v === 'tree' || v === 'features' ? v : undefined),

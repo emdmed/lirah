@@ -382,6 +382,195 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
 }
 :root[data-desk] .tui-pane:is(:focus-within, .terminal-live)::before { color: color-mix(in srgb, var(--color-lamp) 60%, #000); }
 
+/* Royal crafts (a theme's ui.material: Fabergé, Bindery, Sèvres, Maki-e). Flat
+   panels; the character is the frame and ground on the face (::after, over the
+   gilt inlay) and a pattern on the desk. Terminal screens keep a plain ground. */
+:root[data-material="enamel"] { --royal-ground: var(--royal-guilloche); --royal-ground-size: 240px 120px; }
+:root[data-material="leather"] { --royal-ground: url("/royal/grain.webp"); --royal-ground-size: 300px 300px; }
+:root:is([data-material="enamel"], [data-material="leather"]) .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
+  background-image: var(--royal-ground);
+  background-size: var(--royal-ground-size);
+}
+/* Fabergé: a line of gold beads inside every pane. */
+:root[data-material="enamel"] .tui-pane:not(.tui-float, .tui-dialog)::after {
+  outline: 2px dotted color-mix(in srgb, var(--ins-lamp) 75%, transparent);
+  outline-offset: -6px;
+}
+/* Bindery and Sèvres: a double rim (gold, then a finer line) inside the inlay. */
+:root:is([data-material="leather"], [data-material="porcelain"]) .tui-pane:not(.tui-float, .tui-dialog) { --face: var(--ins-panel); --rim: color-mix(in srgb, var(--ins-lamp) 55%, transparent); }
+:root:is([data-material="leather"], [data-material="porcelain"]) .tui-pane.tui-pane-screen { --face: var(--ins-glass); }
+:root[data-material="porcelain"] .tui-pane:not(.tui-float, .tui-dialog) { --rim: #2b4aa0; }
+:root:is([data-material="leather"], [data-material="porcelain"]) .tui-pane:not(.tui-float, .tui-dialog)::after {
+  outline: none;
+  box-shadow: var(--inlay-mask), inset 0 0 0 5px var(--ins-lamp), inset 0 0 0 7px var(--face), inset 0 0 0 7.6px var(--rim);
+}
+/* Maki-e: gold dust settling into the face's bottom-right corner, one firmer hairline. */
+:root[data-material="lacquer"] .tui-pane:not(.tui-float, .tui-dialog)::after {
+  background: url("/royal/dust.svg") right bottom / 460px 460px no-repeat;
+  outline-color: color-mix(in srgb, var(--ins-lamp) 40%, transparent);
+  outline-offset: -5px;
+}
+/* The negoro desk is dark: gilt printed on it stays bright. */
+:root[data-material="lacquer"] :is(.ins-pane-legend, .tui-pane-info, .chassis-rail) { --ins-lamp: var(--color-lamp); }
+:root[data-material="lacquer"] .tui-pane:is(:focus-within, .terminal-live)::before { color: var(--color-lamp); }
+/* Desk patterns: laid paper, partridge-eye, sparse dust. One fixed sheet, as
+   with Shire's marble, so it runs on unbroken behind legends and gutters. */
+:root[data-material="leather"] {
+  --royal-desk: url("/royal/laid.svg");
+  --royal-desk-size: 30px 3px;
+}
+:root[data-material="porcelain"] { --royal-desk: url("/royal/partridge.svg"); --royal-desk-size: 18px 18px; }
+:root[data-material="lacquer"] { --royal-desk: url("/royal/desk-dust.svg"); --royal-desk-size: 400px 400px; }
+:root:is([data-material="leather"], [data-material="porcelain"], [data-material="lacquer"]) :is(body, [class*="bg-[var(--ins-gutter)]"], [style*="--ins-gutter)"]),
+:root:is([data-material="leather"], [data-material="porcelain"], [data-material="lacquer"]) .tui-pane:not(.tui-float, .tui-dialog)::before,
+:root:is([data-material="leather"], [data-material="porcelain"], [data-material="lacquer"]) .tui-pane:not(.tui-float, .tui-dialog) :is(.tui-pane-info, .ins-pane-legend > *) {
+  background-image: var(--royal-desk);
+  background-attachment: fixed;
+  background-size: var(--royal-desk-size);
+}
+:root:is([data-material="leather"], [data-material="porcelain"], [data-material="lacquer"]) .tui-pane:not(.tui-float, .tui-dialog) {
+  background:
+    linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat,
+    var(--royal-desk) 0 0 / var(--royal-desk-size) fixed,
+    var(--ins-gutter);
+}
+
+/* Royal nuggets (settings.royal, any theme; ThemeContext sets data-royal).
+   Each one is off unless listed; turning it off restores what was there. */
+:root { --royal-guilloche: url("/royal/guilloche-dark.svg"); }
+:root[data-theme="light"] { --royal-guilloche: url("/royal/guilloche-light.svg"); }
+/* Beads: the focused pane's frame becomes a line of gold beads inside its edge. */
+:root[data-royal~="beads"] .tui-pane:is(:focus-within, .terminal-live):not(.tui-float, .tui-dialog)::after {
+  border-color: transparent;
+  outline: 2px dotted color-mix(in srgb, var(--ins-lamp) 85%, transparent);
+  outline-offset: -5px;
+}
+/* Guilloché: engine-turned waves over the panel face. Terminal screens stay plain. */
+:root[data-royal~="guilloche"] .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
+  background-image: var(--royal-guilloche);
+  background-size: 240px 120px;
+}
+:root[data-material="velvet"][data-royal~="guilloche"] .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
+  background:
+    linear-gradient(170deg, rgb(255 250 230 / 0.06), transparent 32% 70%, rgb(0 8 4 / 0.18)),
+    var(--royal-guilloche) 0 0 / 240px 120px;
+}
+/* Tooled corners: a gilt fleuron in each corner of the face. Legend panes leave ::before free. */
+:root[data-royal~="corners"] .tui-pane[data-legend]:not(.tui-float, .tui-dialog)::before {
+  content: "";
+  inset: 6px 0;
+  padding: 0;
+  background: var(--ins-lamp) none;
+  opacity: 0.8;
+  z-index: 5;
+  --royal-corners:
+    url("/royal/corner-tl.svg") left 7px top 7px / 16px 16px no-repeat,
+    url("/royal/corner-tr.svg") right 7px top 7px / 16px 16px no-repeat,
+    url("/royal/corner-bl.svg") left 7px bottom 7px / 16px 16px no-repeat,
+    url("/royal/corner-br.svg") right 7px bottom 7px / 16px 16px no-repeat;
+  -webkit-mask: var(--royal-corners);
+  mask: var(--royal-corners);
+}
+/* Coronet: the current tab wears a small crown instead of its crop ticks. */
+:root[data-royal~="coronet"] .ins-tab-current { background-image: none; }
+:root[data-royal~="coronet"] .ins-tab-current::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 15px;
+  width: 10px;
+  height: 8px;
+  background: var(--tick);
+  -webkit-mask: url("/royal/crown.svg") center / contain no-repeat;
+  mask: url("/royal/crown.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+/* Ermine: the desk as white fur with black tails; only themes with a light desk. */
+:root[data-desk][data-royal~="ermine"] :is(body, [class*="bg-[var(--ins-gutter)]"], [style*="--ins-gutter)"]) {
+  background-image: url("/royal/ermine.svg");
+  background-attachment: fixed;
+  background-size: 60px 60px;
+}
+/* Text printed on the desk (rail, legends, pane notes) sits on plain fur, so the tails never cross it. */
+:root[data-desk][data-royal~="ermine"] :is(.ins-rail, .chassis-rail, .tui-pane:not(.tui-float, .tui-dialog) :is(.tui-pane-info, .ins-pane-legend > *)) {
+  background: var(--ins-gutter);
+}
+:root[data-desk][data-royal~="ermine"] :is(.ins-rail, .chassis-rail) * { background-image: none; }
+/* Seal and tinctures are always in the markup (Regalia.jsx); shown only while on. */
+.royal-seal, .royal-tincture { display: none; }
+:root[data-royal~="seal"] .royal-seal, :root[data-royal~="tinctures"] .royal-tincture { display: inline-block; }
+:root[data-royal~="seal"] .royal-seal-off, :root[data-royal~="tinctures"] .royal-tincture-off { display: none; }
+/* Illuminated initial: the focused pane's first letter grows into gold on vermilion
+   and the rest of the name slides aside. Transforms only, so nothing re-lays out
+   mid-way (font-size or padding steps made the text shiver); the name keeps the
+   room for the slide at its end, where it only lengthens the legend's mask. */
+:root[data-royal~="initial"] .ins-pane-legend .ins-pane-name { padding-right: var(--initial-shift); }
+:root[data-royal~="initial"] .ins-pane-legend {
+  /* The box's right edge at 1.2x (a ~0.6em glyph grows ~0.12em, plus its 3px side) and a 1px gap. */
+  --initial-shift: calc(0.12em + 4.6px);
+}
+:root[data-royal~="initial"] .ins-pane-initial,
+:root[data-royal~="initial"] .ins-pane-rest {
+  display: inline-block;
+  transition: transform var(--ins-cool) var(--ins-ease-out), color var(--ins-cool) var(--ins-ease-out);
+}
+:root[data-royal~="initial"] .ins-pane-initial {
+  position: relative;
+  isolation: isolate;
+  /* Grows down from its top, like a drop cap: the legend sits on the pane's top edge, and panes clip above it. */
+  transform-origin: 0 0;
+}
+:root[data-royal~="initial"] .ins-pane-initial::before {
+  content: "";
+  position: absolute;
+  inset: 0 -3px -1px;
+  z-index: -1;
+  background: #8a2a1c;
+  box-shadow: inset 0 0 0 1px #e3bf67;
+  opacity: 0;
+  transition: opacity var(--ins-cool) var(--ins-ease-out);
+}
+:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-pane-initial, .ins-pane-rest, .ins-pane-initial::before) {
+  transition-duration: 240ms;
+}
+:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-initial { transform: scale(1.2); color: #e3bf67; }
+:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-initial::before { opacity: 1; }
+:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-rest { transform: translateX(var(--initial-shift)); }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-royal~="initial"] :is(.ins-pane-initial, .ins-pane-rest, .ins-pane-initial::before) { transition: none; }
+}
+/* Lamp shapes (settings.lampStyle; ThemeContext sets data-lamp). Same states and
+   colours as the reticle; only the drawing changes. A lit lamp is any state but off,
+   or the focused pane's legend lamp. */
+:root[data-lamp="gem"] .ins-lamp::before { display: none; }
+:root[data-lamp="gem"] .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="wait"], [data-state="fault"]),
+:root[data-lamp="gem"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp {
+  background:
+    radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.6) 0 18%, transparent 32%),
+    radial-gradient(circle, var(--lamp-ink) 0 55%, color-mix(in srgb, var(--lamp-ink) 55%, #000) 100%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ins-lamp) 70%, transparent);
+}
+:root[data-lamp="mon"] .ins-lamp::before {
+  inset: -2px;
+  background: var(--lamp-ink);
+  -webkit-mask: url("/royal/mon.svg") center / contain no-repeat;
+  mask: url("/royal/mon.svg") center / contain no-repeat;
+}
+:root[data-lamp="mon"] .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="wait"], [data-state="fault"]),
+:root[data-lamp="mon"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp { box-shadow: none; }
+/* Waiting on you, the crest turns slowly. */
+:root[data-lamp="mon"] .ins-lamp[data-state="wait"]:not([data-settled])::before { animation: royal-mon-turn 12s linear infinite; }
+@keyframes royal-mon-turn { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-lamp="mon"] .ins-lamp::before { animation: none; }
+}
+:root[data-desk][data-royal~="ermine"] .tui-pane:not(.tui-float, .tui-dialog) {
+  background:
+    linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat,
+    url("/royal/ermine.svg") 0 0 / 60px 60px fixed,
+    var(--ins-gutter);
+}
+
 html,
 body,
 #root {

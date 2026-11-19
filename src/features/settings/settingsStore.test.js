@@ -106,4 +106,10 @@ describe('settingsStore', () => {
     expect(disk.get('workspaces/w1/workspace.json').overrides).toEqual({});
     expect(s.getEffectiveSettings('w1').sandboxEnabled).toBe(s.getSettings().sandboxEnabled);
   });
+
+  it('keeps only known royal nuggets and lamp styles', async () => {
+    const s = await fresh();
+    expect(s.sanitize({ royal: ['ermine', 'bogus', 'seal'], lampStyle: 'gem' })).toMatchObject({ royal: ['seal', 'ermine'], lampStyle: 'gem' });
+    expect(s.sanitize({ royal: 'seal', lampStyle: 'disco' })).toMatchObject({ royal: [], lampStyle: 'reticle' });
+  });
 });

@@ -13,6 +13,7 @@ import { isProjectTab, useTabManager } from './TabContext';
 import { useAttentionQueue } from './useAgentAttention';
 import { RenameField } from './RenameField';
 import { Lamp } from '../../components/instrument/Lamp';
+import { TinctureShield } from '../../components/instrument/Regalia';
 import { Button } from '@/components/ui/button';
 import { Add, ChevronDown, Workspace } from '@/components/icons';
 
@@ -84,7 +85,8 @@ export function WorkspaceMenu() {
           title="Workspace (Alt+W cycles; double-click or F2 to rename)"
           aria-label={`Workspace ${active?.name ?? ''}${waitingText}`}
         >
-          <Workspace size={12} className="shrink-0 text-muted-foreground" />
+          <Workspace size={12} className="royal-tincture-off shrink-0 text-muted-foreground" />
+          <TinctureShield index={workspaces.indexOf(active)} />
           <span className="truncate max-w-32 text-[var(--ins-legend)]">{active?.name}</span>
           {waitingNames.length > 0 && <Lamp state={othersBlocked ? 'fault' : 'wait'} />}
           <ChevronDown size={12} className="text-faint" />
@@ -100,6 +102,7 @@ export function WorkspaceMenu() {
         <DropdownMenuRadioGroup value={activeWorkspaceId} onValueChange={switchWorkspace}>
           {workspaces.map((ws) => (
             <DropdownMenuRadioItem key={ws.id} value={ws.id} data-ws-id={ws.id} className="gap-1">
+              <TinctureShield index={workspaces.indexOf(ws)} size={11} className="mr-0.5" />
               {ws.name}
               <span className="tabular-nums text-muted-foreground">{countOf(ws)}</span>
               {star(ws)}

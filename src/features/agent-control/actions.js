@@ -29,6 +29,7 @@ const CHOICES = {
   scrollback: SCROLLBACK_OPTIONS.map((o) => o.value),
   figures: ['full', 'compact'],
   agentVoice: ['plain', 'off'],
+  lampStyle: ['reticle', 'gem', 'mon'],
 };
 
 // Settings the CLI may touch: those with a row in the Settings dialog.

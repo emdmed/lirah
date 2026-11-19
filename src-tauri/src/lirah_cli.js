@@ -750,6 +750,7 @@ const SETTINGS = Object.fromEntries([
   ["showTitleBar", "appearance", "Window controls", true],
   ["zenMode", "appearance", "Zen mode", false],
   ["figures", "appearance", "Figures", "full", { values: ["full", "compact"] }],
+  ["lampStyle", "appearance", "Lamp style", "reticle", { values: ["reticle", "gem", "mon"] }],
   ["scrollback", "terminal", "Scrollback", 10000, { values: [1000, 10000, 50000, 200000] }],
   ["autoCommitCli", "git", "Auto commit", "claude-code", { values: CLI_IDS }],
   ["autoChangelogEnabled", "git", "Auto changelog", false],
@@ -768,6 +769,7 @@ const THEMES = [
   ["matte-black", "Matte Black"], ["hackerman", "Hackerman"], ["osaka-jade", "Osaka Jade"],
   ["ethereal", "Ethereal"], ["flexoki", "Flexoki Light"], ["catppuccin-latte", "Catppuccin Latte"],
   ["rivendell", "Rivendell"], ["lothlorien", "Lothlórien"], ["orrery", "Orrery"], ["shire", "Shire"], ["rivendell-silver", "Rivendell Silver"], ["lothlorien-birch", "Lothlórien Birch"],
+  ["faberge", "Fabergé"], ["bindery", "Bindery"], ["sevres", "Sèvres"], ["makie", "Maki-e"],
   ["omarchy", "Omarchy"], // only exists on Omarchy (src/themes/omarchy.js)
 ];
 const DEFAULT_THEME = "tokyo-night";

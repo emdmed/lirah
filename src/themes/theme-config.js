@@ -1527,6 +1527,120 @@ export const themes = {
   },
 };
 
+// The royal crafts: each a flat panel whose character is its frame, ground and
+// desk (index.css, data-material). All take gilt fittings.
+const royal = ({ name, type = 'dark', terminal, desk, deskInk, panel, card, raised, well, ink, muted, accent, border, lamp, ok, warn, fault, material, folder, gitAdded, gitDeleted }) => ({
+  name,
+  type,
+  terminal,
+  ui: {
+    gutter: desk,
+    gutterForeground: deskInk,
+    trim: 'gilt',
+    material,
+    background: panel,
+    foreground: ink,
+    card,
+    cardForeground: ink,
+    popover: card,
+    popoverForeground: ink,
+    primary: ink,
+    primaryForeground: panel,
+    secondary: raised,
+    secondaryForeground: ink,
+    muted: raised,
+    mutedForeground: muted,
+    accent,
+    accentForeground: panel,
+    destructive: fault,
+    destructiveForeground: panel,
+    border,
+    input: raised,
+    inputBackground: well,
+    ring: lamp,
+    sidebar: panel,
+    sidebarForeground: ink,
+    sidebarPrimary: ink,
+    sidebarPrimaryForeground: panel,
+    sidebarAccent: card,
+    sidebarAccentForeground: ink,
+    sidebarBorder: border,
+    sidebarRing: lamp,
+    lamp,
+    ok,
+    warn,
+    fault,
+    folder,
+    gitAdded,
+    gitDeleted,
+    treeGuide: `${type === 'light' ? '225 55% 23%' : '42 38% 88%'} / 0.1`,
+  },
+});
+
+// Fabergé: imperial-blue enamel over engine turning, beaded gold, pearl desk.
+themes.faberge = royal({
+  name: 'Fabergé', material: 'enamel',
+  terminal: {
+    foreground: '#eee8da', background: '#132048', cursor: '#d8b25e', cursorAccent: '#132048',
+    selectionBackground: '#25356a', selectionForeground: '#eee8da',
+    black: '#24346c', red: '#ec958d', green: '#a9d3a0', yellow: '#e8c46c', blue: '#9db8ec', magenta: '#d6a6d0', cyan: '#94cbe0', white: '#d6d0c0',
+    brightBlack: '#8e95b3', brightRed: '#f5aea7', brightGreen: '#c2e4ba', brightYellow: '#f2d68c', brightBlue: '#b9cdf3', brightMagenta: '#e6c0e0', brightCyan: '#b4dcec', brightWhite: '#fbf7ec',
+  },
+  desk: '#e8e3d6', deskInk: '#16224a',
+  panel: '#15224d', card: '#1a2a5a', raised: '#1f3065', well: '#0e1838',
+  ink: '#eee8da', muted: '#a8abbd', accent: '#cfc8b4', border: 'hsl(42 22% 36%)',
+  lamp: '#d8b25e', ok: '#a9d3a0', warn: '#e5925f', fault: '#e2655a',
+  folder: '42 40% 66%', gitAdded: '105 40% 72%', gitDeleted: '5 75% 68%',
+});
+
+// Bindery: red morocco with a double gilt fillet, on a laid-paper desk.
+themes.bindery = royal({
+  name: 'Bindery', material: 'leather',
+  terminal: {
+    foreground: '#f0e4cd', background: '#30110d', cursor: '#d4a94e', cursorAccent: '#30110d',
+    selectionBackground: '#4e1f18', selectionForeground: '#f0e4cd',
+    black: '#4e2219', red: '#f0928a', green: '#b6d49a', yellow: '#e8c46c', blue: '#9fbfdc', magenta: '#dba7c0', cyan: '#a3d2c6', white: '#dccfb6',
+    brightBlack: '#a08578', brightRed: '#f6aca5', brightGreen: '#cbe3b4', brightYellow: '#f2d68c', brightBlue: '#bad2e8', brightMagenta: '#e9c1d4', brightCyan: '#bfe2d9', brightWhite: '#fbf4e4',
+  },
+  desk: '#ebe3cf', deskInk: '#2a0f0b',
+  panel: '#36140f', card: '#401a14', raised: '#4a1f18', well: '#240b08',
+  ink: '#f0e4cd', muted: '#b7a189', accent: '#d6c6a8', border: 'hsl(38 30% 34%)',
+  lamp: '#d4a94e', ok: '#b6d49a', warn: '#eba066', fault: '#f2806b',
+  folder: '40 50% 62%', gitAdded: '95 40% 70%', gitDeleted: '6 80% 72%',
+});
+
+// Sèvres: white porcelain with a gold rim and cobalt line, on bleu céleste.
+themes.sevres = royal({
+  name: 'Sèvres', type: 'light', material: 'porcelain',
+  terminal: {
+    foreground: '#1b2b5c', background: '#f8f7f1', cursor: '#a87a18', cursorAccent: '#f8f7f1',
+    selectionBackground: '#e4e9f3', selectionForeground: '#1b2b5c',
+    black: '#1b2b5c', red: '#b8452f', green: '#3a7d3f', yellow: '#946500', blue: '#2b4aa0', magenta: '#8e3f86', cyan: '#1a7c8a', white: '#e8e6dc',
+    brightBlack: '#6d7894', brightRed: '#cf6a55', brightGreen: '#55985a', brightYellow: '#b07e10', brightBlue: '#4a68ba', brightMagenta: '#a85ca0', brightCyan: '#2f97a5', brightWhite: '#fbfaf5',
+  },
+  desk: '#86c3d3', deskInk: '#0e2848',
+  panel: '#fbfaf5', card: '#f3f1e8', raised: '#eeece2', well: '#ffffff',
+  ink: '#1b2b5c', muted: '#66708d', accent: '#2b4aa0', border: 'hsl(42 40% 70%)',
+  lamp: '#a87a18', ok: '#4f9a5a', warn: '#c0661e', fault: '#a8321f',
+  folder: '40 75% 38%', gitAdded: '125 37% 36%', gitDeleted: '6 62% 45%',
+});
+
+// Maki-e: black urushi with gold dust in one corner, on negoro red.
+themes.makie = royal({
+  name: 'Maki-e', material: 'lacquer',
+  terminal: {
+    foreground: '#efe6d6', background: '#0f0c0b', cursor: '#d8ad4f', cursorAccent: '#0f0c0b',
+    selectionBackground: '#2a2220', selectionForeground: '#efe6d6',
+    black: '#2a2220', red: '#e8857a', green: '#a9cf9c', yellow: '#e4bb5c', blue: '#93b4d4', magenta: '#cf9fbc', cyan: '#9cc9c0', white: '#d6ccbb',
+    brightBlack: '#8c8277', brightRed: '#f2a59c', brightGreen: '#c2e0b8', brightYellow: '#efcf82', brightBlue: '#b1cbe3', brightMagenta: '#e0bcd2', brightCyan: '#b9ddd6', brightWhite: '#faf4e8',
+  },
+  desk: '#7a2418', deskInk: '#f2e4cc',
+  panel: '#110e0d', card: '#1a1614', raised: '#221c1a', well: '#080605',
+  ink: '#efe6d6', muted: '#a39888', accent: '#cdbfa8', border: 'hsl(40 22% 28%)',
+  lamp: '#d8ad4f', ok: '#a9cf9c', warn: '#e78f56', fault: '#e25d4f',
+  folder: '41 60% 62%', gitAdded: '105 35% 70%', gitDeleted: '6 72% 68%',
+});
+
 // Rivendell on a pale silver-stone desk, in its own ink (see ThemeContext); the
 // panels are Rivendell's, so swapping the two themes swaps only the desk.
 themes['rivendell-silver'] = {

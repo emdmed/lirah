@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getRecordingMode } from '../lib/recordingMode';
 import { themes, defaultTheme, loadTheme, saveTheme } from '../themes/theme-config';
-import { subscribeSettings } from '../features/settings/settingsStore';
+import { subscribeSettings, useSetting } from '../features/settings/settingsStore';
 import { onOmarchyChange } from '../themes/omarchy';
 
 const ThemeContext = createContext(undefined);
@@ -31,6 +31,17 @@ export function ThemeProvider({ children }) {
   useEffect(() => subscribeSettings(() => {
     if (!forced.current) setCurrentTheme(loadTheme());
   }), []);
+
+  // Royal nuggets and the lamp shape ride on the root, like material and trim.
+  const [royal] = useSetting('royal');
+  const [lampStyle] = useSetting('lampStyle');
+  useEffect(() => {
+    const root = document.documentElement;
+    if (royal.length) root.dataset.royal = royal.join(' ');
+    else delete root.dataset.royal;
+    if (lampStyle !== 'reticle') root.dataset.lamp = lampStyle;
+    else delete root.dataset.lamp;
+  }, [royal, lampStyle]);
 
   // The omarchy theme's palette changes in place when the desktop theme does.
   const [palette, setPalette] = useState(0);

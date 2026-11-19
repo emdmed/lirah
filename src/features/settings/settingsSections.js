@@ -95,6 +95,16 @@ export const SETTINGS_ROWS = [
     words: 'figures drawings diagrams compact full calibrated',
   },
   {
+    id: 'regalia', section: 'appearance', kind: 'custom', label: 'Regalia',
+    hint: 'Small royal details, on any theme. Each one is off until you switch it on.',
+    words: 'regalia royal nuggets wax seal illuminated initial coronet crown corners fleuron tinctures heraldic shield beads beaded guilloche ermine',
+  },
+  {
+    id: 'lamp-style', section: 'appearance', kind: 'choice', key: 'lampStyle',
+    label: 'Lamp style', hint: 'How lamps are drawn. Same colours and states.',
+    words: 'lamp style reticle gem cabochon mon crest chrysanthemum royal',
+  },
+  {
     id: 'scrollback', section: 'terminal', kind: 'choice', key: 'scrollback',
     label: 'Scrollback', hint: 'Lines kept per terminal.',
     words: 'scrollback lines history memory buffer',

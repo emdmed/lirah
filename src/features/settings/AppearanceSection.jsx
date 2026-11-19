@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Detent } from '../../components/instrument/Detent';
-import { useSetting } from './settingsStore';
+import { ToggleSwitch } from '../../components/instrument/ToggleSwitch';
+import { useSetting, ROYAL_NUGGETS } from './settingsStore';
 import { Row, Section, ToggleRow } from './parts';
 import { SECTIONS, SETTINGS_ROW } from './settingsSections';
 
@@ -58,6 +59,47 @@ function ThemeList({ themes, value, onChange }) {
   );
 }
 
+const LAMP_OPTIONS = [
+  { value: 'reticle', label: 'reticle', title: 'A sight: ring, crosshair and dot' },
+  { value: 'gem', label: 'gem', title: 'A domed cabochon set in gold' },
+  { value: 'mon', label: 'mon', title: 'A twelve-petal crest; turns while it waits on you' },
+];
+
+// The royal nuggets, in the order the Regalia row lists them.
+const NUGGET_LABELS = {
+  seal: ['Wax seal', 'A red seal stamped with the lyre beside "needs you".'],
+  initial: ['Illuminated initial', 'The focused pane\'s first letter in gold on vermilion.'],
+  coronet: ['Coronet', 'A small crown on the current tab, instead of its corner ticks.'],
+  corners: ['Tooled corners', 'A gilt ornament in each pane corner.'],
+  tinctures: ['Heraldic tinctures', 'Each workspace gets a hatched heraldic shield.'],
+  beads: ['Beaded border', 'The focused pane is framed in gold beads.'],
+  guilloche: ['Guilloché', 'Faint engraved waves on the panels.'],
+  ermine: ['Ermine desk', 'The desk as white ermine. Themes with a light desk only.'],
+};
+
+// One switch per nugget; ermine needs a desk set apart from the panels.
+function RegaliaRow({ hasDesk }) {
+  const [royal, setRoyal] = useSetting('royal');
+  const row = SETTINGS_ROW.regalia;
+  const toggle = (name, on) => setRoyal((list) => ROYAL_NUGGETS.filter((n) => (n === name ? on : list.includes(n))));
+  return (
+    <Row id={row.id} sectionId="appearance" label={row.label} hint={row.hint}>
+      <div className="flex flex-col">
+        {ROYAL_NUGGETS.map((name) => {
+          const [label, hint] = NUGGET_LABELS[name];
+          const disabled = name === 'ermine' && !hasDesk;
+          return (
+            <label key={name} className={cn('flex h-6 items-center gap-2 text-xs', disabled ? 'text-faint' : 'text-muted-foreground')} title={disabled ? 'Needs a theme with a light desk (Shire, Rivendell Silver, Lothlórien Birch)' : hint}>
+              <ToggleSwitch checked={royal.includes(name)} onChange={(on) => toggle(name, on)} disabled={disabled} label={label} />
+              <span className={cn(royal.includes(name) && !disabled && 'text-foreground')}>{label}</span>
+            </label>
+          );
+        })}
+      </div>
+    </Row>
+  );
+}
+
 const FIGURE_OPTIONS = [
   { value: 'full', label: 'full', title: 'Print scales, values and leaders' },
   { value: 'compact', label: 'compact', title: 'Marks only; values in the tooltip' },
@@ -68,6 +110,8 @@ export function AppearanceSection({ active, showTitleBar, onShowTitleBarChange }
   const { currentTheme, themes, changeTheme } = useTheme();
   const [figures, setFigures] = useSetting('figures');
   const [zenMode, setZenMode] = useSetting('zenMode');
+  const [lampStyle, setLampStyle] = useSetting('lampStyle');
+  const lampRow = SETTINGS_ROW['lamp-style'];
   const figuresRow = SETTINGS_ROW.figures;
   return (
     <Section section={SECTIONS.find((s) => s.id === 'appearance')} active={active}>
@@ -85,6 +129,10 @@ export function AppearanceSection({ active, showTitleBar, onShowTitleBarChange }
           className="w-40"
         />
       </Row>
+      <Row id={lampRow.id} sectionId="appearance" label={lampRow.label} hint={lampRow.hint}>
+        <Detent label={lampRow.label} value={lampStyle} options={LAMP_OPTIONS} onChange={setLampStyle} className="w-48" />
+      </Row>
+      <RegaliaRow hasDesk={!!themes[currentTheme]?.ui.gutter} />
     </Section>
   );
 }
