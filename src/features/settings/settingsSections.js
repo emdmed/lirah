@@ -95,9 +95,14 @@ export const SETTINGS_ROWS = [
     words: 'figures drawings diagrams compact full calibrated',
   },
   {
-    id: 'regalia', section: 'appearance', kind: 'custom', label: 'Regalia',
-    hint: 'Small royal details, on any theme. Each one is off until you switch it on.',
-    words: 'regalia royal nuggets wax seal illuminated initial coronet crown corners fleuron tinctures heraldic shield beads beaded guilloche ermine',
+    id: 'guilloche', section: 'appearance', kind: 'custom', label: 'Guilloché',
+    hint: 'Faint engine-turned lines engraved on the panels. Terminal screens stay plain.',
+    words: 'guilloche guilloché engraving pattern regalia royal waves swell current moire moiré',
+  },
+  {
+    id: 'scene', section: 'appearance', kind: 'custom', label: 'Scene',
+    hint: 'A landscape engraved along the foot of each panel.',
+    words: 'scene landscape dunes horizon peaks mountains sea ocean guilloche',
   },
   {
     id: 'lamp-style', section: 'appearance', kind: 'choice', key: 'lampStyle',

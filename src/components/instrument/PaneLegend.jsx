@@ -12,10 +12,7 @@ export function PaneLegend({ index, title, status, note, lit = false, lamp, trai
     <div className="ins-pane-legend">
       <span>
         {index != null && <span className="ins-legend ins-pane-key" data-lit={lit || undefined}>{index}</span>}
-        {/* A string title's first letter is its own span, for the illuminated-initial nugget (index.css). */}
-        <span className="ins-name ins-pane-name">
-          {typeof title === 'string' && title ? <><span className="ins-pane-initial">{title[0]}</span><span className="ins-pane-rest">{title.slice(1)}</span></> : title}
-        </span>
+        <span className="ins-name ins-pane-name">{title}</span>
         {status != null && <span className="ins-pane-legend-status">{status}</span>}
         {(lamp != null || lit) && status == null && <Lamp state={lampState} />}
         {note != null && <span className="ins-pane-legend-note">{note}</span>}

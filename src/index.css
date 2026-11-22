@@ -435,109 +435,39 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
     var(--ins-gutter);
 }
 
-/* Royal nuggets (settings.royal, any theme; ThemeContext sets data-royal).
-   Each one is off unless listed; turning it off restores what was there. */
-:root { --royal-guilloche: url("/royal/guilloche-dark.svg"); }
+/* Guilloché and scene (settings.guilloche, settings.scene, any theme; ThemeContext
+   sets data-guilloche and data-scene): engraved lines over the panel face, and a
+   landscape along its foot, the scene's layer over the field's. Terminal screens stay plain. */
+:root {
+  --royal-guilloche: url("/royal/guilloche-dark.svg");
+  --guilloche: none; --guilloche-size: auto;
+  --scene: none; --scene-size: auto;
+}
 :root[data-theme="light"] { --royal-guilloche: url("/royal/guilloche-light.svg"); }
-/* Beads: the focused pane's frame becomes a line of gold beads inside its edge. */
-:root[data-royal~="beads"] .tui-pane:is(:focus-within, .terminal-live):not(.tui-float, .tui-dialog)::after {
-  border-color: transparent;
-  outline: 2px dotted color-mix(in srgb, var(--ins-lamp) 85%, transparent);
-  outline-offset: -5px;
+:root[data-guilloche="waves"] { --guilloche: var(--royal-guilloche); --guilloche-size: 240px 120px; }
+:root[data-guilloche="swell"] { --guilloche: url("/royal/guilloche-swell-dark.svg"); --guilloche-size: 480px 240px; }
+:root[data-guilloche="current"] { --guilloche: url("/royal/guilloche-current-dark.svg"); --guilloche-size: 480px 240px; }
+:root[data-guilloche="moire"] { --guilloche: url("/royal/guilloche-moire-dark.svg"); --guilloche-size: 480px 120px; }
+:root[data-theme="light"][data-guilloche="swell"] { --guilloche: url("/royal/guilloche-swell-light.svg"); }
+:root[data-theme="light"][data-guilloche="current"] { --guilloche: url("/royal/guilloche-current-light.svg"); }
+:root[data-theme="light"][data-guilloche="moire"] { --guilloche: url("/royal/guilloche-moire-light.svg"); }
+:root[data-scene="dunes"] { --scene: url("/royal/guilloche-scene-dunes-dark.svg"); --scene-size: 720px 140px; }
+:root[data-scene="peaks"] { --scene: url("/royal/guilloche-scene-peaks-dark.svg"); --scene-size: 720px 160px; }
+:root[data-scene="sea"] { --scene: url("/royal/guilloche-scene-sea-dark.svg"); --scene-size: 240px 110px; }
+:root[data-theme="light"][data-scene="dunes"] { --scene: url("/royal/guilloche-scene-dunes-light.svg"); }
+:root[data-theme="light"][data-scene="peaks"] { --scene: url("/royal/guilloche-scene-peaks-light.svg"); }
+:root[data-theme="light"][data-scene="sea"] { --scene: url("/royal/guilloche-scene-sea-light.svg"); }
+:root:is([data-guilloche], [data-scene]) .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
+  background-image: var(--scene), var(--guilloche);
+  background-size: var(--scene-size), var(--guilloche-size);
+  background-position: 0 100%, 0 0;
+  background-repeat: repeat-x, repeat;
 }
-/* Guilloché: engine-turned waves over the panel face. Terminal screens stay plain. */
-:root[data-royal~="guilloche"] .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
-  background-image: var(--royal-guilloche);
-  background-size: 240px 120px;
-}
-:root[data-material="velvet"][data-royal~="guilloche"] .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
-  background:
-    linear-gradient(170deg, rgb(255 250 230 / 0.06), transparent 32% 70%, rgb(0 8 4 / 0.18)),
-    var(--royal-guilloche) 0 0 / 240px 120px;
-}
-/* Tooled corners: a gilt fleuron in each corner of the face. Legend panes leave ::before free. */
-:root[data-royal~="corners"] .tui-pane[data-legend]:not(.tui-float, .tui-dialog)::before {
-  content: "";
-  inset: 6px 0;
-  padding: 0;
-  background: var(--ins-lamp) none;
-  opacity: 0.8;
-  z-index: 5;
-  --royal-corners:
-    url("/royal/corner-tl.svg") left 7px top 7px / 16px 16px no-repeat,
-    url("/royal/corner-tr.svg") right 7px top 7px / 16px 16px no-repeat,
-    url("/royal/corner-bl.svg") left 7px bottom 7px / 16px 16px no-repeat,
-    url("/royal/corner-br.svg") right 7px bottom 7px / 16px 16px no-repeat;
-  -webkit-mask: var(--royal-corners);
-  mask: var(--royal-corners);
-}
-/* Coronet: the current tab wears a small crown instead of its crop ticks. */
-:root[data-royal~="coronet"] .ins-tab-current { background-image: none; }
-:root[data-royal~="coronet"] .ins-tab-current::before {
-  content: "";
-  position: absolute;
-  left: 1px;
-  top: 15px;
-  width: 10px;
-  height: 8px;
-  background: var(--tick);
-  -webkit-mask: url("/royal/crown.svg") center / contain no-repeat;
-  mask: url("/royal/crown.svg") center / contain no-repeat;
-  pointer-events: none;
-}
-/* Ermine: the desk as white fur with black tails; only themes with a light desk. */
-:root[data-desk][data-royal~="ermine"] :is(body, [class*="bg-[var(--ins-gutter)]"], [style*="--ins-gutter)"]) {
-  background-image: url("/royal/ermine.svg");
-  background-attachment: fixed;
-  background-size: 60px 60px;
-}
-/* Text printed on the desk (rail, legends, pane notes) sits on plain fur, so the tails never cross it. */
-:root[data-desk][data-royal~="ermine"] :is(.ins-rail, .chassis-rail, .tui-pane:not(.tui-float, .tui-dialog) :is(.tui-pane-info, .ins-pane-legend > *)) {
-  background: var(--ins-gutter);
-}
-:root[data-desk][data-royal~="ermine"] :is(.ins-rail, .chassis-rail) * { background-image: none; }
-/* Seal and tinctures are always in the markup (Regalia.jsx); shown only while on. */
-.royal-seal, .royal-tincture { display: none; }
-:root[data-royal~="seal"] .royal-seal, :root[data-royal~="tinctures"] .royal-tincture { display: inline-block; }
-:root[data-royal~="seal"] .royal-seal-off, :root[data-royal~="tinctures"] .royal-tincture-off { display: none; }
-/* Illuminated initial: the focused pane's first letter grows into gold on vermilion
-   and the rest of the name slides aside. Transforms only, so nothing re-lays out
-   mid-way (font-size or padding steps made the text shiver); the name keeps the
-   room for the slide at its end, where it only lengthens the legend's mask. */
-:root[data-royal~="initial"] .ins-pane-legend .ins-pane-name { padding-right: var(--initial-shift); }
-:root[data-royal~="initial"] .ins-pane-legend {
-  /* The box's right edge at 1.2x (a ~0.6em glyph grows ~0.12em, plus its 3px side) and a 1px gap. */
-  --initial-shift: calc(0.12em + 4.6px);
-}
-:root[data-royal~="initial"] .ins-pane-initial,
-:root[data-royal~="initial"] .ins-pane-rest {
-  display: inline-block;
-  transition: transform var(--ins-cool) var(--ins-ease-out), color var(--ins-cool) var(--ins-ease-out);
-}
-:root[data-royal~="initial"] .ins-pane-initial {
-  position: relative;
-  isolation: isolate;
-  /* Grows down from its top, like a drop cap: the legend sits on the pane's top edge, and panes clip above it. */
-  transform-origin: 0 0;
-}
-:root[data-royal~="initial"] .ins-pane-initial::before {
-  content: "";
-  position: absolute;
-  inset: 0 -3px -1px;
-  z-index: -1;
-  background: #8a2a1c;
-  box-shadow: inset 0 0 0 1px #e3bf67;
-  opacity: 0;
-  transition: opacity var(--ins-cool) var(--ins-ease-out);
-}
-:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend :is(.ins-pane-initial, .ins-pane-rest, .ins-pane-initial::before) {
-  transition-duration: 240ms;
-}
-:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-initial { transform: scale(1.2); color: #e3bf67; }
-:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-initial::before { opacity: 1; }
-:root[data-royal~="initial"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-pane-rest { transform: translateX(var(--initial-shift)); }
-@media (prefers-reduced-motion: reduce) {
-  :root[data-royal~="initial"] :is(.ins-pane-initial, .ins-pane-rest, .ins-pane-initial::before) { transition: none; }
+:root[data-material="velvet"]:is([data-guilloche], [data-scene]) .tui-pane:not(.tui-float, .tui-dialog, .tui-pane-screen)::after {
+  background-image: linear-gradient(170deg, rgb(255 250 230 / 0.06), transparent 32% 70%, rgb(0 8 4 / 0.18)), var(--scene), var(--guilloche);
+  background-size: 100% 100%, var(--scene-size), var(--guilloche-size);
+  background-position: 0 0, 0 100%, 0 0;
+  background-repeat: no-repeat, repeat-x, repeat;
 }
 /* Lamp shapes (settings.lampStyle; ThemeContext sets data-lamp). Same states and
    colours as the reticle; only the drawing changes. A lit lamp is any state but off,
@@ -564,13 +494,6 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
 @media (prefers-reduced-motion: reduce) {
   :root[data-lamp="mon"] .ins-lamp::before { animation: none; }
 }
-:root[data-desk][data-royal~="ermine"] .tui-pane:not(.tui-float, .tui-dialog) {
-  background:
-    linear-gradient(var(--ins-panel), var(--ins-panel)) 0 6px / 100% calc(100% - 12px) no-repeat,
-    url("/royal/ermine.svg") 0 0 / 60px 60px fixed,
-    var(--ins-gutter);
-}
-
 html,
 body,
 #root {

@@ -32,16 +32,19 @@ export function ThemeProvider({ children }) {
     if (!forced.current) setCurrentTheme(loadTheme());
   }), []);
 
-  // Royal nuggets and the lamp shape ride on the root, like material and trim.
-  const [royal] = useSetting('royal');
+  // The guilloché, the scene and the lamp shape ride on the root, like material and trim.
+  const [guilloche] = useSetting('guilloche');
+  const [scene] = useSetting('scene');
   const [lampStyle] = useSetting('lampStyle');
   useEffect(() => {
     const root = document.documentElement;
-    if (royal.length) root.dataset.royal = royal.join(' ');
-    else delete root.dataset.royal;
+    if (guilloche !== 'off') root.dataset.guilloche = guilloche;
+    else delete root.dataset.guilloche;
+    if (scene !== 'off') root.dataset.scene = scene;
+    else delete root.dataset.scene;
     if (lampStyle !== 'reticle') root.dataset.lamp = lampStyle;
     else delete root.dataset.lamp;
-  }, [royal, lampStyle]);
+  }, [guilloche, scene, lampStyle]);
 
   // The omarchy theme's palette changes in place when the desktop theme does.
   const [palette, setPalette] = useState(0);

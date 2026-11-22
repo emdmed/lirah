@@ -107,9 +107,22 @@ describe('settingsStore', () => {
     expect(s.getEffectiveSettings('w1').sandboxEnabled).toBe(s.getSettings().sandboxEnabled);
   });
 
-  it('keeps only known royal nuggets and lamp styles', async () => {
+  it('keeps only known guilloché patterns and lamp styles', async () => {
     const s = await fresh();
-    expect(s.sanitize({ royal: ['ermine', 'bogus', 'seal'], lampStyle: 'gem' })).toMatchObject({ royal: ['seal', 'ermine'], lampStyle: 'gem' });
-    expect(s.sanitize({ royal: 'seal', lampStyle: 'disco' })).toMatchObject({ royal: [], lampStyle: 'reticle' });
+    expect(s.sanitize({ guilloche: 'current', lampStyle: 'gem' })).toMatchObject({ guilloche: 'current', lampStyle: 'gem' });
+    expect(s.sanitize({ guilloche: 'bogus', lampStyle: 'disco' })).toMatchObject({ guilloche: 'off', lampStyle: 'reticle' });
+  });
+
+  it('carries the old guilloché nugget over as waves', async () => {
+    const s = await fresh();
+    expect(s.sanitize({ royal: ['seal', 'guilloche'] }).guilloche).toBe('waves');
+    expect(s.sanitize({ royal: ['seal'] }).guilloche).toBe('off');
+  });
+
+  it('splits the old horizon guilloché into waves and dunes', async () => {
+    const s = await fresh();
+    expect(s.sanitize({ guilloche: 'horizon' })).toMatchObject({ guilloche: 'waves', scene: 'dunes' });
+    expect(s.sanitize({ guilloche: 'horizon', scene: 'sea' })).toMatchObject({ guilloche: 'waves', scene: 'sea' });
+    expect(s.sanitize({ scene: 'castle' }).scene).toBe('off');
   });
 });

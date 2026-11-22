@@ -15,7 +15,6 @@ import { autopilotLamp } from '../plans/parts';
 import { LIVE, OWN_BUSY, remoteLabel, remoteWork, tabActivity, turnSummary } from './tabActivity';
 import { getTabPrompt } from './tabPrompts';
 import { tally } from './tally';
-import { WaxSeal } from '../../components/instrument/Regalia';
 import { linkRepo, unlinkRepo, useLinkedRepos } from './useLinkedRepos';
 import { useDragReorder } from './useDragReorder';
 import { ROW_KEYS, TabRow } from './TabRow';
@@ -347,7 +346,7 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
           <span className="flex basis-full flex-wrap items-center gap-x-4 gap-y-1.5 pb-1.5 text-muted-foreground">
             {/* Lamps draw a halo past their box, so they get the wider gap. */}
             <span className="flex items-center gap-1.5"><ContextMoon ratio={0.5} />context used</span>
-            <span className="flex items-center gap-2.5 pl-1"><Lamp state="wait" settled className="royal-seal-off" /><WaxSeal />needs you</span>
+            <span className="flex items-center gap-2.5 pl-1"><Lamp state="wait" settled />needs you</span>
             <span className="flex items-center gap-2.5 pl-1"><Lamp state="fault" settled />run stopped</span>
             <span className="flex items-center gap-1.5 font-mono"><span className="text-[var(--ins-ok)]">+4</span>uncommitted lines</span>
             <span className="flex items-center gap-1.5"><Worktree size={12} />other worktrees</span>
@@ -357,7 +356,6 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
           {tally(kinds).map((t, i) => (
             <span key={t.label} className="flex items-center gap-1">
               {i > 0 && <span className="ins-sep-star" aria-hidden="true" />}
-              {t.label === 'needs you' && <WaxSeal className="mr-0.5" />}
               <span className={t.className}>{t.n}</span>
               <span className="text-muted-foreground">{t.label}</span>
               {/* Name the stopped tab; clicking selects its row, which unfolds the reason and resume. */}

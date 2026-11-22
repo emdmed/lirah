@@ -106,8 +106,10 @@ export function usePlanRunActions({
       wakeTab(id); // restored at startup, not booted yet: boots and launches Claude
     } else {
       const active = tabs.find((t) => t.id === activeTabId);
-      const host = active?.planHost || activeTabId;
-      if (!host) {
+      // Opted in from the git setup: the worktree gets its own project tab.
+      const ownTab = cfg.worktrees && cfg.ownTab;
+      const host = ownTab ? undefined : active?.planHost || activeTabId;
+      if (!ownTab && !host) {
         toast.error("Open the plan's project tab first, then send again");
         return null;
       }

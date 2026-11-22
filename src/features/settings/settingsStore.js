@@ -80,9 +80,11 @@ export const SETTINGS_DEFAULTS = {
   // 'full' draws figures with scales, boxed values and leaders; 'compact'
   // keeps their marks only, with the values in the tooltip.
   figures: 'full',
-  // Royal nuggets switched on (see ROYAL_NUGGETS; index.css [data-royal~=…]), and
+  // The guilloché engraved on the panels and the scene at their foot (see
+  // GUILLOCHE_PATTERNS, SCENES; index.css [data-guilloche], [data-scene]), and
   // the lamp shape: 'reticle' (the default), 'gem' (a cabochon) or 'mon' (a crest).
-  royal: [],
+  guilloche: 'off',
+  scene: 'off',
   lampStyle: 'reticle',
   // How the tab's agent talks: 'plain' (short, simple words, problems flagged
   // up front; see tabs/launchOptions.js) or 'off' (the CLI's own style).
@@ -203,7 +205,8 @@ function cleanPlugin(item) {
   };
 }
 
-export const ROYAL_NUGGETS = ['seal', 'initial', 'coronet', 'corners', 'tinctures', 'beads', 'guilloche', 'ermine'];
+export const GUILLOCHE_PATTERNS = ['off', 'waves', 'swell', 'current', 'moire'];
+export const SCENES = ['off', 'dunes', 'peaks', 'sea'];
 export const LAMP_STYLES = ['reticle', 'gem', 'mon'];
 
 // Keys whose value needs more than a type check. Each returns the cleaned
@@ -215,7 +218,8 @@ const VALIDATORS = {
     : undefined),
   plugins: (v) => (Array.isArray(v) ? v.map(cleanPlugin).filter(Boolean) : undefined),
   figures: (v) => (v === 'full' || v === 'compact' ? v : undefined),
-  royal: (v) => (Array.isArray(v) ? ROYAL_NUGGETS.filter((n) => v.includes(n)) : undefined),
+  guilloche: (v) => (GUILLOCHE_PATTERNS.includes(v) ? v : undefined),
+  scene: (v) => (SCENES.includes(v) ? v : undefined),
   lampStyle: (v) => (LAMP_STYLES.includes(v) ? v : undefined),
   agentVoice: (v) => (v === 'plain' || v === 'off' ? v : undefined),
   sidebarSection: (v) => (v === 'tabs' || v === 'files' ? v : undefined),
@@ -231,6 +235,10 @@ const VALIDATORS = {
 export function sanitize(raw, base = SETTINGS_DEFAULTS) {
   const out = { ...base };
   if (!raw || typeof raw !== 'object') return out;
+  // The old royal nuggets list: only its guilloché (now 'waves') survives.
+  if (!('guilloche' in raw) && Array.isArray(raw.royal) && raw.royal.includes('guilloche')) out.guilloche = 'waves';
+  // 'horizon' was waves with dunes before scenes had their own setting.
+  if (raw.guilloche === 'horizon') Object.assign(out, { guilloche: 'waves', scene: 'scene' in raw ? out.scene : 'dunes' });
   for (const key of Object.keys(SETTINGS_DEFAULTS)) {
     if (!(key in raw)) continue;
     const validate = VALIDATORS[key];

@@ -168,6 +168,20 @@ export function PlanGitSection({ plan, busy, onChange, onAddRepo, onRemoveRepo, 
               {cfg.worktrees ? ' · separate checkouts, yours stays untouched' : ' · off: switches branch in your checkout'}
             </span>
           </label>
+          {cfg.worktrees && (
+            <label className="flex items-center gap-2 text-[11px] leading-snug text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={!!cfg.ownTab}
+                onChange={(e) => onChange({ ownTab: e.target.checked })}
+                className="accent-[var(--ins-lamp)]"
+              />
+              <span className="min-w-0">
+                <span className="text-foreground">own tab</span>
+                {' · open the worktree as a standalone project tab'}
+              </span>
+            </label>
+          )}
           <div className="flex min-w-0 items-center gap-2">
             <span className="ins-legend w-12 shrink-0">branch</span>
             <input
