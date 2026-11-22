@@ -4,6 +4,18 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-22
+
+### Added
+
+- **Guilloché patterns** - Settings → Appearance → Guilloché engraves faint lines on the panels: waves, swell, current or moiré. Terminal screens stay plain.
+- **Scenes** - Settings → Appearance → Scene engraves a landscape along the foot of each panel: dunes, peaks or sea.
+- **Plan in its own tab** - With worktrees on, a plan's git setup can open the worktree as a standalone project tab instead of inside the current one.
+
+### Removed
+
+- **Regalia** - The wax seal, illuminated initial, coronet, tooled corners, heraldic shields, beaded border and ermine desk are gone. If you had the engraved ground on, it carries over as the waves guilloché.
+
 ## [0.41.0] - 2026-11-19
 
 ### Added
