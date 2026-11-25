@@ -95,6 +95,17 @@ describe('worklog', () => {
     expect((await turn('no choice', () => {})).decisions).toBeUndefined();
   });
 
+  it("keeps the turn's flags and assumptions, and writes neither when empty", async () => {
+    const flags = [{ n: 'F1', text: 'tests fail' }, { n: null, text: 'slow build' }];
+    await startEntry('f', { prompt: 'flag it', cwd: join(repo) });
+    await endEntry('f', [], [], { flags, assumptions: ['local time'] });
+    expect(entries().at(-1)).toMatchObject({ flags, assumptions: ['local time'] });
+    await startEntry('g', { prompt: 'plain', cwd: join(repo) });
+    await endEntry('g', [], [], { flags: [], assumptions: [] });
+    const end = disk.get(monthFile(Date.now())).trim().split('\n').map((l) => JSON.parse(l)).at(-1);
+    expect(Object.keys(end).sort()).toEqual(['at', 'files', 'id', 'type']);
+  });
+
   it('appends a start and an end line to the month file', async () => {
     await turn('one', () => {});
     const lines = disk.get(monthFile(Date.now())).trim().split('\n').map((l) => JSON.parse(l));
