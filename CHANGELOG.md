@@ -4,6 +4,19 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-25
+
+### Added
+
+- **Code comments setting** - Settings → Agent → Code comments: "Decisions" tells the agent to write comments only for important, non-obvious decisions, and to delete comments that repeat the code, excuse a hack or are out of date. Claude Code only; applies to new launches.
+- **Diff from a tab row** - Click a row's changed-lines readout, or press d, to see that tab's uncommitted changes in the diff viewer.
+- **Numbered plan decisions** - The decisions a plan chunk passes on are numbered D1, D2… across the plan, so you can reply "undo D5". Each one is a short, plain bullet above the PLAN-STATUS line, not a long run-on line.
+
+### Changed
+
+- **Row menu** - A tab row's role, link, folder and close actions are now behind one ⋯ button that is always in the same place, so hovering no longer moves the readout or rewraps the name.
+- **Complete stamp** - A plan's complete stamp presses in only when the plan finishes while you watch; reopening a finished plan shows it still. A chunk that finishes while you watch lands in place once.
+
 ## [0.43.0] - 2026-11-25
 
 ### Added
