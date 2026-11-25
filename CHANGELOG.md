@@ -4,6 +4,15 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-25
+
+### Added
+
+- **Changes dialog** - The log's new changes view (or `:changes`) shows what the agent changed from your prompts, grouped by feature, for a day or a week: when, how many prompts, the lines changed, the version that shipped it and the decisions made, with a model-written title and summary. ← → step back a day or a week, and c copies the notes.
+- **Week and day figures** - The week view draws a feature × day grid with the releases on top (FIG.40); the day view draws one lane per feature on an hour ruler (FIG.41). Click a change to show it in the list.
+- **Plan drift** - A plan's drift toggle draws each chunk's planned files against the files it actually touched, so sweeps stand out (FIG.38).
+- **Decisions carried** - A plan's decisions section shows which later chunks built on each numbered decision, and which ones nothing picked up (FIG.39).
+
 ## [0.44.0] - 2026-11-25
 
 ### Added
