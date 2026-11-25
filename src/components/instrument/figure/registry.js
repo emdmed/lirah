@@ -28,6 +28,7 @@ export const FIGURES = Object.freeze({
   37: { key: 'lifecycle', title: 'PLAN LIFECYCLE' },
   38: { key: 'drift', title: 'DRIFT' },
   39: { key: 'carried', title: 'DECISIONS CARRIED' },
+  40: { key: 'changes-week', title: 'CHANGES THIS WEEK' },
 });
 
 // The FIG number for a figure key, e.g. figNumber('sandbox') === 10.

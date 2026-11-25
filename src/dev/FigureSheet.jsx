@@ -19,6 +19,8 @@ import { Fig22FilesByChunk } from '../features/plans/Fig22FilesByChunk';
 import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
 import { Fig38Drift } from '../features/plans/Fig38Drift';
 import { Fig39Carried } from '../features/plans/Fig39Carried';
+import { Fig40ChangesWeek } from '../features/worklog/Fig40ChangesWeek';
+import { dayKey } from '../features/worklog/weekGrid';
 import { Fig11Merge } from '../features/git/Fig11Merge';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
 import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
@@ -232,6 +234,16 @@ const LOG = [
 const fb = (text) => <div className="font-mono text-[11px] text-muted-foreground">[fallback] {text}</div>;
 
 // Each figure as a render function, so the narrow row can reuse it.
+// FIG 40: three features over the week ending today, two releases.
+const WEEK = Array.from({ length: 7 }, (_, i) => dayKey(NOW - (6 - i) * 1440 * MIN));
+const weekChange = (cells) => ({ days: Object.fromEntries(cells.map((n, i) => [WEEK[i], n]).filter(([, n]) => n)) });
+const WEEK_FEATURES = [
+  { id: 'plans', name: 'Plans', added: 1240, removed: 310, changes: [weekChange([0, 4, 9, 2, 0, 6, 3])] },
+  { id: 'tabs', name: 'Tabs and tab row', added: 420, removed: 180, changes: [weekChange([2, 0, 0, 5, 1, 0, 0])] },
+  { id: null, name: 'No feature', added: 30, removed: 4, changes: [weekChange([0, 0, 1, 0, 0, 0, 2])] },
+];
+const WEEK_RELEASES = [{ tag: 'v0.9.3', at: NOW - 4 * 1440 * MIN }, { tag: 'v0.9.4', at: NOW - 60 * MIN }];
+
 const FIGS = [
   { n: 6, w: 400, paper: 'var(--ins-raised)', el: () => <Fig06Context tokenUsage={TOKEN_USAGE} fallback={fb('context 86k / 200k')} /> },
   { n: 9, w: 480, paper: 'var(--ins-well)', el: () => <Fig09Loop plan={PLAN} pos={{ chunk: LIVE, index: 7, total: 11 }} elapsed="41m" fallback={fb('auto-pilot chunk 7/11')} /> },
@@ -263,6 +275,7 @@ const FIGS = [
   { n: 22, w: 360, el: () => <Fig22FilesByChunk plan={PLAN} files={FILES} /> },
   { n: 38, w: 520, el: () => <Fig38Drift plan={DRIFT_PLAN} files={DRIFT_FILES} /> },
   { n: 39, w: 520, el: () => <Fig39Carried plan={CARRIED_PLAN} /> },
+  { n: 40, w: 660, el: () => <Fig40ChangesWeek features={WEEK_FEATURES} talk={{ [WEEK[6]]: 3 }} releases={WEEK_RELEASES} range={{ from: WEEK[0], to: WEEK[6] }} /> },
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
   { n: '19k', w: 240, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="skeleton" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
 ];

@@ -15,7 +15,8 @@ const dayKey = (at) => {
 
 /**
  * `entries` (parseLog's, oldest first, one repo) → { changes, talk, unmapped }.
- * changes: [{ id, session, start, end, turns, prompts, files, decisions, feature, features }],
+ * changes: [{ id, session, start, end, turns, days, prompts, files, decisions, feature, features }],
+ * days the { 'YYYY-MM-DD': turns } of its turns,
  * feature the id owning most of its files, features every feature id touched (most files first);
  * talk: { 'YYYY-MM-DD': turns } of file-less turns that joined nothing;
  * unmapped: the changes' files no feature of `featureMap` lists.
@@ -42,12 +43,13 @@ export function groupChanges(entries, { featureMap } = {}) {
         talk[dayKey(e.at)] = (talk[dayKey(e.at)] ?? 0) + 1;
         continue;
       }
-      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, prompts: [], files: new Set(), decisions: [] };
+      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, days: {}, prompts: [], files: new Set(), decisions: [] };
       changes.push(change);
       run.open.push(change);
     }
     change.end = e.endedAt ?? e.at;
     change.turns += 1;
+    change.days[dayKey(e.at)] = (change.days[dayKey(e.at)] ?? 0) + 1;
     change.prompts.push(e.prompt);
     files.forEach((f) => change.files.add(f));
     change.decisions.push(...(e.decisions ?? []));

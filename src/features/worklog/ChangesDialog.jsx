@@ -11,6 +11,7 @@ import { useToast } from '../toast';
 import { fallbackTitle } from './changesPrompt';
 import { changesNotes } from './changesNotes';
 import { useChanges, weekRange } from './useChanges';
+import { Fig40ChangesWeek } from './Fig40ChangesWeek';
 
 const OPEN_FIRST = 3; // features open on arrival, biggest first
 const TALK = '__talk';
@@ -101,6 +102,11 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given })
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto pt-1 text-xs">
           {!ch.loading && !ch.changes.length && (
             <EmptyPlate title="No changes this week" description="prompts that edit files in this repo show here, grouped by feature" />
+          )}
+          {ch.features.length > 0 && (
+            <div className="px-1 pb-3 pt-2 edge-b-engraved">
+              <Fig40ChangesWeek features={ch.features} talk={ch.talk} releases={ch.releases} range={range} />
+            </div>
           )}
           {ch.features.map((f, i) => (
             <details
