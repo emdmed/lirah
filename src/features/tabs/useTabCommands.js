@@ -49,7 +49,7 @@ export function useTabCommands({
 }) {
   const { setCliSelectionModalOpen, setDashboardOpen, setBudgetDialogOpen, setAutoChangelogDialogOpen,
     setManageTemplatesDialogOpen, setBookmarksPaletteOpen, setShowHelp,
-    setSettingsOpen, setFeatureExplorerOpen } = dialogs;
+    setSettingsOpen, setFeatureExplorerOpen, setChangesOpen } = dialogs;
   const { sandboxEnabled, networkIsolation, setShowTitleBar, keepFilesAfterSend, setKeepFilesAfterSend } = settings;
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
   const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster, placeZenColumn, dropZenColumn, getWorkspaceTabs } = useTabActions();
@@ -114,6 +114,10 @@ export function useTabCommands({
           .then((summary) => toastSuccess(`${summary} → .orchestration/tools/features.json`))
           .catch((e) => toastError(`Feature map failed: ${e}`));
         toastInfo('Mapping features to files…');
+      } },
+      { id: 'changes', hint: 'this week\'s changes by feature, from the work log', run: () => {
+        if (!projectPath) throw new Error('no project in this tab');
+        setChangesOpen(true);
       } },
       { id: 'keep', hint: 'keep attached files after sending', options: ['on', 'off'], run: (arg) => {
         setKeepFilesAfterSend(onOff(arg, keepFilesAfterSend));

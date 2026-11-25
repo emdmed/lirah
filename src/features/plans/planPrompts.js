@@ -134,10 +134,25 @@ export function parseDecisions(text) {
   return out;
 }
 
+// Earlier decisions a chunk acted on, as `Builds on: D3, D7`: only the D numbers are kept.
+const BUILDS_ON_RE = /^\s*[-*]?\s*Builds\s+on\s*:\s*(.+)$/i;
+
+/** The D numbers of a commit body's or reply's `Builds on:` lines, in order, deduplicated. */
+export function parseBuildsOn(text) {
+  const out = [];
+  for (const line of String(text || '').split('\n')) {
+    const m = line.match(BUILDS_ON_RE);
+    for (const [, n] of m ? m[1].matchAll(/\bD\s*(\d+)\b/gi) : []) if (!out.includes(`D${n}`)) out.push(`D${n}`);
+  }
+  return out;
+}
+
+const BUILDS_ON_RULE = `If this chunk acted on earlier decisions, also add one line -m "Builds on: D3, D7" naming their D numbers; no line if none.`;
+
 // The user reads these too, so keep each one short and plain.
 const DECISION_RULE = `per choice a later chunk should know about: a name, a file location, an approach you picked or rejected and why. Number them D1, D2, … across the whole plan, continuing after the highest D number in earlier chunks' decisions, so the user can reference them. Keep each under 20 words, in plain words: no lists of fields or file names, the code has those. Skip anything obvious from the code; add none if there's nothing worth passing on.`;
 
-const DECISIONS_INSTRUCTION = `Between the message and the trailer, add one -m "Decision D<n>: <short line>" ${DECISION_RULE}`;
+const DECISIONS_INSTRUCTION = `Between the message and the trailer, add one -m "Decision D<n>: <short line>" ${DECISION_RULE}\n${BUILDS_ON_RULE}`;
 
 // The newest chunks show every decision; older ones show only their first few.
 const RECENT_CHUNKS = 5;
@@ -173,7 +188,8 @@ function commitInstruction(plan, chunk, { allowDone = false } = {}) {
   if (isNoGit(plan)) {
     return `This folder isn't a git repository: don't run git or commit. When the chunk is done and working, end your reply with a line
 PLAN-STATUS: ${STATUS_DONE} — <one line on what you did>
-Just above it, after a blank line, add one bullet "- Decision D<n>: <short line>" ${DECISION_RULE}`;
+Just above it, after a blank line, add one bullet "- Decision D<n>: <short line>" ${DECISION_RULE}
+If this chunk acted on earlier decisions, also add one bullet "- Builds on: D3, D7" naming their D numbers; none if none.`;
   }
   return [
     `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
@@ -183,7 +199,7 @@ git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chun
     !isMultiRepo(plan) && 'If you change files in another git repository, commit there too, with the same message and trailer.',
     allowDone && `If the chunk needs no file changes (a check, a test run, an investigation), don't make an empty commit. End your reply with a line
 PLAN-STATUS: ${STATUS_DONE} — <one line on what you did or found>
-Put any "- Decision D<n>:" bullets just above it, after a blank line.`,
+Put any "- Decision D<n>:" and "- Builds on:" bullets just above it, after a blank line.`,
   ].filter(Boolean).join('\n');
 }
 

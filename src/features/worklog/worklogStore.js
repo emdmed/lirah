@@ -106,8 +106,11 @@ export async function changedSince(root, before) {
 
 const open = new Map(); // sessionId -> Promise<{ id, at, root, base, snap } | null>
 
-/** A prompt was sent in `cwd`: log it, and snapshot the repo to diff at the turn's end. */
-export function startEntry(sessionId, { prompt, cwd }) {
+/**
+ * A prompt was sent in `cwd`: log it, and snapshot the repo to diff at the turn's end.
+ * `session` is Claude's own session id (the hook's session_id), kept on the start line.
+ */
+export function startEntry(sessionId, { prompt, cwd, session }) {
   if (typeof prompt !== 'string' || !prompt.trim() || !cwd) return null;
   if (open.has(sessionId)) endEntry(sessionId); // a turn that never got its Stop
   const ctx = (async () => {
@@ -119,7 +122,7 @@ export function startEntry(sessionId, { prompt, cwd }) {
     const at = Date.now();
     const id = `${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     // repo: the repo root, or the folder outside git. Awaited so the end line always follows it.
-    await append(monthFile(at), { type: 'start', id, at, prompt: prompt.trim(), repo: base, cwd, branch });
+    await append(monthFile(at), { type: 'start', id, at, prompt: prompt.trim(), repo: base, cwd, branch, ...(session && { session }) });
     return { id, at, root, base, snap };
   })().catch(() => null);
   open.set(sessionId, ctx);

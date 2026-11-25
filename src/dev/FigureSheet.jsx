@@ -17,6 +17,11 @@ import { Fig20Timeline } from '../features/plans/Fig20Timeline';
 import { Fig21PlanGit } from '../features/plans/Fig21PlanGit';
 import { Fig22FilesByChunk } from '../features/plans/Fig22FilesByChunk';
 import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
+import { Fig38Drift } from '../features/plans/Fig38Drift';
+import { Fig39Carried } from '../features/plans/Fig39Carried';
+import { Fig40ChangesWeek } from '../features/worklog/Fig40ChangesWeek';
+import { Fig41ChangesDay } from '../features/worklog/Fig41ChangesDay';
+import { dayKey } from '../features/worklog/weekGrid';
 import { Fig11Merge } from '../features/git/Fig11Merge';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
 import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
@@ -147,6 +152,29 @@ const FILES = {
   },
 };
 
+// FIG 38: chunk 3 swept 14 files for a 2-file plan; chunk 4 missed one of its planned files.
+const driftChunk = (n, title, files, mins) => ({ id: `d${n}`, n, title, status: 'implemented', files, prompts: [{ at: NOW - 60 * MIN }], doneAt: NOW - (60 - mins) * MIN });
+const DRIFT_PLAN = { chunks: [
+  driftChunk(1, 'driftByChunk pure module', ['src/a.js', 'src/a.test.js'], 9),
+  driftChunk(2, 'Figure in plan detail', ['src/b.jsx', 'src/c.js', 'DESIGN.md'], 14),
+  driftChunk(3, 'Rename every figure prop', ['src/d.jsx', 'src/e.js'], 41),
+  driftChunk(4, 'Docs and QA recipe', ['README.md', 'qa/index.md', 'qa/drift.md'], 6),
+] };
+const DRIFT_FILES = { loading: false, byRepo: {
+  d1: { [ROOT]: ['src/a.js', 'src/a.test.js'] },
+  d2: { [ROOT]: ['src/b.jsx', 'src/c.js', 'DESIGN.md', 'src/index.css'] },
+  d3: { [ROOT]: ['src/d.jsx', 'src/e.js', ...Array.from({ length: 12 }, (_, i) => `src/fig/f${i}.jsx`)] },
+  d4: { [ROOT]: ['README.md', 'qa/index.md', 'package.json'] },
+} };
+
+// FIG 39: D1 carried by chunks 2 and 4, D2 by 3; D3 was built on by nothing.
+const CARRIED_PLAN = { chunks: [
+  { n: 1, title: 'driftByChunk pure module', status: 'implemented', decisions: ['D1: overshootChunk takes rows'], buildsOn: [] },
+  { n: 2, title: 'Figure in plan detail', status: 'implemented', decisions: ['D2: figures live in plans/', 'D3: compact shows text'], buildsOn: ['D1'] },
+  { n: 3, title: 'Record Builds on per chunk', status: 'implemented', decisions: [], buildsOn: ['D2'] },
+  { n: 4, title: 'Docs and QA recipe', status: 'pending', decisions: [], buildsOn: ['D1'] },
+] };
+
 const TOKEN_USAGE = {
   session_id: '5f3a9c21-8e0b-4d6f-a1c2-77b0e4d19c3e',
   model: 'claude-opus-4-1',
@@ -207,6 +235,24 @@ const LOG = [
 const fb = (text) => <div className="font-mono text-[11px] text-muted-foreground">[fallback] {text}</div>;
 
 // Each figure as a render function, so the narrow row can reuse it.
+// FIG 40: three features over the week ending today, two releases.
+const WEEK = Array.from({ length: 7 }, (_, i) => dayKey(NOW - (6 - i) * 1440 * MIN));
+const weekChange = (cells) => ({ days: Object.fromEntries(cells.map((n, i) => [WEEK[i], n]).filter(([, n]) => n)) });
+const WEEK_FEATURES = [
+  { id: 'plans', name: 'Plans', added: 1240, removed: 310, changes: [weekChange([0, 4, 9, 2, 0, 6, 3])] },
+  { id: 'tabs', name: 'Tabs and tab row', added: 420, removed: 180, changes: [weekChange([2, 0, 0, 5, 1, 0, 0])] },
+  { id: null, name: 'No feature', added: 30, removed: 4, changes: [weekChange([0, 0, 1, 0, 0, 0, 2])] },
+];
+// FIG 41: today's lanes, a release between two changes.
+const H = 60 * MIN;
+const dayChange = (id, start, end, turns) => ({ id, start: NOW - start * H, end: NOW - end * H, turns, days: { [WEEK[6]]: turns }, files: [], prompts: [] });
+const DAY_FEATURES = [
+  { id: 'plans', name: 'Plans', changes: [dayChange('p1', 5.5, 3.6, 4), dayChange('p2', 1.2, 0.3, 3)] },
+  { id: 'tabs', name: 'Tabs and tab row', changes: [dayChange('t1', 4.8, 4.8, 1)] },
+];
+const DAY_TITLES = { p1: 'Drift figure in plan detail', p2: 'Decisions carried', t1: 'Fix tab close' };
+const WEEK_RELEASES = [{ tag: 'v0.9.3', at: NOW - 4 * 1440 * MIN }, { tag: 'v0.9.4', at: NOW - 60 * MIN }];
+
 const FIGS = [
   { n: 6, w: 400, paper: 'var(--ins-raised)', el: () => <Fig06Context tokenUsage={TOKEN_USAGE} fallback={fb('context 86k / 200k')} /> },
   { n: 9, w: 480, paper: 'var(--ins-well)', el: () => <Fig09Loop plan={PLAN} pos={{ chunk: LIVE, index: 7, total: 11 }} elapsed="41m" fallback={fb('auto-pilot chunk 7/11')} /> },
@@ -236,6 +282,10 @@ const FIGS = [
   { n: '21d', w: 480, el: () => <Fig21PlanGit plan={PLAN_DONE} fallback={fb('plan/… · ready')} /> },
   { n: 37, w: 1100, paper: 'var(--ins-raised)', el: () => <div className="flex flex-col gap-3"><Fig37Lifecycle plans={LIFECYCLE_PLANS} /><LifecycleKey /></div> },
   { n: 22, w: 360, el: () => <Fig22FilesByChunk plan={PLAN} files={FILES} /> },
+  { n: 38, w: 520, el: () => <Fig38Drift plan={DRIFT_PLAN} files={DRIFT_FILES} /> },
+  { n: 39, w: 520, el: () => <Fig39Carried plan={CARRIED_PLAN} /> },
+  { n: 40, w: 660, el: () => <Fig40ChangesWeek features={WEEK_FEATURES} talk={{ [WEEK[6]]: 3 }} releases={WEEK_RELEASES} range={{ from: WEEK[0], to: WEEK[6] }} /> },
+  { n: 41, w: 660, el: () => <Fig41ChangesDay features={DAY_FEATURES} talk={{ [WEEK[6]]: 3 }} releases={[{ tag: 'v0.9.4', at: NOW - 2 * H }]} titles={DAY_TITLES} day={WEEK[6]} /> },
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
   { n: '19k', w: 240, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="skeleton" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
 ];

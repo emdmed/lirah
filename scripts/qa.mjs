@@ -150,7 +150,7 @@ function seed(home) {
 
 // Per-run state under ~/.lirah. workspaces/ is qa.reset's own (wiping it here would race the
 // reloaded page); control/, bin/, claude-plugin/, hook-token, migrations.json belong to the running Rust side.
-const RUN_STATE = ['tasks', 'plans', 'agent-events', 'prompt-context', 'compaction', 'jobs', 'jobs-logs', 'jobs-state.json'];
+const RUN_STATE = ['tasks', 'plans', 'worklog', 'agent-events', 'prompt-context', 'compaction', 'jobs', 'jobs-logs', 'jobs-state.json'];
 
 /** Back to the fresh baseline: 0 tabs, one workspace, no dialog, no shell left. Throws why not. */
 async function reset(inst) {

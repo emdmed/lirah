@@ -131,8 +131,11 @@ export function PlansProvider({ children }) {
               commits,
               commitsByRepo,
               decisions: seen.size > 0
-                ? [...(c.decisions ?? []), ...found.filter((d) => !c.decisions?.includes(d))]
-                : found,
+                ? [...(c.decisions ?? []), ...found.decisions.filter((d) => !c.decisions?.includes(d))]
+                : found.decisions,
+              buildsOn: seen.size > 0
+                ? [...(c.buildsOn ?? []), ...found.buildsOn.filter((d) => !c.buildsOn?.includes(d))]
+                : found.buildsOn,
               ...(adopted && { now: adopted.doneAt }),
             }),
             baseShas: { ...chunkBases(p, c), ...adopted?.baseShas, ...strayBases },
@@ -202,14 +205,14 @@ export function PlansProvider({ children }) {
   }, [findPlan, checkChunk, updatePlan]);
 
   // An in-progress chunk done with nothing to commit; `result` is what the
-  // agent said it did, `decisions` the Decision: lines of its reply. Commits
+  // agent said it did, `decisions` the Decision: lines of its reply, `buildsOn` its Builds on: D numbers. Commits
   // found first win.
-  const markChunkDone = useCallback(async (repoRoot, planId, chunkId, result = null, decisions = []) => {
+  const markChunkDone = useCallback(async (repoRoot, planId, chunkId, result = null, decisions = [], buildsOn = []) => {
     const res = await checkChunk(repoRoot, planId, chunkId);
     if (res.found || res.error) return res;
     const { chunk } = findChunk(repoRoot, planId, chunkId);
     if (chunk?.status !== CHUNK_STATUS.IN_PROGRESS) return res;
-    updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits: [], commitsByRepo: {}, result, decisions }));
+    updateChunk(repoRoot, planId, chunkId, toImplemented(chunk, { commits: [], commitsByRepo: {}, result, decisions, buildsOn }));
     return { found: false, done: true };
   }, [checkChunk, findChunk, updateChunk]);
 

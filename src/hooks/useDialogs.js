@@ -21,6 +21,7 @@ const FLAGS = {
   orchestrationDashboardOpen: "orchestration",
   markdownViewerOpen: "markdown",
   featureExplorerOpen: "featureExplorer",
+  changesOpen: "changes",
 };
 
 const setterName = (flag) => `set${flag[0].toUpperCase()}${flag.slice(1)}`;

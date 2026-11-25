@@ -44,11 +44,11 @@ const glide = (a, b) => (a.added !== b.added || a.removed !== b.removed ? { ...b
  */
 export function DiffBar({ added = 0, removed = 0, side = 40, fmt = String, values = true, left, className }) {
   const compact = useFigureCompact();
-  const data = { added, removed, side, fmt, values: values && !compact, left, label: `${added} added, ${removed} removed` };
+  const data = { added, removed, side, fmt, values: values && !compact, left, label: `${added} lines added, ${removed} removed` };
   const ref = useCalSvg('diffRow', data, glide);
   if (added + removed === 0) return null;
   return (
-    <span className={`cal ${className ?? ''}`} style={{ display: 'inline-flex', flexShrink: 0, verticalAlign: 'middle' }} title={`+${added} −${removed}`}>
+    <span className={`cal ${className ?? ''}`} style={{ display: 'inline-flex', flexShrink: 0, verticalAlign: 'middle' }} title={`${added} lines added, ${removed} removed`}>
       <svg ref={ref} style={{ display: 'block', overflow: 'visible' }} />
     </span>
   );
