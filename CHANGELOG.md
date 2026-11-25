@@ -4,6 +4,13 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-25
+
+### Changed
+
+- **Notifications** - Toasts now stack as framed panes centred below the top bar, newest on top, instead of one message line above the status bar.
+- **Day figure** - Change titles moved off the bars into a numbered list under the chart (FIG.41); each bar carries its number, and hovering a bar or a title lights both. Click a title to show it in the list.
+
 ## [0.45.1] - 2026-11-25
 
 ### Fixed
