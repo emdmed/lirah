@@ -256,7 +256,7 @@ export function startAgentHookListener() {
     }
     if (hookEvent === 'UserPromptSubmit') {
       startTurn(sessionId, now);
-      startEntry(sessionId, { prompt: payload.prompt, cwd: payload.cwd });
+      startEntry(sessionId, { prompt: payload.prompt, cwd: payload.cwd, session: payload.session_id });
     } else if (hookEvent === 'PostToolUse') recordTool(sessionId, payload, now);
 
     let turnMs = null;

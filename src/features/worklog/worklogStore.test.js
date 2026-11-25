@@ -111,6 +111,17 @@ describe('worklog', () => {
     expect(parseLog(text)).toEqual([{ id: 'a', at: 1, prompt: 'p', repo: '/r', branch: 'main', endedAt: 3, files: ['f'] }]);
   });
 
+  it('keeps the Claude session id of a start line, and reads one without it', async () => {
+    await startEntry('lirah-1', { prompt: 'with session', cwd: join(repo), session: 'claude-abc' });
+    await endEntry('lirah-1');
+    await startEntry('lirah-2', { prompt: 'no session', cwd: join(repo) });
+    await endEntry('lirah-2');
+    const [withSession, without] = entries().slice(-2);
+    expect(withSession).toMatchObject({ prompt: 'with session', session: 'claude-abc', files: [] });
+    expect(without.prompt).toBe('no session');
+    expect(without).not.toHaveProperty('session');
+  });
+
   it('reads the newest months and says when older ones exist', async () => {
     for (const m of ['2026-09', '2026-10', '2026-11']) {
       disk.set(`worklog/${m}.jsonl`, `${JSON.stringify({ type: 'start', id: m, at: 1, prompt: m })}\n`);
