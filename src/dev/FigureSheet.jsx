@@ -17,6 +17,7 @@ import { Fig20Timeline } from '../features/plans/Fig20Timeline';
 import { Fig21PlanGit } from '../features/plans/Fig21PlanGit';
 import { Fig22FilesByChunk } from '../features/plans/Fig22FilesByChunk';
 import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
+import { Fig38Drift } from '../features/plans/Fig38Drift';
 import { Fig11Merge } from '../features/git/Fig11Merge';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
 import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
@@ -147,6 +148,21 @@ const FILES = {
   },
 };
 
+// FIG 38: chunk 3 swept 14 files for a 2-file plan; chunk 4 missed one of its planned files.
+const driftChunk = (n, title, files, mins) => ({ id: `d${n}`, n, title, status: 'implemented', files, prompts: [{ at: NOW - 60 * MIN }], doneAt: NOW - (60 - mins) * MIN });
+const DRIFT_PLAN = { chunks: [
+  driftChunk(1, 'driftByChunk pure module', ['src/a.js', 'src/a.test.js'], 9),
+  driftChunk(2, 'Figure in plan detail', ['src/b.jsx', 'src/c.js', 'DESIGN.md'], 14),
+  driftChunk(3, 'Rename every figure prop', ['src/d.jsx', 'src/e.js'], 41),
+  driftChunk(4, 'Docs and QA recipe', ['README.md', 'qa/index.md', 'qa/drift.md'], 6),
+] };
+const DRIFT_FILES = { loading: false, byRepo: {
+  d1: { [ROOT]: ['src/a.js', 'src/a.test.js'] },
+  d2: { [ROOT]: ['src/b.jsx', 'src/c.js', 'DESIGN.md', 'src/index.css'] },
+  d3: { [ROOT]: ['src/d.jsx', 'src/e.js', ...Array.from({ length: 12 }, (_, i) => `src/fig/f${i}.jsx`)] },
+  d4: { [ROOT]: ['README.md', 'qa/index.md', 'package.json'] },
+} };
+
 const TOKEN_USAGE = {
   session_id: '5f3a9c21-8e0b-4d6f-a1c2-77b0e4d19c3e',
   model: 'claude-opus-4-1',
@@ -236,6 +252,7 @@ const FIGS = [
   { n: '21d', w: 480, el: () => <Fig21PlanGit plan={PLAN_DONE} fallback={fb('plan/… · ready')} /> },
   { n: 37, w: 1100, paper: 'var(--ins-raised)', el: () => <div className="flex flex-col gap-3"><Fig37Lifecycle plans={LIFECYCLE_PLANS} /><LifecycleKey /></div> },
   { n: 22, w: 360, el: () => <Fig22FilesByChunk plan={PLAN} files={FILES} /> },
+  { n: 38, w: 520, el: () => <Fig38Drift plan={DRIFT_PLAN} files={DRIFT_FILES} /> },
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
   { n: '19k', w: 240, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="skeleton" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
 ];

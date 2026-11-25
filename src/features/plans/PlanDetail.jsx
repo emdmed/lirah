@@ -18,6 +18,7 @@ import { useTaskForPlan } from '../tasks/TasksContext';
 import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
 import { Fig22FilesByChunk } from './Fig22FilesByChunk';
+import { Fig38Drift } from './Fig38Drift';
 import { useArrived } from '../../hooks/useArrived';
 import { usePlanCommitFiles } from './usePlanCommitFiles';
 import { useUncommitted } from './useUncommitted';
@@ -170,10 +171,11 @@ export function PlanDetail({ plan }) {
     else pane.implement(plan, next);
   }, [commandSeq]);
   const fileCount = new Set(plan.chunks.flatMap((c) => c.files ?? [])).size;
-  // FIG 22 folds out of the "· K files" count; git runs only once it's open.
-  const [showFiles, setShowFiles] = useState(false);
-  const filesOpen = showFiles;
-  const commitFiles = usePlanCommitFiles(plan, filesOpen);
+  // FIG 22 folds out of the "· K files" count, FIG 38 out of "drift"; git runs only once one is open.
+  const [figView, setFigView] = useState(null);
+  const showFiles = figView === 'files';
+  const showDrift = figView === 'drift';
+  const commitFiles = usePlanCommitFiles(plan, !!figView);
   const noGit = isNoGit(plan);
   // The plan's terminal key: once git is set up (and not removed), or with no git at all.
   const gitCfg = noGit ? null : planGit(plan);
@@ -230,11 +232,22 @@ export function PlanDetail({ plan }) {
                   type="button"
                   aria-expanded={showFiles}
                   aria-controls="plan-files-by-chunk"
-                  onClick={() => setShowFiles((v) => !v)}
+                  onClick={() => setFigView((v) => (v === 'files' ? null : 'files'))}
                   title={showFiles ? 'Hide files by chunk' : 'Show which chunks touched which files'}
                   className="ins-link tabular-nums hover:text-foreground aria-expanded:text-foreground"
                 >
                   {fileCount > 0 ? `${fileCount} files` : 'files'}
+                </button>
+                {' · '}
+                <button
+                  type="button"
+                  aria-expanded={showDrift}
+                  aria-controls="plan-drift"
+                  onClick={() => setFigView((v) => (v === 'drift' ? null : 'drift'))}
+                  title={showDrift ? 'Hide drift' : 'Show planned vs touched files per chunk'}
+                  className="ins-link hover:text-foreground aria-expanded:text-foreground"
+                >
+                  drift
                 </button>
               </>
             ) : (
@@ -242,9 +255,14 @@ export function PlanDetail({ plan }) {
             )}
           </span>}
         >
-          {filesOpen && (
+          {showFiles && (
             <div id="plan-files-by-chunk" className="pb-1">
               <Fig22FilesByChunk plan={plan} files={commitFiles} />
+            </div>
+          )}
+          {showDrift && (
+            <div id="plan-drift" className="pb-1">
+              <Fig38Drift plan={plan} files={commitFiles} />
             </div>
           )}
         </Section>
