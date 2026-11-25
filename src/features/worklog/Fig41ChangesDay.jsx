@@ -7,7 +7,7 @@ import { dayLayout } from './dayLayout';
 // its last (one turn: a dot), titled on a paper backing. A faint dashed lane
 // counts the talk. Each release is a dashed line through every lane, a
 // diamond at the foot with the version and time under it. ↵ or a click on a
-// change opens it in the week list. Compact or narrow, it lists the day's
+// change shows it in the list below. Compact or narrow, it lists the day's
 // changes by feature.
 
 const NAME_W = 170;
@@ -93,12 +93,12 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
                   key={b.change.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${title(b.change)}, ${b.change.days[day]} turn${b.change.days[day] === 1 ? '' : 's'}, open in the week list`}
+                  aria-label={`${title(b.change)}, ${b.change.days[day]} turn${b.change.days[day] === 1 ? '' : 's'}, show in the list`}
                   onClick={open(b.change)}
                   onKeyDown={open(b.change)}
                   className="cursor-pointer outline-none [&:focus-visible_.bar]:stroke-[var(--ins-lamp)]"
                 >
-                  <title>{`${title(b.change)} · ${clock(b.change.start)}–${clock(b.change.end ?? b.change.start)}`}</title>
+                  <title>{`${title(b.change)} · ${clock(b.change.start)}–${clock(b.change.end ?? b.change.start)} · click to show in the list`}</title>
                   {b.dot
                     ? <circle className="bar" cx={x0} cy={y + 5} r={3.5} style={{ fill: INK.fg, strokeWidth: 2 }} />
                     : <rect className="bar" x={x0} y={y + 2} width={Math.max(px(b.x1) - x0, 4)} height={6} style={{ fill: INK.fg, strokeWidth: 2 }} />}

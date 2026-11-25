@@ -9,7 +9,7 @@ import { dayKey, weekGrid } from './weekGrid';
 // removed muted). The bottom row totals every turn of the day, talk included.
 // Compact or narrow, it lists the features with their ± lines.
 
-const NAME_W = 150;
+const NAME_W = 200;
 const COL = 56;
 const ROW = 20;
 const HEAD_Y = 12;
