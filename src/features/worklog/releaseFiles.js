@@ -2,4 +2,4 @@
 const RELEASE_FILES = new Set(['package.json', 'package-lock.json', 'Cargo.toml', 'Cargo.lock', 'tauri.conf.json']);
 
 /** True for a version-bump file at any depth (e.g. 'src-tauri/Cargo.toml'). */
-export const isReleaseBumpFile = (path) => RELEASE_FILES.has(path.split('/').pop());
+export const isReleaseBumpFile = (path) => RELEASE_FILES.has(path.split('/').pop()); // paths-ok: git paths always use '/'

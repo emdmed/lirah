@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-11-25
+
+### Fixed
+- Release build: v0.45.0 installers failed to build (path-check lint).
+
+
 ## [0.45.0] - 2026-11-25
 
 ### Added
