@@ -20,7 +20,7 @@ export function parseReleases(lines) {
     .sort((a, b) => a.at - b.at);
 }
 
-/** `git log --numstat --format=LOG_FORMAT` output → [{ sha, at, subject, files: { path: lines } }], oldest first, release bumps dropped. */
+/** `git log --numstat --format=LOG_FORMAT` output → [{ sha, at, subject, files: { path: [added, removed] } }], oldest first, release bumps dropped. */
 export function parseCommits(text) {
   const commits = [];
   for (const block of text.split('\x1e').slice(1)) {
@@ -30,7 +30,7 @@ export function parseCommits(text) {
     for (const line of rest) {
       const [added, removed, path] = line.split('\t');
       // Binary files show '-' for both counts; they still mark the commit as touching the file.
-      if (path) files[path] = (Number(added) || 0) + (Number(removed) || 0);
+      if (path) files[path] = [Number(added) || 0, Number(removed) || 0];
     }
     const c = { sha, at: Number(ct) * 1000, subject: subject.join('\t'), files };
     const paths = Object.keys(files);
@@ -41,7 +41,7 @@ export function parseCommits(text) {
 }
 
 /**
- * Adds { commits: [sha], lines, version, noCommit } to each change. A change's
+ * Adds { commits: [sha], added, removed, lines, version, noCommit } to each change. A change's
  * commits are those after its start, up to the next release, that touch its
  * files; lines counts only its files in them; version is the first tag at or
  * after its last commit. Mutates and returns `changes`.
@@ -52,7 +52,10 @@ export function attachGit(changes, { releases = [], commits = [] }) {
     const cutoff = releases.find((r) => r.at >= ch.start)?.at ?? Infinity;
     const mine = commits.filter((c) => c.at >= ch.start && c.at <= cutoff && Object.keys(c.files).some((f) => files.has(f)));
     ch.commits = mine.map((c) => c.sha);
-    ch.lines = mine.reduce((n, c) => n + Object.entries(c.files).reduce((m, [f, l]) => m + (files.has(f) ? l : 0), 0), 0);
+    ch.added = 0;
+    ch.removed = 0;
+    for (const c of mine) for (const [f, [a, r]] of Object.entries(c.files)) if (files.has(f)) { ch.added += a; ch.removed += r; }
+    ch.lines = ch.added + ch.removed;
     const last = mine.at(-1)?.at;
     ch.version = last == null ? null : (releases.find((r) => r.at >= last)?.tag ?? null);
     ch.noCommit = files.size > 0 && mine.length === 0;

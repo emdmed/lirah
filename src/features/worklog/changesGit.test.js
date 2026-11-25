@@ -31,7 +31,7 @@ describe('changesGit', () => {
       [change('a', 0, ['src/tabs/RowMenu.jsx']), change('b', 5, ['src/settings/SettingsDialog.jsx']), change('c', 10, ['README.md'])],
       { releases: parseReleases(RELEASES), commits }
     );
-    expect(menu).toMatchObject({ commits: ['bundle'], lines: 11, version: 'v0.44.0', noCommit: false });
+    expect(menu).toMatchObject({ commits: ['bundle'], added: 7, removed: 4, lines: 11, version: 'v0.44.0', noCommit: false });
     expect(comments).toMatchObject({ commits: ['bundle'], lines: 5, version: 'v0.44.0', noCommit: false });
     expect(chat).toMatchObject({ commits: [], lines: 0, version: null, noCommit: true });
   });

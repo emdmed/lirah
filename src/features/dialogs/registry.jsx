@@ -25,6 +25,7 @@ const OrchestrationDashboard = lazyNamed(() => import("@/components/Orchestratio
 const SettingsDialog = lazyNamed(() => import("@/features/settings/SettingsDialog"), "SettingsDialog");
 const GitDiffDialog = lazyNamed(() => import("@/features/git/GitDiffDialog"), "GitDiffDialog");
 const FeatureExplorer = lazyNamed(() => import("@/features/feature-map/FeatureExplorer"), "FeatureExplorer");
+const ChangesDialog = lazyNamed(() => import("@/features/worklog/ChangesDialog"), "ChangesDialog");
 const MarkdownViewerDialog = lazyNamed(() => import("@/features/markdown/MarkdownViewerDialog"), "MarkdownViewerDialog");
 
 // The dashboard reads live usage from the tab's store, so usage polls don't
@@ -121,6 +122,10 @@ export const TAB_DIALOGS = {
   featureExplorer: {
     Component: FeatureExplorer,
     props: (ctx) => ({ projectPath: ctx.projectPath, onReveal: ctx.revealInTree }),
+  },
+  changes: {
+    Component: ChangesDialog,
+    props: (ctx) => ({ projectPath: ctx.currentPath }),
   },
   markdown: {
     Component: MarkdownViewerDialog,

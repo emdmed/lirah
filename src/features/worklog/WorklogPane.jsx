@@ -7,6 +7,8 @@ import { SegmentBank } from '../../components/instrument/SegmentBank';
 import { EmptyLine } from '../plans/parts';
 import { useBranchName } from '../git/useBranchName';
 import { useSetting } from '../settings/settingsStore';
+import { useDialog } from '../dialogs/DialogProvider';
+import { useTabManager } from '../tabs/TabContext';
 import { useWorklog } from './worklogStore';
 import { buildSummaryPrompt, PERIODS, SUMMARY_MODELS } from './worklogSummary';
 import '../markdown/markdown.css';
@@ -54,6 +56,8 @@ export function WorklogPane({ projectPath }) {
   const [allRepos, setAllRepos] = useState(false);
   const [onlyBranch, setOnlyBranch] = useState(false);
   const [view, setView] = useState('decisions');
+  const dialog = useDialog();
+  const { activeTabId } = useTabManager();
 
   if (!entries) return null;
   const everywhere = allRepos || !repo;
@@ -67,11 +71,12 @@ export function WorklogPane({ projectPath }) {
         <SegmentBank
           label="Log view"
           value={view}
-          onChange={setView}
+          onChange={(v) => (v === 'changes' ? dialog.open('changes', {}, activeTabId) : setView(v))}
           options={[
             { value: 'decisions', label: <>decisions{decided > 0 && <Count n={decided} />}</> },
             { value: 'raw', label: <>all logs{filtered.length > 0 && <Count n={filtered.length} />}</> },
             { value: 'summary', label: 'summary' },
+            { value: 'changes', label: 'changes' },
           ]}
         />
         {repo && (
