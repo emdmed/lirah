@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
 import { DiffBar, compactCount } from '../../components/instrument/DiffBar';
 import { Keycap } from '../../components/instrument/Keycap';
 import { Lamp } from '../../components/instrument/Lamp';
 import { Scanner } from '../../components/instrument/Scanner';
+import { SegmentBank } from '../../components/instrument/SegmentBank';
 import { EmptyPlate } from '../../components/EmptyState';
 import { errorMessage } from '../../lib/errorMessage';
 import { basename } from '../../utils/pathUtils';
@@ -12,9 +13,14 @@ import { fallbackTitle } from './changesPrompt';
 import { changesNotes } from './changesNotes';
 import { useChanges, weekRange } from './useChanges';
 import { Fig40ChangesWeek } from './Fig40ChangesWeek';
+import { Fig41ChangesDay } from './Fig41ChangesDay';
+import { dayKey } from './weekGrid';
 
 const OPEN_FIRST = 3; // features open on arrival, biggest first
 const TALK = '__talk';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MODES = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }];
+const noon = (key) => new Date(`${key}T12:00`).getTime(); // a step of whole days stays clear of DST
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const when = (at) => new Date(at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -22,22 +28,44 @@ const when = (at) => new Date(at).toLocaleString(undefined, { weekday: 'short', 
 function rangeLabel({ from, to }) {
   const [a, b] = [from, to].map((k) => new Date(`${k}T00:00`));
   const mon = (d) => d.toLocaleDateString('en', { month: 'short' }).toUpperCase();
+  if (from === to) return a.toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
   return a.getMonth() === b.getMonth() ? `${a.getDate()}–${b.getDate()} ${mon(b)}` : `${a.getDate()} ${mon(a)}–${b.getDate()} ${mon(b)}`;
 }
 
 /** The week's changes in `projectPath`, by feature: what was built, the turns it took, and the release that shipped it. */
 export function ChangesDialog({ open, onOpenChange, projectPath, range: given }) {
-  const range = useMemo(() => given ?? weekRange(), [given]);
+  const [mode, setMode] = useState('week');
+  const [anchor, setAnchor] = useState(() => dayKey(Date.now())); // the day shown, or the last day of the week
+  const range = useMemo(() => given ?? (mode === 'day' ? { from: anchor, to: anchor } : weekRange(noon(anchor))), [given, mode, anchor]);
   const ch = useChanges(projectPath, range);
   const toast = useToast();
   const listRef = useRef(null);
   const [openIds, setOpenIds] = useState(null); // null: the first OPEN_FIRST features
+  const [pending, setPending] = useState(null); // { change, feature } to show once the week list loads
+  const today = dayKey(Date.now());
+  const go = (nextMode, nextAnchor) => { setMode(nextMode); setAnchor(nextAnchor < today ? nextAnchor : today); setOpenIds(null); };
+  const step = (dir) => go(mode, dayKey(noon(anchor) + dir * (mode === 'day' ? 1 : 7) * DAY_MS));
   const isOpen = (id, i) => (openIds ? openIds.has(id) : i < OPEN_FIRST);
   const setOpen = (id, next) => setOpenIds((cur) => {
     const s = new Set(cur ?? ch.features.slice(0, OPEN_FIRST).map((f) => f.id));
     if (next) s.add(id); else s.delete(id);
     return s;
   });
+
+  // A day's change opened in the week: its feature opens and the change scrolls in.
+  useEffect(() => {
+    if (!pending || ch.loading) return;
+    const f = ch.features.find((x) => x.changes.some((c) => c.id === pending.change)) ?? ch.features.find((x) => x.id === pending.feature);
+    setPending(null);
+    if (!f) return;
+    setOpenIds(new Set([...ch.features.slice(0, OPEN_FIRST).map((x) => x.id), f.id]));
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`change-${pending.change}`) ?? listRef.current?.querySelector(`[data-feature="${f.id ?? ''}"] > summary`);
+      el?.scrollIntoView({ block: 'nearest' });
+      el?.focus();
+    });
+  }, [pending, ch.loading, ch.features]);
+  const openInWeek = (c) => { go('week', anchor); setPending({ change: c.id, feature: c.feature }); };
 
   const talkTurns = Object.values(ch.talk).reduce((n, t) => n + t, 0);
   const title = (c) => ch.titles[c.id] ?? fallbackTitle(c);
@@ -46,7 +74,8 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given })
     .then(() => toast.success(`Copied notes for ${plural(ch.features.length, 'feature')}`), (e) => toast.error(errorMessage(e)));
 
   const onKeyDown = (e) => {
-    if (e.target.closest('input, textarea')) return;
+    if (e.defaultPrevented || e.target.closest('input, textarea')) return;
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); step(e.key === 'ArrowLeft' ? -1 : 1); return; }
     if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey && ch.features.length) { e.preventDefault(); copy(); return; }
     if (e.key === 'Enter' && e.target.tagName === 'SUMMARY') {
       e.preventDefault(); // toggled here, not natively, so it acts once
@@ -79,13 +108,20 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given })
         className="flex max-h-[85vh] flex-col gap-0"
         lamp="on"
         status={busy ? <span className="inline-flex items-center gap-1.5"><Scanner size="sm" label={ch.loading ? 'Reading the log' : 'Titling changes'} />{statusText}</span> : statusText}
-        hints={[{ keys: ['↑', '↓'], label: 'feature' }, { keys: ['↵'], label: 'open' }, { keys: ['c'], label: 'copy notes' }]}
+        hints={[{ keys: ['←', '→'], label: mode }, { keys: ['↑', '↓'], label: 'feature' }, { keys: ['↵'], label: 'open' }, { keys: ['c'], label: 'copy notes' }]}
         onKeyDown={onKeyDown}
-        // Rows arrive after the log loads; until then Radix focuses the dialog, so ↑↓ and c still land here.
-        onOpenAutoFocus={(e) => { const row = listRef.current?.querySelector('summary'); if (row) { e.preventDefault(); row.focus(); } }}
+        // Rows arrive after the log loads; until then the dialog holds focus (not the ← button), so ↑↓ and c still land here.
+        onOpenAutoFocus={(e) => { e.preventDefault(); (listRef.current?.querySelector('summary') ?? e.target).focus(); }}
       >
-        <DialogTitle>Changes in {basename(projectPath) || 'this project'}</DialogTitle>
-        <DialogDescription className="sr-only">This week's changes by feature, with the turns, lines and release of each.</DialogDescription>
+        <div className="flex flex-wrap items-center gap-3 pb-1.5">
+          <DialogTitle>Changes in {basename(projectPath) || 'this project'}</DialogTitle>
+          <DialogDescription className="sr-only">The day's or week's changes by feature, with the turns, lines and release of each.</DialogDescription>
+          <span className="ml-auto flex items-center gap-1">
+            <button type="button" className="tui-btn" onClick={() => step(-1)} aria-label={`Previous ${mode}`}>←</button>
+            <button type="button" className="tui-btn" onClick={() => step(1)} disabled={anchor >= today} aria-label={`Next ${mode}`}>→</button>
+          </span>
+          <SegmentBank value={mode} options={MODES} onChange={(m) => go(m, anchor)} label="Range" />
+        </div>
 
         {ch.unmapped.length > 0 && (
           <div className="flex items-center gap-2 py-1.5 text-[11px] text-muted-foreground edge-b-engraved">
@@ -101,16 +137,19 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given })
 
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto pt-1 text-xs">
           {!ch.loading && !ch.changes.length && (
-            <EmptyPlate title="No changes this week" description="prompts that edit files in this repo show here, grouped by feature" />
+            <EmptyPlate title={`No changes this ${mode}`} description="prompts that edit files in this repo show here, grouped by feature" />
           )}
           {ch.features.length > 0 && (
             <div className="px-1 pb-3 pt-2 edge-b-engraved">
-              <Fig40ChangesWeek features={ch.features} talk={ch.talk} releases={ch.releases} range={range} />
+              {range.from === range.to
+                ? <Fig41ChangesDay features={ch.features} talk={ch.talk} releases={ch.releases} titles={ch.titles} day={range.from} onOpen={openInWeek} />
+                : <Fig40ChangesWeek features={ch.features} talk={ch.talk} releases={ch.releases} range={range} />}
             </div>
           )}
           {ch.features.map((f, i) => (
             <details
               key={f.id ?? 'none'}
+              data-feature={f.id ?? ''}
               open={isOpen(f.id, i)}
               onToggle={(e) => e.currentTarget.open !== isOpen(f.id, i) && setOpen(f.id, e.currentTarget.open)}
               className="edge-b-engraved"
@@ -156,7 +195,7 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given })
 
 function ChangeItem({ change: c, title }) {
   return (
-    <li className="flex items-start gap-2">
+    <li id={`change-${c.id}`} tabIndex={-1} className="flex items-start gap-2 outline-none focus-visible:bg-foreground/10">
       <Lamp state="ok" settled className="mt-1" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-baseline gap-2">

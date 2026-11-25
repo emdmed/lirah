@@ -20,6 +20,7 @@ import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
 import { Fig38Drift } from '../features/plans/Fig38Drift';
 import { Fig39Carried } from '../features/plans/Fig39Carried';
 import { Fig40ChangesWeek } from '../features/worklog/Fig40ChangesWeek';
+import { Fig41ChangesDay } from '../features/worklog/Fig41ChangesDay';
 import { dayKey } from '../features/worklog/weekGrid';
 import { Fig11Merge } from '../features/git/Fig11Merge';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
@@ -242,6 +243,14 @@ const WEEK_FEATURES = [
   { id: 'tabs', name: 'Tabs and tab row', added: 420, removed: 180, changes: [weekChange([2, 0, 0, 5, 1, 0, 0])] },
   { id: null, name: 'No feature', added: 30, removed: 4, changes: [weekChange([0, 0, 1, 0, 0, 0, 2])] },
 ];
+// FIG 41: today's lanes, a release between two changes.
+const H = 60 * MIN;
+const dayChange = (id, start, end, turns) => ({ id, start: NOW - start * H, end: NOW - end * H, turns, days: { [WEEK[6]]: turns }, files: [], prompts: [] });
+const DAY_FEATURES = [
+  { id: 'plans', name: 'Plans', changes: [dayChange('p1', 5.5, 3.6, 4), dayChange('p2', 1.2, 0.3, 3)] },
+  { id: 'tabs', name: 'Tabs and tab row', changes: [dayChange('t1', 4.8, 4.8, 1)] },
+];
+const DAY_TITLES = { p1: 'Drift figure in plan detail', p2: 'Decisions carried', t1: 'Fix tab close' };
 const WEEK_RELEASES = [{ tag: 'v0.9.3', at: NOW - 4 * 1440 * MIN }, { tag: 'v0.9.4', at: NOW - 60 * MIN }];
 
 const FIGS = [
@@ -276,6 +285,7 @@ const FIGS = [
   { n: 38, w: 520, el: () => <Fig38Drift plan={DRIFT_PLAN} files={DRIFT_FILES} /> },
   { n: 39, w: 520, el: () => <Fig39Carried plan={CARRIED_PLAN} /> },
   { n: 40, w: 660, el: () => <Fig40ChangesWeek features={WEEK_FEATURES} talk={{ [WEEK[6]]: 3 }} releases={WEEK_RELEASES} range={{ from: WEEK[0], to: WEEK[6] }} /> },
+  { n: 41, w: 660, el: () => <Fig41ChangesDay features={DAY_FEATURES} talk={{ [WEEK[6]]: 3 }} releases={[{ tag: 'v0.9.4', at: NOW - 2 * H }]} titles={DAY_TITLES} day={WEEK[6]} /> },
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
   { n: '19k', w: 240, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="skeleton" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
 ];
