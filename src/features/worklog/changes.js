@@ -1,0 +1,73 @@
+// Worklog entries → changes: the runs of turns that built one thing. Turns run
+// together per Claude session (or per cwd, broken by a 20-minute gap, for
+// entries logged before start lines carried the session). A turn joins the
+// open change it shares a file with; a turn with only new files starts its
+// own; a turn with no files joins the newest open change when its prompt is a
+// follow-up ("yes", "do it"), else it is talk. "ship it" closes them all.
+const GAP_MS = 20 * 60 * 1000;
+const SHIP = /^\s*ship (it|this)\b/i;
+const FOLLOW_UP = /^\s*(yes|yep|yeah|ok(ay)?|sure|continue|go( ahead| on)?|do it|apply\b|proceed|implement it)\b/i;
+
+const dayKey = (at) => {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/**
+ * `entries` (parseLog's, oldest first, one repo) → { changes, talk, unmapped }.
+ * changes: [{ id, session, start, end, turns, prompts, files, decisions, feature, features }],
+ * feature the id owning most of its files, features every feature id touched (most files first);
+ * talk: { 'YYYY-MM-DD': turns } of file-less turns that joined nothing;
+ * unmapped: the changes' files no feature of `featureMap` lists.
+ */
+export function groupChanges(entries, { featureMap } = {}) {
+  const changes = [];
+  const talk = {};
+  const runs = new Map(); // session or cwd key -> { last, open: [change] }
+  for (const e of [...entries].sort((a, b) => a.at - b.at)) {
+    const key = e.session ? `s:${e.session}` : `c:${e.cwd || e.repo}`;
+    let run = runs.get(key);
+    if (!run || (!e.session && e.at - run.last > GAP_MS)) runs.set(key, (run = { open: [] }));
+    run.last = e.endedAt ?? e.at;
+    if (SHIP.test(e.prompt)) {
+      run.open = [];
+      continue;
+    }
+    const files = e.files ?? []; // still running: nothing changed yet
+    let change = files.length
+      ? run.open.findLast((c) => files.some((f) => c.files.has(f)))
+      : FOLLOW_UP.test(e.prompt) ? run.open.at(-1) : null;
+    if (!change) {
+      if (!files.length) {
+        talk[dayKey(e.at)] = (talk[dayKey(e.at)] ?? 0) + 1;
+        continue;
+      }
+      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, prompts: [], files: new Set(), decisions: [] };
+      changes.push(change);
+      run.open.push(change);
+    }
+    change.end = e.endedAt ?? e.at;
+    change.turns += 1;
+    change.prompts.push(e.prompt);
+    files.forEach((f) => change.files.add(f));
+    change.decisions.push(...(e.decisions ?? []));
+  }
+
+  const owners = new Map(); // file -> feature ids
+  for (const f of featureMap?.features ?? []) {
+    for (const p of f.files ?? []) owners.set(p, [...(owners.get(p) ?? []), f.id]);
+  }
+  const unmapped = new Set();
+  for (const c of changes) {
+    c.files = [...c.files].sort();
+    const counts = new Map();
+    for (const p of c.files) {
+      const ids = owners.get(p);
+      if (!ids) unmapped.add(p);
+      ids?.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
+    }
+    c.features = [...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a));
+    c.feature = c.features[0] ?? null;
+  }
+  return { changes, talk, unmapped: [...unmapped].sort() };
+}
