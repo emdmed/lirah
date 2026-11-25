@@ -18,6 +18,7 @@ import { Fig21PlanGit } from '../features/plans/Fig21PlanGit';
 import { Fig22FilesByChunk } from '../features/plans/Fig22FilesByChunk';
 import { Fig37Lifecycle, LifecycleKey } from '../features/plans/Fig37Lifecycle';
 import { Fig38Drift } from '../features/plans/Fig38Drift';
+import { Fig39Carried } from '../features/plans/Fig39Carried';
 import { Fig11Merge } from '../features/git/Fig11Merge';
 import { Fig14Budget } from '../features/token-budget/Fig14Budget';
 import { Fig10Drawing } from '../features/settings/Fig10Sandbox';
@@ -163,6 +164,14 @@ const DRIFT_FILES = { loading: false, byRepo: {
   d4: { [ROOT]: ['README.md', 'qa/index.md', 'package.json'] },
 } };
 
+// FIG 39: D1 carried by chunks 2 and 4, D2 by 3; D3 was built on by nothing.
+const CARRIED_PLAN = { chunks: [
+  { n: 1, title: 'driftByChunk pure module', status: 'implemented', decisions: ['D1: overshootChunk takes rows'], buildsOn: [] },
+  { n: 2, title: 'Figure in plan detail', status: 'implemented', decisions: ['D2: figures live in plans/', 'D3: compact shows text'], buildsOn: ['D1'] },
+  { n: 3, title: 'Record Builds on per chunk', status: 'implemented', decisions: [], buildsOn: ['D2'] },
+  { n: 4, title: 'Docs and QA recipe', status: 'pending', decisions: [], buildsOn: ['D1'] },
+] };
+
 const TOKEN_USAGE = {
   session_id: '5f3a9c21-8e0b-4d6f-a1c2-77b0e4d19c3e',
   model: 'claude-opus-4-1',
@@ -253,6 +262,7 @@ const FIGS = [
   { n: 37, w: 1100, paper: 'var(--ins-raised)', el: () => <div className="flex flex-col gap-3"><Fig37Lifecycle plans={LIFECYCLE_PLANS} /><LifecycleKey /></div> },
   { n: 22, w: 360, el: () => <Fig22FilesByChunk plan={PLAN} files={FILES} /> },
   { n: 38, w: 520, el: () => <Fig38Drift plan={DRIFT_PLAN} files={DRIFT_FILES} /> },
+  { n: 39, w: 520, el: () => <Fig39Carried plan={CARRIED_PLAN} /> },
   { n: 19, w: 360, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="signatures" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
   { n: '19k', w: 240, el: () => <Fig19Detail name="Fig20Timeline.jsx" lineCount={284} levels={LEVELS} chosen="skeleton" defaultLevel="skeleton" paper="var(--ins-panel)" /> },
 ];

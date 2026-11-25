@@ -19,6 +19,8 @@ import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
 import { Fig22FilesByChunk } from './Fig22FilesByChunk';
 import { Fig38Drift } from './Fig38Drift';
+import { Fig39Carried } from './Fig39Carried';
+import { hasBuildsOn } from './decisionLinks';
 import { useArrived } from '../../hooks/useArrived';
 import { usePlanCommitFiles } from './usePlanCommitFiles';
 import { useUncommitted } from './useUncommitted';
@@ -315,6 +317,12 @@ export function PlanDetail({ plan }) {
           </div>
         )}
       </div>
+
+      {hasBuildsOn(plan) && (
+        <Section title="decisions" className="pb-1">
+          <Fig39Carried plan={plan} />
+        </Section>
+      )}
     </>
   );
 
