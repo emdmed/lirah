@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { launchOptions, MASTER_PROMPT, VOICE_PROMPTS } from './launchOptions';
+import { COMMENT_PROMPTS, launchOptions, MASTER_PROMPT, VOICE_PROMPTS } from './launchOptions';
 
 // MASTER_PROMPT moves here from ProjectTab.jsx; the three callers (auto-launch,
 // relaunch, button) all go through launchOptions.
@@ -41,5 +41,16 @@ describe('launchOptions voice', () => {
 
   it('voice prompts stay one shell line', () => {
     for (const v of Object.values(VOICE_PROMPTS)) expect(v).not.toMatch(/\n/);
+  });
+});
+
+describe('launchOptions comments', () => {
+  it('decisions comes after the voice; off adds nothing', () => {
+    expect(launchOptions({ voice: 'plain', comments: 'decisions' }).systemPrompt).toBe(`${VOICE_PROMPTS.plain} ${COMMENT_PROMPTS.decisions}`);
+    expect(launchOptions({ comments: 'off' }).systemPrompt).toBeUndefined();
+  });
+
+  it('comment prompts stay one shell line', () => {
+    for (const v of Object.values(COMMENT_PROMPTS)) expect(v).not.toMatch(/\n/);
   });
 });

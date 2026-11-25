@@ -10,11 +10,12 @@ export const isStoppedRun = (plan) => plan.autopilot?.status === AUTOPILOT_STATU
  * the pane's hint line, so neither lists a key the other ignores. Kept out of
  * TabRow so tests can import it without TabRow's window-only figure code.
  */
-export function rowKeys({ active, closable, edited, plans, summary, worktrees }) {
+export function rowKeys({ active, closable, edited, plans, summary, worktrees, changed }) {
   return [
     plans?.some(isStoppedRun) && { keys: ['p'], on: ['p'], label: 'resume' },
     edited && { keys: ['a'], on: ['a'], label: 'attach' },
     summary && edited && { keys: ['e'], on: ['e'], label: 'edits' },
+    changed && { keys: ['d'], on: ['d'], label: 'diff' },
     plans?.length > 0 && { keys: ['o'], on: ['o'], label: 'plan' },
     !active && { keys: ['l'], on: ['l'], label: 'link' },
     { keys: ['r'], on: ['r', 'F2'], label: 'rename' },

@@ -18,6 +18,7 @@ import { useTaskForPlan } from '../tasks/TasksContext';
 import { AutopilotStrip } from './AutopilotStrip';
 import { Fig20Timeline } from './Fig20Timeline';
 import { Fig22FilesByChunk } from './Fig22FilesByChunk';
+import { useArrived } from '../../hooks/useArrived';
 import { usePlanCommitFiles } from './usePlanCommitFiles';
 import { useUncommitted } from './useUncommitted';
 import { ChunkRow, DoneRun } from './ChunkRow';
@@ -212,6 +213,8 @@ export function PlanDetail({ plan }) {
 
   // A finished plan is read back chunk by chunk, so its breakdown leads.
   const finished = total > 0 && done === total && !chunkInFlight;
+  // The stamp presses in only when the plan ends while open, not on every reopen.
+  const stampArrived = useArrived(finished || !!plan.cancelledAt);
   const chunksBlock = (
     <>
       {total > 0 && (
@@ -411,7 +414,7 @@ export function PlanDetail({ plan }) {
         {runUp && <div className="mt-3">{strip}</div>}
 
         <LifecycleLine plan={plan} />
-        {(finished || plan.cancelledAt) && <CompleteStamp plan={plan} />}
+        {(finished || plan.cancelledAt) && <CompleteStamp plan={plan} arrived={stampArrived} />}
 
         {/* What needs you, in one line: live state is a box (DESIGN.md rule 10). */}
         {stuck && (
@@ -522,7 +525,7 @@ export function PlanDetail({ plan }) {
 }
 
 /** A finished or cancelled plan's mark (orrery Done/Failed glyph and legend), then what it took: chunks, summed working time, first start to last finish. */
-function CompleteStamp({ plan }) {
+function CompleteStamp({ plan, arrived }) {
   const r = chunkRuler(plan);
   // Cancelled wins: a plan you dropped isn't complete, even with every chunk done.
   const cancelled = !!plan.cancelledAt;
@@ -532,7 +535,7 @@ function CompleteStamp({ plan }) {
     : null;
   return (
     <div role="status" className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] tabular-nums text-muted-foreground">
-      <span className="ins-stamp shrink-0" data-cancelled={cancelled || undefined}>
+      <span className="ins-stamp shrink-0" data-cancelled={cancelled || undefined} data-arrived={arrived || undefined}>
         {cancelled ? <Failed size={14} /> : <Done size={14} />}
         {cancelled ? 'cancelled' : 'complete'}
       </span>

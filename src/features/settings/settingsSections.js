@@ -22,6 +22,12 @@ export const SETTINGS_ROWS = [
     words: 'agent voice style tone concise plain simple language talk speak verbose cognitive load',
   },
   {
+    id: 'code-comments', section: 'agent', kind: 'choice', key: 'codeComments',
+    label: 'Code comments',
+    hint: 'Decisions: the agent comments only important, non-obvious decisions; no comments that repeat the code, excuse a hack or are out of date. Claude Code only; applies to new launches.',
+    words: 'code comments comment tautology excuse stale decision record adr lint',
+  },
+  {
     id: 'auto-launch', section: 'agent', kind: 'toggle', key: 'autoLaunchCli',
     label: 'Auto-launch agent',
     hint: 'Start the CLI when a terminal opens or you open a starred project. Off shows a launch key instead.',

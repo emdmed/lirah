@@ -14,13 +14,27 @@ import { RowAction } from './RowAction';
 // The tab's repo role, picked from a menu. Links to the repo in other tabs'
 // prompts carry the role too, so they are re-tagged with it. `open` and
 // `onOpenChange` let the pane open it from the keyboard (t on a row).
-function RoleMenu({ tab, open, onOpenChange, children }) {
+/** The role choices as radio items, for this menu and the row's menu; None only once there is a role to clear. */
+export function RoleItems({ tab, className }) {
   const { setTabRole } = useTabManager();
-  const wrapRef = useRef(null);
   const setRole = (role) => {
     setTabRole(tab.id, role);
     setLinkedRepoRole(tab.projectPath, role || undefined);
   };
+  return (
+    <DropdownMenuRadioGroup value={tab.role ?? ''} onValueChange={setRole}>
+      {REPO_ROLES.map((r) => (
+        <DropdownMenuRadioItem key={r.value} value={r.value} className={className}>
+          {r.label}
+        </DropdownMenuRadioItem>
+      ))}
+      {tab.role && <DropdownMenuRadioItem value="" className={className}>None</DropdownMenuRadioItem>}
+    </DropdownMenuRadioGroup>
+  );
+}
+
+function RoleMenu({ tab, open, onOpenChange, children }) {
+  const wrapRef = useRef(null);
   return (
     // Portalled menu clicks still bubble through React to the row.
     <span ref={wrapRef} className="contents" onClick={(e) => e.stopPropagation()}>
@@ -35,14 +49,7 @@ function RoleMenu({ tab, open, onOpenChange, children }) {
             wrapRef.current?.closest('[data-tab-row]')?.focus();
           }}
         >
-          <DropdownMenuRadioGroup value={tab.role ?? ''} onValueChange={setRole}>
-            {REPO_ROLES.map((r) => (
-              <DropdownMenuRadioItem key={r.value} value={r.value}>
-                {r.label}
-              </DropdownMenuRadioItem>
-            ))}
-            <DropdownMenuRadioItem value="">None</DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
+          <RoleItems tab={tab} />
         </DropdownMenuContent>
       </DropdownMenu>
     </span>
@@ -58,17 +65,6 @@ export function RoleChip({ tab, open, onOpenChange }) {
     <RoleMenu tab={tab} open={open} onOpenChange={onOpenChange}>
       <RowAction tabIndex={-1} title="Change repo role (t)" className={PRINTED}>
         [{repoRoleLabel(tab.role)}]
-      </RowAction>
-    </RoleMenu>
-  );
-}
-
-/** "[role]", for a tab with no repo role yet. */
-export function RoleTagButton({ tab, open, onOpenChange }) {
-  return (
-    <RoleMenu tab={tab} open={open} onOpenChange={onOpenChange}>
-      <RowAction tabIndex={-1} title="Tag this repo's role: ui, api, db… (t)" className={PRINTED}>
-        [role]
       </RowAction>
     </RoleMenu>
   );

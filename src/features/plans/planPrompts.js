@@ -120,19 +120,24 @@ export const STATUS_DONE = 'done';
 // Decisions a chunk made that later chunks should follow. The agent writes them
 // as `Decision:` lines in its commit body (or its reply, when there is no
 // commit); they are read back and put into every later chunk's prompt.
-const DECISION_RE = /^\s*[-*]?\s*Decision:\s*(.+?)\s*$/i;
+// A plan's decisions are numbered (Decision D3:) so the user can reference them; the number is kept.
+const DECISION_RE = /^\s*[-*]?\s*Decision(?:\s+(D\d+))?:\s*(.+?)\s*$/i;
 
 /** The `Decision:` lines of a commit body or reply, without the prefix, in order, deduplicated. */
 export function parseDecisions(text) {
   const out = [];
   for (const line of String(text || '').split('\n')) {
     const m = line.match(DECISION_RE);
-    if (m && !out.includes(m[1])) out.push(m[1]);
+    const d = m && (m[1] ? `${m[1].toUpperCase()}: ${m[2]}` : m[2]);
+    if (d && !out.includes(d)) out.push(d);
   }
   return out;
 }
 
-const DECISIONS_INSTRUCTION = `Between the message and the trailer, add one -m "Decision: <one line>" per choice a later chunk should know about: names, file locations, approaches you picked or rejected and why. Skip anything obvious from the code; add none if there's nothing worth passing on.`;
+// The user reads these too, so keep each one short and plain.
+const DECISION_RULE = `per choice a later chunk should know about: a name, a file location, an approach you picked or rejected and why. Number them D1, D2, … across the whole plan, continuing after the highest D number in earlier chunks' decisions, so the user can reference them. Keep each under 20 words, in plain words: no lists of fields or file names, the code has those. Skip anything obvious from the code; add none if there's nothing worth passing on.`;
+
+const DECISIONS_INSTRUCTION = `Between the message and the trailer, add one -m "Decision D<n>: <short line>" ${DECISION_RULE}`;
 
 // The newest chunks show every decision; older ones show only their first few.
 const RECENT_CHUNKS = 5;
@@ -168,7 +173,7 @@ function commitInstruction(plan, chunk, { allowDone = false } = {}) {
   if (isNoGit(plan)) {
     return `This folder isn't a git repository: don't run git or commit. When the chunk is done and working, end your reply with a line
 PLAN-STATUS: ${STATUS_DONE} — <one line on what you did>
-Just above it, add one line "Decision: <one line>" per choice a later chunk should know about: names, file locations, approaches you picked or rejected and why. Skip anything obvious from the code; add none if there's nothing worth passing on.`;
+Just above it, after a blank line, add one bullet "- Decision D<n>: <short line>" ${DECISION_RULE}`;
   }
   return [
     `When it's done and working, commit only the files you changed for it, with exactly this message and trailer:
@@ -178,7 +183,7 @@ git commit -m "${chunkCommitMessage(plan, chunk).replace(/"/g, "'")}" -m "${chun
     !isMultiRepo(plan) && 'If you change files in another git repository, commit there too, with the same message and trailer.',
     allowDone && `If the chunk needs no file changes (a check, a test run, an investigation), don't make an empty commit. End your reply with a line
 PLAN-STATUS: ${STATUS_DONE} — <one line on what you did or found>
-Put any Decision: lines just above it.`,
+Put any "- Decision D<n>:" bullets just above it, after a blank line.`,
   ].filter(Boolean).join('\n');
 }
 

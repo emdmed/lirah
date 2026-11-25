@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Agent, Branch, ChevronDown, ChevronRight, Folder, Link, Plan } from '@/components/icons';
+import { Agent, Branch, ChevronDown, ChevronRight, Link, Plan } from '@/components/icons';
 import { cn } from '../../lib/utils';
 import { plural } from '../../lib/plural';
 import { MiddleTruncate } from '../../components/MiddleTruncate';
@@ -11,7 +11,8 @@ import { isStoppedRun, rowKeys } from './rowKeys';
 import { Scanner } from '../../components/instrument/Scanner';
 import { Lamp } from '../../components/instrument/Lamp';
 import { RenameField } from './RenameField';
-import { RoleChip, RoleTagButton } from './RoleMenu';
+import { RoleChip } from './RoleMenu';
+import { RowMenu } from './RowMenu';
 import { WorktreeMenu } from './WorktreeMenu';
 import { TurnTrail } from './TurnTrail';
 import { isSettledPlan, TabPlanTier } from '../plans/TabPlanTier';
@@ -51,23 +52,28 @@ function AutoCommitMark({ stage }) {
 const DIFF_LEFT = 32;
 
 /** The row's right-hand readout: uncommitted lines, the context moon, the lamp. */
-function Readout({ info, contextFill, autoCommit, lamp, label, className }) {
+function Readout({ info, contextFill, autoCommit, lamp, label, onDiff }) {
   let diff = null;
   if (autoCommit && autoCommit !== 'done') {
     diff = <AutoCommitMark stage={autoCommit} />;
   } else if (info?.branch) {
     // Clean is the resting state: an empty slot says it.
     diff = info.files === 0 ? null : (
-      <span className="inline-flex" title={`${plural(info.files, 'file')} changed · +${info.added} −${info.deleted}`}>
+      <RowAction
+        tabIndex={-1}
+        onClick={onDiff}
+        title={`${plural(info.files, 'file')} changed · +${info.added} −${info.deleted}\nClick to view the diff (d)`}
+        className="-mx-1 inline-flex cursor-pointer px-1 hover:bg-foreground/10"
+      >
         {info.added || info.deleted
           ? <DiffBar added={info.added} removed={info.deleted} side={24} fmt={compactCount} left={DIFF_LEFT} />
           : plural(info.files, 'file')}
-      </span>
+      </RowAction>
     );
   }
   // Fixed slots, so the moons line up down the pane whatever the counts are.
   return (
-    <span className={cn('flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground', className)}>
+    <span className="flex shrink-0 items-center gap-2 whitespace-nowrap font-mono tabular-nums text-muted-foreground">
       {/* Bars start at the slot's left edge with a fixed reserve, so every row's
           zero tick sits at one x; the slot fits up to −99 / +999 before it grows. */}
       <span className="inline-flex min-w-[84px] items-center justify-start @max-[300px]:hidden">{diff}</span>
@@ -92,6 +98,7 @@ export const ROW_KEYS = [
   { keys: ['o'], label: 'plan' },
   { keys: ['p'], label: 'resume' },
   { keys: ['e'], label: 'edits' },
+  { keys: ['d'], label: 'diff' },
   { keys: ['w'], label: 'worktrees' },
   { keys: ['t'], label: 'role' },
   { keys: ['→'], label: 'unfold' },
@@ -139,11 +146,12 @@ export const TabRow = memo(function TabRow({
       fn();
     };
     if (e.key === 'Enter' || e.key === ' ') return run(() => actions.switchTab(tab.id));
-    const hit = rowKeys({ active, closable, edited, plans, summary, worktrees: info?.worktrees?.length }).find((k) => k.on.includes(e.key));
+    const hit = rowKeys({ active, closable, edited, plans, summary, worktrees: info?.worktrees?.length, changed: info?.files > 0 }).find((k) => k.on.includes(e.key));
     if (!hit) return;
     run({
       attach: () => actions.attachEdits(edited),
       edits: () => actions.toggleTrail(tab.id),
+      diff: () => actions.reviewChanges(tab),
       plan: () => actions.openPlan(tab.id, (livePlans[0] ?? plans[0]).id),
       resume: () => actions.resumePlan(plans.find(isStoppedRun)),
       link: () => actions.toggleLink(tab, name, linked),
@@ -181,51 +189,20 @@ export const TabRow = memo(function TabRow({
     workLabel,
   ].filter(Boolean).join(', ');
 
-  // Row actions sit on the branch line of an unfolded row, so they never
-  // squeeze the name; a one-line row keeps them beside the readout.
-  // `reserve` keeps their width while hidden, so hovering never rewraps the branch.
-  const rowActions = (reserve) => (
-    <span
-      className={cn(
-        'shrink-0 items-center gap-1.5',
-        reserve ? 'flex' : roleMenuOpen ? 'flex' : 'hidden group-hover:flex group-focus-within:flex',
-        reserve && !roleMenuOpen && 'invisible group-hover:visible group-focus-within:visible',
-      )}
-    >
-      {!tab.role && <RoleTagButton tab={tab} open={roleMenuOpen} onOpenChange={onRoleMenu} />}
-
-      {!active && !linked && (
-        <RowAction
-          tabIndex={-1}
-          aria-pressed="false"
-          aria-label={linkLabel}
-          title="Link this repo into the current prompt (l)"
-          onClick={() => actions.toggleLink(tab, name, linked)}
-          className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
-        >
-          <Link size={12} />
-        </RowAction>
-      )}
-      <RowAction
-        tabIndex={-1}
-        aria-label={`Open ${name} in the file manager`}
-        title="Open folder in file manager (f)"
-        onClick={() => actions.openFolder(tab.projectPath)}
-        className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-lamp)]"
-      >
-        <Folder size={12} />
-      </RowAction>
-      {closable && (
-        <RowAction
-          tabIndex={-1}
-          aria-label={`Close ${name}`}
-          title="Close tab (x)"
-          onClick={() => actions.closeTab(tab.id)}
-          className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-[var(--ins-fault)]"
-        >
-          ×
-        </RowAction>
-      )}
+  // The row's actions behind one button in a slot that is always there, so
+  // hovering never moves the readout or rewraps the name.
+  const rowMenu = (
+    <span className={cn('inline-flex shrink-0', !roleMenuOpen && 'invisible group-hover:visible group-focus-within:visible')}>
+      <RowMenu
+        tab={tab}
+        name={name}
+        active={active}
+        linked={linked}
+        closable={closable}
+        open={!tab.role && roleMenuOpen}
+        onOpenChange={onRoleMenu}
+        actions={actions}
+      />
     </span>
   );
 
@@ -253,7 +230,7 @@ export const TabRow = memo(function TabRow({
         }
       }}
       title={tooltip}
-      aria-keyshortcuts="Enter r x l t w a f o e ArrowRight"
+      aria-keyshortcuts="Enter r x l t w a f o e d ArrowRight"
       className={cn(
         // A container, so a narrow pane drops the readout's slots before the name or the actions shrink.
         '@container group relative flex flex-col gap-1 pl-3 pr-2.5 text-left text-[11px] cursor-pointer edge-b-engraved focus-visible:shadow-[inset_0_0_0_1px_var(--ins-lamp)]',
@@ -328,7 +305,7 @@ export const TabRow = memo(function TabRow({
         )}
 
         <span className="ml-auto flex shrink-0 items-center gap-2">
-          {compact && rowActions(false)}
+          {rowMenu}
           {/* Fixed slots, empty or not, so the counts line up down the pane like the readout. */}
           <span className="inline-flex w-8 shrink-0 justify-end @max-[380px]:hidden">
           {pendingPlans > 0 && (
@@ -354,8 +331,7 @@ export const TabRow = memo(function TabRow({
             autoCommit={autoCommit}
             lamp={activityLamp(activity.kind, queued)}
             label={activity.label}
-            // A folded row's actions take the readout's place on hover, so the name keeps its width.
-            className={compact && (roleMenuOpen ? 'hidden' : 'group-hover:hidden group-focus-within:hidden')}
+            onDiff={() => actions.reviewChanges(tab)}
           />
           {/* Rows unfold only on request, so the list never jumps. */}
           <RowAction
@@ -394,7 +370,6 @@ export const TabRow = memo(function TabRow({
             ) : (
               <span>no repo</span>
             )}
-            <span className="ml-auto pl-2">{rowActions(true)}</span>
           </div>
 
           {/* Tier 3: one status line, always there so the row keeps its height.

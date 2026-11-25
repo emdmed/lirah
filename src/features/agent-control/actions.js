@@ -29,6 +29,7 @@ const CHOICES = {
   scrollback: SCROLLBACK_OPTIONS.map((o) => o.value),
   figures: ['full', 'compact'],
   agentVoice: ['plain', 'off'],
+  codeComments: ['decisions', 'off'],
   lampStyle: ['reticle', 'gem', 'mon'],
 };
 

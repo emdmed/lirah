@@ -486,6 +486,8 @@ select option { background-color: var(--ins-raised); color: var(--color-foregrou
   -webkit-mask: url("/royal/mon.svg") center / contain no-repeat;
   mask: url("/royal/mon.svg") center / contain no-repeat;
 }
+/* The dotted halo crowds the crest into a smudge; the turning crest is the live sign. */
+:root[data-lamp="mon"] .ins-lamp::after { display: none; }
 :root[data-lamp="mon"] .ins-lamp:is([data-state="on"], [data-state="ok"], [data-state="warn"], [data-state="wait"], [data-state="fault"]),
 :root[data-lamp="mon"] .tui-pane:is(:focus-within, .terminal-live) > .ins-pane-legend .ins-lamp { box-shadow: none; }
 /* Waiting on you, the crest turns slowly. */
@@ -706,7 +708,8 @@ body {
 }
 
 /* A finished plan's mark: the orrery Done glyph and a legend word in the ok ink
-   (Failed and fault ink once cancelled), faded in once on arrival. */
+   (Failed and fault ink once cancelled). It presses in only when the plan
+   ends while open (data-arrived); reopening a finished plan shows it still. */
 .ins-stamp {
   --stamp-c: var(--ins-ok);
   display: inline-flex;
@@ -716,14 +719,14 @@ body {
   letter-spacing: var(--legend-tracking);
   text-transform: uppercase;
   color: var(--stamp-c);
-  animation: ins-stamp-in 400ms var(--ins-ease-out) both;
 }
+.ins-stamp[data-arrived] { animation: ins-stamp-in 300ms var(--ins-ease-out) both; }
 .ins-stamp[data-cancelled] { --stamp-c: var(--ins-fault); }
 @keyframes ins-stamp-in {
-  from { opacity: 0; }
+  from { opacity: 0; transform: scale(1.12); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ins-stamp { animation: none; }
+  .ins-stamp[data-arrived] { animation-name: ins-fade-in; }
 }
 
 /* Proper names (projects, plans, agents): Spectral italic. Tab titles go to 600. */
@@ -1763,6 +1766,12 @@ body {
   .ins-body[data-body="done"] { border: 0; background: var(--color-foreground); opacity: 1; }
   .ins-body[data-body="next"] { border-style: solid; opacity: 1; }
   .ins-body[data-skipped] { opacity: 0.5; }
+  /* A chunk finished while you watch: its filled body lands in place once. */
+  .ins-body[data-arrived] { animation: ins-body-land var(--ins-dur-enter) var(--ins-ease-out); }
+  @keyframes ins-body-land { from { opacity: 0; transform: scale(0.6); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ins-body[data-arrived] { animation-name: ins-fade-in; }
+  }
 
   .ins-chunk-sun {
     position: relative;

@@ -22,9 +22,17 @@ export const VOICE_PROMPTS = {
     + 'Do not repeat what the user said, narrate your process, or pad with summaries.',
 };
 
+// What comments the agent writes, by the codeComments setting; 'off' has none.
+export const COMMENT_PROMPTS = {
+  decisions: 'Code comments: write a comment only as a decision record, an important non-obvious decision the code cannot show. '
+    + 'Never write a tautology (repeats what the code already says), an excuse (explains away a hacky implementation: fix it, or tell the user and leave no comment), '
+    + 'or a stale comment (about code or behaviour that no longer exists). '
+    + 'Delete tautological and stale comments in the code you touch.',
+};
+
 // What every launch of a tab's agent gets: the master tab always carries the
-// master prompt, every tab its voice; only the auto-launch resumes a conversation.
-export const launchOptions = ({ master, resumeId, voice }) => ({
+// master prompt, every tab its voice and comment rule; only the auto-launch resumes a conversation.
+export const launchOptions = ({ master, resumeId, voice, comments }) => ({
   resumeId,
-  systemPrompt: [master && MASTER_PROMPT, VOICE_PROMPTS[voice]].filter(Boolean).join(' ') || undefined
+  systemPrompt: [master && MASTER_PROMPT, VOICE_PROMPTS[voice], COMMENT_PROMPTS[comments]].filter(Boolean).join(' ') || undefined
 });

@@ -29,7 +29,7 @@ import { Worktree } from '@/components/icons';
 import { ContextMoon } from '../../components/instrument/ContextMoon';
 import { Lamp } from '../../components/instrument/Lamp';
 import { useConfirm } from '../dialogs/DialogProvider';
-import { dirtyCount, worktreeRemove } from '../../lib/git';
+import { dirtyCount, repoTop, worktreeRemove } from '../../lib/git';
 import { lazyNamed } from '../../lib/lazyNamed';
 import { worktreeChanges } from '../git/worktreeChanges';
 
@@ -202,6 +202,19 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     }
   }, [toast]);
 
+  // The tab's uncommitted work against HEAD, untracked files included, in the same viewer.
+  const reviewChanges = useCallback(async (tab) => {
+    try {
+      // From the repo top: a tab opened on a subfolder would join its paths wrong.
+      const top = (await repoTop(tab.projectPath)) ?? tab.projectPath;
+      const { baseRef, files } = await worktreeChanges(top, 'HEAD');
+      if (!files.length) return toast.success('No uncommitted changes');
+      setWorktreeDiff({ repoPath: top, baseRef, files, filePath: files[0].path });
+    } catch (e) {
+      toast.error(`Can't show the diff: ${e?.message || e}`);
+    }
+  }, [toast]);
+
   // Another worktree of the row's repo merges into the tab's branch, in the tab's merge dialog.
   const mergeWorktree = useCallback((tabId, worktree) => {
     if (tabId !== activeTabId) switchTab(tabId);
@@ -256,9 +269,10 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
     mergePlan,
     togglePlanTerminal,
     reviewWorktree,
+    reviewChanges,
     mergeWorktree,
     deleteWorktree,
-  }), [switchTab, openPlan, openPlans, toggleExpanded, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal, reviewWorktree, mergeWorktree, deleteWorktree]);
+  }), [switchTab, openPlan, openPlans, toggleExpanded, requestCloseTab, commitRename, cancelRename, toggleLink, copyBranch, openFolder, attachEdits, toggleTrail, resumePlan, stopPlan, shelve, mergePlan, togglePlanTerminal, reviewWorktree, reviewChanges, mergeWorktree, deleteWorktree]);
 
   const kinds = [];
   const faulted = []; // tabs whose run stopped, for the closing line
@@ -296,9 +310,9 @@ export const TabsSummaryPane = memo(function TabsSummaryPane({ onNewTab, rowHint
         // Rows unfold only by hand (chevron or →), so the list never jumps as you
         // move or agents start and stop; the lamp and queue outline still show live state.
         const compact = !expanded.has(tab.id) && !trailOpen
-          && renamingId !== tab.id && roleMenuId !== tab.id && worktreeMenuId !== tab.id;
+          && renamingId !== tab.id && worktreeMenuId !== tab.id;
         if (tab.id === focusedId) {
-          focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary, worktrees: repo[tab.id]?.worktrees?.length });
+          focusKeys = rowKeys({ active, closable, edited: turn?.edited?.size > 0, plans: tabPlans, summary, worktrees: repo[tab.id]?.worktrees?.length, changed: repo[tab.id]?.files > 0 });
         }
         return (
           <TabRow

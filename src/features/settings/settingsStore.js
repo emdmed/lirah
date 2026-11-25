@@ -89,6 +89,9 @@ export const SETTINGS_DEFAULTS = {
   // How the tab's agent talks: 'plain' (short, simple words, problems flagged
   // up front; see tabs/launchOptions.js) or 'off' (the CLI's own style).
   agentVoice: 'plain',
+  // What comments the agent writes: 'decisions' (decision records only; see
+  // tabs/launchOptions.js) or 'off' (the CLI's own habit).
+  codeComments: 'off',
   // Starred repos: { id, name, path, createdAt, lastAccessedAt }.
   bookmarks: [],
   // Saved prompts: { id, title, content, createdAt, updatedAt }.
@@ -222,6 +225,7 @@ const VALIDATORS = {
   scene: (v) => (SCENES.includes(v) ? v : undefined),
   lampStyle: (v) => (LAMP_STYLES.includes(v) ? v : undefined),
   agentVoice: (v) => (v === 'plain' || v === 'off' ? v : undefined),
+  codeComments: (v) => (v === 'decisions' || v === 'off' ? v : undefined),
   sidebarSection: (v) => (v === 'tabs' || v === 'files' ? v : undefined),
   filesPanel: (v) => (v === 'tree' || v === 'features' ? v : undefined),
   bookmarks: cleanBookmarks,

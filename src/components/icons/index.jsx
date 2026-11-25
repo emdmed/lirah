@@ -68,6 +68,7 @@ const GLYPHS = {
   Edit: <><path d="M15.5 4.5l4 4L9 19l-5 1 1-5z" /></>,
   Clear: <><path d="M9 21h12M3.5 15.5l10-10 6 6-9 9h-3z" /></>,
   Folder: <><path d="M3 5h6l2 2h10v12H3z" /></>,
+  More: <><circle cx="5" cy="12" r="1.6" /><circle className="b" cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></>,
   RemoveFolder: <><path d="M3 5h6l2 2h10v12H3zM9 13h6" /></>,
   File: <><path d="M5 3h9l5 5v13H5zM14 3v5h5" /></>,
   RemoveFile: <><path d="M5 3h9l5 5v13H5zM14 3v5h5M9 15h6" /></>,
@@ -112,5 +113,5 @@ const make = (name) => {
 
 export const ICON_NAMES = Object.keys(GLYPHS);
 export const {
-  Refresh, Repeat, Send, Download, Upload, Import, View, Reveal, Pin, Commit, Branch, Worktree, Workspace, Merge, Plan, Filter, Stats, Agent, Undo, Transfer, Play, Stop, Check, Close, Add, Done, Failed, Warning, Compare, Database, Cost, Sort, Link, Table, Search, FindInFile, Settings, Time, Star, Required, Best, Trophy, Quick, Unpin, Expand, Collapse, CollapseAll, HideSidebar, ShowSidebar, Empty, ChevronDown, ChevronRight, ChevronLeft, ChevronUp, ArrowUp, ArrowDown, ParentFolder, Terminal, Copy, Trash, Edit, Clear, Folder, RemoveFolder, File, RemoveFile, FileBelow, Files, Archive, Save, Chat, NewChat, Code, TextSize, Command, Attach, Tasks, Log, Jobs, Price
+  Refresh, Repeat, Send, Download, Upload, Import, View, Reveal, Pin, Commit, Branch, Worktree, Workspace, Merge, Plan, Filter, Stats, Agent, Undo, Transfer, Play, Stop, Check, Close, Add, Done, Failed, Warning, Compare, Database, Cost, Sort, Link, Table, Search, FindInFile, Settings, Time, Star, Required, Best, Trophy, Quick, Unpin, Expand, Collapse, CollapseAll, HideSidebar, ShowSidebar, Empty, ChevronDown, ChevronRight, ChevronLeft, ChevronUp, ArrowUp, ArrowDown, ParentFolder, Terminal, Copy, Trash, Edit, Clear, Folder, More, RemoveFolder, File, RemoveFile, FileBelow, Files, Archive, Save, Chat, NewChat, Code, TextSize, Command, Attach, Tasks, Log, Jobs, Price
 } = Object.fromEntries(ICON_NAMES.map((n) => [n, make(n)]));

@@ -10,6 +10,7 @@ import { FrameHints } from '../../components/instrument/FrameHints';
 import { AUTOPILOT_STATUS, CHUNK_STATE, CHUNK_STATUS, canMoveChunk, effectiveChunkState, isAutopilotLive, nextChunkId } from './planModel';
 import { BUSY, useBusy, usePlanPane, useStarting } from './PlanPaneContext';
 import { usePlansActions } from './PlansContext';
+import { useArrived } from '../../hooks/useArrived';
 import { isNoGit } from './planGit';
 import { useToast } from '../toast';
 import { useDialogStore } from '../dialogs/DialogProvider';
@@ -29,7 +30,7 @@ const chunkBody = (chunk) => CHUNK_BODY[effectiveChunkState(chunk)] || 'queued';
 
 // The body itself. Live is the site's sun: a dotted corona, a ring round the
 // mark, four rays.
-export function ChunkBody({ body, skipped, label }) {
+export function ChunkBody({ body, skipped, label, arrived }) {
   if (body === 'live') {
     return (
       <span className="ins-chunk-sun" role="img" aria-label={label}>
@@ -42,7 +43,7 @@ export function ChunkBody({ body, skipped, label }) {
       </span>
     );
   }
-  return <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} role="img" aria-label={label} />;
+  return <span className="ins-body ins-round" data-body={body} data-skipped={skipped || undefined} data-arrived={arrived || undefined} role="img" aria-label={label} />;
 }
 
 const STATUS_LABEL = {
@@ -131,6 +132,8 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
   // The one action the diagnosis recommends: commit a dirty tree, mark a clean one done.
   const recommend = stuck && dirty ? (dirty.length > 0 ? 'commit' : 'done') : null;
   const body = chunkBody(chunk) === 'queued' && isNext ? 'next' : chunkBody(chunk);
+  // Finished while you watch: the done body lands once (index.css .ins-body[data-arrived]).
+  const arrived = useArrived(body === 'done');
   const latestPrompt = chunk.prompts?.at(-1);
 
   const startEdit = () => {
@@ -138,7 +141,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
     setEditing(true);
   };
   const saveDecisions = () => {
-    const lines = decisionsDraft.split('\n').map((l) => l.replace(/^\s*[-*]?\s*(Decision:\s*)?/i, '').trim()).filter(Boolean);
+    const lines = decisionsDraft.split('\n').map((l) => l.replace(/^\s*[-*]?\s*(Decision:?\s*)?/i, '').trim()).filter(Boolean);
     onPatch({ decisions: [...new Set(lines)] });
     setDecisionsDraft(null);
   };
@@ -288,7 +291,7 @@ export function ChunkRow({ plan, chunk, open, onToggle, primary = true, uncommit
         title={[isNext && 'Next chunk', !open && chunk.title].filter(Boolean).join('\n') || undefined}
       >
         <span className="flex h-[18px] w-3.5 items-center justify-center">
-          <ChunkBody body={body} skipped={skipped} label={status} />
+          <ChunkBody body={body} skipped={skipped} label={status} arrived={arrived} />
         </span>
         <span
           className={cn(

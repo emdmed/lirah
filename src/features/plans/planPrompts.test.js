@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildDraftPartPrompt, buildDraftAllPrompt, buildTaskPlanPrompt, hasMockupLink, isDraftPath } from './planPrompts';
+import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildDraftPartPrompt, buildDraftAllPrompt, buildTaskPlanPrompt, hasMockupLink, isDraftPath, parseDecisions } from './planPrompts';
 import { joinDraft } from './usePlanFiles';
 import { noGitConfig } from './planModel';
 
@@ -130,5 +130,11 @@ describe('draft part prompt', () => {
   it('drafts a part the user named, and rejects a nameless one', () => {
     expect(buildDraftPartPrompt({ ...base, part: 'test_plan' })).toContain('the test plan side of the plan');
     expect(() => buildDraftPartPrompt({ ...base, part: '' })).toThrow();
+  });
+});
+
+describe('parseDecisions', () => {
+  it('keeps a decision number and reads plain ones', () => {
+    expect(parseDecisions('- Decision D2: x\nDecision: y\n- Decision d3: z')).toEqual(['D2: x', 'y', 'D3: z']);
   });
 });
