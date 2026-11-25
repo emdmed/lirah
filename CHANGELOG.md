@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-25
+
+### Added
+
+- **Numbered flags and suggestions** - In the plain agent voice, warnings are numbered F1, F2… and suggestions R1, R2…, never reused in a conversation, so you can reply "address f2 and f5, also implement r1".
+
 ## [0.42.0] - 2026-11-22
 
 ### Added
