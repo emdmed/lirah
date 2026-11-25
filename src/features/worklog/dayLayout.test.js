@@ -20,7 +20,6 @@ describe('dayLayout', () => {
     const [lane] = l.lanes;
     expect(lane.turns).toBe(4);
     expect(lane.bars.map((b) => [b.change.id, b.x0, b.x1, b.dot])).toEqual([['a', 0.0667, 0.4, false], ['b', 0.8, 0.8, true]].map(([id, x0, x1, dot]) => [id, expect.closeTo(x0, 3), x1, dot]));
-    expect(lane.bars[0].room).toBeCloseTo(0.8 - 0.0667, 3);
     expect(l.releases.map((r) => [r.tag, r.x])).toEqual([['v1', 0.9]]);
     expect(l.talk).toBe(2);
   });

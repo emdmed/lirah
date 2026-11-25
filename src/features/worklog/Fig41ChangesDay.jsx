@@ -1,12 +1,15 @@
-import { Figure, INK, Node, Ruler, STROKE, T, textWidth, useFigureCompact } from '@/components/instrument/figure';
+import { useState } from 'react';
+import { Figure, INK, Node, Ruler, STROKE, T, useFigureCompact } from '@/components/instrument/figure';
 import { fallbackTitle } from './changesPrompt';
 import { dayLayout } from './dayLayout';
 
 // FIG.41: one day's changes in lanes on a time ruler. One lane per feature,
 // its turn count beside the name; each change a bar from its first turn to
-// its last (one turn: a dot), titled on a paper backing. A faint dashed lane
-// counts the talk. Each release is a dashed line through every lane, a
-// diamond at the foot with the version and time under it. ↵ or a click on a
+// its last (one turn: a dot). A faint dashed lane counts the talk. Each
+// release is a dashed line through every lane, a diamond at the foot with the
+// version and time under it. Each change is numbered in time order beside its
+// bar; the titles stack under the chart by those numbers. Hovering a bar or
+// its title lights both in the lamp. ↵ or a click on a
 // change shows it in the list below. Compact or narrow, it lists the day's
 // changes by feature.
 
@@ -15,7 +18,8 @@ const W = 660;
 const X1 = W - 24;
 const RULER_Y = 8;
 const TOP = 34;
-const ROW = 30;
+const ROW = 22;
+const LABEL_ROW = 13;
 const MIN_W = 480;
 
 const hh = (h) => String(h).padStart(2, '0');
@@ -41,6 +45,7 @@ function DayList({ lanes, title }) {
 /** `day`'s changes ('YYYY-MM-DD') by feature; `features`, `talk`, `releases`, `titles` as useChanges gives them. */
 export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen }) {
   const compact = useFigureCompact();
+  const [lit, setLit] = useState(null);
   const l = dayLayout(features, talk, releases, day);
   if (!l) return null;
   const title = (c) => titles[c.id] ?? fallbackTitle(c);
@@ -51,10 +56,16 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
   const yOf = (i) => TOP + i * ROW + ROW / 2;
   const talkY = l.talk ? yOf(l.lanes.length) : null;
   const laneEnd = TOP + (l.lanes.length + (l.talk ? 1 : 0)) * ROW;
-  const bottom = laneEnd + (l.releases.length ? 36 : 4);
+  const labelTop = laneEnd + (l.releases.length ? 42 : 10);
+  const labels = l.lanes.flatMap((ln) => ln.bars).sort((a, b) => a.x0 - b.x0);
+  const num = new Map(labels.map((b, i) => [b.change.id, i + 1]));
+  const bottom = labelTop + labels.length * LABEL_ROW;
   const hours = l.ticks.length - 1;
 
   const label = `Changes on ${day}, ${hh(l.ticks[0].hour)}:00 to ${hh(l.ticks.at(-1).hour)}:00: ${l.lanes.map((ln) => `${ln.name} ${ln.turns} turns, ${ln.bars.map((b) => title(b.change)).join(', ')}`).join('; ')}. ${l.talk} talk turns. Releases: ${l.releases.map((r) => `${r.tag} at ${clock(r.at)}`).join(', ') || 'none'}.`;
+
+  const hover = (id) => ({ onMouseEnter: () => setLit(id), onMouseLeave: () => setLit(null) });
+  const ink = (id, base) => (id === lit ? INK.lamp : base);
 
   const open = (c) => (e) => {
     if (e.type === 'keydown' && e.key !== 'Enter') return;
@@ -87,7 +98,6 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
             <line x1={X0} x2={X1} y1={y + 5} y2={y + 5} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
             {ln.bars.map((b) => {
               const x0 = px(b.x0);
-              const name = cut(title(b.change), b.room * (X1 - X0) - 6);
               return (
                 <g
                   key={b.change.id}
@@ -96,24 +106,27 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
                   aria-label={`${title(b.change)}, ${b.change.days[day]} turn${b.change.days[day] === 1 ? '' : 's'}, show in the list`}
                   onClick={open(b.change)}
                   onKeyDown={open(b.change)}
+                  {...hover(b.change.id)}
                   className="cursor-pointer outline-none [&:focus-visible_.bar]:stroke-[var(--ins-lamp)]"
                 >
                   <title>{`${title(b.change)} · ${clock(b.change.start)}–${clock(b.change.end ?? b.change.start)} · click to show in the list`}</title>
                   {b.dot
-                    ? <circle className="bar" cx={x0} cy={y + 5} r={3.5} style={{ fill: INK.fg, strokeWidth: 2 }} />
-                    : <rect className="bar" x={x0} y={y + 2} width={Math.max(px(b.x1) - x0, 4)} height={6} style={{ fill: INK.fg, strokeWidth: 2 }} />}
-                  {name && (
-                    <>
-                      <rect x={x0 - 2} y={y - 12} width={textWidth(name) + 4} height={12} style={{ fill: INK.paper }} />
-                      <T x={x0} y={y - 3} color={INK.fg}>{name}</T>
-                    </>
-                  )}
+                    ? <circle className="bar" cx={x0} cy={y + 5} r={3.5} style={{ fill: ink(b.change.id, INK.fg), strokeWidth: 2 }} />
+                    : <rect className="bar" x={x0} y={y + 2} width={Math.max(px(b.x1) - x0, 4)} height={6} style={{ fill: ink(b.change.id, INK.fg), strokeWidth: 2 }} />}
+                  <T x={x0} y={y - 2} anchor="middle" color={ink(b.change.id, INK.muted)} halo>{num.get(b.change.id)}</T>
                 </g>
               );
             })}
           </g>
         );
       })}
+      {labels.map((b, i) => (
+        <g key={b.change.id} onClick={open(b.change)} className="cursor-pointer" {...hover(b.change.id)}>
+          <rect x={0} y={labelTop + i * LABEL_ROW} width={W} height={LABEL_ROW} style={{ fill: 'transparent' }} />
+          <T x={16} y={labelTop + i * LABEL_ROW + 9.5} anchor="end" color={ink(b.change.id, INK.muted)}>{i + 1}</T>
+          <T x={24} y={labelTop + i * LABEL_ROW + 9.5} color={ink(b.change.id, INK.fg)}>{cut(title(b.change), W - 24)}</T>
+        </g>
+      ))}
       {talkY != null && (
         <g>
           <T x={0} y={talkY + 3.5} color={INK.faint}>Talk, no code</T>

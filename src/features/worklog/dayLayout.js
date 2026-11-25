@@ -6,9 +6,9 @@ const HOUR = 60 * 60 * 1000;
 
 /**
  * useChanges' features + talk + releases, one 'YYYY-MM-DD' `day` →
- * { from, to, ticks: [{ x, hour }], lanes: [{ id, name, turns, bars: [{ change, x0, x1, dot, room }] }],
+ * { from, to, ticks: [{ x, hour }], lanes: [{ id, name, turns, bars: [{ change, x0, x1, dot }] }],
  *   releases: [{ tag, at, x }], talk } or null when nothing ran that day.
- * `dot` marks a change of one turn that day; `room` the space to the lane's next bar.
+ * `dot` marks a change of one turn that day.
  */
 export function dayLayout(features, talk, releases, day) {
   const d0 = new Date(`${day}T00:00`);
@@ -43,11 +43,7 @@ export function dayLayout(features, talk, releases, day) {
     ticks,
     lanes: lanes.map(({ changes, ...l }) => ({
       ...l,
-      bars: changes.map((c, i) => {
-        const x0 = x(clip(c.start));
-        const next = changes[i + 1];
-        return { change: c, x0, x1: x(clip(c.end ?? c.start)), dot: c.days[day] === 1, room: (next ? x(clip(next.start)) : 1) - x0 };
-      }),
+      bars: changes.map((c) => ({ change: c, x0: x(clip(c.start)), x1: x(clip(c.end ?? c.start)), dot: c.days[day] === 1 })),
     })),
     releases: rels.map((r) => ({ ...r, x: x(r.at) })),
     talk: talk[day] ?? 0,
