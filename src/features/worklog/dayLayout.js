@@ -52,3 +52,22 @@ export function dayLayout(features, talk, releases, day) {
 
 /** dayLayout's lanes → { [changeId]: n }: FIG.41's title numbers, 1.. in start order across lanes. */
 export const dayNumbers = (lanes) => new Map(lanes.flatMap((ln) => ln.bars).sort((a, b) => a.x0 - b.x0).map((b, i) => [b.change.id, i + 1]));
+
+/**
+ * dayLayout's releases on a ruler `width` px wide → each with { anchor, row }.
+ * A lone release sits centred under its diamond on row 0; in a cluster closer
+ * than a label width the pair splits 'end' | 'start' on elbow leaders, and
+ * every further pair stacks one row down.
+ */
+export function releaseLabels(releases, width) {
+  const w = (r) => r.tag.length * 6.6 + 8; // shortcut: fixed mono glyph width, measure if the font changes
+  const clusters = [];
+  releases.forEach((r, i) => {
+    const prev = releases[i - 1];
+    if (prev && (r.x - prev.x) * width < (w(prev) + w(r)) / 2) clusters.at(-1).push(r);
+    else clusters.push([r]);
+  });
+  return clusters.flatMap((c) =>
+    c.length === 1 ? [{ ...c[0], anchor: 'middle', row: 0 }] : c.map((r, i) => ({ ...r, anchor: i % 2 ? 'start' : 'end', row: Math.floor(i / 2) })),
+  );
+}
