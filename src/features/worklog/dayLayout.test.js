@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayLayout } from './dayLayout';
+import { dayLayout, dayNumbers } from './dayLayout';
 
 const at = (hh, mm = 0) => new Date(`2026-11-25T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`).getTime();
 const DAY = '2026-11-25';
@@ -30,5 +30,12 @@ describe('dayLayout', () => {
     expect([l.from, l.to]).toEqual([at(23), at(23) + 3600000]);
     expect(l.lanes[0].bars[0].x1).toBe(1);
     expect(dayLayout([], { [DAY]: 3 }, [], DAY)).toBeNull();
+  });
+});
+
+describe('dayNumbers', () => {
+  it('numbers changes across lanes by start, as FIG.41 does', () => {
+    const bar = (id, x0) => ({ change: { id }, x0 });
+    expect([...dayNumbers([{ bars: [bar('a', 0.5), bar('b', 0)] }, { bars: [bar('c', 0.2)] }])]).toEqual([['b', 1], ['c', 2], ['a', 3]]);
   });
 });

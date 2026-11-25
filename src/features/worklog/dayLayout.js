@@ -49,3 +49,6 @@ export function dayLayout(features, talk, releases, day) {
     talk: talk[day] ?? 0,
   };
 }
+
+/** dayLayout's lanes → { [changeId]: n }: FIG.41's title numbers, 1.. in start order across lanes. */
+export const dayNumbers = (lanes) => new Map(lanes.flatMap((ln) => ln.bars).sort((a, b) => a.x0 - b.x0).map((b, i) => [b.change.id, i + 1]));

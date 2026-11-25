@@ -20,6 +20,7 @@ import { Fig41ChangesDay } from './Fig41ChangesDay';
 import { dayKey } from './weekGrid';
 import { ReviewBlock, clock, reviewCounts } from './ReviewBlock';
 import { flagKey, assumptionKey } from './reviewState';
+import { ReviewQueue } from './ReviewQueue';
 
 const TALK = '__talk';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -107,7 +108,7 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
   };
   const title = (c) => ch.titles[c.id] ?? fallbackTitle(c);
 
-  const copy = () => navigator.clipboard.writeText(changesNotes(ch.features, ch.titles))
+  const copy = () => navigator.clipboard.writeText(changesNotes(ch.features, ch.titles, ch.review))
     .then(() => toast.success(`Copied notes for ${plural(ch.features.length, 'feature')}`), (e) => toast.error(errorMessage(e)));
 
   const onKeyDown = (e) => {
@@ -209,6 +210,9 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
               </div>
             )}
             <div className="min-w-0 flex-1">
+              {!ch.loading && ch.changes.length > 0 && (
+                <ReviewQueue ch={ch} act={act} title={title} day={range.from === range.to ? range.from : null} today={today} onShow={showChange} />
+              )}
               {ch.features.map((f) => (
                 <details
                   key={f.id ?? 'none'}

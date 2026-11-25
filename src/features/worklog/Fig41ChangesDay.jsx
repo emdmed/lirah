@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Figure, INK, Node, Ruler, STROKE, T, useFigureCompact } from '@/components/instrument/figure';
 import { fallbackTitle } from './changesPrompt';
-import { dayLayout } from './dayLayout';
+import { dayLayout, dayNumbers } from './dayLayout';
 
 // FIG.41: one day's changes in lanes on a time ruler. One lane per feature,
 // its turn count beside the name; each change a bar from its first turn to
@@ -58,7 +58,7 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
   const laneEnd = TOP + (l.lanes.length + (l.talk ? 1 : 0)) * ROW;
   const labelTop = laneEnd + (l.releases.length ? 42 : 10);
   const labels = l.lanes.flatMap((ln) => ln.bars).sort((a, b) => a.x0 - b.x0);
-  const num = new Map(labels.map((b, i) => [b.change.id, i + 1]));
+  const num = dayNumbers(l.lanes);
   const bottom = labelTop + labels.length * LABEL_ROW;
   const hours = l.ticks.length - 1;
 
@@ -123,7 +123,7 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
       {labels.map((b, i) => (
         <g key={b.change.id} onClick={open(b.change)} className="cursor-pointer" {...hover(b.change.id)}>
           <rect x={0} y={labelTop + i * LABEL_ROW} width={W} height={LABEL_ROW} style={{ fill: 'transparent' }} />
-          <T x={16} y={labelTop + i * LABEL_ROW + 9.5} anchor="end" color={ink(b.change.id, INK.muted)}>{i + 1}</T>
+          <T x={16} y={labelTop + i * LABEL_ROW + 9.5} anchor="end" color={ink(b.change.id, INK.muted)}>{num.get(b.change.id)}</T>
           <T x={24} y={labelTop + i * LABEL_ROW + 9.5} color={ink(b.change.id, INK.fg)}>{cut(title(b.change), W - 24)}</T>
         </g>
       ))}
