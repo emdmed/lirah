@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { load, save } from '../../lib/fileStore';
 import { useFeatureMap } from '../feature-map/useFeatureMap';
+import { usePlans } from '../plans/PlansContext';
 import { useSetting } from '../settings/settingsStore';
 import { useWorklog } from './worklogStore';
 import { groupChanges } from './changes';
@@ -35,6 +36,7 @@ export function weekRange(now = Date.now()) {
 export function useChanges(projectPath, range) {
   const { entries, repo } = useWorklog(projectPath);
   const fm = useFeatureMap(projectPath);
+  const { plans } = usePlans(repo);
   const [model] = useSetting('worklogSummaryModel');
   const fromMs = startOf(range.from);
   const toMs = startOf(range.to) + DAY_MS;
@@ -53,9 +55,9 @@ export function useChanges(projectPath, range) {
     if (!entries || !repo || git?.key !== gitKey) return null;
     const mine = entries.filter((e) => e.repo === repo && e.at >= fromMs && e.at < toMs);
     const g = groupChanges(mine, { featureMap: fm.map });
-    attachGit(g.changes, git);
+    attachGit(g.changes, { ...git, plans: plans ?? [] });
     return { ...g, releases: git.releases.filter((r) => r.at >= fromMs && r.at < toMs) };
-  }, [entries, repo, git, gitKey, fromMs, toMs, fm.map]);
+  }, [entries, repo, git, gitKey, fromMs, toMs, fm.map, plans]);
 
   const [digest, setDigest] = useState(null); // { of: grouped, titles, summaries }
   useEffect(() => {
