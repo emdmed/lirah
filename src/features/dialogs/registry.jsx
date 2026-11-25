@@ -117,7 +117,8 @@ export const TAB_DIALOGS = {
   },
   gitDiff: {
     Component: GitDiffDialog,
-    props: (ctx) => ({ filePath: ctx.dialogs.diffFilePath, repoPath: ctx.currentPath }),
+    // `entry` may carry a commit range ({ repoPath, baseRef, headRef, changedFiles, filePath }), e.g. from the changes dialog.
+    props: (ctx, entry) => ({ filePath: ctx.dialogs.diffFilePath, repoPath: ctx.currentPath, ...entry }),
   },
   featureExplorer: {
     Component: FeatureExplorer,
@@ -125,7 +126,7 @@ export const TAB_DIALOGS = {
   },
   changes: {
     Component: ChangesDialog,
-    props: (ctx) => ({ projectPath: ctx.currentPath }),
+    props: (ctx) => ({ projectPath: ctx.currentPath, sessionId: ctx.sessionId, fillPrompt: ctx.fillPrompt }),
   },
   markdown: {
     Component: MarkdownViewerDialog,

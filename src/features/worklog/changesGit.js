@@ -1,4 +1,5 @@
 import { git, gitLines } from '../../lib/git';
+import { driftByChunk } from '../plans/driftByChunk';
 import { isReleaseBumpFile } from './releaseFiles';
 
 // Changes (groupChanges) + git: which commits carried each change, how many
@@ -8,6 +9,14 @@ import { isReleaseBumpFile } from './releaseFiles';
 const REL_FORMAT = '%(refname:short)%09%(creatordate:unix)%09%(*committerdate:unix)%09%(committerdate:unix)';
 const LOG_FORMAT = '%x1e%H%x09%ct%x09%s';
 const RELEASE_SUBJECT = /^chore: release\b/;
+const TEST_FILE = /(\.test|\.spec)\.[jt]sx?$|(^|\/)tests?\//;
+const PLAN_SUBJECT = /^plan\(([^)]+)\): (\d+)(?:\/(\d+))? — (.*)$/;
+
+/** 'plan(<slug>): <n>[/<total>] — <title>' → { slug, n, total, title }, else null. total is null when absent. */
+export function parsePlanSubject(subject) {
+  const m = PLAN_SUBJECT.exec(subject ?? '');
+  return m ? { slug: m[1], n: Number(m[2]), total: m[3] ? Number(m[3]) : null, title: m[4] } : null;
+}
 
 /** for-each-ref lines → [{ tag, at }] (ms of the tagged commit), oldest first. */
 export function parseReleases(lines) {
@@ -41,12 +50,15 @@ export function parseCommits(text) {
 }
 
 /**
- * Adds { commits: [sha], added, removed, lines, version, noCommit } to each change. A change's
+ * Adds { commits: [sha], added, removed, lines, version, noCommit, tests, qa, plan, drift } to each change. A change's
  * commits are those after its start, up to the next release, that touch its
  * files; lines counts only its files in them; version is the first tag at or
- * after its last commit. Mutates and returns `changes`.
+ * after its last commit. tests and qa are its test and QA recipe files; plan is
+ * its first plan commit's parsed subject; drift compares that chunk's planned
+ * files with what its plan commits touched, null without a loaded plan.
+ * Mutates and returns `changes`.
  */
-export function attachGit(changes, { releases = [], commits = [] }) {
+export function attachGit(changes, { releases = [], commits = [], plans = [] }) {
   for (const ch of changes) {
     const files = new Set(ch.files);
     const cutoff = releases.find((r) => r.at >= ch.start)?.at ?? Infinity;
@@ -59,6 +71,19 @@ export function attachGit(changes, { releases = [], commits = [] }) {
     const last = mine.at(-1)?.at;
     ch.version = last == null ? null : (releases.find((r) => r.at >= last)?.tag ?? null);
     ch.noCommit = files.size > 0 && mine.length === 0;
+    ch.tests = ch.files.filter((f) => TEST_FILE.test(f));
+    ch.qa = ch.files.filter((f) => f.startsWith('qa/recipes/'));
+    const planned = mine.map((c) => ({ c, p: parsePlanSubject(c.subject) })).filter((x) => x.p);
+    ch.plan = planned[0]?.p ?? null;
+    ch.drift = null;
+    const plan = ch.plan && plans.find((p) => p.slug === ch.plan.slug);
+    const chunk = plan?.chunks.find((c) => c.n === ch.plan.n);
+    if (chunk) {
+      ch.plan.total ??= plan.chunks.length;
+      const touched = planned.filter((x) => x.p.n === chunk.n).flatMap((x) => Object.keys(x.c.files));
+      const row = driftByChunk({ chunks: [chunk] }, { [chunk.id]: { repo: touched } })[0];
+      if (row) ch.drift = { named: row.planned.length, touched: row.touched.length, ratio: row.planned.length ? row.touched.length / row.planned.length : null };
+    }
   }
   return changes;
 }

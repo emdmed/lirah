@@ -4,6 +4,7 @@ import { createEmitter } from '../../lib/createStore';
 import { bashFileTargets } from './bashFileTargets';
 import { endEntry, startEntry } from '../worklog/worklogStore';
 import { parseDecisions } from '../plans/planPrompts';
+import { parseAssumptions, parseFlags } from '../worklog/replyLines';
 import { isAbsolute, normalizePath, ancestorDirs } from '../../utils/pathUtils';
 
 // What each terminal's agent last said about itself through its hooks (see
@@ -266,7 +267,8 @@ export function startAgentHookListener() {
         turn.endedAt = now;
         turnMs = now - turn.startedAt;
       }
-      endEntry(sessionId, turn?.edited, parseDecisions(payload.last_assistant_message));
+      const reply = payload.last_assistant_message;
+      endEntry(sessionId, turn?.edited, parseDecisions(reply), { flags: parseFlags(reply), assumptions: parseAssumptions(reply) });
     } else if (hookEvent === 'SessionEnd') {
       endEntry(sessionId, getLastTurn(sessionId)?.edited);
     }

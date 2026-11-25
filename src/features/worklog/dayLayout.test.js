@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayLayout } from './dayLayout';
+import { dayLayout, dayNumbers, releaseLabels } from './dayLayout';
 
 const at = (hh, mm = 0) => new Date(`2026-11-25T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`).getTime();
 const DAY = '2026-11-25';
@@ -30,5 +30,27 @@ describe('dayLayout', () => {
     expect([l.from, l.to]).toEqual([at(23), at(23) + 3600000]);
     expect(l.lanes[0].bars[0].x1).toBe(1);
     expect(dayLayout([], { [DAY]: 3 }, [], DAY)).toBeNull();
+  });
+});
+
+describe('releaseLabels', () => {
+  it('splits a close pair onto opposite anchors and leaves a lone release centred', () => {
+    const rels = [{ tag: 'v0.45.0', at: at(18, 37) }, { tag: 'v0.45.1', at: at(18, 44) }, { tag: 'v0.46.0', at: at(20, 42) }];
+    const l = dayLayout([], {}, rels, DAY);
+    expect(releaseLabels(l.releases, 466).map((r) => [r.tag, r.anchor, r.row])).toEqual([
+      ['v0.45.0', 'end', 0], ['v0.45.1', 'start', 0], ['v0.46.0', 'middle', 0],
+    ]);
+  });
+
+  it('stacks a third close release one row down', () => {
+    const rels = ['a', 'b', 'c'].map((tag, i) => ({ tag: `v${tag}`, x: 0.5 + i * 0.01 }));
+    expect(releaseLabels(rels, 466).map((r) => [r.anchor, r.row])).toEqual([['end', 0], ['start', 0], ['end', 1]]);
+  });
+});
+
+describe('dayNumbers', () => {
+  it('numbers changes across lanes by start, as FIG.41 does', () => {
+    const bar = (id, x0) => ({ change: { id }, x0 });
+    expect([...dayNumbers([{ bars: [bar('a', 0.5), bar('b', 0)] }, { bars: [bar('c', 0.2)] }])]).toEqual([['b', 1], ['c', 2], ['a', 3]]);
   });
 });

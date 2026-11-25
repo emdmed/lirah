@@ -14,16 +14,20 @@ const dayKey = (at) => {
 };
 
 /**
- * `entries` (parseLog's, oldest first, one repo) → { changes, talk, unmapped }.
- * changes: [{ id, session, start, end, turns, days, prompts, files, decisions, feature, features }],
- * days the { 'YYYY-MM-DD': turns } of its turns,
+ * `entries` (parseLog's, oldest first, one repo) → { changes, talk, talkItems, unmapped }.
+ * changes: [{ id, session, start, end, turns, days, prompts, files, decisions, decided, flags, assumptions, feature, features }],
+ * days the { 'YYYY-MM-DD': turns } of its turns, flags [{ n, text, entry, at, session }] and
+ * assumptions [{ text, entry, at, session, i }] (i its index in the turn's) from its turns' replies,
+ * decided its decisions as [{ text, entry, at, session }],
  * feature the id owning most of its files, features every feature id touched (most files first);
- * talk: { 'YYYY-MM-DD': turns } of file-less turns that joined nothing;
+ * talk: { 'YYYY-MM-DD': turns } of file-less turns that joined nothing, talkItems
+ * { 'YYYY-MM-DD': [{ kind: 'decision' | 'flag' | 'assumption', text, at, entry, session, n?, i? }] } their reply lines;
  * unmapped: the changes' files no feature of `featureMap` lists.
  */
 export function groupChanges(entries, { featureMap } = {}) {
   const changes = [];
   const talk = {};
+  const talkItems = {};
   const runs = new Map(); // session or cwd key -> { last, open: [change] }
   for (const e of [...entries].sort((a, b) => a.at - b.at)) {
     const key = e.session ? `s:${e.session}` : `c:${e.cwd || e.repo}`;
@@ -40,10 +44,17 @@ export function groupChanges(entries, { featureMap } = {}) {
       : FOLLOW_UP.test(e.prompt) ? run.open.at(-1) : null;
     if (!change) {
       if (!files.length) {
-        talk[dayKey(e.at)] = (talk[dayKey(e.at)] ?? 0) + 1;
+        const day = dayKey(e.at);
+        talk[day] = (talk[day] ?? 0) + 1;
+        const items = [
+          ...(e.decisions ?? []).map((text) => ({ kind: 'decision', text })),
+          ...(e.flags ?? []).map((f) => ({ kind: 'flag', ...f })),
+          ...(e.assumptions ?? []).map((text, i) => ({ kind: 'assumption', text, i })),
+        ].map((it) => ({ ...it, at: e.at, entry: e.id, session: e.session ?? null }));
+        if (items.length) (talkItems[day] ??= []).push(...items);
         continue;
       }
-      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, days: {}, prompts: [], files: new Set(), decisions: [] };
+      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, days: {}, prompts: [], files: new Set(), decisions: [], decided: [], flags: [], assumptions: [] };
       changes.push(change);
       run.open.push(change);
     }
@@ -53,6 +64,10 @@ export function groupChanges(entries, { featureMap } = {}) {
     change.prompts.push(e.prompt);
     files.forEach((f) => change.files.add(f));
     change.decisions.push(...(e.decisions ?? []));
+    const from = { entry: e.id, at: e.at, session: e.session ?? null };
+    change.decided.push(...(e.decisions ?? []).map((text) => ({ text, ...from })));
+    change.flags.push(...(e.flags ?? []).map((f) => ({ ...f, ...from })));
+    change.assumptions.push(...(e.assumptions ?? []).map((text, i) => ({ text, ...from, i })));
   }
 
   const owners = new Map(); // file -> feature ids
@@ -71,5 +86,5 @@ export function groupChanges(entries, { featureMap } = {}) {
     c.features = [...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a));
     c.feature = c.features[0] ?? null;
   }
-  return { changes, talk, unmapped: [...unmapped].sort() };
+  return { changes, talk, talkItems, unmapped: [...unmapped].sort() };
 }

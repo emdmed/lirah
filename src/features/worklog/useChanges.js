@@ -1,10 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { load, save } from '../../lib/fileStore';
 import { useFeatureMap } from '../feature-map/useFeatureMap';
+import { usePlans } from '../plans/PlansContext';
 import { useSetting } from '../settings/settingsStore';
 import { useWorklog } from './worklogStore';
 import { groupChanges } from './changes';
 import { attachGit, loadCommits, loadReleases } from './changesGit';
 import { titleChanges } from './changesPrompt';
+import { reviewState } from './reviewState';
+
+const ANSWERS = 'worklog/answers.json';
+const withAnswer = (doc, key, a) => {
+  const { version, revision, ...next } = doc ?? {};
+  if (a) next[key] = a; else delete next[key];
+  return next;
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -20,11 +30,14 @@ export function weekRange(now = Date.now()) {
  * grouped by feature, biggest first. Grouping waits for git, so the list draws
  * once with versions and lines; titles and summaries fill in after (`titling`).
  * → { repo, loading, titling, features: [{ id, name, changes, turns, added, removed, versions, summary }],
- *     changes, titles, talk, unmapped, releases, fm }
+ *     changes, titles, talk, talkItems, prompts, unmapped, releases, fm, review, answer(key, s), unanswer(key) }
+ * review is reviewState's { key: state } for the flags and assumptions of `changes` and talk;
+ * prompts maps an entry id to its prompt.
  */
 export function useChanges(projectPath, range) {
   const { entries, repo } = useWorklog(projectPath);
   const fm = useFeatureMap(projectPath);
+  const { plans } = usePlans(repo);
   const [model] = useSetting('worklogSummaryModel');
   const fromMs = startOf(range.from);
   const toMs = startOf(range.to) + DAY_MS;
@@ -43,9 +56,9 @@ export function useChanges(projectPath, range) {
     if (!entries || !repo || git?.key !== gitKey) return null;
     const mine = entries.filter((e) => e.repo === repo && e.at >= fromMs && e.at < toMs);
     const g = groupChanges(mine, { featureMap: fm.map });
-    attachGit(g.changes, git);
+    attachGit(g.changes, { ...git, plans: plans ?? [] });
     return { ...g, releases: git.releases.filter((r) => r.at >= fromMs && r.at < toMs) };
-  }, [entries, repo, git, gitKey, fromMs, toMs, fm.map]);
+  }, [entries, repo, git, gitKey, fromMs, toMs, fm.map, plans]);
 
   const [digest, setDigest] = useState(null); // { of: grouped, titles, summaries }
   useEffect(() => {
@@ -76,6 +89,24 @@ export function useChanges(projectPath, range) {
       .sort((a, b) => size(b) - size(a));
   }, [grouped, fm.map, digest]);
 
+  const [answers, setAnswers] = useState({});
+  const answersRef = useRef(answers); // save's updater gets no doc on its first try, only after a conflict
+  useEffect(() => {
+    load(ANSWERS, {}).then((doc) => setAnswers((answersRef.current = withAnswer(doc)))).catch((e) => console.error('Failed to read answers:', e));
+  }, []);
+  const mark = useCallback((key, a) => {
+    setAnswers((answersRef.current = withAnswer(answersRef.current, key, a)));
+    save(ANSWERS, (cur) => (cur ? withAnswer(cur, key, a) : answersRef.current)).catch((e) => console.error('Failed to save answers:', e));
+  }, []);
+  const answer = useCallback((key, s) => mark(key, { s, at: Date.now() }), [mark]);
+  const unanswer = useCallback((key) => mark(key, null), [mark]);
+  const review = useMemo(() => {
+    const talk = Object.values(grouped?.talkItems ?? {}).flat();
+    const asChange = { flags: talk.filter((t) => t.kind === 'flag'), assumptions: talk.filter((t) => t.kind === 'assumption') };
+    return reviewState([...(grouped?.changes ?? []), asChange], entries ?? [], answers);
+  }, [grouped, entries, answers]);
+  const prompts = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e.prompt])), [entries]);
+
   const titled = digest?.of === grouped;
   return {
     repo,
@@ -86,7 +117,12 @@ export function useChanges(projectPath, range) {
     changes: grouped?.changes ?? [],
     titles: digest?.titles ?? {},
     talk: grouped?.talk ?? {},
+    talkItems: grouped?.talkItems ?? {},
+    prompts,
     unmapped: grouped?.unmapped ?? [],
     releases: grouped?.releases ?? [],
+    review,
+    answer,
+    unanswer,
   };
 }

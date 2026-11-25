@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Figure, INK, Node, Ruler, STROKE, T, useFigureCompact } from '@/components/instrument/figure';
 import { fallbackTitle } from './changesPrompt';
-import { dayLayout } from './dayLayout';
+import { dayLayout, dayNumbers, releaseLabels } from './dayLayout';
 
 // FIG.41: one day's changes in lanes on a time ruler. One lane per feature,
 // its turn count beside the name; each change a bar from its first turn to
 // its last (one turn: a dot). A faint dashed lane counts the talk. Each
 // release is a dashed line through every lane, a diamond at the foot with the
-// version and time under it. Each change is numbered in time order beside its
+// version and time under it; releases too close to label apart split left and
+// right on elbow leaders, and further ones stack a row down. Each change is numbered in time order beside its
 // bar; the titles stack under the chart by those numbers. Hovering a bar or
 // its title lights both in the lamp. ↵ or a click on a
 // change shows it in the list below. Compact or narrow, it lists the day's
@@ -20,6 +21,7 @@ const RULER_Y = 8;
 const TOP = 34;
 const ROW = 22;
 const LABEL_ROW = 13;
+const REL_ROW = 24;
 const MIN_W = 480;
 
 const hh = (h) => String(h).padStart(2, '0');
@@ -56,9 +58,10 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
   const yOf = (i) => TOP + i * ROW + ROW / 2;
   const talkY = l.talk ? yOf(l.lanes.length) : null;
   const laneEnd = TOP + (l.lanes.length + (l.talk ? 1 : 0)) * ROW;
-  const labelTop = laneEnd + (l.releases.length ? 42 : 10);
+  const rels = releaseLabels(l.releases, X1 - X0);
+  const labelTop = laneEnd + (rels.length ? 42 + Math.max(...rels.map((r) => r.row)) * REL_ROW : 10);
   const labels = l.lanes.flatMap((ln) => ln.bars).sort((a, b) => a.x0 - b.x0);
-  const num = new Map(labels.map((b, i) => [b.change.id, i + 1]));
+  const num = dayNumbers(l.lanes);
   const bottom = labelTop + labels.length * LABEL_ROW;
   const hours = l.ticks.length - 1;
 
@@ -78,15 +81,22 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
       {l.ticks.slice(1, -1).map((t) => (
         <line key={t.x} x1={px(t.x)} x2={px(t.x)} y1={TOP} y2={laneEnd} style={{ stroke: INK.edge, strokeWidth: STROKE.hair }} />
       ))}
-      {l.releases.map((r) => (
-        <g key={r.tag}>
-          <title>{`${r.tag} · ${new Date(r.at).toLocaleString()}`}</title>
-          <line x1={px(r.x)} x2={px(r.x)} y1={TOP} y2={laneEnd + 6} style={{ stroke: INK.muted, strokeWidth: STROKE.hair }} strokeDasharray="3 3" />
-          <Node x={px(r.x)} y={laneEnd + 6} state="merge" size={6} />
-          <T x={px(r.x)} y={laneEnd + 20} anchor="middle" color={INK.fg} halo>{r.tag}</T>
-          <T x={px(r.x)} y={laneEnd + 31} anchor="middle" color={INK.faint} halo>{clock(r.at)}</T>
-        </g>
-      ))}
+      {rels.map((r) => {
+        const x = px(r.x);
+        const y = laneEnd + 20 + r.row * REL_ROW;
+        const side = { start: 1, end: -1, middle: 0 }[r.anchor];
+        const lx = x + side * 8;
+        return (
+          <g key={r.tag}>
+            <title>{`${r.tag} · ${new Date(r.at).toLocaleString()}`}</title>
+            <line x1={x} x2={x} y1={TOP} y2={laneEnd + 6} style={{ stroke: INK.muted, strokeWidth: STROKE.hair }} strokeDasharray="3 3" />
+            <Node x={x} y={laneEnd + 6} state="merge" size={6} />
+            {side ? <path d={`M${x} ${laneEnd + 12} V${y - 3.5} H${x + side * 6}`} fill="none" style={{ stroke: INK.muted, strokeWidth: STROKE.hair }} /> : null}
+            <T x={lx} y={y} anchor={r.anchor} color={INK.fg} halo>{r.tag}</T>
+            <T x={lx} y={y + 11} anchor={r.anchor} color={INK.faint} halo>{clock(r.at)}</T>
+          </g>
+        );
+      })}
       <Ruler x0={X0} x1={X1} y={RULER_Y} max={hours} step={1} labelEvery={hours > 12 ? 2 : 1} fmt={(v) => hh(l.ticks[v].hour)} />
       <line x1={0} x2={W} y1={TOP} y2={TOP} style={{ stroke: INK.edgeStrong, strokeWidth: STROKE.hair }} />
       {l.lanes.map((ln, i) => {
@@ -123,7 +133,7 @@ export function Fig41ChangesDay({ features, talk, releases, titles, day, onOpen 
       {labels.map((b, i) => (
         <g key={b.change.id} onClick={open(b.change)} className="cursor-pointer" {...hover(b.change.id)}>
           <rect x={0} y={labelTop + i * LABEL_ROW} width={W} height={LABEL_ROW} style={{ fill: 'transparent' }} />
-          <T x={16} y={labelTop + i * LABEL_ROW + 9.5} anchor="end" color={ink(b.change.id, INK.muted)}>{i + 1}</T>
+          <T x={16} y={labelTop + i * LABEL_ROW + 9.5} anchor="end" color={ink(b.change.id, INK.muted)}>{num.get(b.change.id)}</T>
           <T x={24} y={labelTop + i * LABEL_ROW + 9.5} color={ink(b.change.id, INK.fg)}>{cut(title(b.change), W - 24)}</T>
         </g>
       ))}

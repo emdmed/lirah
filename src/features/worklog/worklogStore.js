@@ -33,7 +33,7 @@ export function parseLog(text) {
       const { type: _type, ...entry } = ev;
       byId.set(ev.id, { ...entry, files: null });
     } else if (ev?.type === 'end' && byId.has(ev.id)) {
-      Object.assign(byId.get(ev.id), { endedAt: ev.at, files: ev.files ?? [], ...(ev.decisions && { decisions: ev.decisions }) });
+      Object.assign(byId.get(ev.id), { endedAt: ev.at, files: ev.files ?? [], ...(ev.decisions && { decisions: ev.decisions }), ...(ev.flags && { flags: ev.flags }), ...(ev.assumptions && { assumptions: ev.assumptions }) });
     }
   }
   return [...byId.values()];
@@ -131,9 +131,10 @@ export function startEntry(sessionId, { prompt, cwd, session }) {
 
 /**
  * The turn ended: record what it changed. `toolEdited` are absolute paths from
- * Edit/Write tools; `decisions` the `Decision:` lines of the agent's last reply.
+ * Edit/Write tools; `decisions` the `Decision:` lines of the agent's last reply,
+ * `flags` and `assumptions` its ⚠ and `Assumed:` lines (see replyLines.js).
  */
-export async function endEntry(sessionId, toolEdited = [], decisions = []) {
+export async function endEntry(sessionId, toolEdited = [], decisions = [], { flags = [], assumptions = [] } = {}) {
   const pending = open.get(sessionId);
   if (!pending) return;
   open.delete(sessionId);
@@ -147,7 +148,7 @@ export async function endEntry(sessionId, toolEdited = [], decisions = []) {
   const base = ctx.base.replaceAll('\\', '/');
   for (const p of edited) { const abs = p.replaceAll('\\', '/'); files.add(abs.startsWith(`${base}/`) ? abs.slice(base.length + 1) : abs); }
   // In the start's month file, so a turn across midnight on the 1st stays whole.
-  return append(monthFile(ctx.at), { type: 'end', id: ctx.id, at: Date.now(), files: [...files].sort(), ...(decisions.length && { decisions }) });
+  return append(monthFile(ctx.at), { type: 'end', id: ctx.id, at: Date.now(), files: [...files].sort(), ...(decisions.length && { decisions }), ...(flags.length && { flags }), ...(assumptions.length && { assumptions }) });
 }
 
 /**

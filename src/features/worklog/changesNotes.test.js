@@ -11,4 +11,11 @@ describe('changesNotes', () => {
       '## Tabs\n\nRows gained a menu.\n\n- Row menu (v0.44.0)\n- fix the hover (no commit)\n\n## Settings\n\n- Model picker'
     );
   });
+
+  it('lists the open flags under their feature', () => {
+    const flags = [{ entry: 'e1', n: 'F2', text: 'hover lags' }, { entry: 'e1', n: 'F3', text: 'done already' }, { entry: 'e2', n: null, text: 'no number' }];
+    const features = [{ name: 'Tabs', changes: [{ id: 'a', version: 'v1', flags }] }];
+    const review = { 'e1:F2': 'open', 'e1:F3': 'answered', 'e2:F:no number': 'open' };
+    expect(changesNotes(features, { a: 'Row menu' }, review)).toBe('## Tabs\n\n- Row menu (v1)\n\nOpen flags:\n- F2: hover lags\n- no number');
+  });
 });
