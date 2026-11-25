@@ -30,8 +30,9 @@ export function weekRange(now = Date.now()) {
  * grouped by feature, biggest first. Grouping waits for git, so the list draws
  * once with versions and lines; titles and summaries fill in after (`titling`).
  * → { repo, loading, titling, features: [{ id, name, changes, turns, added, removed, versions, summary }],
- *     changes, titles, talk, unmapped, releases, fm, review, answer(key, s), unanswer(key) }
- * review is reviewState's { key: state } for the flags and assumptions of `changes`.
+ *     changes, titles, talk, talkItems, prompts, unmapped, releases, fm, review, answer(key, s), unanswer(key) }
+ * review is reviewState's { key: state } for the flags and assumptions of `changes` and talk;
+ * prompts maps an entry id to its prompt.
  */
 export function useChanges(projectPath, range) {
   const { entries, repo } = useWorklog(projectPath);
@@ -99,7 +100,12 @@ export function useChanges(projectPath, range) {
   }, []);
   const answer = useCallback((key, s) => mark(key, { s, at: Date.now() }), [mark]);
   const unanswer = useCallback((key) => mark(key, null), [mark]);
-  const review = useMemo(() => reviewState(grouped?.changes ?? [], entries ?? [], answers), [grouped, entries, answers]);
+  const review = useMemo(() => {
+    const talk = Object.values(grouped?.talkItems ?? {}).flat();
+    const asChange = { flags: talk.filter((t) => t.kind === 'flag'), assumptions: talk.filter((t) => t.kind === 'assumption') };
+    return reviewState([...(grouped?.changes ?? []), asChange], entries ?? [], answers);
+  }, [grouped, entries, answers]);
+  const prompts = useMemo(() => new Map((entries ?? []).map((e) => [e.id, e.prompt])), [entries]);
 
   const titled = digest?.of === grouped;
   return {
@@ -111,6 +117,8 @@ export function useChanges(projectPath, range) {
     changes: grouped?.changes ?? [],
     titles: digest?.titles ?? {},
     talk: grouped?.talk ?? {},
+    talkItems: grouped?.talkItems ?? {},
+    prompts,
     unmapped: grouped?.unmapped ?? [],
     releases: grouped?.releases ?? [],
     review,

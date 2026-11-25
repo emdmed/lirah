@@ -15,12 +15,13 @@ const dayKey = (at) => {
 
 /**
  * `entries` (parseLog's, oldest first, one repo) → { changes, talk, talkItems, unmapped }.
- * changes: [{ id, session, start, end, turns, days, prompts, files, decisions, flags, assumptions, feature, features }],
+ * changes: [{ id, session, start, end, turns, days, prompts, files, decisions, decided, flags, assumptions, feature, features }],
  * days the { 'YYYY-MM-DD': turns } of its turns, flags [{ n, text, entry, at, session }] and
  * assumptions [{ text, entry, at, session, i }] (i its index in the turn's) from its turns' replies,
+ * decided its decisions as [{ text, entry, at, session }],
  * feature the id owning most of its files, features every feature id touched (most files first);
  * talk: { 'YYYY-MM-DD': turns } of file-less turns that joined nothing, talkItems
- * { 'YYYY-MM-DD': [{ kind: 'decision' | 'flag' | 'assumption', text, at, entry, n? }] } their reply lines;
+ * { 'YYYY-MM-DD': [{ kind: 'decision' | 'flag' | 'assumption', text, at, entry, session, n?, i? }] } their reply lines;
  * unmapped: the changes' files no feature of `featureMap` lists.
  */
 export function groupChanges(entries, { featureMap } = {}) {
@@ -48,12 +49,12 @@ export function groupChanges(entries, { featureMap } = {}) {
         const items = [
           ...(e.decisions ?? []).map((text) => ({ kind: 'decision', text })),
           ...(e.flags ?? []).map((f) => ({ kind: 'flag', ...f })),
-          ...(e.assumptions ?? []).map((text) => ({ kind: 'assumption', text })),
-        ].map((it) => ({ ...it, at: e.at, entry: e.id }));
+          ...(e.assumptions ?? []).map((text, i) => ({ kind: 'assumption', text, i })),
+        ].map((it) => ({ ...it, at: e.at, entry: e.id, session: e.session ?? null }));
         if (items.length) (talkItems[day] ??= []).push(...items);
         continue;
       }
-      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, days: {}, prompts: [], files: new Set(), decisions: [], flags: [], assumptions: [] };
+      change = { id: e.id, session: e.session ?? null, start: e.at, turns: 0, days: {}, prompts: [], files: new Set(), decisions: [], decided: [], flags: [], assumptions: [] };
       changes.push(change);
       run.open.push(change);
     }
@@ -64,6 +65,7 @@ export function groupChanges(entries, { featureMap } = {}) {
     files.forEach((f) => change.files.add(f));
     change.decisions.push(...(e.decisions ?? []));
     const from = { entry: e.id, at: e.at, session: e.session ?? null };
+    change.decided.push(...(e.decisions ?? []).map((text) => ({ text, ...from })));
     change.flags.push(...(e.flags ?? []).map((f) => ({ ...f, ...from })));
     change.assumptions.push(...(e.assumptions ?? []).map((text, i) => ({ text, ...from, i })));
   }

@@ -740,6 +740,11 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
     setTextareaVisible(true);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
+  // Adds `text` to the prompt box without sending, so the user finishes it. A draft stays in front.
+  const fillPrompt = useCallback((text) => {
+    setTextareaContent((prev) => (prev?.trim() ? `${prev}\n${text}` : text));
+    openPromptBox();
+  }, [setTextareaContent, openPromptBox]);
 
   // Keyboard shortcut hooks
   useViewModeShortcuts({
@@ -1360,6 +1365,7 @@ function ProjectTabInner({ draft, projectPath, customLabel, label, zenKey, right
         navigateToBookmark={navigateToBookmark}
         markdownFiles={markdownFiles}
         viewMarkdownFile={viewMarkdownFile}
+        fillPrompt={fillPrompt}
       />
     </SidebarProvider>
     </TokenBudgetProvider>

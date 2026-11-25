@@ -42,6 +42,7 @@ describe('groupChanges', () => {
     expect(decisions.turns).toBe(2);
     expect(decisions.feature).toBe('plans');
     expect(decisions.decisions).toEqual(['plan decisions carry numbers like D1, D2.']);
+    expect(decisions.decided.map((d) => d.text)).toEqual(decisions.decisions);
     expect(decisions.flags).toEqual([
       { n: 'F1', text: 'old plans keep unnumbered decisions', entry: 'm9', at: MORNING[8].at, session: null },
       { n: null, text: 'tests not run', entry: 'm9', at: MORNING[8].at, session: null },
@@ -52,7 +53,7 @@ describe('groupChanges', () => {
     // ship it belongs to no change; "show me an example" is talk
     expect(changes.flatMap((c) => c.files)).not.toContain('package.json');
     expect(talk).toEqual({ '2026-11-25': 1 });
-    expect(talkItems).toEqual({ '2026-11-25': [{ kind: 'decision', text: 'examples only, nothing built', at: MORNING[9].at, entry: 'm10' }] });
+    expect(talkItems).toEqual({ '2026-11-25': [{ kind: 'decision', text: 'examples only, nothing built', at: MORNING[9].at, entry: 'm10', session: null }] });
     expect(unmapped).toContain('src/features/tabs/TabsSummaryPane.jsx');
     expect(unmapped).not.toContain('src/features/tabs/TabRow.jsx');
   });
