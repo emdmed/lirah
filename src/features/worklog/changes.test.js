@@ -19,7 +19,7 @@ const MORNING = [
   { id: 'm6', at: 1795597807024, endedAt: 1795597998714, prompt: "polish the dropdown", files: ["src/features/tabs/RoleMenu.jsx", "src/features/tabs/RowMenu.jsx"] },
   { id: 'm7', at: 1795598068625, endedAt: 1795598138923, prompt: "add a code comments setting", files: ["src-tauri/src/lirah_cli.js", "src/features/agent-control/actions.js", "src/features/settings/SettingsDialog.jsx", "src/features/settings/settingsSections.js", "src/features/settings/settingsStore.js", "src/features/tabs/ProjectTab.jsx", "src/features/tabs/launchOptions.js", "src/features/tabs/launchOptions.test.js"] },
   { id: 'm8', at: 1795598272525, endedAt: 1795598324350, prompt: "ship it", files: ["package-lock.json", "package.json", "src-tauri/Cargo.lock", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"] },
-  { id: 'm9', at: 1795598404886, endedAt: 1795598433281, prompt: "make plan decisions easier to read", files: ["src/features/plans/planPrompts.js"] },
+  { id: 'm9', at: 1795598404886, endedAt: 1795598433281, prompt: "make plan decisions easier to read", files: ["src/features/plans/planPrompts.js"], flags: [{ n: 'F1', text: 'old plans keep unnumbered decisions' }, { n: null, text: 'tests not run' }], assumptions: ['D numbers restart per plan'] },
   { id: 'm10', at: 1795598448218, endedAt: 1795598453547, prompt: "show me an example of how it would look", files: [], decisions: ["examples only, nothing built"] },
   { id: 'm11', at: 1795598467793, endedAt: 1795598501957, prompt: "number the decisions D1, D2", files: ["src/features/plans/ChunkRow.jsx", "src/features/plans/planPrompts.js", "src/features/plans/planPrompts.test.js"], decisions: ["plan decisions carry numbers like D1, D2."] },
   { id: 'm12', at: 1795598530112, endedAt: 1795607757925, prompt: "ship it", files: ["CHANGELOG.md", "package-lock.json", "package.json", "src-tauri/Cargo.lock", "src-tauri/Cargo.toml", "src-tauri/src/lirah_cli.js", "src-tauri/tauri.conf.json", "src/components/icons/index.jsx", "src/features/agent-control/actions.js", "src/features/plans/ChunkRow.jsx", "src/features/plans/PlanDetail.jsx", "src/features/plans/planPrompts.js", "src/features/plans/planPrompts.test.js", "src/features/settings/SettingsDialog.jsx", "src/features/settings/settingsSections.js", "src/features/settings/settingsStore.js", "src/features/tabs/ProjectTab.jsx", "src/features/tabs/RoleMenu.jsx", "src/features/tabs/RowMenu.jsx", "src/features/tabs/TabRow.jsx", "src/features/tabs/TabsSummaryPane.jsx", "src/features/tabs/launchOptions.js", "src/features/tabs/launchOptions.test.js", "src/features/tabs/rowKeys.js", "src/hooks/useArrived.js", "src/index.css"] },
@@ -30,7 +30,7 @@ const turn = (id, min, prompt, files, over) => ({ id, at: t(min), endedAt: t(min
 
 describe('groupChanges', () => {
   it('groups a morning into row menu, code comments setting and numbered decisions', () => {
-    const { changes, talk, unmapped } = groupChanges(MORNING, { featureMap });
+    const { changes, talk, talkItems, unmapped } = groupChanges(MORNING, { featureMap });
     expect(changes.map((c) => c.prompts[0].slice(0, 20))).toEqual(['add a git diff butto', 'add a code comments ', 'make plan decisions ']);
     const [menu, comments, decisions] = changes;
     expect(menu.turns).toBe(6);
@@ -42,9 +42,17 @@ describe('groupChanges', () => {
     expect(decisions.turns).toBe(2);
     expect(decisions.feature).toBe('plans');
     expect(decisions.decisions).toEqual(['plan decisions carry numbers like D1, D2.']);
+    expect(decisions.flags).toEqual([
+      { n: 'F1', text: 'old plans keep unnumbered decisions', entry: 'm9', at: MORNING[8].at, session: null },
+      { n: null, text: 'tests not run', entry: 'm9', at: MORNING[8].at, session: null },
+    ]);
+    expect(decisions.assumptions).toEqual([{ text: 'D numbers restart per plan', entry: 'm9', at: MORNING[8].at, session: null, i: 0 }]);
+    expect(menu.flags).toEqual([]);
+    expect(menu.assumptions).toEqual([]);
     // ship it belongs to no change; "show me an example" is talk
     expect(changes.flatMap((c) => c.files)).not.toContain('package.json');
     expect(talk).toEqual({ '2026-11-25': 1 });
+    expect(talkItems).toEqual({ '2026-11-25': [{ kind: 'decision', text: 'examples only, nothing built', at: MORNING[9].at, entry: 'm10' }] });
     expect(unmapped).toContain('src/features/tabs/TabsSummaryPane.jsx');
     expect(unmapped).not.toContain('src/features/tabs/TabRow.jsx');
   });
