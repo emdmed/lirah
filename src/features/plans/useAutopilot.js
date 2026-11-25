@@ -9,7 +9,7 @@ import {
   AUTO_RESUME_REASONS, AUTOPILOT_STATUS, CHUNK_STATUS, EXCERPT_MAX, HALT_REASON, isAutopilotLive, nextChunkId,
   planProgress, stopDrivesRun, stopOutcome, UNTITLED_PLAN,
 } from './planModel';
-import { buildNudgePrompt, parseDecisions, parseStatusMarker, STATUS_DONE } from './planPrompts';
+import { buildNudgePrompt, parseBuildsOn, parseDecisions, parseStatusMarker, STATUS_DONE } from './planPrompts';
 import { isPendingFix } from './planGitOps';
 import { requestPlanFocus } from './plansPaneEvents';
 import { useHookWatchdog } from './useHookWatchdog';
@@ -277,7 +277,7 @@ export function useAutopilot({
     if (action === 'nudge') return nudge(repoRoot, plan, current);
     if (action === 'done') {
       // Nothing to commit for this chunk (a check, a test run): on to the next.
-      const done = await markChunkDone(repoRoot, planId, current.id, marker.message || null, parseDecisions(text));
+      const done = await markChunkDone(repoRoot, planId, current.id, marker.message || null, parseDecisions(text), parseBuildsOn(text));
       if (done.error) return halt(repoRoot, planId, AUTOPILOT_STATUS.FAILED, HALT_REASON.GIT_ERROR, done.error);
     }
     if (action !== 'halt') {
@@ -300,7 +300,7 @@ export function useAutopilot({
       if (res.found || res.error || chunk.status !== CHUNK_STATUS.IN_PROGRESS) return;
       const text = await lastReply(sessionId);
       const marker = parseStatusMarker(text);
-      if (marker?.kind === STATUS_DONE) markChunkDone(repoRoot, planId, chunk.id, marker.message || null, parseDecisions(text));
+      if (marker?.kind === STATUS_DONE) markChunkDone(repoRoot, planId, chunk.id, marker.message || null, parseDecisions(text), parseBuildsOn(text));
     };
 
     // Check the plan's chunks this session was working on (`which` of them).

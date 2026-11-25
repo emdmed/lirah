@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildDraftPartPrompt, buildDraftAllPrompt, buildTaskPlanPrompt, hasMockupLink, isDraftPath, parseDecisions } from './planPrompts';
+import { buildChunkPrompt, buildFixPrompt, buildNudgePrompt, buildPlanFixPrompt, buildPlanRevisePrompt, buildDraftPartPrompt, buildDraftAllPrompt, buildTaskPlanPrompt, hasMockupLink, isDraftPath, parseBuildsOn, parseDecisions } from './planPrompts';
 import { joinDraft } from './usePlanFiles';
 import { noGitConfig } from './planModel';
 
@@ -136,5 +136,19 @@ describe('draft part prompt', () => {
 describe('parseDecisions', () => {
   it('keeps a decision number and reads plain ones', () => {
     expect(parseDecisions('- Decision D2: x\nDecision: y\n- Decision d3: z')).toEqual(['D2: x', 'y', 'D3: z']);
+  });
+});
+
+describe('parseBuildsOn', () => {
+  it('reads D numbers from Builds on: lines, any case, spacing or bullet', () => {
+    expect(parseBuildsOn('Builds on: D3, D7')).toEqual(['D3', 'D7']);
+    expect(parseBuildsOn('- builds ON :d3 d 12;D3\n* Builds on: D7 and file.js\nDecision D9: x')).toEqual(['D3', 'D12', 'D7']);
+    expect(parseBuildsOn('Builds on: nothing earlier')).toEqual([]);
+    expect(parseBuildsOn(null)).toEqual([]);
+  });
+
+  it('is asked for in git and no-git chunk prompts', () => {
+    expect(buildChunkPrompt(gitPlan, chunk)).toContain('-m "Builds on: D3, D7"');
+    expect(buildChunkPrompt(noGitPlan, chunk)).toContain('"- Builds on: D3, D7"');
   });
 });

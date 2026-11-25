@@ -254,6 +254,7 @@ export function newChunks(chunks) {
     awaitingFix: false,
     result: null, // what the agent said when a chunk was done with nothing to commit
     decisions: [], // its Decision: lines, passed on to later chunks' prompts
+    buildsOn: [], // D numbers of earlier decisions it acted on (its Builds on: line)
     prompts: [], // { kind, at, file } per prompt sent for it (chunk, fix, nudge)
     startedAt: null,
     doneAt: null,
@@ -314,6 +315,7 @@ export function toInProgress({ tabId, baseShas, primaryRoot, now = Date.now() })
     awaitingFix: false,
     result: null,
     decisions: [],
+    buildsOn: [],
     doneRequested: null,
     startedAt: now,
     doneAt: null,
@@ -323,9 +325,9 @@ export function toInProgress({ tabId, baseShas, primaryRoot, now = Date.now() })
 /**
  * Its commits landed, or it was done with nothing to commit (no commits, and
  * `result` says what the agent did). A fix commit on an implemented chunk
- * keeps the first doneAt. `decisions` replaces the chunk's; left out, they stay.
+ * keeps the first doneAt. `decisions` and `buildsOn` replace the chunk's; left out, they stay.
  */
-export function toImplemented(chunk, { commits, commitsByRepo, result = null, decisions, now = Date.now() }) {
+export function toImplemented(chunk, { commits, commitsByRepo, result = null, decisions, buildsOn, now = Date.now() }) {
   return {
     status: CHUNK_STATUS.IMPLEMENTED,
     commits,
@@ -334,6 +336,7 @@ export function toImplemented(chunk, { commits, commitsByRepo, result = null, de
     awaitingFix: false,
     result,
     decisions: decisions ?? chunk.decisions ?? [],
+    buildsOn: buildsOn ?? chunk.buildsOn ?? [],
     doneRequested: null, // { result } from `lirah plans done` while the app was closed
     doneAt: chunk.status === CHUNK_STATUS.IMPLEMENTED ? chunk.doneAt : now,
   };
@@ -350,6 +353,7 @@ export function toRolledBack(revertShas) {
     awaitingFix: false,
     result: null,
     decisions: [],
+    buildsOn: [],
     doneAt: null,
   };
 }
