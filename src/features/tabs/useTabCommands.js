@@ -6,6 +6,7 @@ import { requestQuickTask, requestTasksPane } from '../tasks/tasksPaneEvents';
 import { useWatcher } from '../watcher';
 import { tabDisplayName, useTabActions } from './TabContext';
 import { useBookmarks } from '../bookmarks';
+import { useDialog } from '../dialogs/DialogProvider';
 import { requestAttentionJump } from './useAgentAttention';
 import { SCROLLBACK_OPTIONS, setScrollback } from '../../lib/terminalPrefs';
 import { getSettings, setSetting } from '../settings/settingsStore';
@@ -54,6 +55,7 @@ export function useTabCommands({
   const { secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell } = secondary;
   const { addTab, requestCloseTab, openWorkspace, renameWorkspace, openMaster, placeZenColumn, dropZenColumn, getWorkspaceTabs } = useTabActions();
   const { bookmarks } = useBookmarks();
+  const { open: openDialog } = useDialog();
   const { fileWatchingEnabled, toggleWatchers } = useWatcher();
   const { success: toastSuccess, info: toastInfo, error: toastError } = useToast();
 
@@ -115,7 +117,9 @@ export function useTabCommands({
           .catch((e) => toastError(`Feature map failed: ${e}`));
         toastInfo('Mapping features to files…');
       } },
-      { id: 'changes', hint: 'this week\'s changes by feature, from the work log', run: () => {
+      { id: 'changes', hint: 'this week\'s changes by feature, from the work log; workspace: every tab\'s', options: ['workspace'], argOptional: true, run: (arg) => {
+        if (arg === 'workspace') { openDialog('workspaceChanges', {}, null); return; }
+        if (arg) throw new Error(`no changes view "${arg}"`);
         if (!projectPath) throw new Error('no project in this tab');
         setChangesOpen(true);
       } },
@@ -228,7 +232,7 @@ export function useTabCommands({
       commands.push({ id: 'settings', aliases: ['prefs'], hint: 'all settings', run: () => setSettingsOpen(true) });
     }
     return commands;
-  }, [tabId, projectPath, addTab, placeZenColumn, dropZenColumn, getWorkspaceTabs, bookmarks, requestCloseTab, openWorkspace, renameWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
+  }, [tabId, projectPath, openDialog, addTab, placeZenColumn, dropZenColumn, getWorkspaceTabs, bookmarks, requestCloseTab, openWorkspace, renameWorkspace, openMaster, onLaunchCli, onClearContext, onInsertContext, onOpenLazygit,
     secondaryVisible, closeSecondaryTerminal, setSecondaryVisible, openWithCommand, toggleShell,
     keepFilesAfterSend, setKeepFilesAfterSend, fileWatchingEnabled, toggleWatchers,
     onToggleCompaction, compactionEnabled, compactionAvailable, onAutoCommit, onAutoMerge, themes, changeTheme, sandboxEnabled, networkIsolation, setShowTitleBar,

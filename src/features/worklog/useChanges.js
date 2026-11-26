@@ -32,9 +32,9 @@ export function weekRange(now = Date.now()) {
  * → { repo, loading, titling, features: [{ id, name, changes, turns, added, removed, versions, summary }],
  *     changes, titles, talk, talkItems, prompts, unmapped, releases, fm, review, answer(key, s), unanswer(key) }
  * review is reviewState's { key: state } for the flags and assumptions of `changes` and talk;
- * prompts maps an entry id to its prompt.
+ * prompts maps an entry id to its prompt. `title: false` skips the model's titles and summaries.
  */
-export function useChanges(projectPath, range) {
+export function useChanges(projectPath, range, { title = true } = {}) {
   const { entries, repo } = useWorklog(projectPath);
   const fm = useFeatureMap(projectPath);
   const { plans } = usePlans(repo);
@@ -62,13 +62,13 @@ export function useChanges(projectPath, range) {
 
   const [digest, setDigest] = useState(null); // { of: grouped, titles, summaries }
   useEffect(() => {
-    if (!grouped?.changes.length) return undefined;
+    if (!title || !grouped?.changes.length) return undefined;
     let live = true;
     titleChanges(grouped.changes, { repo, from: range.from, to: range.to, model })
       .then((d) => live && setDigest({ of: grouped, ...d }))
       .catch((e) => console.error('Failed to title changes:', e));
     return () => { live = false; };
-  }, [grouped, repo, range.from, range.to, model]);
+  }, [title, grouped, repo, range.from, range.to, model]);
 
   const features = useMemo(() => {
     if (!grouped) return [];
@@ -112,7 +112,7 @@ export function useChanges(projectPath, range) {
     repo,
     fm,
     loading: !grouped,
-    titling: !!grouped?.changes.length && !titled,
+    titling: title && !!grouped?.changes.length && !titled,
     features,
     changes: grouped?.changes ?? [],
     titles: digest?.titles ?? {},

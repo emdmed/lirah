@@ -7,6 +7,7 @@ import { masterTabOf, tabDisplayName, useTabManager } from './TabContext';
 import { getAgentHookState, getAgentHookVersion, subscribeAgentHooks } from './agentHookState';
 import { getTabSession } from './terminalActivity';
 import { useBookmarks } from '../bookmarks';
+import { useDialog } from '../dialogs/DialogProvider';
 
 const agentState = (tab) => getAgentHookState(getTabSession(tab.id))?.state;
 
@@ -103,6 +104,7 @@ export function MasterStrip() {
   const { tabs, workspaceTabs, activeWorkspaceId, activeTabId, openMaster, switchTab } = useTabManager();
   const { bookmarks } = useBookmarks();
   useSyncExternalStore(subscribeAgentHooks, getAgentHookVersion);
+  const dialog = useDialog();
   const master = masterTabOf(tabs, activeWorkspaceId);
   const showing = !!master && master.id === activeTabId;
   const live = master ? MASTER_STATE[agentState(master)] : null;
@@ -153,6 +155,13 @@ export function MasterStrip() {
         {live && <Lamp state={live.lamp} blink={live.blink} />}
         {word && <span className={cn('truncate', live && 'sr-only')}>{word}</span>}
       </span>
+      <PanelButton
+        onClick={() => dialog.open('workspaceChanges', {}, null)}
+        title="This week's changes of every tab in the workspace"
+        className="shrink-0"
+      >
+        changes
+      </PanelButton>
       <PanelButton
         onClick={toggle}
         aria-pressed={showing}
