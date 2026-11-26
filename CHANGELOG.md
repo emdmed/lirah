@@ -4,6 +4,19 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-11-26
+
+### Added
+
+- **Changes review** - The Changes dialog now shows what the agent flagged, assumed and decided under each change and in the talk row. Ask the agent about a flag or dismiss it, mark an assumption right or wrong, and undo either. Each change also lists its tests or QA recipe and its plan chunk, with a warning when it touched far more files than the chunk named.
+- **Day review queue** - Day view opens with the open flags, unchecked assumptions and untested changes for that day, numbered like FIG.41; week view counts them. Press `f` to jump to the next open flag.
+
+### Changed
+
+- **Changes dialog** - Bolder hierarchy: feature names are headings, counts lead with their numbers, open features are framed and changes inside them are split by dashed rules. A change's lamp now says whether it shipped, is committed or was never committed, and "no commit" outranks "no unit test".
+- **Review markers** - Flags are filled warn tags, assumptions dashed outlines, decisions filled plates. A checked assumption turns ok or fault, and handled markers go quiet.
+- **Release labels** - Release labels that would overlap on the day figure (FIG.41) no longer collide.
+
 ## [0.46.0] - 2026-11-25
 
 ### Changed

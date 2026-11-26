@@ -9,7 +9,7 @@ import { SegmentBank } from '../../components/instrument/SegmentBank';
 import { EmptyPlate } from '../../components/EmptyState';
 import { INK, useFigureCompact } from '../../components/instrument/figure';
 import { errorMessage } from '../../lib/errorMessage';
-import { basename } from '../../utils/pathUtils';
+import { basename, isAbsolute, joinPath } from '../../utils/pathUtils';
 import { useDialog } from '../dialogs/DialogProvider';
 import { useToast } from '../toast';
 import { fallbackTitle } from './changesPrompt';
@@ -80,7 +80,7 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
   // The change's commits as one diff: from before its first to its last, over its files.
   const openDiff = (c) => {
     if (!c?.commits?.length || !ch.repo) return;
-    const files = c.files.filter((f) => !f.startsWith('/')).map((f) => `${ch.repo}/${f}`);
+    const files = c.files.filter((f) => !isAbsolute(f)).map((f) => joinPath(ch.repo, f));
     dialog.open('gitDiff', { repoPath: ch.repo, baseRef: `${c.commits[0]}^`, headRef: c.commits.at(-1), changedFiles: files, filePath: files[0], fileList: true });
   };
   // Typed and submitted like the prompt box's send (usePromptSender).
@@ -177,7 +177,7 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
           </div>
           <span className="ml-auto flex items-center gap-1">
             <button type="button" className="tui-btn" onClick={() => step(-1)} aria-label={`Previous ${mode}`}>←</button>
-            <span className="min-w-[8.5rem] text-center tabular-nums text-[12px] text-foreground" aria-live="polite">{readableRange(range, today)}</span>
+            <span className="min-w-[8.5rem] text-center tabular-nums text-[13px] font-medium text-foreground" aria-live="polite">{readableRange(range, today)}</span>
             <button type="button" className="tui-btn" onClick={() => step(1)} disabled={anchor >= today} aria-label={`Next ${mode}`}>→</button>
           </span>
           <SegmentBank value={mode} options={MODES} onChange={(m) => go(m, anchor)} label="Range" />
@@ -219,12 +219,12 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
                   data-feature={f.id ?? ''}
                   open={isOpen(f.id)}
                   onToggle={(e) => e.currentTarget.open !== isOpen(f.id) && setOpen(f.id, e.currentTarget.open)}
-                  className="edge-b-engraved"
+                  className="edge-b-engraved open:bg-foreground/[0.03]"
                 >
-                  <summary className="flex cursor-pointer list-none items-center gap-3 px-1 py-1.5 outline-none hover:bg-foreground/5 focus-visible:bg-foreground/10">
-                    <span className="ins-name min-w-0 truncate text-[13px] text-foreground">{f.name}</span>
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-2 py-2.5 outline-none hover:bg-foreground/5 focus-visible:bg-foreground/10">
+                    <span className="ins-name min-w-0 truncate text-[17px] font-semibold leading-tight text-foreground">{f.name}</span>
                     <FeatureCounts changes={f.changes} review={ch.review} />
-                    <span className="shrink-0 tabular-nums text-muted-foreground">{plural(f.changes.length, 'change')} · {plural(f.turns, 'turn')}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground"><Count n={f.changes.length} word="change" /> · <Count n={f.turns} word="turn" /></span>
                     <span className="w-[120px] shrink-0">
                       <DiffBar added={f.added} removed={f.removed} side={40} fmt={compactCount} />
                     </span>
@@ -232,9 +232,9 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
                       {f.versions.map((v) => <Keycap key={v} size="sm" title={`Shipped in ${v}`}>{v}</Keycap>)}
                     </span>
                   </summary>
-                  <div className="flex flex-col gap-2 pb-3 pl-1">
-                    {f.summary && <p className="text-muted-foreground">{f.summary}</p>}
-                    <ul className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3 px-2 pb-4 pt-3 edge-t-engraved">
+                    {f.summary && <p className="max-w-[75ch] text-muted-foreground">{f.summary}</p>}
+                    <ul className="flex flex-col divide-y divide-dashed divide-[var(--ins-edge-strong)]">
                       {f.changes.map((c) => <ChangeItem key={c.id} change={c} title={title(c)} act={act} onDiff={() => openDiff(c)} />)}
                     </ul>
                   </div>
@@ -242,19 +242,19 @@ export function ChangesDialog({ open, onOpenChange, projectPath, range: given, s
               ))}
               {talkTurns > 0 && (
                 <details key={TALK} className="edge-b-engraved">
-                  <summary className="flex cursor-pointer list-none items-center gap-3 px-1 py-1.5 outline-none hover:bg-foreground/5 focus-visible:bg-foreground/10">
-                    <span className="ins-name min-w-0 truncate text-[13px] text-muted-foreground">Talk, no code</span>
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-2 py-2.5 outline-none hover:bg-foreground/5 focus-visible:bg-foreground/10">
+                    <span className="ins-name min-w-0 truncate text-[17px] leading-tight text-muted-foreground">Talk, no code</span>
                     <FeatureCounts changes={[{ flags: talkReview.flags, assumptions: talkReview.assumptions, decided: talkReview.decided }]} review={ch.review} />
-                    <span className="shrink-0 tabular-nums text-muted-foreground">{plural(talkTurns, 'turn')}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground"><Count n={talkTurns} word="turn" /></span>
                   </summary>
-                  <ul className="flex flex-col gap-0.5 pl-1 text-muted-foreground">
+                  <ul className="flex flex-col gap-0.5 px-2 text-muted-foreground">
                     {Object.entries(ch.talk).sort().map(([d, n]) => (
                       <li key={d} className="tabular-nums">
                         {new Date(`${d}T00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · {plural(n, 'turn')}
                       </li>
                     ))}
                   </ul>
-                  <div className="pb-3 pl-1"><ReviewBlock {...talkReview} act={act} heading="decided while talking" /></div>
+                  <div className="px-2 pb-4"><ReviewBlock {...talkReview} act={act} heading="decided while talking" /></div>
                 </details>
               )}
             </div>
@@ -301,20 +301,25 @@ function FeatureCounts({ changes, review }) {
 }
 
 const TAG = 'shrink-0 rounded-sm border border-dashed border-[var(--ins-warn)] px-1 text-[11px] text-[var(--ins-warn)]';
+const TAG_SOLID = 'shrink-0 rounded-sm border border-[var(--ins-warn)] bg-[color-mix(in_srgb,var(--ins-warn)_16%,transparent)] px-1 text-[11px] font-medium text-[var(--ins-warn)]';
+
+// '4 changes' with the number in ink, so the counts read before their words.
+const Count = ({ n, word }) => <><span className="font-medium text-foreground">{n}</span> {word}{n === 1 ? '' : 's'}</>;
 const testsText = (c) => (c.tests?.length ? ` · tests: ${c.tests.map(basename).join(', ')}`
   : c.qa?.length ? ` · QA recipe: ${c.qa.map((f) => basename(f).replace(/\.md$/, '')).join(', ')}` : '');
 
 function ChangeItem({ change: c, title, act, onDiff }) {
   const drift = c.drift;
   return (
-    <li id={`change-${c.id}`} tabIndex={-1} className="flex items-start gap-2 outline-none focus-visible:bg-foreground/10">
-      <Lamp state="ok" settled className="mt-1" />
+    <li id={`change-${c.id}`} tabIndex={-1} className="flex items-start gap-2 py-3 outline-none first:pt-1 last:pb-0 focus-visible:bg-foreground/10">
+      {/* shipped ok, committed but unreleased in ink, never committed warns */}
+      <Lamp state={c.version ? 'ok' : c.noCommit ? 'warn' : 'on'} settled className="mt-1" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 text-[13px] text-foreground">{title}</span>
+          <span className="min-w-0 flex-1 text-[13px] font-medium text-foreground">{title}</span>
           {!c.tests?.length && <span title="No unit test file among its files" className={TAG}>no unit test</span>}
           {c.version ? <Keycap size="sm" title={`Shipped in ${c.version}`}>{c.version}</Keycap>
-            : c.noCommit && <span title="Edited, but never committed" className={TAG}>no commit</span>}
+            : c.noCommit && <span title="Edited, but never committed" className={TAG_SOLID}>no commit</span>}
           {c.commits?.length > 0 && <button type="button" className="tui-btn shrink-0" onClick={onDiff} title="Its commits as one diff (d)">diff</button>}
         </div>
         <span className="tabular-nums text-[11px] text-muted-foreground">

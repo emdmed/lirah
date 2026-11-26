@@ -24,7 +24,20 @@ export function ReviewQueue({ ch, act, title, day, today, onShow }) {
   const muted = 'px-1 pb-2 text-[11px] text-muted-foreground';
   if (!flags.length && !assumptions.length && !untested.length) return <p className={muted}>nothing open {day && day !== today ? 'that day' : day ? 'today' : 'this week'}</p>;
   if (!day) {
-    return <p className={muted}>to review · {[plural(flags.length, 'open flag'), plural(assumptions.length, 'unchecked assumption'), `${untested.length} without a unit test`].join(' · ')}</p>;
+    // Each count a readout: the number carries the weight, open flags in the warn colour.
+    const part = (n, label, warn) => n > 0 && (
+      <span key={label} className="inline-flex items-baseline gap-1.5">
+        <span className={`text-[15px] font-medium tabular-nums ${warn ? 'text-[var(--ins-warn)]' : 'text-foreground'}`}>{n}</span>{label}
+      </span>
+    );
+    return (
+      <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1 px-1 pb-3 pt-1 text-[11px] text-muted-foreground edge-b-engraved">
+        <span className="text-[10px] uppercase tracking-wider">to review</span>
+        {part(flags.length, flags.length === 1 ? 'open flag' : 'open flags', true)}
+        {part(assumptions.length, assumptions.length === 1 ? 'unchecked assumption' : 'unchecked assumptions')}
+        {part(untested.length, 'without a unit test')}
+      </p>
+    );
   }
 
   const l = dayLayout(ch.features, ch.talk, ch.releases, day);
