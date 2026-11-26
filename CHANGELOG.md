@@ -4,6 +4,12 @@ All notable changes to Lirah will be documented in this file.
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-11-26
+
+### Added
+
+- **Workspace changes** - A `changes` button on the master strip (or `:changes workspace`) lists this week's changes for every tab in the workspace: open flags, assumptions and decisions, features, changes, turns, lines and releases. Pick a tab to see its full Changes view in place; Esc goes back to the list.
+
 ## [0.47.0] - 2026-11-26
 
 ### Added
